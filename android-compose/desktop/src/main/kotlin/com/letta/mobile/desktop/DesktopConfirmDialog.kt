@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.DialogWindowScope
 import androidx.compose.ui.window.rememberDialogState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Destructive-action confirmation as a real, separate desktop window (it "pops
@@ -83,7 +84,7 @@ private fun ConfirmDialogTitleBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(38.dp)
+                    .height(LettaDimens.Control.actionButton)
                     .background(MaterialTheme.colorScheme.surfaceContainerLow),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -94,11 +95,11 @@ private fun ConfirmDialogTitleBar(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(start = 16.dp),
+                    modifier = Modifier.weight(1f).padding(start = LettaDimens.Space.lg),
                 )
                 Box(
                     modifier = Modifier
-                        .size(width = 46.dp, height = 38.dp)
+                        .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Control.actionButton)
                         .clickable(onClick = onDismiss),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -106,7 +107,7 @@ private fun ConfirmDialogTitleBar(
                         imageVector = Icons.Outlined.Close,
                         contentDescription = "Close",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(15.dp),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                 }
             }
@@ -131,8 +132,8 @@ private fun ConfirmDialogBody(
     onDismiss: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(22.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxSize().padding(LettaDimens.Space.xl),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         Text(
             request.message,
@@ -142,7 +143,7 @@ private fun ConfirmDialogBody(
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md, Alignment.End),
         ) {
             DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
             DesktopDefaultButton(onClick = onConfirm) {

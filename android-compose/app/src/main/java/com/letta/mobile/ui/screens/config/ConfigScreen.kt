@@ -53,6 +53,7 @@ import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.util.Telemetry
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +78,7 @@ fun ConfigScreen(
     ) { paddingValues ->
         when (val state = uiState) {
             is UiState.Loading -> ShimmerCard(
-                modifier = Modifier.padding(paddingValues).padding(16.dp),
+                modifier = Modifier.padding(paddingValues).padding(LettaDimens.Space.lg),
             )
             is UiState.Error -> ErrorContent(
                 message = state.message,
@@ -192,8 +193,8 @@ private fun ConfigContent(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)
     ) {
         ConfigRefreshStatus(
             isRefreshing = state.isRefreshing,
@@ -322,8 +323,8 @@ private fun ConfigContent(
                 headlineContent = {
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         ThemePreset.entries.forEach { preset ->
                             FilterChip(
@@ -423,7 +424,7 @@ private fun ConfigContent(
                 leadingContent = { Icon(LettaIcons.Save, contentDescription = null) },
                 trailingContent = {
                     if (state.isSaving) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Orb.sm))
                     }
                 },
             )
@@ -538,13 +539,13 @@ private fun ConfigRefreshStatus(
         isRefreshing -> Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = LettaDimens.Space.xs),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                strokeWidth = 2.dp,
+                modifier = Modifier.size(LettaDimens.Control.icon),
+                strokeWidth = LettaDimens.Space.hair,
             )
             Text(
                 text = stringResource(R.string.screen_config_refreshing),
@@ -591,15 +592,15 @@ private fun EmbeddedRuntimeStatusItem(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = LettaIcons.Psychology,
                 contentDescription = null,
-                modifier = Modifier.padding(end = 8.dp),
+                modifier = Modifier.padding(end = LettaDimens.Space.sm),
             )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
                 Text(
                     text = stringResource(R.string.screen_config_embedded_runtime_title),
                     style = MaterialTheme.typography.bodyLarge,
@@ -626,8 +627,8 @@ private fun EmbeddedRuntimeStatusItem(
         }
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             AssistChip(
                 onClick = {},
@@ -676,7 +677,7 @@ private fun LocalModelSettingsItem(
     val view = LocalView.current
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Text(
             text = stringResource(R.string.screen_config_on_device_model_title),
@@ -723,13 +724,13 @@ private fun LocalModelSettingsItem(
         ) {
             if (state.isImportingLocalModel) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(LettaDimens.Control.icon),
+                    strokeWidth = LettaDimens.Space.hair,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             } else {
                 Icon(LettaIcons.FileOpen, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             }
             Text(
                 stringResource(
@@ -750,7 +751,7 @@ private fun LocalModelSettingsItem(
             leadingIcon = { Icon(LettaIcons.Psychology, null) },
             singleLine = true,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             Text(
                 text = stringResource(R.string.screen_config_local_model_accelerator),
                 style = MaterialTheme.typography.bodyMedium,
@@ -824,7 +825,7 @@ private fun EmbeddedModelCatalogSection(
     onCancel: (EmbeddedModelCatalogItem) -> Unit,
     onSelect: (EmbeddedModelCatalogItem) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             text = stringResource(R.string.screen_config_embedded_model_catalog),
             style = MaterialTheme.typography.bodyMedium,
@@ -860,8 +861,8 @@ private fun EmbeddedModelCatalogRow(
     val entry = item.entry
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(entry.name, style = MaterialTheme.typography.bodyMedium)
             Text(

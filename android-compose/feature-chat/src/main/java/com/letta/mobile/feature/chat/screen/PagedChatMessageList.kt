@@ -34,6 +34,7 @@ import com.letta.mobile.ui.chat.render.toChatRenderItemState
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
 import com.letta.mobile.ui.zoom.PinchScalePreviewController
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal fun followNewestEdge(wasScrolling: Boolean, atNewestEdge: Boolean, prependExhausted: Boolean): Boolean =
     wasScrolling && atNewestEdge && prependExhausted
@@ -322,7 +323,7 @@ private fun PagedChatMessageListContent(
                             ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, live.size + index, context, dimens, shapes))
                         }
                     } else {
-                        Spacer(Modifier.height(48.dp))
+                        Spacer(Modifier.height(LettaDimens.Orb.railSlotWidth))
                     }
                 }
                 val load = pages.loadState

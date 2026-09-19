@@ -42,6 +42,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import java.util.Locale
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class CompactionModeOption(
     val value: String,
@@ -120,7 +121,7 @@ internal fun ToolRulesSection(
     CardGroup(title = { Text(stringResource(R.string.screen_agent_edit_tool_rules_section)) }) {
         item(
             headlineContent = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     Text(
                         text = stringResource(R.string.screen_agent_edit_tool_rules_description),
                         style = MaterialTheme.typography.bodySmall,
@@ -235,11 +236,11 @@ private fun EnvironmentVariableEditorRow(
     onRemove: () -> Unit,
 ) {
     val hasHiddenStoredValue = variable.hasStoredValue && variable.originalValue == null && variable.value.isBlank()
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = variable.key.ifBlank { stringResource(R.string.screen_agent_edit_environment_variable) },
@@ -611,7 +612,7 @@ internal fun AdvancedCompactionSection(
                 val committedValue = state.slidingWindowPercentage.coerceIn(0f, 1f)
                 var localValue by remember { mutableStateOf(committedValue) }
                 LaunchedEffect(committedValue) { localValue = committedValue }
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                     Text(
                         text = stringResource(
                             R.string.screen_agent_edit_sliding_window_percentage,
@@ -622,7 +623,7 @@ internal fun AdvancedCompactionSection(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                     ) {
                         Slider(
                             value = localValue,
@@ -710,7 +711,7 @@ internal fun ContextWindowLimitSlider(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Text(
             text = stringResource(R.string.common_context_window),

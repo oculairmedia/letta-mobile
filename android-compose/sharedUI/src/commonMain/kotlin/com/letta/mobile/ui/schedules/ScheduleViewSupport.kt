@@ -11,9 +11,10 @@ import com.letta.mobile.ui.theme.customColors
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.isoDayNumber
 import kotlin.time.Instant
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Geometry and labels shared by the schedule views (week grid, agenda, timeline) and their hosts. */
-val HOUR_HEIGHT = 44.dp
+val HOUR_HEIGHT = LettaDimens.Orb.railSlotHeight
 const val GRID_HOURS = 24
 const val HOUR_LABEL_STEP = 3
 const val WEEK_GRID_MAX_PER_DAY = 4

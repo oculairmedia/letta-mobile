@@ -81,6 +81,7 @@ import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.listItemMetadata
 import java.util.Locale
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -226,7 +227,7 @@ private fun SystemAccessDashboardBody(
 ) {
     when (uiState) {
         is UiState.Loading -> {
-            Column(modifier = modifier.padding(16.dp)) {
+            Column(modifier = modifier.padding(LettaDimens.Space.lg)) {
                 ShimmerCard(modifier = Modifier.fillMaxWidth())
             }
         }
@@ -251,8 +252,8 @@ private fun SystemAccessDashboardContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         item("summary") {
             SystemAccessSummaryCard(state = state)
@@ -276,7 +277,7 @@ private fun SystemAccessDashboardContent(
             }
         }
 
-        item("bottom_spacer") { Spacer(Modifier.height(16.dp)) }
+        item("bottom_spacer") { Spacer(Modifier.height(LettaDimens.Space.lg)) }
     }
 }
 
@@ -303,7 +304,7 @@ private fun SystemAccessSummaryCard(state: SystemAccessDashboardUiState) {
 
 @Composable
 private fun CapabilityHeadline(capability: SystemAccessCapability) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -330,7 +331,7 @@ private fun CapabilityDetails(
     flavor: SystemAccessFlavor,
     onPermissionIntentClick: (SystemAccessPermissionIntent) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
         Text(
             text = capability.statusReason,
             style = MaterialTheme.typography.bodySmall,
@@ -338,8 +339,8 @@ private fun CapabilityDetails(
         )
 
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             MetadataChip("Flavor: ${capability.flavorAvailability.availabilityFor(flavor).label}")
             MetadataChip("Risk: ${capability.policyRisk.level.label}")
@@ -371,8 +372,8 @@ private fun CapabilityDetails(
         }
         if (actions.isNotEmpty()) {
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 actions.forEach { intent ->
                     TextButton(onClick = { onPermissionIntentClick(intent) }) {
@@ -401,7 +402,7 @@ private fun MetadataChip(text: String) {
 
 @Composable
 private fun DetailLine(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
         Text(
             text = label,
             style = MaterialTheme.typography.listItemMetadata,

@@ -49,6 +49,7 @@ import com.letta.mobile.desktop.DesktopControlText
 import java.util.Base64
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Bundled label/options/select for [ComposerDropdownChip]. */
 internal data class ComposerDropdownChipModel(
@@ -71,20 +72,20 @@ internal fun ComposerDropdownChip(model: ComposerDropdownChipModel) {
     Box {
         Surface(
             onClick = { open = !open },
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.sm),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = contentColor,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (model.leadingIcon != null) {
                     Icon(
                         imageVector = model.leadingIcon,
                         contentDescription = null,
-                        modifier = Modifier.size(13.dp),
+                        modifier = Modifier.size(LettaDimens.Control.iconSm),
                         tint = contentColor,
                     )
                 }
@@ -96,7 +97,7 @@ internal fun ComposerDropdownChip(model: ComposerDropdownChipModel) {
                 Icon(
                     imageVector = Icons.Outlined.KeyboardArrowDown,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -136,18 +137,18 @@ internal fun ComposerAttachmentChip(
     onRemove: () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(start = LettaDimens.Space.sm, end = LettaDimens.Space.sm, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DesktopAttachmentImage(
                 attachment = UiImageAttachment(base64 = image.base64, mediaType = image.mediaType),
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
             Text(
                 text = "image",
@@ -158,7 +159,7 @@ internal fun ComposerAttachmentChip(
                 imageVector = Icons.Outlined.Close,
                 contentDescription = "Remove attachment",
                 modifier = Modifier
-                    .size(14.dp)
+                    .size(LettaDimens.Control.icon)
                     .clickable(onClick = onRemove),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -174,7 +175,7 @@ internal fun DesktopImageAttachmentsGrid(
     if (attachments.isEmpty()) return
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         val cellHeight = if (attachments.size == 1) 220.dp else 128.dp
         attachments.take(4).forEach { attachment ->
@@ -202,14 +203,14 @@ internal fun DesktopImageAttachmentThumbnailStrip(
     var fullscreen by remember { mutableStateOf<UiImageAttachment?>(null) }
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         attachments.take(6).forEach { attachment ->
             DesktopAttachmentImage(
                 attachment = attachment,
                 modifier = Modifier
-                    .size(width = 56.dp, height = 40.dp)
+                    .size(width = 56.dp, height = LettaDimens.Orb.lg)
                     .clickable { fullscreen = attachment },
             )
         }
@@ -268,7 +269,7 @@ internal fun DesktopFullscreenImageOverlay(
                 Image(
                     bitmap = imageBitmap,
                     contentDescription = "Attachment fullscreen",
-                    modifier = Modifier.fillMaxSize().padding(40.dp),
+                    modifier = Modifier.fillMaxSize().padding(LettaDimens.Orb.lg),
                     contentScale = ContentScale.Fit,
                 )
             } else {

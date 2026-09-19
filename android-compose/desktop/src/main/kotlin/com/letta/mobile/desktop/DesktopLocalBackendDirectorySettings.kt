@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 import java.io.File
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Desktop settings card for the "local backend data directory" — where the
@@ -88,8 +89,8 @@ private fun DesktopLocalBackendDirectoryCardBody(
     onResetToDefault: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.padding(LettaDimens.Space.xl),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         Text(
             text = "Local backend data directory",
@@ -127,7 +128,7 @@ private fun DesktopLocalBackendDirectoryActionButtons(
     onLaunchPicker: () -> Unit,
     onResetToDefault: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
         DesktopDefaultButton(
             enabled = !state.isSaving,
             onClick = onLaunchPicker,

@@ -115,6 +115,7 @@ import java.time.Instant
 import java.util.Locale
 
 import kotlin.time.Duration.Companion.seconds
+import com.letta.mobile.ui.theme.LettaDimens
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RunMonitorScreen(
@@ -168,7 +169,7 @@ fun RunMonitorScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadRuns() },
@@ -187,7 +188,7 @@ fun RunMonitorScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = LettaDimens.Space.lg),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -210,8 +211,8 @@ fun RunMonitorScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             itemsIndexed(filteredRuns, key = { _, run -> run.id }) { index, run ->
                                 StaggeredListItem(index = index) {
@@ -369,8 +370,8 @@ private fun RunCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             // Row 1 — primary: status chip + live/frozen duration
             Row(
@@ -380,7 +381,7 @@ private fun RunCard(
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     run.status?.let { status -> StatusChip(status = status) }
@@ -423,7 +424,7 @@ private fun RunCard(
             }
 
             HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
             )
 
             // Row 3 — metadata: timestamp + low-contrast truncated UUID pill (click-to-copy)
@@ -446,18 +447,18 @@ private fun RunCard(
                     text = truncateRunId(run.id),
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = LettaCodeFont,
-                        fontSize = 11.sp,
+                        fontSize = LettaDimens.Type.caption,
                     ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
                     maxLines = 1,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                         .clickable {
                             clipboard.setText(AnnotatedString(run.id))
                             HapticEffects.longPress(haptic, view)
                         }
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
                 )
             }
         }
@@ -526,7 +527,7 @@ private fun RunDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             item {
                 CardGroup {
                     run.status?.let {
@@ -737,8 +738,8 @@ private fun RunDetailDialog(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                                .padding(LettaDimens.Space.md),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
                         ) {
                             Text(
                                 text = buildString {
@@ -819,7 +820,7 @@ private fun RunDetailDialog(
                 }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     if (onCancel != null) {
                         TextButton(onClick = onCancel) {
                             Text(stringResource(R.string.action_cancel_run), color = MaterialTheme.colorScheme.error)
@@ -860,7 +861,7 @@ private fun StepDetailDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             // Section 1 — Core Status & Identity
             CardGroup(title = { Text(stringResource(R.string.screen_runs_step_section_core_title)) }) {
@@ -877,7 +878,7 @@ private fun StepDetailDialog(
                             text = step.id,
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 12.sp,
+                                fontSize = LettaDimens.Type.caption,
                             ),
                         )
                     },
@@ -896,7 +897,7 @@ private fun StepDetailDialog(
                                 value,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
+                                    fontSize = LettaDimens.Type.caption,
                                 ),
                             )
                         },
@@ -910,7 +911,7 @@ private fun StepDetailDialog(
                                 value,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
+                                    fontSize = LettaDimens.Type.caption,
                                 ),
                             )
                         },
@@ -961,7 +962,7 @@ private fun StepDetailDialog(
                                 value,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
+                                    fontSize = LettaDimens.Type.caption,
                                 ),
                             )
                         },
@@ -975,7 +976,7 @@ private fun StepDetailDialog(
                                 value,
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = FontFamily.Monospace,
-                                    fontSize = 12.sp,
+                                    fontSize = LettaDimens.Type.caption,
                                 ),
                             )
                         },
@@ -1046,7 +1047,7 @@ private fun StepDetailDialog(
                                     value,
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
+                                        fontSize = LettaDimens.Type.caption,
                                     ),
                                 )
                             },
@@ -1145,14 +1146,14 @@ private fun StepDetailDialog(
                     text = stringResource(R.string.screen_runs_step_trace_section_title),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                    modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.sm),
                 )
                 t.createdAt?.let { createdAt ->
                     Text(
                         text = stringResource(R.string.screen_runs_step_trace_created_label, createdAt),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 4.dp),
+                        modifier = Modifier.padding(start = LettaDimens.Space.xs),
                     )
                 }
                 StepTraceAccordion(
@@ -1171,7 +1172,7 @@ private fun StepDetailDialog(
                     text = stringResource(R.string.screen_runs_step_messages_title),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                    modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.sm),
                 )
                 messages.takeLast(8).forEach { message ->
                     Text(
@@ -1184,7 +1185,7 @@ private fun StepDetailDialog(
             }
 
             // Footer — feedback actions
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 TextButton(onClick = onSetPositiveFeedback) {
                     Text(stringResource(R.string.screen_runs_step_feedback_positive_action))
                 }
@@ -1226,13 +1227,13 @@ private fun StepTraceAccordion(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs)
                 .background(
                     MaterialTheme.colorScheme.surfaceContainer,
-                    RoundedCornerShape(8.dp),
+                    RoundedCornerShape(LettaDimens.Radius.sm),
                 )
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             if (truncated.isTruncated) {
                 Row(
@@ -1316,8 +1317,8 @@ private fun StepTagRow(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         tags.forEach { tag ->
             AssistChip(
@@ -1367,8 +1368,8 @@ private fun PreviewRunCardRunning() {
     LettaTheme(dynamicColor = false) {
         Surface {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(LettaDimens.Space.lg),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             ) {
                 RunCard(
                     run = Run(

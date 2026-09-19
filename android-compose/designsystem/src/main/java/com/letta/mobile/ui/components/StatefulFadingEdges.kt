@@ -12,11 +12,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 fun Modifier.statefulFadingEdges(
     scrollState: LazyListState,
     backgroundColor: Color,
-    fadeLength: Dp = 32.dp,
+    fadeLength: Dp = LettaDimens.Space.xxl,
 ): Modifier = composed {
     // ⚡ Bolt Optimization: `scrollState.canScrollBackward` and `canScrollForward`
     // are already backed by Compose State. Wrapping them in `derivedStateOf` is redundant

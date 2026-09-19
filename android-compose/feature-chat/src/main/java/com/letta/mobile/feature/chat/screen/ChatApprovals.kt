@@ -25,6 +25,7 @@ import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.chatTypography
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun ApprovalRequestCard(
@@ -36,7 +37,7 @@ internal fun ApprovalRequestCard(
     // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion) render a
     // structured question/answer card instead of the generic approve/reject card.
     if (AskUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) return
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             text = stringResource(R.string.screen_chat_approval_request_title),
             style = MaterialTheme.chatTypography.toolLabel,
@@ -79,8 +80,8 @@ internal fun ApprovalRequestControls(
     if (!approval.requiresUserInput()) return
 
     Column(
-        modifier = Modifier.padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(top = LettaDimens.Space.xs),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         // letta-mobile-vilsn: structured question/answer card for
         // runtime user-input tools (AskUserQuestion); falls back to the
@@ -132,7 +133,7 @@ internal fun ApprovalActionRow(
         validate = { true },
     )
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         OutlinedButton(
             onClick = {
                 HapticEffects.contextClick(haptic, view)
@@ -174,7 +175,7 @@ internal fun ApprovalResponseCard(message: UiMessage) {
         stringResource(R.string.screen_chat_approval_rejected_title)
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(text = title, style = MaterialTheme.chatTypography.toolLabel)
         approval.reason?.takeIf { it.isNotBlank() }?.let { reason ->
             Text(

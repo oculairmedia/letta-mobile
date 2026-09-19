@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.designsystem.R
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 object ToolAffordanceRowTestTags {
     const val CONTAINER = "tool-affordance-row"
@@ -42,13 +43,13 @@ fun ToolAffordanceRow(
         modifier = modifier
             .fillMaxWidth()
             .testTag(ToolAffordanceRowTestTags.CONTAINER),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Text(
             text = stringResource(R.string.tool_affordance_row_label),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-            modifier = Modifier.padding(start = 4.dp),
+            modifier = Modifier.padding(start = LettaDimens.Space.xs),
         )
         LazyRow(
             state = rowState,
@@ -58,8 +59,8 @@ fun ToolAffordanceRow(
                     scrollState = rowState,
                     backgroundColor = MaterialTheme.colorScheme.surface,
                 ),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            contentPadding = PaddingValues(vertical = LettaDimens.Space.xs),
         ) {
             items(items = tools, key = { it.id.value }) { tool ->
                 val chipDescription = stringResource(
@@ -79,7 +80,7 @@ fun ToolAffordanceRow(
                         Icon(
                             imageVector = LettaIcons.Tool,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(LettaDimens.Control.icon),
                         )
                     },
                     modifier = Modifier

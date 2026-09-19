@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The one way an agent is pictured anywhere in the app: its mascot when it has one (moving while
@@ -67,4 +68,4 @@ fun AgentInitialTile(
     }
 }
 
-private val LARGE_INITIAL_FROM = 40.dp
+private val LARGE_INITIAL_FROM = LettaDimens.Orb.lg

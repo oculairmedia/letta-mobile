@@ -40,6 +40,7 @@ import com.composables.icons.lucide.Undo2
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The tool rail down the left of the board, the way Concepts and Miro keep their tools: pointer
@@ -70,14 +71,14 @@ fun CanvasControlsBar(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        tonalElevation = 2.dp,
-        shadowElevation = 6.dp,
+        tonalElevation = LettaDimens.Space.hair,
+        shadowElevation = LettaDimens.Space.sm,
     ) {
         Column(
-            modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             PointerModes.forEach { (mode, label) ->
@@ -140,7 +141,7 @@ private fun ControlButton(control: Control, onClick: () -> Unit) {
             IconButtonDefaults.iconButtonColors()
         },
     ) {
-        Icon(imageVector = control.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(imageVector = control.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
@@ -148,9 +149,9 @@ private fun ControlButton(control: Control, onClick: () -> Unit) {
 private fun RailDivider() {
     Box(
         modifier = Modifier
-            .padding(vertical = 3.dp)
+            .padding(vertical = LettaDimens.Space.xs)
             .height(1.dp)
-            .width(22.dp)
+            .width(LettaDimens.Space.xl)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
     )
 }
@@ -189,4 +190,4 @@ private fun iconFor(mode: Mode): ImageVector = when (mode) {
     else -> Lucide.Pencil
 }
 
-private val BUTTON_SIZE = 38.dp
+private val BUTTON_SIZE = LettaDimens.Control.actionButton

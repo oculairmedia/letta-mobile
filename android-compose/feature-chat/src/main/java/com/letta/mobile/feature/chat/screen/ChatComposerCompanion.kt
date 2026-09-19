@@ -23,6 +23,7 @@ import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.MascotLive
 import com.letta.mobile.ui.mascot.mascotAvailable
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The row above the composer while the agent is at work: the live mascot, thinking or speaking,
@@ -80,6 +81,6 @@ internal fun ChatComposerCompanion(agentId: String?, status: (@Composable () -> 
 
 /** The companion's surface; the body spans ~60 % of it, so this reads as a ~39 dp character. */
 private val ChatComposerCompanionSize = 64.dp
-private val ChatComposerCompanionIdleSize = 32.dp
-private val ChatComposerCompanionGap = 2.dp
-private val ChatComposerCompanionBodyDrop = 7.dp
+private val ChatComposerCompanionIdleSize = LettaDimens.Space.xxl
+private val ChatComposerCompanionGap = LettaDimens.Space.hair
+private val ChatComposerCompanionBodyDrop = LettaDimens.Space.sm

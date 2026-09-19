@@ -59,6 +59,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
 import kotlin.time.Duration.Companion.seconds
+import com.letta.mobile.ui.theme.LettaDimens
 
 const val DEFAULT_AUTO_EXPAND_DELAY_MS = 1500L
 const val DEFAULT_STAGED_COLLAPSE_DELAY_MS = 300L
@@ -182,7 +183,7 @@ internal fun ProjectedToolTimelineGroupCard(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         if (RenderDiagnostics.enabled()) {
             RenderDiagnostics.onVisibleGroups(
@@ -264,9 +265,9 @@ private fun ToolRunSummaryRow(
             .fillMaxWidth()
             .testTag(ToolRunSummaryTestTags.Row)
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 10.dp),
+            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = summary.label(elapsed),
@@ -278,7 +279,7 @@ private fun ToolRunSummaryRow(
             imageVector = LettaIcons.ExpandMore,
             contentDescription = "Open command details",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }
@@ -297,8 +298,8 @@ internal fun ToolRunDetailsSheet(
         modifier = Modifier.testTag(ToolRunSummaryTestTags.Details),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, bottom = LettaDimens.Space.xxl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = summarizeToolRun(groups).label(),
@@ -476,8 +477,8 @@ private fun ProjectedToolTimelineCallRow(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 2.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                        .padding(top = LettaDimens.Space.hair),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
                 ) {
                     if (call.state == ToolTimelineState.Running) {
                         LiveStatusText(
@@ -592,12 +593,12 @@ private fun ProjectedToolOutcomeLabel(
     Row(
         modifier = modifier.semantics(mergeDescendants = true) { contentDescription = label },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(12.dp),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
             tint = tint,
         )
         Text(

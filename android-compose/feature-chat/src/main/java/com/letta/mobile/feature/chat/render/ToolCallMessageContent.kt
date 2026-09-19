@@ -13,6 +13,7 @@ import com.letta.mobile.feature.chat.screen.MessageToolCalls
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import kotlinx.collections.immutable.toImmutableList
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal object ToolCallRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage): Boolean =
@@ -27,7 +28,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
         onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
         isStreaming: Boolean,
     ) {
-        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             if (message.content.isNotBlank()) {
                 renderToolCallMessageText(
                     message = message,

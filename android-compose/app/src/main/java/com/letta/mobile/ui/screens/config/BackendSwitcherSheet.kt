@@ -46,6 +46,7 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-cdlk: Bottom-sheet surface that replaces the full-screen
@@ -98,13 +99,13 @@ fun BackendSwitcherSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         ) {
             Text(
                 text = stringResource(R.string.screen_config_list_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 12.dp),
+                modifier = Modifier.padding(bottom = LettaDimens.Space.md),
             )
 
             when (val state = uiState) {
@@ -142,7 +143,7 @@ fun BackendSwitcherSheet(
                         }
                     }
                     if (!state.data.hasEmbeddedLettaCodeConfig) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                         EmbeddedRuntimeConnectAction(
                             status = state.data.embeddedRuntimeStatus,
                             onConnect = {
@@ -154,7 +155,7 @@ fun BackendSwitcherSheet(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.md))
 
             FilledTonalButton(
                 onClick = { dismissAndThen(onNavigateToAddNewServer) },
@@ -165,11 +166,11 @@ fun BackendSwitcherSheet(
                     contentDescription = null,
                     modifier = Modifier.size(LettaIconSizing.Inline),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(stringResource(R.string.screen_config_list_add_server))
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
         }
     }
 
@@ -193,7 +194,7 @@ private fun EmbeddedRuntimeConnectAction(
     status: EmbeddedLettaCodeRuntimeStatus,
     onConnect: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         FilledTonalButton(
             onClick = onConnect,
             modifier = Modifier.fillMaxWidth(),
@@ -203,7 +204,7 @@ private fun EmbeddedRuntimeConnectAction(
                 contentDescription = null,
                 modifier = Modifier.size(LettaIconSizing.Inline),
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(stringResource(R.string.screen_config_embedded_runtime_connect))
         }
         Text(
@@ -259,7 +260,7 @@ private fun BackendSwitcherRow(
         refusalTrigger = refusalTrigger,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = LettaDimens.Space.xs)
             .combinedClickable(
                 onClick = {
                     if (isOffline) refusalTrigger++ else onSelect()
@@ -269,17 +270,17 @@ private fun BackendSwitcherRow(
             ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             HealthDot(
                 health = config.health,
                 modifier = Modifier
                     .align(Alignment.Top)
-                    .padding(top = 7.dp, end = 8.dp),
+                    .padding(top = LettaDimens.Space.sm, end = LettaDimens.Space.sm),
             )
             Box(
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(LettaDimens.Orb.md),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -292,10 +293,10 @@ private fun BackendSwitcherRow(
                     modifier = Modifier.size(LettaIconSizing.Inline),
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
             ) {
                 Text(
                     text = when (config.mode) {
@@ -350,7 +351,7 @@ private fun BackendSwitcherRowPreview() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         ) {
             BackendSwitcherRow(
                 config = previewServerConfig(

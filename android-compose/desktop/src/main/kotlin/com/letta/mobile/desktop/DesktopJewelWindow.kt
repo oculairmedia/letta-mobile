@@ -20,6 +20,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -47,14 +48,33 @@ import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
 import java.awt.Rectangle
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
 @Immutable
+/**
+ * The header's unified search: a persistent field, with its results in a panel
+ * under it. Not a chevron that opens a menu — the field is always there and is
+ * typed into directly.
+ *
+ * [config] carries the scopes, the "Filter to this agent" toggle and the
+ * placeholder, so the window only has to draw it.
+ */
+internal data class DesktopHeaderSearch(
+    val query: String,
+    val onQueryChange: (String) -> Unit,
+    val sections: List<com.letta.mobile.ui.search.LettaSearchSection>,
+    val onRowSelected: (com.letta.mobile.ui.search.LettaSearchRow) -> Unit,
+    val onDismiss: () -> Unit,
+    val config: com.letta.mobile.ui.search.LettaSearchConfig,
+)
+
 internal data class DesktopHeaderSidebarOverflow(
     val mode: WorkPlayMode,
     val onNewChat: () -> Unit,
     val onDestination: (LensDestination) -> Unit,
+    val onSettings: () -> Unit,
 )
 
 /**
@@ -74,14 +94,13 @@ internal data class DesktopHeaderChromeState(
     val onToggleSidebar: () -> Unit,
     val sidebarToggleFocusRequester: FocusRequester? = null,
     val sidebarOverflow: DesktopHeaderSidebarOverflow? = null,
+    val search: DesktopHeaderSearch? = null,
     val conversationTabs: List<DesktopConversationTab> = emptyList(),
     val activeConversationId: String? = null,
     val onSelectConversationTab: (String) -> Unit = {},
     val onCloseConversationTab: (String) -> Unit = {},
     val onReorderConversationTab: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
     val onNewConversationTab: (() -> Unit)? = null,
-    val tabPickerItems: List<com.letta.mobile.data.desktopshell.TabPickerItem> = emptyList(),
-    val onOpenTabPickerItem: (com.letta.mobile.data.desktopshell.TabPickerItem) -> Unit = {},
 ) {
     companion object {
         val Empty = DesktopHeaderChromeState(
@@ -98,7 +117,7 @@ internal data class DesktopHeaderChromeState(
 private val TitleBarHeight = 48.dp
 
 /** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
-private val TabbedTitleBarHeight = 38.dp
+private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
 
 /**
  * Bounds the identity block by a fixed max width rather than a Row `weight`.
@@ -113,6 +132,7 @@ private val TabbedTitleBarHeight = 38.dp
  * to the window's right edge at any width.
  */
 private val IdentityBlockMaxWidth = 320.dp
+private val HeaderSearchWidth = 260.dp
 
 /** Always leaves an unobstructed title-bar lane for native window dragging. */
 private val MinimumTitleBarDragWidth = 96.dp
@@ -223,7 +243,7 @@ internal fun DesktopJewelWindow(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 8.dp)
+                                .padding(start = LettaDimens.Space.sm)
                                 .onGloballyPositioned { coordinates ->
                                     val bounds = titleBarScreenBoundsOrNull(
                                         coordinates = coordinates,
@@ -249,10 +269,34 @@ internal fun DesktopJewelWindow(
                                         mode = overflow.mode,
                                         onNewChat = overflow.onNewChat,
                                         onDestination = overflow.onDestination,
+                                        onSettings = overflow.onSettings,
                                     )
                                 }
                             }
-                            Box(modifier = Modifier.width(4.dp))
+                            Box(modifier = Modifier.width(LettaDimens.Space.xs))
+                            header.search?.let { search ->
+                                com.letta.mobile.ui.search.LettaSearchAnchoredField(
+                                    query = search.query,
+                                    onQueryChange = search.onQueryChange,
+                                    sections = search.sections,
+                                    onRowSelected = search.onRowSelected,
+                                    onDismiss = search.onDismiss,
+                                    // Re-enable focus for this subtree. Nucleus's TitleBarCore
+                                    // applies `focusProperties { canFocus = false }` to the whole
+                                    // title bar on Windows/Linux, so Tab navigation cannot wander
+                                    // into the window-drag area — which also means no child there
+                                    // can take focus. Buttons never noticed; a text field could be
+                                    // clicked and never receive a keystroke. Nucleus's own comment
+                                    // notes macOS keeps focus enabled exactly so TextField children
+                                    // in the title bar work, so this restores that locally rather
+                                    // than moving the field out of the header.
+                                    modifier = Modifier
+                                        .width(HeaderSearchWidth)
+                                        .focusProperties { canFocus = true },
+                                    config = search.config,
+                                )
+                            }
+
                             // Agent-first identity: leading avatar, conversation
                             // title over agent name (letta-mobile-3arhe.1).
                             val identity = header.identity
@@ -282,8 +326,6 @@ internal fun DesktopJewelWindow(
                                             onClose = header.onCloseConversationTab,
                                             onReorder = header.onReorderConversationTab,
                                             onNewConversation = header.onNewConversationTab,
-                                            pickerItems = header.tabPickerItems,
-                                            onOpenPickerItem = header.onOpenTabPickerItem,
                                         ),
                                         dragLaneWidth = MinimumTitleBarDragWidth,
                                         modifier = Modifier.fillMaxHeight(),
@@ -297,17 +339,17 @@ internal fun DesktopJewelWindow(
                                 )
                             } else {
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
                                         .widthIn(max = IdentityBlockMaxWidth)
-                                        .padding(horizontal = 8.dp),
+                                        .padding(horizontal = LettaDimens.Space.sm),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.ChatBubbleOutline,
                                         contentDescription = null,
                                         tint = colorScheme.onSurface,
-                                        modifier = Modifier.size(15.dp),
+                                        modifier = Modifier.size(LettaDimens.Control.icon),
                                     )
                                     Text(
                                         text = title,

@@ -42,6 +42,7 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Immutable
 data class SubagentTodoSheetTarget(
@@ -293,7 +294,7 @@ private fun SubagentTodoLoading() {
     ) {
         CircularProgressIndicator(
             modifier = Modifier.size(LettaIconSizing.Toolbar),
-            strokeWidth = 2.dp,
+            strokeWidth = LettaDimens.Space.hair,
             color = MaterialTheme.colorScheme.primary,
         )
     }

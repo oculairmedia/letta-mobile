@@ -26,6 +26,7 @@ import ca.oculair.meridian.R
 import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun FirstRunWelcomeCard(
@@ -35,27 +36,27 @@ internal fun FirstRunWelcomeCard(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier.padding(24.dp),
+        modifier = modifier.padding(LettaDimens.Space.xl),
         contentAlignment = Alignment.Center,
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 520.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.lg),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(LettaDimens.Space.xl),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
             ) {
                 Icon(
                     imageVector = LettaIcons.Agent,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(LettaDimens.Orb.lg),
                 )
                 Text(
                     text = stringResource(R.string.screen_conversations_first_run_title),
@@ -97,14 +98,14 @@ internal fun FirstRunWelcomeCard(
 @Composable
 private fun FirstRunStep(text: String) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = LettaIcons.Check,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
         )
         Text(
             text = text,

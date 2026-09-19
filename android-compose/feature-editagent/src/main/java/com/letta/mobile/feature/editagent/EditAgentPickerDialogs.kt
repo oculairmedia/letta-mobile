@@ -54,6 +54,7 @@ import com.letta.mobile.ui.components.highlightSearchMatches
 import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun SearchPickerField(
@@ -72,12 +73,12 @@ internal fun SearchPickerField(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 84.dp)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(end = 36.dp),
+                    .padding(end = LettaDimens.Space.xxl),
             ) {
                 Text(
                     text = label,
@@ -190,12 +191,12 @@ internal fun FullScreenModelPickerDialog(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = paddingValues.calculateTopPadding() + 8.dp,
-                        bottom = paddingValues.calculateBottomPadding() + 24.dp,
+                        start = LettaDimens.Space.lg,
+                        end = LettaDimens.Space.lg,
+                        top = paddingValues.calculateTopPadding() + LettaDimens.Space.sm,
+                        bottom = paddingValues.calculateBottomPadding() + LettaDimens.Space.xl,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     groupedModels.forEach { (provider, providerModels) ->
                         item(key = "section-$provider") {
@@ -207,7 +208,7 @@ internal fun FullScreenModelPickerDialog(
                             ) {
                                 Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                                 ) {
                                     providerModels.forEach { model ->
                                         val selectionValue = model.handle ?: model.name ?: model.displayName
@@ -247,7 +248,7 @@ internal fun ModelPickerCard(
             },
         ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = model.displayName,
@@ -274,10 +275,10 @@ internal fun ModelPickerCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 AssistChip(onClick = {}, enabled = false, label = { Text(model.providerType) })
                 model.contextWindow?.let { contextWindow ->
@@ -365,12 +366,12 @@ internal fun FullScreenToolPickerDialog(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = paddingValues.calculateTopPadding() + 8.dp,
-                        bottom = paddingValues.calculateBottomPadding() + 24.dp,
+                        start = LettaDimens.Space.lg,
+                        end = LettaDimens.Space.lg,
+                        top = paddingValues.calculateTopPadding() + LettaDimens.Space.sm,
+                        bottom = paddingValues.calculateBottomPadding() + LettaDimens.Space.xl,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     items(filteredTools, key = { it.id.value }) { tool ->
                         val isSelected = tool.id.value in selection
@@ -406,9 +407,9 @@ internal fun SelectableToolCard(
         ),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Checkbox(checked = selected, onCheckedChange = null)
             Column(modifier = Modifier.weight(1f)) {
@@ -511,12 +512,12 @@ internal fun FullScreenBlockPickerDialog(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = paddingValues.calculateTopPadding() + 8.dp,
-                        bottom = paddingValues.calculateBottomPadding() + 24.dp,
+                        start = LettaDimens.Space.lg,
+                        end = LettaDimens.Space.lg,
+                        top = paddingValues.calculateTopPadding() + LettaDimens.Space.sm,
+                        bottom = paddingValues.calculateBottomPadding() + LettaDimens.Space.xl,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     items(filteredBlocks, key = { it.id.value }) { block ->
                         val isSelected = block.id.value in selection
@@ -552,13 +553,13 @@ internal fun SelectableBlockCard(
         ),
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Checkbox(checked = selected, onCheckedChange = null)
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     Text(
                         text = highlightSearchMatches(block.label ?: stringResource(R.string.common_unknown), query, highlightColors),
                         style = MaterialTheme.typography.titleSmall,

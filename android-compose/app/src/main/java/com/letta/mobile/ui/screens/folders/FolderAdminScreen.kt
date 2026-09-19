@@ -58,6 +58,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,7 +117,7 @@ fun FolderAdminScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = viewModel::loadFolders,
@@ -131,8 +132,8 @@ fun FolderAdminScreen(
                 ) {
                     state.data.folderMetadata?.let { metadata ->
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg),
+                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_folders_total_sources_chip, metadata.totalSources)) })
                             AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_folders_total_files_chip, metadata.totalFiles)) })
@@ -151,8 +152,8 @@ fun FolderAdminScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             items(filtered, key = { it.id }) { folder ->
                                 FolderCard(
@@ -253,7 +254,7 @@ private fun FolderCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -262,7 +263,7 @@ private fun FolderCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(folder.name, style = MaterialTheme.typography.titleMedium)
                     folder.description?.takeIf { it.isNotBlank() }?.let {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -271,8 +272,8 @@ private fun FolderCard(
                 }
             }
             folder.vectorDbProvider?.let { provider ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     AssistChip(onClick = {}, label = { Text(provider) })
                 }
             }
@@ -321,7 +322,7 @@ private fun FolderDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             CardGroup {
                 item(
                     headlineContent = { Text(stringResource(R.string.screen_folders_id_label, "")) },

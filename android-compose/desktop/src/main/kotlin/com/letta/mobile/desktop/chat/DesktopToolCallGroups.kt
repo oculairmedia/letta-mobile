@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Desktop-side row projection that folds runs of consecutive tool-only
@@ -191,15 +192,15 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
                 .fillMaxWidth()
                 .clickable(role = Role.Button) { expanded = !expanded }
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Terminal,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(13.dp),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
             Text(
                 text = "${group.toolCallCount} tool calls",
@@ -223,13 +224,13 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
                 imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                 contentDescription = if (expanded) "Collapse tool calls" else "Expand tool calls",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
         }
         if (expanded) {
             Column(
-                modifier = Modifier.padding(start = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(start = LettaDimens.Space.md),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
             ) {
                 group.singles.forEach { single ->
                     single.message.toolCalls.orEmpty().forEach { toolCall ->

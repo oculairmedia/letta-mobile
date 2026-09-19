@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Unified pill-shaped search bar used across all screens.
@@ -36,13 +37,13 @@ fun LettaSearchBar(
     clearIconContentDescription: String = "Clear search",
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val iconSize = if (compact) 18.dp else 20.dp
+    val iconSize = if (compact) LettaDimens.Space.lg else LettaDimens.Space.xl
     val textStyle = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium
 
     TextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = modifier.then(if (compact) Modifier.heightIn(min = 40.dp) else Modifier),
+        modifier = modifier.then(if (compact) Modifier.heightIn(min = LettaDimens.Orb.lg) else Modifier),
         placeholder = {
             Text(
                 placeholder,
@@ -69,7 +70,7 @@ fun LettaSearchBar(
         },
         singleLine = true,
         textStyle = textStyle,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         colors = TextFieldDefaults.colors(
             unfocusedContainerColor = colorScheme.surfaceContainerHigh,
             focusedContainerColor = colorScheme.surfaceContainerHigh,

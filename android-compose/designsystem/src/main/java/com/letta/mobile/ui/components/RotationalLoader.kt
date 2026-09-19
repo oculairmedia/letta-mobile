@@ -18,11 +18,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun RotationalLoader(
     modifier: Modifier = Modifier,
-    size: Dp = 48.dp,
+    size: Dp = LettaDimens.Orb.railSlotWidth,
     color: Color = MaterialTheme.colorScheme.primary,
     secondaryColor: Color = MaterialTheme.colorScheme.primaryContainer,
 ) {

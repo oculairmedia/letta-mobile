@@ -54,6 +54,7 @@ import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The board's one property control, in the way Concepts keeps a single master control that
@@ -91,7 +92,7 @@ fun CanvasPropertyControl(
             modifier = Modifier
                 .size(OPENER_SIZE)
                 .background(swatch, CircleShape)
-                .border(2.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
+                .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
                 .semantics { contentDescription = label }
                 .clickable { open = !open },
             contentAlignment = Alignment.Center,
@@ -104,7 +105,7 @@ fun CanvasPropertyControl(
             )
         }
         if (open) {
-            val besideOffset = with(androidx.compose.ui.platform.LocalDensity.current) { IntOffset((OPENER_SIZE + 12.dp).roundToPx(), 0) }
+            val besideOffset = with(androidx.compose.ui.platform.LocalDensity.current) { IntOffset((OPENER_SIZE + LettaDimens.Space.md).roundToPx(), 0) }
             Popup(
                 alignment = if (beside) Alignment.TopStart else Alignment.TopCenter,
                 offset = if (beside) besideOffset else IntOffset.Zero,
@@ -157,14 +158,14 @@ private fun CanvasPropertyPanel(
         ColorTarget.CARD -> note?.color ?: Color.Transparent
     }
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 8.dp,
+        shadowElevation = LettaDimens.Space.sm,
         modifier = Modifier.semantics { contentDescription = "Property panel" },
     ) {
         Column(
-            modifier = Modifier.width(PANEL_WIDTH).verticalScroll(rememberScrollState()).padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.width(PANEL_WIDTH).verticalScroll(rememberScrollState()).padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -178,13 +179,13 @@ private fun CanvasPropertyPanel(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onClose, modifier = Modifier.size(26.dp).semantics { contentDescription = "Close properties" }) {
-                    Icon(Lucide.X, contentDescription = null, modifier = Modifier.size(14.dp))
+                IconButton(onClick = onClose, modifier = Modifier.size(LettaDimens.Control.iconButton).semantics { contentDescription = "Close properties" }) {
+                    Icon(Lucide.X, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
                 }
             }
 
             // Colour: pick which colour of the target, then the one picker edits it.
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
                 targets.forEach { t ->
                     val color = when (t) {
                         ColorTarget.STROKE -> state.strokeColor
@@ -234,7 +235,7 @@ private fun CanvasPropertyPanel(
 @Composable
 private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (CanvasPropertyIntent) -> Unit) {
     SectionLabel("Stroke width")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
         StrokeWidths.forEach { (label, width) ->
             Chip(label = label, description = "Width $label", selected = properties.strokeWidth == width) {
                 dispatchProperty(CanvasPropertyIntent.SetStrokeWidth(width))
@@ -248,7 +249,7 @@ private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (C
         onChange = { dispatchProperty(CanvasPropertyIntent.SetOpacity(it)) },
     )
     SectionLabel("Stroke style")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         StrokeStyles.forEach { (label, style) ->
             Chip(label = label, description = "Stroke $label", selected = properties.strokeStyle == style) {
                 dispatchProperty(CanvasPropertyIntent.SetStrokeStyle(style))
@@ -268,7 +269,7 @@ private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (C
 @Composable
 private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
     SectionLabel("Size")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         TextSizes.forEach { (label, scale) ->
             Chip(label = label, description = "Size $label", selected = (style.fontScale ?: 1f) == scale) {
                 note.onStyle(style.copy(fontScale = scale))
@@ -276,7 +277,7 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
         }
     }
     SectionLabel("Font")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         TextFamilies.forEach { (label, key) ->
             Chip(label = label, description = "Font $label", selected = (style.fontFamily ?: "sans") == key) {
                 note.onStyle(style.copy(fontFamily = key))
@@ -284,7 +285,7 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
         }
     }
     SectionLabel("Alignment")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Toggle("Align start", Lucide.AlignLeft, selected = (style.align ?: "start") == "start") { note.onStyle(style.copy(align = "start")) }
         Toggle("Align center", Lucide.AlignCenter, selected = style.align == "center") { note.onStyle(style.copy(align = "center")) }
         Toggle("Align end", Lucide.AlignRight, selected = style.align == "end") { note.onStyle(style.copy(align = "end")) }
@@ -295,25 +296,25 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
 private fun TargetChip(target: ColorTarget, color: Color, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         modifier = Modifier.height(CHIP_HEIGHT).semantics { contentDescription = "Target ${target.label}" },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Box(
                 modifier = Modifier
-                    .size(14.dp)
+                    .size(LettaDimens.Control.icon)
                     .background(color, CircleShape)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                if (color.alpha == 0f) Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(10.dp), tint = MaterialTheme.colorScheme.outline)
+                if (color.alpha == 0f) Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = MaterialTheme.colorScheme.outline)
             }
-            Icon(target.glyph, contentDescription = null, modifier = Modifier.size(13.dp))
+            Icon(target.glyph, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
         }
     }
 }
@@ -322,11 +323,11 @@ private fun TargetChip(target: ColorTarget, color: Color, selected: Boolean, onC
 private fun Chip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier.height(CHIP_HEIGHT).semantics { contentDescription = description },
     ) {
-        Box(modifier = Modifier.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.padding(horizontal = LettaDimens.Space.sm), contentAlignment = Alignment.Center) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -344,7 +345,7 @@ private fun Toggle(label: String, icon: ImageVector, selected: Boolean, onClick:
         modifier = Modifier.size(CHIP_HEIGHT).semantics { contentDescription = label },
         colors = if (selected) IconButtonDefaults.filledTonalIconButtonColors() else IconButtonDefaults.iconButtonColors(),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
@@ -360,7 +361,7 @@ private fun LabelledSlider(label: String, value: Float, range: ClosedFloatingPoi
         value = value.coerceIn(range),
         onValueChange = onChange,
         valueRange = range,
-        modifier = Modifier.fillMaxWidth().height(24.dp).semantics { contentDescription = label },
+        modifier = Modifier.fillMaxWidth().height(LettaDimens.Space.xl).semantics { contentDescription = label },
     )
 }
 
@@ -375,6 +376,6 @@ internal val StrokeStyles: List<Pair<String, StrokeStyle>> = listOf(
 )
 
 private const val MAX_CORNER_RADIUS = 64f
-private val OPENER_SIZE = 22.dp
-private val CHIP_HEIGHT = 28.dp
+private val OPENER_SIZE = LettaDimens.Space.xl
+private val CHIP_HEIGHT = LettaDimens.Control.fieldHeight
 private val PANEL_WIDTH = 280.dp

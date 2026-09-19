@@ -63,6 +63,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +115,7 @@ fun MessageBatchMonitorScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = viewModel::loadBatches,
@@ -137,7 +138,7 @@ fun MessageBatchMonitorScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = LettaDimens.Space.lg),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -163,8 +164,8 @@ fun MessageBatchMonitorScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             items(filteredBatches, key = { it.id }) { batch ->
                                 MessageBatchCard(
@@ -234,13 +235,13 @@ private fun MessageBatchCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Text(
                 text = batch.id,
                 style = MaterialTheme.typography.listItemHeadline.copy(fontFamily = LettaCodeFont),
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 batch.status?.let { status ->
                     StatusChip(status = status)
                 }
@@ -248,7 +249,7 @@ private fun MessageBatchCard(
                     AssistChip(onClick = {}, label = { Text(type) })
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             batch.createdAt?.let { createdAt ->
                 Text(
                     text = stringResource(R.string.screen_message_batches_created_label, formatRelativeTime(createdAt)),
@@ -293,7 +294,7 @@ private fun MessageBatchDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             item {
                 CardGroup {
                     batch.status?.let {
@@ -432,8 +433,8 @@ private fun BatchMessageCard(message: BatchMessage) {
         colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -548,8 +549,8 @@ private fun previewBatchMessage() = BatchMessage(
 private fun MessageBatchCardPreview() {
     LettaPreviewFrame {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             MessageBatchCard(batch = previewJob(), onInspect = {})
             MessageBatchCard(

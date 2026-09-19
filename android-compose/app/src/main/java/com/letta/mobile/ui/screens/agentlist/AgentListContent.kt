@@ -47,6 +47,7 @@ import com.letta.mobile.ui.motion.StaggeredListItem
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class AgentListContentState(
     val uiState: AgentListUiState,
@@ -387,11 +388,11 @@ internal fun AgentHydratingBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LoadingIndicator(modifier = Modifier.size(18.dp))
+            LoadingIndicator(modifier = Modifier.size(LettaDimens.Control.icon))
             Column {
                 Text("Loading more agents", style = MaterialTheme.typography.labelLarge)
                 Text(

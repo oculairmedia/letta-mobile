@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun ConversationsErrorContent(
@@ -35,9 +36,9 @@ internal fun ConversationsErrorContent(
             contentDescription = "Error",
             tint = MaterialTheme.colorScheme.error,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         Text(text = message, style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         Button(onClick = onRetry) {
             Text(stringResource(R.string.action_retry))
         }

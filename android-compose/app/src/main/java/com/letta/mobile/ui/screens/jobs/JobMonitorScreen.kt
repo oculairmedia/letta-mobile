@@ -58,6 +58,7 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,7 +111,7 @@ fun JobMonitorScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadJobs() },
@@ -129,7 +130,7 @@ fun JobMonitorScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = LettaDimens.Space.lg),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -152,8 +153,8 @@ fun JobMonitorScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             items(filteredJobs, key = { it.id }) { job ->
                                 JobCard(
@@ -243,7 +244,7 @@ private fun JobCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -262,8 +263,8 @@ private fun JobCard(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 job.status?.let { status ->
                     StatusChip(status = status)
                 }
@@ -271,7 +272,7 @@ private fun JobCard(
                     AssistChip(onClick = {}, label = { Text(type) })
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             job.agentId?.let { agentId ->
                 Text(
                     text = stringResource(R.string.screen_jobs_agent_label, agentId),
@@ -316,7 +317,7 @@ private fun JobDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             item {
                 CardGroup {
                     job.status?.let {
@@ -419,7 +420,7 @@ private fun JobDetailDialog(
                 }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     if (onCancel != null) {
                         TextButton(onClick = onCancel) {
                             Text(stringResource(R.string.action_cancel_job), color = MaterialTheme.colorScheme.error)

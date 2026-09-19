@@ -4,8 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,6 +64,7 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.theme.LettaDimens
 /** Surface + composer catalog inputs for [ChatDetailPane]. */
 internal data class ChatDetailPaneState(
     val surface: DesktopChatSurfaceState,
@@ -131,7 +130,6 @@ internal fun ChatDetailPane(
             submittingRequestIds = state.submittingApprovalRequestIds,
         )
     }
-    val paneEdgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
     // Drive the ambient glow off the thinking state: a teal breath while the
     // agent works, a brief "completed" settle afterward, error tint on failure.
     var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
@@ -156,9 +154,11 @@ internal fun ChatDetailPane(
             else -> ambientStatus = DesktopAmbientStatus.Idle
         }
     }
-    // A hairline edge separates the chat pane from the sidebar without insetting
-    // it: the pane stays flush to the window, so this reads as one boundary line
-    // rather than a second frame floating inside the app's own window border.
+    // No pane edge drawn here. The boundary between this pane and whatever sits
+    // to its left (rail, or sidebar when open) is already drawn by RailDivider,
+    // and this stroke landed immediately beside it — two 1px lines a pixel
+    // apart, reading as one thick, slightly wrong border. One owner per
+    // boundary: the divider.
     CompositionLocalProvider(
         LocalDesktopApprovalDecision provides approvalHandler,
         LocalDesktopAgentMessageContext provides DesktopAgentMessageContext(
@@ -171,15 +171,7 @@ internal fun ChatDetailPane(
             status = ambientStatus,
             modifier = modifier
                 .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.background)
-                .drawBehind {
-                    val stroke = 1.dp.toPx()
-                    drawRect(
-                        color = paneEdgeColor,
-                        topLeft = Offset.Zero,
-                        size = Size(stroke, size.height),
-                    )
-                },
+                .background(MaterialTheme.colorScheme.background),
         ) {
             ChatDetailBody(
                 surface = surface,
@@ -242,9 +234,9 @@ private fun ChatDetailBody(
 @Composable
 private fun CanonicalStatusRow(status: String, agentId: String?, modifier: Modifier) {
     Row(
-        modifier = modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+        modifier = modifier.padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xl),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         com.letta.mobile.ui.mascot.MascotLoading(agentId)
         Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -350,15 +342,15 @@ private fun DesktopWorkingDirectoryRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = onChangeDirectory != null && !loading) { pickerLauncher.launch() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Icon(
             imageVector = Icons.Outlined.Folder,
             contentDescription = "Working directory",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         Text(
             text = when {
@@ -403,12 +395,12 @@ private fun NewConversationWelcome(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 40.dp, vertical = 16.dp),
+            .padding(horizontal = LettaDimens.Orb.lg, vertical = LettaDimens.Space.lg),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
         ) {
             // The agent itself, at hero size - the mascot's rest seat while the greeting shows (it
@@ -443,21 +435,21 @@ private fun NewConversationWelcome(
             // Setup tasks as a row of chips: the same three actions, a fifth of the height.
             if (onOnboardingTask != null) {
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     AgentOnboarding.tasks(agentName).forEach { task ->
                         Surface(
                             onClick = { onOnboardingTask(task.kind) },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(LettaDimens.Radius.sm),
                             color = MaterialTheme.colorScheme.surfaceContainer,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         ) {
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
                             ) {
                                 Icon(
                                     imageVector = when (task.kind) {
@@ -467,7 +459,7 @@ private fun NewConversationWelcome(
                                     },
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(LettaDimens.Control.icon),
                                 )
                                 Text(task.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                             }
@@ -489,8 +481,8 @@ private fun NewConversationWelcome(
 private fun FirstRunActionGrid(onAction: (String) -> Unit) {
     val cc = MaterialTheme.customColors
     // One row of four: the mascot is the page now, the moves are a strip under it.
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md), modifier = Modifier.fillMaxWidth()) {
             FirstRunCard("Start a conversation", "Just say hello", MaterialTheme.colorScheme.primary, Modifier.weight(1f)) {
                 onAction("Hi! Let's get started.")
             }
@@ -518,17 +510,17 @@ private fun FirstRunCard(
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         // One line: the title is the move; the subtitle rides in the tooltip-sized muted text after it.
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
+            Box(Modifier.size(LettaDimens.Space.sm).clip(CircleShape).background(accent))
             Text(
                 title,
                 style = MaterialTheme.typography.labelLarge,
@@ -548,8 +540,8 @@ private fun OnboardingTaskRow(task: OnboardingTask, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -560,9 +552,9 @@ private fun OnboardingTaskRow(task: OnboardingTask, onClick: () -> Unit) {
             },
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
             Text(
                 text = task.title,
                 style = MaterialTheme.typography.titleSmall,
@@ -597,14 +589,14 @@ internal fun ChatStatePanel(
             // `background`): this hero sits over the ambient glow beside them,
             // and `surface` made the connect/error state a shade off its own pane.
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 40.dp, vertical = 28.dp),
+            .padding(horizontal = LettaDimens.Orb.lg, vertical = LettaDimens.Space.xxl),
         contentAlignment = Alignment.Center,
     ) {
         val failureHeadline = failureHeadline(screenStatus, state.errorMessage)
         Column(
             modifier = Modifier.widthIn(max = ChatColumnMaxWidth),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             // The wordmark is a welcome, not a diagnosis. When the pane is here
             // because something BROKE, a display-size brand lockup on top pushes

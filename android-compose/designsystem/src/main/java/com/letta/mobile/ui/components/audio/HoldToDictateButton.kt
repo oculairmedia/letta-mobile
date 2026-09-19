@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-rl0d / letta-mobile-7w57: hold-to-talk affordance.
@@ -98,7 +99,7 @@ fun HoldToDictateButton(
     if (recordAudioPermissionGranted) {
         Box(
             modifier = modifier
-                .size(48.dp)
+                .size(LettaDimens.Orb.railSlotWidth)
                 .testTag(HOLD_TO_DICTATE_BUTTON_TEST_TAG)
                 .pointerInput(Unit) {
                     val cancelThresholdPx = cancelThresholdDp.dp.toPx()
@@ -140,7 +141,7 @@ fun HoldToDictateButton(
 private fun HoldToDictateVisual(isRecognizing: Boolean, enabled: Boolean) {
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(LettaDimens.Orb.railSlotHeight)
             .clip(CircleShape)
             .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
             .background(

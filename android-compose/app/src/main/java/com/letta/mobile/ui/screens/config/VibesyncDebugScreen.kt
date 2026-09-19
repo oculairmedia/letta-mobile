@@ -29,6 +29,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,11 +58,11 @@ fun VibesyncDebugScreen(
         },
     ) { padding ->
         when (val state = uiState) {
-            is UiState.Loading -> Text(stringResource(R.string.common_loading), modifier = Modifier.padding(padding).padding(16.dp))
+            is UiState.Loading -> Text(stringResource(R.string.common_loading), modifier = Modifier.padding(padding).padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(message = state.message, onRetry = viewModel::refresh, modifier = Modifier.padding(padding))
             is UiState.Success -> Column(
-                modifier = Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
             ) {
                 val statusText = state.data.health?.status
                     ?: if (state.data.stats != null) {

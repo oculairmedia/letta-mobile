@@ -44,6 +44,7 @@ import com.letta.mobile.desktop.skills.DesktopSkillsSurface
 import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceActions
 import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceState
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class DestinationMemoryActions(
     val onRefresh: () -> Unit,
@@ -360,8 +361,8 @@ private fun ScrollableDestinationContent(
         modifier = modifier
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 32.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xl),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         item { DestinationHeader(inputs.destination) }
         scrollableDestinationItems(
@@ -373,7 +374,7 @@ private fun ScrollableDestinationContent(
 
 @Composable
 private fun DestinationHeader(destination: DesktopDestination) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Text(
             text = destination.label,
             style = MaterialTheme.typography.headlineSmall,

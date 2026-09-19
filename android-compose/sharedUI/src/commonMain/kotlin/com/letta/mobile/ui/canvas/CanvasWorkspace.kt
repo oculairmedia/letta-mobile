@@ -72,6 +72,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Shared Canvas Workspace composable for Meridian: the DrawBox board with block-document notes
@@ -599,19 +600,19 @@ fun CanvasWorkspace(
                         } else {
                             LazyColumn(
                                 modifier = Modifier.fillMaxWidth().height(300.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                             ) {
                                 items(checkpoints) { cp ->
                                     Card(
                                         modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(LettaDimens.Radius.sm),
                                         colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
                                         ),
                                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
                                     ) {
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
@@ -646,7 +647,7 @@ fun CanvasWorkspace(
                                                         }
                                                     }
                                                 },
-                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                contentPadding = PaddingValues(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
                                             ) {
                                                 Text("Restore", style = MaterialTheme.typography.labelSmall)
                                             }
@@ -771,7 +772,7 @@ fun CanvasWorkspace(
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 val toolbar = noteToolbar
                 if (toolbar != null && (activeNoteId != null || expandedNoteId != null)) {
@@ -838,6 +839,6 @@ private fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offs
 }
 
 private const val DUPLICATE_OFFSET = 20f
-private val CHROME_INSET = 12.dp
+private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
 private const val WHEEL_ZOOM_STEP = 1.1f

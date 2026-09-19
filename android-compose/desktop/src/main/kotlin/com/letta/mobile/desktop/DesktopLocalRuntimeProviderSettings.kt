@@ -24,6 +24,7 @@ import com.letta.mobile.data.runtime.LocalRuntimeProviderConfig
 import com.letta.mobile.data.runtime.LocalRuntimeProviderStatus
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Desktop state for the "Local runtime provider" settings section — the
@@ -62,8 +63,8 @@ internal fun LocalRuntimeProviderSettingsCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             Text(
                 text = "Local runtime provider",
@@ -98,7 +99,7 @@ internal fun LocalRuntimeProviderSettingsCard(
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                 DesktopDefaultButton(
                     enabled = !state.isSaving && LocalRuntimeProviderConfig.isValidBaseUrl(baseUrlInput.text),
                     onClick = {

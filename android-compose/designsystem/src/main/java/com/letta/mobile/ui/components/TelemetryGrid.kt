@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.ui.theme.LettaCodeFont
 import java.util.Locale
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun TelemetryGrid(
@@ -58,8 +59,8 @@ fun TelemetryGrid(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -94,7 +95,7 @@ fun TelemetryGrid(
                         VerticalDivider(
                             modifier = Modifier
                                 .fillMaxHeight()
-                                .padding(vertical = 6.dp),
+                                .padding(vertical = LettaDimens.Space.sm),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = TelemetryDividerAlpha),
                         )
                     }
@@ -110,14 +111,14 @@ private fun TelemetryMetricItem(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 6.dp),
+        modifier = modifier.padding(horizontal = LettaDimens.Space.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         Text(
             text = metric.label.uppercase(Locale.US),
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.sp,
+                fontSize = LettaDimens.Type.micro,
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 0.5.sp,
             ),
@@ -137,12 +138,12 @@ private fun TelemetryMetricItem(
             )
             Text(
                 text = metric.suffix,
-                modifier = Modifier.padding(start = 2.dp, bottom = 2.dp),
+                modifier = Modifier.padding(start = LettaDimens.Space.hair, bottom = LettaDimens.Space.hair),
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
+                    fontSize = LettaDimens.Type.micro,
                     fontWeight = FontWeight.SemiBold,
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.50f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
                 maxLines = 1,
             )
         }
@@ -160,7 +161,7 @@ private fun TelemetryCostChip(costUsd: Double) {
     ) {
         Text(
             text = formatCostUsd(costUsd),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
             style = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = LettaCodeFont,
                 fontWeight = FontWeight.SemiBold,

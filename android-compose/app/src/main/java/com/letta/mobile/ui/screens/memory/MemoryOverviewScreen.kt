@@ -74,6 +74,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.LettaTheme
 import com.letta.mobile.ui.theme.listItemHeadline
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,14 +118,14 @@ private fun MemoryOverviewContent(
     modifier: Modifier = Modifier,
 ) {
     if (state.isLoading && state.memory.sections.isEmpty()) {
-        ShimmerCard(modifier = modifier.padding(16.dp))
+        ShimmerCard(modifier = modifier.padding(LettaDimens.Space.lg))
         return
     }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         item {
             MemoryOverviewHeader(
@@ -175,7 +176,7 @@ private fun MemoryOverviewHeader(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Text(
             text = state.memory.scopeSubtitle,
@@ -187,8 +188,8 @@ private fun MemoryOverviewHeader(
             onClick = onRefresh,
             enabled = !state.isLoading,
         ) {
-            Icon(LettaIcons.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
+            Icon(LettaIcons.Refresh, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+            Spacer(Modifier.width(LettaDimens.Space.sm))
             Text(
                 text = stringResource(
                     if (state.isLoading) R.string.screen_memory_refreshing else R.string.screen_memory_refresh,
@@ -209,7 +210,7 @@ private fun MemoryErrorBanner(message: String) {
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
     }
 }
@@ -223,7 +224,7 @@ private fun MemoryAgentSelector(
     var expanded by remember { mutableStateOf(false) }
     val selectedAgent = agents.firstOrNull { it.id == selectedAgentId }
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             text = stringResource(R.string.screen_memory_agent_label),
             style = MaterialTheme.typography.labelLarge,
@@ -269,8 +270,8 @@ private fun MemorySummaryCard(summary: MemoryParitySummary) {
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text(
                 text = stringResource(R.string.screen_memory_summary_title),
@@ -278,7 +279,7 @@ private fun MemorySummaryCard(summary: MemoryParitySummary) {
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                 items(
                     items = summary.metrics,
                     key = { metric -> metric.kind.name },
@@ -297,8 +298,8 @@ private fun SummaryMetric(metric: MemorySummaryMetric) {
         shape = MaterialTheme.shapes.small,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
         ) {
             Text(
                 text = metric.value,
@@ -328,18 +329,18 @@ private fun MemorySectionCard(section: MemoryParitySection) {
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             ) {
                 Icon(
                     imageVector = section.kind.icon(),
                     contentDescription = null,
                     tint = section.kind.tint(),
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -360,7 +361,7 @@ private fun MemorySectionCard(section: MemoryParitySection) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     section.items.forEach { item ->
                         MemoryItemRow(item)
                     }
@@ -378,18 +379,18 @@ private fun MemoryItemRow(item: MemoryParityItem) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 Icon(
                     imageVector = item.icon(),
                     contentDescription = null,
                     tint = item.tint(),
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(LettaDimens.Control.icon),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -416,7 +417,7 @@ private fun MemoryItemRow(item: MemoryParityItem) {
             if (item.metadataLabels.isNotEmpty()) {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     item.metadataLabels.forEach { label ->
                         AssistChip(

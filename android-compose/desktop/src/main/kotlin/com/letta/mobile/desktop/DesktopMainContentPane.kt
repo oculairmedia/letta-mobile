@@ -26,6 +26,7 @@ import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.ui.components.LettaSidePane
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class DesktopMainContentInputs(
     val editingAgentId: String?,
@@ -75,7 +76,7 @@ internal fun DesktopMainContentPane(
                     onClick = actions.onShowBackgroundTasks,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 12.dp, end = 16.dp),
+                        .padding(top = LettaDimens.Space.md, end = LettaDimens.Space.lg),
                 )
             }
         } else {

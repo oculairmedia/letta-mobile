@@ -80,6 +80,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.datetime.LocalTime
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.ui.theme.LettaDimens
 
 private val a2uiLog by lazy { timelineLogger("A2UI") }
 
@@ -209,7 +210,7 @@ internal fun A2uiBooleanInput(
         modifier = modifier
             .fillMaxWidth()
             .clickable(enabled = !surfaceSubmitting) { update(!checked) },
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when (kind) {
@@ -231,7 +232,7 @@ internal fun A2uiBooleanInput(
                 text = it,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (surfaceSubmitting) {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
@@ -271,7 +272,7 @@ internal fun A2uiRadio(
         modifier = modifier
             .fillMaxWidth()
             .testTag(A2uiTestTags.RADIO),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         label?.let {
             Text(
@@ -285,7 +286,7 @@ internal fun A2uiRadio(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = !surfaceSubmitting) { update(option.key) },
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(
@@ -297,7 +298,7 @@ internal fun A2uiRadio(
                     text = option.label,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (surfaceSubmitting) {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
@@ -365,7 +366,7 @@ internal fun A2uiChoicePicker(
             .fillMaxWidth()
             .then(if (surfaceSubmitting) Modifier.semantics { disabled() } else Modifier)
             .testTag(A2uiTestTags.CHOICE_PICKER),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         label?.let {
             Text(
@@ -380,7 +381,7 @@ internal fun A2uiChoicePicker(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 options.forEach { option ->
                     FilterChip(
@@ -405,7 +406,7 @@ internal fun A2uiChoicePicker(
                         .fillMaxWidth()
                         .testTag(A2uiTestTags.CHOICE_PICKER_LIST_OPTION)
                         .clickable(enabled = !surfaceSubmitting) { update(option.key) },
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (multiSelect) {
@@ -425,7 +426,7 @@ internal fun A2uiChoicePicker(
                         text = option.label,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (surfaceSubmitting) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         } else {
                             MaterialTheme.colorScheme.onSurface
                         },
@@ -717,18 +718,18 @@ private fun A2uiSkeletonIcon(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)),
     )
 }
 
 private fun A2uiComponent.iconSize(): Dp =
     raw.dpValue("sizeDp", "size_dp", "dp") ?: when (raw.stringValue("size")?.trim()?.lowercase()) {
-        "xs" -> 12.dp
-        "sm" -> 16.dp
-        "md", null, "" -> 24.dp
-        "lg" -> 32.dp
-        else -> raw.dpValue("size") ?: 24.dp
+        "xs" -> LettaDimens.Space.md
+        "sm" -> LettaDimens.Space.lg
+        "md", null, "" -> LettaDimens.Space.xl
+        "lg" -> LettaDimens.Space.xxl
+        else -> raw.dpValue("size") ?: LettaDimens.Space.xl
     }
 
 @Composable
@@ -772,7 +773,7 @@ internal fun A2uiDivider(
     if (component.raw.stringValue("axis", "orientation") == "vertical") {
         VerticalDivider(
             modifier = modifier
-                .height(component.height() ?: 32.dp)
+                .height(component.height() ?: LettaDimens.Space.xxl)
                 .testTag(A2uiTestTags.DIVIDER),
             color = MaterialTheme.colorScheme.outlineVariant,
         )
@@ -1033,20 +1034,20 @@ internal fun A2uiMedia(
         modifier = modifier
             .fillMaxWidth()
             .testTag(kind.testTag),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             if (kind == A2uiMediaKind.Video) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1065,7 +1066,7 @@ internal fun A2uiMedia(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedButton(
@@ -1118,7 +1119,7 @@ internal fun A2uiCard(
         elevation = CardDefaults.cardElevation(defaultElevation = component.elevation()),
     ) {
         val child = component.child ?: component.children.firstOrNull()
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             if (child == null) {
                 A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
             } else {
@@ -1220,19 +1221,19 @@ internal fun A2uiButton(
                 modifier = Modifier
                     .widthIn(min = 72.dp)
                     .testTag(A2uiTestTags.MISSING_TEXT),
-                height = 12.dp,
+                height = LettaDimens.Space.md,
             )
         } else {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (inFlight) {
                     CircularProgressIndicator(
                         modifier = Modifier
-                            .size(16.dp)
+                            .size(LettaDimens.Control.icon)
                             .testTag(A2uiTestTags.BUTTON_PROGRESS),
-                        strokeWidth = 2.dp,
+                        strokeWidth = LettaDimens.Space.hair,
                     )
                 }
                 Text(

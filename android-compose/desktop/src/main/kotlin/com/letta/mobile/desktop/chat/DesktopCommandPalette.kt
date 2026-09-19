@@ -45,6 +45,7 @@ import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.data.search.mascotAgentId
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Cmd/Ctrl-K command palette (Penpot "Search (command palette)"): a centered,
@@ -95,10 +96,10 @@ private fun CommandPaletteModal(onDismiss: () -> Unit, content: @Composable () -
                     indication = null,
                     onClick = {},
                 ),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.lg),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 8.dp,
+            shadowElevation = LettaDimens.Space.sm,
         ) {
             content()
         }
@@ -108,11 +109,11 @@ private fun CommandPaletteModal(onDismiss: () -> Unit, content: @Composable () -
 @Composable
 private fun PaletteSearchField(query: TextFieldValue, onQuery: (TextFieldValue) -> Unit, focusRequester: FocusRequester) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(14.dp),
+        modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
         JewelTextField(query, onQuery, modifier = Modifier.fillMaxWidth().focusRequester(focusRequester))
     }
     Box(
@@ -134,7 +135,7 @@ private fun PaletteResults(
                     text = "No matches for \"$query\"",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(LettaDimens.Space.xl),
                 )
             }
         }
@@ -145,7 +146,7 @@ private fun PaletteResults(
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs),
                 )
             }
             items(results, key = { "$kind-${it.id}" }) { item ->
@@ -161,9 +162,9 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         PaletteItemLeading(item)
         Text(
@@ -194,9 +195,9 @@ internal fun PaletteItemLeading(item: PaletteItem) {
             imageVector = Icons.Outlined.ArrowForward,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     } else {
-        AgentOrb(index = item.orbIndex ?: 0, size = 22.dp, cornerRadius = 6.dp, agentId = item.mascotAgentId())
+        AgentOrb(index = item.orbIndex ?: 0, size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm, agentId = item.mascotAgentId())
     }
 }

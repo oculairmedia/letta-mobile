@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Settings card for the agent rail: how far back an agent must have been used to stay on it. */
 @Composable
@@ -26,8 +27,8 @@ internal fun DesktopRailSettingsCard(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text("Agent rail", style = MaterialTheme.typography.titleLarge)
             Text(
@@ -35,7 +36,7 @@ internal fun DesktopRailSettingsCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 RAIL_RECENCY_CHOICES.forEach { (days, label) ->
                     DesktopRadioChip(selected = recencyDays == days, onClick = { onRecencyDaysChange(days) }) {
                         DesktopControlText(label)

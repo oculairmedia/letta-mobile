@@ -44,6 +44,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlin.reflect.KClass
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun AdaptiveScaffold(
@@ -107,7 +108,7 @@ private fun LettaNavigationRail(
     NavigationRail(
         modifier = modifier.fillMaxHeight(),
         containerColor = MaterialTheme.colorScheme.surface,
-        header = { Spacer(Modifier.width(8.dp)) },
+        header = { Spacer(Modifier.width(LettaDimens.Space.sm)) },
     ) {
         Spacer(Modifier.weight(1f))
         visibleDestinations.forEach { destination ->

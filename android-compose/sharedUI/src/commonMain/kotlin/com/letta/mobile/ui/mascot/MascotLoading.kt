@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * A wait, shown as the agent: its live mascot inside an orbiting ring. Anywhere the product has to
@@ -75,7 +76,7 @@ private fun LoadingOrbit(diameter: Dp) {
     )
     val primary = MaterialTheme.colorScheme.primary
     Canvas(Modifier.size(diameter)) {
-        val strokeWidth = 2.dp.toPx()
+        val strokeWidth = LettaDimens.Space.hair.toPx()
         val radius = (size.minDimension - strokeWidth) / 2f
         drawCircle(color = primary.copy(alpha = 0.18f), radius = radius, style = Stroke(width = strokeWidth))
         rotate(angle) {
@@ -90,5 +91,5 @@ private fun LoadingOrbit(diameter: Dp) {
 }
 
 /** The mascot's tile inside the ring; the ring adds [MascotLoadingRingInset] all round. */
-val MascotLoadingSize: Dp = 40.dp
-private val MascotLoadingRingInset = 5.dp
+val MascotLoadingSize: Dp = LettaDimens.Orb.lg
+private val MascotLoadingRingInset = LettaDimens.Space.xs

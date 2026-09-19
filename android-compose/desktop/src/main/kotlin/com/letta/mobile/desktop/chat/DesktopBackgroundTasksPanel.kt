@@ -44,6 +44,7 @@ import java.time.Duration
 import java.time.Instant
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Right-side "Background tasks" panel (Penpot "App Mockups v2" desktop board):
@@ -88,8 +89,8 @@ internal fun DesktopBackgroundTasksPanel(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             if (running.isNotEmpty()) {
                 item { SectionHeader("Running") }
@@ -116,7 +117,7 @@ private fun SectionHeader(
     onAction: (() -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.sm, bottom = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -164,14 +165,14 @@ private fun RunningTaskCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .let { if (canExpand) it.clickable { expanded = !expanded } else it }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AgentActivityOrb(size = 30.dp, activity = AgentActivity.Working)
+                AgentActivityOrb(size = LettaDimens.Orb.md, activity = AgentActivity.Working)
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
                 ) {
                     Text(
                         text = entry.taskTitle(),
@@ -193,7 +194,7 @@ private fun RunningTaskCard(
                         imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                         contentDescription = if (expanded) "Collapse" else "Expand",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                 }
             }
@@ -209,8 +210,8 @@ private fun TodoLog(todos: List<SubagentTodo>?, entry: SubagentEntry) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp)
-            .padding(bottom = 12.dp),
+            .padding(horizontal = LettaDimens.Space.lg)
+            .padding(bottom = LettaDimens.Space.md),
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -218,8 +219,8 @@ private fun TodoLog(todos: List<SubagentTodo>?, entry: SubagentEntry) {
             color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.md),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 when {
                     todos == null -> LogLine("…", "Loading activity", MaterialTheme.colorScheme.onSurfaceVariant)
@@ -249,7 +250,7 @@ private fun TodoLine(todo: SubagentTodo) {
 
 @Composable
 private fun LogLine(glyph: String, text: String, color: Color) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             text = glyph,
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -270,19 +271,19 @@ private fun FinishedTaskRow(entry: SubagentEntry) {
     val isFailure = entry.status == SubagentStatus.FAILED || entry.status == SubagentStatus.CANCELLED
     val accent = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.customColors.successColor
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = if (isFailure) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle,
             contentDescription = null,
             tint = accent,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
         ) {
             Text(
                 text = entry.taskTitle(),
@@ -327,11 +328,11 @@ internal fun DesktopBackgroundTasksToggle(
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shadowElevation = 2.dp,
+                shadowElevation = LettaDimens.Space.hair,
             ) {
-                Box(modifier = Modifier.padding(7.dp)) {
+                Box(modifier = Modifier.padding(LettaDimens.Space.sm)) {
                     AgentActivityOrb(
-                        size = 22.dp,
+                        size = LettaDimens.Space.xl,
                         activity = if (runningCount > 0) AgentActivity.Working else AgentActivity.Idle,
                     )
                 }

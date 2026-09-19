@@ -49,6 +49,7 @@ import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.ZoomIn
 import com.composables.icons.lucide.ZoomOut
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The board's chrome, in the layout whiteboard tools converge on: a small title pill top-left,
@@ -68,7 +69,7 @@ internal fun CanvasTitlePill(
         if (onNavigateBack != null) {
             PillIconButton(Lucide.ChevronLeft, "Back", onClick = onNavigateBack)
         }
-        Column(modifier = Modifier.padding(start = if (onNavigateBack == null) 12.dp else 2.dp, end = 14.dp)) {
+        Column(modifier = Modifier.padding(start = if (onNavigateBack == null) LettaDimens.Space.md else LettaDimens.Space.hair, end = LettaDimens.Space.lg)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
@@ -134,7 +135,7 @@ internal fun CanvasActionsPill(
             text = "${zoom.scalePercent}%",
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier
-                .widthIn(min = 36.dp)
+                .widthIn(min = LettaDimens.Space.xxl)
                 .semantics { contentDescription = "Zoom level" }
                 .pointerInput(zoom.onActualSize) { detectTapGestures(onDoubleTap = { zoom.onActualSize() }) },
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -160,19 +161,19 @@ internal fun CanvasActionsPill(
                     text = "Background",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs),
                 )
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     BoardBackgrounds.forEach { entry ->
                         Box(
                             modifier = Modifier
-                                .size(26.dp)
+                                .size(LettaDimens.Control.iconButton)
                                 .background(entry.color, CircleShape)
                                 .border(
-                                    width = if (entry.color == background.color) 2.dp else 1.dp,
+                                    width = if (entry.color == background.color) LettaDimens.Space.hair else 1.dp,
                                     color = if (entry.color == background.color) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                                     shape = CircleShape,
                                 )
@@ -185,8 +186,8 @@ internal fun CanvasActionsPill(
                         palette = BoardBackgrounds,
                         label = "Background color",
                         onPick = background.onColor,
-                        swatchSize = 26.dp,
-                        modifier = Modifier.size(26.dp),
+                        swatchSize = LettaDimens.Space.xl,
+                        modifier = Modifier.size(LettaDimens.Control.iconButton),
                     )
                 }
                 BackgroundPatternRows(background)
@@ -200,8 +201,8 @@ internal fun CanvasActionsPill(
 private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
     val pattern = background.pattern
     Row(
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CanvasBackgroundPattern.KINDS.forEach { kind ->
@@ -212,8 +213,8 @@ private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
     }
     if (pattern.kind != CanvasBackgroundPattern.NONE) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CanvasBackgroundPattern.SPACINGS.forEach { spacing ->
@@ -221,14 +222,14 @@ private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
                     background.onPattern(pattern.copy(spacing = spacing))
                 }
             }
-            Box(modifier = Modifier.size(6.dp))
+            Box(modifier = Modifier.size(LettaDimens.Space.sm))
             ColorSwatchPicker(
                 current = pattern.tint(),
                 palette = StrokePalette,
                 label = "Pattern color",
                 onPick = { background.onPattern(pattern.copy(colorHex = it.toHex())) },
-                swatchSize = 22.dp,
-                modifier = Modifier.size(26.dp),
+                swatchSize = LettaDimens.Space.xl,
+                modifier = Modifier.size(LettaDimens.Control.iconButton),
             )
         }
     }
@@ -238,7 +239,7 @@ private fun BackgroundPatternRows(background: CanvasBackgroundActions) {
 private fun MenuChip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier.semantics { contentDescription = description },
     ) {
@@ -246,7 +247,7 @@ private fun MenuChip(label: String, description: String, selected: Boolean, onCl
             text = label,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         )
     }
 }
@@ -255,8 +256,8 @@ private fun MenuChip(label: String, description: String, selected: Boolean, onCl
 private fun PillDivider() {
     Box(
         modifier = Modifier
-            .padding(horizontal = 3.dp)
-            .size(width = 1.dp, height = 20.dp)
+            .padding(horizontal = LettaDimens.Space.xs)
+            .size(width = 1.dp, height = LettaDimens.Space.xl)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
     )
 }
@@ -266,7 +267,7 @@ private fun PillDivider() {
 internal fun CanvasStatusLine(text: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.85f),
     ) {
         Text(
@@ -275,7 +276,7 @@ internal fun CanvasStatusLine(text: String, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).widthIn(max = 360.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs).widthIn(max = 360.dp),
         )
     }
 }
@@ -294,15 +295,15 @@ internal val BoardBackgrounds: List<NamedColor> = listOf(
 private fun ChromePill(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-        shadowElevation = 4.dp,
+        shadowElevation = LettaDimens.Space.xs,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
             content = { content() },
         )
     }
@@ -310,8 +311,8 @@ private fun ChromePill(modifier: Modifier = Modifier, content: @Composable () ->
 
 @Composable
 private fun PillIconButton(icon: ImageVector, label: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(34.dp).semantics { contentDescription = label }) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+    IconButton(onClick = onClick, modifier = Modifier.size(LettaDimens.Control.iconButtonLg).semantics { contentDescription = label }) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
@@ -319,7 +320,7 @@ private fun PillIconButton(icon: ImageVector, label: String, onClick: () -> Unit
 private fun MenuEntry(icon: ImageVector, label: String, onClick: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label) },
-        leadingIcon = { Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
+        leadingIcon = { Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
         onClick = onClick,
     )
 }

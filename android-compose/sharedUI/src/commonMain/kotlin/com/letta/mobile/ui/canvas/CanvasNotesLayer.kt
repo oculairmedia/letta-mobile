@@ -55,6 +55,7 @@ import com.letta.mobile.data.canvas.CanvasSession
 import io.ak1.drawbox.domain.model.Viewport
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The canvas's block documents as elements on the board, one card per document, placed in the
@@ -192,14 +193,14 @@ private fun CanvasNoteCard(
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
         border = when {
-            active || selection.selected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            active || selection.selected -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.primary)
             plain -> null
-            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+            else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         },
         shadowElevation = when {
             plain && !active -> 0.dp
-            active -> 8.dp
-            else -> 4.dp
+            active -> LettaDimens.Space.sm
+            else -> LettaDimens.Space.xs
         },
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -224,7 +225,7 @@ private fun CanvasNoteCard(
                         json = document.json,
                         onLightSurface = tint != null && !plain,
                         style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) 18.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                        modifier = Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
                     )
                 } else {
                     CanvasBlockEditor(
@@ -235,7 +236,7 @@ private fun CanvasNoteCard(
                         onLightSurface = tint != null && !plain,
                         onToolbar = onToolbar,
                         style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) 18.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                        modifier = Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
                     )
                 }
                 if (plain && active) {
@@ -295,16 +296,16 @@ private fun NoteHandleBar(
             .height(HANDLE_HEIGHT)
             .background(onCard.copy(alpha = 0.08f))
             .dragHandle(onDragStart, onDrag, onDragEnd)
-            .padding(start = 8.dp, end = 2.dp),
+            .padding(start = LettaDimens.Space.sm, end = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Lucide.GripVertical,
             contentDescription = "Move note",
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             tint = onCard,
         )
-        Spacer(modifier = Modifier.size(6.dp))
+        Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
         Text(
             text = "Note",
             style = MaterialTheme.typography.labelSmall,
@@ -316,7 +317,7 @@ private fun NoteHandleBar(
             Icon(
                 imageVector = Lucide.Maximize2,
                 contentDescription = "Open note",
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = onCard,
             )
         }
@@ -324,7 +325,7 @@ private fun NoteHandleBar(
             Icon(
                 imageVector = Lucide.X,
                 contentDescription = "Remove note",
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = onCard,
             )
         }
@@ -341,7 +342,7 @@ private fun TextMoveGrip(
 ) {
     Box(
         modifier = modifier
-            .size(18.dp)
+            .size(LettaDimens.Control.icon)
             .dragHandle(onDragStart, onDrag, onDragEnd)
             .semantics { contentDescription = "Move text" },
         contentAlignment = Alignment.Center,
@@ -349,7 +350,7 @@ private fun TextMoveGrip(
         Icon(
             imageVector = Lucide.GripVertical,
             contentDescription = null,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -364,16 +365,16 @@ private fun NoteResizeHandle(
 ) {
     Box(
         modifier = modifier
-            .size(18.dp)
+            .size(LettaDimens.Control.icon)
             .dragHandle(onDragStart, onDrag, onDragEnd)
             .semantics { contentDescription = "Resize note" },
         contentAlignment = Alignment.BottomEnd,
     ) {
         Box(
             modifier = Modifier
-                .padding(4.dp)
-                .size(8.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .padding(LettaDimens.Space.xs)
+                .size(LettaDimens.Space.sm)
+                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                 .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
         )
     }
@@ -413,5 +414,5 @@ private const val TEXT_DEFAULT_HEIGHT = 120f
 private const val NOTE_DEFAULT_ORIGIN = 80f
 private const val NOTE_STAGGER = 40f
 private const val NOTE_MIN_SIZE = 140f
-private val NOTE_CORNER = 12.dp
-private val HANDLE_HEIGHT = 28.dp
+private val NOTE_CORNER = LettaDimens.Radius.md
+private val HANDLE_HEIGHT = LettaDimens.Control.iconButton

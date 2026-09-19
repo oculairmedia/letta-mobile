@@ -93,6 +93,7 @@ import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.shimmerColor
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal val LocalChatShouldDeferHeavyToolCards = compositionLocalOf { false }
 
@@ -181,8 +182,8 @@ internal fun SubagentNotificationCard(
     }
 
     Column(
-        modifier = modifier.padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier.padding(vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         if (isSuccessfulCompletion) {
             // A completed activity contributes one touch-sized timeline row. Its raw
@@ -251,11 +252,11 @@ private fun SubagentCompletedSummaryRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 48.dp)
+            .defaultMinSize(minHeight = LettaDimens.Orb.railSlotWidth)
             .testTag("completed-activity-summary")
             .semantics { contentDescription = "Completed" }
             .clickable(onClick = onToggleDetails)
-            .padding(vertical = 8.dp),
+            .padding(vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -264,7 +265,7 @@ private fun SubagentCompletedSummaryRow(
             modifier = Modifier.size(LettaIconSizing.Inline),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
         Text(
             text = summary,
             style = MaterialTheme.typography.listItemSupporting,
@@ -277,7 +278,7 @@ private fun SubagentCompletedSummaryRow(
             imageVector = LettaIcons.ExpandMore,
             contentDescription = disclosure,
             modifier = Modifier
-                .size(14.dp)
+                .size(LettaDimens.Control.icon)
                 .rotate(if (expanded) 180f else 0f),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -294,7 +295,7 @@ private fun SubagentNotificationExpandedContent(
     onOpenSubagent: () -> Unit,
     onToggleDetails: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         notification.summary?.let { summary ->
             Text(
                 text = summary,
@@ -319,7 +320,7 @@ private fun SubagentNotificationExpandedContent(
 
 @Composable
 private fun SubagentNotificationMetadata(notification: UiSubagentNotification) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         notification.usage?.takeIf { it.isNotBlank() }?.let { SubagentMetaChip(text = it) }
         notification.durationMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
         notification.taskId?.let { SubagentMetaChip(text = it) }
@@ -340,7 +341,7 @@ private fun SubagentNotificationHeader(
             modifier = Modifier.size(LettaIconSizing.Inline),
             tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
         Text(
             text = "${notification.activityLabel()} $headline",
             style = MaterialTheme.typography.chatBubbleSender,
@@ -377,7 +378,7 @@ private fun SubagentNotificationActions(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         if (canOpenSubagent) {
             Text(
@@ -385,17 +386,17 @@ private fun SubagentNotificationActions(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .defaultMinSize(minHeight = 32.dp)
+                    .defaultMinSize(minHeight = LettaDimens.Space.xxl)
                     .clickable(onClick = onOpenSubagent)
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = LettaDimens.Space.sm),
             )
         }
         if (hasDetails) {
             Row(
                 modifier = Modifier
-                    .defaultMinSize(minHeight = 32.dp)
+                    .defaultMinSize(minHeight = LettaDimens.Space.xxl)
                     .clickable(onClick = onToggleDetails)
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -407,7 +408,7 @@ private fun SubagentNotificationActions(
                     imageVector = LettaIcons.ExpandMore,
                     contentDescription = disclosure,
                     modifier = Modifier
-                        .size(14.dp)
+                        .size(LettaDimens.Control.icon)
                         .rotate(if (expanded) 180f else 0f),
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -418,7 +419,7 @@ private fun SubagentNotificationActions(
 
 @Composable
 private fun SubagentNotificationDetails(report: String?, transcriptUri: String?) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         report?.let {
             MarkdownText(text = it, textColor = MaterialTheme.colorScheme.onSurface)
         }
@@ -458,8 +459,8 @@ internal fun SubagentDispatchCard(
     Column(
         modifier = modifier
             .then(openTodosModifier)
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -468,7 +469,7 @@ internal fun SubagentDispatchCard(
                 modifier = Modifier.size(LettaIconSizing.Inline),
                 tint = MaterialTheme.colorScheme.tertiary,
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(
                 text = "Dispatched: ${dispatch.description}",
                 style = MaterialTheme.typography.chatBubbleSender,
@@ -479,11 +480,11 @@ internal fun SubagentDispatchCard(
             )
             if (dispatch.runInBackground) {
                 SubagentMetaChip(text = "background")
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
             }
             SubagentMetaChip(text = dispatch.subagentType)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             status?.let { SubagentMetaChip(text = subagentDispatchStatus(it)) }
             executionTimeMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
             dispatch.taskId?.let { SubagentMetaChip(text = it) }
@@ -508,7 +509,7 @@ internal fun SubagentDispatchCard(
                     imageVector = LettaIcons.ExpandMore,
                     contentDescription = if (expanded) "Hide prompt" else "Show prompt",
                     modifier = Modifier
-                        .size(14.dp)
+                        .size(LettaDimens.Control.icon)
                         .rotate(if (expanded) 180f else 0f),
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -544,7 +545,7 @@ private fun SubagentMetaChip(text: String) {
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
         )
     }
 }
@@ -686,7 +687,7 @@ internal fun ToolCallCard(
     }
 
     // Dropped the Card's background fill + outline border — chrome enough on its own.
-    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
         // Single-line header — tap to expand/collapse
         Row(
             modifier = Modifier
@@ -698,7 +699,7 @@ internal fun ToolCallCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(display.emoji, style = codeStyle)
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(
                 text = compactTitle,
                 style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily),
@@ -714,11 +715,11 @@ internal fun ToolCallCard(
             // animates from "requesting input" to "approved".
             if (approvalState != null) {
                 AnimatedToolApprovalChip(state = approvalState)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
             }
             executionTimeText?.let { time ->
                 ToolMetaChip(text = time)
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
             }
             if (isError) {
                 Icon(
@@ -837,16 +838,16 @@ internal fun GeneratedImageToolCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f),
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         ),
         border = BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.38f),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -870,7 +871,7 @@ internal fun GeneratedImageToolCard(
                         else -> MaterialTheme.colorScheme.onTertiaryContainer
                     },
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (hasImage) "Generated image" else "Generating image",
@@ -935,19 +936,22 @@ internal fun GeneratedImageToolCard(
     }
 }
 
+// Image placeholder geometry: fixed presentation height for generated image shimmer
+private val GeneratedImagePlaceholderHeight = 220.dp
+
 @Composable
 private fun GeneratedImageShimmer(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .height(220.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .height(GeneratedImagePlaceholderHeight)
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(18.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .padding(LettaDimens.Space.lg)
+                .clip(RoundedCornerShape(LettaDimens.Radius.md))
                 .background(shimmerColor()),
         )
     }
@@ -1055,7 +1059,7 @@ private fun ToolCallExpandedBodyContentInner(
                             isWarning = isWarning,
                             fontScale = fontScale,
                         )
-        Column(modifier = Modifier.padding(top = 4.dp)) {
+        Column(modifier = Modifier.padding(top = LettaDimens.Space.xs)) {
             // letta-mobile (toolcard-dedup): removed the "Tool: <name>" line
             // (the header already names the tool). Timing/detail kept below.
             executionTimeText?.let { time ->
@@ -1098,7 +1102,7 @@ private fun ToolCallExpandedBodyContentInner(
                     animationSpec = ChatMotion.chipCrossfadeSpec,
                     label = "ToolOutputChevronRotation",
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1125,13 +1129,13 @@ private fun ToolCallExpandedBodyContentInner(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
                     }
                     Icon(
                         imageVector = LettaIcons.ExpandMore,
                         contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
                         modifier = Modifier
-                            .size(14.dp)
+                            .size(LettaDimens.Control.icon)
                             .rotate(resultChevronRotation),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                     )
@@ -1162,7 +1166,7 @@ internal fun ToolCallExpandedSummary(
     fontScale: Float,
 ) {
     argumentSummary?.let { summary ->
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
         ToolSummaryLine(
             label = summary.label,
             value = summary.value,
@@ -1176,7 +1180,7 @@ internal fun ToolCallExpandedSummary(
     // — it duplicated the Output section below. Keep only the running-status
     // hint for in-flight calls that have no Output yet.
     if (resultPreview == null && toolCall.result == null) {
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
         ToolSummaryLine(
             label = "Status",
             value = "Running",
@@ -1205,8 +1209,8 @@ internal fun UiToolCall.toolCallMotionKey(): String = buildString {
 internal fun ToolApprovalChip(state: ToolApprovalState) {
     val container = when (state) {
         ToolApprovalState.RequestingInput -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-        ToolApprovalState.Approved -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-        ToolApprovalState.Rejected -> MaterialTheme.colorScheme.error.copy(alpha = 0.18f)
+        ToolApprovalState.Approved -> MaterialTheme.colorScheme.primaryContainer
+        ToolApprovalState.Rejected -> MaterialTheme.colorScheme.errorContainer
     }
     val text = when (state) {
         ToolApprovalState.RequestingInput -> stringResource(R.string.screen_chat_tool_approval_chip_requesting_input)
@@ -1226,7 +1230,7 @@ internal fun ToolApprovalChip(state: ToolApprovalState) {
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = tint,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
         )
     }
 }
@@ -1241,7 +1245,7 @@ internal fun ToolMetaChip(text: String) {
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

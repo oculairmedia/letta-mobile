@@ -57,6 +57,7 @@ import com.letta.mobile.ui.components.LettaSectionLabel
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
 import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Sidebar header: the title slot, then the agent's kebab.
@@ -74,7 +75,7 @@ internal fun SidebarAgentHeader(
     val home = state.selectedDestination == DesktopDestination.Home
     // The mascot is the header: large, the name beneath it, the kebab tucked in the corner so
     // the character has the width to itself.
-    Box(Modifier.fillMaxWidth().padding(start = 2.dp, bottom = 16.dp)) {
+    Box(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.hair, bottom = LettaDimens.Space.lg)) {
         SidebarHeaderTitleSlot(
             state = state,
             onEditAgent = actions.onEditAgent,
@@ -156,7 +157,7 @@ private fun SidebarAgentIdentity(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         // The agent pane's hero seat: the mascot stands here, large, whenever the pane shows.
         // The seat is empty while the character is away (the hop leaves nothing behind); an
@@ -165,10 +166,10 @@ private fun SidebarAgentIdentity(
         MascotSeat(
             agentId = identity.agentId,
             stage = MascotStage.AGENT_PANE_HERO,
-            size = if (mascot != null) SidebarHeroSeatSize else 30.dp,
+            size = if (mascot != null) SidebarHeroSeatSize else LettaDimens.Space.xxl,
             onEdit = onEditAgent,
         ) { vacancy ->
-            if (vacancy == MascotSeatVacancy.NO_MASCOT) AgentOrb(index = identity.agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
+            if (vacancy == MascotSeatVacancy.NO_MASCOT) AgentOrb(index = identity.agentOrbIndex, size = LettaDimens.Orb.md, cornerRadius = LettaDimens.Radius.sm)
         }
         Text(
             text = identity.agentName,
@@ -179,9 +180,9 @@ private fun SidebarAgentIdentity(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
             modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                 .clickable(onClick = onEditAgent)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
         )
     }
 }
@@ -195,7 +196,7 @@ private fun SidebarAgentOverflowMenu(actions: DesktopAgentSidebarActions) {
             contentDescription = "Agent menu",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .size(16.dp)
+                .size(LettaDimens.Control.icon)
                 .clickable { menuOpen = true },
         )
         if (menuOpen) {
@@ -267,7 +268,7 @@ internal fun ColumnScope.SidebarConversationList(
         modifier = Modifier
             .fillMaxWidth()
             .weight(1f),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         items(items = state.conversations, key = { it.id }) { conversation ->
             SidebarConversationListItem(
@@ -301,8 +302,8 @@ private fun SidebarArchiveFilterRow(
     onArchiveFilterChange: (ConversationArchiveFilter) -> Unit,
 ) {
     Row(
-        modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.sm),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         ConversationArchiveFilter.entries.forEach { filter ->
             DesktopChipTab(text = filter.label, active = archiveFilter == filter) {

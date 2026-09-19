@@ -30,6 +30,7 @@ import com.composables.icons.lucide.Trash2
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The contextual bar at the top of the board, the way Concepts and Miro show what applies to the
@@ -57,14 +58,14 @@ fun CanvasSelectionBar(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        tonalElevation = 2.dp,
-        shadowElevation = 6.dp,
+        tonalElevation = LettaDimens.Space.hair,
+        shadowElevation = LettaDimens.Space.sm,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CanvasPropertyControl(
@@ -118,7 +119,7 @@ private fun BarButton(icon: ImageVector, label: String, selected: Boolean = fals
         modifier = Modifier.size(BAR_BUTTON).semantics { contentDescription = label },
         colors = if (selected) IconButtonDefaults.filledTonalIconButtonColors() else IconButtonDefaults.iconButtonColors(),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
@@ -126,11 +127,11 @@ private fun BarButton(icon: ImageVector, label: String, selected: Boolean = fals
 private fun Divider() {
     Box(
         modifier = Modifier
-            .padding(horizontal = 2.dp)
+            .padding(horizontal = LettaDimens.Space.hair)
             .width(1.dp)
-            .height(22.dp)
+            .height(LettaDimens.Space.xl)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
     )
 }
 
-private val BAR_BUTTON = 34.dp
+private val BAR_BUTTON = LettaDimens.Space.xxl

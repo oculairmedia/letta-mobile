@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Renders a contiguous run of assistant messages sharing a `runId` as a
@@ -377,13 +378,13 @@ private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowMod
     // (DefaultStepDotCenterY = 17.dp). Anything heavier than 7.dp vertical
     // padding pushes the text below the dot.
     Surface(
-        modifier = rowModifier.padding(vertical = 7.dp),
+        modifier = rowModifier.padding(vertical = LettaDimens.Space.sm),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
     ) {
         Text(
             text = message.content,
-            modifier = Modifier.padding(horizontal = 12.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
             style = MaterialTheme.typography.bodyMedium,
         )
     }

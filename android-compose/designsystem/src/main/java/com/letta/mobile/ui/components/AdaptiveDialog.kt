@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +52,7 @@ fun AdaptiveDialog(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
-                            .padding(16.dp),
+                            .padding(LettaDimens.Space.lg),
                     ) {
                         content()
                     }
@@ -63,7 +64,7 @@ fun AdaptiveDialog(
                     modifier = modifier
                         .widthIn(max = 900.dp)
                         .fillMaxWidth()
-                        .padding(40.dp),
+                        .padding(LettaDimens.Orb.lg),
                 ) {
                     CenterAlignedTopAppBar(
                         title = { Text(title) },
@@ -74,7 +75,7 @@ fun AdaptiveDialog(
                         },
                     )
                     androidx.compose.foundation.layout.Box(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(LettaDimens.Space.lg),
                     ) {
                         content()
                     }

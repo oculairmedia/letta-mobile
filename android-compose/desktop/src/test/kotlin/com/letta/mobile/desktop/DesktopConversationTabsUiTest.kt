@@ -4,6 +4,9 @@ package com.letta.mobile.desktop
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.center
+import com.letta.mobile.ui.search.SearchFieldTestTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertCountEquals
@@ -44,14 +47,13 @@ class DesktopConversationTabsUiTest {
         assertEquals("conversation-1", closedId)
     }
 
+    // The chevron picker is gone: unified search moved to a persistent field in
+    // the header (DesktopHeaderSearch / LettaSearchAnchoredField), which searches
+    // agents and canvases too, not just this agent's conversations. What remains
+    // on the strip is the "+".
     @Test
-    fun plusOpensANewConversationAndThePickerSearchesConversationsAndCanvases() = runComposeUiTest {
+    fun plusStartsANewConversation() = runComposeUiTest {
         var newConversations = 0
-        var opened: com.letta.mobile.data.desktopshell.TabPickerItem? = null
-        val items = listOf(
-            com.letta.mobile.data.desktopshell.TabPickerItem("c-2", "paginated response notes", "Ada", com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION),
-            com.letta.mobile.data.desktopshell.TabPickerItem("k-4", "Canvas 4", "Canvas", com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS),
-        )
         setContent {
             DesktopMaterialTheme {
                 DesktopConversationTabRow(
@@ -59,8 +61,6 @@ class DesktopConversationTabsUiTest {
                     activeConversationId = "conversation-1",
                     actions = DesktopConversationTabActions(
                         onNewConversation = { newConversations++ },
-                        pickerItems = items,
-                        onOpenPickerItem = { opened = it },
                     ),
                 )
             }
@@ -68,16 +68,6 @@ class DesktopConversationTabsUiTest {
 
         onNodeWithContentDescription("New conversation tab").performClick()
         assertEquals(1, newConversations)
-
-        onNodeWithContentDescription("Open conversation or canvas").performClick()
-        onNodeWithContentDescription("Open conversation paginated response notes").assertExists()
-        onNodeWithContentDescription("Open canvas Canvas 4").assertExists()
-        // Typing filters: "canv" leaves only the canvas.
-        onNodeWithContentDescription("Search tabs").performTextInput("canv")
-        onAllNodesWithContentDescription("Open conversation paginated response notes").assertCountEquals(0)
-        onNodeWithContentDescription("Open canvas Canvas 4").performClick()
-        assertEquals("k-4", opened?.id)
-        assertEquals(com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS, opened?.kind)
     }
 
     @Test

@@ -52,6 +52,7 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Feature flag: when false, the tool-affordance chip strip above the
@@ -106,7 +107,7 @@ internal fun ChatScreenLayout(
                 haptic = haptic,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = params.contentPadding.calculateTopPadding() + 8.dp, end = 8.dp),
+                    .padding(top = params.contentPadding.calculateTopPadding() + LettaDimens.Space.sm, end = LettaDimens.Space.sm),
             ),
         )
         ChatScreenComposerColumn(
@@ -479,7 +480,7 @@ private fun ChatScreenThinkingTokenSection(
         reducedMotion = reducedMotion,
         reserveSpace = thinkingTokenActive,
         // Beside the mascot companion: no leading inset, the row already places it.
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(end = 16.dp, top = 4.dp, bottom = 4.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(end = LettaDimens.Space.lg, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
     )
 }
 

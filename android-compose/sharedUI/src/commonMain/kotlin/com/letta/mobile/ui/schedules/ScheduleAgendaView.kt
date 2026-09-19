@@ -46,6 +46,7 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
+import com.letta.mobile.ui.theme.LettaDimens
 
 data class AgendaViewParams(
     val defs: List<ScheduleDef>,
@@ -72,10 +73,10 @@ fun AgendaView(params: AgendaViewParams) {
     }
     val completed = agenda.runs.count { it.status == RunStatus.Done }
     val cadenceById = remember(params.defs) { cadenceLabels(params.defs) }
-    Column(Modifier.fillMaxSize().padding(horizontal = 28.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.xxl)) {
         AgendaMonthHeader(params)
         AgendaDateStrip(params.selectedDate, params.today, params.onSelectDate)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(LettaDimens.Space.lg))
         Text(
             dayHeading(params.selectedDate, params.today),
             style = MaterialTheme.typography.titleMedium,
@@ -87,7 +88,7 @@ fun AgendaView(params: AgendaViewParams) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.customColors.onSurfaceMutedColor,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(LettaDimens.Space.md))
         AgendaRunList(
             AgendaRunListParams(
                 runs = agenda.runs,
@@ -117,7 +118,7 @@ private fun cadenceLabels(defs: List<ScheduleDef>): Map<String, String> =
 private fun AgendaMonthHeader(params: AgendaViewParams) {
     val isToday = params.selectedDate == params.today
     Row(
-        Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        Modifier.fillMaxWidth().padding(bottom = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -133,7 +134,7 @@ private fun AgendaMonthHeader(params: AgendaViewParams) {
                     else MaterialTheme.colorScheme.surfaceContainerHigh,
                 )
                 .clickable { params.onSelectDate(params.today) }
-                .padding(horizontal = 12.dp, vertical = 5.dp),
+                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
         ) {
             Text(
                 "Today",
@@ -186,7 +187,7 @@ fun AgendaDateStrip(selectedDate: LocalDate, today: LocalDate, onSelect: (LocalD
 fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
     val selected = date == selectedDate
     Column(
-        Modifier.padding(2.dp).clickable { onSelect(date) }.padding(vertical = 6.dp),
+        Modifier.padding(LettaDimens.Space.hair).clickable { onSelect(date) }.padding(vertical = LettaDimens.Space.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -194,9 +195,9 @@ fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: LocalDate, on
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.customColors.onSurfaceMutedColor,
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(LettaDimens.Space.xs))
         Box(
-            Modifier.size(34.dp).clip(CircleShape)
+            Modifier.size(LettaDimens.Orb.md).clip(CircleShape)
                 .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent),
             contentAlignment = Alignment.Center,
         ) {
@@ -229,10 +230,10 @@ fun AgendaRow(params: AgendaRowParams) {
             time,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(52.dp).padding(top = 12.dp),
+            modifier = Modifier.width(52.dp).padding(top = LettaDimens.Space.md),
         )
         AgendaStatusRail(status = params.run.status)
-        Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
+        Column(Modifier.weight(1f).padding(vertical = LettaDimens.Space.md)) {
             Text(
                 params.run.scheduleName,
                 style = MaterialTheme.typography.bodyMedium,
@@ -256,20 +257,20 @@ fun AgendaRow(params: AgendaRowParams) {
             if (params.run.status == RunStatus.Done) "Ran $time" else label,
             style = MaterialTheme.typography.labelMedium,
             color = color,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = LettaDimens.Space.md),
         )
     }
 }
 
 @Composable
 private fun AgendaStatusRail(status: RunStatus) {
-    Box(Modifier.width(24.dp).fillMaxHeight()) {
+    Box(Modifier.width(LettaDimens.Space.xl).fillMaxHeight()) {
         Box(
             Modifier.align(Alignment.Center).width(1.dp).fillMaxHeight()
                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         )
         Box(
-            Modifier.align(Alignment.TopCenter).padding(top = 14.dp).size(10.dp).clip(CircleShape)
+            Modifier.align(Alignment.TopCenter).padding(top = LettaDimens.Space.lg).size(LettaDimens.Control.iconSm).clip(CircleShape)
                 .background(statusColor(status)),
         )
     }

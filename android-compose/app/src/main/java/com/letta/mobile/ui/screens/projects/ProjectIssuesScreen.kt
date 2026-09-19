@@ -99,6 +99,7 @@ import com.pushpal.jetlime.ItemsList
 import com.pushpal.jetlime.JetLimeColumn
 import com.pushpal.jetlime.JetLimeEvent
 import com.pushpal.jetlime.JetLimeEventDefaults
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -448,8 +449,8 @@ private fun IssueFilterRow(
 ) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         val statuses = listOf(null, "open", "in_progress", "closed")
         statuses.forEach { status ->
@@ -479,8 +480,8 @@ private fun ProjectIssueCreationChartCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text(
                 text = stringResource(R.string.screen_project_issues_created_chart_title),
@@ -488,8 +489,8 @@ private fun ProjectIssueCreationChartCard(
             )
             summary?.let {
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     IssueMetaChip(stringResource(R.string.screen_project_issues_analytics_created_total, it.totalCreatedInRange))
                     IssueMetaChip(stringResource(R.string.screen_project_issues_analytics_completed_total, it.totalCompletedInRange))
@@ -580,20 +581,20 @@ private fun ProjectIssueCompletedTimelineCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = LettaCardDefaults.listContainerColor,
-        tonalElevation = 2.dp,
+        tonalElevation = LettaDimens.Space.hair,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = items.isNotEmpty()) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 Text(
                     text = stringResource(R.string.screen_project_issues_completed_timeline_title),
@@ -618,7 +619,7 @@ private fun ProjectIssueCompletedTimelineCard(
                             stringResource(R.string.action_expand)
                         },
                         modifier = Modifier
-                            .size(20.dp)
+                            .size(LettaDimens.Control.iconButtonSm)
                             .rotate(chevronRotation),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -640,7 +641,7 @@ private fun ProjectIssueCompletedTimelineCard(
                     enter = projectTimelineExpandEnter(),
                     exit = projectTimelineExpandExit(),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                         val timelineHeight = ((items.size.coerceAtMost(4) * 96) + 24).dp
                         val pointFillColor = MaterialTheme.colorScheme.tertiary
                         val pointColor = MaterialTheme.colorScheme.tertiaryContainer
@@ -665,9 +666,9 @@ private fun ProjectIssueCompletedTimelineCard(
                                     position = position,
                                     pointColor = if (isHighlighted) highlightPointColor else pointColor,
                                     pointFillColor = if (isHighlighted) highlightPointFill else pointFillColor,
-                                    pointRadius = if (isHighlighted) 12.dp else 10.dp,
+                                    pointRadius = if (isHighlighted) LettaDimens.Space.md else LettaDimens.Space.md,
                                     pointStrokeColor = if (isHighlighted) highlightStroke else pointStrokeColor,
-                                    pointStrokeWidth = if (isHighlighted) 2.dp else 1.dp,
+                                    pointStrokeWidth = if (isHighlighted) LettaDimens.Space.hair else 1.dp,
                                     pointType = EventPointType.filled(1f),
                                 ),
                             ) {
@@ -719,17 +720,17 @@ private fun ProjectIssueTimelineEvent(
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = if (highlighted) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainerHighest
         },
-        tonalElevation = if (highlighted) 3.dp else 1.dp,
+        tonalElevation = if (highlighted) LettaDimens.Space.xs else 1.dp,
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = stringResource(R.string.screen_project_issues_completed_at, formatRelativeTime(item.completedAt)),
@@ -743,8 +744,8 @@ private fun ProjectIssueTimelineEvent(
                 overflow = TextOverflow.Ellipsis,
             )
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 IssueMetaChip(item.id)
                 IssueMetaChip(item.statusLabel)
@@ -764,20 +765,20 @@ private fun ProjectIssueCard(
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = LettaCardDefaults.listContainerColor,
-        tonalElevation = 2.dp,
+        tonalElevation = LettaDimens.Space.hair,
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                     Text(issue.id, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     Text(issue.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
@@ -792,7 +793,7 @@ private fun ProjectIssueCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 issue.priority?.let { IssueMetaChip(it.uppercase()) }
                 issue.type?.let { IssueMetaChip(it) }
                 issue.assignee?.takeIf { it.isNotBlank() }?.let { IssueMetaChip(it) }
@@ -806,17 +807,17 @@ private fun ProjectIssueCard(
 private fun ProjectIssueHeader(issue: ProjectIssueDetail) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = LettaCardDefaults.listContainerColor,
-        tonalElevation = 3.dp,
+        tonalElevation = LettaDimens.Space.xs,
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text(issue.id, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(issue.title, style = MaterialTheme.typography.headlineSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 IssueStatusChip(issue.statusLabel ?: issue.status, issue.ready)
                 issue.priority?.let { IssueMetaChip(it.uppercase()) }
                 issue.type?.let { IssueMetaChip(it) }
@@ -889,7 +890,7 @@ private fun IssueStatusChip(status: String, ready: Boolean) {
         onClick = {},
         label = { Text(if (ready) stringResource(R.string.screen_project_issues_ready_label) else status.toIssueLabel()) },
         leadingIcon = {
-            Icon(LettaIcons.Circle, contentDescription = null, modifier = Modifier.size(12.dp), tint = content)
+            Icon(LettaIcons.Circle, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = content)
         },
         colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
             containerColor = container,
@@ -953,8 +954,8 @@ private fun previewReadyIssueSummary() = ProjectIssueSummary(
 private fun ProjectIssueCardPreview() {
     LettaPreviewFrame {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             ProjectIssueCard(issue = previewProjectIssueSummary(), onClick = {})
             ProjectIssueCard(issue = previewReadyIssueSummary(), onClick = {})
@@ -967,8 +968,8 @@ private fun ProjectIssueCardPreview() {
 private fun ProjectIssueStatusChipPreview() {
     LettaPreviewFrame {
         Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             IssueStatusChip(status = "open", ready = false)
             IssueStatusChip(status = "in_progress", ready = false)
@@ -983,8 +984,8 @@ private fun ProjectIssueStatusChipPreview() {
 private fun ProjectIssueMetaChipPreview() {
     LettaPreviewFrame {
         Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             IssueMetaChip(value = "high")
             IssueMetaChip(value = "task")

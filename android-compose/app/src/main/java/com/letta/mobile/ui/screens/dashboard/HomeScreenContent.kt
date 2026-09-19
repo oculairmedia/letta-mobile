@@ -31,6 +31,7 @@ import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun HomeContent(
@@ -70,13 +71,13 @@ private fun HomeErrorBanner(error: String?) {
             .fillMaxWidth()
             .padding(horizontal = LettaSpacing.SCREEN_HORIZONTAL)
             .padding(bottom = LettaSpacing.CARD_GAP),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
     ) {
         Text(
             text = error,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
         )
     }
 }

@@ -57,6 +57,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +109,7 @@ fun ModelBrowserScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> EmptyState(
                 icon = LettaIcons.Search,
                 message = state.message,
@@ -179,8 +180,8 @@ private fun ModelBrowserContent(
         }
 
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             item {
                 FilterChip(
@@ -195,7 +196,7 @@ private fun ModelBrowserContent(
                     onClick = { onProviderSelect(provider) },
                     label = { Text(provider) },
                     leadingIcon = if (state.selectedProvider == provider) {
-                        { Icon(LettaIcons.Check, contentDescription = "Selected", modifier = Modifier.height(16.dp)) }
+                        { Icon(LettaIcons.Check, contentDescription = "Selected", modifier = Modifier.height(LettaDimens.Space.lg)) }
                     } else {
                         null
                     },
@@ -203,7 +204,7 @@ private fun ModelBrowserContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
         when (state.selectedTab) {
             ModelTab.LLM -> {
@@ -215,8 +216,8 @@ private fun ModelBrowserContent(
                     )
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(LettaDimens.Space.lg),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         itemsIndexed(filteredModels, key = ::llmModelListKey) { _, model ->
                             LlmModelCard(
@@ -236,8 +237,8 @@ private fun ModelBrowserContent(
                     )
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(LettaDimens.Space.lg),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         itemsIndexed(filteredEmbeddingModels, key = ::embeddingModelListKey) { _, model ->
                             EmbeddingModelCard(
@@ -263,7 +264,7 @@ private fun LlmModelCard(
         modifier = modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Text(
                 text = model.displayName,
                 style = MaterialTheme.typography.titleSmall,
@@ -280,10 +281,10 @@ private fun LlmModelCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 AssistChip(onClick = {}, label = { Text(model.providerType) })
                 model.contextWindow?.let { contextWindow ->
@@ -319,7 +320,7 @@ private fun EmbeddingModelCard(
         modifier = modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Text(
                 text = model.displayName,
                 style = MaterialTheme.typography.titleSmall,
@@ -336,10 +337,10 @@ private fun EmbeddingModelCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 AssistChip(onClick = {}, label = { Text(model.providerType) })
                 model.embeddingDim?.let { dim ->
@@ -375,7 +376,7 @@ private fun LlmModelDetailDialog(
     ) {
         Column(
             modifier = Modifier.verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             model.handle?.let {
                 DetailRow(stringResource(R.string.screen_models_detail_handle, it))
@@ -388,7 +389,7 @@ private fun LlmModelDetailDialog(
                 DetailRow(stringResource(R.string.screen_models_detail_provider_category, it))
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.xs))
 
             model.contextWindow?.let {
                 DetailRow(stringResource(R.string.screen_models_detail_context_window, com.letta.mobile.util.FormatHelpers.formatCompactCount(it)))
@@ -410,7 +411,7 @@ private fun LlmModelDetailDialog(
             }
 
             if (model.enableReasoner == true || model.reasoningEffort != null || model.maxReasoningTokens != null) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.xs))
                 model.enableReasoner?.let {
                     DetailRow(stringResource(R.string.screen_models_detail_reasoning, stringResource(if (it) R.string.screen_models_detail_enabled else R.string.screen_models_detail_disabled)))
                 }
@@ -423,7 +424,7 @@ private fun LlmModelDetailDialog(
             }
 
             if (model.modelEndpointType != null || model.modelEndpoint != null || model.modelWrapper != null) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.xs))
                 model.modelEndpointType?.let {
                     DetailRow(stringResource(R.string.screen_models_detail_endpoint_type, it))
                 }
@@ -436,7 +437,7 @@ private fun LlmModelDetailDialog(
             }
 
             if (model.compatibilityType != null || model.verbosity != null || model.tier != null) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.xs))
                 model.compatibilityType?.let {
                     DetailRow(stringResource(R.string.screen_models_detail_compatibility, it))
                 }
@@ -465,7 +466,7 @@ private fun EmbeddingModelDetailDialog(
     ) {
         Column(
             modifier = Modifier.verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             model.handle?.let {
                 DetailRow(stringResource(R.string.screen_models_detail_handle, it))
@@ -478,7 +479,7 @@ private fun EmbeddingModelDetailDialog(
                 DetailRow(stringResource(R.string.screen_models_detail_provider_category, it))
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.xs))
 
             model.embeddingModel?.let {
                 DetailRow(stringResource(R.string.screen_models_embedding_model, it))
@@ -494,7 +495,7 @@ private fun EmbeddingModelDetailDialog(
             }
 
             if (model.embeddingEndpointType != null || model.embeddingEndpoint != null) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.xs))
                 model.embeddingEndpointType?.let {
                     DetailRow(stringResource(R.string.screen_models_detail_endpoint_type, it))
                 }
@@ -504,7 +505,7 @@ private fun EmbeddingModelDetailDialog(
             }
 
             if (model.azureEndpoint != null || model.azureVersion != null || model.azureDeployment != null) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.xs))
                 model.azureEndpoint?.let {
                     DetailRow(stringResource(R.string.screen_models_detail_azure_endpoint, it))
                 }

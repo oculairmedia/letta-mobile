@@ -44,6 +44,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
+import com.letta.mobile.ui.theme.LettaDimens
 
 data class WeekViewParams(
     val defs: List<ScheduleDef>,
@@ -122,7 +123,7 @@ private fun frequentScheduleIds(grid: WeekGrid): Set<String> =
 
 @Composable
 private fun WeekDayHeaderRow(days: List<LocalDate>, today: LocalDate, gutter: Dp) {
-    Row(Modifier.fillMaxWidth().padding(start = gutter, end = 4.dp)) {
+    Row(Modifier.fillMaxWidth().padding(start = gutter, end = LettaDimens.Space.xs)) {
         days.forEach { date ->
             WeekDayHeaderCell(date = date, isToday = date == today)
         }
@@ -132,14 +133,14 @@ private fun WeekDayHeaderRow(days: List<LocalDate>, today: LocalDate, gutter: Dp
 @Composable
 private fun RowScope.WeekDayHeaderCell(date: LocalDate, isToday: Boolean) {
     Box(
-        Modifier.weight(1f).padding(horizontal = 4.dp, vertical = 6.dp),
+        Modifier.weight(1f).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             Modifier.fillMaxWidth()
                 .clip(MaterialTheme.shapes.medium)
                 .background(if (isToday) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
-                .padding(vertical = 6.dp),
+                .padding(vertical = LettaDimens.Space.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -161,9 +162,9 @@ private fun RowScope.WeekDayHeaderCell(date: LocalDate, isToday: Boolean) {
 private fun WeekHighFreqBanner(hiddenCount: Int) {
     val noun = if (hiddenCount == 1) "schedule" else "schedules"
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 6.dp)
+        Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.sm)
             .clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
     ) {
         Text(
             "$hiddenCount high-frequency $noun run every hour — see the Timeline view for their run density.",
@@ -210,7 +211,7 @@ private fun WeekHourGutter(gutter: Dp) {
                         "${ScheduleFormat.pad2(h)}:00",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.customColors.onSurfaceMutedColor,
-                        modifier = Modifier.offset(y = (-6).dp).padding(end = 10.dp),
+                        modifier = Modifier.offset(y = (-6).dp).padding(end = LettaDimens.Space.md),
                     )
                 }
             }
@@ -232,7 +233,7 @@ private fun RowScope.WeekDayColumn(params: WeekDayColumnParams) {
     ) {
         WeekHourGridLines()
         Box(
-            Modifier.fillMaxHeight().width(0.5.dp)
+            Modifier.fillMaxHeight().width(LettaDimens.Space.hair)
                 .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         )
         params.runs.forEach { wr ->
@@ -256,7 +257,7 @@ private fun WeekHourGridLines() {
             val alpha = if (h % HOUR_LABEL_STEP == 0) 0.4f else 0.18f
             Box(
                 Modifier.height(HOUR_HEIGHT).fillMaxWidth().border(
-                    width = 0.5.dp,
+                    width = LettaDimens.Space.hair,
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = alpha),
                 ),
             )
@@ -272,11 +273,11 @@ private fun WeekNowMarker(gutter: Dp, nowMinutes: Int) {
     ) {
         Box(Modifier.width(gutter), contentAlignment = Alignment.CenterEnd) {
             Box(
-                Modifier.size(8.dp).offset(x = 4.dp).clip(CircleShape)
+                Modifier.size(LettaDimens.Space.sm).offset(x = LettaDimens.Space.xs).clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary),
             )
         }
-        Box(Modifier.weight(1f).height(2.dp).background(MaterialTheme.colorScheme.primary))
+        Box(Modifier.weight(1f).height(LettaDimens.Space.hair).background(MaterialTheme.colorScheme.primary))
     }
 }
 
@@ -289,14 +290,14 @@ fun WeekRunBar(params: WeekRunBarParams) {
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 3.dp)
+            .padding(horizontal = LettaDimens.Space.xs)
             .offset(y = HOUR_HEIGHT * (params.minuteOfDay / 60f))
-            .height(18.dp)
+            .height(LettaDimens.Space.lg)
             .clip(MaterialTheme.shapes.extraSmall)
             .background(if (filled) color.copy(alpha = fillAlpha) else Color.Transparent)
             .border(1.dp, color.copy(alpha = borderAlpha), MaterialTheme.shapes.extraSmall)
             .clickable(onClick = params.onClick)
-            .padding(horizontal = 5.dp),
+            .padding(horizontal = LettaDimens.Space.xs),
         contentAlignment = Alignment.CenterStart,
     ) {
         Text(

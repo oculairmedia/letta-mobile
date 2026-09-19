@@ -44,6 +44,7 @@ import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import androidx.compose.material3.Text
+import com.letta.mobile.ui.theme.LettaDimens
 
 private fun <T> androidx.compose.foundation.lazy.LazyListScope.searchSection(
     keyPrefix: String,
@@ -77,16 +78,16 @@ private fun <T> androidx.compose.foundation.lazy.LazyListScope.searchSection(
                 modifier = Modifier.fillMaxWidth().animateItem(),
             ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         cardIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.md))
                     Column {
                         Text(
                             text = primaryText(item),
@@ -138,8 +139,8 @@ internal fun SearchResultsContent(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(start = LettaDimens.Space.md, end = LettaDimens.Space.md, top = 0.dp, bottom = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         searchSection(
             keyPrefix = "agents",
@@ -212,15 +213,15 @@ internal fun SearchResultsContent(
                         onClick = { onMessageClick(msg) },
                         modifier = Modifier.fillMaxWidth().animateItem(),
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(LettaDimens.Space.md)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     LettaIcons.Chat,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(LettaDimens.Control.icon),
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                                 Text(
                                     text = msg.role?.replaceFirstChar { it.uppercase() }
                                         ?: stringResource(R.string.screen_home_search_message_role_fallback),
@@ -228,7 +229,7 @@ internal fun SearchResultsContent(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                             Text(
                                 text = highlightSearchMatches(
                                     searchResultSnippet(msg.content.orEmpty(), searchQuery),
@@ -250,9 +251,9 @@ internal fun SearchResultsContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 4.dp),
+                        .padding(top = LettaDimens.Space.sm, bottom = LettaDimens.Space.xs),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     Text(
                         text = stringResource(R.string.screen_home_search_messages_section),
@@ -260,8 +261,8 @@ internal fun SearchResultsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     androidx.compose.material3.CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(LettaDimens.Control.icon),
+                        strokeWidth = LettaDimens.Space.hair,
                     )
                 }
             }
@@ -273,7 +274,7 @@ internal fun SearchResultsContent(
                     text = stringResource(R.string.screen_home_search_no_results),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.xxl),
                 )
             }
         }

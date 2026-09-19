@@ -46,6 +46,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.skia.Image
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-nonza (sixv8.3): the desktop install / first-run pairing
@@ -96,9 +97,9 @@ internal fun DesktopPairInstallScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(LettaDimens.Space.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             Text(
                 text = "Welcome to Letta Desktop",
@@ -112,11 +113,11 @@ internal fun DesktopPairInstallScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             QrCard(controller = controller)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             InstructionalFooter(controller = controller)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             Row(actions = controller, onCancel = onCancel)
         }
     }
@@ -132,9 +133,9 @@ private fun QrCard(controller: DesktopPairInviteController) {
     Box(
         modifier = Modifier
             .size(360.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.md))
             .background(Color.White)
-            .padding(16.dp),
+            .padding(LettaDimens.Space.lg),
         contentAlignment = Alignment.Center,
     ) {
         when {
@@ -171,7 +172,7 @@ private fun InstructionalFooter(controller: DesktopPairInviteController) {
     val expiresAtMs = controller.expiresAtMs
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Text(
             text = "Open the Letta mobile app, tap \"Pair a desktop\", and point your camera at this code.",
@@ -208,7 +209,7 @@ private fun Row(
     onCancel: () -> Unit,
 ) {
     androidx.compose.foundation.layout.Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopDefaultButton(
@@ -218,9 +219,9 @@ private fun Row(
             Icon(
                 imageVector = Icons.Outlined.Refresh,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
             Text(text = "Regenerate")
         }
         DesktopOutlinedButton(

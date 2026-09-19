@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * A secondary page that opens beside the main content, never over it.
@@ -98,9 +99,9 @@ fun LettaSidePaneHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Text(
             text = title,
@@ -116,9 +117,9 @@ fun LettaSidePaneHeader(
             imageVector = Lucide.X,
             contentDescription = "Close",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp).clickable(onClick = onClose),
+            modifier = Modifier.size(LettaDimens.Control.icon).clickable(onClick = onClose),
         )
     }
 }
 
-private val RESIZE_HANDLE_WIDTH = 6.dp
+private val RESIZE_HANDLE_WIDTH = LettaDimens.Space.sm

@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun ChatMessageListBody(
@@ -168,11 +169,11 @@ private fun ChatMessageListLazyColumnContent(params: ChatMessageListLazyColumnPa
 }
 
 private fun chatMessageListTopFadeLength(topPadding: Dp): Dp {
-    return if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
+    return if (topPadding > 0.dp) topPadding + LettaDimens.Space.lg else ChatFadeEdgeLength
 }
 
 internal fun chatMessageListBottomFadeLength(bottomPadding: Dp): Dp {
-    return if (bottomPadding > 0.dp) bottomPadding + 48.dp else ChatFadeEdgeLength + 48.dp
+    return if (bottomPadding > 0.dp) bottomPadding + LettaDimens.Orb.railSlotWidth else ChatFadeEdgeLength + LettaDimens.Orb.railSlotWidth
 }
 
 @Composable

@@ -32,6 +32,7 @@ import com.letta.mobile.ui.tags.TagDrillInUiState
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun TagDrillInDialog(
@@ -51,7 +52,7 @@ fun TagDrillInDialog(
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
                 ) {
                     CircularProgressIndicator()
                     Text(
@@ -74,7 +75,7 @@ fun TagDrillInDialog(
                 val itemsByType = remember(state.items) {
                     state.items.groupBy { it.entityType }
                 }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                     TagDrillInEntityType.entries.forEach { entityType ->
                         val itemsForType = itemsByType[entityType] ?: emptyList()
                         if (itemsForType.isNotEmpty()) {
@@ -105,12 +106,12 @@ private fun TagDrillInItemCard(item: TagDrillInItem) {
         ),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             androidx.compose.foundation.layout.Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 Icon(
                     imageVector = icon(item.entityType),
@@ -146,10 +147,10 @@ private fun TagDrillInItemCard(item: TagDrillInItem) {
             }
 
             if (item.otherTags.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     item.otherTags.forEach { tag ->
                         AssistChip(

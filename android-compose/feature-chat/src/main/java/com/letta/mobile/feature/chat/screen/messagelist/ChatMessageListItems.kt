@@ -31,6 +31,7 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun MeasuredChatRenderItem(
@@ -228,7 +229,7 @@ private fun DebugMessageCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
         Column(modifier = Modifier.padding(LettaSpacing.CARD_GAP)) {

@@ -25,6 +25,7 @@ import com.letta.mobile.ui.components.MultiFieldInputDialog
 import ca.oculair.meridian.R
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun ToolPickerDialog(
@@ -52,7 +53,7 @@ fun ToolPickerDialog(
         } else {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 360.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 items(tools, key = { it.id.value }) { tool ->
                     TextButton(
@@ -72,7 +73,7 @@ fun ToolPickerDialog(
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(start = 8.dp),
+                                .padding(start = LettaDimens.Space.sm),
                         ) {
                             Text(
                                 text = tool.name,

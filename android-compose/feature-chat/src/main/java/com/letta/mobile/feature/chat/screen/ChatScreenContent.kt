@@ -55,6 +55,7 @@ import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableMap
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal fun shouldShowStarterPromptsForNoConversation(state: ChatUiState): Boolean =
     state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()
@@ -293,7 +294,7 @@ internal fun DismissibleA2uiSurface(
                         imageVector = LettaIcons.Delete,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm)
                     )
                 },
                 onClick = {
@@ -344,14 +345,14 @@ internal fun GoalStatusCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
         shape = MaterialTheme.shapes.large,
-        tonalElevation = 3.dp,
+        tonalElevation = LettaDimens.Space.xs,
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             GoalStatusCardHeader(goal = goal, loading = loading, onRefresh = callbacks.onRefresh)
             GoalStatusCardDetails(goal = goal)
@@ -403,7 +404,7 @@ private fun GoalStatusCardActions(
 ) {
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         if (goal.status == "complete") {
             TextButton(onClick = callbacks.onClear) { Text("Clear") }

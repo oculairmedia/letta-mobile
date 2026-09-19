@@ -27,6 +27,7 @@ import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class HomeScreenTopBarParams(
     val title: String,
@@ -89,7 +90,7 @@ private fun HomeScreenTopBarTitle(params: HomeScreenTopBarParams) {
 @Composable
 private fun HomeScreenTopBarTitleRow(params: HomeScreenTopBarParams) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(params.title)
@@ -98,7 +99,7 @@ private fun HomeScreenTopBarTitleRow(params: HomeScreenTopBarParams) {
                 LettaIcons.Circle,
                 contentDescription = "Connected",
                 tint = MaterialTheme.customColors.onlineColor,
-                modifier = Modifier.size(8.dp),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
         }
         HomeScreenTopBarBackendChip(params)

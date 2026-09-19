@@ -28,6 +28,7 @@ import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemSupporting
 import kotlinx.collections.immutable.toImmutableList
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +58,7 @@ fun ConfigListScreen(
         }
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadConfigs() },
@@ -92,8 +93,8 @@ private fun ConfigListContent(
     } else {
         LazyColumn(
             modifier = modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)
         ) {
             if (showEmbeddedRuntimeConnect) {
                 item(key = "embedded-lettacode-connect") {
@@ -128,14 +129,14 @@ private fun EmbeddedRuntimeConnectCard(
         colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = LettaIcons.Psychology,
                     contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp),
+                    modifier = Modifier.padding(end = LettaDimens.Space.sm),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -192,7 +193,7 @@ private fun ConfigCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(LettaDimens.Space.lg),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -200,7 +201,7 @@ private fun ConfigCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HealthDot(
                         health = config.health,
-                        modifier = Modifier.padding(end = 8.dp),
+                        modifier = Modifier.padding(end = LettaDimens.Space.sm),
                     )
                     AssistChip(
                         onClick = {},
@@ -212,7 +213,7 @@ private fun ConfigCard(
                         }
                     )
                     if (config.isActive) {
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                         AssistChip(
                             onClick = {},
                             label = {
@@ -228,7 +229,7 @@ private fun ConfigCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
 
                 Text(
                     text = when (config.mode) {
@@ -251,7 +252,7 @@ private fun ConfigCard(
                     ) {
                         Text(stringResource(R.string.action_set_active))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 }
 
                 IconButton(onClick = { showDeleteDialog = true }) {
@@ -337,7 +338,7 @@ private fun EmbeddedRuntimeConnectCardPreview() {
         EmbeddedRuntimeConnectCard(
             status = previewEmbeddedRuntimeStatus,
             onConnect = {},
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
     }
 }
@@ -350,7 +351,7 @@ private fun ConfigCardPreview() {
             config = previewServerConfigs.first(),
             onSetActive = {},
             onDelete = {},
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
     }
 }

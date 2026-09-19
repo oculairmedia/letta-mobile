@@ -22,6 +22,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The bench's half of MOTION-PIPELINE section 6, tier 2: the probe numbers a `--probe` build of the
@@ -198,7 +199,7 @@ private fun sparkLevels(samples: List<Float>): List<Int> {
 /** The X-sheet strip: one sparkline, value, delta and spacing class per probed property. */
 @Composable
 fun TelemetryPanel(tracks: List<TelemetryTrack>, windowSeconds: Float, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Text(
             "telemetry - ${tracks.size} probed properties, last %.0f s".format(windowSeconds),
             color = Color(0xFFBBBBBB),
@@ -218,14 +219,14 @@ fun TelemetryPanel(tracks: List<TelemetryTrack>, windowSeconds: Float, modifier:
 @Composable
 private fun TelemetryRow(track: TelemetryTrack) {
     val samples = track.samples.toList()
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
         Text(
             "${track.name.removePrefix(TELEMETRY_PREFIX).trimStart('_', '.')}  %+.2f  d %+.3f  ${spacingOf(samples).label}"
                 .format(track.value, track.delta),
             color = Color(0xFFDDDDDD),
             style = MaterialTheme.typography.labelSmall,
         )
-        Sparkline(samples, Modifier.fillMaxWidth().height(34.dp).padding(vertical = 2.dp))
+        Sparkline(samples, Modifier.fillMaxWidth().height(LettaDimens.Space.xxl).padding(vertical = LettaDimens.Space.hair))
     }
 }
 
