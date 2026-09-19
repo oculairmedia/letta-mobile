@@ -1,129 +1,105 @@
 package com.letta.mobile.data.canvas
 
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * The board's undo has to walk what the person did, in the order they did it, across two things
+ * that each kept their own history: the drawing (DrawBox's, and private) and the documents (ops on
+ * the session, which had no history at all). These tests are about that ORDER, because it is the
+ * one thing neither side can know on its own.
+ */
 class CanvasHistoryTest {
 
+    private fun documents(label: String) = CanvasHistory.Step.Documents(
+        undo = emptyList(),
+        redo = emptyList(),
+        label = label,
+    )
+
     @Test
-    fun testCheckpointCaptureAndRestore() = runTest {
-        val store = InMemoryCanvasDocumentStore()
-        val docId = CanvasId("canvas-history-1")
-        val session = CanvasSession(canvasId = docId, store = store)
-        session.load()
+    fun undoWalksBackThroughBothKindsInTheOrderTheyHappened() {
+        val history = CanvasHistory()
+        history.record(CanvasHistory.Step.Drawing)
+        history.record(documents("note added"))
+        history.record(CanvasHistory.Step.Drawing)
 
-        // 1. Initial state (empty)
-        session.applyAgentReplace("""{"bgColor":-1,"elements":[]}""", actorId = "agent-1")
-        val checkpointsAfterFirst = session.checkpoints.value
-        assertTrue(checkpointsAfterFirst.isNotEmpty())
-        val firstCp = checkpointsAfterFirst.first()
-        assertEquals(1L, firstCp.revision)
-
-        // 2. Second state (added element)
-        val addOp = CanvasOp.AddElementOp(
-            opId = "op-add-1",
-            actorId = "user-1",
-            lamport = 1L,
-            elementId = "elem-1",
-            elementJson = """{"id":"elem-1","type":"rect"}""",
-        )
-        session.applyLocal(addOp)
-        val checkpointsAfterSecond = session.checkpoints.value
-        assertEquals(2, checkpointsAfterSecond.size)
-        val secondCp = checkpointsAfterSecond.first()
-        assertEquals(2L, secondCp.revision)
-        assertTrue(session.sceneJsonOrEmpty().contains("elem-1"))
-
-        // 3. Third state (different background)
-        val bgOp = CanvasOp.SetBackgroundOp(
-            opId = "op-bg-1",
-            actorId = "user-1",
-            lamport = 2L,
-            colorHex = "#FF0000",
-        )
-        session.applyLocal(bgOp)
-        assertEquals(3, session.checkpoints.value.size)
-        assertEquals(3L, session.document.value?.revision)
-
-        // 4. Restore to first checkpoint (rev 1: empty elements)
-        val restoredDoc = session.restoreCheckpoint(firstCp.checkpointId, actorId = "user-1")
-        assertEquals(4L, restoredDoc.revision) // Revision advances
-        assertEquals(firstCp.sceneJson, restoredDoc.sceneJson)
-        assertFalse(restoredDoc.sceneJson.contains("elem-1"))
-
-        // New checkpoint was recorded for the restore
-        val latestCp = session.checkpoints.value.first()
-        assertEquals(4L, latestCp.revision)
-        assertTrue(latestCp.description.contains("Restored to rev 1"))
+        assertEquals(CanvasHistory.Step.Drawing, history.undo())
+        assertEquals("note added", (history.undo() as CanvasHistory.Step.Documents).label)
+        assertEquals(CanvasHistory.Step.Drawing, history.undo())
+        assertNull(history.undo())
     }
 
     @Test
-    fun testRestoreEnforcesAcl() = runTest {
-        val store = InMemoryCanvasDocumentStore()
-        val docId = CanvasId("canvas-history-acl")
-        val acl = CanvasAcl(
-            ownerUserId = "alice",
-            writerUserIds = setOf("bob"),
-        )
-        val doc = CanvasDocument(
-            id = docId,
-            title = "Protected History",
-            revision = 1L,
-            sceneJson = """{"bgColor":-1,"elements":[]}""",
-            acl = acl,
-        )
-        store.upsert(doc)
+    fun redoReplaysWhatWasUndone() {
+        val history = CanvasHistory()
+        history.record(documents("note added"))
+        history.record(CanvasHistory.Step.Drawing)
 
-        val session = CanvasSession(canvasId = docId, store = store)
-        session.load()
-
-        val addOp = CanvasOp.AddElementOp(
-            opId = "op-add",
-            actorId = "alice",
-            lamport = 1L,
-            elementId = "e1",
-            elementJson = """{"id":"e1"}""",
-        )
-        session.applyLocal(addOp)
-        val checkpoints = session.checkpoints.value
-        val initialCp = checkpoints.last()
-
-        // Eve is not allowed to restore
-        assertFailsWith<UnauthorizedCanvasMutationException> {
-            session.restoreCheckpoint(initialCp.checkpointId, actorId = "eve")
-        }
-
-        // Bob (authorized writer) can restore
-        val restored = session.restoreCheckpoint(initialCp.checkpointId, actorId = "bob")
-        assertEquals(3L, restored.revision)
+        history.undo()
+        history.undo()
+        assertEquals("note added", (history.redo() as CanvasHistory.Step.Documents).label)
+        assertEquals(CanvasHistory.Step.Drawing, history.redo())
+        assertNull(history.redo())
     }
 
     @Test
-    fun testHistoryBoundedByMaxCheckpoints() = runTest {
-        val store = InMemoryCanvasDocumentStore()
-        val docId = CanvasId("canvas-history-bound")
-        val session = CanvasSession(canvasId = docId, store = store)
+    fun doingSomethingNewAbandonsTheUndoneBranch() {
+        val history = CanvasHistory()
+        history.record(documents("first"))
+        history.undo()
+        assertTrue(history.canRedo.value)
 
-        // Perform 40 edits
-        for (i in 1..40) {
-            session.applyLocal(
-                CanvasOp.SetBackgroundOp(
-                    opId = "op-$i",
-                    actorId = "user-1",
-                    lamport = i.toLong(),
-                    colorHex = "#0000$i",
-                )
-            )
-        }
+        history.record(documents("second"))
 
-        assertTrue(session.checkpoints.value.size <= CanvasSession.MAX_CHECKPOINTS)
-        assertEquals(CanvasSession.MAX_CHECKPOINTS, session.checkpoints.value.size)
-        // Most recent should be rev 40
-        assertEquals(40L, session.checkpoints.value.first().revision)
+        assertFalse(history.canRedo.value)
+        assertEquals("second", (history.undo() as CanvasHistory.Step.Documents).label)
+        assertNull(history.undo())
+    }
+
+    @Test
+    fun theFlagsFollowWhatIsActuallyThere() {
+        val history = CanvasHistory()
+        assertFalse(history.canUndo.value)
+        assertFalse(history.canRedo.value)
+
+        history.record(CanvasHistory.Step.Drawing)
+        assertTrue(history.canUndo.value)
+        assertFalse(history.canRedo.value)
+
+        history.undo()
+        assertFalse(history.canUndo.value)
+        assertTrue(history.canRedo.value)
+    }
+
+    @Test
+    fun theOldestStepsFallOffRatherThanGrowingForever() {
+        val history = CanvasHistory(limit = 2)
+        history.record(documents("first"))
+        history.record(documents("second"))
+        history.record(documents("third"))
+
+        assertEquals("third", (history.undo() as CanvasHistory.Step.Documents).label)
+        assertEquals("second", (history.undo() as CanvasHistory.Step.Documents).label)
+        assertNull(history.undo())
+    }
+
+    @Test
+    fun clearingLeavesNothingToUndoIntoABoardThatIsGone() {
+        // A restored checkpoint or an agent replacing the scene means the steps that remain would
+        // undo into a board that no longer exists.
+        val history = CanvasHistory()
+        history.record(documents("note added"))
+        history.undo()
+
+        history.clear()
+
+        assertFalse(history.canUndo.value)
+        assertFalse(history.canRedo.value)
+        assertNull(history.undo())
+        assertNull(history.redo())
     }
 }

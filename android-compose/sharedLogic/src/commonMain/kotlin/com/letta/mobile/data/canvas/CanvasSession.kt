@@ -146,7 +146,10 @@ class CanvasSession(
      * Applies a single locally-generated [CanvasOp], appends to [opLog], projects state,
      * updates persistence, and publishes to [syncTransport].
      */
-    suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock {
+    suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock { applyLocalLocked(op) }
+
+    /** [applyLocal]'s body, for callers that must test the scene and act on it under one lock. */
+    private suspend fun applyLocalLocked(op: CanvasOp): CanvasDocument {
         val current = currentDoc()
         if (current.acl != null && !current.acl.canWrite(op.actorId)) {
             throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
@@ -156,7 +159,7 @@ class CanvasSession(
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         val updated = commitScene(newScene)
         syncTransport?.publish(canvasId, op)
-        updated
+        return updated
     }
 
     /**
@@ -373,15 +376,26 @@ class CanvasSession(
         )
     }
 
-    suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument =
-        applyLocal(
-            CanvasOp.RemoveDocumentOp(
-                opId = CanvasOpDiffer.generateOpId("doc"),
-                actorId = actorId,
-                lamport = lamportClock + 1,
-                documentId = documentId,
-            ),
-        )
+    /**
+     * Removes a block document; null when it was already gone.
+     *
+     * The test and the op share one lock because the callers repeat themselves: the eraser drags
+     * across a note and queues a removal per frame, all of them while the note is still in the
+     * projected scene. Without the guard each one appends an op, commits a revision and publishes
+     * to peers, for a note that is deleted once.
+     */
+    suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument? =
+        mutex.withLock {
+            if (documents().none { it.id == documentId }) return@withLock null
+            applyLocalLocked(
+                CanvasOp.RemoveDocumentOp(
+                    opId = CanvasOpDiffer.generateOpId("doc"),
+                    actorId = actorId,
+                    lamport = lamportClock + 1,
+                    documentId = documentId,
+                ),
+            )
+        }
 
     suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
         val doc = currentDoc()

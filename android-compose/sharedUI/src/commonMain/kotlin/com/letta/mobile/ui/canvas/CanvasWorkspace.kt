@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.canvas
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,8 +28,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -112,10 +116,20 @@ fun CanvasWorkspace(
     }
     val checkpoints by (session?.checkpoints?.collectAsState() ?: remember { mutableStateOf(emptyList()) })
     val documents = remember(sessionDoc) { session?.documents().orEmpty() }
+    // Long-lived lambdas — the intent collector, the pointer handlers on the board — are created
+    // once and keep whatever `documents` held at the time. That is why the eraser and connector
+    // snapping worked on every drawn shape and on no note: shapes are read fresh from
+    // controller.state, notes came from a list captured before they existed.
+    val liveDocuments by rememberUpdatedState(documents)
     val coroutineScope = rememberCoroutineScope()
 
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
+    // The session revision the controller's elements were built from. Documents are derived
+    // from `sessionDoc` and so are current the instant a revision lands, while the elements
+    // only catch up when the collector below re-imports the scene. Until the two agree, the
+    // label reconciler would see every label's shape as missing and delete it.
+    var importedRevision by remember { mutableStateOf(0L) }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
     // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
@@ -134,7 +148,10 @@ fun CanvasWorkspace(
         localPattern
     }
     LaunchedEffect(backgroundPattern) {
-        controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
+        // The grid is DrawBox's own (see showGrid below), so the tiled pattern is left unset for
+        // it; otherwise both would draw and we would be back to two grids.
+        val tiled = backgroundPattern.takeIf { it.kind != CanvasBackgroundPattern.GRID }
+        controller.setBackgroundPattern(tiled?.painter(), backgroundPattern.tint())
     }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
@@ -166,6 +183,7 @@ fun CanvasWorkspace(
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
                 }
+                importedRevision = lastImportedRev
                 delay(100)
                 initialLoadDone = true
 
@@ -182,6 +200,9 @@ fun CanvasWorkspace(
                                 statusMessage = "Agent updated canvas (rev ${doc.revision})"
                             }
                         }
+                        // Set after any re-import: a bump that changed only documents leaves the
+                        // elements already current, so the gate must not stick closed on it.
+                        importedRevision = doc.revision
                     }
                 }
             } finally {
@@ -280,6 +301,12 @@ fun CanvasWorkspace(
     // gesture for UI zoom is told where the board is so it leaves those events alone.
     val wheelZoomRegions = LocalWheelZoomRegions.current
     var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    // The board's controls are drawn over the board, so their bounds are held here and the pen
+    // declines events over them - see CanvasChromeRegions.
+    val chromeRegions = remember { CanvasChromeRegions() }
+    // The stroke under the nib. It lives up here because the board paints it and the pen consumer
+    // fills it, and those are far apart in this function.
+    val penPreview = remember { mutableStateListOf<io.ak1.drawbox.domain.model.Element.PathSample>() }
     DisposableEffect(wheelZoomRegions) {
         val unregister = wheelZoomRegions?.register { boardBounds }
         onDispose { unregister?.invoke() }
@@ -299,6 +326,21 @@ fun CanvasWorkspace(
         coroutineScope.launch { runCatching { session.moveDocuments(frames) } }
     }
 
+    // The eraser is a drag, not a click, and DrawBoxController does not surface EraseAt on its
+    // intent flow, so notes are taken by watching the eraser's own pointer instead.
+    fun eraseNotesAt(world: Offset, radius: Float) {
+        if (session == null) return
+        val hit = liveDocuments.filter { doc ->
+            val f = doc.frame ?: return@filter false
+            Rect(f.x - radius, f.y - radius, f.x + f.width + radius, f.y + f.height + radius).contains(world)
+        }
+        if (hit.isEmpty()) return
+        val ids = hit.map { it.id }.toSet()
+        if (activeNoteId in ids) activeNoteId = null
+        selectedNoteIds = selectedNoteIds - ids
+        coroutineScope.launch { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+    }
+
     // Marquee and move are DrawBox gestures; the notes follow the same intents so a marquee
     // takes in note cards and dragging the selection moves them too, committed on release.
     LaunchedEffect(controller, session) {
@@ -306,7 +348,7 @@ fun CanvasWorkspace(
             when (intent) {
                 is io.ak1.drawbox.domain.model.Intent.CommitMarquee -> {
                     val rect = intent.rect
-                    selectedNoteIds = documents.filter { doc ->
+                    selectedNoteIds = liveDocuments.filter { doc ->
                         val f = doc.frame ?: return@filter false
                         rect.overlaps(Rect(f.x, f.y, f.x + f.width, f.y + f.height))
                     }.map { it.id }.toSet()
@@ -404,6 +446,17 @@ fun CanvasWorkspace(
             DrawBox(
                 state = state,
                 onIntent = controller::onIntent,
+                // Shapes and notes share one selection look; see CanvasSelectionChrome.
+                selectionStyle = canvasSelectionStyle(),
+                // DrawBox draws a grid of its own, on by default, and the board draws a pattern of
+                // its own on top: two grids at two spacings, which is why the background could not
+                // be turned off — ours went away and its did not.
+                //
+                // Now the setting picks exactly one of them. A grid IS DrawBox's grid, drawn by the
+                // engine that owns the viewport, so it stays crisp at every zoom. Dots and lines
+                // are the board's tiled pattern, which DrawBox has no equivalent for. "None" turns
+                // off both, so none means none.
+                showGrid = backgroundPattern.kind == CanvasBackgroundPattern.GRID,
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
@@ -417,6 +470,26 @@ fun CanvasWorkspace(
                             }
                         }
                     }
+                    // A shape holds text: double-tap one to write in it. Placed after DrawBox in
+                    // the chain, so DrawBox's own gestures see the pointer first and this only
+                    // catches taps nothing else wanted.
+                    .pointerInput(session) {
+                        detectTapGestures(onDoubleTap = { position ->
+                            val current = controller.state.value
+                            val world = current.viewport.screenToWorld(position)
+                            val shape = CanvasShapeLabels.shapeAt(current.elements, world) ?: return@detectTapGestures
+                            val labelId = CanvasShapeLabels.labelIdOf(shape.id)
+                            val frame = CanvasShapeLabels.frameFor(shape.bounds())
+                            val s = session ?: return@detectTapGestures
+                            coroutineScope.launch {
+                                val existing = s.documents().firstOrNull { it.id == labelId }
+                                if (existing == null) {
+                                    runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
+                                }
+                                activeNoteId = labelId
+                            }
+                        })
+                    }
                     // After DrawBox has handled the event (Final pass): track Alt and the pointer
                     // while a connector is drawn, and on release snap the connector just finished.
                     .pointerInput(session) {
@@ -428,6 +501,14 @@ fun CanvasWorkspace(
                                 val connectorMode = current.mode == io.ak1.drawbox.domain.model.Mode.LINE ||
                                     current.mode == io.ak1.drawbox.domain.model.Mode.ARROW
                                 val position = event.changes.firstOrNull()?.position
+                                if (current.mode == io.ak1.drawbox.domain.model.Mode.ERASER &&
+                                    position != null && event.changes.any { it.pressed }
+                                ) {
+                                    eraseNotesAt(
+                                        current.viewport.screenToWorld(position),
+                                        current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f),
+                                    )
+                                }
                                 when {
                                     !connectorMode -> drawingConnectorAt = null
                                     event.type == PointerEventType.Press || event.type == PointerEventType.Move -> {
@@ -437,12 +518,21 @@ fun CanvasWorkspace(
                                     }
                                     event.type == PointerEventType.Release -> {
                                         drawingConnectorAt = null
-                                        if (!altHeld) snapLatestConnector(controller, session, documents, coroutineScope)
+                                        if (!altHeld) snapLatestConnector(controller, session, liveDocuments, coroutineScope)
                                     }
                                 }
                             }
                         }
                     },
+            )
+
+            // The stroke under the nib, until DrawBox owns it.
+            CanvasPenPreview(
+                samples = penPreview,
+                viewport = state.viewport,
+                color = state.strokeColor,
+                alpha = state.opacity,
+                modifier = Modifier.fillMaxSize(),
             )
 
             // Block documents live on the board as note cards, in world coordinates.
@@ -458,11 +548,24 @@ fun CanvasWorkspace(
                     onToolbar = { noteToolbar = it },
                     selectedIds = selectedNoteIds,
                     groupOffset = groupOffset,
+                    // The eraser takes a note the way it takes a stroke: touch it and it is gone.
+                    eraseMode = state.mode == io.ak1.drawbox.domain.model.Mode.ERASER,
+                    onErase = { id ->
+                        if (session != null) {
+                            if (activeNoteId == id) activeNoteId = null
+                            selectedNoteIds = selectedNoteIds - id
+                            coroutineScope.launch { runCatching { session.removeDocument(id) } }
+                        }
+                    },
                     onPress = { id, shift ->
                         if (shift) {
                             selectedNoteIds = if (id in selectedNoteIds) selectedNoteIds - id else selectedNoteIds + id
                             activeNoteId = null
                         } else if (id !in selectedNoteIds) {
+                            // Picking a note replaces the board's selection, exactly as picking a
+                            // shape does. Without this the drawn selection stayed put and the note
+                            // joined it, so a plain click read as a shift-click.
+                            controller.clearSelection()
                             selectedNoteIds = emptySet()
                             activeNoteId = id
                         }
@@ -482,6 +585,94 @@ fun CanvasWorkspace(
             // Picking a drawing element hands the selection to DrawBox; the note lets go.
             LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
 
+            // The pen draws its own strokes.
+            //
+            // Everything else the pen does — pressing a button, picking a note, dragging a handle —
+            // arrives as ordinary input and needs nothing here. Drawing is the exception: pressure
+            // is per sample and no mouse event can carry it, so those events are taken here and
+            // built into one Element.Path on lift. Taking them also stops the platform delivering
+            // the same stroke a second time without pressure.
+            //
+            // Flipping the stylus over erases: the eraser nib is a tool in its own right, so it is
+            // read from the event rather than asked of the user.
+            // Layout coordinates are in pixels; the pen reports in the window's logical units. On
+            // a scaled display those differ by the density, and subtracting a pixel-space board
+            // offset from a logical-space point put every event outside the board — so the canvas
+            // declined them all and the stroke quietly fell back to the pressureless mouse path.
+            val penDensity = LocalDensity.current.density
+            DisposableEffect(session, state.mode, penDensity) {
+                var stroke: CanvasPenStroke? = null
+                CanvasPenInput.consumer = consumer@{ event ->
+                    val current = controller.state.value
+                    // The pen reports against the window; the board sits somewhere inside it. Going
+                    // straight to screenToWorld skips the offset that Compose's own hit testing
+                    // would have applied, and the ink lands away from the nib by however far the
+                    // board is inset.
+                    val board = boardBounds ?: return@consumer false
+                    val inRoot = Offset(event.x * penDensity, event.y * penDensity)
+                    val onBoard = Offset(inRoot.x - board.left, inRoot.y - board.top)
+                    if (onBoard.x < 0f || onBoard.y < 0f || onBoard.x > board.width || onBoard.y > board.height) {
+                        return@consumer false
+                    }
+                    // Inside the board, but over one of its own controls: the rail, a bar, an
+                    // opened note. Those are pressed, not drawn on, and the pen is offered events
+                    // by position rather than by hit testing, so it has to decline them itself.
+                    if (chromeRegions.contains(inRoot)) return@consumer false
+                    val world = current.viewport.screenToWorld(onBoard)
+                    if (event.tool == CanvasPenTool.ERASER) {
+                        if (event.phase == CanvasPenEvent.Phase.DOWN || event.phase == CanvasPenEvent.Phase.MOVE) {
+                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.EraseAt(world, current.eraserSize))
+                            eraseNotesAt(world, current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f))
+                            return@consumer true
+                        }
+                        return@consumer false
+                    }
+                    if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
+                    when (event.phase) {
+                        CanvasPenEvent.Phase.DOWN -> {
+                            penPreview.clear()
+                            stroke = current.beginPenStroke().also { started ->
+                                started.add(world, event.pressure)?.let { penPreview += it }
+                            }
+                            true
+                        }
+                        CanvasPenEvent.Phase.MOVE -> stroke?.let { active ->
+                            active.add(world, event.pressure)?.let { penPreview += it }
+                            true
+                        } ?: false
+                        CanvasPenEvent.Phase.UP, CanvasPenEvent.Phase.OUT -> {
+                            val finished = stroke ?: return@consumer false
+                            stroke = null
+                            penPreview.clear()
+                            finished.finish("pen-${Clock.System.now().toEpochMilliseconds()}")?.let { path ->
+                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(path))
+                            }
+                            true
+                        }
+                        CanvasPenEvent.Phase.IN -> false
+                    }
+                }
+                onDispose { CanvasPenInput.consumer = null }
+            }
+
+            // A label lives inside its shape: it is re-framed whenever the shape moves or is
+            // resized, and removed with it. Keyed on the element list so a shape dragged by
+            // DrawBox carries its text along in the same frame.
+            LaunchedEffect(state.elements, liveDocuments, session, importedRevision, initialLoadDone) {
+                val s = session ?: return@LaunchedEffect
+                val work = CanvasShapeLabels.reconcile(state.elements, liveDocuments)
+                // Re-framing is safe at any time: it only touches labels whose shape is present.
+                if (work.moved.isNotEmpty()) runCatching { s.moveDocuments(work.moved) }
+                // Deleting is not. A label is only an orphan once the elements and the documents
+                // describe the same revision; before that "no such shape" means "not imported
+                // yet", and acting on it destroys the text the shape is holding.
+                if (!initialLoadDone || sessionDoc?.revision != importedRevision) return@LaunchedEffect
+                work.orphaned.forEach { id ->
+                    if (activeNoteId == id) activeNoteId = null
+                    runCatching { s.removeDocument(id) }
+                }
+            }
+
             // A bound connector end follows its note: whenever a document's frame changes (a local
             // drag, a peer, the agent), every arrow bound to it is re-pointed through DrawBox, so
             // the move reaches the scene through the normal export rather than a re-import that
@@ -494,8 +685,11 @@ fun CanvasWorkspace(
                     arrowBindings.forEach { (elementId, binding) ->
                         val connector = state.elements.firstOrNull { it.id == elementId } as? io.ak1.drawbox.domain.model.Element.Shape
                             ?: return@forEach
-                        CanvasSnapping.follow(connector, binding, id, frame)?.let { points ->
-                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(elementId, points))
+                        CanvasSnapping.follow(connector, binding, id, frame)?.let { geometry ->
+                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(elementId, geometry.points))
+                            if (geometry.bend != connector.bend) {
+                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetLineBend(elementId, geometry.bend))
+                            }
                         }
                     }
                 }
@@ -504,7 +698,7 @@ fun CanvasWorkspace(
             val connectorMode = state.mode == io.ak1.drawbox.domain.model.Mode.LINE || state.mode == io.ak1.drawbox.domain.model.Mode.ARROW
             val snapAnchor = drawingConnectorAt?.takeIf { connectorMode && !altHeld }?.let { at ->
                 val drawing = CanvasSnapping.latestConnector(state.elements)
-                CanvasSnapping.nearest(at, CanvasSnapping.anchors(state.elements, documents, drawing?.id), state.viewport.scale)
+                CanvasSnapping.nearest(at, CanvasSnapping.anchors(state.elements, liveDocuments, drawing?.id), state.viewport.scale)
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
@@ -518,7 +712,7 @@ fun CanvasWorkspace(
                             back()
                         }
                     },
-                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET),
+                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET).canvasChrome(chromeRegions),
                 )
             }
 
@@ -583,7 +777,7 @@ fun CanvasWorkspace(
                         statusMessage = "Background pattern: ${pattern.kind}"
                     },
                 ),
-                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET),
+                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET).canvasChrome(chromeRegions),
             )
 
 
@@ -712,7 +906,9 @@ fun CanvasWorkspace(
                     } else {
                         null
                     },
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = if (showTitle) 64.dp else CHROME_INSET),
+                    modifier = Modifier.align(Alignment.TopCenter)
+                        .padding(top = if (showTitle) 64.dp else CHROME_INSET)
+                        .canvasChrome(chromeRegions),
                 )
             }
 
@@ -726,7 +922,10 @@ fun CanvasWorkspace(
                 dispatchProperty = dispatchProperty,
                 onAddNote = session?.let { s ->
                     {
-                        val frame = newNoteFrame(state.viewport.screenToWorld(boardCenter))
+                        val frame = clearOfExisting(
+                            newNoteFrame(state.viewport.screenToWorld(boardCenter)),
+                            liveDocuments.mapNotNull { it.frame },
+                        )
                         val id = "note-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
                             runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
@@ -740,7 +939,10 @@ fun CanvasWorkspace(
                 },
                 onAddText = session?.let { s ->
                     {
-                        val frame = newTextFrame(state.viewport.screenToWorld(boardCenter))
+                        val frame = clearOfExisting(
+                            newTextFrame(state.viewport.screenToWorld(boardCenter)),
+                            liveDocuments.mapNotNull { it.frame },
+                        )
                         val id = "text-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
                             runCatching { s.setDocument(id, "", frame = frame, color = PLAIN_TEXT_COLOR) }
@@ -754,7 +956,8 @@ fun CanvasWorkspace(
                 },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp),
+                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
+                    .canvasChrome(chromeRegions),
             )
 
             // A note opened large sits over the board, under the foot bar so formatting stays reachable.
@@ -770,7 +973,8 @@ fun CanvasWorkspace(
 
             // The foot of the board: the active note's formatting bar, centred, above the status line.
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET)
+                    .canvasChrome(chromeRegions),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {

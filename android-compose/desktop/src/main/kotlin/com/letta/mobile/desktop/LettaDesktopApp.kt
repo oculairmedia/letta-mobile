@@ -142,6 +142,51 @@ internal fun LettaDesktopApp(
     val railPrefs = rememberDesktopRailPrefs(secureSettingsStore)
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val canvasDocuments by canvasShell.library.documents.collectAsState()
+
+    // Test hook, off unless -Dletta.repro.newCanvas=<rounds> is set: creates a new canvas over and
+    // over in the real shell, which is the one place the "RootNodeOwner is already disposed" crash
+    // has ever been seen. A reduced window with the same parts does not reproduce it, so the repro
+    // has to run in here. Prints REPRO-ROUND per attempt and REPRO-CLEAN at the end; the crash
+    // itself ends the process, which is the failing signal.
+    val reproRounds = remember { System.getProperty("letta.repro.newCanvas")?.toIntOrNull() ?: 0 }
+    var reproMenuOpen by remember { mutableStateOf(false) }
+    if (reproRounds > 0) {
+        // The menu matters: calling the open-canvas action on its own never fails. In the real
+        // flow the action is chosen from a popup, which is its own scene layer being torn down at
+        // the same moment the content is replaced.
+        androidx.compose.material3.DropdownMenu(
+            expanded = reproMenuOpen,
+            onDismissRequest = { reproMenuOpen = false },
+        ) {
+            androidx.compose.material3.DropdownMenuItem(
+                text = { androidx.compose.material3.Text("Open canvas") },
+                onClick = { reproMenuOpen = false },
+            )
+        }
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(REPRO_SETTLE_MS)
+            repeat(reproRounds) { index ->
+                println("REPRO-ROUND $index")
+                reproMenuOpen = true
+                kotlinx.coroutines.delay(REPRO_MENU_MS)
+                reproMenuOpen = false
+                // The composer menu's path, not the sidebar's: getOrCreateForConversation against a
+                // conversation that has no canvas yet, which is the create the crash follows.
+                canvasShell.openForConversation(
+                    com.letta.mobile.desktop.canvas.DesktopCanvasOwner(
+                        conversationId = "repro-conversation-$index",
+                        agentId = null,
+                        agentName = "Repro",
+                    ),
+                )
+                kotlinx.coroutines.delay(REPRO_STEP_MS)
+                canvasShell.close()
+                kotlinx.coroutines.delay(REPRO_STEP_MS)
+            }
+            println("REPRO-CLEAN: $reproRounds rounds, no crash")
+            kotlin.system.exitProcess(0)
+        }
+    }
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
@@ -1152,3 +1197,12 @@ private fun desktopActiveTitle(destination: DesktopDestination, conversationTitl
  * tools and default memory blocks (model/embedding default to the active
  * agent's config so the new agent is valid for this backend).
  */
+
+/** How long the shell is given to finish starting before the repro hook begins. */
+private const val REPRO_SETTLE_MS = 6000L
+
+/** How long each repro round holds a state before moving on. */
+private const val REPRO_STEP_MS = 900L
+
+/** How long the repro's stand-in menu stays open before the action is chosen. */
+private const val REPRO_MENU_MS = 250L

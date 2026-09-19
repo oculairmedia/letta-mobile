@@ -168,6 +168,10 @@ internal fun DesktopJewelWindow(
             state = state,
             title = title,
         ) {
+            // The pen, read from Windows Ink and posted as ordinary mouse input, so it can draw
+            // AND press things. AWT reports no stylus of its own — measured, see
+            // letta-mobile-4i2z9.5 — so without this the tablet does nothing at all.
+            com.letta.mobile.desktop.input.InstallTabletPen(window)
             DesktopMaterialTheme {
                 val colorScheme = MaterialTheme.colorScheme
                 // With a tab strip the active tab is painted in the page

@@ -15,6 +15,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.singleWindowApplication
 import com.letta.mobile.desktop.initializeDesktopLifecycleMainThread
+import com.letta.mobile.desktop.input.InstallTabletPen
 import com.letta.mobile.ui.canvas.CanvasSamples
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 
@@ -28,6 +29,8 @@ fun main() {
         title = "Meridian Canvas Workspace (Debug)",
         state = androidx.compose.ui.window.WindowState(width = 1280.dp, height = 820.dp),
     ) {
+        // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
+        InstallTabletPen(window)
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
@@ -57,6 +60,8 @@ internal fun CanvasDebugWindow(
         title = "Meridian Canvas Workspace (Debug)",
         state = rememberWindowState(width = 1280.dp, height = 820.dp),
     ) {
+        // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
+        InstallTabletPen(window)
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(

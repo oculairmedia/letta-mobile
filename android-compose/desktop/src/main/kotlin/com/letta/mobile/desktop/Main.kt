@@ -234,6 +234,20 @@ private fun DebugWindows() {
 @OptIn(ExperimentalComposeUiApi::class)
 internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFactory { window ->
     WindowExceptionHandler { throwable ->
+        if (isRecoverableRenderError(throwable)) {
+            // Not fatal, and not ours to die over: the frame was drawn against a scene layer - a
+            // menu, a tooltip, a dialog - that was disposed between the frame being scheduled and
+            // being drawn. Compose draws the next frame against a live scene.
+            //
+            // This handler used to exit for ANY throwable, which is what actually closed the app
+            // when a new canvas was opened: the race below is Compose's, but killing the process
+            // over it was ours. Logged once so the underlying race stays visible without filling
+            // the log a frame at a time.
+            if (loggedRecoverableRenderError.compareAndSet(false, true)) {
+                DesktopCrashReporter.logCrash(throwable, context = "recoverable render frame")
+            }
+            return@WindowExceptionHandler
+        }
         DesktopCrashReporter.logCrash(throwable, context = "window composition")
         val message = buildString {
             append(DesktopCrashReporter.userMessage(throwable))
@@ -246,3 +260,21 @@ internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFacto
         exitProcess(1)
     }
 }
+
+/** Said once: a dropped frame is worth knowing about, not worth a log entry per frame. */
+private val loggedRecoverableRenderError = java.util.concurrent.atomic.AtomicBoolean(false)
+
+/**
+ * True for the render errors the app should survive rather than exit on.
+ *
+ * Compose throws when it measures a scene layer whose root node was disposed after the frame was
+ * scheduled - closing a menu while the screen behind it is replaced is enough. The frame is lost
+ * either way; the only question is whether the app goes with it.
+ *
+ * Deliberately narrow: this is the one message, on the one exception type. Anything else is still
+ * a crash, still reported, and still exits, because an app that swallows every render error hides
+ * the faults that matter.
+ */
+internal fun isRecoverableRenderError(throwable: Throwable): Boolean =
+    throwable is IllegalArgumentException &&
+        throwable.message?.contains("is already disposed", ignoreCase = true) == true
