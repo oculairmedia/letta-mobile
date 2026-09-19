@@ -30,9 +30,9 @@ import com.letta.mobile.ui.theme.listItemColors
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.theme.LettaDimens
 
-private val CardGroupCorner = LettaDimens.Space.xl
-private val CardGroupItemSpacing = LettaDimens.Space.hair
-private val CardGroupInnerCorner = LettaDimens.Space.xs
+private val CardGroupCorner = 20.dp
+private val CardGroupItemSpacing = 2.dp
+private val CardGroupInnerCorner = 4.dp
 
 data class CardGroupItem(
     val onClick: (() -> Unit)?,
