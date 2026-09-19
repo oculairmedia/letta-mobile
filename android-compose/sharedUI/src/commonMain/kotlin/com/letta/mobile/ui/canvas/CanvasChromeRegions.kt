@@ -2,6 +2,7 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -47,10 +48,18 @@ class CanvasChromeRegions {
 @Composable
 internal fun Modifier.canvasChrome(regions: CanvasChromeRegions?): Modifier {
     if (regions == null) return this
-    var bounds: Rect? = null
-    DisposableEffect(regions) {
-        val unregister = regions.register { bounds }
+    // Remembered, not a plain local. A local is a NEW variable on every recomposition: the
+    // registry goes on reading the one it captured first while the layout callback writes to the
+    // newest, so the bounds read as null for ever and the control protects nothing.
+    val holder = remember { ChromeBounds() }
+    DisposableEffect(regions, holder) {
+        val unregister = regions.register { holder.bounds }
         onDispose { unregister() }
     }
-    return onGloballyPositioned { bounds = it.boundsInRoot() }
+    return onGloballyPositioned { holder.bounds = it.boundsInRoot() }
+}
+
+/** Where one control currently is. Plain, so moving a control does not recompose anything. */
+private class ChromeBounds {
+    var bounds: Rect? = null
 }

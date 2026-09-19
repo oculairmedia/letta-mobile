@@ -61,15 +61,25 @@ internal object CanvasShapeLabels {
      * The label re-frames that [elements] now call for: every label document whose shape has moved
      * or been resized away from it, and every label whose shape is gone.
      */
+    /**
+     * What the board should do about its labels, given [owners] - the recorded shape for each
+     * label document.
+     *
+     * Only an owned document is managed here. The name is not the proof: a board can hold an
+     * ordinary note called `label-report`, and reading ownership off the id meant deleting it as
+     * an orphan the moment no shape called `report` existed. Anything unowned is left alone, so
+     * an unknown or legacy document fails safe toward being kept.
+     */
     fun reconcile(
         elements: List<Element>,
         documents: List<CanvasSceneDocument>,
+        owners: Map<String, String>,
     ): Reconciliation {
         val shapesById = elements.filterIsInstance<Element.Shape>().associateBy { it.id }
         val moved = mutableMapOf<String, CanvasDocumentFrame>()
         val orphaned = mutableListOf<String>()
         documents.forEach { doc ->
-            val shapeId = shapeIdOf(doc.id) ?: return@forEach
+            val shapeId = owners[doc.id] ?: return@forEach
             val shape = shapesById[shapeId]
             if (shape == null) {
                 orphaned += doc.id

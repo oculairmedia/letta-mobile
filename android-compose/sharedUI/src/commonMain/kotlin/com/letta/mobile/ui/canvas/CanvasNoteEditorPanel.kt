@@ -48,12 +48,15 @@ fun CanvasNoteEditorPanel(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     onToolbar: ((NoteToolbar?) -> Unit)? = null,
+    /** The whole overlay, scrim included, is chrome: nothing behind it is drawable. */
+    chromeRegions: CanvasChromeRegions? = null,
 ) {
     val scope = rememberCoroutineScope()
     val tint = parseHexColor(document.color)?.takeIf { it.alpha > 0f }
     Box(
         modifier = modifier
             .fillMaxSize()
+            .canvasChrome(chromeRegions)
             .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
             // A tap on the scrim closes; taps on the panel stay in the panel.
             .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },

@@ -306,6 +306,29 @@ class CanvasSession(
     fun arrowBindings(): Map<String, CanvasArrowBinding> = CanvasOpProjector.arrowBindingsOf(sceneJsonOrEmpty())
 
     /** Binds a connector's ends to documents (both null unbinds); a no-op when already so. */
+    /** Which shape owns which label document; see [CanvasOp.SetLabelOwnerOp]. */
+    fun labelOwners(): Map<String, String> = CanvasOpProjector.labelOwnersOf(sceneJsonOrEmpty())
+
+    /**
+     * Records that [documentId] is [shapeId]'s label, or releases it when [shapeId] is null.
+     *
+     * Ownership is what makes the reconciler willing to move or delete a document, so it is
+     * written by whoever creates the label and never inferred from the document's name.
+     */
+    suspend fun setLabelOwner(
+        documentId: String,
+        shapeId: String?,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument = applyLocal(
+        CanvasOp.SetLabelOwnerOp(
+            opId = CanvasOpDiffer.generateOpId("label"),
+            actorId = actorId,
+            lamport = lamportClock + 1,
+            documentId = documentId,
+            shapeId = shapeId,
+        ),
+    )
+
     suspend fun bindArrow(
         elementId: String,
         binding: CanvasArrowBinding,

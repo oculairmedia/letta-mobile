@@ -77,6 +77,24 @@ sealed interface CanvasOp {
         val binding: CanvasArrowBinding,
     ) : CanvasOp
 
+    /**
+     * Marks a block document as the label OWNED by [shapeId], or releases it when [shapeId] is
+     * null.
+     *
+     * Ownership is recorded rather than inferred from the document's id. A board can hold a
+     * perfectly ordinary note called `label-report`, and treating the name as proof of ownership
+     * means the label reconciler deletes it the moment no shape by that name exists.
+     */
+    @Serializable
+    @SerialName("set_label_owner")
+    data class SetLabelOwnerOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val documentId: String,
+        val shapeId: String?,
+    ) : CanvasOp
+
     /** Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins. */
     @Serializable
     @SerialName("set_background_pattern")
@@ -138,6 +156,7 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId)
     is CanvasOp.SetArrowBindingOp -> copy(actorId = actorId)
+    is CanvasOp.SetLabelOwnerOp -> copy(actorId = actorId)
     is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
     is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })

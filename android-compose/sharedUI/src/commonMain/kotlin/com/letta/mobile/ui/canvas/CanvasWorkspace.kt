@@ -485,6 +485,9 @@ fun CanvasWorkspace(
                                 val existing = s.documents().firstOrNull { it.id == labelId }
                                 if (existing == null) {
                                     runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
+                                    // Ownership is recorded, not inferred from the name: this is
+                                    // what makes the reconciler willing to move and delete it.
+                                    runCatching { s.setLabelOwner(labelId, shape.id) }
                                 }
                                 activeNoteId = labelId
                             }
@@ -602,6 +605,9 @@ fun CanvasWorkspace(
             val penDensity = LocalDensity.current.density
             DisposableEffect(session, state.mode, penDensity) {
                 var stroke: CanvasPenStroke? = null
+                // True while the stroke in progress began on a note: the whole stroke belongs to
+                // the note, not only the samples that happen to fall inside it.
+                var strokeStartedOnDocument = false
                 CanvasPenInput.consumer = consumer@{ event ->
                     val current = controller.state.value
                     // The pen reports against the window; the board sits somewhere inside it. Going
@@ -628,6 +634,26 @@ fun CanvasWorkspace(
                         return@consumer false
                     }
                     if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
+                    // A note is written in, not drawn on.
+                    //
+                    // Tested by the note's own frame in world space, not by registered layout
+                    // bounds: a card is placed with a graphicsLayer transform, so its layout
+                    // bounds say where it was laid out rather than where it is drawn.
+                    //
+                    // And read from the SESSION rather than the composed list, once per stroke.
+                    // The composed list is a frame behind at the moment the nib lands - the pen
+                    // arrives off its own poll loop, not on a frame - and a note that is on
+                    // screen but not yet in that list gets drawn straight through. Once per
+                    // stroke also keeps the projection off the 120Hz sample path.
+                    if (event.phase == CanvasPenEvent.Phase.DOWN) {
+                        strokeStartedOnDocument = session?.documents()?.any { doc ->
+                            doc.frame?.let { f ->
+                                world.x >= f.x && world.y >= f.y &&
+                                    world.x <= f.x + f.width && world.y <= f.y + f.height
+                            } == true
+                        } == true
+                    }
+                    if (strokeStartedOnDocument) return@consumer false
                     when (event.phase) {
                         CanvasPenEvent.Phase.DOWN -> {
                             penPreview.clear()
@@ -660,7 +686,7 @@ fun CanvasWorkspace(
             // DrawBox carries its text along in the same frame.
             LaunchedEffect(state.elements, liveDocuments, session, importedRevision, initialLoadDone) {
                 val s = session ?: return@LaunchedEffect
-                val work = CanvasShapeLabels.reconcile(state.elements, liveDocuments)
+                val work = CanvasShapeLabels.reconcile(state.elements, liveDocuments, s.labelOwners())
                 // Re-framing is safe at any time: it only touches labels whose shape is present.
                 if (work.moved.isNotEmpty()) runCatching { s.moveDocuments(work.moved) }
                 // Deleting is not. A label is only an orphan once the elements and the documents
@@ -670,6 +696,9 @@ fun CanvasWorkspace(
                 work.orphaned.forEach { id ->
                     if (activeNoteId == id) activeNoteId = null
                     runCatching { s.removeDocument(id) }
+                    // Released as well as removed, so a document id reused later starts unowned
+                    // rather than inheriting a dead shape.
+                    runCatching { s.setLabelOwner(id, null) }
                 }
             }
 
@@ -968,6 +997,7 @@ fun CanvasWorkspace(
                     document = expanded,
                     onClose = { expandedNoteId = null },
                     onToolbar = { noteToolbar = it },
+                    chromeRegions = chromeRegions,
                 )
             }
 

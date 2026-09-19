@@ -41,6 +41,7 @@ object CanvasOpProjector {
     private const val BG_LAMPORT = "_bgLamport"
     private const val BG_ACTOR = "_bgActorId"
     private const val ARROW_BINDINGS = "_arrowBindings"
+    private const val LABEL_OWNERS = "_labelOwners"
     private const val BINDING_VALUE = "binding"
     private const val BG_PATTERN = "_bgPattern"
     private const val BG_PATTERN_LAMPORT = "_bgPatternLamport"
@@ -124,6 +125,7 @@ object CanvasOpProjector {
         is CanvasOp.SetBackgroundOp -> setBackground(sceneJson, op)
         is CanvasOp.SetBackgroundPatternOp -> setBackgroundPattern(sceneJson, op)
         is CanvasOp.SetArrowBindingOp -> setArrowBinding(sceneJson, op)
+        is CanvasOp.SetLabelOwnerOp -> setLabelOwner(sceneJson, op)
         is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.RemoveElementOp -> removeElementWithLww(sceneJson, op)
@@ -210,6 +212,45 @@ object CanvasOpProjector {
             buildMap {
                 parsed.forEach { (key, value) -> if (key != ARROW_BINDINGS) put(key, value) }
                 put(ARROW_BINDINGS, updated)
+            },
+        )
+    }
+
+    /**
+     * Which shape owns which label document, by document id.
+     *
+     * A document is a shape's label because this says so, not because of what it is called.
+     */
+    fun labelOwnersOf(sceneJson: String): Map<String, String> {
+        val parsed = parseScene(sceneJson)
+        val table = runCatching { parsed[LABEL_OWNERS]?.jsonObject }.getOrNull() ?: return emptyMap()
+        return table.mapNotNull { (documentId, entry) ->
+            val shapeId = runCatching { entry.jsonObject[BINDING_VALUE]?.jsonPrimitive?.content }.getOrNull()
+            shapeId?.takeIf { it.isNotBlank() }?.let { documentId to it }
+        }.toMap()
+    }
+
+    /** LWW per document id; a null shape is kept as the release, so a peer cannot re-claim it. */
+    private fun setLabelOwner(sceneJson: String, op: CanvasOp.SetLabelOwnerOp): String {
+        val parsed = parseScene(sceneJson)
+        val table = runCatching { parsed[LABEL_OWNERS]?.jsonObject }.getOrNull().orEmpty()
+        val existing = table[op.documentId]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val atLamport = runCatching { existing?.get(LAMPORT)?.jsonPrimitive?.long }.getOrNull()
+        val atActor = runCatching { existing?.get(ACTOR)?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        if (!wins(WriterProvenance(op.lamport, op.actorId), atLamport?.let { WriterProvenance(it, atActor) })) return sceneJson
+        val entry = buildJsonObject {
+            put(BINDING_VALUE, JsonPrimitive(op.shapeId.orEmpty()))
+            put(LAMPORT, JsonPrimitive(op.lamport))
+            put(ACTOR, JsonPrimitive(op.actorId))
+        }
+        val updated = buildJsonObject {
+            table.forEach { (id, value) -> if (id != op.documentId) put(id, value) }
+            put(op.documentId, entry)
+        }
+        return canonicalScene(
+            buildMap {
+                parsed.forEach { (key, value) -> if (key != LABEL_OWNERS) put(key, value) }
+                put(LABEL_OWNERS, updated)
             },
         )
     }
