@@ -331,6 +331,19 @@ tasks.register<JavaExec>("runShaderLookdev") {
     systemProperty("lookdev.shaderDir", layout.projectDirectory.dir("lookdev-shaders").asFile.absolutePath)
 }
 
+/**
+ * Drives the "open a new canvas" crash on its own, in a loop, so it can be bisected without a
+ * person clicking. Exits 1 on REPRO-FAILED, 0 on REPRO-CLEAN. Takes the same -PcomposeLayers
+ * override as the app.
+ */
+tasks.register<JavaExec>("runCanvasCrashRepro") {
+    group = "verification"
+    description = "Reproduces the RootNodeOwner-disposed crash when a new canvas is opened."
+    mainClass.set("com.letta.mobile.desktop.canvas.CanvasOpenCrashReproKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+    providers.gradleProperty("composeLayers").orNull?.let { systemProperty("compose.layers.type", it) }
+}
+
 // Dedicated runner for the Canvas Workspace debug window (P0 interactive review).
 tasks.register<JavaExec>("runCanvas") {
     group = "application"
@@ -463,6 +476,14 @@ nucleus.application {
         "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
     )
+
+    // How Compose renders popups, menus and tooltips: drawn into the window's own canvas as
+    // scene "layers" (the default), or as separate heavyweight components. Overridable for
+    // bisecting a layer-disposal crash: -PcomposeLayers=COMPONENT.
+    providers.gradleProperty("composeLayers").orNull?.let { jvmArgs("-Dcompose.layers.type=$it") }
+
+    // -PreproNewCanvas=<rounds> drives the new-canvas crash in the real shell (see LettaDesktopApp).
+    providers.gradleProperty("reproNewCanvas").orNull?.let { jvmArgs("-Dletta.repro.newCanvas=$it") }
 
     // Native Image is intentionally opt-in: the JVM distribution remains the
     // compatibility build for JCEF and Iroh, while release engineers can run

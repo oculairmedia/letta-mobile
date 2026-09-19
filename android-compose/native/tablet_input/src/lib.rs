@@ -174,9 +174,14 @@ pub extern "system" fn Java_com_letta_mobile_desktop_input_TabletBridge_nativeOp
     _class: JClass,
     hwnd: jlong,
 ) -> jlong {
-    match Bridge::new(hwnd as isize) {
-        Some(bridge) => Box::into_raw(Box::new(bridge)) as jlong,
-        None => 0,
+    // As in nativePoll: a panic here would abort the JVM rather than unwind into it.
+    match std::panic::catch_unwind(|| Bridge::new(hwnd as isize)) {
+        Ok(Some(bridge)) => Box::into_raw(Box::new(bridge)) as jlong,
+        Ok(None) => 0,
+        Err(_) => {
+            eprintln!("TABLET: the native bridge panicked while opening; reporting no tablet");
+            0
+        }
     }
 }
 
@@ -194,7 +199,17 @@ pub extern "system" fn Java_com_letta_mobile_desktop_input_TabletBridge_nativePo
     // SAFETY: the handle is one we returned from nativeOpen and the JVM side does not use it
     // after nativeClose.
     let bridge = unsafe { &mut *(handle as *mut Bridge) };
-    let events = bridge.drain();
+    // A panic must not cross back into the JVM. This is an `extern "system"` function, so an
+    // unwind through it is undefined and Rust aborts the process instead - the whole app dies
+    // with a bare NTSTATUS and no stack worth reading. A tablet that misbehaves for one frame
+    // should cost that frame, not the session, so a panic here becomes "no events".
+    let events = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.drain())) {
+        Ok(events) => events,
+        Err(_) => {
+            eprintln!("TABLET: the native bridge panicked while draining; dropping this frame");
+            return empty;
+        }
+    };
     match env.new_float_array(events.len() as i32) {
         Ok(array) => {
             if env.set_float_array_region(&array, 0, &events).is_err() {

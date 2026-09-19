@@ -92,7 +92,9 @@ internal class TabletPen(
             println("TABLET: polling on ${Thread.currentThread().name}")
             try {
                 while (isActive && handles.isNotEmpty()) {
-                    handles.forEach { (name, open, component) ->
+                    dropDeadTargets()
+                    if (handles.isEmpty()) break
+                    handles.toList().forEach { (name, open, component) ->
                         val events = runCatching { TabletBridge.nativePoll(open) }
                             .onFailure { println("TABLET: poll threw: $it") }
                             .getOrDefault(FloatArray(0))
@@ -101,7 +103,11 @@ internal class TabletPen(
                                 sawFrom = name
                                 println("TABLET: events are coming from $name: ${events.take(16).joinToString()}")
                             }
-                            if (sawFrom == name) dispatch(events, component)
+                            // Posting into a component that is no longer on screen drives a layout
+                            // pass on a Compose scene that has been disposed, which throws on the
+                            // event thread and takes the whole app down. Drop the frame instead:
+                            // the pen has nowhere to draw anyway.
+                            if (sawFrom == name && component.isShowing) dispatch(events, component)
                         }
                     }
                     delay(pollInterval)
@@ -131,6 +137,24 @@ internal class TabletPen(
         }
         visit(window)
         return found
+    }
+
+    /**
+     * Closes the handles whose component no longer has a native window behind it.
+     *
+     * The targets are found once, when the pen starts, and a Compose window can replace its
+     * rendering layer underneath us. A handle onto a component that has been disposed is not just
+     * useless - it is the one that crashes the app when the next event arrives.
+     */
+    private fun dropDeadTargets() {
+        val dead = handles.filterNot { (_, _, component) -> component.isDisplayable }
+        if (dead.isEmpty()) return
+        handles.removeAll(dead)
+        dead.forEach { (name, address, _) ->
+            println("TABLET: $name is gone; closing its handle")
+            runCatching { TabletBridge.nativeClose(address) }
+        }
+        if (handles.isEmpty()) sawFrom = null
     }
 
     fun stop() {
