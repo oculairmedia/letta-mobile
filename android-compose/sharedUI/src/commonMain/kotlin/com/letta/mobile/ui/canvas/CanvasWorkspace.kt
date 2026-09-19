@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasDocumentUndo
+import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
@@ -130,6 +132,18 @@ fun CanvasWorkspace(
     // only catch up when the collector below re-imports the scene. Until the two agree, the
     // label reconciler would see every label's shape as missing and delete it.
     var importedRevision by remember { mutableStateOf(0L) }
+    // The board's one undo history, across the drawing (DrawBox's own stack) and the documents
+    // (ops on the session). It records the ORDER, which is the one thing neither side can know.
+    val history = remember(session) { CanvasHistory() }
+    // True while undo or redo is being applied, so the work it causes is not recorded as a new
+    // step: without it, undoing a stroke saves a drawing change that goes straight back on the
+    // stack and the button never reaches anything older.
+    var applyingHistory by remember { mutableStateOf(false) }
+    // The elements as they were when the drawing was last saved, so a save that changed nothing
+    // about them records no step.
+    var lastSavedElements by remember {
+        mutableStateOf<List<io.ak1.drawbox.domain.model.Element>?>(null)
+    }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
     // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
@@ -168,6 +182,9 @@ fun CanvasWorkspace(
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
+        // A different board, or the same board replaced: the steps that remain would undo into a
+        // board that no longer exists.
+        history.clear()
         if (session != null) {
             sessionRegistry?.register(session)
             val syncJob = session.startSync(this)
@@ -254,6 +271,22 @@ fun CanvasWorkspace(
                             session.applyLocalScene(event.json)
                         }
                         lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(session.sceneJsonOrEmpty())
+                        // A settled drawing change is one step for the person, whatever DrawBox
+                        // did internally to get there. Undo delegates it back to DrawBox, which
+                        // owns the elements; the history only remembers that it came next.
+                        //
+                        // Measured on the ELEMENTS, not on the scene json. A save that only
+                        // rewrote the background recorded a step that nothing could undo, and
+                        // recording anything discards the redo branch - so one spurious step
+                        // silently emptied redo straight after an undo.
+                        val elementsNow = controller.state.value.elements
+                        val elementsBefore = lastSavedElements
+                        lastSavedElements = elementsNow
+                        if (applyingHistory) {
+                            applyingHistory = false
+                        } else if (elementsBefore != null && elementsBefore != elementsNow) {
+                            history.record(CanvasHistory.Step.Drawing)
+                        }
                     }
                     onExportJson?.invoke(event.json)
                 }
@@ -286,16 +319,86 @@ fun CanvasWorkspace(
     }
 
     val hasSelection = state.selectedIds.isNotEmpty()
+    // The buttons answer for the BOARD. Taking their enabled state from DrawBox alone left them
+    // greyed out after a note action - there was something to undo, and the only control for it
+    // looked unavailable.
+    val historyCanUndo by history.canUndo.collectAsState()
+    val historyCanRedo by history.canRedo.collectAsState()
     val controlsBarState = CanvasControlsBridge.buildControlsBarState(
         state = state,
-        canUndo = canUndo,
-        canRedo = canRedo,
+        canUndo = canUndo || historyCanUndo,
+        canRedo = canRedo || historyCanRedo,
     )
     val properties = CanvasControlsBridge.buildProperties(state)
     val dispatchProperty: (CanvasPropertyIntent) -> Unit = { intent ->
         CanvasControlsBridge.dispatchProperty(controller = controller, intent = intent, state = state)
     }
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
+
+    /**
+     * Runs a document change and records it as one undoable step.
+     *
+     * The step is a diff of the documents either side of [block] rather than the ops inside it: a
+     * single board action can touch several documents through several calls, and what undo owes
+     * the person is the state they had.
+     */
+    suspend fun recordingDocuments(label: String, block: suspend () -> Unit) {
+        val s = session
+        if (s == null || applyingHistory) {
+            block()
+            return
+        }
+        val before = s.documents()
+        block()
+        CanvasDocumentUndo.stepBetween(before, s.documents(), label)?.let { history.record(it) }
+    }
+
+    /** Applies one history step, without recording what it causes as a new step. */
+    fun applyHistory(step: CanvasHistory.Step?, redo: Boolean) {
+        when (step) {
+            null -> Unit
+            is CanvasHistory.Step.Drawing -> {
+                // The elements are DrawBox's; only it can put them back.
+                applyingHistory = true
+                if (redo) controller.redo() else controller.undo()
+            }
+            is CanvasHistory.Step.Documents -> {
+                val s = session ?: return
+                val ops = if (redo) step.redo else step.undo
+                coroutineScope.launch {
+                    applyingHistory = true
+                    runCatching { s.applyLocalStamped(ops) }
+                    applyingHistory = false
+                    statusMessage = if (redo) "Redid ${step.label}" else "Undid ${step.label}"
+                }
+            }
+        }
+    }
+
+    /**
+     * Undo for the whole board.
+     *
+     * Falls back to DrawBox when the history has nothing left: a board loaded from a session has
+     * a drawing whose steps this session never saw, and the person should still be able to undo
+     * it rather than press a live-looking button that does nothing.
+     */
+    fun undoBoard() {
+        val step = history.undo()
+        if (step == null) {
+            if (canUndo) controller.undo()
+        } else {
+            applyHistory(step, redo = false)
+        }
+    }
+
+    fun redoBoard() {
+        val step = history.redo()
+        if (step == null) {
+            if (canRedo) controller.redo()
+        } else {
+            applyHistory(step, redo = true)
+        }
+    }
 
     // Ctrl/Cmd + wheel over the board zooms the board, not the window: the host that owns that
     // gesture for UI zoom is told where the board is so it leaves those events alone.
@@ -338,7 +441,9 @@ fun CanvasWorkspace(
         val ids = hit.map { it.id }.toSet()
         if (activeNoteId in ids) activeNoteId = null
         selectedNoteIds = selectedNoteIds - ids
-        coroutineScope.launch { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+        coroutineScope.launch {
+            recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+        }
     }
 
     // Marquee and move are DrawBox gestures; the notes follow the same intents so a marquee
@@ -372,7 +477,9 @@ fun CanvasWorkspace(
         if (selectedNoteIds.isNotEmpty() && session != null) {
             val ids = selectedNoteIds
             selectedNoteIds = emptySet()
-            coroutineScope.launch { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+            coroutineScope.launch {
+            recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+        }
             if (hasSelection) controller.deleteSelected()
             return true
         }
@@ -380,7 +487,7 @@ fun CanvasWorkspace(
         val id = activeNoteId ?: return false
         if (session == null || expandedNoteId != null) return false
         activeNoteId = null
-        coroutineScope.launch { runCatching { session.removeDocument(id) } }
+        coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
         return true
     }
     // Duplicate: the drawn selection as offset copies with fresh ids (selected afterwards), or
@@ -407,8 +514,8 @@ fun CanvasWorkspace(
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
         CanvasKeyAction.ESCAPE -> { controller.clearSelection(); activeNoteId = null; expandedNoteId = null; selectedNoteIds = emptySet(); true }
-        CanvasKeyAction.UNDO -> { if (canUndo) controller.undo(); true }
-        CanvasKeyAction.REDO -> { if (canRedo) controller.redo(); true }
+        CanvasKeyAction.UNDO -> { undoBoard(); true }
+        CanvasKeyAction.REDO -> { redoBoard(); true }
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
         null -> false
     }
@@ -557,7 +664,7 @@ fun CanvasWorkspace(
                         if (session != null) {
                             if (activeNoteId == id) activeNoteId = null
                             selectedNoteIds = selectedNoteIds - id
-                            coroutineScope.launch { runCatching { session.removeDocument(id) } }
+                            coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
                         }
                     },
                     onPress = { id, shift ->
@@ -867,6 +974,9 @@ fun CanvasWorkspace(
                                                             // this status with "Agent updated canvas".
                                                             lastExportedJson = restored.sceneJson
                                                             controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
+                                                            // The board has been replaced wholesale; the steps before it
+                                                            // would undo into a board that no longer exists.
+                                                            history.clear()
                                                             statusMessage = "Restored to revision ${cp.revision}"
                                                             showHistoryDialog = false
                                                         }.onFailure { err ->
@@ -892,7 +1002,20 @@ fun CanvasWorkspace(
                 )
             }
 
-            val dispatch: (io.ak1.drawbox.ui.controls.ControlsBarIntent) -> Unit = { intent ->
+            // Undo and redo are the board's, not the drawing's: a note edit and a stroke are both
+            // things the person did, and they undo in the order they were done.
+            val dispatch: (io.ak1.drawbox.ui.controls.ControlsBarIntent) -> Unit = dispatch@{ intent ->
+                when (intent) {
+                    io.ak1.drawbox.ui.controls.ControlsBarIntent.Undo -> {
+                        undoBoard()
+                        return@dispatch
+                    }
+                    io.ak1.drawbox.ui.controls.ControlsBarIntent.Redo -> {
+                        redoBoard()
+                        return@dispatch
+                    }
+                    else -> Unit
+                }
                 CanvasControlsBridge.dispatchIntent(
                     controller = controller,
                     intent = intent,
@@ -923,7 +1046,7 @@ fun CanvasWorkspace(
                             onDelete = {
                                 val id = activeNote.id
                                 activeNoteId = null
-                                coroutineScope.launch { runCatching { session.removeDocument(id) } }
+                                coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
                             },
                             style = activeNote.style,
                             onStyle = { style ->
@@ -961,12 +1084,14 @@ fun CanvasWorkspace(
                         )
                         val id = "note-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
-                            runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
-                                .onSuccess {
-                                    activeNoteId = id
-                                    statusMessage = "Added note"
-                                }
-                                .onFailure { statusMessage = "Error: could not add note (${it.message})" }
+                            recordingDocuments("adding a note") {
+                                runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
+                                    .onSuccess {
+                                        activeNoteId = id
+                                        statusMessage = "Added note"
+                                    }
+                                    .onFailure { statusMessage = "Error: could not add note (${it.message})" }
+                            }
                         }
                     }
                 },
@@ -978,12 +1103,14 @@ fun CanvasWorkspace(
                         )
                         val id = "text-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
-                            runCatching { s.setDocument(id, "", frame = frame, color = PLAIN_TEXT_COLOR) }
-                                .onSuccess {
-                                    activeNoteId = id
-                                    statusMessage = "Added text"
-                                }
-                                .onFailure { statusMessage = "Error: could not add text (${it.message})" }
+                            recordingDocuments("adding text") {
+                                runCatching { s.setDocument(id, "", frame = frame, color = PLAIN_TEXT_COLOR) }
+                                    .onSuccess {
+                                        activeNoteId = id
+                                        statusMessage = "Added text"
+                                    }
+                                    .onFailure { statusMessage = "Error: could not add text (${it.message})" }
+                            }
                         }
                     }
                 },

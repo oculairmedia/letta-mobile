@@ -98,6 +98,54 @@ object CanvasDocumentUndo {
         return if (wouldChange) restore(previous) else null
     }
 
+    /**
+     * The history step that turns [before] into [after], or null when nothing changed.
+     *
+     * Taken as a diff of the documents rather than from the ops that did it. A single board action
+     * can touch several documents through several calls - a marquee drag moves every selected
+     * note - and what undo owes the person is the state they had, not a transcript of the calls
+     * that left it.
+     */
+    fun stepBetween(
+        before: List<CanvasSceneDocument>,
+        after: List<CanvasSceneDocument>,
+        label: String = "",
+    ): CanvasHistory.Step.Documents? {
+        val beforeById = before.associateBy { it.id }
+        val afterById = after.associateBy { it.id }
+        val undo = mutableListOf<CanvasOp>()
+        val redo = mutableListOf<CanvasOp>()
+
+        (beforeById.keys + afterById.keys).sorted().forEach { id ->
+            val was = beforeById[id]
+            val now = afterById[id]
+            when {
+                was == now -> Unit
+                was == null && now != null -> {
+                    undo += remove(id)
+                    redo += restore(now)
+                }
+                was != null && now == null -> {
+                    undo += restore(was)
+                    redo += remove(id)
+                }
+                was != null && now != null -> {
+                    undo += restore(was)
+                    redo += restore(now)
+                }
+            }
+        }
+        if (undo.isEmpty()) return null
+        return CanvasHistory.Step.Documents(undo = undo, redo = redo, label = label)
+    }
+
+    private fun remove(documentId: String): CanvasOp.RemoveDocumentOp = CanvasOp.RemoveDocumentOp(
+        opId = CanvasOpDiffer.generateOpId("undo"),
+        actorId = CanvasSession.LOCAL_USER_ACTOR_ID,
+        lamport = 0L,
+        documentId = documentId,
+    )
+
     /** The op that puts [document] back exactly as it was, every field named. */
     private fun restore(document: CanvasSceneDocument): CanvasOp.SetDocumentOp = CanvasOp.SetDocumentOp(
         opId = CanvasOpDiffer.generateOpId("undo"),

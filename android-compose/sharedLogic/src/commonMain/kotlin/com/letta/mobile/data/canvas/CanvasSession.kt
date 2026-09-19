@@ -306,6 +306,23 @@ class CanvasSession(
     fun arrowBindings(): Map<String, CanvasArrowBinding> = CanvasOpProjector.arrowBindingsOf(sceneJsonOrEmpty())
 
     /** Binds a connector's ends to documents (both null unbinds); a no-op when already so. */
+    /**
+     * Applies [ops] as local changes, stamped with this session's clock as they go in.
+     *
+     * For undo and redo: an inverse is computed when the change happens and applied whenever the
+     * person presses the button, by which time the scene has moved on. Applied with the clock it
+     * was born with, last-writer-wins simply discards it - the board does not move, and undo
+     * looks broken rather than refused.
+     */
+    suspend fun applyLocalStamped(ops: List<CanvasOp>): CanvasDocument? = mutex.withLock {
+        var last: CanvasDocument? = null
+        ops.forEach { op ->
+            val stamped = op.withStamp(CanvasOpDiffer.generateOpId("undo"), ++lamportClock)
+            last = applyLocalLocked(stamped)
+        }
+        last
+    }
+
     /** Which shape owns which label document; see [CanvasOp.SetLabelOwnerOp]. */
     fun labelOwners(): Map<String, String> = CanvasOpProjector.labelOwnersOf(sceneJsonOrEmpty())
 

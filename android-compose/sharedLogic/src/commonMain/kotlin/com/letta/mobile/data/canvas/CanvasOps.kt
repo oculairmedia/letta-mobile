@@ -163,6 +163,27 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
 }
 
 /**
+ * The same operation with a fresh identity and [lamport].
+ *
+ * An inverse is built when a change happens and applied whenever the person presses undo, so it
+ * cannot carry the clock it was born with: the scene has moved on, and last-writer-wins would
+ * discard a stale op without a word. It is stamped at the moment it is applied instead.
+ */
+fun CanvasOp.withStamp(opId: String, lamport: Long): CanvasOp = when (this) {
+    is CanvasOp.ReplaceSceneOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.AddElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.UpdateElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.RemoveElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetBackgroundOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetBackgroundPatternOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetArrowBindingOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetLabelOwnerOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetDocumentOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.RemoveDocumentOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.BatchOp -> copy(opId = opId, lamport = lamport, ops = ops.map { it.withStamp(opId, lamport) })
+}
+
+/**
  * Tool payload DTOs for App Server external tools (canvas.*).
  */
 @Serializable
