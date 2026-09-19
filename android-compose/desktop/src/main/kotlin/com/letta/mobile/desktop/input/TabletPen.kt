@@ -38,6 +38,7 @@ internal class TabletPen(
 ) {
     private val handles = mutableListOf<Triple<String, Long, Component>>()
     private var sawFrom: String? = null
+    private var reportedGeometry = false
     private var down = false
     private var lastPoint = Point(0, 0)
 
@@ -157,6 +158,28 @@ internal class TabletPen(
         if (handles.isEmpty()) sawFrom = null
     }
 
+    /**
+     * Says once, with numbers, where the pen thinks it is against where the pointer actually is.
+     *
+     * An offset cursor is the one pen fault that cannot be reasoned about from a stack: it needs
+     * the raw physical point, the scale it was divided by, the component the event is posted to
+     * and where that component sits on screen. Printing all four turns "it is off by a bit" into
+     * a measurement.
+     */
+    private fun reportGeometryOnce(target: Component, physicalX: Float, physicalY: Float, scale: Double, logical: Point) {
+        if (reportedGeometry) return
+        reportedGeometry = true
+        val onScreen = runCatching { target.locationOnScreen }.getOrNull()
+        val cursor = runCatching { java.awt.MouseInfo.getPointerInfo()?.location }.getOrNull()
+        val expectedOnScreen = onScreen?.let { Point(it.x + logical.x, it.y + logical.y) }
+        println(
+            "TABLET GEOMETRY: physical=($physicalX, $physicalY) scale=$scale logical=$logical " +
+                "target=${target.label()} size=${target.size} locationOnScreen=$onScreen " +
+                "penWouldLandAt=$expectedOnScreen osCursor=$cursor " +
+                "delta=${if (expectedOnScreen != null && cursor != null) Point(cursor.x - expectedOnScreen.x, cursor.y - expectedOnScreen.y) else null}",
+        )
+    }
+
     fun stop() {
         val open = handles.toList()
         handles.clear()
@@ -193,6 +216,7 @@ internal class TabletPen(
             if (offerToCanvas(kind, x, y, force, tool)) continue
 
             val point = Point(x.toInt(), y.toInt())
+            reportGeometryOnce(target, events[index - TabletBridge.STRIDE + 1], events[index - TabletBridge.STRIDE + 2], scale, point)
             when (kind) {
                 TabletBridge.KIND_DOWN -> {
                     down = true

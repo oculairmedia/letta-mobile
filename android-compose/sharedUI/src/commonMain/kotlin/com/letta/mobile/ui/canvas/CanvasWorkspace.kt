@@ -301,6 +301,9 @@ fun CanvasWorkspace(
     // gesture for UI zoom is told where the board is so it leaves those events alone.
     val wheelZoomRegions = LocalWheelZoomRegions.current
     var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    // The board's controls are drawn over the board, so their bounds are held here and the pen
+    // declines events over them - see CanvasChromeRegions.
+    val chromeRegions = remember { CanvasChromeRegions() }
     // The stroke under the nib. It lives up here because the board paints it and the pen consumer
     // fills it, and those are far apart in this function.
     val penPreview = remember { mutableStateListOf<io.ak1.drawbox.domain.model.Element.PathSample>() }
@@ -606,10 +609,15 @@ fun CanvasWorkspace(
                     // would have applied, and the ink lands away from the nib by however far the
                     // board is inset.
                     val board = boardBounds ?: return@consumer false
-                    val onBoard = Offset(event.x * penDensity - board.left, event.y * penDensity - board.top)
+                    val inRoot = Offset(event.x * penDensity, event.y * penDensity)
+                    val onBoard = Offset(inRoot.x - board.left, inRoot.y - board.top)
                     if (onBoard.x < 0f || onBoard.y < 0f || onBoard.x > board.width || onBoard.y > board.height) {
                         return@consumer false
                     }
+                    // Inside the board, but over one of its own controls: the rail, a bar, an
+                    // opened note. Those are pressed, not drawn on, and the pen is offered events
+                    // by position rather than by hit testing, so it has to decline them itself.
+                    if (chromeRegions.contains(inRoot)) return@consumer false
                     val world = current.viewport.screenToWorld(onBoard)
                     if (event.tool == CanvasPenTool.ERASER) {
                         if (event.phase == CanvasPenEvent.Phase.DOWN || event.phase == CanvasPenEvent.Phase.MOVE) {
@@ -704,7 +712,7 @@ fun CanvasWorkspace(
                             back()
                         }
                     },
-                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET),
+                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET).canvasChrome(chromeRegions),
                 )
             }
 
@@ -769,7 +777,7 @@ fun CanvasWorkspace(
                         statusMessage = "Background pattern: ${pattern.kind}"
                     },
                 ),
-                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET),
+                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET).canvasChrome(chromeRegions),
             )
 
 
@@ -898,7 +906,9 @@ fun CanvasWorkspace(
                     } else {
                         null
                     },
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = if (showTitle) 64.dp else CHROME_INSET),
+                    modifier = Modifier.align(Alignment.TopCenter)
+                        .padding(top = if (showTitle) 64.dp else CHROME_INSET)
+                        .canvasChrome(chromeRegions),
                 )
             }
 
@@ -946,7 +956,8 @@ fun CanvasWorkspace(
                 },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp),
+                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
+                    .canvasChrome(chromeRegions),
             )
 
             // A note opened large sits over the board, under the foot bar so formatting stays reachable.
@@ -962,7 +973,8 @@ fun CanvasWorkspace(
 
             // The foot of the board: the active note's formatting bar, centred, above the status line.
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET)
+                    .canvasChrome(chromeRegions),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
