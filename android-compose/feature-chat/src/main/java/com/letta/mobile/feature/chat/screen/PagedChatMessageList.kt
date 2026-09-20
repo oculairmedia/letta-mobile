@@ -35,6 +35,28 @@ internal fun displayedLiveRows(live: List<ChatRenderItem>, residentSettled: List
     return live.filterNot { it.key in settledKeys }
 }
 
+/** Additive S1 diagnostics: composition commits and layout passes, not GPU-presented frames. */
+internal sealed interface TimelineOpeningObservation {
+    enum class Surface { Opening, OpenFailed, InitialLoading, InitialFailed, Timeline }
+    data class Committed(val surface: Surface, val residentRows: Int = 0, val confirmedEmpty: Boolean = false) : TimelineOpeningObservation
+    data class Layout(val rows: List<VisibleRow>, val viewportStart: Int, val viewportEnd: Int) : TimelineOpeningObservation
+    data class VisibleRow(val key: String, val offset: Int, val size: Int)
+}
+
+internal val LocalTimelineOpeningObserver = staticCompositionLocalOf<((TimelineOpeningObservation) -> Unit)?> { null }
+
+@Composable
+private fun ObserveOpeningCommit(
+    surface: TimelineOpeningObservation.Surface,
+    residentRows: Int = 0,
+    confirmedEmpty: Boolean = false,
+) {
+    val observer = LocalTimelineOpeningObserver.current
+    if (observer != null) SideEffect {
+        observer(TimelineOpeningObservation.Committed(surface, residentRows, confirmedEmpty))
+    }
+}
+
 internal enum class TimelineRowLifecycle { Mount, Dispose }
 
 internal val LocalTimelineRowLifecycleObserver = staticCompositionLocalOf<(TimelineRowLifecycle, String) -> Unit> {
@@ -59,6 +81,7 @@ internal fun PagedChatMessageList(
     modifier: Modifier = Modifier,
 ) {
     if (presentation.opening || presentation.openError != null) {
+        ObserveOpeningCommit(if (presentation.openError == null) TimelineOpeningObservation.Surface.Opening else TimelineOpeningObservation.Surface.OpenFailed)
         androidx.compose.foundation.layout.Column(modifier) {
             // The agent opening its own conversation, not an anonymous wait (wbin4.2).
             if (presentation.openError == null) MascotLoading(state.agentId)
@@ -88,9 +111,16 @@ private fun PagedChatMessageListContent(
     val displayedLive = displayedLiveRows(live, pages.itemSnapshotList.items)
     val refresh = pages.loadState.source.refresh
     if (!rememberHistoryGate(presentation, pages)) {
+        ObserveOpeningCommit(if (refresh is LoadState.Error) TimelineOpeningObservation.Surface.InitialFailed else TimelineOpeningObservation.Surface.InitialLoading)
         PagedTimelineLazyLayout.InitialLoadingView(refresh = refresh, onRetry = pages::retry, modifier = modifier)
         return
     }
+    ObserveOpeningCommit(
+        TimelineOpeningObservation.Surface.Timeline,
+        residentRows = pages.itemSnapshotList.items.size,
+        confirmedEmpty = pages.itemCount == 0 && displayedLive.isEmpty() &&
+            PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh),
+    )
     ObserveResidentRows(presentation, pages)
     val listState = key(presentation) { rememberLazyListState() }
     val missingTarget by presentation.missingTarget.collectAsStateWithLifecycle()

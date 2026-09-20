@@ -1,0 +1,244 @@
+package com.letta.mobile.feature.chat
+
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
+import androidx.paging.PagingData
+import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.feature.chat.screen.ChatContentAppearance
+import com.letta.mobile.feature.chat.screen.ChatContentCallbacks
+import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.LocalTimelineOpeningObserver
+import com.letta.mobile.feature.chat.screen.PagedChatMessageList
+import com.letta.mobile.feature.chat.screen.TimelineOpeningObservation
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.ui.theme.LettaChatTheme
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import com.letta.mobile.feature.chat.TimelineOpeningRecorder.Milestone
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
+class TimelineOpeningObservationTest {
+    @get:Rule val compose = createComposeRule()
+    private fun row(id: String) = ChatRenderItem.Single(
+        UiMessage(id = id, role = "user", content = id, timestamp = "2026-09-07T00:00:00Z"),
+        GroupPosition.None,
+    )
+
+    /** Channel holds page delivery without sleeps; opening, page, anchor and freshness are separate. */
+    private inner class Fixture {
+        val rows = listOf(row("first"), row("second"), row("third"))
+        // visibleItemsInfo iteration order for this reverseLayout list, not screen top-to-bottom.
+        // residentPageReachesBoundedAnchoredViewportWithoutFreshness verifies the actual callback.
+        val expectedVisibleKeys = listOf(rows[0].key, rows[1].key, rows[2].key)
+        val recorder = TimelineOpeningRecorder(expectedVisibleKeys, rows.first().key).also {
+            it.mark(Milestone.Selection)
+        }
+        val delivery = Channel<PagingData<ChatRenderItem>>(Channel.UNLIMITED)
+        var generations = 0
+        // A fixture-only boundary; no claim about canonical transport or process-cold IO.
+        val freshness = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val settled = delivery.receiveAsFlow().onEach {
+            generations++
+            recorder.mark(Milestone.FirstGeneration)
+        }
+        val opened = ChatPagingPresentation(settled, MutableStateFlow(emptyList()), {})
+        val current = mutableStateOf(ChatPagingPresentation(settled, MutableStateFlow(emptyList()), {}, opening = true))
+        fun open() {
+            recorder.mark(Milestone.PresentationOpen)
+            current.value = opened
+        }
+        fun page(items: List<ChatRenderItem>, refresh: LoadState = LoadState.NotLoading(false)) {
+            check(delivery.trySend(PagingData.from(items, LoadStates(
+                refresh, LoadState.NotLoading(true), LoadState.NotLoading(true),
+            ))).isSuccess)
+        }
+        fun mount() {
+            recorder.mark(Milestone.Selection)
+            compose.setContent {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalTimelineOpeningObserver provides recorder::observe) {
+                        PagedChatMessageList(current.value, ChatUiState(), ChatContentCallbacks(
+                            onSendMessage = {}, onRerunMessage = {}, onLoadOlderMessages = {},
+                            onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
+                            onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
+                        ), ChatContentAppearance())
+                    }
+                }
+            }
+        }
+        fun surfaces() = recorder.observations.mapNotNull {
+            (it.observation as? TimelineOpeningObservation.Committed)?.surface
+        }.distinct()
+        fun milestones() = recorder.milestones.map { it.second }
+    }
+
+    @Test fun residentPageReachesBoundedAnchoredViewportWithoutFreshness() {
+        val f = Fixture()
+        f.open()
+        f.page(f.rows)
+        f.recorder.resolveAnchor()
+        f.mount()
+        compose.onNodeWithText("third").assertIsDisplayed()
+        compose.runOnIdle {
+            val measured = f.recorder.observations.map { it.observation }
+                .filterIsInstance<TimelineOpeningObservation.Layout>().last()
+            assertEquals("raw visibleItemsInfo order with reverseLayout=true",
+                f.expectedVisibleKeys, measured.rows.map { it.key })
+            assertEquals("newest-edge anchor offset", 0, measured.rows.first().offset)
+            assertTrue("reverse-layout offsets increase away from the newest edge",
+                measured.rows.zipWithNext().all { (a, b) -> a.offset < b.offset })
+            assertEquals(listOf(Milestone.Selection, Milestone.PresentationOpen, Milestone.FirstGeneration,
+                Milestone.ViewportReady, Milestone.FirstContentCommitted), f.milestones())
+            assertEquals(1, f.generations)
+            assertFalse(f.freshness.isCompleted)
+        }
+    }
+
+    @Test fun heldPageExposesLoadingThenPartialContentBeforeCompleteViewport() {
+        val f = Fixture()
+        f.mount()
+        compose.onNodeWithText("Opening conversation...").assertIsDisplayed()
+        compose.runOnIdle { f.open() }
+        compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
+        compose.runOnIdle { f.page(f.rows.take(1)) }
+        compose.onNodeWithText("first").assertIsDisplayed()
+        compose.runOnIdle {
+            assertTrue(Milestone.FirstGeneration in f.milestones())
+            assertTrue(Milestone.FirstContentCommitted in f.milestones())
+            assertFalse(Milestone.ViewportReady in f.milestones())
+            f.page(f.rows)
+        }
+        compose.onNodeWithText("third").assertIsDisplayed()
+        compose.runOnIdle {
+            assertFalse("rows alone do not resolve an anchor", Milestone.ViewportReady in f.milestones())
+            f.recorder.resolveAnchor()
+            assertEquals(listOf(Milestone.Selection, Milestone.PresentationOpen, Milestone.FirstGeneration,
+                Milestone.FirstContentCommitted, Milestone.ViewportReady), f.milestones())
+            assertEquals(listOf(TimelineOpeningObservation.Surface.Opening,
+                TimelineOpeningObservation.Surface.InitialLoading, TimelineOpeningObservation.Surface.Timeline), f.surfaces())
+            assertFalse(f.freshness.isCompleted)
+        }
+    }
+
+    @Test fun coldIndexedLikePageReleaseDoesNotWaitForFixtureFreshness() {
+        // Models delayed local delivery only; it does not launch a process or exercise disk IO.
+        val f = Fixture()
+        f.mount()
+        compose.runOnIdle { f.open() }
+        compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
+        compose.runOnIdle {
+            f.recorder.resolveAnchor()
+            f.page(f.rows)
+        }
+        compose.onNodeWithText("third").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(listOf(Milestone.Selection, Milestone.PresentationOpen, Milestone.FirstGeneration,
+                Milestone.ViewportReady, Milestone.FirstContentCommitted), f.milestones())
+            val before = f.milestones()
+            assertFalse(f.freshness.isCompleted)
+            f.freshness.complete(Unit)
+            assertEquals(before, f.milestones())
+            assertEquals(1, f.generations)
+        }
+    }
+
+    @Test fun emissionOneRowAndWrongAnchorCannotCountAsCompleteViewport() {
+        val recorder = TimelineOpeningRecorder(listOf("a", "b"), "a", anchorOffset = 7)
+        recorder.mark(Milestone.Selection)
+        recorder.mark(Milestone.PresentationOpen)
+        recorder.mark(Milestone.FirstGeneration)
+        recorder.resolveAnchor()
+        // Same raw visibleItemsInfo iteration order as the reverse-layout Compose fixture.
+        // Offsets increase away from the newest edge; do not reverse into screen order.
+        fun layout(vararg rows: TimelineOpeningObservation.VisibleRow) {
+            recorder.observe(TimelineOpeningObservation.Layout(rows.toList(), 0, 100))
+        }
+        assertFalse(recorder.milestones.any { it.second == Milestone.ViewportReady })
+        layout(TimelineOpeningObservation.VisibleRow("a", 7, 20))
+        assertFalse(recorder.milestones.any { it.second == Milestone.ViewportReady })
+        layout(TimelineOpeningObservation.VisibleRow("a", 0, 20), TimelineOpeningObservation.VisibleRow("b", 20, 20))
+        assertFalse(recorder.milestones.any { it.second == Milestone.ViewportReady })
+        layout(TimelineOpeningObservation.VisibleRow("a", 7, 20), TimelineOpeningObservation.VisibleRow("b", 120, 20))
+        assertFalse(recorder.milestones.any { it.second == Milestone.ViewportReady })
+        repeat(2) {
+            layout(TimelineOpeningObservation.VisibleRow("a", 7, 20), TimelineOpeningObservation.VisibleRow("b", 27, 20))
+        }
+        assertEquals(1, recorder.milestones.count { it.second == Milestone.ViewportReady })
+        assertEquals(5, recorder.observations.size) // No coalescing of repeated layout states.
+    }
+
+    @Test fun reorderedExpectedKeysCannotCountAsCompleteViewport() {
+        assertWrongVisibleWindow(listOf("a", "c", "b"))
+    }
+
+    @Test fun unexpectedInterleavedRowCannotCountAsCompleteViewport() {
+        assertWrongVisibleWindow(listOf("a", "interloper", "b", "c"))
+    }
+
+    @Test fun duplicateVisibleRowCannotCountAsCompleteViewport() {
+        assertWrongVisibleWindow(listOf("a", "b", "b", "c"))
+    }
+
+    private fun assertWrongVisibleWindow(keys: List<String>) {
+        val expected = listOf("a", "b", "c")
+        val recorder = TimelineOpeningRecorder(expected, "a", anchorOffset = 7)
+        recorder.resolveAnchor()
+        // Raw visibleItemsInfo order, with increasing reverse-layout offsets just as above.
+        fun layout(window: List<String>) = TimelineOpeningObservation.Layout(
+            window.mapIndexed { index, key -> TimelineOpeningObservation.VisibleRow(key, 7 + index * 20, 20) },
+            0, 100,
+        )
+        recorder.observe(layout(keys))
+        assertFalse("wrong ordered window $keys must not be ready",
+            recorder.milestones.any { it.second == Milestone.ViewportReady })
+        recorder.observe(layout(expected))
+        assertEquals(1, recorder.milestones.count { it.second == Milestone.ViewportReady })
+    }
+
+    @Test fun confirmedEmptyRetainsCurrentEmptyTimelineRatherThanInventingEmptyUi() {
+        val f = Fixture()
+        f.mount()
+        compose.runOnIdle { f.open() }
+        compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
+        compose.runOnIdle { f.page(emptyList()) }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(listOf(Milestone.Selection, Milestone.PresentationOpen, Milestone.FirstGeneration,
+                Milestone.Empty), f.milestones())
+            assertEquals(TimelineOpeningObservation.Surface.Timeline, f.surfaces().last())
+        }
+    }
+
+    @Test fun initialPageFailureRecordsTerminalFailureAndExistingRetry() {
+        val f = Fixture()
+        f.mount()
+        compose.runOnIdle { f.open() }
+        compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
+        compose.runOnIdle { f.page(emptyList(), LoadState.Error(IllegalStateException("held failure"))) }
+        compose.onNodeWithText("Could not load conversation").assertIsDisplayed()
+        compose.onNodeWithText("Retry").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(listOf(Milestone.Selection, Milestone.PresentationOpen, Milestone.FirstGeneration,
+                Milestone.Failed), f.milestones())
+            assertFalse(f.recorder.observations.any { it.observation is TimelineOpeningObservation.Layout })
+        }
+    }
+}
