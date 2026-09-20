@@ -383,6 +383,17 @@ fun CanvasWorkspace(
      * it rather than press a live-looking button that does nothing.
      */
     fun undoBoard() {
+        // A drawing change is recorded when the debounced save lands, so the most recent thing
+        // the person did can still be unrecorded when they reach for undo. Undoing the history's
+        // top in that moment reaches PAST it - back to some older note action - and the board
+        // does something they did not ask for. An unsaved drawing change is therefore undone
+        // first, and never recorded, because it never became a step.
+        val drawingUnsaved = lastSavedElements != null && lastSavedElements != state.elements
+        if (drawingUnsaved && canUndo) {
+            applyingHistory = true
+            controller.undo()
+            return
+        }
         val step = history.undo()
         if (step == null) {
             if (canUndo) controller.undo()
