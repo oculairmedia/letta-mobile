@@ -207,19 +207,20 @@ fun CanvasWorkspace(
                 // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
                 // Conflict: agent replace wins; toast/status.
                 session.document.collect { doc ->
-                    if (doc != null && doc.revision > lastImportedRev) {
-                        lastImportedRev = doc.revision
-                        if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
-                            val cleanJson = CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)
-                            if (!CanvasOpProjector.drawingsEqual(cleanJson, lastDrawing)) {
-                                controller.importPath(cleanJson)
-                                lastDrawing = cleanJson
-                                statusMessage = "Agent updated canvas (rev ${doc.revision})"
-                            }
-                        }
-                        // Set after any re-import: a bump that changed only documents leaves the
-                        // elements already current, so the gate must not stick closed on it.
-                        importedRevision = doc.revision
+                    val result = CanvasWorkspaceSupport.evaluateExternalDocSync(
+                        ExternalSyncParams(
+                            doc = doc,
+                            lastImportedRev = lastImportedRev,
+                            lastExportedJson = lastExportedJson,
+                            lastDrawing = lastDrawing,
+                        ),
+                    ) ?: return@collect
+                    lastImportedRev = result.newImportedRev
+                    importedRevision = result.newImportedRev
+                    if (result.shouldImport && result.cleanJson != null) {
+                        controller.importPath(result.cleanJson)
+                        lastDrawing = result.cleanJson
+                        result.statusMessage?.let { statusMessage = it }
                     }
                 }
             } finally {
@@ -256,58 +257,40 @@ fun CanvasWorkspace(
                     lastExportedJson = event.json
                     val wasAutosaving = isAutosaving
                     isAutosaving = false
-                    val hasElements = event.json.contains("\"elements\"")
-                    if (!wasAutosaving) {
-                        statusMessage = if (hasElements) {
-                            "Exported JSON (${event.json.length} chars, verified)"
-                        } else {
-                            "Warning: Exported JSON missing 'elements' key"
-                        }
+                    CanvasWorkspaceSupport.computeJsonExportStatus(event.json, wasAutosaving)?.let {
+                        statusMessage = it
                     }
                     if (session != null && session.sceneJsonOrEmpty() != event.json) {
-                        // Recorded before the write so the session collector, which may run first,
-                        // already knows this drawing is DrawBox's own and not an external change.
                         lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(event.json)
                         withContext(Dispatchers.Default) {
                             session.applyLocalScene(event.json)
                         }
                         lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(session.sceneJsonOrEmpty())
-                        // A settled drawing change is one step for the person, whatever DrawBox
-                        // did internally to get there. Undo delegates it back to DrawBox, which
-                        // owns the elements; the history only remembers that it came next.
-                        //
-                        // Measured on the ELEMENTS, not on the scene json. A save that only
-                        // rewrote the background recorded a step that nothing could undo, and
-                        // recording anything discards the redo branch - so one spurious step
-                        // silently emptied redo straight after an undo.
                         val elementsNow = controller.state.value.elements
-                        val elementsBefore = lastSavedElements
+                        val shouldRecord = CanvasWorkspaceSupport.shouldRecordDrawingStep(
+                            elementsBefore = lastSavedElements,
+                            elementsNow = elementsNow,
+                            isApplyingHistory = applyingHistory,
+                        )
                         lastSavedElements = elementsNow
                         if (applyingHistory) {
                             applyingHistory = false
-                        } else if (elementsBefore != null && elementsBefore != elementsNow) {
+                        } else if (shouldRecord) {
                             history.record(CanvasHistory.Step.Drawing())
                         }
                     }
                     onExportJson?.invoke(event.json)
                 }
                 is Event.SvgExported -> {
-                    val hasSvgTag = event.svg.contains("<svg", ignoreCase = true)
-                    statusMessage = if (hasSvgTag) {
-                        "Exported SVG (${event.svg.length} chars, verified)"
-                    } else {
-                        "Warning: Exported SVG missing '<svg' tag"
-                    }
+                    statusMessage = CanvasWorkspaceSupport.computeSvgExportStatus(event.svg)
                     onExportSvg?.invoke(event.svg)
                     if (isSharingToChat && onShareToChat != null) {
                         isSharingToChat = false
-                        val bytes = event.svg.encodeToByteArray()
-                        if (bytes.size <= com.letta.mobile.data.attachment.AttachmentLimits.Default.maxRawBytesPerImage) {
-                            onShareToChat.invoke(bytes, "image/svg+xml")
-                            statusMessage = "Shared canvas SVG (${bytes.size} bytes) to chat"
-                        } else {
-                            statusMessage = "Error: Exported SVG exceeds attachment limit (${bytes.size} bytes)"
-                        }
+                        statusMessage = CanvasWorkspaceSupport.handleSvgShareToChat(
+                            svg = event.svg,
+                            maxBytes = com.letta.mobile.data.attachment.AttachmentLimits.Default.maxRawBytesPerImage,
+                            onShare = onShareToChat,
+                        )
                     }
                 }
                 is Event.Error -> {
@@ -452,28 +435,15 @@ fun CanvasWorkspace(
                 // tap detector in the chain CONSUMED the first tap, so a single tap never reached
                 // DrawBox at all and the text tool placed nothing.
                 is io.ak1.drawbox.domain.model.Intent.RequestTextEditAt -> {
-                    val elements = controller.state.value.elements
-                    val text = CanvasTextElements.at(elements, intent.offset, intent.tolerance)
-                    if (text != null) {
-                        editingTextId = text.id
-                    } else {
-                        // A shape holds text too, and that text is a block document - a label
-                        // owned by the shape, which follows it and goes with it.
-                        val shape = CanvasShapeLabels.shapeAt(elements, intent.offset)
-                        val s = session
-                        if (shape != null && s != null) {
-                            val labelId = CanvasShapeLabels.labelIdOf(shape.id)
-                            val frame = CanvasShapeLabels.frameFor(shape.bounds())
-                            coroutineScope.launch {
-                                if (s.documents().none { it.id == labelId }) {
-                                    runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
-                                    // Ownership is recorded, not inferred from the name: this is
-                                    // what makes the reconciler willing to move and delete it.
-                                    runCatching { s.setLabelOwner(labelId, shape.id) }
-                                }
-                                activeNoteId = labelId
-                            }
-                        }
+                    coroutineScope.launch {
+                        CanvasWorkspaceSupport.handleRequestTextEdit(
+                            offset = intent.offset,
+                            tolerance = intent.tolerance,
+                            elements = controller.state.value.elements,
+                            session = session,
+                            onEditText = { editingTextId = it },
+                            onActivateShapeLabel = { activeNoteId = it },
+                        )
                     }
                 }
                 is io.ak1.drawbox.domain.model.Intent.ClearSelection,
@@ -487,26 +457,26 @@ fun CanvasWorkspace(
     // lets both go, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) undo and redo the drawing, Ctrl/Cmd+D
     // duplicates. Handled where they bubble to, so a note editor keeps every key it consumes.
     val boardFocus = remember { FocusRequester() }
-    fun deleteFocused(): Boolean {
-        if (selectedNoteIds.isNotEmpty() && session != null) {
-            val ids = selectedNoteIds
+    fun deleteFocused(): Boolean = CanvasWorkspaceSupport.deleteFocused(
+        selectedNoteIds = selectedNoteIds,
+        hasSelection = hasSelection,
+        activeNoteId = activeNoteId,
+        expandedNoteId = expandedNoteId,
+        hasSession = session != null,
+        onDeleteSelection = { controller.deleteSelected() },
+        onDeleteNotes = { ids ->
             selectedNoteIds = emptySet()
             coroutineScope.launch {
-                recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+                recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session?.removeDocument(id) } } }
             }
-            if (hasSelection) controller.deleteSelected()
-            return true
-        }
-        if (hasSelection) {
-            controller.deleteSelected()
-            return true
-        }
-        val id = activeNoteId ?: return false
-        if (session == null || expandedNoteId != null) return false
-        activeNoteId = null
-        coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
-        return true
-    }
+        },
+        onDeleteActiveNote = { id ->
+            activeNoteId = null
+            coroutineScope.launch {
+                recordingDocuments("deleting a note") { runCatching { session?.removeDocument(id) } }
+            }
+        },
+    )
 
     fun duplicateFocused(): Boolean {
         if (hasSelection) {
@@ -570,14 +540,7 @@ fun CanvasWorkspace(
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.type != PointerEventType.Scroll) continue
-                            val modifiers = event.keyboardModifiers
-                            if (!modifiers.isCtrlPressed && !modifiers.isMetaPressed) continue
-                            val change = event.changes.firstOrNull() ?: continue
-                            val delta = event.changes.fold(0f) { acc, c -> acc + c.scrollDelta.y }
-                            if (delta == 0f) continue
-                            controller.zoomBy(if (delta > 0f) 1f / WHEEL_ZOOM_STEP else WHEEL_ZOOM_STEP, change.position)
-                            event.changes.forEach { it.consume() }
+                            CanvasWorkspaceSupport.handleWheelZoom(event, controller)
                         }
                     }
                 },
@@ -617,33 +580,18 @@ fun CanvasWorkspace(
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Final)
-                                altHeld = event.keyboardModifiers.isAltPressed
-                                val current = controller.state.value
-                                val connectorMode = current.mode == io.ak1.drawbox.domain.model.Mode.LINE ||
-                                    current.mode == io.ak1.drawbox.domain.model.Mode.ARROW
-                                val position = event.changes.firstOrNull()?.position
-                                if (current.mode == io.ak1.drawbox.domain.model.Mode.ERASER &&
-                                    position != null && event.changes.any { it.pressed }
-                                ) {
-                                    eraseNotesAt(
-                                        EraserArea(
-                                            world = current.viewport.screenToWorld(position),
-                                            radius = current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f),
-                                        ),
-                                    )
-                                }
-                                when {
-                                    !connectorMode -> drawingConnectorAt = null
-                                    event.type == PointerEventType.Press || event.type == PointerEventType.Move -> {
-                                        if (position != null && event.changes.any { it.pressed }) {
-                                            drawingConnectorAt = current.viewport.screenToWorld(position)
-                                        }
-                                    }
-                                    event.type == PointerEventType.Release -> {
-                                        drawingConnectorAt = null
-                                        if (!altHeld) CanvasWorkspaceSupport.snapLatestConnector(controller, session, liveDocuments, coroutineScope)
-                                    }
-                                }
+                                val result = CanvasWorkspaceSupport.handleFinalPointerPass(
+                                    FinalPointerPassParams(
+                                        event = event,
+                                        current = controller.state.value,
+                                        onEraseNotes = { eraseNotesAt(it) },
+                                        onSnapLatestConnector = {
+                                            CanvasWorkspaceSupport.snapLatestConnector(controller, session, liveDocuments, coroutineScope)
+                                        },
+                                    ),
+                                )
+                                altHeld = result.altHeld
+                                drawingConnectorAt = result.drawingConnectorAt
                             }
                         }
                     },
@@ -769,28 +717,16 @@ fun CanvasWorkspace(
             // resized, and removed with it. Keyed on the element list so a shape dragged by
             // DrawBox carries its text along in the same frame.
             LaunchedEffect(state.elements, liveDocuments, session, importedRevision, initialLoadDone) {
-                val s = session ?: return@LaunchedEffect
-                val work = CanvasShapeLabels.reconcile(state.elements, liveDocuments, s.labelOwners())
-                // Re-framing is safe at any time: it only touches labels whose shape is present.
-                if (work.moved.isNotEmpty()) runCatching { s.moveDocuments(work.moved) }
-                // Deleting is not. A label is only an orphan once the elements and the documents
-                // describe the same revision; before that "no such shape" means "not imported
-                // yet", and acting on it destroys the text the shape is holding.
-                if (!initialLoadDone || sessionDoc?.revision != importedRevision) return@LaunchedEffect
-                // A label goes because its shape went, which is a drawing step already on the
-                // history - so this work is FOLDED INTO that step rather than recorded beside it
-                // or, as before, not recorded at all. Undoing the deletion then gives back the
-                // shape and the words it was holding in one press; it used to give back an empty
-                // box, the text having been destroyed outside the history entirely.
-                recordingWithLastDrawing("deleting a labelled shape") {
-                    work.orphaned.forEach { id ->
-                        if (activeNoteId == id) activeNoteId = null
-                        runCatching { s.removeDocument(id) }
-                        // Released as well as removed, so a document id reused later starts
-                        // unowned rather than inheriting a dead shape.
-                        runCatching { s.setLabelOwner(id, null) }
-                    }
-                }
+                CanvasWorkspaceSupport.reconcileShapeLabels(
+                    elements = state.elements,
+                    liveDocuments = liveDocuments,
+                    session = session,
+                    sessionDoc = sessionDoc,
+                    importedRevision = importedRevision,
+                    initialLoadDone = initialLoadDone,
+                    onClearActiveNoteIf = { id -> if (activeNoteId == id) activeNoteId = null },
+                    recordDeletion = { block -> recordingWithLastDrawing("deleting a labelled shape") { block() } },
+                )
             }
 
             // A bound connector end follows its note: whenever a document's frame changes (a local
@@ -1061,4 +997,4 @@ fun CanvasWorkspace(
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
-private const val WHEEL_ZOOM_STEP = 1.1f
+internal const val WHEEL_ZOOM_STEP = 1.1f

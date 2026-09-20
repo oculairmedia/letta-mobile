@@ -6,8 +6,16 @@ import com.letta.mobile.data.canvas.CanvasArrowBinding
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasDocumentUndo
 import com.letta.mobile.data.canvas.CanvasHistory
+import com.letta.mobile.data.canvas.CanvasDocument
+import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isAltPressed
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import io.ak1.drawbox.domain.model.State as DrawBoxState
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.ShapeType
@@ -79,6 +87,32 @@ internal data class FollowConnectorsParams(
     val arrowBindings: Map<String, CanvasArrowBinding>,
     val documents: List<CanvasSceneDocument>,
     val lastFrames: Map<String, CanvasDocumentFrame>,
+)
+
+internal data class ExternalSyncParams(
+    val doc: CanvasDocument?,
+    val lastImportedRev: Long,
+    val lastExportedJson: String?,
+    val lastDrawing: String?,
+)
+
+internal data class ExternalSyncResult(
+    val shouldImport: Boolean,
+    val cleanJson: String?,
+    val newImportedRev: Long,
+    val statusMessage: String?,
+)
+
+internal data class FinalPointerPassParams(
+    val event: PointerEvent,
+    val current: DrawBoxState,
+    val onEraseNotes: (EraserArea) -> Unit,
+    val onSnapLatestConnector: () -> Unit,
+)
+
+internal data class FinalPointerPassResult(
+    val altHeld: Boolean,
+    val drawingConnectorAt: Offset?,
 )
 
 internal object CanvasWorkspaceSupport {
@@ -332,21 +366,42 @@ internal object CanvasWorkspaceSupport {
     }
 
     fun followConnectors(params: FollowConnectorsParams): Map<String, CanvasDocumentFrame> {
-        val frames = params.documents.mapNotNull { doc -> doc.frame?.let { doc.id to it } }.toMap()
-        frames.forEach { (id, frame) ->
-            if (params.lastFrames[id] == frame || id !in params.lastFrames) return@forEach
-            params.arrowBindings.forEach { (elementId, binding) ->
-                val connector = params.elements.firstOrNull { it.id == elementId } as? Element.Shape
-                    ?: return@forEach
-                CanvasSnapping.follow(connector, binding, id, frame)?.let { geometry ->
-                    params.controller.onIntent(Intent.SetElementPoints(elementId, geometry.points))
-                    if (geometry.bend != connector.bend) {
-                        params.controller.onIntent(Intent.SetLineBend(elementId, geometry.bend))
-                    }
-                }
+        val frames = extractDocumentFrames(params.documents)
+        syncMovedFrames(params, frames)
+        return frames
+    }
+
+    private fun extractDocumentFrames(documents: List<CanvasSceneDocument>): Map<String, CanvasDocumentFrame> =
+        documents.mapNotNull { doc -> doc.frame?.let { doc.id to it } }.toMap()
+
+    private fun syncMovedFrames(params: FollowConnectorsParams, frames: Map<String, CanvasDocumentFrame>) {
+        for ((id, frame) in frames) {
+            val prev = params.lastFrames[id]
+            if (prev != null && prev != frame) {
+                updateConnectorsForFrame(params, id, frame)
             }
         }
-        return frames
+    }
+
+    private fun updateConnectorsForFrame(params: FollowConnectorsParams, id: String, frame: CanvasDocumentFrame) {
+        for ((elementId, binding) in params.arrowBindings) {
+            updateSingleConnector(params, elementId, binding, id, frame)
+        }
+    }
+
+    private fun updateSingleConnector(
+        params: FollowConnectorsParams,
+        elementId: String,
+        binding: CanvasArrowBinding,
+        id: String,
+        frame: CanvasDocumentFrame,
+    ) {
+        val connector = params.elements.firstOrNull { it.id == elementId } as? Element.Shape ?: return
+        val geometry = CanvasSnapping.follow(connector, binding, id, frame) ?: return
+        params.controller.onIntent(Intent.SetElementPoints(elementId, geometry.points))
+        if (geometry.bend != connector.bend) {
+            params.controller.onIntent(Intent.SetLineBend(elementId, geometry.bend))
+        }
     }
 
     private fun validatePenPosition(
@@ -426,6 +481,175 @@ internal object CanvasWorkspaceSupport {
             val (updatedStroke, handled) = handleDrawPhase(drawParams, stroke)
             stroke = updatedStroke
             handled
+        }
+    }
+
+    fun evaluateExternalDocSync(params: ExternalSyncParams): ExternalSyncResult? {
+        val doc = params.doc ?: return null
+        if (doc.revision <= params.lastImportedRev) return null
+        val sceneJson = doc.sceneJson
+        val diffJson = sceneJson.isNotBlank() && sceneJson != params.lastExportedJson
+        val clean = if (diffJson) CanvasOpProjector.stripMetadataForDrawBox(sceneJson) else null
+        val shouldImport = clean != null && !CanvasOpProjector.drawingsEqual(clean, params.lastDrawing)
+        val msg = if (shouldImport) "Agent updated canvas (rev ${doc.revision})" else null
+        return ExternalSyncResult(
+            shouldImport = shouldImport,
+            cleanJson = clean,
+            newImportedRev = doc.revision,
+            statusMessage = msg,
+        )
+    }
+
+    fun computeJsonExportStatus(json: String, wasAutosaving: Boolean): String? {
+        if (wasAutosaving) return null
+        return if (json.contains("\"elements\"")) {
+            "Exported JSON (${json.length} chars, verified)"
+        } else {
+            "Warning: Exported JSON missing 'elements' key"
+        }
+    }
+
+    fun computeSvgExportStatus(svg: String): String =
+        if (svg.contains("<svg", ignoreCase = true)) {
+            "Exported SVG (${svg.length} chars, verified)"
+        } else {
+            "Warning: Exported SVG missing '<svg' tag"
+        }
+
+    fun handleSvgShareToChat(
+        svg: String,
+        maxBytes: Int,
+        onShare: (ByteArray, String) -> Unit,
+    ): String {
+        val bytes = svg.encodeToByteArray()
+        return if (bytes.size <= maxBytes) {
+            onShare(bytes, "image/svg+xml")
+            "Shared canvas SVG (${bytes.size} bytes) to chat"
+        } else {
+            "Error: Exported SVG exceeds attachment limit (${bytes.size} bytes)"
+        }
+    }
+
+    fun shouldRecordDrawingStep(
+        elementsBefore: List<Element>?,
+        elementsNow: List<Element>,
+        isApplyingHistory: Boolean,
+    ): Boolean = !isApplyingHistory && elementsBefore != null && elementsBefore != elementsNow
+
+    fun deleteFocused(
+        selectedNoteIds: Set<String>,
+        hasSelection: Boolean,
+        activeNoteId: String?,
+        expandedNoteId: String?,
+        hasSession: Boolean,
+        onDeleteSelection: () -> Unit,
+        onDeleteNotes: (Set<String>) -> Unit,
+        onDeleteActiveNote: (String) -> Unit,
+    ): Boolean {
+        if (selectedNoteIds.isNotEmpty() && hasSession) {
+            onDeleteNotes(selectedNoteIds)
+            if (hasSelection) onDeleteSelection()
+            return true
+        }
+        if (hasSelection) {
+            onDeleteSelection()
+            return true
+        }
+        val id = activeNoteId ?: return false
+        if (!hasSession || expandedNoteId != null) return false
+        onDeleteActiveNote(id)
+        return true
+    }
+
+    suspend fun handleRequestTextEdit(
+        offset: Offset,
+        tolerance: Float,
+        elements: List<Element>,
+        session: CanvasSession?,
+        onEditText: (String) -> Unit,
+        onActivateShapeLabel: (String) -> Unit,
+    ) {
+        val text = CanvasTextElements.at(elements, offset, tolerance)
+        if (text != null) {
+            onEditText(text.id)
+            return
+        }
+        val shape = CanvasShapeLabels.shapeAt(elements, offset) ?: return
+        val s = session ?: return
+        val labelId = CanvasShapeLabels.labelIdOf(shape.id)
+        val frame = CanvasShapeLabels.frameFor(shape.bounds())
+        if (s.documents().none { it.id == labelId }) {
+            runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
+            runCatching { s.setLabelOwner(labelId, shape.id) }
+        }
+        onActivateShapeLabel(labelId)
+    }
+
+    fun handleWheelZoom(
+        event: PointerEvent,
+        controller: DrawBoxController,
+        zoomStep: Float = WHEEL_ZOOM_STEP,
+    ): Boolean {
+        if (event.type != PointerEventType.Scroll) return false
+        val modifiers = event.keyboardModifiers
+        if (!modifiers.isCtrlPressed && !modifiers.isMetaPressed) return false
+        val change = event.changes.firstOrNull() ?: return false
+        val delta = event.changes.fold(0f) { acc, c -> acc + c.scrollDelta.y }
+        if (delta == 0f) return false
+        val factor = if (delta > 0f) 1f / zoomStep else zoomStep
+        controller.zoomBy(factor, change.position)
+        event.changes.forEach { it.consume() }
+        return true
+    }
+
+    fun handleFinalPointerPass(params: FinalPointerPassParams): FinalPointerPassResult {
+        val event = params.event
+        val altHeld = event.keyboardModifiers.isAltPressed
+        val current = params.current
+        val connectorMode = current.mode == io.ak1.drawbox.domain.model.Mode.LINE ||
+            current.mode == io.ak1.drawbox.domain.model.Mode.ARROW
+        val position = event.changes.firstOrNull()?.position
+        val isPressed = event.changes.any { it.pressed }
+
+        if (current.mode == io.ak1.drawbox.domain.model.Mode.ERASER && isPressed && position != null) {
+            val radius = current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f)
+            params.onEraseNotes(EraserArea(world = current.viewport.screenToWorld(position), radius = radius))
+        }
+
+        val connectorAt = when {
+            !connectorMode -> null
+            event.type == PointerEventType.Press || event.type == PointerEventType.Move -> {
+                if (isPressed && position != null) current.viewport.screenToWorld(position) else null
+            }
+            event.type == PointerEventType.Release -> {
+                if (!altHeld) params.onSnapLatestConnector()
+                null
+            }
+            else -> null
+        }
+        return FinalPointerPassResult(altHeld = altHeld, drawingConnectorAt = connectorAt)
+    }
+
+    suspend fun reconcileShapeLabels(
+        elements: List<Element>,
+        liveDocuments: List<CanvasSceneDocument>,
+        session: CanvasSession?,
+        sessionDoc: CanvasDocument?,
+        importedRevision: Long,
+        initialLoadDone: Boolean,
+        onClearActiveNoteIf: (String) -> Unit,
+        recordDeletion: suspend (suspend () -> Unit) -> Unit,
+    ) {
+        val s = session ?: return
+        val work = CanvasShapeLabels.reconcile(elements, liveDocuments, s.labelOwners())
+        if (work.moved.isNotEmpty()) runCatching { s.moveDocuments(work.moved) }
+        if (!initialLoadDone || sessionDoc?.revision != importedRevision) return
+        recordDeletion {
+            work.orphaned.forEach { id ->
+                onClearActiveNoteIf(id)
+                runCatching { s.removeDocument(id) }
+                runCatching { s.setLabelOwner(id, null) }
+            }
         }
     }
 }
