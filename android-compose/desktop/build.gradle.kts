@@ -136,6 +136,41 @@ val buildDesktopMermaidNative = tasks.register<Exec>("buildDesktopMermaidNative"
         manifest.asFile.absolutePath,
     )
 }
+// The pen bridge (native/tablet_input): Windows Ink read directly, because AWT never reports a
+// stylus and Compose Desktop has no stylus path at all. Built and staged exactly like the Mermaid
+// renderer above.
+val tabletNativeLibraryName = when {
+    System.getProperty("os.name").startsWith("Windows", ignoreCase = true) -> "letta_tablet_input.dll"
+    System.getProperty("os.name").startsWith("Mac", ignoreCase = true) -> "libletta_tablet_input.dylib"
+    else -> "libletta_tablet_input.so"
+}
+val tabletInputDir = rootProject.layout.projectDirectory.dir("native/tablet_input")
+// Its own staging directory: Sync clears whatever it does not own, so two of them pointed at one
+// directory would take turns deleting each other's library.
+val tabletNativeDir = layout.buildDirectory.dir("generated/tablet-native")
+val buildDesktopTabletNative = tasks.register<Exec>("buildDesktopTabletNative") {
+    val manifest = tabletInputDir.file("Cargo.toml")
+    inputs.files(
+        manifest,
+        tabletInputDir.file("Cargo.lock"),
+        fileTree(tabletInputDir.dir("src")),
+    )
+    outputs.file(tabletInputDir.file("target/release/$tabletNativeLibraryName"))
+    commandLine(
+        providers.environmentVariable("CARGO").orElse("cargo").get(),
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        manifest.asFile.absolutePath,
+    )
+}
+val stageDesktopTabletNative = tasks.register<Sync>("stageDesktopTabletNative") {
+    dependsOn(buildDesktopTabletNative)
+    from(tabletInputDir.file("target/release/$tabletNativeLibraryName"))
+    into(tabletNativeDir)
+}
+
 val stageDesktopMermaidNative = tasks.register<Sync>("stageDesktopMermaidNative") {
     dependsOn(buildDesktopMermaidNative)
     from(mermaidRendererDir.file("target/release/$mermaidNativeLibraryName"))
@@ -144,10 +179,11 @@ val stageDesktopMermaidNative = tasks.register<Sync>("stageDesktopMermaidNative"
 
 sourceSets.main {
     resources.srcDir(mermaidNativeDir)
+    resources.srcDir(tabletNativeDir)
 }
 
 tasks.named("processResources") {
-    dependsOn(stageDesktopMermaidNative)
+    dependsOn(stageDesktopMermaidNative, stageDesktopTabletNative)
 }
 
 dependencies {
@@ -295,6 +331,19 @@ tasks.register<JavaExec>("runShaderLookdev") {
     systemProperty("lookdev.shaderDir", layout.projectDirectory.dir("lookdev-shaders").asFile.absolutePath)
 }
 
+/**
+ * Drives the "open a new canvas" crash on its own, in a loop, so it can be bisected without a
+ * person clicking. Exits 1 on REPRO-FAILED, 0 on REPRO-CLEAN. Takes the same -PcomposeLayers
+ * override as the app.
+ */
+tasks.register<JavaExec>("runCanvasCrashRepro") {
+    group = "verification"
+    description = "Reproduces the RootNodeOwner-disposed crash when a new canvas is opened."
+    mainClass.set("com.letta.mobile.desktop.canvas.CanvasOpenCrashReproKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+    providers.gradleProperty("composeLayers").orNull?.let { systemProperty("compose.layers.type", it) }
+}
+
 // Dedicated runner for the Canvas Workspace debug window (P0 interactive review).
 tasks.register<JavaExec>("runCanvas") {
     group = "application"
@@ -427,6 +476,14 @@ nucleus.application {
         "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
     )
+
+    // How Compose renders popups, menus and tooltips: drawn into the window's own canvas as
+    // scene "layers" (the default), or as separate heavyweight components. Overridable for
+    // bisecting a layer-disposal crash: -PcomposeLayers=COMPONENT.
+    providers.gradleProperty("composeLayers").orNull?.let { jvmArgs("-Dcompose.layers.type=$it") }
+
+    // -PreproNewCanvas=<rounds> drives the new-canvas crash in the real shell (see LettaDesktopApp).
+    providers.gradleProperty("reproNewCanvas").orNull?.let { jvmArgs("-Dletta.repro.newCanvas=$it") }
 
     // Native Image is intentionally opt-in: the JVM distribution remains the
     // compatibility build for JCEF and Iroh, while release engineers can run

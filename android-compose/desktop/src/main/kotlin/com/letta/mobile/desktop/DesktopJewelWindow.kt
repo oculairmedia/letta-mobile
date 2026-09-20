@@ -15,7 +15,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -23,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
+import com.letta.mobile.ui.components.LocalMenuActionScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
@@ -168,6 +172,15 @@ internal fun DesktopJewelWindow(
             state = state,
             title = title,
         ) {
+            // The pen, read from Windows Ink and posted as ordinary mouse input, so it can draw
+            // AND press things. AWT reports no stylus of its own — measured, see
+            // letta-mobile-4i2z9.5 — so without this the tablet does nothing at all.
+            //
+            // The registry is this window's: the pen delivers into it and the canvas composed
+            // below registers with it, so the table of live consumers dies with the window that
+            // owns it rather than outliving every window in the process.
+            val penRegistry = remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
+            com.letta.mobile.desktop.input.InstallTabletPen(window, penRegistry)
             DesktopMaterialTheme {
                 val colorScheme = MaterialTheme.colorScheme
                 // With a tab strip the active tab is painted in the page
@@ -373,7 +386,19 @@ internal fun DesktopJewelWindow(
                             }
                         }
                     }
-                    content()
+                    // The pen belongs to this window: a canvas composed inside it registers
+                    // under this window's identity, so two open windows cannot take each other's
+                    // strokes.
+                    // The window's own scope runs what a menu item chose: a popup is dismissed by
+                    // being removed, so the action cannot belong to the popup.
+                    val windowScope = rememberCoroutineScope()
+                    CompositionLocalProvider(
+                        LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
+                        com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
+                        LocalMenuActionScope provides windowScope,
+                    ) {
+                        content()
+                    }
                 }
             }
         }

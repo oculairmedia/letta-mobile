@@ -234,6 +234,28 @@ private fun DebugWindows() {
 @OptIn(ExperimentalComposeUiApi::class)
 internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFactory { window ->
     WindowExceptionHandler { throwable ->
+        if (isRecoverableRenderError(throwable)) {
+            // Not fatal, and not ours to die over: the frame was drawn against a scene layer - a
+            // menu, a tooltip, a dialog - that was disposed between the frame being scheduled and
+            // being drawn. Compose draws the next frame against a live scene.
+            //
+            // This handler used to exit for ANY throwable, which is what actually closed the app
+            // when a new canvas was opened: the race below is Compose's, but killing the process
+            // over it was ours. Logged once so the underlying race stays visible without filling
+            // the log a frame at a time.
+            // Counted, not just noticed. Logging once per session answers "did it happen" and
+            // nothing else - not how often, not whether a flash is one dropped frame or twenty in
+            // a row. The count and the gap since the previous drop are what say how bad it is.
+            val dropped = recoverableRenderFrames.incrementAndGet()
+            val now = System.nanoTime()
+            val previous = lastRecoverableRenderFrame.getAndSet(now)
+            val sincePrevious = if (previous == 0L) -1L else (now - previous) / NANOS_PER_MILLI
+            println("RENDER: dropped frame #$dropped" + if (sincePrevious < 0) " (first)" else " (+${sincePrevious}ms)")
+            if (dropped == 1L) {
+                DesktopCrashReporter.logCrash(throwable, context = "recoverable render frame")
+            }
+            return@WindowExceptionHandler
+        }
         DesktopCrashReporter.logCrash(throwable, context = "window composition")
         val message = buildString {
             append(DesktopCrashReporter.userMessage(throwable))
@@ -246,3 +268,30 @@ internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFacto
         exitProcess(1)
     }
 }
+
+/** How many frames this session has lost to the disposed-layer race. */
+private val recoverableRenderFrames = java.util.concurrent.atomic.AtomicLong(0)
+
+/** When the last one was, so the gap between drops says whether they cascade. */
+private val lastRecoverableRenderFrame = java.util.concurrent.atomic.AtomicLong(0)
+
+private const val NANOS_PER_MILLI = 1_000_000L
+
+/**
+ * True for the render errors the app should survive rather than exit on.
+ *
+ * Compose throws when it measures a scene layer whose root node was disposed after the frame was
+ * scheduled - closing a menu while the screen behind it is replaced is enough. The frame is lost
+ * either way; the only question is whether the app goes with it.
+ *
+ * Deliberately narrow: the owner Compose names, on the one exception type. "is already disposed"
+ * on its own was too broad - a session, a transport or any other object reporting the same phrase
+ * would have been swallowed with it, and an app that hides the faults that matter is worse than
+ * one that exits on a frame it could have survived.
+ */
+internal fun isRecoverableRenderError(throwable: Throwable): Boolean =
+    throwable is IllegalArgumentException &&
+        throwable.message?.contains(DISPOSED_SCENE_OWNER, ignoreCase = true) == true
+
+/** What Compose throws when it measures a scene layer whose root node has gone. */
+private const val DISPOSED_SCENE_OWNER = "RootNodeOwner is already disposed"

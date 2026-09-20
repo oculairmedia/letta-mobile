@@ -53,6 +53,43 @@ class CanvasDocumentBlocksTest {
         assertTrue(CanvasOpProjector.stripMetadataForDrawBox(replaced).contains("_documents").not(), "DrawBox never sees the documents")
     }
 
+    /**
+     * A label is only a label because the scene says which shape owns it. Carrying the documents
+     * through a replace but not that record left every label as an ordinary note belonging to
+     * nothing: it sat where the old shape had been, and nothing would ever move or remove it.
+     */
+    @Test
+    fun replaceSceneKeepsLabelOwnershipUnlessItBringsItsOwn() {
+        val owned = CanvasOpProjector.project(
+            CanvasOpProjector.project("", listOf(set("label-rect-1", "{\"words\":true}", lamport = 1))),
+            listOf(
+                CanvasOp.SetLabelOwnerOp(
+                    opId = "o",
+                    actorId = "local_user",
+                    lamport = 2,
+                    documentId = "label-rect-1",
+                    shapeId = "rect-1",
+                ),
+            ),
+        )
+        assertEquals(mapOf("label-rect-1" to "rect-1"), CanvasOpProjector.labelOwnersOf(owned))
+
+        val replaced = CanvasOpProjector.project(
+            owned,
+            listOf(CanvasOp.ReplaceSceneOp(opId = "r", actorId = "agent", lamport = 3, sceneJson = """{"bgColor":"#000000ff","elements":[]}""")),
+        )
+
+        assertEquals(
+            mapOf("label-rect-1" to "rect-1"),
+            CanvasOpProjector.labelOwnersOf(replaced),
+            "an agent redraw left the label owned by nothing",
+        )
+        assertTrue(
+            CanvasOpProjector.stripMetadataForDrawBox(replaced).contains("_labelOwners").not(),
+            "DrawBox never sees the ownership record",
+        )
+    }
+
     @Test
     fun aWriteWithoutAFrameKeepsWhereTheNoteWasAndARemovalDropsIt() {
         val placed = CanvasDocumentFrame(x = 10f, y = 20f, width = 300f, height = 200f)

@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.canvas
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,13 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,8 +21,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,6 +51,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasDocumentUndo
+import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
@@ -62,7 +61,6 @@ import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.bounds
-import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -112,10 +110,32 @@ fun CanvasWorkspace(
     }
     val checkpoints by (session?.checkpoints?.collectAsState() ?: remember { mutableStateOf(emptyList()) })
     val documents = remember(sessionDoc) { session?.documents().orEmpty() }
+    // Long-lived lambdas — the intent collector, the pointer handlers on the board — are created
+    // once and keep whatever `documents` held at the time. That is why the eraser and connector
+    // snapping worked on every drawn shape and on no note: shapes are read fresh from
+    // controller.state, notes came from a list captured before they existed.
+    val liveDocuments by rememberUpdatedState(documents)
     val coroutineScope = rememberCoroutineScope()
 
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
+    // The session revision the controller's elements were built from. Documents are derived
+    // from `sessionDoc` and so are current the instant a revision lands, while the elements
+    // only catch up when the collector below re-imports the scene. Until the two agree, the
+    // label reconciler would see every label's shape as missing and delete it.
+    var importedRevision by remember { mutableStateOf(0L) }
+    // The board's one undo history, across the drawing (DrawBox's own stack) and the documents
+    // (ops on the session). It records the ORDER, which is the one thing neither side can know.
+    val history = remember(session) { CanvasHistory() }
+    // True while undo or redo is being applied, so the work it causes is not recorded as a new
+    // step: without it, undoing a stroke saves a drawing change that goes straight back on the
+    // stack and the button never reaches anything older.
+    var applyingHistory by remember { mutableStateOf(false) }
+    // The elements as they were when the drawing was last saved, so a save that changed nothing
+    // about them records no step.
+    var lastSavedElements by remember {
+        mutableStateOf<List<io.ak1.drawbox.domain.model.Element>?>(null)
+    }
     var lastExportedJson by remember { mutableStateOf<String?>(null) }
     // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
@@ -134,7 +154,10 @@ fun CanvasWorkspace(
         localPattern
     }
     LaunchedEffect(backgroundPattern) {
-        controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
+        // The grid is DrawBox's own (see showGrid below), so the tiled pattern is left unset for
+        // it; otherwise both would draw and we would be back to two grids.
+        val tiled = backgroundPattern.takeIf { it.kind != CanvasBackgroundPattern.GRID }
+        controller.setBackgroundPattern(tiled?.painter(), backgroundPattern.tint())
     }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
@@ -147,10 +170,16 @@ fun CanvasWorkspace(
     var groupOffset by remember { mutableStateOf(Offset.Zero) }
     // The note being worked in (toolbar and block handles shown) and the one opened large.
     var activeNoteId by remember { mutableStateOf<String?>(null) }
+    // Which of DrawBox's text elements has the caret. DrawBox places text, measures it, wraps it
+    // and says when one is to be edited; the editor itself is the host's to render, which is this.
+    var editingTextId by remember { mutableStateOf<String?>(null) }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
+        // A different board, or the same board replaced: the steps that remain would undo into a
+        // board that no longer exists.
+        history.clear()
         if (session != null) {
             sessionRegistry?.register(session)
             val syncJob = session.startSync(this)
@@ -166,22 +195,32 @@ fun CanvasWorkspace(
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
                 }
+                importedRevision = lastImportedRev
                 delay(100)
+                // The baseline is the board AS LOADED, set before any edit is accepted. Left null
+                // until the first save, the first drawing change only initialises it and records
+                // nothing - so a note done first and a stroke done second undid in the wrong
+                // order, taking the older note back before the newer stroke.
+                lastSavedElements = controller.state.value.elements
                 initialLoadDone = true
 
                 // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
                 // Conflict: agent replace wins; toast/status.
                 session.document.collect { doc ->
-                    if (doc != null && doc.revision > lastImportedRev) {
-                        lastImportedRev = doc.revision
-                        if (doc.sceneJson.isNotBlank() && doc.sceneJson != lastExportedJson) {
-                            val cleanJson = CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)
-                            if (!CanvasOpProjector.drawingsEqual(cleanJson, lastDrawing)) {
-                                controller.importPath(cleanJson)
-                                lastDrawing = cleanJson
-                                statusMessage = "Agent updated canvas (rev ${doc.revision})"
-                            }
-                        }
+                    val result = CanvasWorkspaceSupport.evaluateExternalDocSync(
+                        ExternalSyncParams(
+                            doc = doc,
+                            lastImportedRev = lastImportedRev,
+                            lastExportedJson = lastExportedJson,
+                            lastDrawing = lastDrawing,
+                        ),
+                    ) ?: return@collect
+                    lastImportedRev = result.newImportedRev
+                    importedRevision = result.newImportedRev
+                    if (result.shouldImport && result.cleanJson != null) {
+                        controller.importPath(result.cleanJson)
+                        lastDrawing = result.cleanJson
+                        result.statusMessage?.let { statusMessage = it }
                     }
                 }
             } finally {
@@ -193,6 +232,7 @@ fun CanvasWorkspace(
                 statusMessage = "Loaded diagram (${state.elements.size} elements)"
             }
             delay(100)
+            lastSavedElements = controller.state.value.elements
             initialLoadDone = true
         }
     }
@@ -217,42 +257,40 @@ fun CanvasWorkspace(
                     lastExportedJson = event.json
                     val wasAutosaving = isAutosaving
                     isAutosaving = false
-                    val hasElements = event.json.contains("\"elements\"")
-                    if (!wasAutosaving) {
-                        statusMessage = if (hasElements) {
-                            "Exported JSON (${event.json.length} chars, verified)"
-                        } else {
-                            "Warning: Exported JSON missing 'elements' key"
-                        }
+                    CanvasWorkspaceSupport.computeJsonExportStatus(event.json, wasAutosaving)?.let {
+                        statusMessage = it
                     }
                     if (session != null && session.sceneJsonOrEmpty() != event.json) {
-                        // Recorded before the write so the session collector, which may run first,
-                        // already knows this drawing is DrawBox's own and not an external change.
                         lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(event.json)
                         withContext(Dispatchers.Default) {
                             session.applyLocalScene(event.json)
                         }
                         lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(session.sceneJsonOrEmpty())
+                        val elementsNow = controller.state.value.elements
+                        val shouldRecord = CanvasWorkspaceSupport.shouldRecordDrawingStep(
+                            elementsBefore = lastSavedElements,
+                            elementsNow = elementsNow,
+                            isApplyingHistory = applyingHistory,
+                        )
+                        lastSavedElements = elementsNow
+                        if (applyingHistory) {
+                            applyingHistory = false
+                        } else if (shouldRecord) {
+                            history.record(CanvasHistory.Step.Drawing())
+                        }
                     }
                     onExportJson?.invoke(event.json)
                 }
                 is Event.SvgExported -> {
-                    val hasSvgTag = event.svg.contains("<svg", ignoreCase = true)
-                    statusMessage = if (hasSvgTag) {
-                        "Exported SVG (${event.svg.length} chars, verified)"
-                    } else {
-                        "Warning: Exported SVG missing '<svg' tag"
-                    }
+                    statusMessage = CanvasWorkspaceSupport.computeSvgExportStatus(event.svg)
                     onExportSvg?.invoke(event.svg)
                     if (isSharingToChat && onShareToChat != null) {
                         isSharingToChat = false
-                        val bytes = event.svg.encodeToByteArray()
-                        if (bytes.size <= com.letta.mobile.data.attachment.AttachmentLimits.Default.maxRawBytesPerImage) {
-                            onShareToChat.invoke(bytes, "image/svg+xml")
-                            statusMessage = "Shared canvas SVG (${bytes.size} bytes) to chat"
-                        } else {
-                            statusMessage = "Error: Exported SVG exceeds attachment limit (${bytes.size} bytes)"
-                        }
+                        statusMessage = CanvasWorkspaceSupport.handleSvgShareToChat(
+                            svg = event.svg,
+                            maxBytes = com.letta.mobile.data.attachment.AttachmentLimits.Default.maxRawBytesPerImage,
+                            onShare = onShareToChat,
+                        )
                     }
                 }
                 is Event.Error -> {
@@ -265,10 +303,15 @@ fun CanvasWorkspace(
     }
 
     val hasSelection = state.selectedIds.isNotEmpty()
+    // The buttons answer for the BOARD. Taking their enabled state from DrawBox alone left them
+    // greyed out after a note action - there was something to undo, and the only control for it
+    // looked unavailable.
+    val historyCanUndo by history.canUndo.collectAsState()
+    val historyCanRedo by history.canRedo.collectAsState()
     val controlsBarState = CanvasControlsBridge.buildControlsBarState(
         state = state,
-        canUndo = canUndo,
-        canRedo = canRedo,
+        canUndo = canUndo || historyCanUndo,
+        canRedo = canRedo || historyCanRedo,
     )
     val properties = CanvasControlsBridge.buildProperties(state)
     val dispatchProperty: (CanvasPropertyIntent) -> Unit = { intent ->
@@ -276,10 +319,71 @@ fun CanvasWorkspace(
     }
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
 
+    val documentRecorderContext = remember(session, history) {
+        DocumentRecorderContext(
+            session = session,
+            history = history,
+            isApplyingHistory = { applyingHistory },
+        )
+    }
+
+    suspend fun recordDocumentChange(
+        request: DocumentChangeRequest,
+        block: suspend () -> Unit,
+    ) = CanvasWorkspaceSupport.recordDocumentChange(documentRecorderContext, request, block)
+
+    /**
+     * Runs a document change and records it as one undoable step.
+     *
+     * The step is a diff of the documents either side of [block] rather than the ops inside it: a
+     * single board action can touch several documents through several calls, and what undo owes
+     * the person is the state they had.
+     */
+    suspend fun recordingDocuments(label: String, block: suspend () -> Unit) =
+        recordDocumentChange(DocumentChangeRequest(label = label, attachToLastDrawing = false), block)
+
+    /**
+     * Records document work that belongs to the drawing change just made.
+     *
+     * A label goes because its shape went, and the board notices a moment later - the reconciler
+     * runs when the elements settle - so the two halves of one action arrive separately. Folding
+     * this half into that step is what makes one press give back the shape AND the words it was
+     * holding; recorded as a step of its own it would take two, with an empty box in between.
+     * When there is no drawing step to fold into, it is recorded on its own rather than lost.
+     */
+    suspend fun recordingWithLastDrawing(label: String, block: suspend () -> Unit) =
+        recordDocumentChange(DocumentChangeRequest(label = label, attachToLastDrawing = true), block)
+
+    val historyActionContext = remember(controller, session, history, coroutineScope) {
+        HistoryActionContext(
+            controller = controller,
+            session = session,
+            history = history,
+            scope = coroutineScope,
+            onApplyingHistory = { applyingHistory = it },
+            onStatusMessage = { statusMessage = it },
+        )
+    }
+
+    fun undoBoard() {
+        val drawingUnsaved = lastSavedElements != null && lastSavedElements != state.elements
+        CanvasWorkspaceSupport.undoBoard(historyActionContext, drawingUnsaved, canUndo)
+    }
+
+    fun redoBoard() {
+        CanvasWorkspaceSupport.redoBoard(historyActionContext, canRedo)
+    }
+
     // Ctrl/Cmd + wheel over the board zooms the board, not the window: the host that owns that
     // gesture for UI zoom is told where the board is so it leaves those events alone.
     val wheelZoomRegions = LocalWheelZoomRegions.current
     var boardBounds by remember { mutableStateOf<Rect?>(null) }
+    // The board's controls are drawn over the board, so their bounds are held here and the pen
+    // declines events over them - see CanvasChromeRegions.
+    val chromeRegions = remember { CanvasChromeRegions() }
+    // The stroke under the nib. It lives up here because the board paints it and the pen consumer
+    // fills it, and those are far apart in this function.
+    val penPreview = remember { mutableStateListOf<io.ak1.drawbox.domain.model.Element.PathSample>() }
     DisposableEffect(wheelZoomRegions) {
         val unregister = wheelZoomRegions?.register { boardBounds }
         onDispose { unregister?.invoke() }
@@ -293,10 +397,23 @@ fun CanvasWorkspace(
         val offset = groupOffset
         groupOffset = Offset.Zero
         if (session == null || offset == Offset.Zero || selectedNoteIds.isEmpty()) return
-        val frames = documents.filter { it.id in selectedNoteIds }.mapNotNull { doc ->
-            doc.frame?.let { doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y) }
-        }.toMap()
-        coroutineScope.launch { runCatching { session.moveDocuments(frames) } }
+        val frames = CanvasWorkspaceSupport.buildMoveFrames(documents, selectedNoteIds, offset)
+        coroutineScope.launch {
+            recordingDocuments("moving notes") { runCatching { session.moveDocuments(frames) } }
+        }
+    }
+
+    // The eraser is a drag, not a click, and DrawBoxController does not surface EraseAt on its
+    // intent flow, so notes are taken by watching the eraser's own pointer instead.
+    fun eraseNotesAt(area: EraserArea) {
+        if (session == null) return
+        val ids = CanvasWorkspaceSupport.findErasedNoteIds(area, liveDocuments)
+        if (ids.isEmpty()) return
+        if (activeNoteId in ids) activeNoteId = null
+        selectedNoteIds = selectedNoteIds - ids
+        coroutineScope.launch {
+            recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+        }
     }
 
     // Marquee and move are DrawBox gestures; the notes follow the same intents so a marquee
@@ -305,16 +422,32 @@ fun CanvasWorkspace(
         controller.intents.collect { intent ->
             when (intent) {
                 is io.ak1.drawbox.domain.model.Intent.CommitMarquee -> {
-                    val rect = intent.rect
-                    selectedNoteIds = documents.filter { doc ->
-                        val f = doc.frame ?: return@filter false
-                        rect.overlaps(Rect(f.x, f.y, f.x + f.width, f.y + f.height))
-                    }.map { it.id }.toSet()
+                    selectedNoteIds = CanvasWorkspaceSupport.findMarqueeNoteIds(intent.rect, liveDocuments)
                     if (selectedNoteIds.isNotEmpty()) activeNoteId = null
                 }
                 is io.ak1.drawbox.domain.model.Intent.MoveSelected ->
                     if (selectedNoteIds.isNotEmpty()) groupOffset += intent.delta
                 is io.ak1.drawbox.domain.model.Intent.EndTransform -> commitGroupMove()
+                // The text tool asks for a caret in whatever was tapped: an existing piece of
+                // text, or the one DrawBox is about to insert there.
+                // Double-tapping asks for a caret in whatever is under the pointer, and DrawBox
+                // reports that rather than the board watching for its own double tap: a second
+                // tap detector in the chain CONSUMED the first tap, so a single tap never reached
+                // DrawBox at all and the text tool placed nothing.
+                is io.ak1.drawbox.domain.model.Intent.RequestTextEditAt -> {
+                    coroutineScope.launch {
+                        CanvasWorkspaceSupport.handleRequestTextEdit(
+                            RequestTextEditParams(
+                                offset = intent.offset,
+                                tolerance = intent.tolerance,
+                                elements = controller.state.value.elements,
+                                session = session,
+                                onEditText = { editingTextId = it },
+                                onActivateShapeLabel = { activeNoteId = it },
+                            ),
+                        )
+                    }
+                }
                 is io.ak1.drawbox.domain.model.Intent.ClearSelection,
                 is io.ak1.drawbox.domain.model.Intent.SelectAt -> if (groupOffset == Offset.Zero) selectedNoteIds = emptySet()
                 else -> Unit
@@ -326,50 +459,74 @@ fun CanvasWorkspace(
     // lets both go, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) undo and redo the drawing, Ctrl/Cmd+D
     // duplicates. Handled where they bubble to, so a note editor keeps every key it consumes.
     val boardFocus = remember { FocusRequester() }
-    fun deleteFocused(): Boolean {
-        if (selectedNoteIds.isNotEmpty() && session != null) {
-            val ids = selectedNoteIds
-            selectedNoteIds = emptySet()
-            coroutineScope.launch { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
-            if (hasSelection) controller.deleteSelected()
-            return true
-        }
-        if (hasSelection) { controller.deleteSelected(); return true }
-        val id = activeNoteId ?: return false
-        if (session == null || expandedNoteId != null) return false
-        activeNoteId = null
-        coroutineScope.launch { runCatching { session.removeDocument(id) } }
-        return true
-    }
-    // Duplicate: the drawn selection as offset copies with fresh ids (selected afterwards), or
-    // the active note as a new document with the same text, colour and style, 20 units away.
+    fun deleteFocused(): Boolean = CanvasWorkspaceSupport.deleteFocused(
+        DeleteFocusedParams(
+            selectedNoteIds = selectedNoteIds,
+            hasSelection = hasSelection,
+            activeNoteId = activeNoteId,
+            expandedNoteId = expandedNoteId,
+            hasSession = session != null,
+            onDeleteSelection = { controller.deleteSelected() },
+            onDeleteNotes = { ids ->
+                selectedNoteIds = emptySet()
+                coroutineScope.launch {
+                    recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session?.removeDocument(id) } } }
+                }
+            },
+            onDeleteActiveNote = { id ->
+                activeNoteId = null
+                coroutineScope.launch {
+                    recordingDocuments("deleting a note") { runCatching { session?.removeDocument(id) } }
+                }
+            },
+        ),
+    )
+
     fun duplicateFocused(): Boolean {
         if (hasSelection) {
-            val copies = state.elements.filter { it.id in state.selectedIds }.map { duplicateElement(it) }
-            copies.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(it)) }
-            controller.clearSelection()
-            copies.forEach { copy -> controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(selectionPointOf(copy), 4f)) }
-            statusMessage = "Duplicated ${copies.size} element(s)"
-            return true
+            return CanvasWorkspaceSupport.duplicateDrawnSelection(
+                controller = controller,
+                elements = state.elements,
+                selectedIds = state.selectedIds,
+                onStatus = { statusMessage = it },
+            )
         }
-        val note = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } } ?: return false
-        if (session == null) return false
-        val frame = (note.frame ?: defaultNoteFrame(0)).let { it.copy(x = it.x + DUPLICATE_OFFSET, y = it.y + DUPLICATE_OFFSET) }
-        val id = "${note.id.substringBefore('-')}-${Clock.System.now().toEpochMilliseconds()}"
-        coroutineScope.launch {
-            runCatching { session.setDocument(id, note.json, frame = frame, color = note.color, style = note.style) }
-                .onSuccess { activeNoteId = id; statusMessage = "Duplicated note" }
-        }
-        return true
+        return CanvasWorkspaceSupport.duplicateActiveNote(
+            activeNoteId = activeNoteId,
+            documents = documents,
+            session = session,
+            onCreated = { id, note, frame, s ->
+                coroutineScope.launch {
+                    recordingDocuments("duplicating a note") {
+                        runCatching { s.setDocument(id, note.json, frame = frame, color = note.color, style = note.style) }
+                            .onSuccess { activeNoteId = id; statusMessage = "Duplicated note" }
+                    }
+                }
+            },
+        )
     }
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
-        CanvasKeyAction.ESCAPE -> { controller.clearSelection(); activeNoteId = null; expandedNoteId = null; selectedNoteIds = emptySet(); true }
-        CanvasKeyAction.UNDO -> { if (canUndo) controller.undo(); true }
-        CanvasKeyAction.REDO -> { if (canRedo) controller.redo(); true }
+        CanvasKeyAction.ESCAPE -> {
+            controller.clearSelection()
+            activeNoteId = null
+            editingTextId = null
+            expandedNoteId = null
+            selectedNoteIds = emptySet()
+            true
+        }
+        CanvasKeyAction.UNDO -> { undoBoard(); true }
+        CanvasKeyAction.REDO -> { redoBoard(); true }
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
         null -> false
     }
+    // Everything composed inside the board records its document edits into the board's history,
+    // so an editor writing a note's text produces undo steps of its own rather than leaving undo
+    // with nothing between "the note exists" and "it does not".
+    val documentRecorder = remember(session) {
+        CanvasDocumentRecorder { label, block -> recordingDocuments(label, block) }
+    }
+    CompositionLocalProvider(LocalCanvasDocumentRecorder provides documentRecorder) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -387,14 +544,7 @@ fun CanvasWorkspace(
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.type != PointerEventType.Scroll) continue
-                            val modifiers = event.keyboardModifiers
-                            if (!modifiers.isCtrlPressed && !modifiers.isMetaPressed) continue
-                            val change = event.changes.firstOrNull() ?: continue
-                            val delta = event.changes.fold(0f) { acc, c -> acc + c.scrollDelta.y }
-                            if (delta == 0f) continue
-                            controller.zoomBy(if (delta > 0f) 1f / WHEEL_ZOOM_STEP else WHEEL_ZOOM_STEP, change.position)
-                            event.changes.forEach { it.consume() }
+                            CanvasWorkspaceSupport.handleWheelZoom(event, controller)
                         }
                     }
                 },
@@ -404,6 +554,17 @@ fun CanvasWorkspace(
             DrawBox(
                 state = state,
                 onIntent = controller::onIntent,
+                // Shapes and notes share one selection look; see CanvasSelectionChrome.
+                selectionStyle = canvasSelectionStyle(),
+                // DrawBox draws a grid of its own, on by default, and the board draws a pattern of
+                // its own on top: two grids at two spacings, which is why the background could not
+                // be turned off — ours went away and its did not.
+                //
+                // Now the setting picks exactly one of them. A grid IS DrawBox's grid, drawn by the
+                // engine that owns the viewport, so it stays crisp at every zoom. Dots and lines
+                // are the board's tiled pattern, which DrawBox has no equivalent for. "None" turns
+                // off both, so none means none.
+                showGrid = backgroundPattern.kind == CanvasBackgroundPattern.GRID,
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
@@ -423,26 +584,51 @@ fun CanvasWorkspace(
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Final)
-                                altHeld = event.keyboardModifiers.isAltPressed
-                                val current = controller.state.value
-                                val connectorMode = current.mode == io.ak1.drawbox.domain.model.Mode.LINE ||
-                                    current.mode == io.ak1.drawbox.domain.model.Mode.ARROW
-                                val position = event.changes.firstOrNull()?.position
-                                when {
-                                    !connectorMode -> drawingConnectorAt = null
-                                    event.type == PointerEventType.Press || event.type == PointerEventType.Move -> {
-                                        if (position != null && event.changes.any { it.pressed }) {
-                                            drawingConnectorAt = current.viewport.screenToWorld(position)
-                                        }
-                                    }
-                                    event.type == PointerEventType.Release -> {
-                                        drawingConnectorAt = null
-                                        if (!altHeld) snapLatestConnector(controller, session, documents, coroutineScope)
-                                    }
-                                }
+                                val result = CanvasWorkspaceSupport.handleFinalPointerPass(
+                                    FinalPointerPassParams(
+                                        event = event,
+                                        current = controller.state.value,
+                                        onEraseNotes = { eraseNotesAt(it) },
+                                        onSnapLatestConnector = {
+                                            CanvasWorkspaceSupport.snapLatestConnector(controller, session, liveDocuments, coroutineScope)
+                                        },
+                                    ),
+                                )
+                                altHeld = result.altHeld
+                                drawingConnectorAt = result.drawingConnectorAt
                             }
                         }
                     },
+            )
+
+            // The text tool places an element and the board puts the caret in it. Read from the
+            // ELEMENTS rather than from the insert intent: DrawBox republishes intents through a
+            // shared flow with no buffer, which drops them when the collector is busy, and a
+            // caret that sometimes does not appear is worse than no caret at all.
+            var knownTextIds by remember(session) { mutableStateOf<Set<String>?>(null) }
+            LaunchedEffect(state.elements) {
+                val (ids, emptyId) = CanvasWorkspaceSupport.detectNewEmptyTextElement(state.elements, knownTextIds)
+                knownTextIds = ids
+                if (emptyId != null) editingTextId = emptyId
+            }
+
+            // The caret, where DrawBox asked for one. Its own editor, placed by its own viewport:
+            // the text on the board and the text being typed are then the same thing, measured
+            // and wrapped by the same code, which is what a text element is for.
+            val editingText = CanvasTextElements.byId(state.elements, editingTextId)
+            if (editingText != null) {
+                io.ak1.drawbox.text.InlineTextEditor(
+                    editingText,
+                    state.viewport,
+                    editingText.text,
+                ) { typed -> controller.updateText(editingText.id, typed) }
+            }
+
+            // The stroke under the nib, until DrawBox owns it.
+            CanvasPenPreview(
+                samples = penPreview,
+                state = state,
+                modifier = Modifier.fillMaxSize(),
             )
 
             // Block documents live on the board as note cards, in world coordinates.
@@ -458,11 +644,22 @@ fun CanvasWorkspace(
                     onToolbar = { noteToolbar = it },
                     selectedIds = selectedNoteIds,
                     groupOffset = groupOffset,
+                    // The eraser takes a note the way it takes a stroke: touch it and it is gone.
+                    eraseMode = state.mode == io.ak1.drawbox.domain.model.Mode.ERASER,
+                    onErase = { id ->
+                        if (activeNoteId == id) activeNoteId = null
+                        selectedNoteIds = selectedNoteIds - id
+                        coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
+                    },
                     onPress = { id, shift ->
                         if (shift) {
                             selectedNoteIds = if (id in selectedNoteIds) selectedNoteIds - id else selectedNoteIds + id
                             activeNoteId = null
                         } else if (id !in selectedNoteIds) {
+                            // Picking a note replaces the board's selection, exactly as picking a
+                            // shape does. Without this the drawn selection stayed put and the note
+                            // joined it, so a plain click read as a shift-click.
+                            controller.clearSelection()
                             selectedNoteIds = emptySet()
                             activeNoteId = id
                         }
@@ -482,29 +679,82 @@ fun CanvasWorkspace(
             // Picking a drawing element hands the selection to DrawBox; the note lets go.
             LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
 
+            // The pen draws its own strokes.
+            //
+            // Everything else the pen does — pressing a button, picking a note, dragging a handle —
+            // arrives as ordinary input and needs nothing here. Drawing is the exception: pressure
+            // is per sample and no mouse event can carry it, so those events are taken here and
+            // built into one Element.Path on lift. Taking them also stops the platform delivering
+            // the same stroke a second time without pressure.
+            //
+            // Flipping the stylus over erases: the eraser nib is a tool in its own right, so it is
+            // read from the event rather than asked of the user.
+            // Layout coordinates are in pixels; the pen reports in the window's logical units. On
+            // a scaled display those differ by the density, and subtracting a pixel-space board
+            // offset from a logical-space point put every event outside the board — so the canvas
+            // declined them all and the stroke quietly fell back to the pressureless mouse path.
+            val penDensity = LocalDensity.current.density
+            // Which window's pen this canvas answers, so two open boards cannot take each other's
+            // events or clear each other's registration.
+            val penTarget = LocalCanvasPenTarget.current
+            // The registry belongs to the host that reads the tablet, not to the process.
+            val penRegistry = LocalCanvasPenRegistry.current
+            val penConsumer = remember(session, state.mode, penDensity, penTarget, penRegistry, boardBounds) {
+                CanvasWorkspaceSupport.createPenConsumer(
+                    PenConsumerParams(
+                        controller = controller,
+                        session = session,
+                        boardBounds = boardBounds,
+                        chromeRegions = chromeRegions,
+                        penDensity = penDensity,
+                        penPreview = penPreview,
+                        onEraseArea = { eraseNotesAt(it) },
+                    ),
+                )
+            }
+            DisposableEffect(penConsumer, penTarget, penRegistry) {
+                val disposePen = penRegistry.register(penTarget, penConsumer)
+                onDispose { disposePen() }
+            }
+
+            // A label lives inside its shape: it is re-framed whenever the shape moves or is
+            // resized, and removed with it. Keyed on the element list so a shape dragged by
+            // DrawBox carries its text along in the same frame.
+            LaunchedEffect(state.elements, liveDocuments, session, importedRevision, initialLoadDone) {
+                CanvasWorkspaceSupport.reconcileShapeLabels(
+                    ReconcileShapeLabelsParams(
+                        elements = state.elements,
+                        liveDocuments = liveDocuments,
+                        session = session,
+                        sessionDoc = sessionDoc,
+                        importedRevision = importedRevision,
+                        initialLoadDone = initialLoadDone,
+                        onClearActiveNoteIf = { id -> if (activeNoteId == id) activeNoteId = null },
+                        recordDeletion = { block -> recordingWithLastDrawing("deleting a labelled shape") { block() } },
+                    ),
+                )
+            }
+
             // A bound connector end follows its note: whenever a document's frame changes (a local
             // drag, a peer, the agent), every arrow bound to it is re-pointed through DrawBox, so
             // the move reaches the scene through the normal export rather than a re-import that
             // would throw the camera back.
             var lastFrames by remember { mutableStateOf<Map<String, CanvasDocumentFrame>>(emptyMap()) }
             LaunchedEffect(documents, arrowBindings) {
-                val frames = documents.mapNotNull { doc -> doc.frame?.let { doc.id to it } }.toMap()
-                frames.forEach { (id, frame) ->
-                    if (lastFrames[id] == frame || id !in lastFrames) return@forEach
-                    arrowBindings.forEach { (elementId, binding) ->
-                        val connector = state.elements.firstOrNull { it.id == elementId } as? io.ak1.drawbox.domain.model.Element.Shape
-                            ?: return@forEach
-                        CanvasSnapping.follow(connector, binding, id, frame)?.let { points ->
-                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(elementId, points))
-                        }
-                    }
-                }
-                lastFrames = frames
+                lastFrames = CanvasWorkspaceSupport.followConnectors(
+                    FollowConnectorsParams(
+                        controller = controller,
+                        elements = state.elements,
+                        arrowBindings = arrowBindings,
+                        documents = documents,
+                        lastFrames = lastFrames,
+                    ),
+                )
             }
             val connectorMode = state.mode == io.ak1.drawbox.domain.model.Mode.LINE || state.mode == io.ak1.drawbox.domain.model.Mode.ARROW
             val snapAnchor = drawingConnectorAt?.takeIf { connectorMode && !altHeld }?.let { at ->
                 val drawing = CanvasSnapping.latestConnector(state.elements)
-                CanvasSnapping.nearest(at, CanvasSnapping.anchors(state.elements, documents, drawing?.id), state.viewport.scale)
+                CanvasSnapping.nearest(at, CanvasSnapping.anchors(state.elements, liveDocuments, drawing?.id), state.viewport.scale)
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
@@ -518,7 +768,7 @@ fun CanvasWorkspace(
                             back()
                         }
                     },
-                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET),
+                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET).canvasChrome(chromeRegions),
                 )
             }
 
@@ -583,89 +833,46 @@ fun CanvasWorkspace(
                         statusMessage = "Background pattern: ${pattern.kind}"
                     },
                 ),
-                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET),
+                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET).canvasChrome(chromeRegions),
             )
 
 
-            // History dialog
-            if (showHistoryDialog && session != null) {
-                AlertDialog(
-                    onDismissRequest = { showHistoryDialog = false },
-                    title = {
-                        Text("Revision History", style = MaterialTheme.typography.titleMedium)
-                    },
-                    text = {
-                        if (checkpoints.isEmpty()) {
-                            Text("No revision checkpoints recorded yet.", style = MaterialTheme.typography.bodyMedium)
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().height(300.dp),
-                                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                            ) {
-                                items(checkpoints) { cp ->
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
-                                        ),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "Revision ${cp.revision}",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                )
-                                                val desc = if (cp.description.isNotBlank()) cp.description else "Actor: ${cp.actorId}"
-                                                Text(
-                                                    text = desc,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                            Button(
-                                                onClick = {
-                                                    coroutineScope.launch {
-                                                        runCatching {
-                                                            session.restoreCheckpoint(cp.checkpointId)
-                                                        }.onSuccess { restored ->
-                                                            // Claim the restored scene as ours first, or the external-update
-                                                            // collector sees the revision bump, imports it again and overwrites
-                                                            // this status with "Agent updated canvas".
-                                                            lastExportedJson = restored.sceneJson
-                                                            controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
-                                                            statusMessage = "Restored to revision ${cp.revision}"
-                                                            showHistoryDialog = false
-                                                        }.onFailure { err ->
-                                                            statusMessage = "Restore failed: ${err.message}"
-                                                        }
-                                                    }
-                                                },
-                                                contentPadding = PaddingValues(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
-                                            ) {
-                                                Text("Restore", style = MaterialTheme.typography.labelSmall)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+            CanvasHistoryDialog(
+                show = showHistoryDialog && session != null,
+                checkpoints = checkpoints,
+                onDismiss = { showHistoryDialog = false },
+                onRestore = { cp ->
+                    val s = session ?: return@CanvasHistoryDialog
+                    coroutineScope.launch {
+                        runCatching {
+                            s.restoreCheckpoint(cp.checkpointId)
+                        }.onSuccess { restored ->
+                            lastExportedJson = restored.sceneJson
+                            controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
+                            history.clear()
+                            statusMessage = "Restored to revision ${cp.revision}"
+                            showHistoryDialog = false
+                        }.onFailure { err ->
+                            statusMessage = "Restore failed: ${err.message}"
                         }
-                    },
-                    confirmButton = {
-                        Button(onClick = { showHistoryDialog = false }) {
-                            Text("Close")
-                        }
-                    },
-                )
-            }
+                    }
+                },
+            )
 
-            val dispatch: (io.ak1.drawbox.ui.controls.ControlsBarIntent) -> Unit = { intent ->
+            // Undo and redo are the board's, not the drawing's: a note edit and a stroke are both
+            // things the person did, and they undo in the order they were done.
+            val dispatch: (io.ak1.drawbox.ui.controls.ControlsBarIntent) -> Unit = dispatch@{ intent ->
+                when (intent) {
+                    io.ak1.drawbox.ui.controls.ControlsBarIntent.Undo -> {
+                        undoBoard()
+                        return@dispatch
+                    }
+                    io.ak1.drawbox.ui.controls.ControlsBarIntent.Redo -> {
+                        redoBoard()
+                        return@dispatch
+                    }
+                    else -> Unit
+                }
                 CanvasControlsBridge.dispatchIntent(
                     controller = controller,
                     intent = intent,
@@ -696,15 +903,23 @@ fun CanvasWorkspace(
                             onDelete = {
                                 val id = activeNote.id
                                 activeNoteId = null
-                                coroutineScope.launch { runCatching { session.removeDocument(id) } }
+                                coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
                             },
                             style = activeNote.style,
                             onStyle = { style ->
-                                coroutineScope.launch { runCatching { session.restyleDocument(activeNote.id, style) } }
+                                coroutineScope.launch {
+                                    recordingDocuments("restyling a note") {
+                                        runCatching { session.restyleDocument(activeNote.id, style) }
+                                    }
+                                }
                             },
                             color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
                             onColor = { color ->
-                                coroutineScope.launch { runCatching { session.recolorDocument(activeNote.id, color.toHex()) } }
+                                coroutineScope.launch {
+                                    recordingDocuments("recolouring a note") {
+                                        runCatching { session.recolorDocument(activeNote.id, color.toHex()) }
+                                    }
+                                }
                             },
                             defaultTextColor = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurface,
                             plain = plain,
@@ -712,7 +927,9 @@ fun CanvasWorkspace(
                     } else {
                         null
                     },
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = if (showTitle) 64.dp else CHROME_INSET),
+                    modifier = Modifier.align(Alignment.TopCenter)
+                        .padding(top = if (showTitle) 64.dp else CHROME_INSET)
+                        .canvasChrome(chromeRegions),
                 )
             }
 
@@ -726,35 +943,27 @@ fun CanvasWorkspace(
                 dispatchProperty = dispatchProperty,
                 onAddNote = session?.let { s ->
                     {
-                        val frame = newNoteFrame(state.viewport.screenToWorld(boardCenter))
+                        val frame = clearOfExisting(
+                            newNoteFrame(state.viewport.screenToWorld(boardCenter)),
+                            liveDocuments.mapNotNull { it.frame },
+                        )
                         val id = "note-${Clock.System.now().toEpochMilliseconds()}"
                         coroutineScope.launch {
-                            runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
-                                .onSuccess {
-                                    activeNoteId = id
-                                    statusMessage = "Added note"
-                                }
-                                .onFailure { statusMessage = "Error: could not add note (${it.message})" }
-                        }
-                    }
-                },
-                onAddText = session?.let { s ->
-                    {
-                        val frame = newTextFrame(state.viewport.screenToWorld(boardCenter))
-                        val id = "text-${Clock.System.now().toEpochMilliseconds()}"
-                        coroutineScope.launch {
-                            runCatching { s.setDocument(id, "", frame = frame, color = PLAIN_TEXT_COLOR) }
-                                .onSuccess {
-                                    activeNoteId = id
-                                    statusMessage = "Added text"
-                                }
-                                .onFailure { statusMessage = "Error: could not add text (${it.message})" }
+                            recordingDocuments("adding a note") {
+                                runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
+                                    .onSuccess {
+                                        activeNoteId = id
+                                        statusMessage = "Added note"
+                                    }
+                                    .onFailure { statusMessage = "Error: could not add note (${it.message})" }
+                            }
                         }
                     }
                 },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp),
+                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
+                    .canvasChrome(chromeRegions),
             )
 
             // A note opened large sits over the board, under the foot bar so formatting stays reachable.
@@ -765,12 +974,14 @@ fun CanvasWorkspace(
                     document = expanded,
                     onClose = { expandedNoteId = null },
                     onToolbar = { noteToolbar = it },
+                    chromeRegions = chromeRegions,
                 )
             }
 
             // The foot of the board: the active note's formatting bar, centred, above the status line.
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET)
+                    .canvasChrome(chromeRegions),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
@@ -786,59 +997,10 @@ fun CanvasWorkspace(
         }
     }
     }
-}
-
-/**
- * Snaps the connector a release just finished to the nearest anchors within the snap radius:
- * its points move onto them, ends on notes are recorded in the session, and ends on drawn
- * shapes are handed to DrawBox's own binding pass so they follow the shape from then on.
- */
-private fun snapLatestConnector(
-    controller: DrawBoxController,
-    session: CanvasSession?,
-    documents: List<com.letta.mobile.data.canvas.CanvasSceneDocument>,
-    scope: kotlinx.coroutines.CoroutineScope,
-) {
-    val current = controller.state.value
-    val connector = CanvasSnapping.latestConnector(current.elements) ?: return
-    val anchors = CanvasSnapping.anchors(current.elements, documents, connector.id)
-    val snapped = CanvasSnapping.snap(connector, anchors, current.viewport.scale) ?: return
-    if (snapped.points != connector.points) {
-        controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(connector.id, snapped.points))
-    }
-    if (snapped.boundToShape) controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(connector.id))
-    if (session != null && (snapped.binding.start != null || snapped.binding.end != null)) {
-        scope.launch { runCatching { session.bindArrow(connector.id, snapped.binding) } }
     }
 }
 
-/** [element] moved by [DUPLICATE_OFFSET] with a fresh id, the way whiteboards duplicate in place. */
-private fun duplicateElement(element: io.ak1.drawbox.domain.model.Element): io.ak1.drawbox.domain.model.Element {
-    val moved = element.translate(Offset(DUPLICATE_OFFSET, DUPLICATE_OFFSET))
-    val id = "${element.id}-copy-${Clock.System.now().toEpochMilliseconds()}"
-    return when (moved) {
-        is io.ak1.drawbox.domain.model.Element.Shape -> moved.copy(id = id, startBinding = null, endBinding = null)
-        is io.ak1.drawbox.domain.model.Element.Path -> moved.copy(id = id)
-        is io.ak1.drawbox.domain.model.Element.Text -> moved.copy(id = id)
-        else -> moved
-    }
-}
-
-/**
- * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
- * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
- * for text (hit by its box).
- */
-private fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offset = when (element) {
-    is io.ak1.drawbox.domain.model.Element.Shape -> when (element.shapeType) {
-        io.ak1.drawbox.domain.model.ShapeType.LINE, io.ak1.drawbox.domain.model.ShapeType.ARROW -> element.points.first()
-        else -> element.bounds().let { Offset(it.center.x, it.top) }
-    }
-    is io.ak1.drawbox.domain.model.Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
-    else -> element.bounds().center
-}
-
-private const val DUPLICATE_OFFSET = 20f
+private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
-private const val WHEEL_ZOOM_STEP = 1.1f
+internal const val WHEEL_ZOOM_STEP = 1.1f

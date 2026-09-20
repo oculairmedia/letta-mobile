@@ -89,10 +89,26 @@ class CanvasSession(
     suspend fun load(): CanvasDocument? = mutex.withLock {
         val loaded = store.get(canvasId)
         _document.value = loaded
-        if (loaded != null && _checkpoints.value.isEmpty()) {
-            recordInitialCheckpoint(loaded)
+        if (loaded != null) {
+            adoptLamportOf(loaded)
+            if (_checkpoints.value.isEmpty()) recordInitialCheckpoint(loaded)
         }
         loaded
+    }
+
+    /**
+     * Raises the clock above every writer already recorded in [doc]'s scene.
+     *
+     * A board that is opened again is a board somebody has already written to. This session's
+     * writes are settled last-writer-wins against the provenance in that scene, so a clock left
+     * at zero makes its first edits OLDER than what they are editing: the projector keeps the
+     * existing value and the edit is dropped, with nothing anywhere to report it. Erasing a
+     * shape on a re-opened board did exactly that - the removal was discarded and the shape came
+     * back the moment the board re-read the scene.
+     */
+    private fun adoptLamportOf(doc: CanvasDocument) {
+        val highest = CanvasOpProjector.maxLamport(doc.sceneJson)
+        if (highest > lamportClock) lamportClock = highest
     }
 
     private fun recordInitialCheckpoint(doc: CanvasDocument) {
@@ -113,6 +129,7 @@ class CanvasSession(
      */
     private fun initialize(doc: CanvasDocument) {
         _document.value = doc
+        adoptLamportOf(doc)
         recordInitialCheckpoint(doc)
     }
 
@@ -146,7 +163,10 @@ class CanvasSession(
      * Applies a single locally-generated [CanvasOp], appends to [opLog], projects state,
      * updates persistence, and publishes to [syncTransport].
      */
-    suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock {
+    suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock { applyLocalLocked(op) }
+
+    /** [applyLocal]'s body, for callers that must test the scene and act on it under one lock. */
+    private suspend fun applyLocalLocked(op: CanvasOp): CanvasDocument {
         val current = currentDoc()
         if (current.acl != null && !current.acl.canWrite(op.actorId)) {
             throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
@@ -156,7 +176,7 @@ class CanvasSession(
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         val updated = commitScene(newScene)
         syncTransport?.publish(canvasId, op)
-        updated
+        return updated
     }
 
     /**
@@ -303,6 +323,46 @@ class CanvasSession(
     fun arrowBindings(): Map<String, CanvasArrowBinding> = CanvasOpProjector.arrowBindingsOf(sceneJsonOrEmpty())
 
     /** Binds a connector's ends to documents (both null unbinds); a no-op when already so. */
+    /**
+     * Applies [ops] as local changes, stamped with this session's clock as they go in.
+     *
+     * For undo and redo: an inverse is computed when the change happens and applied whenever the
+     * person presses the button, by which time the scene has moved on. Applied with the clock it
+     * was born with, last-writer-wins simply discards it - the board does not move, and undo
+     * looks broken rather than refused.
+     */
+    suspend fun applyLocalStamped(ops: List<CanvasOp>): CanvasDocument? = mutex.withLock {
+        var last: CanvasDocument? = null
+        ops.forEach { op ->
+            val stamped = op.withStamp(CanvasOpDiffer.generateOpId("undo"), ++lamportClock)
+            last = applyLocalLocked(stamped)
+        }
+        last
+    }
+
+    /** Which shape owns which label document; see [CanvasOp.SetLabelOwnerOp]. */
+    fun labelOwners(): Map<String, String> = CanvasOpProjector.labelOwnersOf(sceneJsonOrEmpty())
+
+    /**
+     * Records that [documentId] is [shapeId]'s label, or releases it when [shapeId] is null.
+     *
+     * Ownership is what makes the reconciler willing to move or delete a document, so it is
+     * written by whoever creates the label and never inferred from the document's name.
+     */
+    suspend fun setLabelOwner(
+        documentId: String,
+        shapeId: String?,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument = applyLocal(
+        CanvasOp.SetLabelOwnerOp(
+            opId = CanvasOpDiffer.generateOpId("label"),
+            actorId = actorId,
+            lamport = lamportClock + 1,
+            documentId = documentId,
+            shapeId = shapeId,
+        ),
+    )
+
     suspend fun bindArrow(
         elementId: String,
         binding: CanvasArrowBinding,
@@ -373,15 +433,26 @@ class CanvasSession(
         )
     }
 
-    suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument =
-        applyLocal(
-            CanvasOp.RemoveDocumentOp(
-                opId = CanvasOpDiffer.generateOpId("doc"),
-                actorId = actorId,
-                lamport = lamportClock + 1,
-                documentId = documentId,
-            ),
-        )
+    /**
+     * Removes a block document; null when it was already gone.
+     *
+     * The test and the op share one lock because the callers repeat themselves: the eraser drags
+     * across a note and queues a removal per frame, all of them while the note is still in the
+     * projected scene. Without the guard each one appends an op, commits a revision and publishes
+     * to peers, for a note that is deleted once.
+     */
+    suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument? =
+        mutex.withLock {
+            if (documents().none { it.id == documentId }) return@withLock null
+            applyLocalLocked(
+                CanvasOp.RemoveDocumentOp(
+                    opId = CanvasOpDiffer.generateOpId("doc"),
+                    actorId = actorId,
+                    lamport = lamportClock + 1,
+                    documentId = documentId,
+                ),
+            )
+        }
 
     suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
         val doc = currentDoc()

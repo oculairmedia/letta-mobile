@@ -85,12 +85,16 @@ fun CanvasBlockEditor(
     }
 
     // Writes the editor's document to the session when it differs from what was last written.
+    // Each write is one undo step: typing is coalesced into a write per pause, which is the
+    // granularity a person expects undo to move in.
+    val recorder = LocalCanvasDocumentRecorder.current
     suspend fun persist() {
         val current = runCatching { stateHolder.toJson(textStates, spanStates) }.getOrNull() ?: return
         if (current == lastEditorJson) return
         lastEditorJson = current
         lastStoredJson = current
-        runCatching { session.setDocument(documentId, current, actorId) }
+        val write: suspend () -> Unit = { runCatching { session.setDocument(documentId, current, actorId) } }
+        if (recorder == null) write() else recorder.recording("typing", write)
     }
 
     LaunchedEffect(session.canvasId, documentId) {

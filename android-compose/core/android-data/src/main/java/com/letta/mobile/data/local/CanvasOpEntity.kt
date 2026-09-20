@@ -45,6 +45,7 @@ data class CanvasOpEntity(
                 is CanvasOp.SetBackgroundOp -> "set_background"
                 is CanvasOp.SetBackgroundPatternOp -> "set_background_pattern"
                 is CanvasOp.SetArrowBindingOp -> "set_arrow_binding"
+                is CanvasOp.SetLabelOwnerOp -> "set_label_owner"
                 is CanvasOp.SetDocumentOp -> "set_document"
                 is CanvasOp.RemoveDocumentOp -> "remove_document"
                 is CanvasOp.BatchOp -> "batch"

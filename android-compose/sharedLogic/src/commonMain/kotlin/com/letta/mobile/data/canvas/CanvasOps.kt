@@ -77,6 +77,24 @@ sealed interface CanvasOp {
         val binding: CanvasArrowBinding,
     ) : CanvasOp
 
+    /**
+     * Marks a block document as the label OWNED by [shapeId], or releases it when [shapeId] is
+     * null.
+     *
+     * Ownership is recorded rather than inferred from the document's id. A board can hold a
+     * perfectly ordinary note called `label-report`, and treating the name as proof of ownership
+     * means the label reconciler deletes it the moment no shape by that name exists.
+     */
+    @Serializable
+    @SerialName("set_label_owner")
+    data class SetLabelOwnerOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val documentId: String,
+        val shapeId: String?,
+    ) : CanvasOp
+
     /** Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins. */
     @Serializable
     @SerialName("set_background_pattern")
@@ -138,9 +156,31 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId)
     is CanvasOp.SetArrowBindingOp -> copy(actorId = actorId)
+    is CanvasOp.SetLabelOwnerOp -> copy(actorId = actorId)
     is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
     is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })
+}
+
+/**
+ * The same operation with a fresh identity and [lamport].
+ *
+ * An inverse is built when a change happens and applied whenever the person presses undo, so it
+ * cannot carry the clock it was born with: the scene has moved on, and last-writer-wins would
+ * discard a stale op without a word. It is stamped at the moment it is applied instead.
+ */
+fun CanvasOp.withStamp(opId: String, lamport: Long): CanvasOp = when (this) {
+    is CanvasOp.ReplaceSceneOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.AddElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.UpdateElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.RemoveElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetBackgroundOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetBackgroundPatternOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetArrowBindingOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetLabelOwnerOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetDocumentOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.RemoveDocumentOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.BatchOp -> copy(opId = opId, lamport = lamport, ops = ops.map { it.withStamp(opId, lamport) })
 }
 
 /**

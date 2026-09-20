@@ -92,9 +92,6 @@ fun CanvasControlsBar(
                     dispatch(ControlsBarIntent.SelectMode(mode))
                 }
             }
-            if (onAddText != null) {
-                ControlButton(Control(Lucide.Type, "Text"), onClick = onAddText)
-            }
             if (onAddNote != null) {
                 ControlButton(Control(Lucide.StickyNote, "Add note"), onClick = onAddNote)
             }
@@ -103,7 +100,18 @@ fun CanvasControlsBar(
             // for every colour and property, targeting the selection or else the current tool.
             CanvasPropertyControl(
                 state = state,
-                properties = properties ?: CanvasProperties(0, 4f, 1f, io.ak1.drawbox.domain.model.StrokeStyle.SOLID, 0f, false),
+                properties = properties ?: CanvasProperties(
+                    selectionCount = 0,
+                    strokeWidth = 4f,
+                    opacity = 1f,
+                    strokeStyle = io.ak1.drawbox.domain.model.StrokeStyle.SOLID,
+                    cornerRadius = 0f,
+                    showCornerRadius = false,
+                    fontSize = DEFAULT_FONT_SIZE,
+                    fontFamily = io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SANS,
+                    textAlignment = io.ak1.drawbox.domain.model.TextAlignment.LEFT,
+                    showFontSize = false,
+                ),
                 dispatch = dispatch,
                 dispatchProperty = dispatchProperty,
                 label = "Stroke color",
@@ -170,6 +178,10 @@ internal val DrawingModes: List<Pair<Mode, String>> = listOf(
     Mode.RECTANGLE to "Rectangle",
     Mode.CIRCLE to "Circle",
     Mode.TRIANGLE to "Triangle",
+    // The board's own text element: DrawBox places it, measures it, wraps it and edits it, so
+    // text is a thing on the drawing like every other thing rather than a note pretending to be
+    // one. See CanvasWorkspace for the editor this mode asks for.
+    Mode.TEXT to "Text",
     Mode.ERASER to "Eraser",
 )
 
@@ -191,3 +203,6 @@ private fun iconFor(mode: Mode): ImageVector = when (mode) {
 }
 
 private val BUTTON_SIZE = LettaDimens.Control.actionButton
+
+/** DrawBox's own starting size for text, for a bar with no state to read yet. */
+private const val DEFAULT_FONT_SIZE = 24f

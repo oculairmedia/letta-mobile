@@ -78,7 +78,19 @@ internal object CanvasSnapping {
     }
 
     /** [connector]'s points with every end bound to [documentId] moved onto [frame]. */
-    fun follow(connector: Element.Shape, binding: CanvasArrowBinding, documentId: String, frame: CanvasDocumentFrame): List<Offset>? {
+    /**
+     * This connector re-pointed at [frame], after the document it is bound to moved or resized.
+     *
+     * The ends follow their anchors, and a curved connector's control point is recomputed from the
+     * new ends rather than left where it was: a bend is an absolute point, so a connector that kept
+     * its old one bowed further and further out of shape the more its note was moved.
+     */
+    fun follow(
+        connector: Element.Shape,
+        binding: CanvasArrowBinding,
+        documentId: String,
+        frame: CanvasDocumentFrame,
+    ): CanvasConnectorGeometry? {
         if (connector.points.size < 2) return null
         var changed = false
         val points = connector.points.toMutableList()
@@ -90,7 +102,9 @@ internal object CanvasSnapping {
             val (x, y) = CanvasSnap.anchorOn(frame, end.side)
             points[points.lastIndex] = Offset(x, y); changed = true
         }
-        return points.takeIf { changed }
+        if (!changed) return null
+        return connectorGeometry(points.first(), points.last(), connector.connectorShape())
+            .copy(points = points)
     }
 }
 
