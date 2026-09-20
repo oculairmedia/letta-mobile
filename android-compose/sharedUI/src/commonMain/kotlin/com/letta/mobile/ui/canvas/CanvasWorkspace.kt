@@ -437,12 +437,14 @@ fun CanvasWorkspace(
                 is io.ak1.drawbox.domain.model.Intent.RequestTextEditAt -> {
                     coroutineScope.launch {
                         CanvasWorkspaceSupport.handleRequestTextEdit(
-                            offset = intent.offset,
-                            tolerance = intent.tolerance,
-                            elements = controller.state.value.elements,
-                            session = session,
-                            onEditText = { editingTextId = it },
-                            onActivateShapeLabel = { activeNoteId = it },
+                            RequestTextEditParams(
+                                offset = intent.offset,
+                                tolerance = intent.tolerance,
+                                elements = controller.state.value.elements,
+                                session = session,
+                                onEditText = { editingTextId = it },
+                                onActivateShapeLabel = { activeNoteId = it },
+                            ),
                         )
                     }
                 }
@@ -458,24 +460,26 @@ fun CanvasWorkspace(
     // duplicates. Handled where they bubble to, so a note editor keeps every key it consumes.
     val boardFocus = remember { FocusRequester() }
     fun deleteFocused(): Boolean = CanvasWorkspaceSupport.deleteFocused(
-        selectedNoteIds = selectedNoteIds,
-        hasSelection = hasSelection,
-        activeNoteId = activeNoteId,
-        expandedNoteId = expandedNoteId,
-        hasSession = session != null,
-        onDeleteSelection = { controller.deleteSelected() },
-        onDeleteNotes = { ids ->
-            selectedNoteIds = emptySet()
-            coroutineScope.launch {
-                recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session?.removeDocument(id) } } }
-            }
-        },
-        onDeleteActiveNote = { id ->
-            activeNoteId = null
-            coroutineScope.launch {
-                recordingDocuments("deleting a note") { runCatching { session?.removeDocument(id) } }
-            }
-        },
+        DeleteFocusedParams(
+            selectedNoteIds = selectedNoteIds,
+            hasSelection = hasSelection,
+            activeNoteId = activeNoteId,
+            expandedNoteId = expandedNoteId,
+            hasSession = session != null,
+            onDeleteSelection = { controller.deleteSelected() },
+            onDeleteNotes = { ids ->
+                selectedNoteIds = emptySet()
+                coroutineScope.launch {
+                    recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session?.removeDocument(id) } } }
+                }
+            },
+            onDeleteActiveNote = { id ->
+                activeNoteId = null
+                coroutineScope.launch {
+                    recordingDocuments("deleting a note") { runCatching { session?.removeDocument(id) } }
+                }
+            },
+        ),
     )
 
     fun duplicateFocused(): Boolean {
@@ -718,14 +722,16 @@ fun CanvasWorkspace(
             // DrawBox carries its text along in the same frame.
             LaunchedEffect(state.elements, liveDocuments, session, importedRevision, initialLoadDone) {
                 CanvasWorkspaceSupport.reconcileShapeLabels(
-                    elements = state.elements,
-                    liveDocuments = liveDocuments,
-                    session = session,
-                    sessionDoc = sessionDoc,
-                    importedRevision = importedRevision,
-                    initialLoadDone = initialLoadDone,
-                    onClearActiveNoteIf = { id -> if (activeNoteId == id) activeNoteId = null },
-                    recordDeletion = { block -> recordingWithLastDrawing("deleting a labelled shape") { block() } },
+                    ReconcileShapeLabelsParams(
+                        elements = state.elements,
+                        liveDocuments = liveDocuments,
+                        session = session,
+                        sessionDoc = sessionDoc,
+                        importedRevision = importedRevision,
+                        initialLoadDone = initialLoadDone,
+                        onClearActiveNoteIf = { id -> if (activeNoteId == id) activeNoteId = null },
+                        recordDeletion = { block -> recordingWithLastDrawing("deleting a labelled shape") { block() } },
+                    ),
                 )
             }
 

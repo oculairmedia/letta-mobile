@@ -115,6 +115,37 @@ internal data class FinalPointerPassResult(
     val drawingConnectorAt: Offset?,
 )
 
+internal data class DeleteFocusedParams(
+    val selectedNoteIds: Set<String>,
+    val hasSelection: Boolean,
+    val activeNoteId: String?,
+    val expandedNoteId: String?,
+    val hasSession: Boolean,
+    val onDeleteSelection: () -> Unit,
+    val onDeleteNotes: (Set<String>) -> Unit,
+    val onDeleteActiveNote: (String) -> Unit,
+)
+
+internal data class RequestTextEditParams(
+    val offset: Offset,
+    val tolerance: Float,
+    val elements: List<Element>,
+    val session: CanvasSession?,
+    val onEditText: (String) -> Unit,
+    val onActivateShapeLabel: (String) -> Unit,
+)
+
+internal data class ReconcileShapeLabelsParams(
+    val elements: List<Element>,
+    val liveDocuments: List<CanvasSceneDocument>,
+    val session: CanvasSession?,
+    val sessionDoc: CanvasDocument?,
+    val importedRevision: Long,
+    val initialLoadDone: Boolean,
+    val onClearActiveNoteIf: (String) -> Unit,
+    val recordDeletion: suspend (suspend () -> Unit) -> Unit,
+)
+
 internal object CanvasWorkspaceSupport {
     internal const val DUPLICATE_OFFSET = 20f
 
@@ -536,53 +567,37 @@ internal object CanvasWorkspaceSupport {
         isApplyingHistory: Boolean,
     ): Boolean = !isApplyingHistory && elementsBefore != null && elementsBefore != elementsNow
 
-    fun deleteFocused(
-        selectedNoteIds: Set<String>,
-        hasSelection: Boolean,
-        activeNoteId: String?,
-        expandedNoteId: String?,
-        hasSession: Boolean,
-        onDeleteSelection: () -> Unit,
-        onDeleteNotes: (Set<String>) -> Unit,
-        onDeleteActiveNote: (String) -> Unit,
-    ): Boolean {
-        if (selectedNoteIds.isNotEmpty() && hasSession) {
-            onDeleteNotes(selectedNoteIds)
-            if (hasSelection) onDeleteSelection()
+    fun deleteFocused(params: DeleteFocusedParams): Boolean {
+        if (params.selectedNoteIds.isNotEmpty() && params.hasSession) {
+            params.onDeleteNotes(params.selectedNoteIds)
+            if (params.hasSelection) params.onDeleteSelection()
             return true
         }
-        if (hasSelection) {
-            onDeleteSelection()
+        if (params.hasSelection) {
+            params.onDeleteSelection()
             return true
         }
-        val id = activeNoteId ?: return false
-        if (!hasSession || expandedNoteId != null) return false
-        onDeleteActiveNote(id)
+        val id = params.activeNoteId ?: return false
+        if (!params.hasSession || params.expandedNoteId != null) return false
+        params.onDeleteActiveNote(id)
         return true
     }
 
-    suspend fun handleRequestTextEdit(
-        offset: Offset,
-        tolerance: Float,
-        elements: List<Element>,
-        session: CanvasSession?,
-        onEditText: (String) -> Unit,
-        onActivateShapeLabel: (String) -> Unit,
-    ) {
-        val text = CanvasTextElements.at(elements, offset, tolerance)
+    suspend fun handleRequestTextEdit(params: RequestTextEditParams) {
+        val text = CanvasTextElements.at(params.elements, params.offset, params.tolerance)
         if (text != null) {
-            onEditText(text.id)
+            params.onEditText(text.id)
             return
         }
-        val shape = CanvasShapeLabels.shapeAt(elements, offset) ?: return
-        val s = session ?: return
+        val shape = CanvasShapeLabels.shapeAt(params.elements, params.offset) ?: return
+        val s = params.session ?: return
         val labelId = CanvasShapeLabels.labelIdOf(shape.id)
         val frame = CanvasShapeLabels.frameFor(shape.bounds())
         if (s.documents().none { it.id == labelId }) {
             runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
             runCatching { s.setLabelOwner(labelId, shape.id) }
         }
-        onActivateShapeLabel(labelId)
+        params.onActivateShapeLabel(labelId)
     }
 
     fun handleWheelZoom(
@@ -602,51 +617,60 @@ internal object CanvasWorkspaceSupport {
         return true
     }
 
+    private fun isConnectorMode(mode: io.ak1.drawbox.domain.model.Mode): Boolean =
+        mode == io.ak1.drawbox.domain.model.Mode.LINE || mode == io.ak1.drawbox.domain.model.Mode.ARROW
+
+    private fun eraseNotesIfErasing(
+        params: FinalPointerPassParams,
+        isPressed: Boolean,
+        position: Offset?,
+    ) {
+        if (params.current.mode != io.ak1.drawbox.domain.model.Mode.ERASER) return
+        if (!isPressed || position == null) return
+        val current = params.current
+        val radius = current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f)
+        params.onEraseNotes(EraserArea(world = current.viewport.screenToWorld(position), radius = radius))
+    }
+
+    private fun connectorAnchorAt(
+        event: PointerEvent,
+        current: DrawBoxState,
+        isPressed: Boolean,
+        position: Offset?,
+    ): Offset? {
+        if (!isPressed || position == null) return null
+        val type = event.type
+        val isDragOrPress = type == PointerEventType.Press || type == PointerEventType.Move
+        return if (isDragOrPress) current.viewport.screenToWorld(position) else null
+    }
+
     fun handleFinalPointerPass(params: FinalPointerPassParams): FinalPointerPassResult {
         val event = params.event
         val altHeld = event.keyboardModifiers.isAltPressed
-        val current = params.current
-        val connectorMode = current.mode == io.ak1.drawbox.domain.model.Mode.LINE ||
-            current.mode == io.ak1.drawbox.domain.model.Mode.ARROW
         val position = event.changes.firstOrNull()?.position
         val isPressed = event.changes.any { it.pressed }
 
-        if (current.mode == io.ak1.drawbox.domain.model.Mode.ERASER && isPressed && position != null) {
-            val radius = current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f)
-            params.onEraseNotes(EraserArea(world = current.viewport.screenToWorld(position), radius = radius))
-        }
+        eraseNotesIfErasing(params, isPressed, position)
 
         val connectorAt = when {
-            !connectorMode -> null
-            event.type == PointerEventType.Press || event.type == PointerEventType.Move -> {
-                if (isPressed && position != null) current.viewport.screenToWorld(position) else null
-            }
+            !isConnectorMode(params.current.mode) -> null
             event.type == PointerEventType.Release -> {
                 if (!altHeld) params.onSnapLatestConnector()
                 null
             }
-            else -> null
+            else -> connectorAnchorAt(event, params.current, isPressed, position)
         }
         return FinalPointerPassResult(altHeld = altHeld, drawingConnectorAt = connectorAt)
     }
 
-    suspend fun reconcileShapeLabels(
-        elements: List<Element>,
-        liveDocuments: List<CanvasSceneDocument>,
-        session: CanvasSession?,
-        sessionDoc: CanvasDocument?,
-        importedRevision: Long,
-        initialLoadDone: Boolean,
-        onClearActiveNoteIf: (String) -> Unit,
-        recordDeletion: suspend (suspend () -> Unit) -> Unit,
-    ) {
-        val s = session ?: return
-        val work = CanvasShapeLabels.reconcile(elements, liveDocuments, s.labelOwners())
+    suspend fun reconcileShapeLabels(params: ReconcileShapeLabelsParams) {
+        val s = params.session ?: return
+        val work = CanvasShapeLabels.reconcile(params.elements, params.liveDocuments, s.labelOwners())
         if (work.moved.isNotEmpty()) runCatching { s.moveDocuments(work.moved) }
-        if (!initialLoadDone || sessionDoc?.revision != importedRevision) return
-        recordDeletion {
+        if (!params.initialLoadDone || params.sessionDoc?.revision != params.importedRevision) return
+        params.recordDeletion {
             work.orphaned.forEach { id ->
-                onClearActiveNoteIf(id)
+                params.onClearActiveNoteIf(id)
                 runCatching { s.removeDocument(id) }
                 runCatching { s.setLabelOwner(id, null) }
             }
