@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +24,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.ItemSnapshotList
 import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.letta.mobile.feature.chat.screen.messagelist.*
@@ -86,6 +89,247 @@ internal fun PagedChatMessageList(
     }
 }
 
+private fun isInitialPageAvailable(
+    pages: LazyPagingItems<ChatRenderItem>,
+    refresh: LoadState,
+): Boolean = pages.itemSnapshotList.items.isNotEmpty() ||
+    (refresh is LoadState.NotLoading &&
+        pages.loadState.source.prepend.endOfPaginationReached &&
+        pages.loadState.source.append.endOfPaginationReached)
+
+@Composable
+private fun PagedChatInitialLoadingView(
+    refresh: LoadState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.foundation.layout.Column(modifier) {
+        androidx.compose.material3.Text(
+            if (refresh is LoadState.Error) "Could not load conversation" else "Loading conversation...",
+        )
+        if (refresh is LoadState.Error) {
+            androidx.compose.material3.TextButton(onClick = onRetry) {
+                androidx.compose.material3.Text("Retry")
+            }
+        }
+    }
+}
+
+internal fun resolveTargetScrollPosition(
+    target: String,
+    displayedLive: List<ChatRenderItem>,
+    snapshot: ItemSnapshotList<ChatRenderItem>,
+): Int? {
+    val visibleLiveIndex = displayedLive.indexOfFirst { it.containsMessageId(target) }.takeIf { it >= 0 }
+    return visibleLiveIndex
+        ?: residentTargetIndex(snapshot.items, target, displayedLive.size, snapshot.placeholdersBefore)
+}
+
+internal fun resolveFirstVisibleMessageId(
+    index: Int,
+    displayedLive: List<ChatRenderItem>,
+    pages: LazyPagingItems<ChatRenderItem>,
+): String? {
+    val row = displayedLive.getOrNull(index)
+        ?: (index - displayedLive.size).takeIf { it in 0 until pages.itemCount }?.let { pages.peek(it) }
+    return when (row) {
+        is ChatRenderItem.Single -> row.message.id
+        is ChatRenderItem.RunBlock -> row.messages.lastOrNull()?.first?.id
+        else -> null
+    }
+}
+
+private fun Modifier.pagedTimelinePinchZoom(
+    pinch: PinchScalePreviewController,
+    activeFontScale: Float,
+    onScaleChange: (Float) -> Unit,
+): Modifier = pointerInput(pinch) {
+    try {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            do {
+                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                if (event.changes.count { it.pressed } >= 2) {
+                    if (!pinch.isPinching) pinch.begin(activeFontScale)
+                    pinch.applyZoom(event.calculateZoom())
+                    event.changes.forEach { it.consume() }
+                }
+            } while (event.changes.any { it.pressed })
+            if (pinch.isPinching) {
+                val scale = pinch.finishPreview()
+                onScaleChange(scale)
+            }
+        }
+    } finally {
+        pinch.cancel()
+    }
+}
+
+private class PagedTimelineScrollEffectsParams(
+    val listState: LazyListState,
+    val pages: LazyPagingItems<ChatRenderItem>,
+    val live: List<ChatRenderItem>,
+    val presentation: ChatPagingPresentation,
+    val following: Boolean,
+    val onFollowingChange: (Boolean) -> Unit,
+)
+
+@Composable
+private fun PagedTimelineScrollEffects(params: PagedTimelineScrollEffectsParams) {
+    LaunchedEffect(params.listState) {
+        params.listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is androidx.compose.foundation.interaction.DragInteraction.Start) params.onFollowingChange(false)
+        }
+    }
+    LaunchedEffect(params.listState, params.pages.loadState.prepend.endOfPaginationReached) {
+        var wasScrolling = false
+        snapshotFlow { params.listState.isScrollInProgress }.collect { scrolling ->
+            if (!scrolling && followNewestEdge(wasScrolling, !params.listState.canScrollBackward, params.pages.loadState.prepend.endOfPaginationReached)) {
+                params.onFollowingChange(true)
+            }
+            wasScrolling = scrolling
+        }
+    }
+    LaunchedEffect(params.live) { RenderDiagnostics.newRenderGeneration() }
+    var previousLiveUser by remember(params.presentation) {
+        mutableStateOf((params.live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
+    }
+    LaunchedEffect(params.live) {
+        val newest = (params.live.firstOrNull() as? ChatRenderItem.Single)?.message
+        if (newest?.role == "user" && newest.id != previousLiveUser) {
+            if (params.presentation.isAnchoredAwayFromTail) params.presentation.requestTail()
+            else {
+                params.listState.scrollToItem(0)
+                params.onFollowingChange(true)
+            }
+        }
+        previousLiveUser = newest?.id
+    }
+    LaunchedEffect(params.live, params.pages.itemSnapshotList, params.following) {
+        if (params.following && !params.listState.isScrollInProgress) params.listState.scrollToItem(0)
+    }
+}
+
+private class PagedTimelineTargetEffectsParams(
+    val presentation: ChatPagingPresentation,
+    val pages: LazyPagingItems<ChatRenderItem>,
+    val displayedLive: List<ChatRenderItem>,
+    val listState: LazyListState,
+    val routeTarget: String?,
+    val restoreAnchor: ChatPagingViewport?,
+    val following: Boolean,
+    val onHighlightTarget: (String?) -> Unit,
+)
+
+@Composable
+private fun PagedTimelineTargetEffects(params: PagedTimelineTargetEffectsParams) {
+    var targetPositioned by remember(params.presentation, params.routeTarget) { mutableStateOf(false) }
+    val missingTarget by params.presentation.missingTarget.collectAsStateWithLifecycle()
+
+    LaunchedEffect(params.pages.loadState.refresh) {
+        if (shouldRepositionAfterPagerRefresh(params.pages.loadState.refresh)) targetPositioned = false
+    }
+    LaunchedEffect(params.presentation, params.routeTarget, params.pages.itemSnapshotList, params.displayedLive) {
+        val target = params.routeTarget ?: params.restoreAnchor?.messageId ?: return@LaunchedEffect
+        if (!targetPositioned) {
+            val index = resolveTargetScrollPosition(target, params.displayedLive, params.pages.itemSnapshotList)
+            if (index != null) {
+                if (params.routeTarget == null) {
+                    params.listState.scrollToItem(index, params.restoreAnchor?.offset ?: 0)
+                } else {
+                    params.listState.scrollToItem(index)
+                    val item = snapshotFlow {
+                        params.listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+                    }.first { it != null }!!
+                    val layout = params.listState.layoutInfo
+                    val centerOffset = ((layout.viewportEndOffset - layout.viewportStartOffset - item.size) / 2)
+                        .coerceAtLeast(0)
+                    params.listState.scrollToItem(index, -centerOffset)
+                    params.onHighlightTarget(target)
+                }
+                targetPositioned = true
+            }
+        }
+    }
+    LaunchedEffect(params.presentation, missingTarget) {
+        if (params.routeTarget == null && params.restoreAnchor != null && missingTarget == params.restoreAnchor.messageId) {
+            params.presentation.requestTail()
+        }
+    }
+    LaunchedEffect(params.presentation, targetPositioned, params.displayedLive, params.pages.itemSnapshotList, params.following) {
+        if (!targetPositioned && (params.restoreAnchor != null || params.routeTarget != null)) return@LaunchedEffect
+        snapshotFlow { params.listState.firstVisibleItemIndex to params.listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val messageId = resolveFirstVisibleMessageId(index, params.displayedLive, params.pages)
+                if (messageId != null) params.presentation.saveViewport(ChatPagingViewport(messageId, offset, params.following))
+            }
+    }
+}
+
+private class PagedTimelineLazyListParams(
+    val pages: LazyPagingItems<ChatRenderItem>,
+    val displayedLive: List<ChatRenderItem>,
+    val presentation: ChatPagingPresentation,
+    val listState: LazyListState,
+    val kineticOverscroll: androidx.compose.foundation.OverscrollEffect?,
+    val appearance: ChatContentAppearance,
+    val context: ChatMessageListLazyContext,
+    val agentId: String?,
+)
+
+@Composable
+private fun PagedTimelineLazyList(
+    params: PagedTimelineLazyListParams,
+    modifier: Modifier = Modifier,
+) {
+    val dimens = MaterialTheme.chatDimens
+    LazyColumn(
+        overscrollEffect = params.kineticOverscroll,
+        modifier = modifier,
+        state = params.listState,
+        reverseLayout = true,
+        contentPadding = PaddingValues(
+            start = dimens.contentPaddingHorizontal,
+            end = dimens.contentPaddingHorizontal,
+            top = params.appearance.topPadding,
+            bottom = params.appearance.bottomPadding,
+        ),
+    ) {
+        val settledKey = params.pages.itemKey { it.key }
+        items(
+            count = params.displayedLive.size + params.pages.itemCount,
+            key = { index ->
+                params.displayedLive.getOrNull(index)?.key
+                    ?: settledKey(index - params.displayedLive.size)
+            },
+        ) { index ->
+            val liveRow = params.displayedLive.getOrNull(index)
+            val pageIndex = index - params.displayedLive.size
+            val row = liveRow ?: params.pages[pageIndex]
+            if (row == null) {
+                Spacer(Modifier.height(LettaDimens.Orb.railSlotWidth))
+            } else {
+                if (liveRow == null) {
+                    params.presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
+                }
+                val older = if (liveRow != null) {
+                    params.displayedLive.getOrNull(index + 1) ?: params.pages.peek(0)
+                } else {
+                    if (pageIndex + 1 < params.pages.itemCount) params.pages.peek(pageIndex + 1) else null
+                }
+                TimelineRow(row, index, older, params.context)
+            }
+        }
+        val load = params.pages.loadState
+        if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
+            item(key = "paging-loading") { MascotLoading(params.agentId) }
+        }
+        if (load.refresh is LoadState.Error || load.append is LoadState.Error || load.prepend is LoadState.Error) {
+            item(key = "paging-retry") { TextButton(onClick = params.pages::retry) { Text("Retry history") } }
+        }
+    }
+}
+
 @Composable
 private fun PagedChatMessageListContent(
     presentation: ChatPagingPresentation,
@@ -101,19 +345,12 @@ private fun PagedChatMessageListContent(
     val displayedLive = displayedLiveRows(live, residentRows)
     var initialHistoryReady by remember(presentation) { mutableStateOf(false) }
     val refresh = pages.loadState.source.refresh
-    val initialPageAvailable = pages.itemSnapshotList.items.isNotEmpty() ||
-        (refresh is LoadState.NotLoading && pages.loadState.source.prepend.endOfPaginationReached &&
-            pages.loadState.source.append.endOfPaginationReached)
+    val initialPageAvailable = isInitialPageAvailable(pages, refresh)
     if (initialPageAvailable) SideEffect { initialHistoryReady = true }
     // Do not paint an optimistic-only conversation before its first history page.
     // Once visible, keep the viewport mounted through all later refreshes.
     if (!initialHistoryReady && !initialPageAvailable) {
-        androidx.compose.foundation.layout.Column(modifier) {
-            androidx.compose.material3.Text(if (refresh is LoadState.Error) "Could not load conversation" else "Loading conversation...")
-            if (refresh is LoadState.Error) androidx.compose.material3.TextButton(onClick = { pages.retry() }) {
-                androidx.compose.material3.Text("Retry")
-            }
-        }
+        PagedChatInitialLoadingView(refresh = refresh, onRetry = pages::retry, modifier = modifier)
         return
     }
     LaunchedEffect(presentation, pages) {
@@ -134,44 +371,6 @@ private fun PagedChatMessageListContent(
     var following by remember(presentation, routeTarget) {
         mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
-    LaunchedEffect(listState) {
-        listState.interactionSource.interactions.collect { interaction ->
-            if (interaction is androidx.compose.foundation.interaction.DragInteraction.Start) following = false
-        }
-    }
-    LaunchedEffect(listState, pages.loadState.prepend.endOfPaginationReached) {
-        var wasScrolling = false
-        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (!scrolling && followNewestEdge(wasScrolling, !listState.canScrollBackward, pages.loadState.prepend.endOfPaginationReached)) {
-                following = true
-            }
-            wasScrolling = scrolling
-        }
-    }
-    // The live (unpaged) tail is the other source this host renders from; it
-    // changes independently of the resident page rows, so it ends a generation too.
-    LaunchedEffect(live) { RenderDiagnostics.newRenderGeneration() }
-    var previousLiveUser by remember(presentation) {
-        mutableStateOf((live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
-    }
-    LaunchedEffect(live) {
-        val newest = (live.firstOrNull() as? ChatRenderItem.Single)?.message
-        if (newest?.role == "user" && newest.id != previousLiveUser) {
-            if (presentation.isAnchoredAwayFromTail) presentation.requestTail()
-            else {
-                listState.scrollToItem(0)
-                following = true
-            }
-        }
-        previousLiveUser = newest?.id
-    }
-    LaunchedEffect(live, pages.itemSnapshotList, following) {
-        if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
-    }
-    var targetPositioned by remember(presentation, routeTarget) { mutableStateOf(false) }
-    LaunchedEffect(pages.loadState.refresh) {
-        if (shouldRepositionAfterPagerRefresh(pages.loadState.refresh)) targetPositioned = false
-    }
     var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
     LaunchedEffect(highlightedTarget) {
         if (highlightedTarget != null) {
@@ -179,85 +378,51 @@ private fun PagedChatMessageListContent(
             highlightedTarget = null
         }
     }
-    LaunchedEffect(presentation, routeTarget, pages.itemSnapshotList, live) {
-        val target = routeTarget ?: restoreAnchor?.messageId ?: return@LaunchedEffect
-        if (!targetPositioned) {
-            // The engine selects an around-target window. Inspect only resident rows;
-            // never trigger sequential history loads to search for an absent target.
-            val snapshot = pages.itemSnapshotList
-            val visibleLiveIndex = displayedLive.indexOfFirst { it.containsMessageId(target) }.takeIf { it >= 0 }
-            val index = visibleLiveIndex
-                ?: residentTargetIndex(snapshot.items, target, displayedLive.size, snapshot.placeholdersBefore)
-            if (index != null) {
-                if (routeTarget == null) {
-                    listState.scrollToItem(index, restoreAnchor?.offset ?: 0)
-                } else {
-                    listState.scrollToItem(index)
-                    val item = snapshotFlow {
-                        listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-                    }.first { it != null }!!
-                    val layout = listState.layoutInfo
-                    val centerOffset = ((layout.viewportEndOffset - layout.viewportStartOffset - item.size) / 2)
-                        .coerceAtLeast(0)
-                    listState.scrollToItem(index, -centerOffset)
-                    highlightedTarget = target
-                }
-                targetPositioned = true
-            }
-        }
-    }
-    LaunchedEffect(presentation, missingTarget) {
-        if (routeTarget == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId) {
-            presentation.requestTail()
-        }
-    }
-    LaunchedEffect(presentation, targetPositioned, live, pages.itemSnapshotList, following) {
-        if (!targetPositioned && (restoreAnchor != null || routeTarget != null)) return@LaunchedEffect
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .collect { (index, offset) ->
-                val row = displayedLive.getOrNull(index)
-                    ?: (index - displayedLive.size).takeIf { it in 0 until pages.itemCount }
-                        ?.let { pages.peek(it) }
-                val messageId = when (row) {
-                    is ChatRenderItem.Single -> row.message.id
-                    is ChatRenderItem.RunBlock -> row.messages.lastOrNull()?.first?.id
-                    else -> null
-                }
-                if (messageId != null) presentation.saveViewport(ChatPagingViewport(messageId, offset, following))
-            }
-    }
+
+    PagedTimelineScrollEffects(
+        params = PagedTimelineScrollEffectsParams(
+            listState = listState,
+            pages = pages,
+            live = live,
+            presentation = presentation,
+            following = following,
+            onFollowingChange = { following = it },
+        ),
+    )
+    PagedTimelineTargetEffects(
+        params = PagedTimelineTargetEffectsParams(
+            presentation = presentation,
+            pages = pages,
+            displayedLive = displayedLive,
+            listState = listState,
+            routeTarget = routeTarget,
+            restoreAnchor = restoreAnchor,
+            following = following,
+            onHighlightTarget = { highlightedTarget = it },
+        ),
+    )
+
     val density = LocalDensity.current
     val direction = LocalLayoutDirection.current
     val dimens = MaterialTheme.chatDimens
-    val shapes = MaterialTheme.chatShapes
     val geometry = remember(presentation) { ChatMessageGeometryState() }
     val pinch = remember { PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f) }
     SideEffect { pinch.syncCommittedScale(appearance.activeFontScale) }
     val currentCallbacks by rememberUpdatedState(callbacks)
     val currentActiveScale by rememberUpdatedState(appearance.activeFontScale)
     val liveScale = if (pinch.isPinching) pinch.effectiveScale else appearance.activeFontScale
-    BoxWithConstraints(modifier.fillMaxSize().pointerInput(pinch) {
-        try {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
-                do {
-                    val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                    if (event.changes.count { it.pressed } >= 2) {
-                        if (!pinch.isPinching) pinch.begin(currentActiveScale)
-                        pinch.applyZoom(event.calculateZoom())
-                        event.changes.forEach { it.consume() }
-                    }
-                } while (event.changes.any { it.pressed })
-                if (pinch.isPinching) {
-                    val scale = pinch.finishPreview()
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .pagedTimelinePinchZoom(
+                pinch = pinch,
+                activeFontScale = currentActiveScale,
+                onScaleChange = { scale ->
                     currentCallbacks.onActiveFontScaleChange(scale)
                     currentCallbacks.onFontScaleChange(scale)
-                }
-            }
-        } finally {
-            pinch.cancel()
-        }
-    }) {
+                },
+            ),
+    ) {
         val newestMessage = (live.firstOrNull() ?: pages.itemSnapshotList.items.firstOrNull())?.newestMessage()
         val context = ChatMessageListLazyContext(
             itemState = state.toChatRenderItemState(),
@@ -314,47 +479,19 @@ private fun PagedChatMessageListContent(
             // Keep the viewport behind the header; only resting content needs its inset.
             modifier = Modifier.fillMaxSize(),
         ) {
-            LazyColumn(
-                overscrollEffect = kineticOverscroll,
+            PagedTimelineLazyList(
+                params = PagedTimelineLazyListParams(
+                    pages = pages,
+                    displayedLive = displayedLive,
+                    presentation = presentation,
+                    listState = listState,
+                    kineticOverscroll = kineticOverscroll,
+                    appearance = appearance,
+                    context = context,
+                    agentId = state.agentId,
+                ),
                 modifier = Modifier.fillMaxSize(),
-                state = listState,
-                reverseLayout = true,
-                contentPadding = PaddingValues(start = dimens.contentPaddingHorizontal, end = dimens.contentPaddingHorizontal,
-                    top = appearance.topPadding, bottom = appearance.bottomPadding),
-            ) {
-                val settledKey = pages.itemKey { it.key }
-                items(
-                    count = displayedLive.size + pages.itemCount,
-                    key = { index ->
-                        displayedLive.getOrNull(index)?.key
-                            ?: settledKey(index - displayedLive.size)
-                    },
-                ) { index ->
-                    val liveRow = displayedLive.getOrNull(index)
-                    val pageIndex = index - displayedLive.size
-                    val row = liveRow ?: pages[pageIndex]
-                    if (row == null) {
-                        Spacer(Modifier.height(LettaDimens.Orb.railSlotWidth))
-                    } else {
-                        if (liveRow == null) {
-                            presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
-                        }
-                        val older = if (liveRow != null) {
-                            displayedLive.getOrNull(index + 1) ?: pages.peek(0)
-                        } else {
-                            if (pageIndex + 1 < pages.itemCount) pages.peek(pageIndex + 1) else null
-                        }
-                        TimelineRow(row, index, older, context, dimens, shapes)
-                    }
-                }
-                val load = pages.loadState
-                if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
-                    item(key = "paging-loading") { MascotLoading(state.agentId) }
-                }
-                if (load.refresh is LoadState.Error || load.append is LoadState.Error || load.prepend is LoadState.Error) {
-                    item(key = "paging-retry") { TextButton(onClick = pages::retry) { Text("Retry history") } }
-                }
-            }
+            )
         }
         if (missingTarget != null && missingTarget == routeTarget) {
             Column(Modifier.align(Alignment.BottomCenter).padding(bottom = appearance.bottomPadding)) {
@@ -391,9 +528,9 @@ private fun TimelineRow(
     index: Int,
     older: ChatRenderItem?,
     context: ChatMessageListLazyContext,
-    dimens: com.letta.mobile.ui.theme.ChatDimens,
-    shapes: com.letta.mobile.ui.theme.ChatShapes,
 ) {
+    val dimens = MaterialTheme.chatDimens
+    val shapes = MaterialTheme.chatShapes
     val rowKey = row.key
     val lifecycleObserver = LocalTimelineRowLifecycleObserver.current
     DisposableEffect(rowKey) {
