@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -131,6 +132,39 @@ class CanonicalTimelinePagingTest {
         }
     }
 
+    @Test fun repeatedDurableRevisionsKeepOnePagerAndReplaceOnlyItsSource() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val session = CanonicalTimelineSession(store, PageTransport(records = 1), scope, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        val pagingData = mutableListOf<androidx.paging.PagingData<TimelineSettledRecord>>()
+        val presenter = RecordingPresenter<TimelineSettledRecord>()
+        val collectors = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            collectors.launch {
+                session.paging(selection).collect { page ->
+                    pagingData += page
+                    presenter.collectFrom(page)
+                }
+            }
+            presenter.awaitRows(1) { "initial page never arrived" }
+            val initialRevision = session.publication.value.durableRevision
+            repeat(5) { cycle ->
+                session.engine.advanceToolSweep(selection)
+                awaitCondition({ "cycle=$cycle revision=${session.publication.value.durableRevision}" }) {
+                    session.publication.value.durableRevision >= initialRevision + cycle + 1L
+                }
+                presenter.awaitIdle()
+                assertEquals(listOf("m-0"), presenter.snapshot().items.map { it.key.identity.value })
+            }
+
+            assertTrue(pagingData.size > 1, "durable revisions must replace invalidated sources")
+            assertTrue(pagingData.size <= 6, "one Pager must coalesce five rapid source invalidations: ${pagingData.size}")
+            assertTrue(store.reads > 1, "source refreshes must read new ledger snapshots")
+        } finally {
+            collectors.cancel()
+        }
+    }
+
     @Test fun settledPresentationDecodesAndProjectsEachRenderedRecordOnce() = runBlocking {
         val store = InMemoryTimelineStore()
         val transport = PageTransport(records = 1)
@@ -178,6 +212,62 @@ class CanonicalTimelinePagingTest {
             assertEquals("otid-m-0", presenter.snapshot().items.single().otid)
             delay(50)
             assertEquals(decodeCount, decodes.get(), "a settled presenter must not keep re-decoding")
+            presentation.close()
+        } finally {
+            ui.cancel()
+        }
+    }
+
+    @Test fun resolvedStreamedKeyIsPreservedAcrossPostSettlementPagingRevisions() = runBlocking {
+        val streamedId = "cm-stream-m-0"
+        val canonicalId = "m-0"
+        val store = InMemoryTimelineStore()
+        store.putEvidence("identity/serverId/$streamedId", canonicalId.encodeToByteArray())
+        val transport = PageTransport(records = 1)
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        val fence = coordinator.beginLive(owner)
+        val streamedMsg = AssistantMessage(
+            id = streamedId,
+            contentRaw = JsonPrimitive("streamed content"),
+            date = "2026-01-01T00:00:00Z",
+        )
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(streamedMsg)))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        val emittedGenerations = AtomicInteger(0)
+        try {
+            ui.launch {
+                presentation.settled.collectLatest { page ->
+                    emittedGenerations.incrementAndGet()
+                    presenter.collectFrom(page)
+                }
+            }
+            presenter.awaitRows(1) { "initial page never arrived" }
+            presenter.awaitIdle()
+            val initialRow = presenter.snapshot().items.single()
+            assertEquals(TimelineMessageId(canonicalId), initialRow.identity)
+            assertEquals("segment-$streamedId", initialRow.item.key)
+
+            // Acknowledge settlement: this clears owner.session.live
+            presentation.onResidentRows(listOf(initialRow))
+            awaitCondition({ "live did not clear on settlement" }) { owner.session.live.value == null }
+
+            val genBeforeSweep = emittedGenerations.get()
+            // Advance a durable revision to invalidate Paging and force a new paging generation
+            owner.session.engine.advanceToolSweep(owner.selection)
+            awaitCondition({ "new paging generation did not arrive" }) {
+                emittedGenerations.get() > genBeforeSweep
+            }
+            presenter.awaitIdle()
+
+            // Post-settlement paging generation must retain the streamed key rather than reverting to canonical identity
+            val postSettlementRow = presenter.snapshot().items.single()
+            assertEquals(TimelineMessageId(canonicalId), postSettlementRow.identity)
+            assertEquals("segment-$streamedId", postSettlementRow.item.key)
             presentation.close()
         } finally {
             ui.cancel()

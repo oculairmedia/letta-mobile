@@ -1,11 +1,15 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.ui.components.SCROLL_TO_BOTTOM_FAB_TAG
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -41,10 +45,15 @@ class PagedChatContentTest {
         GroupPosition.None,
     )
 
-    @Test fun targetLookupIncludesLiveAndPlaceholderOffsetsWithoutLoadingMissingHistory() {
-        val rows = listOf(row("newer"), row("target"), row("older"))
-        org.junit.Assert.assertEquals(8, residentTargetIndex(rows, "target", 2, 5))
-        org.junit.Assert.assertNull(residentTargetIndex(rows, "missing", 2, 5))
+    @Test fun targetLookupUsesDisplayedDedupedLiveCountAndPlaceholderOffset() {
+        val duplicate = row("duplicate").copy(keyOverride = "shared")
+        val live = listOf(row("live"), duplicate)
+        val rows = listOf(duplicate.copy(message = row("canonical").message), row("target"), row("older"))
+        val displayedLive = displayedLiveRows(live, rows)
+
+        org.junit.Assert.assertEquals(listOf("live"), displayedLive.map { (it as ChatRenderItem.Single).message.id })
+        org.junit.Assert.assertEquals(7, residentTargetIndex(rows, "target", displayedLive.size, 5))
+        org.junit.Assert.assertNull(residentTargetIndex(rows, "missing", displayedLive.size, 5))
     }
 
     @Test fun dateBoundaryRequiresResidentOlderRowAndValidDifferentDay() {

@@ -8,6 +8,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -40,6 +41,7 @@ class CanonicalTimelinePresentation private constructor(
     private val resident = MutableStateFlow<Map<TimelineMessageId, Long>>(emptyMap())
     private val residentOtids = MutableStateFlow<Set<String>>(emptySet())
     private val residentServerIds = MutableStateFlow<Set<String>>(emptySet())
+    private val streamedKeyAliases = ConcurrentHashMap<TimelineMessageId, String>()
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
     init {
@@ -112,6 +114,7 @@ class CanonicalTimelinePresentation private constructor(
     private val liveProjection: Flow<List<ChatRenderItem>> = combine(
         owner.session.live, owner.session.pending, resident, residentOtids, residentServerIds,
     ) { publication, pending, presented, settledOtids, settledServerIds ->
+        cacheStreamedAliases(publication)
         // One logical event stays on screen once. Sends converge by otid; server-originated
         // reasoning and assistant frames converge by server id even when storage remaps the row key.
         val events = publication?.overlayEvents(presented).orEmpty()
@@ -132,6 +135,16 @@ class CanonicalTimelinePresentation private constructor(
             }
         }
         active.asReversed() + optimistic.asReversed()
+    }
+
+    private fun cacheStreamedAliases(publication: TimelineLivePublication?) {
+        val aliases = publication?.aliases ?: return
+        if (aliases.isEmpty()) return
+        for ((serverId, canonical) in aliases) {
+            if (publication.block.events.any { it.serverId == serverId }) {
+                streamedKeyAliases.putIfAbsent(canonical, "segment-$serverId")
+            }
+        }
     }
 
     init {
@@ -192,11 +205,31 @@ class CanonicalTimelinePresentation private constructor(
         return copy(toolCalls = calls.map { if (it.settled) it else it.copy(settled = true) })
     }
 
+    private fun ChatRenderItem.withKeyOverride(key: String): ChatRenderItem = when (this) {
+        is ChatRenderItem.Single -> copy(keyOverride = key)
+        is ChatRenderItem.RunBlock -> copy(keyOverride = key)
+        else -> this
+    }
+
+    /** Preserve the LazyColumn slot while an aliased streamed row becomes its canonical ledger row. */
+    private fun replacementKey(identity: TimelineMessageId): String {
+        streamedKeyAliases[identity]?.let { return it }
+        val live = owner.session.live.value
+        val streamedId = live?.aliases?.entries?.singleOrNull { (serverId, canonical) ->
+            canonical == identity && live.block.events.any { it.serverId == serverId }
+        }?.key
+        val key = "segment-${streamedId ?: identity.value}"
+        if (streamedId != null) {
+            streamedKeyAliases[identity] = key
+        }
+        return key
+    }
+
     private fun project(record: TimelineSettledRecord, presentation: TimelineSettledPresentation): Row = when (presentation) {
         is TimelineSettledPresentation.Render -> Row(
             record.key.identity,
             record.revision,
-            presentation.item.settledToolCalls(),
+            presentation.item.settledToolCalls().withKeyOverride(replacementKey(record.key.identity)),
             otid = presentation.event.otid,
             serverId = presentation.event.serverId,
         )
@@ -205,7 +238,7 @@ class CanonicalTimelinePresentation private constructor(
             record.revision,
             ChatRenderItem.Single(
                 UiMessage(record.key.identity.value, "assistant", "", timestamp = ""),
-                GroupPosition.None, keyOverride = "segment-${record.key.identity.value}",
+                GroupPosition.None, keyOverride = replacementKey(record.key.identity),
             ),
             TimelineBodyReference(
                 owner.selection.scope,
