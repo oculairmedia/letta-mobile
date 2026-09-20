@@ -10,10 +10,16 @@ import com.letta.mobile.ui.components.SCROLL_TO_BOTTOM_FAB_TAG
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.geometry.Offset
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.screen.*
@@ -41,10 +47,106 @@ class PagedChatContentTest {
         GroupPosition.None,
     )
 
-    @Test fun targetLookupIncludesLiveAndPlaceholderOffsetsWithoutLoadingMissingHistory() {
-        val rows = listOf(row("newer"), row("target"), row("older"))
-        org.junit.Assert.assertEquals(8, residentTargetIndex(rows, "target", 2, 5))
-        org.junit.Assert.assertNull(residentTargetIndex(rows, "missing", 2, 5))
+    @Test fun targetLookupUsesDisplayedDedupedLiveCountAndPlaceholderOffset() {
+        val duplicate = row("duplicate").copy(keyOverride = "shared")
+        val live = listOf(row("live"), duplicate)
+        val rows = listOf(duplicate.copy(message = row("canonical").message), row("target"), row("older"))
+        val displayedLive = displayedLiveRows(live, rows)
+
+        org.junit.Assert.assertEquals(listOf("live"), displayedLive.map { (it as ChatRenderItem.Single).message.id })
+        org.junit.Assert.assertEquals(7, residentTargetIndex(rows, "target", displayedLive.size, 5))
+        org.junit.Assert.assertNull(residentTargetIndex(rows, "missing", displayedLive.size, 5))
+    }
+
+    @Test fun realPagerReceivesEdgeAccessHintsAndLoadsBeyondInitialWindow() {
+        val loads = mutableListOf<PagingSource.LoadParams<Int>>()
+        val pager = Pager(PagingConfig(pageSize = 10, prefetchDistance = 1, enablePlaceholders = true, maxSize = 30)) {
+            object : PagingSource<Int, ChatRenderItem>() {
+                override fun getRefreshKey(state: PagingState<Int, ChatRenderItem>): Int? = state.anchorPosition
+                override suspend fun load(params: LoadParams<Int>): LoadResult<Int, ChatRenderItem> {
+                    synchronized(loads) { loads += params }
+                    val start = params.key ?: 0
+                    val end = (start + params.loadSize).coerceAtMost(60)
+                    return LoadResult.Page(
+                        data = (start until end).map { row("paged-$it") },
+                        prevKey = (start - params.loadSize).takeIf { it >= 0 },
+                        nextKey = end.takeIf { it < 60 },
+                        itemsBefore = start,
+                        itemsAfter = 60 - end,
+                    )
+                }
+            }
+        }
+        val presentation = ChatPagingPresentation(pager.flow, MutableStateFlow(emptyList()), {})
+        compose.setContent {
+            LettaChatTheme {
+                PagedChatMessageList(
+                    presentation, ChatUiState(),
+                    ChatContentCallbacks(
+                        onSendMessage = {}, onRerunMessage = {}, onLoadOlderMessages = {},
+                        onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
+                        onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
+                    ), ChatContentAppearance(),
+                )
+            }
+        }
+
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(28)
+        compose.waitUntil(10_000) { synchronized(loads) { loads.any { it is PagingSource.LoadParams.Append } } }
+        compose.runOnIdle {
+            org.junit.Assert.assertTrue(
+                "edge access must issue an append hint",
+                synchronized(loads) { loads.any { it is PagingSource.LoadParams.Append } },
+            )
+        }
+    }
+
+    @Test fun fiveLiveToSettledHandoffsKeepActualComposeSlotsMounted() {
+        val unrelated = row("unrelated")
+        val live = MutableStateFlow<List<ChatRenderItem>>(emptyList())
+        val settled = MutableStateFlow<PagingData<ChatRenderItem>>(PagingData.from(listOf(unrelated)))
+        val presentation = ChatPagingPresentation(settled, live, {})
+        val mounts = mutableMapOf<String, Int>()
+        val disposes = mutableMapOf<String, Int>()
+        compose.setContent {
+            LettaChatTheme {
+                CompositionLocalProvider(LocalTimelineRowLifecycleObserver provides { event, key ->
+                    val target = if (event == TimelineRowLifecycle.Mount) mounts else disposes
+                    target[key] = target.getOrDefault(key, 0) + 1
+                }) {
+                    PagedChatMessageList(
+                        presentation, ChatUiState(),
+                        ChatContentCallbacks(
+                            onSendMessage = {}, onRerunMessage = {}, onLoadOlderMessages = {},
+                            onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
+                            onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
+                        ), ChatContentAppearance(),
+                    )
+                }
+            }
+        }
+
+        repeat(5) { cycle ->
+            val key = "segment-stream-$cycle"
+            val liveRow = row("live-$cycle").copy(keyOverride = key)
+            val settledRow = row("canonical-$cycle").copy(
+                message = row("canonical-$cycle").message.copy(content = "settled-$cycle"),
+                keyOverride = key,
+            )
+            compose.runOnIdle { live.value = listOf(liveRow) }
+            compose.onNodeWithText("live-$cycle").assertIsDisplayed()
+            compose.runOnIdle { settled.value = PagingData.from(listOf(settledRow, unrelated)) }
+            compose.onNodeWithText("settled-$cycle").assertIsDisplayed()
+            compose.onNodeWithText("live-$cycle").assertDoesNotExist()
+            compose.runOnIdle { live.value = emptyList() }
+            compose.onNodeWithText("settled-$cycle").assertIsDisplayed()
+            compose.runOnIdle {
+                org.junit.Assert.assertEquals("cycle $cycle mounted once", 1, mounts[key])
+                org.junit.Assert.assertEquals("cycle $cycle was not disposed", null, disposes[key])
+                org.junit.Assert.assertEquals("unrelated row remains mounted", 1, mounts[unrelated.key])
+                org.junit.Assert.assertEquals("unrelated row remains alive", null, disposes[unrelated.key])
+            }
+        }
     }
 
     @Test fun dateBoundaryRequiresResidentOlderRowAndValidDifferentDay() {

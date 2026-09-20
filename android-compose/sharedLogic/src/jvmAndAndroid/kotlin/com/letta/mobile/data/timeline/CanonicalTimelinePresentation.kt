@@ -192,11 +192,26 @@ class CanonicalTimelinePresentation private constructor(
         return copy(toolCalls = calls.map { if (it.settled) it else it.copy(settled = true) })
     }
 
+    private fun ChatRenderItem.withKeyOverride(key: String): ChatRenderItem = when (this) {
+        is ChatRenderItem.Single -> copy(keyOverride = key)
+        is ChatRenderItem.RunBlock -> copy(keyOverride = key)
+        else -> this
+    }
+
+    /** Preserve the LazyColumn slot while an aliased streamed row becomes its canonical ledger row. */
+    private fun replacementKey(identity: TimelineMessageId): String {
+        val live = owner.session.live.value
+        val streamedId = live?.aliases?.entries?.singleOrNull { (serverId, canonical) ->
+            canonical == identity && live.block.events.any { it.serverId == serverId }
+        }?.key
+        return "segment-${streamedId ?: identity.value}"
+    }
+
     private fun project(record: TimelineSettledRecord, presentation: TimelineSettledPresentation): Row = when (presentation) {
         is TimelineSettledPresentation.Render -> Row(
             record.key.identity,
             record.revision,
-            presentation.item.settledToolCalls(),
+            presentation.item.settledToolCalls().withKeyOverride(replacementKey(record.key.identity)),
             otid = presentation.event.otid,
             serverId = presentation.event.serverId,
         )

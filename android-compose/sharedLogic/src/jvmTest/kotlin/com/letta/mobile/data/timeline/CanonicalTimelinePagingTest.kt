@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -128,6 +129,39 @@ class CanonicalTimelinePagingTest {
         } finally {
             presentation.close()
             ui.cancel()
+        }
+    }
+
+    @Test fun repeatedDurableRevisionsKeepOnePagerAndReplaceOnlyItsSource() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val session = CanonicalTimelineSession(store, PageTransport(records = 1), scope, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        val pagingData = mutableListOf<androidx.paging.PagingData<TimelineSettledRecord>>()
+        val presenter = RecordingPresenter<TimelineSettledRecord>()
+        val collectors = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            collectors.launch {
+                session.paging(selection).collect { page ->
+                    pagingData += page
+                    presenter.collectFrom(page)
+                }
+            }
+            presenter.awaitRows(1) { "initial page never arrived" }
+            val initialRevision = session.publication.value.durableRevision
+            repeat(5) { cycle ->
+                session.engine.advanceToolSweep(selection)
+                awaitCondition({ "cycle=$cycle revision=${session.publication.value.durableRevision}" }) {
+                    session.publication.value.durableRevision >= initialRevision + cycle + 1L
+                }
+                presenter.awaitIdle()
+                assertEquals(listOf("m-0"), presenter.snapshot().items.map { it.key.identity.value })
+            }
+
+            assertTrue(pagingData.size > 1, "durable revisions must replace invalidated sources")
+            assertTrue(pagingData.size <= 6, "one Pager must coalesce five rapid source invalidations: ${pagingData.size}")
+            assertTrue(store.reads > 1, "source refreshes must read new ledger snapshots")
+        } finally {
+            collectors.cancel()
         }
     }
 

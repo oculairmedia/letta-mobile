@@ -367,9 +367,11 @@ internal class ChatTimelineObserver(
         }
         val previous = uiState.value
         val thinkingStart = a2uiThinkingStartMessageCount()
-        val responseArrived = thinkingStart != null && ui
-            .drop(thinkingStart)
-            .any { it.role == "assistant" && !it.isReasoning }
+        val responseArrived = thinkingStart != null && (
+            projection.tailIsAssistant || ui
+                .drop(thinkingStart)
+                .any { it.role == "assistant" && !it.isReasoning }
+        )
         if (responseArrived) clearA2uiThinkingOnResponse()
         val presentation = presenter.present(
             projection = projection,
@@ -425,9 +427,11 @@ internal class ChatTimelineObserver(
             clearFollowingDuplicateInitialMessageInFlight()
         }
         val thinkingStart = a2uiThinkingStartMessageCount()
-        val responseArrived = thinkingStart != null && projection.ui
-            .drop(thinkingStart)
-            .any { it.role == "assistant" && !it.isReasoning }
+        val responseArrived = thinkingStart != null && (
+            projection.tailIsAssistant || projection.ui
+                .drop(thinkingStart)
+                .any { it.role == "assistant" && !it.isReasoning }
+        )
         if (responseArrived) clearA2uiThinkingOnResponse()
         val presentation = presenter.present(
             projection = projection,

@@ -42,6 +42,17 @@ internal fun followNewestEdge(wasScrolling: Boolean, atNewestEdge: Boolean, prep
 internal fun shouldRepositionAfterPagerRefresh(refresh: LoadState): Boolean =
     refresh is LoadState.Loading
 
+internal fun displayedLiveRows(live: List<ChatRenderItem>, residentSettled: List<ChatRenderItem>): List<ChatRenderItem> {
+    val settledKeys = residentSettled.mapTo(mutableSetOf()) { it.key }
+    return live.filterNot { it.key in settledKeys }
+}
+
+internal enum class TimelineRowLifecycle { Mount, Dispose }
+
+internal val LocalTimelineRowLifecycleObserver = staticCompositionLocalOf<(TimelineRowLifecycle, String) -> Unit> {
+    { _, _ -> }
+}
+
 internal fun residentTargetIndex(
     rows: List<com.letta.mobile.data.chat.projection.ChatRenderItem>,
     target: String,
@@ -86,6 +97,8 @@ private fun PagedChatMessageListContent(
     val routeTarget = if (presentation.hasBoundRoute) presentation.routeTarget else appearance.scrollToMessageId
     val pages = presentation.settled.collectAsLazyPagingItems()
     val live by presentation.live.collectAsStateWithLifecycle()
+    val residentRows = pages.itemSnapshotList.items
+    val displayedLive = displayedLiveRows(live, residentRows)
     var initialHistoryReady by remember(presentation) { mutableStateOf(false) }
     val refresh = pages.loadState.source.refresh
     val initialPageAvailable = pages.itemSnapshotList.items.isNotEmpty() ||
@@ -172,8 +185,9 @@ private fun PagedChatMessageListContent(
             // The engine selects an around-target window. Inspect only resident rows;
             // never trigger sequential history loads to search for an absent target.
             val snapshot = pages.itemSnapshotList
-            val index = live.indexOfFirst { it.containsMessageId(target) }.takeIf { it >= 0 }
-                ?: residentTargetIndex(snapshot.items, target, live.size, snapshot.placeholdersBefore)
+            val visibleLiveIndex = displayedLive.indexOfFirst { it.containsMessageId(target) }.takeIf { it >= 0 }
+            val index = visibleLiveIndex
+                ?: residentTargetIndex(snapshot.items, target, displayedLive.size, snapshot.placeholdersBefore)
             if (index != null) {
                 if (routeTarget == null) {
                     listState.scrollToItem(index, restoreAnchor?.offset ?: 0)
@@ -201,8 +215,9 @@ private fun PagedChatMessageListContent(
         if (!targetPositioned && (restoreAnchor != null || routeTarget != null)) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) ->
-                val row = live.getOrNull(index) ?: (index - live.size).takeIf { it in 0 until pages.itemCount }
-                    ?.let { pages.peek(it) }
+                val row = displayedLive.getOrNull(index)
+                    ?: (index - displayedLive.size).takeIf { it in 0 until pages.itemCount }
+                        ?.let { pages.peek(it) }
                 val messageId = when (row) {
                     is ChatRenderItem.Single -> row.message.id
                     is ChatRenderItem.RunBlock -> row.messages.lastOrNull()?.first?.id
@@ -307,23 +322,29 @@ private fun PagedChatMessageListContent(
                 contentPadding = PaddingValues(start = dimens.contentPaddingHorizontal, end = dimens.contentPaddingHorizontal,
                     top = appearance.topPadding, bottom = appearance.bottomPadding),
             ) {
-                items(live.size, key = { live[it].key }) { index ->
-                    Column {
-                        PagedDateBoundary(live[index], live.getOrNull(index + 1)
-                            ?: if (pages.itemCount > 0) pages.peek(0) else null)
-                        ChatMessageListRenderItem(ChatMessageListRenderItemParams(live[index], index, context, dimens, shapes))
-                    }
-                }
-                items(pages.itemCount, key = pages.itemKey { it.key }) { index ->
-                    val row = pages[index]
-                    if (row != null) {
-                        presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
-                        Column {
-                            PagedDateBoundary(row, if (index + 1 < pages.itemCount) pages.peek(index + 1) else null)
-                            ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, live.size + index, context, dimens, shapes))
-                        }
-                    } else {
+                val settledKey = pages.itemKey { it.key }
+                items(
+                    count = displayedLive.size + pages.itemCount,
+                    key = { index ->
+                        displayedLive.getOrNull(index)?.key
+                            ?: settledKey(index - displayedLive.size)
+                    },
+                ) { index ->
+                    val liveRow = displayedLive.getOrNull(index)
+                    val pageIndex = index - displayedLive.size
+                    val row = liveRow ?: pages[pageIndex]
+                    if (row == null) {
                         Spacer(Modifier.height(LettaDimens.Orb.railSlotWidth))
+                    } else {
+                        if (liveRow == null) {
+                            presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
+                        }
+                        val older = if (liveRow != null) {
+                            displayedLive.getOrNull(index + 1) ?: pages.peek(0)
+                        } else {
+                            if (pageIndex + 1 < pages.itemCount) pages.peek(pageIndex + 1) else null
+                        }
+                        TimelineRow(row, index, older, context, dimens, shapes)
                     }
                 }
                 val load = pages.loadState
@@ -361,6 +382,27 @@ private fun PagedChatMessageListContent(
                     bottom = LettaSpacing.INNER_PADDING + appearance.bottomPadding,
                 ),
         )
+    }
+}
+
+@Composable
+private fun TimelineRow(
+    row: ChatRenderItem,
+    index: Int,
+    older: ChatRenderItem?,
+    context: ChatMessageListLazyContext,
+    dimens: com.letta.mobile.ui.theme.ChatDimens,
+    shapes: com.letta.mobile.ui.theme.ChatShapes,
+) {
+    val rowKey = row.key
+    val lifecycleObserver = LocalTimelineRowLifecycleObserver.current
+    DisposableEffect(rowKey) {
+        lifecycleObserver(TimelineRowLifecycle.Mount, rowKey)
+        onDispose { lifecycleObserver(TimelineRowLifecycle.Dispose, rowKey) }
+    }
+    Column {
+        PagedDateBoundary(row, older)
+        ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, index, context, dimens, shapes))
     }
 }
 
