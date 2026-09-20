@@ -1,9 +1,12 @@
 package com.letta.mobile.feature.chat.screen
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
@@ -11,19 +14,40 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.feature.chat.screen.PagedTimelineEffects.timelinePinchZoom
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListLazyContext
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListRenderItem
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListRenderItemParams
+import com.letta.mobile.feature.chat.screen.messagelist.chatMessageListBottomFadeLength
+import com.letta.mobile.feature.chat.screen.messagelist.newestMessage
+import com.letta.mobile.feature.chat.screen.messagelist.toRenderCallbacks
+import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.toChatRenderItemState
 import com.letta.mobile.ui.components.DateSeparator
+import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
+import com.letta.mobile.ui.zoom.PinchScalePreviewController
+import kotlinx.coroutines.launch
 
 internal class PagedTimelineLazyListParams(
     val pages: LazyPagingItems<ChatRenderItem>,
@@ -36,110 +60,249 @@ internal class PagedTimelineLazyListParams(
     val agentId: String?,
 )
 
-@Composable
-internal fun PagedTimelineLazyList(
-    params: PagedTimelineLazyListParams,
-    modifier: Modifier = Modifier,
-) {
-    val dimens = MaterialTheme.chatDimens
-    LazyColumn(
-        overscrollEffect = params.kineticOverscroll,
-        modifier = modifier,
-        state = params.listState,
-        reverseLayout = true,
-        contentPadding = PaddingValues(
-            start = dimens.contentPaddingHorizontal,
-            end = dimens.contentPaddingHorizontal,
-            top = params.appearance.topPadding,
-            bottom = params.appearance.bottomPadding,
-        ),
+internal class PagedTimelineViewportParams(
+    val presentation: ChatPagingPresentation,
+    val state: ChatUiState,
+    val pages: LazyPagingItems<ChatRenderItem>,
+    val displayedLive: List<ChatRenderItem>,
+    val listState: LazyListState,
+    val following: Boolean,
+    val onFollowingChange: (Boolean) -> Unit,
+    val highlightedTarget: String?,
+    val routeTarget: String?,
+    val missingTarget: String?,
+    val appearance: ChatContentAppearance,
+    val callbacks: ChatContentCallbacks,
+    val modifier: Modifier,
+)
+
+internal object PagedTimelineLazyLayout {
+    fun isInitialPageAvailable(
+        pages: LazyPagingItems<ChatRenderItem>,
+        refresh: LoadState,
+    ): Boolean {
+        val hasItems = pages.itemSnapshotList.items.isNotEmpty()
+        val endReached = refresh is LoadState.NotLoading &&
+            pages.loadState.source.prepend.endOfPaginationReached &&
+            pages.loadState.source.append.endOfPaginationReached
+        return hasItems || endReached
+    }
+
+    @Composable
+    fun InitialLoadingView(
+        refresh: LoadState,
+        onRetry: () -> Unit,
+        modifier: Modifier = Modifier,
     ) {
-        val settledKey = params.pages.itemKey { it.key }
-        items(
-            count = params.displayedLive.size + params.pages.itemCount,
-            key = { index ->
-                params.displayedLive.getOrNull(index)?.key
-                    ?: settledKey(index - params.displayedLive.size)
-            },
-        ) { index ->
-            val liveRow = params.displayedLive.getOrNull(index)
-            val pageIndex = index - params.displayedLive.size
-            val row = liveRow ?: params.pages[pageIndex]
-            if (row == null) {
-                Spacer(Modifier.height(LettaDimens.Orb.railSlotWidth))
-            } else {
-                if (liveRow == null) {
-                    params.presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
+        Column(modifier) {
+            val label = if (refresh is LoadState.Error) "Could not load conversation" else "Loading conversation..."
+            Text(label)
+            if (refresh is LoadState.Error) {
+                TextButton(onClick = onRetry) {
+                    Text("Retry")
                 }
-                val older = if (liveRow != null) {
-                    params.displayedLive.getOrNull(index + 1)
-                        ?: if (params.pages.itemCount > 0) params.pages.peek(0) else null
+            }
+        }
+    }
+
+    @Composable
+    fun LazyList(
+        params: PagedTimelineLazyListParams,
+        modifier: Modifier = Modifier,
+    ) {
+        val dimens = MaterialTheme.chatDimens
+        LazyColumn(
+            overscrollEffect = params.kineticOverscroll,
+            modifier = modifier,
+            state = params.listState,
+            reverseLayout = true,
+            contentPadding = PaddingValues(
+                start = dimens.contentPaddingHorizontal,
+                end = dimens.contentPaddingHorizontal,
+                top = params.appearance.topPadding,
+                bottom = params.appearance.bottomPadding,
+            ),
+        ) {
+            val settledKey = params.pages.itemKey { it.key }
+            items(
+                count = params.displayedLive.size + params.pages.itemCount,
+                key = { index ->
+                    params.displayedLive.getOrNull(index)?.key
+                        ?: settledKey(index - params.displayedLive.size)
+                },
+            ) { index ->
+                val liveRow = params.displayedLive.getOrNull(index)
+                val pageIndex = index - params.displayedLive.size
+                val row = liveRow ?: params.pages[pageIndex]
+                if (row == null) {
+                    Spacer(Modifier.height(LettaDimens.Orb.railSlotWidth))
                 } else {
-                    if (pageIndex + 1 < params.pages.itemCount) params.pages.peek(pageIndex + 1) else null
+                    if (liveRow == null) {
+                        params.presentation.deferredReader(row)?.let { reader -> DeferredWindowControls(row.key, reader) }
+                    }
+                    val older = if (liveRow != null) {
+                        params.displayedLive.getOrNull(index + 1)
+                            ?: if (params.pages.itemCount > 0) params.pages.peek(0) else null
+                    } else {
+                        if (pageIndex + 1 < params.pages.itemCount) params.pages.peek(pageIndex + 1) else null
+                    }
+                    Row(row, index, older, params.context)
                 }
-                TimelineRow(row, index, older, params.context)
+            }
+            val load = params.pages.loadState
+            if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
+                item(key = "paging-loading") { MascotLoading(params.agentId) }
+            }
+            if (load.refresh is LoadState.Error || load.append is LoadState.Error || load.prepend is LoadState.Error) {
+                item(key = "paging-retry") { TextButton(onClick = params.pages::retry) { Text("Retry history") } }
             }
         }
-        val load = params.pages.loadState
-        if (load.refresh is LoadState.Loading || load.append is LoadState.Loading) {
-            item(key = "paging-loading") { MascotLoading(params.agentId) }
+    }
+
+    @Composable
+    fun Row(
+        row: ChatRenderItem,
+        index: Int,
+        older: ChatRenderItem?,
+        context: ChatMessageListLazyContext,
+    ) {
+        val dimens = MaterialTheme.chatDimens
+        val shapes = MaterialTheme.chatShapes
+        val rowKey = row.key
+        val lifecycleObserver = LocalTimelineRowLifecycleObserver.current
+        DisposableEffect(rowKey) {
+            lifecycleObserver(TimelineRowLifecycle.Mount, rowKey)
+            onDispose { lifecycleObserver(TimelineRowLifecycle.Dispose, rowKey) }
         }
-        if (load.refresh is LoadState.Error || load.append is LoadState.Error || load.prepend is LoadState.Error) {
-            item(key = "paging-retry") { TextButton(onClick = params.pages::retry) { Text("Retry history") } }
+        Column {
+            DateBoundary(row, older)
+            ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, index, context, dimens, shapes))
         }
     }
-}
 
-@Composable
-internal fun TimelineRow(
-    row: ChatRenderItem,
-    index: Int,
-    older: ChatRenderItem?,
-    context: ChatMessageListLazyContext,
-) {
-    val dimens = MaterialTheme.chatDimens
-    val shapes = MaterialTheme.chatShapes
-    val rowKey = row.key
-    val lifecycleObserver = LocalTimelineRowLifecycleObserver.current
-    DisposableEffect(rowKey) {
-        lifecycleObserver(TimelineRowLifecycle.Mount, rowKey)
-        onDispose { lifecycleObserver(TimelineRowLifecycle.Dispose, rowKey) }
+    @Composable
+    fun DateBoundary(newer: ChatRenderItem, older: ChatRenderItem?) {
+        pagedBoundaryDate(newer, older)?.let { DateSeparator(date = it) }
     }
-    Column {
-        PagedDateBoundary(row, older)
-        ChatMessageListRenderItem(ChatMessageListRenderItemParams(row, index, context, dimens, shapes))
-    }
-}
 
-@Composable
-internal fun PagedDateBoundary(newer: ChatRenderItem, older: ChatRenderItem?) {
-    pagedBoundaryDate(newer, older)?.let { DateSeparator(date = it) }
-}
+    @Composable
+    fun Viewport(params: PagedTimelineViewportParams) {
+        val density = LocalDensity.current
+        val direction = LocalLayoutDirection.current
+        val dimens = MaterialTheme.chatDimens
+        val scope = rememberCoroutineScope()
+        val geometry = remember(params.presentation) { ChatMessageGeometryState() }
+        val pinch = remember { PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f) }
+        SideEffect { pinch.syncCommittedScale(params.appearance.activeFontScale) }
+        val currentCallbacks by rememberUpdatedState(params.callbacks)
+        val currentActiveScale by rememberUpdatedState(params.appearance.activeFontScale)
+        val liveScale = if (pinch.isPinching) pinch.effectiveScale else params.appearance.activeFontScale
 
-internal fun isInitialPageAvailable(
-    pages: LazyPagingItems<ChatRenderItem>,
-    refresh: LoadState,
-): Boolean {
-    val hasItems = pages.itemSnapshotList.items.isNotEmpty()
-    val endReached = refresh is LoadState.NotLoading &&
-        pages.loadState.source.prepend.endOfPaginationReached &&
-        pages.loadState.source.append.endOfPaginationReached
-    return hasItems || endReached
-}
-
-@Composable
-internal fun PagedChatInitialLoadingView(
-    refresh: LoadState,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    androidx.compose.foundation.layout.Column(modifier) {
-        val label = if (refresh is LoadState.Error) "Could not load conversation" else "Loading conversation..."
-        Text(label)
-        if (refresh is LoadState.Error) {
-            TextButton(onClick = onRetry) {
-                Text("Retry")
+        BoxWithConstraints(
+            modifier = params.modifier
+                .fillMaxSize()
+                .timelinePinchZoom(
+                    pinch = pinch,
+                    activeFontScale = currentActiveScale,
+                    onScaleChange = { scale ->
+                        currentCallbacks.onActiveFontScaleChange(scale)
+                        currentCallbacks.onFontScaleChange(scale)
+                    },
+                ),
+        ) {
+            val liveNewest = params.presentation.live.value.firstOrNull()?.newestMessage()
+            val residentNewest = params.pages.itemSnapshotList.items.firstOrNull()?.newestMessage()
+            val newestMessage = liveNewest ?: residentNewest
+            val context = ChatMessageListLazyContext(
+                itemState = params.state.toChatRenderItemState(),
+                conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId,
+                chatMode = params.appearance.chatMode,
+                contentWidthPx = with(density) { (maxWidth - dimens.contentPaddingHorizontal * 2).roundToPx() },
+                density = density,
+                layoutDirection = direction,
+                activeFontScale = params.appearance.activeFontScale,
+                liveFontScale = liveScale,
+                newestMessageId = newestMessage?.id,
+                highlightedMessageId = params.highlightedTarget,
+                itemGeometryState = geometry,
+                pinchFontScaleController = pinch,
+                scaleWindowIndexRange = IntRange.EMPTY,
+                callbacks = params.callbacks.toRenderCallbacks(),
+            )
+            val reducedMotion = com.letta.mobile.ui.components.rememberReducedMotionEnabled()
+            val kineticOverscroll = rememberTimelineKineticOverscroll(
+                enabled = !reducedMotion && !pinch.isPinching &&
+                    params.pages.loadState.refresh !is LoadState.Loading,
+                canFlingPastPositiveEdge = {
+                    !params.listState.canScrollForward && params.pages.loadState.append.endOfPaginationReached
+                },
+                canFlingPastNegativeEdge = {
+                    !params.listState.canScrollBackward && params.pages.loadState.prepend.endOfPaginationReached
+                },
+            )
+            DisposableEffect(kineticOverscroll) {
+                onDispose(kineticOverscroll::cancelAndClear)
             }
+            val fadeTargetColor = chatFadeTargetColor(
+                chatBackground = params.appearance.chatBackground,
+                fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            )
+            val fadeScrimColor = chatFadeScrimColor(
+                chatBackground = params.appearance.chatBackground,
+                surfaceColor = MaterialTheme.colorScheme.background,
+            )
+            val topFadeLength = params.appearance.topPadding + ChatFadeEdgeLength
+            val bottomFadeLength = chatMessageListBottomFadeLength(params.appearance.bottomPadding)
+            val newestRole = newestMessage?.role
+            val suppressBottomFade = params.following && newestRole == "user" && params.state.isStreaming
+            ChatFadingEdgesBox(
+                listState = params.listState,
+                targetColor = fadeTargetColor,
+                scrimColor = fadeScrimColor,
+                topPadding = 0.dp,
+                topFadeLength = topFadeLength,
+                bottomFadeLength = bottomFadeLength,
+                suppressBottom = suppressBottomFade,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                LazyList(
+                    params = PagedTimelineLazyListParams(
+                        pages = params.pages,
+                        displayedLive = params.displayedLive,
+                        presentation = params.presentation,
+                        listState = params.listState,
+                        kineticOverscroll = kineticOverscroll,
+                        appearance = params.appearance,
+                        context = context,
+                        agentId = params.state.agentId,
+                    ),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            if (params.missingTarget != null && params.missingTarget == params.routeTarget) {
+                Column(Modifier.align(Alignment.BottomCenter).padding(bottom = params.appearance.bottomPadding)) {
+                    Text("Message not found")
+                }
+            }
+            ScrollToBottomFab(
+                visible = shouldShowNewestAffordance(
+                    isAnchoredAwayFromTail = params.presentation.isAnchoredAwayFromTail,
+                    canScrollTowardNewest = params.listState.canScrollBackward,
+                ),
+                onClick = {
+                    if (params.presentation.isAnchoredAwayFromTail) params.presentation.requestTail()
+                    else scope.launch {
+                        params.listState.scrollToItem(0)
+                        params.onFollowingChange(true)
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = LettaSpacing.INNER_PADDING,
+                        bottom = LettaSpacing.INNER_PADDING + params.appearance.bottomPadding,
+                    ),
+            )
         }
     }
 }
