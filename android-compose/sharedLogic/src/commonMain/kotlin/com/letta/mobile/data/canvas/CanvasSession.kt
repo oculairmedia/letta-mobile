@@ -89,10 +89,26 @@ class CanvasSession(
     suspend fun load(): CanvasDocument? = mutex.withLock {
         val loaded = store.get(canvasId)
         _document.value = loaded
-        if (loaded != null && _checkpoints.value.isEmpty()) {
-            recordInitialCheckpoint(loaded)
+        if (loaded != null) {
+            adoptLamportOf(loaded)
+            if (_checkpoints.value.isEmpty()) recordInitialCheckpoint(loaded)
         }
         loaded
+    }
+
+    /**
+     * Raises the clock above every writer already recorded in [doc]'s scene.
+     *
+     * A board that is opened again is a board somebody has already written to. This session's
+     * writes are settled last-writer-wins against the provenance in that scene, so a clock left
+     * at zero makes its first edits OLDER than what they are editing: the projector keeps the
+     * existing value and the edit is dropped, with nothing anywhere to report it. Erasing a
+     * shape on a re-opened board did exactly that - the removal was discarded and the shape came
+     * back the moment the board re-read the scene.
+     */
+    private fun adoptLamportOf(doc: CanvasDocument) {
+        val highest = CanvasOpProjector.maxLamport(doc.sceneJson)
+        if (highest > lamportClock) lamportClock = highest
     }
 
     private fun recordInitialCheckpoint(doc: CanvasDocument) {
@@ -113,6 +129,7 @@ class CanvasSession(
      */
     private fun initialize(doc: CanvasDocument) {
         _document.value = doc
+        adoptLamportOf(doc)
         recordInitialCheckpoint(doc)
     }
 

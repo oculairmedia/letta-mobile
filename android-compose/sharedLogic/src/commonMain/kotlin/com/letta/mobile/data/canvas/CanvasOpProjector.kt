@@ -36,6 +36,8 @@ object CanvasOpProjector {
 
     private const val DEFAULT_BG_COLOR = "#ffffffff"
     private const val LAMPORT = "_lamport"
+    /** Every provenance key ends this way: `_lamport`, `_bgLamport`, `_bgPatternLamport`. */
+    private const val LAMPORT_SUFFIX = "lamport"
     private const val ACTOR = "_actorId"
     private const val TOMBSTONES = "_removed"
     private const val BG_LAMPORT = "_bgLamport"
@@ -558,6 +560,37 @@ object CanvasOpProjector {
         val eb = runCatching { pb["elements"]?.jsonArray?.toSet() }.getOrNull().orEmpty()
         if (ea != eb) return false
         return pa.filterKeys { it != "elements" } == pb.filterKeys { it != "elements" }
+    }
+
+    /**
+     * The highest lamport any writer left anywhere in [sceneJson] - elements, their tombstones,
+     * documents, the background, the bindings.
+     *
+     * A session that adopts an existing scene has to start its clock above this. Its writes are
+     * settled last-writer-wins against exactly these numbers, so a clock starting from zero makes
+     * every edit older than what it is editing and the projector keeps the existing value: the
+     * change is dropped, silently, with no error anywhere to say so.
+     *
+     * Read by walking the whole tree for any `*lamport` key rather than by visiting the keys
+     * this file happens to name today, so a provenance added later cannot quietly fall outside it.
+     */
+    fun maxLamport(sceneJson: String): Long {
+        if (sceneJson.isBlank()) return 0L
+        val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() ?: return 0L
+        return maxLamportOf(root)
+    }
+
+    private fun maxLamportOf(element: kotlinx.serialization.json.JsonElement): Long = when (element) {
+        is JsonObject -> element.entries.maxOfOrNull { (key, value) ->
+            val own = if (key.endsWith(LAMPORT_SUFFIX, ignoreCase = true)) {
+                runCatching { value.jsonPrimitive.long }.getOrNull() ?: 0L
+            } else {
+                0L
+            }
+            maxOf(own, maxLamportOf(value))
+        } ?: 0L
+        is JsonArray -> element.maxOfOrNull { maxLamportOf(it) } ?: 0L
+        else -> 0L
     }
 
     fun stripMetadataForDrawBox(sceneJson: String): String {

@@ -23,13 +23,13 @@ class CanvasHistoryTest {
     @Test
     fun undoWalksBackThroughBothKindsInTheOrderTheyHappened() {
         val history = CanvasHistory()
-        history.record(CanvasHistory.Step.Drawing)
+        history.record(CanvasHistory.Step.Drawing())
         history.record(documents("note added"))
-        history.record(CanvasHistory.Step.Drawing)
+        history.record(CanvasHistory.Step.Drawing())
 
-        assertEquals(CanvasHistory.Step.Drawing, history.undo())
+        assertEquals(CanvasHistory.Step.Drawing(), history.undo())
         assertEquals("note added", (history.undo() as CanvasHistory.Step.Documents).label)
-        assertEquals(CanvasHistory.Step.Drawing, history.undo())
+        assertEquals(CanvasHistory.Step.Drawing(), history.undo())
         assertNull(history.undo())
     }
 
@@ -37,12 +37,12 @@ class CanvasHistoryTest {
     fun redoReplaysWhatWasUndone() {
         val history = CanvasHistory()
         history.record(documents("note added"))
-        history.record(CanvasHistory.Step.Drawing)
+        history.record(CanvasHistory.Step.Drawing())
 
         history.undo()
         history.undo()
         assertEquals("note added", (history.redo() as CanvasHistory.Step.Documents).label)
-        assertEquals(CanvasHistory.Step.Drawing, history.redo())
+        assertEquals(CanvasHistory.Step.Drawing(), history.redo())
         assertNull(history.redo())
     }
 
@@ -66,7 +66,7 @@ class CanvasHistoryTest {
         assertFalse(history.canUndo.value)
         assertFalse(history.canRedo.value)
 
-        history.record(CanvasHistory.Step.Drawing)
+        history.record(CanvasHistory.Step.Drawing())
         assertTrue(history.canUndo.value)
         assertFalse(history.canRedo.value)
 
