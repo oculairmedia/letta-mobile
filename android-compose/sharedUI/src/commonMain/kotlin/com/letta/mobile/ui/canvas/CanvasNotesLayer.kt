@@ -444,12 +444,15 @@ internal fun clearOfExisting(
 ): CanvasDocumentFrame {
     var frame = wanted
     var moves = 0
-    while (moves < MAX_CASCADE && taken.any { it.x == frame.x && it.y == frame.y }) {
+    while (moves < MAX_CASCADE && taken.any { it.sharesOrigin(frame) }) {
         frame = frame.copy(x = frame.x + NOTE_STAGGER, y = frame.y + NOTE_STAGGER)
         moves++
     }
     return frame
 }
+
+private fun CanvasDocumentFrame.sharesOrigin(other: CanvasDocumentFrame): Boolean =
+    x == other.x && y == other.y
 
 /** A frame for a new note centred on [worldCenter]. */
 internal fun newNoteFrame(worldCenter: Offset): CanvasDocumentFrame = CanvasDocumentFrame(

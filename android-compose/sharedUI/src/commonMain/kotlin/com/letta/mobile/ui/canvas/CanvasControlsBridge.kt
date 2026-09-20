@@ -8,6 +8,7 @@ import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.State
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
+import androidx.compose.ui.graphics.Color
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
 
@@ -23,19 +24,11 @@ object CanvasControlsBridge {
     ): ControlsBarState {
         val selectedDrawables = state.elements.filter { it.id in state.selectedIds }
         val selectedShapes = selectedDrawables.filterIsInstance<Element.Shape>()
-        val isClosedShapeMode = state.mode == Mode.RECTANGLE ||
-            state.mode == Mode.CIRCLE ||
-            state.mode == Mode.TRIANGLE
+        val isClosedShapeMode = state.mode.isClosedShape()
         val showFill = selectedShapes.isNotEmpty() || isClosedShapeMode
         val currentFillColor = selectedShapes.firstOrNull()?.fillColor ?: state.currentItemFillColor
         val currentStrokeEnabled = selectedShapes.firstOrNull()?.strokeEnabled ?: state.currentItemStrokeEnabled
-
-        val currentShapeColor = when (val first = selectedDrawables.firstOrNull()) {
-            is Element.Shape -> first.strokeColor
-            is Element.Path -> first.strokeColor
-            is Element.Text -> first.color
-            else -> state.strokeColor
-        }
+        val currentShapeColor = resolveStrokeColor(selectedDrawables, state.strokeColor)
 
         return ControlsBarState(
             currentMode = state.mode,
@@ -92,6 +85,17 @@ object CanvasControlsBridge {
 
     private fun hasRectangle(selected: List<Element>): Boolean =
         selected.any { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
+
+    private fun Mode.isClosedShape(): Boolean =
+        this == Mode.RECTANGLE || this == Mode.CIRCLE || this == Mode.TRIANGLE
+
+    private fun resolveStrokeColor(selected: List<Element>, fallback: Color): Color =
+        when (val first = selected.firstOrNull()) {
+            is Element.Shape -> first.strokeColor
+            is Element.Path -> first.strokeColor
+            is Element.Text -> first.color
+            else -> fallback
+        }
 
     fun dispatchIntent(
         controller: DrawBoxController,

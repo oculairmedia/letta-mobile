@@ -15,7 +15,7 @@ internal class TabletPenAwtMapper {
 
     fun dispatch(target: Component, sample: TabletPenDecoder.DecodedSample, scale: Double) {
         val point = Point(sample.x.toInt(), sample.y.toInt())
-        reportGeometryOnce(target, sample.rawX, sample.rawY, scale, point)
+        reportGeometryOnce(target, sample, scale)
         when (sample.kind) {
             TabletBridge.KIND_DOWN -> {
                 down = true
@@ -66,9 +66,10 @@ internal class TabletPenAwtMapper {
         else -> MouseEvent.BUTTON1
     }
 
-    private fun reportGeometryOnce(target: Component, physicalX: Float, physicalY: Float, scale: Double, logical: Point) {
+    private fun reportGeometryOnce(target: Component, sample: TabletPenDecoder.DecodedSample, scale: Double) {
         if (reportedGeometry) return
         reportedGeometry = true
+        val logical = Point(sample.x.toInt(), sample.y.toInt())
         val onScreen = runCatching { target.locationOnScreen }.getOrNull()
         val cursor = runCatching { java.awt.MouseInfo.getPointerInfo()?.location }.getOrNull()
         val expectedOnScreen = onScreen?.let { Point(it.x + logical.x, it.y + logical.y) }
@@ -78,7 +79,7 @@ internal class TabletPenAwtMapper {
             null
         }
         println(
-            "TABLET GEOMETRY: physical=($physicalX, $physicalY) scale=$scale logical=$logical " +
+            "TABLET GEOMETRY: physical=(${sample.rawX}, ${sample.rawY}) scale=$scale logical=$logical " +
                 "target=${target.label()} size=${target.size} locationOnScreen=$onScreen " +
                 "penWouldLandAt=$expectedOnScreen osCursor=$cursor delta=$delta",
         )
