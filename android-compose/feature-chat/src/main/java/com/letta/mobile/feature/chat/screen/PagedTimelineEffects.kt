@@ -52,37 +52,55 @@ internal object PagedTimelineEffects {
                 if (interaction is DragInteraction.Start) params.onFollowingChange(false)
             }
         }
-        LaunchedEffect(params.listState, params.pages.loadState.prepend.endOfPaginationReached) {
-            var wasScrolling = false
-            snapshotFlow { params.listState.isScrollInProgress }.collect { scrolling ->
-                val atEdge = !params.listState.canScrollBackward
-                val prependDone = params.pages.loadState.prepend.endOfPaginationReached
-                if (!scrolling && followNewestEdge(wasScrolling, atEdge, prependDone)) {
-                    params.onFollowingChange(true)
-                }
-                wasScrolling = scrolling
-            }
-        }
+        observeScrollSettlement(params.listState, params.pages.loadState.prepend.endOfPaginationReached, params.onFollowingChange)
         LaunchedEffect(params.live) { RenderDiagnostics.newRenderGeneration() }
-        var previousLiveUser by remember(params.presentation) {
-            mutableStateOf((params.live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
-        }
-        LaunchedEffect(params.live) {
-            val newest = (params.live.firstOrNull() as? ChatRenderItem.Single)?.message
-            if (newest?.role == "user" && newest.id != previousLiveUser) {
-                if (params.presentation.isAnchoredAwayFromTail) {
-                    params.presentation.requestTail()
-                } else {
-                    params.listState.scrollToItem(0)
-                    params.onFollowingChange(true)
-                }
-            }
-            previousLiveUser = newest?.id
-        }
+        observeLiveUserPrompt(params.live, params.presentation, params.listState, params.onFollowingChange)
         LaunchedEffect(params.live, params.pages.itemSnapshotList, params.following) {
             if (params.following && !params.listState.isScrollInProgress) {
                 params.listState.scrollToItem(0)
             }
+        }
+    }
+
+    @Composable
+    private fun observeScrollSettlement(
+        listState: LazyListState,
+        prependDone: Boolean,
+        onFollowingChange: (Boolean) -> Unit,
+    ) {
+        LaunchedEffect(listState, prependDone) {
+            var wasScrolling = false
+            snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+                val atEdge = !listState.canScrollBackward
+                if (!scrolling && followNewestEdge(wasScrolling, atEdge, prependDone)) {
+                    onFollowingChange(true)
+                }
+                wasScrolling = scrolling
+            }
+        }
+    }
+
+    @Composable
+    private fun observeLiveUserPrompt(
+        live: List<ChatRenderItem>,
+        presentation: ChatPagingPresentation,
+        listState: LazyListState,
+        onFollowingChange: (Boolean) -> Unit,
+    ) {
+        var previousLiveUser by remember(presentation) {
+            mutableStateOf((live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
+        }
+        LaunchedEffect(live) {
+            val newest = (live.firstOrNull() as? ChatRenderItem.Single)?.message
+            if (newest?.role == "user" && newest.id != previousLiveUser) {
+                if (presentation.isAnchoredAwayFromTail) {
+                    presentation.requestTail()
+                } else {
+                    listState.scrollToItem(0)
+                    onFollowingChange(true)
+                }
+            }
+            previousLiveUser = newest?.id
         }
     }
 
@@ -99,30 +117,18 @@ internal object PagedTimelineEffects {
             if (!targetPositioned) {
                 val index = resolveTargetScrollPosition(target, params.displayedLive, params.pages.itemSnapshotList)
                 if (index != null) {
-                    if (params.routeTarget == null) {
-                        params.listState.scrollToItem(index, params.restoreAnchor?.offset ?: 0)
-                    } else {
-                        params.listState.scrollToItem(index)
-                        val item = snapshotFlow {
-                            params.listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-                        }.first { it != null }!!
-                        val layout = params.listState.layoutInfo
-                        val centerOffset = ((layout.viewportEndOffset - layout.viewportStartOffset - item.size) / 2)
-                            .coerceAtLeast(0)
-                        params.listState.scrollToItem(index, -centerOffset)
-                        params.onHighlightTarget(target)
-                    }
+                    applyTargetScroll(params, index, target)
                     targetPositioned = true
                 }
             }
         }
         LaunchedEffect(params.presentation, missingTarget) {
-            if (params.routeTarget == null && params.restoreAnchor != null && missingTarget == params.restoreAnchor.messageId) {
+            if (shouldRestoreMissingTail(params.routeTarget, params.restoreAnchor, missingTarget)) {
                 params.presentation.requestTail()
             }
         }
         LaunchedEffect(params.presentation, targetPositioned, params.displayedLive, params.pages.itemSnapshotList, params.following) {
-            if (!targetPositioned && (params.restoreAnchor != null || params.routeTarget != null)) return@LaunchedEffect
+            if (!canSaveViewport(targetPositioned, params.restoreAnchor, params.routeTarget)) return@LaunchedEffect
             snapshotFlow { params.listState.firstVisibleItemIndex to params.listState.firstVisibleItemScrollOffset }
                 .collect { (index, offset) ->
                     val messageId = resolveFirstVisibleMessageId(index, params.displayedLive, params.pages)
@@ -130,6 +136,38 @@ internal object PagedTimelineEffects {
                 }
         }
     }
+
+    private suspend fun applyTargetScroll(
+        params: PagedTimelineTargetEffectsParams,
+        index: Int,
+        target: String,
+    ) {
+        if (params.routeTarget == null) {
+            params.listState.scrollToItem(index, params.restoreAnchor?.offset ?: 0)
+        } else {
+            params.listState.scrollToItem(index)
+            val item = snapshotFlow {
+                params.listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+            }.first { it != null }!!
+            val layout = params.listState.layoutInfo
+            val centerOffset = ((layout.viewportEndOffset - layout.viewportStartOffset - item.size) / 2)
+                .coerceAtLeast(0)
+            params.listState.scrollToItem(index, -centerOffset)
+            params.onHighlightTarget(target)
+        }
+    }
+
+    private fun shouldRestoreMissingTail(
+        routeTarget: String?,
+        restoreAnchor: ChatPagingViewport?,
+        missingTarget: String?,
+    ): Boolean = routeTarget == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId
+
+    private fun canSaveViewport(
+        targetPositioned: Boolean,
+        restoreAnchor: ChatPagingViewport?,
+        routeTarget: String?,
+    ): Boolean = targetPositioned || (restoreAnchor == null && routeTarget == null)
 
     fun resolveTargetScrollPosition(
         target: String,

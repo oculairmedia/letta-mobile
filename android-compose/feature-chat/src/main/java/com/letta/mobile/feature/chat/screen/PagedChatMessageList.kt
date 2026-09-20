@@ -16,6 +16,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -84,40 +85,20 @@ private fun PagedChatMessageListContent(
     val routeTarget = if (presentation.hasBoundRoute) presentation.routeTarget else appearance.scrollToMessageId
     val pages = presentation.settled.collectAsLazyPagingItems()
     val live by presentation.live.collectAsStateWithLifecycle()
-    val residentRows = pages.itemSnapshotList.items
-    val displayedLive = displayedLiveRows(live, residentRows)
-    var initialHistoryReady by remember(presentation) { mutableStateOf(false) }
+    val displayedLive = displayedLiveRows(live, pages.itemSnapshotList.items)
     val refresh = pages.loadState.source.refresh
-    val initialPageAvailable = PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh)
-    if (initialPageAvailable) SideEffect { initialHistoryReady = true }
-    if (!initialHistoryReady && !initialPageAvailable) {
+    if (!rememberHistoryGate(presentation, pages)) {
         PagedTimelineLazyLayout.InitialLoadingView(refresh = refresh, onRetry = pages::retry, modifier = modifier)
         return
     }
-    LaunchedEffect(presentation, pages) {
-        snapshotFlow { pages.itemSnapshotList.items }.collect { resident ->
-            // letta-mobile-x1xnl: this host builds its rows from LazyPagingItems,
-            // so it never calls RenderDiagnostics.onRenderItemsBuilt — the hook
-            // that ends a render generation. Without a bump here the composed-key
-            // set accumulates across every page load and each legitimate
-            // re-composition is reported as lazyItem.doubleComposed at WARN.
-            RenderDiagnostics.newRenderGeneration()
-            presentation.onResidentRows(resident)
-        }
-    }
+    ObserveResidentRows(presentation, pages)
     val listState = key(presentation) { rememberLazyListState() }
     val missingTarget by presentation.missingTarget.collectAsStateWithLifecycle()
     val restoreAnchor = remember(presentation) { presentation.viewport?.takeUnless { it.following } }
     var following by remember(presentation, routeTarget) {
         mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
-    var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
-    LaunchedEffect(highlightedTarget) {
-        if (highlightedTarget != null) {
-            kotlinx.coroutines.delay(2_000)
-            highlightedTarget = null
-        }
-    }
+    val (highlightedTarget, onHighlightTarget) = rememberHighlightedTarget(presentation, routeTarget)
 
     PagedTimelineEffects.ScrollEffects(
         params = PagedTimelineScrollEffectsParams(
@@ -138,7 +119,7 @@ private fun PagedChatMessageListContent(
             routeTarget = routeTarget,
             restoreAnchor = restoreAnchor,
             following = following,
-            onHighlightTarget = { highlightedTarget = it },
+            onHighlightTarget = onHighlightTarget,
         ),
     )
 
@@ -159,6 +140,51 @@ private fun PagedChatMessageListContent(
             modifier = modifier,
         ),
     )
+}
+
+@Composable
+private fun rememberHistoryGate(
+    presentation: ChatPagingPresentation,
+    pages: LazyPagingItems<ChatRenderItem>,
+): Boolean {
+    var initialHistoryReady by remember(presentation) { mutableStateOf(false) }
+    val refresh = pages.loadState.source.refresh
+    val initialPageAvailable = PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh)
+    if (initialPageAvailable) SideEffect { initialHistoryReady = true }
+    return initialHistoryReady || initialPageAvailable
+}
+
+@Composable
+private fun ObserveResidentRows(
+    presentation: ChatPagingPresentation,
+    pages: LazyPagingItems<ChatRenderItem>,
+) {
+    LaunchedEffect(presentation, pages) {
+        snapshotFlow { pages.itemSnapshotList.items }.collect { resident ->
+            // letta-mobile-x1xnl: this host builds its rows from LazyPagingItems,
+            // so it never calls RenderDiagnostics.onRenderItemsBuilt — the hook
+            // that ends a render generation. Without a bump here the composed-key
+            // set accumulates across every page load and each legitimate
+            // re-composition is reported as lazyItem.doubleComposed at WARN.
+            RenderDiagnostics.newRenderGeneration()
+            presentation.onResidentRows(resident)
+        }
+    }
+}
+
+@Composable
+private fun rememberHighlightedTarget(
+    presentation: ChatPagingPresentation,
+    routeTarget: String?,
+): Pair<String?, (String?) -> Unit> {
+    var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
+    LaunchedEffect(highlightedTarget) {
+        if (highlightedTarget != null) {
+            kotlinx.coroutines.delay(2_000)
+            highlightedTarget = null
+        }
+    }
+    return highlightedTarget to { highlightedTarget = it }
 }
 
 internal fun pagedBoundaryDate(newer: ChatRenderItem, older: ChatRenderItem?): LocalDate? {
