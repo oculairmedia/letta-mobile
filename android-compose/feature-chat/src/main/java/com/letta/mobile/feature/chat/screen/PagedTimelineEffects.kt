@@ -199,7 +199,7 @@ internal object PagedTimelineEffects {
     }
 
     fun Modifier.timelinePinchZoom(params: TimelinePinchZoomParams): Modifier {
-        return pointerInput(params.pinch) {
+        return pointerInput(params.pinch, params.activeFontScale) {
             try {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)

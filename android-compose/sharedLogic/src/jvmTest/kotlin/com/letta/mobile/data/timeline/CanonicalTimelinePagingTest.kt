@@ -238,8 +238,14 @@ class CanonicalTimelinePagingTest {
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
         val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        val emittedGenerations = AtomicInteger(0)
         try {
-            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            ui.launch {
+                presentation.settled.collectLatest { page ->
+                    emittedGenerations.incrementAndGet()
+                    presenter.collectFrom(page)
+                }
+            }
             presenter.awaitRows(1) { "initial page never arrived" }
             presenter.awaitIdle()
             val initialRow = presenter.snapshot().items.single()
@@ -250,8 +256,12 @@ class CanonicalTimelinePagingTest {
             presentation.onResidentRows(listOf(initialRow))
             awaitCondition({ "live did not clear on settlement" }) { owner.session.live.value == null }
 
+            val genBeforeSweep = emittedGenerations.get()
             // Advance a durable revision to invalidate Paging and force a new paging generation
             owner.session.engine.advanceToolSweep(owner.selection)
+            awaitCondition({ "new paging generation did not arrive" }) {
+                emittedGenerations.get() > genBeforeSweep
+            }
             presenter.awaitIdle()
 
             // Post-settlement paging generation must retain the streamed key rather than reverting to canonical identity
