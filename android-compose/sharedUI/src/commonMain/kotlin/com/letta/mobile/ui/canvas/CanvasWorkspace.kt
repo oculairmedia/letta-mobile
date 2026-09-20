@@ -73,9 +73,6 @@ import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
@@ -385,84 +382,24 @@ fun CanvasWorkspace(
     suspend fun recordingWithLastDrawing(label: String, block: suspend () -> Unit) =
         recordDocumentChange(DocumentChangeRequest(label = label, attachToLastDrawing = true), block)
 
-    fun applyDrawingStep(step: CanvasHistory.Step.Drawing, direction: HistoryDirection) {
-        // The elements are DrawBox's; only it can put them back.
-        applyingHistory = true
-        if (direction.isRedo) controller.redo() else controller.undo()
-        // A labelled shape takes its label with it, so the same step carries the document
-        // work: restoring the shape without its text hands back an empty box.
-        val documents = step.documents
-        val s = session
-        if (documents != null && s != null) {
-            coroutineScope.launch {
-                runCatching { s.applyLocalStamped(if (direction.isRedo) documents.redo else documents.undo) }
-            }
-        }
+    val historyActionContext = remember(controller, session, history, coroutineScope) {
+        HistoryActionContext(
+            controller = controller,
+            session = session,
+            history = history,
+            scope = coroutineScope,
+            onApplyingHistory = { applyingHistory = it },
+            onStatusMessage = { statusMessage = it },
+        )
     }
 
-    fun applyDocumentsStep(step: CanvasHistory.Step.Documents, direction: HistoryDirection) {
-        val s = session ?: return
-        val ops = if (direction.isRedo) step.redo else step.undo
-        coroutineScope.launch {
-            applyingHistory = true
-            val applied = runCatching { s.applyLocalStamped(ops) }
-            applyingHistory = false
-            if (!applied.isSuccess) {
-                if (direction.isRedo) history.undo() else history.redo()
-            }
-            statusMessage = CanvasWorkspaceSupport.documentHistoryMessage(
-                HistoryMessageContext(
-                    label = step.label,
-                    direction = direction,
-                    success = applied.isSuccess,
-                ),
-            )
-        }
-    }
-
-    /** Applies one history step, without recording what it causes as a new step. */
-    fun applyHistory(step: CanvasHistory.Step?, direction: HistoryDirection) {
-        when (step) {
-            null -> Unit
-            is CanvasHistory.Step.Drawing -> applyDrawingStep(step, direction)
-            is CanvasHistory.Step.Documents -> applyDocumentsStep(step, direction)
-        }
-    }
-
-    /**
-     * Undo for the whole board.
-     *
-     * Falls back to DrawBox when the history has nothing left: a board loaded from a session has
-     * a drawing whose steps this session never saw, and the person should still be able to undo
-     * it rather than press a live-looking button that does nothing.
-     */
     fun undoBoard() {
-        // A drawing change is recorded when the debounced save lands, so the most recent thing
-        // the person did can still be unrecorded when they reach for undo. Undoing the history's
-        // top in that moment reaches PAST it - back to some older note action - and the board
-        // does something they did not ask for. An unsaved drawing change is therefore undone
-        // first, and never recorded, because it never became a step.
         val drawingUnsaved = lastSavedElements != null && lastSavedElements != state.elements
-        if (drawingUnsaved && canUndo) {
-            applyingHistory = true
-            controller.undo()
-            return
-        }
-        val step = history.undo()
-        if (step == null) {
-            if (canUndo) controller.undo()
-        } else {
-            applyHistory(step, HistoryDirection.Undo)
-        }
+        CanvasWorkspaceSupport.undoBoard(historyActionContext, drawingUnsaved, canUndo)
     }
 
     fun redoBoard() {
-        val step = history.redo()
-        if (step == null) {
-            if (canRedo) controller.redo()
-        } else {
-            applyHistory(step, HistoryDirection.Redo)
-        }
+        CanvasWorkspaceSupport.redoBoard(historyActionContext, canRedo)
     }
 
     // Ctrl/Cmd + wheel over the board zooms the board, not the window: the host that owns that
@@ -488,9 +425,7 @@ fun CanvasWorkspace(
         val offset = groupOffset
         groupOffset = Offset.Zero
         if (session == null || offset == Offset.Zero || selectedNoteIds.isEmpty()) return
-        val frames = documents.filter { it.id in selectedNoteIds }.mapNotNull { doc ->
-            doc.frame?.let { doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y) }
-        }.toMap()
+        val frames = CanvasWorkspaceSupport.buildMoveFrames(documents, selectedNoteIds, offset)
         coroutineScope.launch {
             recordingDocuments("moving notes") { runCatching { session.moveDocuments(frames) } }
         }
@@ -500,17 +435,8 @@ fun CanvasWorkspace(
     // intent flow, so notes are taken by watching the eraser's own pointer instead.
     fun eraseNotesAt(area: EraserArea) {
         if (session == null) return
-        val hit = liveDocuments.filter { doc ->
-            val f = doc.frame ?: return@filter false
-            Rect(
-                f.x - area.radius,
-                f.y - area.radius,
-                f.x + f.width + area.radius,
-                f.y + f.height + area.radius,
-            ).contains(area.world)
-        }
-        if (hit.isEmpty()) return
-        val ids = hit.map { it.id }.toSet()
+        val ids = CanvasWorkspaceSupport.findErasedNoteIds(area, liveDocuments)
+        if (ids.isEmpty()) return
         if (activeNoteId in ids) activeNoteId = null
         selectedNoteIds = selectedNoteIds - ids
         coroutineScope.launch {
@@ -524,11 +450,7 @@ fun CanvasWorkspace(
         controller.intents.collect { intent ->
             when (intent) {
                 is io.ak1.drawbox.domain.model.Intent.CommitMarquee -> {
-                    val rect = intent.rect
-                    selectedNoteIds = liveDocuments.filter { doc ->
-                        val f = doc.frame ?: return@filter false
-                        rect.overlaps(Rect(f.x, f.y, f.x + f.width, f.y + f.height))
-                    }.map { it.id }.toSet()
+                    selectedNoteIds = CanvasWorkspaceSupport.findMarqueeNoteIds(intent.rect, liveDocuments)
                     if (selectedNoteIds.isNotEmpty()) activeNoteId = null
                 }
                 is io.ak1.drawbox.domain.model.Intent.MoveSelected ->
@@ -576,18 +498,20 @@ fun CanvasWorkspace(
     // lets both go, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) undo and redo the drawing, Ctrl/Cmd+D
     // duplicates. Handled where they bubble to, so a note editor keeps every key it consumes.
     val boardFocus = remember { FocusRequester() }
-    fun deleteSelectedNotes(): Boolean {
-        if (selectedNoteIds.isEmpty() || session == null) return false
-        val ids = selectedNoteIds
-        selectedNoteIds = emptySet()
-        coroutineScope.launch {
-            recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+    fun deleteFocused(): Boolean {
+        if (selectedNoteIds.isNotEmpty() && session != null) {
+            val ids = selectedNoteIds
+            selectedNoteIds = emptySet()
+            coroutineScope.launch {
+                recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
+            }
+            if (hasSelection) controller.deleteSelected()
+            return true
         }
-        if (hasSelection) controller.deleteSelected()
-        return true
-    }
-
-    fun deleteActiveNote(): Boolean {
+        if (hasSelection) {
+            controller.deleteSelected()
+            return true
+        }
         val id = activeNoteId ?: return false
         if (session == null || expandedNoteId != null) return false
         activeNoteId = null
@@ -595,48 +519,28 @@ fun CanvasWorkspace(
         return true
     }
 
-    fun deleteFocused(): Boolean {
-        if (deleteSelectedNotes()) return true
-        if (hasSelection) { controller.deleteSelected(); return true }
-        return deleteActiveNote()
-    }
-
-    fun duplicateDrawnSelection(): Boolean {
-        if (!hasSelection) return false
-        val copies = state.elements.filter { it.id in state.selectedIds }
-            .map { CanvasWorkspaceSupport.duplicateElement(it) }
-        copies.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(it)) }
-        controller.clearSelection()
-        copies.forEach { copy ->
-            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(CanvasWorkspaceSupport.selectionPointOf(copy), 4f))
-        }
-        statusMessage = "Duplicated ${copies.size} element(s)"
-        return true
-    }
-
-    fun duplicateActiveNote(): Boolean {
-        val note = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } } ?: return false
-        if (session == null) return false
-        val frame = (note.frame ?: defaultNoteFrame(0)).let {
-            it.copy(x = it.x + CanvasWorkspaceSupport.DUPLICATE_OFFSET, y = it.y + CanvasWorkspaceSupport.DUPLICATE_OFFSET)
-        }
-        val id = "${note.id.substringBefore('-')}-${Clock.System.now().toEpochMilliseconds()}"
-        coroutineScope.launch {
-            // Recorded like every other document change a person makes. Written straight to the
-            // session, the copy was the one note action undo could not take back.
-            recordingDocuments("duplicating a note") {
-                runCatching { session.setDocument(id, note.json, frame = frame, color = note.color, style = note.style) }
-                    .onSuccess { activeNoteId = id; statusMessage = "Duplicated note" }
-            }
-        }
-        return true
-    }
-
-    // Duplicate: the drawn selection as offset copies with fresh ids (selected afterwards), or
-    // the active note as a new document with the same text, colour and style, 20 units away.
     fun duplicateFocused(): Boolean {
-        if (duplicateDrawnSelection()) return true
-        return duplicateActiveNote()
+        if (hasSelection) {
+            return CanvasWorkspaceSupport.duplicateDrawnSelection(
+                controller = controller,
+                elements = state.elements,
+                selectedIds = state.selectedIds,
+                onStatus = { statusMessage = it },
+            )
+        }
+        return CanvasWorkspaceSupport.duplicateActiveNote(
+            activeNoteId = activeNoteId,
+            documents = documents,
+            session = session,
+            onCreated = { id, note, frame, s ->
+                coroutineScope.launch {
+                    recordingDocuments("duplicating a note") {
+                        runCatching { s.setDocument(id, note.json, frame = frame, color = note.color, style = note.style) }
+                            .onSuccess { activeNoteId = id; statusMessage = "Duplicated note" }
+                    }
+                }
+            },
+        )
     }
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
@@ -809,11 +713,9 @@ fun CanvasWorkspace(
                     // The eraser takes a note the way it takes a stroke: touch it and it is gone.
                     eraseMode = state.mode == io.ak1.drawbox.domain.model.Mode.ERASER,
                     onErase = { id ->
-                        if (session != null) {
-                            if (activeNoteId == id) activeNoteId = null
-                            selectedNoteIds = selectedNoteIds - id
-                            coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
-                        }
+                        if (activeNoteId == id) activeNoteId = null
+                        selectedNoteIds = selectedNoteIds - id
+                        coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
                     },
                     onPress = { id, shift ->
                         if (shift) {
@@ -881,14 +783,12 @@ fun CanvasWorkspace(
                     if (current.tempPanActive) return@consumer false
                     val board = boardBounds ?: return@consumer false
                     val inRoot = Offset(event.x * penDensity, event.y * penDensity)
-                    val onBoard = Offset(inRoot.x - board.left, inRoot.y - board.top)
-                    if (onBoard.x < 0f || onBoard.y < 0f || onBoard.x > board.width || onBoard.y > board.height) {
-                        return@consumer false
-                    }
+                    if (!CanvasWorkspaceSupport.isPointInsideBounds(inRoot, board)) return@consumer false
                     // Inside the board, but over one of its own controls: the rail, a bar, an
                     // opened note. Those are pressed, not drawn on, and the pen is offered events
                     // by position rather than by hit testing, so it has to decline them itself.
                     if (chromeRegions.contains(inRoot)) return@consumer false
+                    val onBoard = Offset(inRoot.x - board.left, inRoot.y - board.top)
                     val world = current.viewport.screenToWorld(onBoard)
                     if (event.tool == CanvasPenTool.ERASER) {
                         if (event.phase == CanvasPenEvent.Phase.DOWN || event.phase == CanvasPenEvent.Phase.MOVE) {
@@ -899,24 +799,12 @@ fun CanvasWorkspace(
                         return@consumer false
                     }
                     if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
-                    // A note is written in, not drawn on.
-                    //
-                    // Tested by the note's own frame in world space, not by registered layout
-                    // bounds: a card is placed with a graphicsLayer transform, so its layout
-                    // bounds say where it was laid out rather than where it is drawn.
-                    //
-                    // And read from the SESSION rather than the composed list, once per stroke.
-                    // The composed list is a frame behind at the moment the nib lands - the pen
-                    // arrives off its own poll loop, not on a frame - and a note that is on
-                    // screen but not yet in that list gets drawn straight through. Once per
-                    // stroke also keeps the projection off the 120Hz sample path.
+                    // A note is written in, not drawn on. Tested by the note's own frame in world space.
                     if (event.phase == CanvasPenEvent.Phase.DOWN) {
-                        strokeStartedOnDocument = session?.documents()?.any { doc ->
-                            doc.frame?.let { f ->
-                                world.x >= f.x && world.y >= f.y &&
-                                    world.x <= f.x + f.width && world.y <= f.y + f.height
-                            } == true
-                        } == true
+                        strokeStartedOnDocument = CanvasWorkspaceSupport.isWorldPointInDocuments(
+                            world = world,
+                            documents = session?.documents().orEmpty(),
+                        )
                     }
                     if (strokeStartedOnDocument) return@consumer false
                     when (event.phase) {
