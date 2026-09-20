@@ -723,6 +723,19 @@ fun CanvasWorkspace(
                             activeNoteId = id
                         }
                     },
+                    // Text is an object first: a press selects it, so it can be dragged and
+                    // resized by the same handles a shape has, and the caret is asked for with a
+                    // double click. A press that went straight to the caret is why text needed a
+                    // grip of its own to be movable at all.
+                    onSelect = { id, shift ->
+                        if (shift) {
+                            selectedNoteIds = if (id in selectedNoteIds) selectedNoteIds - id else selectedNoteIds + id
+                        } else {
+                            controller.clearSelection()
+                            selectedNoteIds = setOf(id)
+                        }
+                        activeNoteId = null
+                    },
                     onGroupDrag = { delta -> groupOffset += delta },
                     onGroupDragEnd = ::commitGroupMove,
                     modifier = Modifier.fillMaxSize().clipToBounds(),

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import kotlin.math.abs
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,7 +45,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import io.ak1.drawbox.domain.model.ResizeHandle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
@@ -89,6 +94,8 @@ fun CanvasNotesLayer(
     groupOffset: Offset = Offset.Zero,
     /** A press on a card: with Shift it toggles the card in the multi-selection instead of activating it. */
     onPress: (id: String, shift: Boolean) -> Unit = { id, _ -> onActivate(id) },
+    /** A press that selects rather than activates - what a text element does, being an object first. */
+    onSelect: (id: String, shift: Boolean) -> Unit = { id, shift -> onPress(id, shift) },
     /** Dragging a selected card moves the whole selection; the host owns that gesture. */
     onGroupDrag: ((Offset) -> Unit)? = null,
     onGroupDragEnd: (() -> Unit)? = null,
@@ -115,6 +122,7 @@ fun CanvasNotesLayer(
                     selected = selected,
                     groupOffset = if (selected) groupOffset else Offset.Zero,
                     onPress = { shift -> onPress(document.id, shift) },
+                    onSelect = { shift -> onSelect(document.id, shift) },
                     onGroupDrag = onGroupDrag?.takeIf { selected },
                     onGroupDragEnd = onGroupDragEnd?.takeIf { selected },
                 ),
@@ -128,6 +136,12 @@ internal class NoteSelection(
     val selected: Boolean,
     val groupOffset: Offset,
     val onPress: (shift: Boolean) -> Unit,
+    /**
+     * A press that picks the card up as an object rather than putting the caret in it. Text uses
+     * this - it is selected on a press and edited on a double click, the way a shape is - so the
+     * eight handles are the one control for moving and resizing everything on the board.
+     */
+    val onSelect: (shift: Boolean) -> Unit,
     val onGroupDrag: ((Offset) -> Unit)?,
     val onGroupDragEnd: (() -> Unit)?,
 )
@@ -212,6 +226,35 @@ private fun CanvasNoteCard(
     // without being draggable.
     val chromeInset = canvasSelectionStyle().chromeInset()
     val insetPx = with(density) { chromeInset.toPx() } * scale
+
+    // A text element is the words, not a card holding them: its box is whatever they need, so the
+    // chrome sits ON the text instead of around an empty note-sized frame. Measured from what was
+    // laid out, and ignored while a gesture owns the frame - a resize would otherwise fight the fit.
+    var fittedPx by remember(document.id) { mutableStateOf<IntSize?>(null) }
+    val fitted = fittedPx.takeIf { plain && !gestureActive }
+    val boxWidthDp = fitted?.let { with(density) { it.width.toDp() } } ?: widthDp
+    val boxHeightDp = fitted?.let { with(density) { it.height.toDp() } } ?: heightDp
+
+    // The fit is written back, so the frame the eraser, the pen and the connectors test against is
+    // the box on screen. moveDocuments carries the frame alone and reads the text from the session,
+    // so a fit landing mid-sentence cannot overwrite what is being typed. Not recorded: it is a
+    // consequence of the typing, which is a step of its own already.
+    LaunchedEffect(document.id, fitted, plain) {
+        val size = fitted ?: return@LaunchedEffect
+        val current = document.frame ?: defaultFrame
+        val width = size.width.toFloat()
+        val height = size.height.toFloat()
+        if (abs(current.width - width) < FIT_EPSILON && abs(current.height - height) < FIT_EPSILON) return@LaunchedEffect
+        val fittedFrame = current.copy(width = width, height = height)
+        frame = fittedFrame
+        runCatching { session.moveDocuments(mapOf(document.id to fittedFrame)) }
+    }
+
+    val groupDrag = selection.onGroupDrag
+    val groupDragEnd = selection.onGroupDragEnd
+    val onMove: (Offset) -> Unit = if (groupDrag != null) groupDrag else { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }
+    val onMoveEnd: () -> Unit = if (groupDragEnd != null) groupDragEnd else ::commit
+
     Box(
         modifier = Modifier
             .offset {
@@ -220,17 +263,29 @@ private fun CanvasNoteCard(
                     (screenTopLeft.y - insetPx).roundToInt(),
                 )
             }
-            .size(width = widthDp + chromeInset * 2, height = heightDp + chromeInset * 2)
+            .size(width = boxWidthDp + chromeInset * 2, height = boxHeightDp + chromeInset * 2)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0f)
             },
     ) {
+    // Text is picked up the way a shape is: resting, it is an object - press it and the chrome is
+    // around the words, drag it anywhere to move it - and the caret is asked for with a double
+    // click. A single press used to put the caret in, which is why text needed a grip of its own
+    // to be movable at all; the grip is gone and the handles are the one control.
+    val textAsObject = plain && !active
     Surface(
         modifier = Modifier
             .padding(chromeInset)
-            .size(width = widthDp, height = heightDp)
+            .then(
+                if (plain) {
+                    Modifier.widthIn(max = widthDp).wrapContentSize()
+                } else {
+                    Modifier.size(width = widthDp, height = heightDp)
+                },
+            )
+            .onSizeChanged { if (plain) fittedPx = it }
             .semantics { contentDescription = "Note ${document.id}" }
             // Taps and drags on the card belong to the note, never to the drawing beneath it; a
             // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
@@ -238,16 +293,38 @@ private fun CanvasNoteCard(
             // eraseMode is a key, not just a capture: a pointerInput block keeps the values it
             // was created with, so keying on the id alone left this handler believing the eraser
             // was never active.
-            .pointerInput(document.id, eraseMode) {
+            .pointerInput(document.id, eraseMode, textAsObject) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    if (eraseMode) onErase() else selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
+                    val shift = currentEvent.keyboardModifiers.isShiftPressed
+                    when {
+                        eraseMode -> onErase()
+                        textAsObject -> selection.onSelect(shift)
+                        else -> selection.onPress(shift)
+                    }
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                     } while (event.changes.any { it.pressed })
                 }
             }
-            .pointerInput(document.id) { detectTapGestures(onTap = {}) },
+            .then(
+                // Resting text moves by being dragged, like the shape it now behaves as.
+                if (textAsObject) {
+                    Modifier.dragHandle(
+                        onDragStart = { if (groupDrag == null) gestureActive = true },
+                        onDrag = onMove,
+                        onDragEnd = onMoveEnd,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .pointerInput(document.id, textAsObject) {
+                detectTapGestures(
+                    onDoubleTap = if (textAsObject) ({ _ -> onActivate() }) else null,
+                    onTap = {},
+                )
+            },
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
         // Selection is drawn by CanvasSelectionChrome, the same chrome a shape gets. The card's
@@ -257,20 +334,42 @@ private fun CanvasNoteCard(
             plain -> null
             else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         },
+        // Text on the board is text, not a card, so it never casts one - active or not. A
+        // transparent surface with an elevation does not simply skip the shadow: Compose draws
+        // the shadow body anyway, and a grey slab appeared behind the words the moment they were
+        // edited.
         shadowElevation = when {
-            plain && !active -> 0.dp
+            plain -> 0.dp
             active -> LettaDimens.Space.sm
             else -> LettaDimens.Space.xs
         },
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // A note has a handle bar; a text element is just text, with a grip to move it by
-            // while active and everything else in the bar at the top of the board.
-            val groupDrag = selection.onGroupDrag
-            val groupDragEnd = selection.onGroupDragEnd
-            val onMove: (Offset) -> Unit = if (groupDrag != null) groupDrag else { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }
-            val onMoveEnd: () -> Unit = if (groupDragEnd != null) groupDragEnd else ::commit
-            if (!plain) NoteHandleBar(
+        if (plain) {
+            // Text, and nothing else: no bar, no card, no grip - just the words, padded by a hair
+            // so the chrome does not sit on the glyphs. Resting text is drawn rather than edited,
+            // so a press cannot land in a text field and give back the caret the double click is
+            // there to ask for.
+            if (textAsObject) {
+                CanvasBlockPreview(
+                    json = document.json,
+                    onLightSurface = false,
+                    style = document.style,
+                    modifier = Modifier.padding(TEXT_INSET),
+                )
+            } else {
+                CanvasBlockEditor(
+                    session = session,
+                    documentId = document.id,
+                    storedJson = document.json,
+                    active = active,
+                    onLightSurface = false,
+                    onToolbar = onToolbar,
+                    style = document.style,
+                    modifier = Modifier.padding(TEXT_INSET),
+                )
+            }
+        } else Column(modifier = Modifier.fillMaxSize()) {
+            NoteHandleBar(
                 cardColor = cardColor,
                 onCard = onCard,
                 onDragStart = { if (groupDrag == null) gestureActive = true },
@@ -289,9 +388,9 @@ private fun CanvasNoteCard(
                 if (expanded) {
                     CanvasBlockPreview(
                         json = document.json,
-                        onLightSurface = tint != null && !plain,
+                        onLightSurface = tint != null,
                         style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
+                        modifier = Modifier.fillMaxSize().padding(start = LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
                     )
                 } else {
                     CanvasBlockEditor(
@@ -299,18 +398,10 @@ private fun CanvasNoteCard(
                         documentId = document.id,
                         storedJson = document.json,
                         active = active,
-                        onLightSurface = tint != null && !plain,
+                        onLightSurface = tint != null,
                         onToolbar = onToolbar,
                         style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
-                    )
-                }
-                if (plain && active) {
-                    TextMoveGrip(
-                        modifier = Modifier.align(Alignment.TopStart),
-                        onDragStart = { if (groupDrag == null) gestureActive = true },
-                        onDrag = onMove,
-                        onDragEnd = onMoveEnd,
+                        modifier = Modifier.fillMaxSize().padding(start = LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
                     )
                 }
             }
@@ -323,8 +414,8 @@ private fun CanvasNoteCard(
             CanvasSelectionChrome(
                 style = canvasSelectionStyle(),
                 scale = scale,
-                contentWidth = widthDp,
-                contentHeight = heightDp,
+                contentWidth = boxWidthDp,
+                contentHeight = boxHeightDp,
                 onResize = { handle, delta ->
                     if (resizeStartFrame == null) resizeStartFrame = frame
                     gestureActive = true
@@ -405,30 +496,6 @@ private fun NoteHandleBar(
     }
 }
 
-/** The grip a text element is moved by: a small handle in its top-left corner while active. */
-@Composable
-private fun TextMoveGrip(
-    modifier: Modifier,
-    onDragStart: () -> Unit,
-    onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .size(LettaDimens.Control.icon)
-            .dragHandle(onDragStart, onDrag, onDragEnd)
-            .semantics { contentDescription = "Move text" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Lucide.GripVertical,
-            contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 /** Where the [index]th never-placed document lands: a stagger so several stay visible. */
 internal fun defaultNoteFrame(index: Int): CanvasDocumentFrame = CanvasDocumentFrame(
     x = NOTE_DEFAULT_ORIGIN + index * NOTE_STAGGER,
@@ -487,6 +554,12 @@ private const val NOTE_STAGGER = 40f
 private const val MAX_CASCADE = 24
 private const val NOTE_MIN_SIZE = 140f
 private val NOTE_CORNER = LettaDimens.Radius.md
+
+/** How far the chrome stands off the glyphs of a text element. */
+private val TEXT_INSET = LettaDimens.Space.xs
+
+/** Below this, a re-measure is the same box and writing it back would be churn. */
+private const val FIT_EPSILON = 0.5f
 private val HANDLE_HEIGHT = LettaDimens.Control.iconButton
 
 /**
