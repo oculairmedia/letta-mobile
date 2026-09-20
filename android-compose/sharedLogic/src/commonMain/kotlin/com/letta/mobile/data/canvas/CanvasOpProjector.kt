@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -139,6 +140,16 @@ object CanvasOpProjector {
      * own lamport and actor. Otherwise they would arrive with no provenance and the next
      * out-of-order element op — however old — would win against them.
      */
+    private fun stampElement(element: JsonElement, provenance: WriterProvenance): JsonElement {
+        val obj = runCatching { element.jsonObject }.getOrNull() ?: return element
+        val id = runCatching { obj["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+        return parseElementWithMetadata(ElementMetadataInput(id, payload, provenance))
+    }
+
+    private fun stampElements(elements: JsonArray?, provenance: WriterProvenance): List<JsonElement> =
+        elements?.map { stampElement(it, provenance) } ?: emptyList()
+
     private fun replaceScene(sceneJson: String, op: CanvasOp.ReplaceSceneOp): String {
         val incoming = if (op.sceneJson.isNotBlank()) parseScene(op.sceneJson) else parseEmptyScene()
         // A replace is a drawing, not a notebook: it carries the block documents of the scene it
@@ -153,12 +164,7 @@ object CanvasOpProjector {
         val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else current[DOCUMENTS]
         val carriedLabelOwners = if (carriedDocuments != null && !incoming.containsKey(LABEL_OWNERS)) current[LABEL_OWNERS] else null
         val provenance = WriterProvenance(op.lamport, op.actorId)
-        val stamped = incoming["elements"]?.jsonArray?.map { element ->
-            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@map element
-            val id = runCatching { obj["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-            val payload = json.encodeToString(JsonObject.serializer(), obj)
-            parseElementWithMetadata(ElementMetadataInput(id, payload, provenance))
-        } ?: emptyList()
+        val stamped = stampElements(incoming["elements"]?.jsonArray, provenance)
         return canonicalScene(
             buildMap {
                 incoming.forEach { (key, value) -> if (key != "elements") put(key, value) }

@@ -411,7 +411,7 @@ fun CanvasWorkspace(
             if (!applied.isSuccess) {
                 if (direction.isRedo) history.undo() else history.redo()
             }
-            statusMessage = documentHistoryMessage(
+            statusMessage = CanvasWorkspaceSupport.documentHistoryMessage(
                 HistoryMessageContext(
                     label = step.label,
                     direction = direction,
@@ -604,10 +604,13 @@ fun CanvasWorkspace(
 
     fun duplicateDrawnSelection(): Boolean {
         if (!hasSelection) return false
-        val copies = state.elements.filter { it.id in state.selectedIds }.map { duplicateElement(it) }
+        val copies = state.elements.filter { it.id in state.selectedIds }
+            .map { CanvasWorkspaceSupport.duplicateElement(it) }
         copies.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(it)) }
         controller.clearSelection()
-        copies.forEach { copy -> controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(selectionPointOf(copy), 4f)) }
+        copies.forEach { copy ->
+            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(CanvasWorkspaceSupport.selectionPointOf(copy), 4f))
+        }
         statusMessage = "Duplicated ${copies.size} element(s)"
         return true
     }
@@ -744,7 +747,7 @@ fun CanvasWorkspace(
                                     }
                                     event.type == PointerEventType.Release -> {
                                         drawingConnectorAt = null
-                                        if (!altHeld) snapLatestConnector(controller, session, liveDocuments, coroutineScope)
+                                        if (!altHeld) CanvasWorkspaceSupport.snapLatestConnector(controller, session, liveDocuments, coroutineScope)
                                     }
                                 }
                             }
@@ -1301,75 +1304,11 @@ fun CanvasWorkspace(
     }
 }
 
-/**
- * Snaps the connector a release just finished to the nearest anchors within the snap radius:
- * its points move onto them, ends on notes are recorded in the session, and ends on drawn
- * shapes are handed to DrawBox's own binding pass so they follow the shape from then on.
- */
-private fun snapLatestConnector(
-    controller: DrawBoxController,
-    session: CanvasSession?,
-    documents: List<com.letta.mobile.data.canvas.CanvasSceneDocument>,
-    scope: kotlinx.coroutines.CoroutineScope,
-) {
-    val current = controller.state.value
-    val connector = CanvasSnapping.latestConnector(current.elements) ?: return
-    val anchors = CanvasSnapping.anchors(current.elements, documents, connector.id)
-    val snapped = CanvasSnapping.snap(connector, anchors, current.viewport.scale) ?: return
-    if (snapped.points != connector.points) {
-        controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(connector.id, snapped.points))
-    }
-    if (snapped.boundToShape) controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(connector.id))
-    if (session != null && (snapped.binding.start != null || snapped.binding.end != null)) {
-        scope.launch { runCatching { session.bindArrow(connector.id, snapped.binding) } }
-    }
-}
-
-/** [element] moved by [DUPLICATE_OFFSET] with a fresh id, the way whiteboards duplicate in place. */
-private fun duplicateElement(element: io.ak1.drawbox.domain.model.Element): io.ak1.drawbox.domain.model.Element {
-    val moved = element.translate(Offset(DUPLICATE_OFFSET, DUPLICATE_OFFSET))
-    val id = "${element.id}-copy-${Clock.System.now().toEpochMilliseconds()}"
-    return when (moved) {
-        is io.ak1.drawbox.domain.model.Element.Shape -> moved.copy(id = id, startBinding = null, endBinding = null)
-        is io.ak1.drawbox.domain.model.Element.Path -> moved.copy(id = id)
-        is io.ak1.drawbox.domain.model.Element.Text -> moved.copy(id = id)
-        else -> moved
-    }
-}
-
-private fun shapeSelectionPoint(shape: io.ak1.drawbox.domain.model.Element.Shape): Offset =
-    when (shape.shapeType) {
-        io.ak1.drawbox.domain.model.ShapeType.LINE,
-        io.ak1.drawbox.domain.model.ShapeType.ARROW -> shape.points.first()
-        else -> shape.bounds().let { Offset(it.center.x, it.top) }
-    }
-
-/**
- * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
- * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
- * for text (hit by its box).
- */
-private fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offset = when (element) {
-    is io.ak1.drawbox.domain.model.Element.Shape -> shapeSelectionPoint(element)
-    is io.ak1.drawbox.domain.model.Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
-    else -> element.bounds().center
-}
-
-private const val DUPLICATE_OFFSET = 20f
-/** How long the board waits for the text DrawBox said it was inserting before giving up on it. */
-private const val INSERT_TEXT_TIMEOUT_MS = 2000L
-
-private val CHROME_INSET = LettaDimens.Space.md
-private const val ZOOM_STEP = 1.25f
-private const val WHEEL_ZOOM_STEP = 1.1f
-
-internal enum class HistoryDirection {
-    Undo,
-    Redo;
+internal enum class HistoryDirection(val verb: String, val past: String) {
+    Undo("undo", "Undid"),
+    Redo("redo", "Redid");
 
     val isRedo: Boolean get() = this == Redo
-    val verb: String get() = if (isRedo) "redo" else "undo"
-    val past: String get() = if (isRedo) "Redid" else "Undid"
 }
 
 internal data class HistoryMessageContext(
@@ -1388,8 +1327,70 @@ internal data class EraserArea(
     val radius: Float,
 )
 
-private fun documentHistoryMessage(context: HistoryMessageContext): String {
-    val verb = context.direction.verb
-    val past = context.direction.past
-    return if (context.success) "$past ${context.label}" else "Could not $verb ${context.label}"
+private const val DUPLICATE_OFFSET = 20f
+/** How long the board waits for the text DrawBox said it was inserting before giving up on it. */
+private const val INSERT_TEXT_TIMEOUT_MS = 2000L
+
+private val CHROME_INSET = LettaDimens.Space.md
+private const val ZOOM_STEP = 1.25f
+private const val WHEEL_ZOOM_STEP = 1.1f
+
+internal object CanvasWorkspaceSupport {
+    /**
+     * Snaps the connector a release just finished to the nearest anchors within the snap radius:
+     * its points move onto them, ends on notes are recorded in the session, and ends on drawn
+     * shapes are handed to DrawBox's own binding pass so they follow the shape from then on.
+     */
+    fun snapLatestConnector(
+        controller: DrawBoxController,
+        session: CanvasSession?,
+        documents: List<com.letta.mobile.data.canvas.CanvasSceneDocument>,
+        scope: kotlinx.coroutines.CoroutineScope,
+    ) {
+        val current = controller.state.value
+        val connector = CanvasSnapping.latestConnector(current.elements) ?: return
+        val anchors = CanvasSnapping.anchors(current.elements, documents, connector.id)
+        val snapped = CanvasSnapping.snap(connector, anchors, current.viewport.scale) ?: return
+        if (snapped.points != connector.points) {
+            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(connector.id, snapped.points))
+        }
+        if (snapped.boundToShape) controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(connector.id))
+        if (session != null && (snapped.binding.start != null || snapped.binding.end != null)) {
+            scope.launch { runCatching { session.bindArrow(connector.id, snapped.binding) } }
+        }
+    }
+
+    /** [element] moved by [DUPLICATE_OFFSET] with a fresh id, the way whiteboards duplicate in place. */
+    fun duplicateElement(element: io.ak1.drawbox.domain.model.Element): io.ak1.drawbox.domain.model.Element {
+        val moved = element.translate(Offset(DUPLICATE_OFFSET, DUPLICATE_OFFSET))
+        val id = "${element.id}-copy-${Clock.System.now().toEpochMilliseconds()}"
+        return when (moved) {
+            is io.ak1.drawbox.domain.model.Element.Shape -> moved.copy(id = id, startBinding = null, endBinding = null)
+            is io.ak1.drawbox.domain.model.Element.Path -> moved.copy(id = id)
+            is io.ak1.drawbox.domain.model.Element.Text -> moved.copy(id = id)
+            else -> moved
+        }
+    }
+
+    fun shapeSelectionPoint(shape: io.ak1.drawbox.domain.model.Element.Shape): Offset =
+        when (shape.shapeType) {
+            io.ak1.drawbox.domain.model.ShapeType.LINE,
+            io.ak1.drawbox.domain.model.ShapeType.ARROW -> shape.points.first()
+            else -> shape.bounds().let { Offset(it.center.x, it.top) }
+        }
+
+    /**
+     * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
+     * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
+     * for text (hit by its box).
+     */
+    fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offset = when (element) {
+        is io.ak1.drawbox.domain.model.Element.Shape -> shapeSelectionPoint(element)
+        is io.ak1.drawbox.domain.model.Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
+        else -> element.bounds().center
+    }
+
+    fun documentHistoryMessage(context: HistoryMessageContext): String =
+        if (context.success) "${context.direction.past} ${context.label}"
+        else "Could not ${context.direction.verb} ${context.label}"
 }
