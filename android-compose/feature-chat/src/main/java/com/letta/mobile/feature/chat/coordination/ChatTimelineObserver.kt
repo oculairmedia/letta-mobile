@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.TimelineProjection
+import com.letta.mobile.ui.chat.render.ChatPresentation
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.util.Telemetry
@@ -362,23 +363,8 @@ internal class ChatTimelineObserver(
         val surfaces = syncA2uiHistorySnapshot(binding.conversationId, projection.a2uiMessages)
         val clearLoading = ui.isNotEmpty() || awaitingProjectionAfterHydrate
         if (clearLoading) awaitingProjectionAfterHydrate = false
-        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
-            clearFollowingDuplicateInitialMessageInFlight()
-        }
         val previous = uiState.value
-        val thinkingStart = a2uiThinkingStartMessageCount()
-        val responseArrived = thinkingStart != null && ui
-            .drop(thinkingStart)
-            .any { it.role == "assistant" && !it.isReasoning }
-        if (responseArrived) clearA2uiThinkingOnResponse()
-        val presentation = presenter.present(
-            projection = projection,
-            signals = presenceSignals(
-                PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
-            ),
-            previousIsStreaming = previous.isStreaming,
-            previousIsAgentTyping = previous.isAgentTyping,
-        )
+        val presentation = resolvePresentation(binding, projection, previous)
         recordPresentation(
             PresentationRecord(generation, projection, previous, presentation.isStreaming, presentation.isAgentTyping),
         )
@@ -421,22 +407,7 @@ internal class ChatTimelineObserver(
         generation: ChatHydrationTrace.Generation?,
     ): UiStatePublication? {
         val previous = uiState.value
-        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
-            clearFollowingDuplicateInitialMessageInFlight()
-        }
-        val thinkingStart = a2uiThinkingStartMessageCount()
-        val responseArrived = thinkingStart != null && projection.ui
-            .drop(thinkingStart)
-            .any { it.role == "assistant" && !it.isReasoning }
-        if (responseArrived) clearA2uiThinkingOnResponse()
-        val presentation = presenter.present(
-            projection = projection,
-            signals = presenceSignals(
-                PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
-            ),
-            previousIsStreaming = previous.isStreaming,
-            previousIsAgentTyping = previous.isAgentTyping,
-        )
+        val presentation = resolvePresentation(binding, projection, previous)
         if (presentation.isStreaming == previous.isStreaming &&
             presentation.isAgentTyping == previous.isAgentTyping
         ) return null
@@ -455,6 +426,36 @@ internal class ChatTimelineObserver(
             ),
         )
     }
+
+    private fun resolvePresentation(
+        binding: TimelineObserverBinding,
+        projection: TimelineProjection,
+        previous: ChatUiState,
+    ): ChatPresentation {
+        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
+            clearFollowingDuplicateInitialMessageInFlight()
+        }
+        val thinkingStart = a2uiThinkingStartMessageCount()
+        val responseArrived = hasAssistantResponseArrived(projection, thinkingStart)
+        if (responseArrived) clearA2uiThinkingOnResponse()
+        return presenter.present(
+            projection = projection,
+            signals = presenceSignals(
+                PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
+            ),
+            previousIsStreaming = previous.isStreaming,
+            previousIsAgentTyping = previous.isAgentTyping,
+        )
+    }
+
+    private fun hasAssistantResponseArrived(
+        projection: TimelineProjection,
+        thinkingStart: Int?,
+    ): Boolean = thinkingStart != null && (
+        projection.tailIsAssistant || projection.ui
+            .drop(thinkingStart)
+            .any { it.role == "assistant" && !it.isReasoning }
+    )
 
     private fun presenceSignals(request: PresenceRequest) = ChatPresenceSignals(
         replyStreaming = activeReplyStreams.value.contains(request.binding.conversationId) ||

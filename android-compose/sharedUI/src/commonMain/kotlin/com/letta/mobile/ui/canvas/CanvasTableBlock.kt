@@ -39,6 +39,7 @@ import io.github.linreal.cascade.editor.registry.BlockDescriptor
 import io.github.linreal.cascade.editor.registry.BlockPreviewRenderer
 import io.github.linreal.cascade.editor.registry.BlockPreviewScope
 import io.github.linreal.cascade.editor.registry.BlockRegistry
+import io.github.linreal.cascade.editor.ui.createEditorRegistry
 import io.github.linreal.cascade.editor.registry.BlockRenderScope
 import io.github.linreal.cascade.editor.registry.ScopedBlockRenderer
 import com.letta.mobile.ui.theme.LettaDimens
@@ -87,7 +88,15 @@ object CanvasTableBlock {
     )
 
     /** The default registry plus the table, for every editor and preview on the board. */
-    fun registry(): BlockRegistry = BlockRegistry.createDefault().apply {
+    /**
+     * The editor's own registry, plus our table block.
+     *
+     * It must be [createEditorRegistry], not `BlockRegistry.createDefault()`: "default" registers
+     * the built-in block DESCRIPTORS only, so paragraphs and headings are known to the insert menu
+     * but have nothing to draw them with, and every built-in block renders as empty space. Only
+     * our table survived that, because we register its renderer by hand right here.
+     */
+    fun registry(): BlockRegistry = createEditorRegistry().apply {
         register(descriptor, TableBlockRenderer)
         registerPreviewRenderer(TYPE_ID, TablePreviewRenderer)
     }

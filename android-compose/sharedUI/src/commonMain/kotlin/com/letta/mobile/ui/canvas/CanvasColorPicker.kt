@@ -19,6 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import codes.side.colorpicker.state.ColoringMode
+import codes.side.colorpicker.conversion.toComposeColor
+import codes.side.colorpicker.ui.HslColorPicker
+import codes.side.colorpicker.model.HslColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -172,9 +176,23 @@ fun CanvasColorPicker(
                     allowNone = false,
                 ) { onPick(it, true) }
             }
-            HslSlider("Hue", hsl.h, 0f..360f) { hsl = hsl.copy(h = it); onPick(hsl.toColor(), false) }
-            HslSlider("Saturation", hsl.s, 0f..1f) { hsl = hsl.copy(s = it); onPick(hsl.toColor(), false) }
-            HslSlider("Lightness", hsl.l, 0f..1f) { hsl = hsl.copy(l = it); onPick(hsl.toColor(), false) }
+            // anyColorPicker's HSL picker, in place of three sliders of our own. It holds the
+            // colour in the space you are editing, so dragging hue no longer walks saturation and
+            // lightness a little on every round trip through RGB. Stateless overload: this screen
+            // already owns the colour, and two sources of truth for it would drift.
+            HslColorPicker(
+                color = HslColor(hue = hsl.h, saturation = hsl.s, lightness = hsl.l),
+                onColorChange = { picked ->
+                    // anyColorPicker edits hue, saturation and lightness; the alpha is ours to
+                    // carry, or a translucent colour comes back opaque from an unrelated edit.
+                    hsl = Hsl(picked.hue, picked.saturation, picked.lightness, hsl.alpha)
+                    val color = hsl.toColor()
+                    hexText = color.toHex()
+                    onPick(color, false)
+                },
+                coloringMode = ColoringMode.Contextual,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Box(
                     modifier = Modifier
@@ -257,7 +275,14 @@ private fun PaletteEntry(color: Color, name: String, selected: Boolean, onClick:
 }
 
 /** Hue in degrees, saturation and lightness in 0..1. */
-internal data class Hsl(val h: Float, val s: Float, val l: Float) {
+/**
+ * A colour in the space the picker edits, [alpha] included.
+ *
+ * Alpha is carried rather than dropped and re-applied: hue, saturation and lightness are the only
+ * channels an HSL edit may touch, and a colour that went through the picker used to come back
+ * fully opaque - a translucent highlight turned solid the moment its hue was nudged.
+ */
+internal data class Hsl(val h: Float, val s: Float, val l: Float, val alpha: Float = 1f) {
     fun toColor(): Color {
         val c = (1f - kotlin.math.abs(2f * l - 1f)) * s
         val hh = (h % 360f + 360f) % 360f / 60f
@@ -271,7 +296,12 @@ internal data class Hsl(val h: Float, val s: Float, val l: Float) {
             else -> Triple(c, 0f, x)
         }
         val m = l - c / 2f
-        return Color((r1 + m).coerceIn(0f, 1f), (g1 + m).coerceIn(0f, 1f), (b1 + m).coerceIn(0f, 1f))
+        return Color(
+            red = (r1 + m).coerceIn(0f, 1f),
+            green = (g1 + m).coerceIn(0f, 1f),
+            blue = (b1 + m).coerceIn(0f, 1f),
+            alpha = alpha.coerceIn(0f, 1f),
+        )
     }
 }
 
@@ -279,7 +309,7 @@ internal fun Color.toHsl(): Hsl {
     val max = maxOf(red, green, blue)
     val min = minOf(red, green, blue)
     val l = (max + min) / 2f
-    if (max == min) return Hsl(0f, 0f, l)
+    if (max == min) return Hsl(0f, 0f, l, alpha)
     val d = max - min
     val s = if (l > 0.5f) d / (2f - max - min) else d / (max + min)
     val h = when (max) {
@@ -287,7 +317,7 @@ internal fun Color.toHsl(): Hsl {
         green -> ((blue - red) / d + 2f) * 60f
         else -> ((red - green) / d + 4f) * 60f
     }
-    return Hsl(h, s, l)
+    return Hsl(h, s, l, alpha)
 }
 
 /** Black or white, whichever reads on [background]. */

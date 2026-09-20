@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -36,11 +37,14 @@ object CanvasOpProjector {
 
     private const val DEFAULT_BG_COLOR = "#ffffffff"
     private const val LAMPORT = "_lamport"
+    /** Every provenance key ends this way: `_lamport`, `_bgLamport`, `_bgPatternLamport`. */
+    private const val LAMPORT_SUFFIX = "lamport"
     private const val ACTOR = "_actorId"
     private const val TOMBSTONES = "_removed"
     private const val BG_LAMPORT = "_bgLamport"
     private const val BG_ACTOR = "_bgActorId"
     private const val ARROW_BINDINGS = "_arrowBindings"
+    private const val LABEL_OWNERS = "_labelOwners"
     private const val BINDING_VALUE = "binding"
     private const val BG_PATTERN = "_bgPattern"
     private const val BG_PATTERN_LAMPORT = "_bgPatternLamport"
@@ -124,6 +128,7 @@ object CanvasOpProjector {
         is CanvasOp.SetBackgroundOp -> setBackground(sceneJson, op)
         is CanvasOp.SetBackgroundPatternOp -> setBackgroundPattern(sceneJson, op)
         is CanvasOp.SetArrowBindingOp -> setArrowBinding(sceneJson, op)
+        is CanvasOp.SetLabelOwnerOp -> setLabelOwner(sceneJson, op)
         is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.RemoveElementOp -> removeElementWithLww(sceneJson, op)
@@ -135,22 +140,36 @@ object CanvasOpProjector {
      * own lamport and actor. Otherwise they would arrive with no provenance and the next
      * out-of-order element op — however old — would win against them.
      */
+    private fun stampElement(element: JsonElement, provenance: WriterProvenance): JsonElement {
+        val obj = runCatching { element.jsonObject }.getOrNull() ?: return element
+        val id = runCatching { obj["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+        return parseElementWithMetadata(ElementMetadataInput(id, payload, provenance))
+    }
+
+    private fun stampElements(elements: JsonArray?, provenance: WriterProvenance): List<JsonElement> =
+        elements?.map { stampElement(it, provenance) } ?: emptyList()
+
     private fun replaceScene(sceneJson: String, op: CanvasOp.ReplaceSceneOp): String {
         val incoming = if (op.sceneJson.isNotBlank()) parseScene(op.sceneJson) else parseEmptyScene()
         // A replace is a drawing, not a notebook: it carries the block documents of the scene it
         // replaces unless it brings its own, so an agent redraw never erases the notes.
-        val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else parseScene(sceneJson)[DOCUMENTS]
+        //
+        // Ownership is carried with them. A label is only a label because the scene records which
+        // shape owns it, and that record is what lets the reconciler move it, re-frame it and
+        // take it away with its shape. Dropped by a replace, every label survived as an ordinary
+        // note that belonged to nothing: it stayed where the old shape was, and nothing would
+        // ever clean it up.
+        val current = parseScene(sceneJson)
+        val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else current[DOCUMENTS]
+        val carriedLabelOwners = if (carriedDocuments != null && !incoming.containsKey(LABEL_OWNERS)) current[LABEL_OWNERS] else null
         val provenance = WriterProvenance(op.lamport, op.actorId)
-        val stamped = incoming["elements"]?.jsonArray?.map { element ->
-            val obj = runCatching { element.jsonObject }.getOrNull() ?: return@map element
-            val id = runCatching { obj["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty()
-            val payload = json.encodeToString(JsonObject.serializer(), obj)
-            parseElementWithMetadata(ElementMetadataInput(id, payload, provenance))
-        } ?: emptyList()
+        val stamped = stampElements(incoming["elements"]?.jsonArray, provenance)
         return canonicalScene(
             buildMap {
                 incoming.forEach { (key, value) -> if (key != "elements") put(key, value) }
                 carriedDocuments?.let { put(DOCUMENTS, it) }
+                carriedLabelOwners?.let { put(LABEL_OWNERS, it) }
                 put("elements", JsonArray(stamped))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
                 put(BG_ACTOR, JsonPrimitive(op.actorId))
@@ -210,6 +229,45 @@ object CanvasOpProjector {
             buildMap {
                 parsed.forEach { (key, value) -> if (key != ARROW_BINDINGS) put(key, value) }
                 put(ARROW_BINDINGS, updated)
+            },
+        )
+    }
+
+    /**
+     * Which shape owns which label document, by document id.
+     *
+     * A document is a shape's label because this says so, not because of what it is called.
+     */
+    fun labelOwnersOf(sceneJson: String): Map<String, String> {
+        val parsed = parseScene(sceneJson)
+        val table = runCatching { parsed[LABEL_OWNERS]?.jsonObject }.getOrNull() ?: return emptyMap()
+        return table.mapNotNull { (documentId, entry) ->
+            val shapeId = runCatching { entry.jsonObject[BINDING_VALUE]?.jsonPrimitive?.content }.getOrNull()
+            shapeId?.takeIf { it.isNotBlank() }?.let { documentId to it }
+        }.toMap()
+    }
+
+    /** LWW per document id; a null shape is kept as the release, so a peer cannot re-claim it. */
+    private fun setLabelOwner(sceneJson: String, op: CanvasOp.SetLabelOwnerOp): String {
+        val parsed = parseScene(sceneJson)
+        val table = runCatching { parsed[LABEL_OWNERS]?.jsonObject }.getOrNull().orEmpty()
+        val existing = table[op.documentId]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val atLamport = runCatching { existing?.get(LAMPORT)?.jsonPrimitive?.long }.getOrNull()
+        val atActor = runCatching { existing?.get(ACTOR)?.jsonPrimitive?.content }.getOrNull().orEmpty()
+        if (!wins(WriterProvenance(op.lamport, op.actorId), atLamport?.let { WriterProvenance(it, atActor) })) return sceneJson
+        val entry = buildJsonObject {
+            put(BINDING_VALUE, JsonPrimitive(op.shapeId.orEmpty()))
+            put(LAMPORT, JsonPrimitive(op.lamport))
+            put(ACTOR, JsonPrimitive(op.actorId))
+        }
+        val updated = buildJsonObject {
+            table.forEach { (id, value) -> if (id != op.documentId) put(id, value) }
+            put(op.documentId, entry)
+        }
+        return canonicalScene(
+            buildMap {
+                parsed.forEach { (key, value) -> if (key != LABEL_OWNERS) put(key, value) }
+                put(LABEL_OWNERS, updated)
             },
         )
     }
@@ -353,6 +411,14 @@ object CanvasOpProjector {
         val actor = runCatching { entry[ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
         return WriterProvenance(lamport, actor)
     }
+    private data class DocumentWriteInput(
+        val documentId: String,
+        val provenance: WriterProvenance,
+        val json: String?,
+        val frame: CanvasDocumentFrame? = null,
+        val color: String? = null,
+        val style: CanvasTextStyle? = null,
+    )
 
     /**
      * Last writer wins per document id, like elements. A removal stays in the array as a removed
@@ -361,29 +427,24 @@ object CanvasOpProjector {
      */
     private fun writeDocument(
         sceneJson: String,
-        documentId: String,
-        provenance: WriterProvenance,
-        json: String?,
-        frame: CanvasDocumentFrame? = null,
-        color: String? = null,
-        style: CanvasTextStyle? = null,
+        input: DocumentWriteInput,
     ): String {
         val parsed = parseScene(sceneJson)
         val entries = documentEntries(parsed).toMutableList()
-        val index = entries.indexOfFirst { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull() == documentId }
-        if (index >= 0 && !wins(provenance, documentProvenance(entries[index]))) return sceneJson
+        val index = entries.indexOfFirst { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull() == input.documentId }
+        if (index >= 0 && !wins(input.provenance, documentProvenance(entries[index]))) return sceneJson
         val existing = entries.getOrNull(index)?.takeIf { !isRemovedDocument(it) }
-        val keptFrame = frame ?: existing?.let(::documentFrame)
-        val keptColor = color ?: existing?.let(::documentColor)
-        val keptStyle = style ?: existing?.let(::documentStyle)
+        val keptFrame = input.frame ?: existing?.let(::documentFrame)
+        val keptColor = input.color ?: existing?.let(::documentColor)
+        val keptStyle = input.style ?: existing?.let(::documentStyle)
         val entry = buildJsonObject {
-            put("id", JsonPrimitive(documentId))
-            if (json != null) put(DOC_JSON, JsonPrimitive(json)) else put(DOC_REMOVED, JsonPrimitive(true))
-            if (json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
-            if (json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
-            if (json != null && keptStyle != null) put(DOC_STYLE, styleJson(keptStyle))
-            put(LAMPORT, JsonPrimitive(provenance.lamport))
-            put(ACTOR, JsonPrimitive(provenance.actorId))
+            put("id", JsonPrimitive(input.documentId))
+            if (input.json != null) put(DOC_JSON, JsonPrimitive(input.json)) else put(DOC_REMOVED, JsonPrimitive(true))
+            if (input.json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
+            if (input.json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
+            if (input.json != null && keptStyle != null) put(DOC_STYLE, styleJson(keptStyle))
+            put(LAMPORT, JsonPrimitive(input.provenance.lamport))
+            put(ACTOR, JsonPrimitive(input.provenance.actorId))
         }
         if (index >= 0) entries[index] = entry else entries.add(entry)
         entries.sortBy { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty() }
@@ -396,10 +457,27 @@ object CanvasOpProjector {
     }
 
     private fun upsertDocumentWithLww(sceneJson: String, op: CanvasOp.SetDocumentOp): String =
-        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), op.documentJson, op.frame, op.color, op.style)
+        writeDocument(
+            sceneJson,
+            DocumentWriteInput(
+                documentId = op.documentId,
+                provenance = WriterProvenance(op.lamport, op.actorId),
+                json = op.documentJson,
+                frame = op.frame,
+                color = op.color,
+                style = op.style,
+            ),
+        )
 
     private fun removeDocumentWithLww(sceneJson: String, op: CanvasOp.RemoveDocumentOp): String =
-        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), null)
+        writeDocument(
+            sceneJson,
+            DocumentWriteInput(
+                documentId = op.documentId,
+                provenance = WriterProvenance(op.lamport, op.actorId),
+                json = null,
+            ),
+        )
 
     private fun tombstonesOf(scene: JsonObject): Map<String, WriterProvenance> {
         val raw = runCatching { scene[TOMBSTONES]?.jsonObject }.getOrNull() ?: return emptyMap()
@@ -517,6 +595,37 @@ object CanvasOpProjector {
         val eb = runCatching { pb["elements"]?.jsonArray?.toSet() }.getOrNull().orEmpty()
         if (ea != eb) return false
         return pa.filterKeys { it != "elements" } == pb.filterKeys { it != "elements" }
+    }
+
+    /**
+     * The highest lamport any writer left anywhere in [sceneJson] - elements, their tombstones,
+     * documents, the background, the bindings.
+     *
+     * A session that adopts an existing scene has to start its clock above this. Its writes are
+     * settled last-writer-wins against exactly these numbers, so a clock starting from zero makes
+     * every edit older than what it is editing and the projector keeps the existing value: the
+     * change is dropped, silently, with no error anywhere to say so.
+     *
+     * Read by walking the whole tree for any `*lamport` key rather than by visiting the keys
+     * this file happens to name today, so a provenance added later cannot quietly fall outside it.
+     */
+    fun maxLamport(sceneJson: String): Long {
+        if (sceneJson.isBlank()) return 0L
+        val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() ?: return 0L
+        return maxLamportOf(root)
+    }
+
+    private fun maxLamportOf(element: kotlinx.serialization.json.JsonElement): Long = when (element) {
+        is JsonObject -> element.entries.maxOfOrNull { (key, value) ->
+            val own = if (key.endsWith(LAMPORT_SUFFIX, ignoreCase = true)) {
+                runCatching { value.jsonPrimitive.long }.getOrNull() ?: 0L
+            } else {
+                0L
+            }
+            maxOf(own, maxLamportOf(value))
+        } ?: 0L
+        is JsonArray -> element.maxOfOrNull { maxLamportOf(it) } ?: 0L
+        else -> 0L
     }
 
     fun stripMetadataForDrawBox(sceneJson: String): String {

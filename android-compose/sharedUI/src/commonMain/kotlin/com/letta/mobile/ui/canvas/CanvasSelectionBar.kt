@@ -23,6 +23,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BringToFront
 import com.composables.icons.lucide.Copy
+import kotlin.math.roundToInt
+import com.composables.icons.lucide.AArrowDown
+import com.composables.icons.lucide.AArrowUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.SendToBack
@@ -82,6 +85,18 @@ fun CanvasSelectionBar(
                 onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
                 BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
             } else if (hasSelection) {
+                // Text is sized from the bar it is selected on, not from a panel behind a swatch:
+                // it is the one property you reach for over and over, and a step up or a step down
+                // is the whole of what that needs.
+                if (properties.showFontSize) {
+                    Divider()
+                    BarButton(Lucide.AArrowDown, "Smaller text") {
+                        dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(properties.fontSize, up = false)))
+                    }
+                    BarButton(Lucide.AArrowUp, "Larger text") {
+                        dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(properties.fontSize, up = true)))
+                    }
+                }
                 Divider()
                 BarButton(Lucide.BringToFront, "Bring to front", onClick = onBringToFront)
                 BarButton(Lucide.SendToBack, "Send to back", onClick = onSendToBack)
@@ -105,6 +120,22 @@ class NoteBarActions(
     /** True for a text element (no card), which has no note colour to offer. */
     val plain: Boolean,
 )
+
+/**
+ * One step up or down from [size], as the bar's two buttons take it.
+ *
+ * A ratio rather than a ladder: a step is the same visual amount at every size, and text that was
+ * set to something the ladder does not name cannot get stuck between rungs. Clamped so a step can
+ * never leave text too small to find or too large to fit on a board.
+ */
+internal fun steppedFontSize(size: Float, up: Boolean): Float {
+    val stepped = if (up) size * FONT_STEP else size / FONT_STEP
+    return stepped.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE).roundToInt().toFloat()
+}
+
+private const val FONT_STEP = 1.25f
+private const val MIN_FONT_SIZE = 8f
+private const val MAX_FONT_SIZE = 240f
 
 /** Text sizes as the control labels them, and the scale each applies to the editor's sizes. */
 internal val TextSizes: List<Pair<String, Float>> = listOf("S" to 0.85f, "M" to 1f, "L" to 1.4f, "XL" to 2f)

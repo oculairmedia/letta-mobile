@@ -103,19 +103,34 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) { controller.state.value.bgColor == androidx.compose.ui.graphics.Color(0xFFF7F3EA) }
     }
 
-    @Test
-    fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
+    private data class WorkspaceHarness(
+        val session: com.letta.mobile.data.canvas.CanvasSession,
+        val controller: io.ak1.drawbox.presentation.viewmodel.DrawBoxController,
+    )
+
+    private fun androidx.compose.ui.test.ComposeUiTest.withWorkspace(
+        title: String = "Notes Board",
+        initialSceneJson: String = "",
+    ): WorkspaceHarness {
         val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
-                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Notes Board", initialSceneJson = ""),
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = title, initialSceneJson = initialSceneJson),
             )
         }
-
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
         setContent {
-            CanvasWorkspace(session = session)
+            CanvasWorkspace(session = session, controller = controller)
         }
+        return WorkspaceHarness(session, controller)
+    }
+
+    @Test
+    fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
+        val (session, controller) = withWorkspace("Notes Board")
 
         onAllNodesWithContentDescription("Note ", substring = true).assertCountEquals(0)
         // Zoom in first: placing and moving notes writes the session, and that must never reload
@@ -150,12 +165,32 @@ class CanvasWorkspaceUiTest {
         onNodeWithContentDescription("Close note editor").performClick()
         onAllNodesWithContentDescription("Note editor").assertCountEquals(0)
 
-        // The Text tool places a plain (transparent) block document; the active note's formatting
-        // controls sit at the foot of the board, not inside the card, with every block kind.
-        onNodeWithContentDescription("Text").performClick()
+        // A shape's LABEL is the board's plain block document: the text tool itself now places one
+        // of DrawBox's own text elements instead (see CanvasTextToolUiTest), so this is where a
+        // plain document and its formatting still live. Double-clicking a shape opens one.
+        verifyShapeLabelWorkflow(controller, session, note.id)
+    }
+
+    private fun androidx.compose.ui.test.ComposeUiTest.verifyShapeLabelWorkflow(
+        controller: io.ak1.drawbox.presentation.viewmodel.DrawBoxController,
+        session: com.letta.mobile.data.canvas.CanvasSession,
+        noteId: String,
+    ) {
+        controller.importPath(
+            """{"bgColor":"#ffffffff","elements":[{"id":"rect-1","type":"Shape","zIndex":1,
+            "points":["40.0,40.0","240.0,160.0"],"strokeColor":"#000000ff","strokeWidth":4.0,
+            "shapeType":"RECTANGLE","modifiedAt":1}]}""",
+        )
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 1 }
+        // Double-clicking asks for a caret, and asking for one is a Select-tool gesture: DrawBox
+        // reports it only in SELECT, which is where picking things up happens.
+        onNodeWithContentDescription("Select").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.mode == io.ak1.drawbox.domain.model.Mode.SELECT }
+        val centre = controller.state.value.viewport.worldToScreen(androidx.compose.ui.geometry.Offset(140f, 100f))
+        onNodeWithContentDescription("Canvas board").performMouseInput { doubleClick(centre) }
         waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
-        val text = session.documents().first { it.id.startsWith("text-") }
-        kotlin.test.assertEquals("#00000000", text.color)
+        val text = session.documents().first { it.id != noteId }
+        kotlin.test.assertEquals("#00000000", text.color, "a label is a plain document")
         waitUntil(timeoutMillis = 5000) {
             onAllNodesWithContentDescription("Bold").fetchSemanticsNodes().isNotEmpty()
         }
@@ -164,8 +199,8 @@ class CanvasWorkspaceUiTest {
             session.documents().first { it.id == text.id }.json.contains("\"todo\"")
         }
 
-        // A text element has no note chrome, and its bar sets size, family, alignment and colour,
-        // all of which persist with the document.
+        // A plain document has no note chrome, and its bar sets size, family, alignment and
+        // colour, all of which persist with the document.
         // The one "Move note" grip on the board belongs to the sticky note placed above.
         onAllNodesWithContentDescription("Move note").assertCountEquals(1)
         onNodeWithContentDescription("Move text").assertExists()
