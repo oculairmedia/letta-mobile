@@ -112,21 +112,38 @@ internal object PagedTimelineEffects {
         LaunchedEffect(params.pages.loadState.refresh) {
             if (shouldRepositionAfterPagerRefresh(params.pages.loadState.refresh)) targetPositioned = false
         }
+        observeTargetPositioning(params, targetPositioned) { targetPositioned = it }
+        LaunchedEffect(params.presentation, missingTarget) {
+            if (shouldRestoreMissingTail(params.routeTarget, params.restoreAnchor, missingTarget)) {
+                params.presentation.requestTail()
+            }
+        }
+        observeViewportSaving(params, targetPositioned)
+    }
+
+    @Composable
+    private fun observeTargetPositioning(
+        params: PagedTimelineTargetEffectsParams,
+        targetPositioned: Boolean,
+        onPositioned: (Boolean) -> Unit,
+    ) {
         LaunchedEffect(params.presentation, params.routeTarget, params.pages.itemSnapshotList, params.displayedLive) {
             val target = params.routeTarget ?: params.restoreAnchor?.messageId ?: return@LaunchedEffect
             if (!targetPositioned) {
                 val index = resolveTargetScrollPosition(target, params.displayedLive, params.pages.itemSnapshotList)
                 if (index != null) {
                     applyTargetScroll(params, index, target)
-                    targetPositioned = true
+                    onPositioned(true)
                 }
             }
         }
-        LaunchedEffect(params.presentation, missingTarget) {
-            if (shouldRestoreMissingTail(params.routeTarget, params.restoreAnchor, missingTarget)) {
-                params.presentation.requestTail()
-            }
-        }
+    }
+
+    @Composable
+    private fun observeViewportSaving(
+        params: PagedTimelineTargetEffectsParams,
+        targetPositioned: Boolean,
+    ) {
         LaunchedEffect(params.presentation, targetPositioned, params.displayedLive, params.pages.itemSnapshotList, params.following) {
             if (!canSaveViewport(targetPositioned, params.restoreAnchor, params.routeTarget)) return@LaunchedEffect
             snapshotFlow { params.listState.firstVisibleItemIndex to params.listState.firstVisibleItemScrollOffset }

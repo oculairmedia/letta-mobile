@@ -167,22 +167,21 @@ internal object PagedTimelineLazyLayout {
                 DeferredWindowControls(row.key, reader)
             }
         }
-        val older = resolveOlderRow(liveRow, index, pageIndex, params.displayedLive, params.pages)
+        val older = resolveOlderRow(liveRow, index, params)
         Row(row, index, older, params.context)
     }
 
     private fun resolveOlderRow(
         liveRow: ChatRenderItem?,
         index: Int,
-        pageIndex: Int,
-        displayedLive: List<ChatRenderItem>,
-        pages: LazyPagingItems<ChatRenderItem>,
+        params: PagedTimelineLazyListParams,
     ): ChatRenderItem? {
         if (liveRow != null) {
-            return displayedLive.getOrNull(index + 1)
-                ?: if (pages.itemCount > 0) pages.peek(0) else null
+            return params.displayedLive.getOrNull(index + 1)
+                ?: if (params.pages.itemCount > 0) params.pages.peek(0) else null
         }
-        return if (pageIndex + 1 < pages.itemCount) pages.peek(pageIndex + 1) else null
+        val pageIndex = index - params.displayedLive.size
+        return if (pageIndex + 1 < params.pages.itemCount) params.pages.peek(pageIndex + 1) else null
     }
 
     private fun LazyListScope.timelineLoadingFooter(
@@ -237,8 +236,7 @@ internal object PagedTimelineLazyLayout {
         val dimens = MaterialTheme.chatDimens
         val scope = rememberCoroutineScope()
         val geometry = remember(params.presentation) { ChatMessageGeometryState() }
-        val pinch = remember { PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f) }
-        SideEffect { pinch.syncCommittedScale(params.appearance.activeFontScale) }
+        val pinch = rememberTimelinePinchController(params.appearance.activeFontScale)
         val currentCallbacks by rememberUpdatedState(params.callbacks)
         val currentActiveScale by rememberUpdatedState(params.appearance.activeFontScale)
         val liveScale = if (pinch.isPinching) pinch.effectiveScale else params.appearance.activeFontScale
@@ -280,72 +278,98 @@ internal object PagedTimelineLazyLayout {
                 pages = params.pages,
                 isPinching = pinch.isPinching,
             )
-            val fadeTargetColor = chatFadeTargetColor(
-                chatBackground = params.appearance.chatBackground,
-                fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            )
-            val fadeScrimColor = chatFadeScrimColor(
-                chatBackground = params.appearance.chatBackground,
-                surfaceColor = MaterialTheme.colorScheme.background,
-            )
-            val topFadeLength = params.appearance.topPadding + ChatFadeEdgeLength
-            val bottomFadeLength = chatMessageListBottomFadeLength(params.appearance.bottomPadding)
-            val suppressBottomFade = shouldSuppressBottomFade(
-                following = params.following,
-                role = newestMessage?.role,
-                isStreaming = params.state.isStreaming,
-            )
-            ChatFadingEdgesBox(
-                listState = params.listState,
-                targetColor = fadeTargetColor,
-                scrimColor = fadeScrimColor,
-                topPadding = 0.dp,
-                topFadeLength = topFadeLength,
-                bottomFadeLength = bottomFadeLength,
-                suppressBottom = suppressBottomFade,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                LazyList(
-                    params = PagedTimelineLazyListParams(
-                        pages = params.pages,
-                        displayedLive = params.displayedLive,
-                        presentation = params.presentation,
-                        listState = params.listState,
-                        kineticOverscroll = kineticOverscroll,
-                        appearance = params.appearance,
-                        context = context,
-                        agentId = params.state.agentId,
-                    ),
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+            TimelineFadingList(params, context, kineticOverscroll, newestMessage)
             MissingTargetNotice(
                 missingTarget = params.missingTarget,
                 routeTarget = params.routeTarget,
                 bottomPadding = params.appearance.bottomPadding,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
-            ScrollToBottomFab(
-                visible = shouldShowNewestAffordance(
-                    isAnchoredAwayFromTail = params.presentation.isAnchoredAwayFromTail,
-                    canScrollTowardNewest = params.listState.canScrollBackward,
-                ),
-                onClick = {
-                    onScrollToBottomClick(
-                        presentation = params.presentation,
-                        listState = params.listState,
-                        onFollowingChange = params.onFollowingChange,
-                        scope = scope,
-                    )
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = LettaSpacing.INNER_PADDING,
-                        bottom = LettaSpacing.INNER_PADDING + params.appearance.bottomPadding,
-                    ),
+            TimelineScrollToBottom(
+                params = params,
+                scope = scope,
+                modifier = Modifier.align(Alignment.BottomEnd),
             )
         }
+    }
+
+    @Composable
+    private fun rememberTimelinePinchController(activeFontScale: Float): PinchScalePreviewController {
+        val pinch = remember { PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f) }
+        SideEffect { pinch.syncCommittedScale(activeFontScale) }
+        return pinch
+    }
+
+    @Composable
+    private fun TimelineFadingList(
+        params: PagedTimelineViewportParams,
+        context: ChatMessageListLazyContext,
+        kineticOverscroll: androidx.compose.foundation.OverscrollEffect?,
+        newestMessage: UiMessage?,
+    ) {
+        val fadeTargetColor = chatFadeTargetColor(
+            chatBackground = params.appearance.chatBackground,
+            fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        )
+        val fadeScrimColor = chatFadeScrimColor(
+            chatBackground = params.appearance.chatBackground,
+            surfaceColor = MaterialTheme.colorScheme.background,
+        )
+        val suppressBottomFade = shouldSuppressBottomFade(
+            following = params.following,
+            role = newestMessage?.role,
+            isStreaming = params.state.isStreaming,
+        )
+        ChatFadingEdgesBox(
+            listState = params.listState,
+            targetColor = fadeTargetColor,
+            scrimColor = fadeScrimColor,
+            topPadding = 0.dp,
+            topFadeLength = params.appearance.topPadding + ChatFadeEdgeLength,
+            bottomFadeLength = chatMessageListBottomFadeLength(params.appearance.bottomPadding),
+            suppressBottom = suppressBottomFade,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            LazyList(
+                params = PagedTimelineLazyListParams(
+                    pages = params.pages,
+                    displayedLive = params.displayedLive,
+                    presentation = params.presentation,
+                    listState = params.listState,
+                    kineticOverscroll = kineticOverscroll,
+                    appearance = params.appearance,
+                    context = context,
+                    agentId = params.state.agentId,
+                ),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    @Composable
+    private fun TimelineScrollToBottom(
+        params: PagedTimelineViewportParams,
+        scope: CoroutineScope,
+        modifier: Modifier = Modifier,
+    ) {
+        ScrollToBottomFab(
+            visible = shouldShowNewestAffordance(
+                isAnchoredAwayFromTail = params.presentation.isAnchoredAwayFromTail,
+                canScrollTowardNewest = params.listState.canScrollBackward,
+            ),
+            onClick = {
+                onScrollToBottomClick(
+                    presentation = params.presentation,
+                    listState = params.listState,
+                    onFollowingChange = params.onFollowingChange,
+                    scope = scope,
+                )
+            },
+            modifier = modifier.padding(
+                end = LettaSpacing.INNER_PADDING,
+                bottom = LettaSpacing.INNER_PADDING + params.appearance.bottomPadding,
+            ),
+        )
     }
 
     private fun resolveNewestMessage(
