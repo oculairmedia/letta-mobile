@@ -32,8 +32,12 @@ fun main() {
         state = androidx.compose.ui.window.WindowState(width = 1280.dp, height = 820.dp),
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
-        InstallTabletPen(window)
-        CompositionLocalProvider(LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window)) {
+        val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
+        InstallTabletPen(window, penRegistry)
+        CompositionLocalProvider(
+            LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
+            com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
+        ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
@@ -65,8 +69,12 @@ internal fun CanvasDebugWindow(
         state = rememberWindowState(width = 1280.dp, height = 820.dp),
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
-        InstallTabletPen(window)
-        CompositionLocalProvider(LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window)) {
+        val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
+        InstallTabletPen(window, penRegistry)
+        CompositionLocalProvider(
+            LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
+            com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
+        ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(

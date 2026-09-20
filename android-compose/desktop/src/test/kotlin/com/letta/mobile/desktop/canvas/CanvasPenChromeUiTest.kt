@@ -9,7 +9,8 @@ import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.ui.canvas.CanvasPenEvent
-import com.letta.mobile.ui.canvas.CanvasPenInput
+import com.letta.mobile.ui.canvas.CanvasPenRegistry
+import com.letta.mobile.ui.canvas.LocalCanvasPenRegistry
 import com.letta.mobile.ui.canvas.CanvasPenTool
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import io.ak1.drawbox.domain.model.Mode
@@ -45,13 +46,18 @@ class CanvasPenChromeUiTest {
      * the display density - so the test has to divide by the same density the board multiplies by,
      * or the stroke lands somewhere else entirely.
      */
-    private fun stroke(at: Pair<Float, Float>, density: Float, target: com.letta.mobile.ui.canvas.CanvasPenTarget): Boolean {
+    private fun stroke(
+        at: Pair<Float, Float>,
+        density: Float,
+        target: com.letta.mobile.ui.canvas.CanvasPenTarget,
+        registry: CanvasPenRegistry,
+    ): Boolean {
         val x = at.first / density
         val y = at.second / density
         val step = 20f / density
-        val taken = CanvasPenInput.deliver(target, CanvasPenEvent(CanvasPenEvent.Phase.DOWN, x, y, 0.6f, CanvasPenTool.DRAW))
-        CanvasPenInput.deliver(target, CanvasPenEvent(CanvasPenEvent.Phase.MOVE, x + step, y + step, 0.6f, CanvasPenTool.DRAW))
-        CanvasPenInput.deliver(target, CanvasPenEvent(CanvasPenEvent.Phase.UP, x + step, y + step, 0.6f, CanvasPenTool.DRAW))
+        val taken = registry.deliver(target, CanvasPenEvent(CanvasPenEvent.Phase.DOWN, x, y, 0.6f, CanvasPenTool.DRAW))
+        registry.deliver(target, CanvasPenEvent(CanvasPenEvent.Phase.MOVE, x + step, y + step, 0.6f, CanvasPenTool.DRAW))
+        registry.deliver(target, CanvasPenEvent(CanvasPenEvent.Phase.UP, x + step, y + step, 0.6f, CanvasPenTool.DRAW))
         return taken
     }
 
@@ -59,19 +65,22 @@ class CanvasPenChromeUiTest {
     fun theNoteIsWrittenInRatherThanDrawnOn() = runComposeUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
+        val registry = CanvasPenRegistry()
         var density = 1f
         var penTarget: com.letta.mobile.ui.canvas.CanvasPenTarget = com.letta.mobile.ui.canvas.DefaultPenTarget
         setContent {
             density = androidx.compose.ui.platform.LocalDensity.current.density
             penTarget = com.letta.mobile.ui.canvas.LocalCanvasPenTarget.current
-            CanvasWorkspace(session = session, controller = controller)
+            androidx.compose.runtime.CompositionLocalProvider(LocalCanvasPenRegistry provides registry) {
+                CanvasWorkspace(session = session, controller = controller)
+            }
         }
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
         controller.setMode(Mode.PEN)
         waitUntil(timeoutMillis = 5000) { controller.state.value.mode == Mode.PEN }
-        waitUntil(timeoutMillis = 5000) { CanvasPenInput.hasConsumer(penTarget) }
+        waitUntil(timeoutMillis = 5000) { registry.hasConsumer(penTarget) }
 
         val frame = session.documents().single().frame!!
         val centreOfNote = controller.state.value.viewport.worldToScreen(
@@ -79,7 +88,7 @@ class CanvasPenChromeUiTest {
         )
         val elementsBefore = controller.state.value.elements.size
 
-        val takenOverNote = stroke(centreOfNote.x to centreOfNote.y, density, penTarget)
+        val takenOverNote = stroke(centreOfNote.x to centreOfNote.y, density, penTarget, registry)
         waitForIdle()
 
         assertTrue(!takenOverNote, "the pen must decline a stroke that starts on a note")
@@ -95,20 +104,23 @@ class CanvasPenChromeUiTest {
         // The other half of the same rule: excluding chrome must not cost the board its ink.
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
+        val registry = CanvasPenRegistry()
         var density = 1f
         var penTarget: com.letta.mobile.ui.canvas.CanvasPenTarget = com.letta.mobile.ui.canvas.DefaultPenTarget
         setContent {
             density = androidx.compose.ui.platform.LocalDensity.current.density
             penTarget = com.letta.mobile.ui.canvas.LocalCanvasPenTarget.current
-            CanvasWorkspace(session = session, controller = controller)
+            androidx.compose.runtime.CompositionLocalProvider(LocalCanvasPenRegistry provides registry) {
+                CanvasWorkspace(session = session, controller = controller)
+            }
         }
 
         controller.setMode(Mode.PEN)
-        waitUntil(timeoutMillis = 5000) { CanvasPenInput.hasConsumer(penTarget) }
+        waitUntil(timeoutMillis = 5000) { registry.hasConsumer(penTarget) }
         val elementsBefore = controller.state.value.elements.size
 
         // Far from the rail down the left and clear of the bars top and bottom.
-        stroke(600f to 400f, density, penTarget)
+        stroke(600f to 400f, density, penTarget, registry)
 
         waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size > elementsBefore }
     }

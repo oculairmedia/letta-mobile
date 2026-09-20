@@ -16,7 +16,7 @@ import java.awt.Point
 import java.awt.Window
 import com.letta.mobile.ui.canvas.CanvasPenEvent
 import com.letta.mobile.ui.canvas.CanvasPenTarget
-import com.letta.mobile.ui.canvas.CanvasPenInput
+import com.letta.mobile.ui.canvas.CanvasPenRegistry
 import com.letta.mobile.ui.canvas.CanvasPenTool
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
@@ -36,6 +36,8 @@ import javax.swing.SwingUtilities
  */
 internal class TabletPen(
     private val window: Window,
+    /** Where this window's canvas registered; the pen delivers here and nowhere else. */
+    private val penRegistry: CanvasPenRegistry,
     private val pollInterval: Long = POLL_INTERVAL_MS,
 ) {
     private val handles = mutableListOf<Triple<String, Long, Component>>()
@@ -259,7 +261,7 @@ internal class TabletPen(
     /** True when the canvas took this event and it must not also become a mouse event. */
     private fun offerToCanvas(kind: Int, x: Float, y: Float, force: Float, tool: Int): Boolean {
         // Offered to the canvas in THIS pen's window, never to whichever canvas registered last.
-        if (!CanvasPenInput.hasConsumer(WindowPenTarget(window))) return false
+        if (!penRegistry.hasConsumer(WindowPenTarget(window))) return false
         val phase = when (kind) {
             TabletBridge.KIND_DOWN -> CanvasPenEvent.Phase.DOWN
             TabletBridge.KIND_UP -> CanvasPenEvent.Phase.UP
@@ -274,7 +276,7 @@ internal class TabletPen(
             else -> CanvasPenTool.OTHER
         }
         val taken = runCatching {
-            CanvasPenInput.deliver(
+            penRegistry.deliver(
                 WindowPenTarget(window),
                 CanvasPenEvent(
                     phase = phase,

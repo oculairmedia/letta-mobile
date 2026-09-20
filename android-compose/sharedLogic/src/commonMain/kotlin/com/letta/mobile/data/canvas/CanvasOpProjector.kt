@@ -143,7 +143,15 @@ object CanvasOpProjector {
         val incoming = if (op.sceneJson.isNotBlank()) parseScene(op.sceneJson) else parseEmptyScene()
         // A replace is a drawing, not a notebook: it carries the block documents of the scene it
         // replaces unless it brings its own, so an agent redraw never erases the notes.
-        val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else parseScene(sceneJson)[DOCUMENTS]
+        //
+        // Ownership is carried with them. A label is only a label because the scene records which
+        // shape owns it, and that record is what lets the reconciler move it, re-frame it and
+        // take it away with its shape. Dropped by a replace, every label survived as an ordinary
+        // note that belonged to nothing: it stayed where the old shape was, and nothing would
+        // ever clean it up.
+        val current = parseScene(sceneJson)
+        val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else current[DOCUMENTS]
+        val carriedLabelOwners = if (incoming.containsKey(LABEL_OWNERS)) null else current[LABEL_OWNERS]
         val provenance = WriterProvenance(op.lamport, op.actorId)
         val stamped = incoming["elements"]?.jsonArray?.map { element ->
             val obj = runCatching { element.jsonObject }.getOrNull() ?: return@map element
@@ -155,6 +163,7 @@ object CanvasOpProjector {
             buildMap {
                 incoming.forEach { (key, value) -> if (key != "elements") put(key, value) }
                 carriedDocuments?.let { put(DOCUMENTS, it) }
+                carriedLabelOwners?.let { put(LABEL_OWNERS, it) }
                 put("elements", JsonArray(stamped))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
                 put(BG_ACTOR, JsonPrimitive(op.actorId))

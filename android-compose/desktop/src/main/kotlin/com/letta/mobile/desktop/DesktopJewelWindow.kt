@@ -175,7 +175,12 @@ internal fun DesktopJewelWindow(
             // The pen, read from Windows Ink and posted as ordinary mouse input, so it can draw
             // AND press things. AWT reports no stylus of its own — measured, see
             // letta-mobile-4i2z9.5 — so without this the tablet does nothing at all.
-            com.letta.mobile.desktop.input.InstallTabletPen(window)
+            //
+            // The registry is this window's: the pen delivers into it and the canvas composed
+            // below registers with it, so the table of live consumers dies with the window that
+            // owns it rather than outliving every window in the process.
+            val penRegistry = remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
+            com.letta.mobile.desktop.input.InstallTabletPen(window, penRegistry)
             DesktopMaterialTheme {
                 val colorScheme = MaterialTheme.colorScheme
                 // With a tab strip the active tab is painted in the page
@@ -389,6 +394,7 @@ internal fun DesktopJewelWindow(
                     val windowScope = rememberCoroutineScope()
                     CompositionLocalProvider(
                         LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
+                        com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
                         LocalMenuActionScope provides windowScope,
                     ) {
                         content()
