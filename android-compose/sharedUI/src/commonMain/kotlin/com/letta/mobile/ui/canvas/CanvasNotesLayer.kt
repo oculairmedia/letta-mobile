@@ -257,8 +257,12 @@ private fun CanvasNoteCard(
             plain -> null
             else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         },
+        // Text on the board is text, not a card, so it never casts one - active or not. A
+        // transparent surface with an elevation does not simply skip the shadow: Compose draws
+        // the shadow body anyway, and a grey slab appeared behind the words the moment they were
+        // edited.
         shadowElevation = when {
-            plain && !active -> 0.dp
+            plain -> 0.dp
             active -> LettaDimens.Space.sm
             else -> LettaDimens.Space.xs
         },

@@ -234,6 +234,34 @@ private fun CanvasPropertyPanel(
 
 @Composable
 private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (CanvasPropertyIntent) -> Unit) {
+    // Text is set in a size, not drawn in a stroke width, so this is offered to text alone - for
+    // the selected text, or for the next piece the text tool places.
+    if (properties.showFontSize) {
+        SectionLabel("Text size")
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            FontSizes.forEach { (label, size) ->
+                Chip(label = label, description = "Text size $label", selected = properties.fontSize == size) {
+                    dispatchProperty(CanvasPropertyIntent.SetFontSize(size))
+                }
+            }
+        }
+        SectionLabel("Font")
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            FontFamilies.forEach { (label, key) ->
+                Chip(label = label, description = "Font $label", selected = properties.fontFamily == key) {
+                    dispatchProperty(CanvasPropertyIntent.SetFontFamily(key))
+                }
+            }
+        }
+        SectionLabel("Alignment")
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            TextAlignments.forEach { (label, alignment) ->
+                Chip(label = label, description = "Align $label", selected = properties.textAlignment == alignment) {
+                    dispatchProperty(CanvasPropertyIntent.SetTextAlignment(alignment))
+                }
+            }
+        }
+    }
     SectionLabel("Stroke width")
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
         StrokeWidths.forEach { (label, width) ->
@@ -366,6 +394,29 @@ private fun LabelledSlider(label: String, value: Float, range: ClosedFloatingPoi
 }
 
 /** Stroke widths as the control labels them, in world units. */
+/** The sizes text is offered in, in points, small to large. */
+internal val FontSizes: List<Pair<String, Float>> = listOf(
+    "S" to 16f,
+    "M" to 24f,
+    "L" to 36f,
+    "XL" to 56f,
+    "XXL" to 80f,
+)
+
+/** The faces text can be set in, as DrawBox names them. */
+internal val FontFamilies: List<Pair<String, String>> = listOf(
+    "Sans" to io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SANS,
+    "Serif" to io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SERIF,
+    "Mono" to io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.MONO,
+)
+
+/** Which edge the lines are set against. */
+internal val TextAlignments: List<Pair<String, io.ak1.drawbox.domain.model.TextAlignment>> = listOf(
+    "left" to io.ak1.drawbox.domain.model.TextAlignment.LEFT,
+    "center" to io.ak1.drawbox.domain.model.TextAlignment.CENTER,
+    "right" to io.ak1.drawbox.domain.model.TextAlignment.RIGHT,
+)
+
 internal val StrokeWidths: List<Pair<String, Float>> = listOf("Thin" to 2f, "Medium" to 4f, "Thick" to 8f, "Bold" to 14f)
 
 /** Stroke styles as the control labels them. */

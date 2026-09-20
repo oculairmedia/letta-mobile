@@ -74,6 +74,9 @@ import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
@@ -178,6 +181,9 @@ fun CanvasWorkspace(
     var groupOffset by remember { mutableStateOf(Offset.Zero) }
     // The note being worked in (toolbar and block handles shown) and the one opened large.
     var activeNoteId by remember { mutableStateOf<String?>(null) }
+    // Which of DrawBox's text elements has the caret. DrawBox places text, measures it, wraps it
+    // and says when one is to be edited; the editor itself is the host's to render, which is this.
+    var editingTextId by remember { mutableStateOf<String?>(null) }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
@@ -359,6 +365,27 @@ fun CanvasWorkspace(
         CanvasDocumentUndo.stepBetween(before, s.documents(), label)?.let { history.record(it) }
     }
 
+    /**
+     * Records document work that belongs to the drawing change just made.
+     *
+     * A label goes because its shape went, and the board notices a moment later - the reconciler
+     * runs when the elements settle - so the two halves of one action arrive separately. Folding
+     * this half into that step is what makes one press give back the shape AND the words it was
+     * holding; recorded as a step of its own it would take two, with an empty box in between.
+     * When there is no drawing step to fold into, it is recorded on its own rather than lost.
+     */
+    suspend fun recordingWithLastDrawing(label: String, block: suspend () -> Unit) {
+        val s = session
+        if (s == null || applyingHistory) {
+            block()
+            return
+        }
+        val before = s.documents()
+        block()
+        val step = CanvasDocumentUndo.stepBetween(before, s.documents(), label) ?: return
+        if (!history.addToLastDrawing(step)) history.record(step)
+    }
+
     /** Applies one history step, without recording what it causes as a new step. */
     fun applyHistory(step: CanvasHistory.Step?, redo: Boolean) {
         when (step) {
@@ -498,6 +525,37 @@ fun CanvasWorkspace(
                 is io.ak1.drawbox.domain.model.Intent.MoveSelected ->
                     if (selectedNoteIds.isNotEmpty()) groupOffset += intent.delta
                 is io.ak1.drawbox.domain.model.Intent.EndTransform -> commitGroupMove()
+                // The text tool asks for a caret in whatever was tapped: an existing piece of
+                // text, or the one DrawBox is about to insert there.
+                // Double-tapping asks for a caret in whatever is under the pointer, and DrawBox
+                // reports that rather than the board watching for its own double tap: a second
+                // tap detector in the chain CONSUMED the first tap, so a single tap never reached
+                // DrawBox at all and the text tool placed nothing.
+                is io.ak1.drawbox.domain.model.Intent.RequestTextEditAt -> {
+                    val elements = controller.state.value.elements
+                    val text = CanvasTextElements.at(elements, intent.offset, intent.tolerance)
+                    if (text != null) {
+                        editingTextId = text.id
+                    } else {
+                        // A shape holds text too, and that text is a block document - a label
+                        // owned by the shape, which follows it and goes with it.
+                        val shape = CanvasShapeLabels.shapeAt(elements, intent.offset)
+                        val s = session
+                        if (shape != null && s != null) {
+                            val labelId = CanvasShapeLabels.labelIdOf(shape.id)
+                            val frame = CanvasShapeLabels.frameFor(shape.bounds())
+                            coroutineScope.launch {
+                                if (s.documents().none { it.id == labelId }) {
+                                    runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
+                                    // Ownership is recorded, not inferred from the name: this is
+                                    // what makes the reconciler willing to move and delete it.
+                                    runCatching { s.setLabelOwner(labelId, shape.id) }
+                                }
+                                activeNoteId = labelId
+                            }
+                        }
+                    }
+                }
                 is io.ak1.drawbox.domain.model.Intent.ClearSelection,
                 is io.ak1.drawbox.domain.model.Intent.SelectAt -> if (groupOffset == Offset.Zero) selectedNoteIds = emptySet()
                 else -> Unit
@@ -542,14 +600,25 @@ fun CanvasWorkspace(
         val frame = (note.frame ?: defaultNoteFrame(0)).let { it.copy(x = it.x + DUPLICATE_OFFSET, y = it.y + DUPLICATE_OFFSET) }
         val id = "${note.id.substringBefore('-')}-${Clock.System.now().toEpochMilliseconds()}"
         coroutineScope.launch {
-            runCatching { session.setDocument(id, note.json, frame = frame, color = note.color, style = note.style) }
-                .onSuccess { activeNoteId = id; statusMessage = "Duplicated note" }
+            // Recorded like every other document change a person makes. Written straight to the
+            // session, the copy was the one note action undo could not take back.
+            recordingDocuments("duplicating a note") {
+                runCatching { session.setDocument(id, note.json, frame = frame, color = note.color, style = note.style) }
+                    .onSuccess { activeNoteId = id; statusMessage = "Duplicated note" }
+            }
         }
         return true
     }
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
-        CanvasKeyAction.ESCAPE -> { controller.clearSelection(); activeNoteId = null; expandedNoteId = null; selectedNoteIds = emptySet(); true }
+        CanvasKeyAction.ESCAPE -> {
+            controller.clearSelection()
+            activeNoteId = null
+            editingTextId = null
+            expandedNoteId = null
+            selectedNoteIds = emptySet()
+            true
+        }
         CanvasKeyAction.UNDO -> { undoBoard(); true }
         CanvasKeyAction.REDO -> { redoBoard(); true }
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
@@ -620,29 +689,6 @@ fun CanvasWorkspace(
                             }
                         }
                     }
-                    // A shape holds text: double-tap one to write in it. Placed after DrawBox in
-                    // the chain, so DrawBox's own gestures see the pointer first and this only
-                    // catches taps nothing else wanted.
-                    .pointerInput(session) {
-                        detectTapGestures(onDoubleTap = { position ->
-                            val current = controller.state.value
-                            val world = current.viewport.screenToWorld(position)
-                            val shape = CanvasShapeLabels.shapeAt(current.elements, world) ?: return@detectTapGestures
-                            val labelId = CanvasShapeLabels.labelIdOf(shape.id)
-                            val frame = CanvasShapeLabels.frameFor(shape.bounds())
-                            val s = session ?: return@detectTapGestures
-                            coroutineScope.launch {
-                                val existing = s.documents().firstOrNull { it.id == labelId }
-                                if (existing == null) {
-                                    runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
-                                    // Ownership is recorded, not inferred from the name: this is
-                                    // what makes the reconciler willing to move and delete it.
-                                    runCatching { s.setLabelOwner(labelId, shape.id) }
-                                }
-                                activeNoteId = labelId
-                            }
-                        })
-                    }
                     // After DrawBox has handled the event (Final pass): track Alt and the pointer
                     // while a connector is drawn, and on release snap the connector just finished.
                     .pointerInput(session) {
@@ -678,6 +724,31 @@ fun CanvasWorkspace(
                         }
                     },
             )
+
+            // The text tool places an element and the board puts the caret in it. Read from the
+            // ELEMENTS rather than from the insert intent: DrawBox republishes intents through a
+            // shared flow with no buffer, which drops them when the collector is busy, and a
+            // caret that sometimes does not appear is worse than no caret at all.
+            var knownTextIds by remember(session) { mutableStateOf(emptySet<String>()) }
+            LaunchedEffect(state.elements) {
+                val ids = CanvasTextElements.ids(state.elements)
+                val added = ids - knownTextIds
+                knownTextIds = ids
+                added.firstOrNull { CanvasTextElements.byId(state.elements, it)?.text.isNullOrEmpty() }
+                    ?.let { editingTextId = it }
+            }
+
+            // The caret, where DrawBox asked for one. Its own editor, placed by its own viewport:
+            // the text on the board and the text being typed are then the same thing, measured
+            // and wrapped by the same code, which is what a text element is for.
+            val editingText = CanvasTextElements.byId(state.elements, editingTextId)
+            if (editingText != null) {
+                io.ak1.drawbox.text.InlineTextEditor(
+                    editingText,
+                    state.viewport,
+                    editingText.text,
+                ) { typed -> controller.updateText(editingText.id, typed) }
+            }
 
             // The stroke under the nib, until DrawBox owns it.
             CanvasPenPreview(
@@ -723,19 +794,6 @@ fun CanvasWorkspace(
                             activeNoteId = id
                         }
                     },
-                    // Text is an object first: a press selects it, so it can be dragged and
-                    // resized by the same handles a shape has, and the caret is asked for with a
-                    // double click. A press that went straight to the caret is why text needed a
-                    // grip of its own to be movable at all.
-                    onSelect = { id, shift ->
-                        if (shift) {
-                            selectedNoteIds = if (id in selectedNoteIds) selectedNoteIds - id else selectedNoteIds + id
-                        } else {
-                            controller.clearSelection()
-                            selectedNoteIds = setOf(id)
-                        }
-                        activeNoteId = null
-                    },
                     onGroupDrag = { delta -> groupOffset += delta },
                     onGroupDragEnd = ::commitGroupMove,
                     modifier = Modifier.fillMaxSize().clipToBounds(),
@@ -769,7 +827,9 @@ fun CanvasWorkspace(
             // Which window's pen this canvas answers, so two open boards cannot take each other's
             // events or clear each other's registration.
             val penTarget = LocalCanvasPenTarget.current
-            DisposableEffect(session, state.mode, penDensity, penTarget) {
+            // The registry belongs to the host that reads the tablet, not to the process.
+            val penRegistry = LocalCanvasPenRegistry.current
+            DisposableEffect(session, state.mode, penDensity, penTarget, penRegistry) {
                 var stroke: CanvasPenStroke? = null
                 // True while the stroke in progress began on a note: the whole stroke belongs to
                 // the note, not only the samples that happen to fall inside it.
@@ -849,7 +909,7 @@ fun CanvasWorkspace(
                         CanvasPenEvent.Phase.IN -> false
                     }
                 }
-                val disposePen = CanvasPenInput.register(penTarget, penConsumer)
+                val disposePen = penRegistry.register(penTarget, penConsumer)
                 onDispose { disposePen() }
             }
 
@@ -865,12 +925,19 @@ fun CanvasWorkspace(
                 // describe the same revision; before that "no such shape" means "not imported
                 // yet", and acting on it destroys the text the shape is holding.
                 if (!initialLoadDone || sessionDoc?.revision != importedRevision) return@LaunchedEffect
-                work.orphaned.forEach { id ->
-                    if (activeNoteId == id) activeNoteId = null
-                    runCatching { s.removeDocument(id) }
-                    // Released as well as removed, so a document id reused later starts unowned
-                    // rather than inheriting a dead shape.
-                    runCatching { s.setLabelOwner(id, null) }
+                // A label goes because its shape went, which is a drawing step already on the
+                // history - so this work is FOLDED INTO that step rather than recorded beside it
+                // or, as before, not recorded at all. Undoing the deletion then gives back the
+                // shape and the words it was holding in one press; it used to give back an empty
+                // box, the text having been destroyed outside the history entirely.
+                recordingWithLastDrawing("deleting a labelled shape") {
+                    work.orphaned.forEach { id ->
+                        if (activeNoteId == id) activeNoteId = null
+                        runCatching { s.removeDocument(id) }
+                        // Released as well as removed, so a document id reused later starts
+                        // unowned rather than inheriting a dead shape.
+                        runCatching { s.setLabelOwner(id, null) }
+                    }
                 }
             }
 
@@ -1164,25 +1231,6 @@ fun CanvasWorkspace(
                         }
                     }
                 },
-                onAddText = session?.let { s ->
-                    {
-                        val frame = clearOfExisting(
-                            newTextFrame(state.viewport.screenToWorld(boardCenter)),
-                            liveDocuments.mapNotNull { it.frame },
-                        )
-                        val id = "text-${Clock.System.now().toEpochMilliseconds()}"
-                        coroutineScope.launch {
-                            recordingDocuments("adding text") {
-                                runCatching { s.setDocument(id, "", frame = frame, color = PLAIN_TEXT_COLOR) }
-                                    .onSuccess {
-                                        activeNoteId = id
-                                        statusMessage = "Added text"
-                                    }
-                                    .onFailure { statusMessage = "Error: could not add text (${it.message})" }
-                            }
-                        }
-                    }
-                },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
@@ -1274,6 +1322,9 @@ private fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offs
 }
 
 private const val DUPLICATE_OFFSET = 20f
+/** How long the board waits for the text DrawBox said it was inserting before giving up on it. */
+private const val INSERT_TEXT_TIMEOUT_MS = 2000L
+
 private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
 private const val WHEEL_ZOOM_STEP = 1.1f

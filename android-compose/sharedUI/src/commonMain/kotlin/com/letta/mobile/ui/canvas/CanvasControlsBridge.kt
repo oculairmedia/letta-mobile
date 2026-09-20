@@ -3,6 +3,7 @@ package com.letta.mobile.ui.canvas
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
+import io.ak1.drawbox.domain.model.TextAlignment
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.State
 import io.ak1.drawbox.domain.model.StrokeStyle
@@ -65,6 +66,10 @@ object CanvasControlsBridge {
             strokeStyle = shape?.strokeStyle ?: state.currentItemStrokeStyle,
             cornerRadius = shape?.cornerRadius ?: state.currentItemCornerRadius,
             showCornerRadius = hasRectangle || (selected.isEmpty() && state.mode == Mode.RECTANGLE),
+            fontSize = text?.fontSize ?: state.currentItemFontSize,
+            fontFamily = text?.fontFamilyKey ?: state.currentItemFontFamilyKey,
+            textAlignment = text?.alignment ?: state.currentItemTextAlignment,
+            showFontSize = text != null || (selected.isEmpty() && state.mode == Mode.TEXT),
         )
     }
 
@@ -117,6 +122,20 @@ object CanvasControlsBridge {
                 if (hasSelection) controller.setSelectionCornerRadius(intent.radius)
                 else controller.setCornerRadius(intent.radius)
             }
+            is CanvasPropertyIntent.SetFontSize -> {
+                // The selection if there is one, the tool if there is not - the same shape every
+                // other property on this bar has.
+                if (hasSelection) controller.setSelectionFontSize(intent.size)
+                else controller.setFontSize(intent.size)
+            }
+            is CanvasPropertyIntent.SetFontFamily -> {
+                if (hasSelection) controller.setSelectionFontFamily(intent.key)
+                else controller.setFontFamily(intent.key)
+            }
+            is CanvasPropertyIntent.SetTextAlignment -> {
+                if (hasSelection) controller.setSelectionTextAlignment(intent.alignment)
+                else controller.setTextAlignment(intent.alignment)
+            }
             is CanvasPropertyIntent.SetOpacity -> {
                 controller.setOpacity(intent.opacity)
                 if (!hasSelection) return
@@ -142,6 +161,14 @@ data class CanvasProperties(
     val strokeStyle: StrokeStyle,
     val cornerRadius: Float,
     val showCornerRadius: Boolean,
+    /** The size the selected text is set in, or the size the next text will be placed at. */
+    val fontSize: Float,
+    /** The face that text is set in: `sans`, `serif` or `mono`. */
+    val fontFamily: String,
+    /** The edge that text is set against. */
+    val textAlignment: TextAlignment,
+    /** Whether the size of the type is worth offering: text is selected, or about to be placed. */
+    val showFontSize: Boolean,
 )
 
 /**
@@ -153,4 +180,13 @@ sealed interface CanvasPropertyIntent {
     data class SetOpacity(val opacity: Float) : CanvasPropertyIntent
     data class SetStrokeStyle(val style: StrokeStyle) : CanvasPropertyIntent
     data class SetCornerRadius(val radius: Float) : CanvasPropertyIntent
+
+    /** The size of the type: of the selected text, or of the next text placed. */
+    data class SetFontSize(val size: Float) : CanvasPropertyIntent
+
+    /** The face the type is set in: `sans`, `serif` or `mono`. */
+    data class SetFontFamily(val key: String) : CanvasPropertyIntent
+
+    /** Which edge the lines are set against. */
+    data class SetTextAlignment(val alignment: TextAlignment) : CanvasPropertyIntent
 }
