@@ -68,7 +68,6 @@ import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.bounds
-import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -618,7 +617,9 @@ fun CanvasWorkspace(
     fun duplicateActiveNote(): Boolean {
         val note = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } } ?: return false
         if (session == null) return false
-        val frame = (note.frame ?: defaultNoteFrame(0)).let { it.copy(x = it.x + DUPLICATE_OFFSET, y = it.y + DUPLICATE_OFFSET) }
+        val frame = (note.frame ?: defaultNoteFrame(0)).let {
+            it.copy(x = it.x + CanvasWorkspaceSupport.DUPLICATE_OFFSET, y = it.y + CanvasWorkspaceSupport.DUPLICATE_OFFSET)
+        }
         val id = "${note.id.substringBefore('-')}-${Clock.System.now().toEpochMilliseconds()}"
         coroutineScope.launch {
             // Recorded like every other document change a person makes. Written straight to the
@@ -1304,93 +1305,7 @@ fun CanvasWorkspace(
     }
 }
 
-internal enum class HistoryDirection(val verb: String, val past: String) {
-    Undo("undo", "Undid"),
-    Redo("redo", "Redid");
-
-    val isRedo: Boolean get() = this == Redo
-}
-
-internal data class HistoryMessageContext(
-    val label: String,
-    val direction: HistoryDirection,
-    val success: Boolean,
-)
-
-internal data class DocumentChangeRequest(
-    val label: String,
-    val attachToLastDrawing: Boolean = false,
-)
-
-internal data class EraserArea(
-    val world: Offset,
-    val radius: Float,
-)
-
-private const val DUPLICATE_OFFSET = 20f
-/** How long the board waits for the text DrawBox said it was inserting before giving up on it. */
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
-
 private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
 private const val WHEEL_ZOOM_STEP = 1.1f
-
-internal object CanvasWorkspaceSupport {
-    /**
-     * Snaps the connector a release just finished to the nearest anchors within the snap radius:
-     * its points move onto them, ends on notes are recorded in the session, and ends on drawn
-     * shapes are handed to DrawBox's own binding pass so they follow the shape from then on.
-     */
-    fun snapLatestConnector(
-        controller: DrawBoxController,
-        session: CanvasSession?,
-        documents: List<com.letta.mobile.data.canvas.CanvasSceneDocument>,
-        scope: kotlinx.coroutines.CoroutineScope,
-    ) {
-        val current = controller.state.value
-        val connector = CanvasSnapping.latestConnector(current.elements) ?: return
-        val anchors = CanvasSnapping.anchors(current.elements, documents, connector.id)
-        val snapped = CanvasSnapping.snap(connector, anchors, current.viewport.scale) ?: return
-        if (snapped.points != connector.points) {
-            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(connector.id, snapped.points))
-        }
-        if (snapped.boundToShape) controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(connector.id))
-        if (session != null && (snapped.binding.start != null || snapped.binding.end != null)) {
-            scope.launch { runCatching { session.bindArrow(connector.id, snapped.binding) } }
-        }
-    }
-
-    /** [element] moved by [DUPLICATE_OFFSET] with a fresh id, the way whiteboards duplicate in place. */
-    fun duplicateElement(element: io.ak1.drawbox.domain.model.Element): io.ak1.drawbox.domain.model.Element {
-        val moved = element.translate(Offset(DUPLICATE_OFFSET, DUPLICATE_OFFSET))
-        val id = "${element.id}-copy-${Clock.System.now().toEpochMilliseconds()}"
-        return when (moved) {
-            is io.ak1.drawbox.domain.model.Element.Shape -> moved.copy(id = id, startBinding = null, endBinding = null)
-            is io.ak1.drawbox.domain.model.Element.Path -> moved.copy(id = id)
-            is io.ak1.drawbox.domain.model.Element.Text -> moved.copy(id = id)
-            else -> moved
-        }
-    }
-
-    fun shapeSelectionPoint(shape: io.ak1.drawbox.domain.model.Element.Shape): Offset =
-        when (shape.shapeType) {
-            io.ak1.drawbox.domain.model.ShapeType.LINE,
-            io.ak1.drawbox.domain.model.ShapeType.ARROW -> shape.points.first()
-            else -> shape.bounds().let { Offset(it.center.x, it.top) }
-        }
-
-    /**
-     * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
-     * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
-     * for text (hit by its box).
-     */
-    fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offset = when (element) {
-        is io.ak1.drawbox.domain.model.Element.Shape -> shapeSelectionPoint(element)
-        is io.ak1.drawbox.domain.model.Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
-        else -> element.bounds().center
-    }
-
-    fun documentHistoryMessage(context: HistoryMessageContext): String =
-        if (context.success) "${context.direction.past} ${context.label}"
-        else "Could not ${context.direction.verb} ${context.label}"
-}
