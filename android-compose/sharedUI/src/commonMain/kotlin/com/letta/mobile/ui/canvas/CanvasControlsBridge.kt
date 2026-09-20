@@ -58,20 +58,40 @@ object CanvasControlsBridge {
         val shape = selected.filterIsInstance<Element.Shape>().firstOrNull()
         val path = selected.filterIsInstance<Element.Path>().firstOrNull()
         val text = selected.filterIsInstance<Element.Text>().firstOrNull()
-        val hasRectangle = selected.any { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
+        val textProps = textPropertyRows(selected, text, state)
         return CanvasProperties(
             selectionCount = selected.size,
             strokeWidth = shape?.strokeWidth ?: path?.strokeWidth ?: state.strokeWidth,
             opacity = path?.alpha ?: text?.opacity ?: state.opacity,
             strokeStyle = shape?.strokeStyle ?: state.currentItemStrokeStyle,
             cornerRadius = shape?.cornerRadius ?: state.currentItemCornerRadius,
-            showCornerRadius = hasRectangle || (selected.isEmpty() && state.mode == Mode.RECTANGLE),
+            showCornerRadius = hasRectangle(selected) || (selected.isEmpty() && state.mode == Mode.RECTANGLE),
+            fontSize = textProps.fontSize,
+            fontFamily = textProps.fontFamily,
+            textAlignment = textProps.textAlignment,
+            showFontSize = textProps.showFontSize,
+        )
+    }
+
+    private data class CanvasTextProperties(
+        val fontSize: Float,
+        val fontFamily: String,
+        val textAlignment: TextAlignment,
+        val showFontSize: Boolean,
+    )
+
+    private fun textPropertyRows(selected: List<Element>, text: Element.Text?, state: State): CanvasTextProperties {
+        val show = text != null || (selected.isEmpty() && state.mode == Mode.TEXT)
+        return CanvasTextProperties(
             fontSize = text?.fontSize ?: state.currentItemFontSize,
             fontFamily = text?.fontFamilyKey ?: state.currentItemFontFamilyKey,
             textAlignment = text?.alignment ?: state.currentItemTextAlignment,
-            showFontSize = text != null || (selected.isEmpty() && state.mode == Mode.TEXT),
+            showFontSize = show,
         )
     }
+
+    private fun hasRectangle(selected: List<Element>): Boolean =
+        selected.any { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
 
     fun dispatchIntent(
         controller: DrawBoxController,
@@ -110,6 +130,44 @@ object CanvasControlsBridge {
     ) {
         val hasSelection = state.selectedIds.isNotEmpty()
         when (intent) {
+            is CanvasPropertyIntent.SetFontSize,
+            is CanvasPropertyIntent.SetFontFamily,
+            is CanvasPropertyIntent.SetTextAlignment -> dispatchTextProperty(controller, intent, hasSelection)
+            is CanvasPropertyIntent.SetOpacity -> applyOpacity(controller, intent.opacity, state, hasSelection)
+            is CanvasPropertyIntent.SetStrokeWidth,
+            is CanvasPropertyIntent.SetStrokeStyle,
+            is CanvasPropertyIntent.SetCornerRadius -> dispatchStrokeProperty(controller, intent, hasSelection)
+        }
+    }
+
+    private fun dispatchTextProperty(
+        controller: DrawBoxController,
+        intent: CanvasPropertyIntent,
+        hasSelection: Boolean,
+    ) {
+        when (intent) {
+            is CanvasPropertyIntent.SetFontSize -> {
+                if (hasSelection) controller.setSelectionFontSize(intent.size)
+                else controller.setFontSize(intent.size)
+            }
+            is CanvasPropertyIntent.SetFontFamily -> {
+                if (hasSelection) controller.setSelectionFontFamily(intent.key)
+                else controller.setFontFamily(intent.key)
+            }
+            is CanvasPropertyIntent.SetTextAlignment -> {
+                if (hasSelection) controller.setSelectionTextAlignment(intent.alignment)
+                else controller.setTextAlignment(intent.alignment)
+            }
+            else -> Unit
+        }
+    }
+
+    private fun dispatchStrokeProperty(
+        controller: DrawBoxController,
+        intent: CanvasPropertyIntent,
+        hasSelection: Boolean,
+    ) {
+        when (intent) {
             is CanvasPropertyIntent.SetStrokeWidth -> {
                 if (hasSelection) controller.setSelectionStrokeWidth(intent.width)
                 else controller.setStrokeWidth(intent.width)
@@ -122,34 +180,27 @@ object CanvasControlsBridge {
                 if (hasSelection) controller.setSelectionCornerRadius(intent.radius)
                 else controller.setCornerRadius(intent.radius)
             }
-            is CanvasPropertyIntent.SetFontSize -> {
-                // The selection if there is one, the tool if there is not - the same shape every
-                // other property on this bar has.
-                if (hasSelection) controller.setSelectionFontSize(intent.size)
-                else controller.setFontSize(intent.size)
-            }
-            is CanvasPropertyIntent.SetFontFamily -> {
-                if (hasSelection) controller.setSelectionFontFamily(intent.key)
-                else controller.setFontFamily(intent.key)
-            }
-            is CanvasPropertyIntent.SetTextAlignment -> {
-                if (hasSelection) controller.setSelectionTextAlignment(intent.alignment)
-                else controller.setTextAlignment(intent.alignment)
-            }
-            is CanvasPropertyIntent.SetOpacity -> {
-                controller.setOpacity(intent.opacity)
-                if (!hasSelection) return
-                state.elements
-                    .filter { it.id in state.selectedIds }
-                    .forEach { element ->
-                        when (element) {
-                            is Element.Path -> controller.onIntent(Intent.UpdateElement(element.copy(alpha = intent.opacity)))
-                            is Element.Text -> controller.onIntent(Intent.UpdateElement(element.copy(opacity = intent.opacity)))
-                            else -> Unit
-                        }
-                    }
-            }
+            else -> Unit
         }
+    }
+
+    private fun applyOpacity(
+        controller: DrawBoxController,
+        opacity: Float,
+        state: State,
+        hasSelection: Boolean,
+    ) {
+        controller.setOpacity(opacity)
+        if (!hasSelection) return
+        state.elements
+            .filter { it.id in state.selectedIds }
+            .forEach { element ->
+                when (element) {
+                    is Element.Path -> controller.onIntent(Intent.UpdateElement(element.copy(alpha = opacity)))
+                    is Element.Text -> controller.onIntent(Intent.UpdateElement(element.copy(opacity = opacity)))
+                    else -> Unit
+                }
+            }
     }
 }
 

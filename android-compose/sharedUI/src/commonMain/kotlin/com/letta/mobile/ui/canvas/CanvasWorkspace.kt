@@ -347,14 +347,11 @@ fun CanvasWorkspace(
     }
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
 
-    /**
-     * Runs a document change and records it as one undoable step.
-     *
-     * The step is a diff of the documents either side of [block] rather than the ops inside it: a
-     * single board action can touch several documents through several calls, and what undo owes
-     * the person is the state they had.
-     */
-    suspend fun recordingDocuments(label: String, block: suspend () -> Unit) {
+    suspend fun recordDocumentChange(
+        label: String,
+        attachToLastDrawing: Boolean = false,
+        block: suspend () -> Unit,
+    ) {
         val s = session
         if (s == null || applyingHistory) {
             block()
@@ -362,8 +359,21 @@ fun CanvasWorkspace(
         }
         val before = s.documents()
         block()
-        CanvasDocumentUndo.stepBetween(before, s.documents(), label)?.let { history.record(it) }
+        val step = CanvasDocumentUndo.stepBetween(before, s.documents(), label) ?: return
+        if (!attachToLastDrawing || !history.addToLastDrawing(step)) {
+            history.record(step)
+        }
     }
+
+    /**
+     * Runs a document change and records it as one undoable step.
+     *
+     * The step is a diff of the documents either side of [block] rather than the ops inside it: a
+     * single board action can touch several documents through several calls, and what undo owes
+     * the person is the state they had.
+     */
+    suspend fun recordingDocuments(label: String, block: suspend () -> Unit) =
+        recordDocumentChange(label = label, attachToLastDrawing = false, block = block)
 
     /**
      * Records document work that belongs to the drawing change just made.
@@ -374,54 +384,49 @@ fun CanvasWorkspace(
      * holding; recorded as a step of its own it would take two, with an empty box in between.
      * When there is no drawing step to fold into, it is recorded on its own rather than lost.
      */
-    suspend fun recordingWithLastDrawing(label: String, block: suspend () -> Unit) {
+    suspend fun recordingWithLastDrawing(label: String, block: suspend () -> Unit) =
+        recordDocumentChange(label = label, attachToLastDrawing = true, block = block)
+
+    fun applyDrawingStep(step: CanvasHistory.Step.Drawing, redo: Boolean) {
+        // The elements are DrawBox's; only it can put them back.
+        applyingHistory = true
+        if (redo) controller.redo() else controller.undo()
+        // A labelled shape takes its label with it, so the same step carries the document
+        // work: restoring the shape without its text hands back an empty box.
+        val documents = step.documents
         val s = session
-        if (s == null || applyingHistory) {
-            block()
-            return
+        if (documents != null && s != null) {
+            coroutineScope.launch {
+                runCatching { s.applyLocalStamped(if (redo) documents.redo else documents.undo) }
+            }
         }
-        val before = s.documents()
-        block()
-        val step = CanvasDocumentUndo.stepBetween(before, s.documents(), label) ?: return
-        if (!history.addToLastDrawing(step)) history.record(step)
+    }
+
+    fun applyDocumentsStep(step: CanvasHistory.Step.Documents, redo: Boolean) {
+        val s = session ?: return
+        val ops = if (redo) step.redo else step.undo
+        coroutineScope.launch {
+            applyingHistory = true
+            val applied = runCatching { s.applyLocalStamped(ops) }
+            applyingHistory = false
+            if (applied.isSuccess) {
+                statusMessage = if (redo) "Redid ${step.label}" else "Undid ${step.label}"
+            } else {
+                // The step moved across the stacks before this ran, so a storage, ACL or
+                // transport failure would leave the history insisting it happened. Put it
+                // back where it was: pressing undo again should retry, not skip.
+                if (redo) history.undo() else history.redo()
+                statusMessage = "Could not ${if (redo) "redo" else "undo"} ${step.label}"
+            }
+        }
     }
 
     /** Applies one history step, without recording what it causes as a new step. */
     fun applyHistory(step: CanvasHistory.Step?, redo: Boolean) {
         when (step) {
             null -> Unit
-            is CanvasHistory.Step.Drawing -> {
-                // The elements are DrawBox's; only it can put them back.
-                applyingHistory = true
-                if (redo) controller.redo() else controller.undo()
-                // A labelled shape takes its label with it, so the same step carries the document
-                // work: restoring the shape without its text hands back an empty box.
-                val documents = step.documents
-                val s = session
-                if (documents != null && s != null) {
-                    coroutineScope.launch {
-                        runCatching { s.applyLocalStamped(if (redo) documents.redo else documents.undo) }
-                    }
-                }
-            }
-            is CanvasHistory.Step.Documents -> {
-                val s = session ?: return
-                val ops = if (redo) step.redo else step.undo
-                coroutineScope.launch {
-                    applyingHistory = true
-                    val applied = runCatching { s.applyLocalStamped(ops) }
-                    applyingHistory = false
-                    if (applied.isSuccess) {
-                        statusMessage = if (redo) "Redid ${step.label}" else "Undid ${step.label}"
-                    } else {
-                        // The step moved across the stacks before this ran, so a storage, ACL or
-                        // transport failure would leave the history insisting it happened. Put it
-                        // back where it was: pressing undo again should retry, not skip.
-                        if (redo) history.undo() else history.redo()
-                        statusMessage = "Could not ${if (redo) "redo" else "undo"} ${step.label}"
-                    }
-                }
-            }
+            is CanvasHistory.Step.Drawing -> applyDrawingStep(step, redo)
+            is CanvasHistory.Step.Documents -> applyDocumentsStep(step, redo)
         }
     }
 

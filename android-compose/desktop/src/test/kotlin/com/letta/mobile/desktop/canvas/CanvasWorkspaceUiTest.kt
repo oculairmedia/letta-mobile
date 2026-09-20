@@ -103,22 +103,34 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) { controller.state.value.bgColor == androidx.compose.ui.graphics.Color(0xFFF7F3EA) }
     }
 
-    @Test
-    fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
+    private data class WorkspaceHarness(
+        val session: com.letta.mobile.data.canvas.CanvasSession,
+        val controller: io.ak1.drawbox.presentation.viewmodel.DrawBoxController,
+    )
+
+    private fun androidx.compose.ui.test.ComposeUiTest.withWorkspace(
+        title: String = "Notes Board",
+        initialSceneJson: String = "",
+    ): WorkspaceHarness {
         val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
-                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Notes Board", initialSceneJson = ""),
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = title, initialSceneJson = initialSceneJson),
             )
         }
         val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
             io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
         )
-
         setContent {
             CanvasWorkspace(session = session, controller = controller)
         }
+        return WorkspaceHarness(session, controller)
+    }
+
+    @Test
+    fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
+        val (session, controller) = withWorkspace("Notes Board")
 
         onAllNodesWithContentDescription("Note ", substring = true).assertCountEquals(0)
         // Zoom in first: placing and moving notes writes the session, and that must never reload
@@ -156,6 +168,14 @@ class CanvasWorkspaceUiTest {
         // A shape's LABEL is the board's plain block document: the text tool itself now places one
         // of DrawBox's own text elements instead (see CanvasTextToolUiTest), so this is where a
         // plain document and its formatting still live. Double-clicking a shape opens one.
+        verifyShapeLabelWorkflow(controller, session, note.id)
+    }
+
+    private fun androidx.compose.ui.test.ComposeUiTest.verifyShapeLabelWorkflow(
+        controller: io.ak1.drawbox.presentation.viewmodel.DrawBoxController,
+        session: com.letta.mobile.data.canvas.CanvasSession,
+        noteId: String,
+    ) {
         controller.importPath(
             """{"bgColor":"#ffffffff","elements":[{"id":"rect-1","type":"Shape","zIndex":1,
             "points":["40.0,40.0","240.0,160.0"],"strokeColor":"#000000ff","strokeWidth":4.0,
@@ -169,7 +189,7 @@ class CanvasWorkspaceUiTest {
         val centre = controller.state.value.viewport.worldToScreen(androidx.compose.ui.geometry.Offset(140f, 100f))
         onNodeWithContentDescription("Canvas board").performMouseInput { doubleClick(centre) }
         waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
-        val text = session.documents().first { it.id != note.id }
+        val text = session.documents().first { it.id != noteId }
         kotlin.test.assertEquals("#00000000", text.color, "a label is a plain document")
         waitUntil(timeoutMillis = 5000) {
             onAllNodesWithContentDescription("Bold").fetchSemanticsNodes().isNotEmpty()
