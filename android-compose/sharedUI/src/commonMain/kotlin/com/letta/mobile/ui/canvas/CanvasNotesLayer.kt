@@ -183,17 +183,7 @@ private fun CanvasNoteCard(
         val started = resizeStartFrame
         resizeStartFrame = null
         // Scale the type by however much the box grew, height being what type is measured by.
-        val scaledStyle = if (plain && started != null && started.height > 0f) {
-            val factor = committed.height / started.height
-            if (factor == 1f) {
-                null
-            } else {
-                val style = document.style ?: CanvasTextStyle()
-                style.copy(fontScale = ((style.fontScale ?: 1f) * factor).coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE))
-            }
-        } else {
-            null
-        }
+        val scaledStyle = computeScaledStyle(plain, started, committed, document.style)
         scope.launch {
             recorder.recordingOrJust("moving a note") {
                 // One commit, not two. A frame op followed by a style op can half-succeed, leaving
@@ -538,3 +528,17 @@ private val ResizeHandle.movesBottom: Boolean
 /** Type may be scaled this far by dragging a text element's box, and no further. */
 private const val MIN_FONT_SCALE = 0.4f
 private const val MAX_FONT_SCALE = 8f
+
+private fun computeScaledStyle(
+    plain: Boolean,
+    started: CanvasDocumentFrame?,
+    committed: CanvasDocumentFrame,
+    currentStyle: CanvasTextStyle?,
+): CanvasTextStyle? {
+    if (!plain || started == null || started.height <= 0f) return null
+    val factor = committed.height / started.height
+    if (factor == 1f) return null
+    val style = currentStyle ?: CanvasTextStyle()
+    val baseScale = style.fontScale ?: 1f
+    return style.copy(fontScale = (baseScale * factor).coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE))
+}

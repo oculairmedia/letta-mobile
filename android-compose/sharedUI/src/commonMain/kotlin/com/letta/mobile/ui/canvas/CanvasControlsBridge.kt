@@ -102,18 +102,12 @@ object CanvasControlsBridge {
             ControlsBarIntent.Undo -> controller.undo()
             ControlsBarIntent.Redo -> controller.redo()
             is ControlsBarIntent.SelectMode -> controller.setMode(intent.mode)
-            is ControlsBarIntent.SetStrokeColor -> {
-                if (hasSelection) controller.setSelectionColor(intent.color)
-                else controller.setColor(intent.color)
-            }
-            is ControlsBarIntent.SetStrokeEnabled -> {
-                if (hasSelection) controller.setSelectionStrokeEnabled(intent.enabled)
-                else controller.setStrokeEnabled(intent.enabled)
-            }
-            is ControlsBarIntent.SetFillColor -> {
-                if (hasSelection) controller.setSelectionFillColor(intent.color)
-                else controller.setFillColor(intent.color)
-            }
+            is ControlsBarIntent.SetStrokeColor ->
+                applyTarget(hasSelection, { controller.setSelectionColor(intent.color) }, { controller.setColor(intent.color) })
+            is ControlsBarIntent.SetStrokeEnabled ->
+                applyTarget(hasSelection, { controller.setSelectionStrokeEnabled(intent.enabled) }, { controller.setStrokeEnabled(intent.enabled) })
+            is ControlsBarIntent.SetFillColor ->
+                applyTarget(hasSelection, { controller.setSelectionFillColor(intent.color) }, { controller.setFillColor(intent.color) })
         }
     }
 

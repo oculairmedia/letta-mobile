@@ -60,6 +60,7 @@ internal fun rememberDesktopCanvasShell(scope: CoroutineScope): DesktopCanvasShe
     val library = rememberDesktopCanvasLibrary(store, scope)
     val sessionState = remember { mutableStateOf<CanvasSession?>(null) }
     val shell = remember(store, library, scope) { DesktopCanvasShell(store, library, scope, sessionState) }
+    DesktopCanvasCrashReproHook(shell)
     // Opening, creating or closing a canvas can change what the library lists.
     LaunchedEffect(sessionState.value) { library.refresh() }
     return shell

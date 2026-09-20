@@ -42,6 +42,8 @@ internal class TabletPenAwtMapper {
 
     private fun post(target: Component, point: Point, id: Int) {
         val modifiers = if (down) MouseEvent.BUTTON1_DOWN_MASK else 0
+        val clicks = if (id == MouseEvent.MOUSE_CLICKED) 1 else 0
+        val button = mouseButtonFor(id)
         target.dispatchEvent(
             MouseEvent(
                 target,
@@ -50,15 +52,18 @@ internal class TabletPenAwtMapper {
                 modifiers,
                 point.x,
                 point.y,
-                if (id == MouseEvent.MOUSE_CLICKED) 1 else 0,
+                clicks,
                 false,
-                if (id == MouseEvent.MOUSE_MOVED || id == MouseEvent.MOUSE_ENTERED || id == MouseEvent.MOUSE_EXITED) {
-                    MouseEvent.NOBUTTON
-                } else {
-                    MouseEvent.BUTTON1
-                },
+                button,
             ),
         )
+    }
+
+    private fun mouseButtonFor(id: Int): Int = when (id) {
+        MouseEvent.MOUSE_MOVED,
+        MouseEvent.MOUSE_ENTERED,
+        MouseEvent.MOUSE_EXITED -> MouseEvent.NOBUTTON
+        else -> MouseEvent.BUTTON1
     }
 
     private fun reportGeometryOnce(target: Component, physicalX: Float, physicalY: Float, scale: Double, logical: Point) {
@@ -67,11 +72,15 @@ internal class TabletPenAwtMapper {
         val onScreen = runCatching { target.locationOnScreen }.getOrNull()
         val cursor = runCatching { java.awt.MouseInfo.getPointerInfo()?.location }.getOrNull()
         val expectedOnScreen = onScreen?.let { Point(it.x + logical.x, it.y + logical.y) }
+        val delta = if (expectedOnScreen != null && cursor != null) {
+            Point(cursor.x - expectedOnScreen.x, cursor.y - expectedOnScreen.y)
+        } else {
+            null
+        }
         println(
             "TABLET GEOMETRY: physical=($physicalX, $physicalY) scale=$scale logical=$logical " +
                 "target=${target.label()} size=${target.size} locationOnScreen=$onScreen " +
-                "penWouldLandAt=$expectedOnScreen osCursor=$cursor " +
-                "delta=${if (expectedOnScreen != null && cursor != null) Point(cursor.x - expectedOnScreen.x, cursor.y - expectedOnScreen.y) else null}",
+                "penWouldLandAt=$expectedOnScreen osCursor=$cursor delta=$delta",
         )
     }
 

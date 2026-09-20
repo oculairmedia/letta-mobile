@@ -142,8 +142,6 @@ internal fun LettaDesktopApp(
     val railPrefs = rememberDesktopRailPrefs(secureSettingsStore)
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val canvasDocuments by canvasShell.library.documents.collectAsState()
-
-    com.letta.mobile.desktop.canvas.DesktopCanvasCrashReproHook(canvasShell)
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
@@ -1154,5 +1152,3 @@ private fun desktopActiveTitle(destination: DesktopDestination, conversationTitl
  * tools and default memory blocks (model/embedding default to the active
  * agent's config so the new agent is valid for this backend).
  */
-
-
