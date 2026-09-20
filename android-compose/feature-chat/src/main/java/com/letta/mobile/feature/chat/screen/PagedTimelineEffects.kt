@@ -42,6 +42,7 @@ internal class PagedTimelineTargetEffectsParams(
     val restoreAnchor: ChatPagingViewport?,
     val following: Boolean,
     val onHighlightTarget: (String?) -> Unit,
+    val onAnchorApplied: () -> Unit = {},
 ) {
     fun shouldRestoreMissingTail(missingTarget: String?): Boolean =
         routeTarget == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId
@@ -67,7 +68,7 @@ internal object PagedTimelineEffects {
         observeScrollSettlement(params)
         LaunchedEffect(params.live) { RenderDiagnostics.newRenderGeneration() }
         observeLiveUserPrompt(params)
-        LaunchedEffect(params.live, params.pages.itemSnapshotList, params.following) {
+        LaunchedEffect(params.live, params.pages.itemSnapshotList.items.firstOrNull()?.key, params.following) {
             if (params.following && !params.listState.isScrollInProgress) {
                 params.listState.scrollToItem(0)
             }
@@ -138,6 +139,7 @@ internal object PagedTimelineEffects {
                 if (index != null) {
                     applyTargetScroll(params, index)
                     targetPositioned.value = true
+                    params.onAnchorApplied()
                 }
             }
         }
@@ -171,12 +173,20 @@ internal object PagedTimelineEffects {
                 params.listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
             }.first { it != null }!!
             val layout = params.listState.layoutInfo
-            val centerOffset = ((layout.viewportEndOffset - layout.viewportStartOffset - item.size) / 2)
-                .coerceAtLeast(0)
+            val centerOffset = openingAnchorOffset(layout, item.size, routeTarget = true, savedOffset = null)
             params.listState.scrollToItem(index, -centerOffset)
             params.onHighlightTarget(target)
         }
     }
+
+    fun openingAnchorOffset(
+        layout: androidx.compose.foundation.lazy.LazyListLayoutInfo,
+        itemSize: Int,
+        routeTarget: Boolean,
+        savedOffset: Int?,
+    ): Int = if (routeTarget) {
+        ((layout.viewportEndOffset - layout.viewportStartOffset - itemSize) / 2).coerceAtLeast(0)
+    } else -(savedOffset ?: 0)
 
     fun resolveTargetScrollPosition(
         target: String,

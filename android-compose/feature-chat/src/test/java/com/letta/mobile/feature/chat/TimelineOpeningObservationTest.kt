@@ -60,6 +60,32 @@ class TimelineOpeningObservationTest {
         GroupPosition.None,
     )
 
+    private enum class Boundary { Terminal, Open }
+
+    /**
+     * Test-local Paging source boundaries. With reverseLayout, Paging prepend is the newest edge
+     * (the source's prevKey) and append is the older edge (the source's nextKey).
+     */
+    private data class PageBoundaries(
+        val newest: Boundary,
+        val older: Boundary,
+    ) {
+        private fun Boundary.loadState() = LoadState.NotLoading(this == Boundary.Terminal)
+
+        fun loadStates(refresh: LoadState) = LoadStates(
+            refresh = refresh,
+            prepend = newest.loadState(),
+            append = older.loadState(),
+        )
+
+        val isCompleteHistory get() = newest == Boundary.Terminal && older == Boundary.Terminal
+
+        companion object {
+            val Complete = PageBoundaries(Boundary.Terminal, Boundary.Terminal)
+            val NewestOpen = PageBoundaries(Boundary.Open, Boundary.Terminal)
+        }
+    }
+
     /** Channel holds page delivery without sleeps; opening, page, anchor and freshness are separate. */
     private inner class Fixture {
         val rows = listOf(row("first"), row("second"), row("third"))
@@ -73,6 +99,9 @@ class TimelineOpeningObservationTest {
         var generations = 0
         val shellMounts = mutableListOf<com.letta.mobile.feature.chat.screen.TimelineShellToken>()
         val shellDisposals = mutableListOf<com.letta.mobile.feature.chat.screen.TimelineShellToken>()
+        val readiness = mutableListOf<Pair<androidx.compose.foundation.lazy.LazyListState, Boolean>>()
+        val mounts = mutableListOf<String>()
+        val disposals = mutableListOf<String>()
         // A fixture-only boundary; no claim about canonical transport or process-cold IO.
         val freshness = kotlinx.coroutines.CompletableDeferred<Unit>()
         val settled = delivery.receiveAsFlow().onEach {
@@ -85,10 +114,12 @@ class TimelineOpeningObservationTest {
             recorder.mark(Milestone.PresentationOpen)
             current.value = opened
         }
-        fun page(items: List<ChatRenderItem>, refresh: LoadState = LoadState.NotLoading(false)) {
-            check(delivery.trySend(PagingData.from(items, LoadStates(
-                refresh, LoadState.NotLoading(true), LoadState.NotLoading(true),
-            ))).isSuccess)
+        fun page(
+            items: List<ChatRenderItem>,
+            boundaries: PageBoundaries,
+            refresh: LoadState = LoadState.NotLoading(false),
+        ) {
+            check(delivery.trySend(PagingData.from(items, boundaries.loadStates(refresh))).isSuccess)
         }
         fun mount(modifier: Modifier = Modifier) {
             recorder.mark(Milestone.Selection)
@@ -96,6 +127,13 @@ class TimelineOpeningObservationTest {
                 LettaChatTheme {
                     CompositionLocalProvider(
                         LocalTimelineOpeningObserver provides recorder::observe,
+                        com.letta.mobile.feature.chat.screen.LocalTimelineReadinessObserver provides { state, ready ->
+                            readiness += state to ready
+                        },
+                        com.letta.mobile.feature.chat.screen.LocalTimelineRowLifecycleObserver provides { event, key ->
+                            if (event == com.letta.mobile.feature.chat.screen.TimelineRowLifecycle.Mount) mounts += key
+                            else disposals += key
+                        },
                         com.letta.mobile.feature.chat.screen.LocalTimelineShellLifecycleObserver provides { event ->
                             when (event) {
                                 is com.letta.mobile.feature.chat.screen.TimelineShellLifecycle.Mounted -> shellMounts += event.token
@@ -118,6 +156,87 @@ class TimelineOpeningObservationTest {
         fun milestones() = recorder.milestones.map { it.second }
     }
 
+    @Test fun readyRevealKeepsViewportStateAndMountedKeys() {
+        val f = Fixture()
+        f.open()
+        f.page(f.rows, PageBoundaries.NewestOpen)
+        f.mount(Modifier.size(300.dp, 400.dp))
+        compose.onNodeWithText("first").assertDoesNotExist()
+        val before = compose.runOnIdle {
+            assertEquals(f.expectedVisibleKeys.toSet(), f.mounts.toSet())
+            assertTrue(f.readiness.none { it.second })
+            val layout = f.readiness.last().first.layoutInfo
+            assertEquals(f.expectedVisibleKeys, layout.visibleItemsInfo.map { it.key })
+            assertTrue(layout.viewportSize.width > 0 && layout.viewportSize.height > 0)
+            // onGloballyPositioned proves placement, not merely lazy measure metadata.
+            assertTrue(f.recorder.observations.any {
+                val measured = it.observation as? TimelineOpeningObservation.Layout
+                measured?.rows?.map { row -> row.key } == f.expectedVisibleKeys
+            })
+            f.readiness.last().first
+        }
+        compose.runOnIdle { f.page(f.rows, PageBoundaries.Complete) }
+        compose.onNodeWithText("first").assertIsDisplayed()
+        compose.runOnIdle {
+            assertTrue(f.readiness.all { it.first === before })
+            assertEquals(f.expectedVisibleKeys.toSet(), f.mounts.toSet())
+            assertEquals(3, f.mounts.size)
+            assertTrue(f.disposals.isEmpty())
+            assertEquals(1, f.readiness.map { it.second }.distinct().count { it })
+        }
+    }
+
+    @Test fun olderContinuationDoesNotMoveInitialAnchor() {
+        val f = Fixture()
+        f.open()
+        f.page(f.rows, PageBoundaries(Boundary.Terminal, Boundary.Open))
+        f.mount(Modifier.size(300.dp, 200.dp))
+        compose.onNodeWithText("first").assertIsDisplayed()
+        val before = compose.runOnIdle {
+            f.readiness.last().first.layoutInfo.visibleItemsInfo.map { it.key to it.offset }
+        }
+        compose.runOnIdle { f.page(f.rows + (1..20).map { row("older-$it") }, PageBoundaries.Complete) }
+        compose.runOnIdle {
+            assertEquals(before, f.readiness.last().first.layoutInfo.visibleItemsInfo.map { it.key to it.offset })
+        }
+    }
+
+    @Test fun routeTargetWaitsForResidentAppliedAnchorWithOpenBoundaries() = requestedAnchorReveals(saved = false)
+
+    @Test fun savedViewportWaitsForResidentAppliedAnchorWithOpenBoundaries() = requestedAnchorReveals(saved = true)
+
+    private fun requestedAnchorReveals(saved: Boolean) {
+        val f = Fixture()
+        if (saved) f.opened.viewport = com.letta.mobile.feature.chat.screen.ChatPagingViewport("third", 7)
+        else {
+            f.opened.hasBoundRoute = true
+            f.opened.routeTarget = "third"
+        }
+        f.open()
+        f.page(f.rows.take(1), PageBoundaries(Boundary.Open, Boundary.Open))
+        f.mount(Modifier.size(300.dp, 200.dp))
+        compose.onNodeWithText("first").assertDoesNotExist()
+        compose.runOnIdle { assertTrue(f.readiness.none { it.second }) }
+        compose.runOnIdle { f.page(f.rows + (1..20).map { row("older-$it") }, PageBoundaries(Boundary.Open, Boundary.Open)) }
+        compose.onNodeWithText("third").assertIsDisplayed()
+        compose.runOnIdle {
+            val layout = f.readiness.last().first.layoutInfo
+            val target = layout.visibleItemsInfo.first { it.key == f.rows[2].key }
+            if (saved) assertEquals(-7, target.offset)
+            else assertEquals((layout.viewportEndOffset - layout.viewportStartOffset - target.size) / 2, target.offset)
+            assertTrue(f.readiness.last().second)
+        }
+    }
+
+    @Test fun terminalOneMessageReveals() {
+        val f = Fixture()
+        f.open()
+        f.page(f.rows.take(1), PageBoundaries.Complete)
+        f.mount()
+        compose.onNodeWithText("first").assertIsDisplayed()
+        compose.onNodeWithText("Loading conversation...").assertDoesNotExist()
+    }
+
     @Test fun callerModifierConstrainsLoadingAndTimelineContentExactlyOnce() {
         val f = Fixture()
         f.mount(Modifier.size(300.dp, 240.dp).testTag("caller-viewport").padding(20.dp))
@@ -132,16 +251,18 @@ class TimelineOpeningObservationTest {
         assertLoading()
         compose.runOnIdle { f.open() }
         assertLoading()
-        compose.runOnIdle { f.page(f.rows.take(1)) }
-        compose.onNodeWithText("first").assertIsDisplayed()
+        compose.runOnIdle { f.page(f.rows.take(1), PageBoundaries.NewestOpen) }
+        compose.onNodeWithText("first").assertDoesNotExist()
+        compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
+        compose.runOnIdle { f.page(f.rows, PageBoundaries.Complete) }
         assertContent(hasScrollToIndexAction())
         compose.onNodeWithTag("caller-viewport").assertWidthIsEqualTo(300.dp).assertHeightIsEqualTo(240.dp)
     }
 
-    @Test fun residentPageReachesBoundedAnchoredViewportWithoutFreshness() {
+    @Test fun cachedOpenFirstVisibleFrameIsCompleteAndAnchored() {
         val f = Fixture()
         f.open()
-        f.page(f.rows)
+        f.page(f.rows, PageBoundaries.Complete)
         f.recorder.resolveAnchor()
         f.mount()
         compose.onNodeWithText("third").assertIsDisplayed()
@@ -160,19 +281,22 @@ class TimelineOpeningObservationTest {
         }
     }
 
-    @Test fun heldPageExposesLoadingThenPartialContentBeforeCompleteViewport() {
+    @Test fun heldOneRowGenerationExposesLoadingBeforeCompleteViewport() {
         val f = Fixture()
         f.mount()
         compose.onNodeWithText("Opening conversation...").assertIsDisplayed()
         compose.runOnIdle { f.open() }
         compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
-        compose.runOnIdle { f.page(f.rows.take(1)) }
-        compose.onNodeWithText("first").assertIsDisplayed()
+        compose.runOnIdle { f.page(f.rows.take(1), PageBoundaries.NewestOpen) }
+        compose.onNodeWithText("first").assertDoesNotExist()
+        compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
         compose.runOnIdle {
             assertTrue(Milestone.FirstGeneration in f.milestones())
+            // S1 records placement, not drawing: hidden rows now legitimately lay out.
             assertTrue(Milestone.FirstContentCommitted in f.milestones())
+            assertTrue(f.readiness.none { it.second })
             assertFalse(Milestone.ViewportReady in f.milestones())
-            f.page(f.rows)
+            f.page(f.rows, PageBoundaries.Complete)
         }
         compose.onNodeWithText("third").assertIsDisplayed()
         compose.runOnIdle {
@@ -194,7 +318,7 @@ class TimelineOpeningObservationTest {
         compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
         compose.runOnIdle {
             f.recorder.resolveAnchor()
-            f.page(f.rows)
+            f.page(f.rows, PageBoundaries.Complete)
         }
         compose.onNodeWithText("third").assertIsDisplayed()
         compose.runOnIdle {
@@ -261,10 +385,23 @@ class TimelineOpeningObservationTest {
         assertEquals(1, recorder.milestones.count { it.second == Milestone.ViewportReady })
     }
 
-    @Test fun typedReadinessPreservesResidentGateWithoutViewportOrTimer() {
+    @Test fun typedReadinessUsesPagingBoundariesRatherThanRowCount() {
+        val incompleteOneRow = PageBoundaries.NewestOpen
+        val completedOneMessage = PageBoundaries.Complete
+        // Paging boundary state, not the number of resident rows, establishes fixture history.
+        assertFalse(incompleteOneRow.isCompleteHistory)
+        assertTrue(completedOneMessage.isCompleteHistory)
+        assertEquals(TimelineOpeningState.Priming, deriveTimelineOpeningState(
+            opening = false,
+            openError = null,
+            historyReady = incompleteOneRow.isCompleteHistory,
+        ))
+        assertEquals(TimelineOpeningState.Ready, deriveTimelineOpeningState(
+            opening = false,
+            openError = null,
+            historyReady = completedOneMessage.isCompleteHistory,
+        ))
         assertEquals(TimelineOpeningState.Opening, deriveTimelineOpeningState(true, null))
-        assertEquals(TimelineOpeningState.Priming, deriveTimelineOpeningState(false, null))
-        assertEquals(TimelineOpeningState.Ready, deriveTimelineOpeningState(false, null, historyReady = true))
         assertEquals(TimelineOpeningState.Priming, deriveTimelineOpeningState(false, null,
             refresh = LoadState.NotLoading(false)))
         assertEquals(TimelineOpeningState.Empty, deriveTimelineOpeningState(false, null,
@@ -304,21 +441,23 @@ class TimelineOpeningObservationTest {
         compose.runOnIdle { f.open() }
         loading()
         assertEquals(original, shellId())
-        compose.runOnIdle { f.page(emptyList(), LoadState.Loading) }
+        compose.runOnIdle { f.page(emptyList(), PageBoundaries.Complete, LoadState.Loading) }
         loading()
         compose.onNodeWithText("No messages yet").assertDoesNotExist()
-        compose.runOnIdle { f.page(emptyList(), LoadState.Error(IllegalStateException())) }
+        compose.runOnIdle { f.page(emptyList(), PageBoundaries.Complete, LoadState.Error(IllegalStateException())) }
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Could not load conversation")).assertIsDisplayed()
         compose.onNodeWithText("Retry").assertHasClickAction().performClick()
         assertEquals(original, shellId())
-        compose.runOnIdle { f.page(emptyList()) }
+        compose.runOnIdle { f.page(emptyList(), PageBoundaries.Complete) }
         compose.onNodeWithText("No messages yet").assertIsDisplayed()
         assertEquals(original, shellId())
-        compose.runOnIdle { f.page(f.rows.take(1)) }
-        compose.onNodeWithText("first").assertIsDisplayed()
+        compose.runOnIdle { f.page(f.rows.take(1), PageBoundaries.NewestOpen) }
+        compose.onNodeWithText("first").assertDoesNotExist()
+        compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
+        compose.runOnIdle { f.page(f.rows, PageBoundaries.Complete) }
         compose.onNodeWithText("No messages yet").assertDoesNotExist()
         assertEquals(original, shellId())
-        compose.runOnIdle { f.page(f.rows) }
+        compose.runOnIdle { f.page(f.rows, PageBoundaries.Complete) }
         compose.onNodeWithText("third").assertIsDisplayed()
         assertEquals(original, shellId())
     }
@@ -328,7 +467,7 @@ class TimelineOpeningObservationTest {
         f.mount()
         compose.runOnIdle { f.open() }
         compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
-        compose.runOnIdle { f.page(emptyList()) }
+        compose.runOnIdle { f.page(emptyList(), PageBoundaries.Complete) }
         compose.waitForIdle()
         compose.runOnIdle {
             assertEquals(listOf(Milestone.Selection, Milestone.PresentationOpen, Milestone.FirstGeneration,
@@ -342,13 +481,18 @@ class TimelineOpeningObservationTest {
         f.mount()
         compose.runOnIdle { f.open() }
         compose.onNodeWithText("Loading conversation...").assertIsDisplayed()
-        compose.runOnIdle { f.page(emptyList(), LoadState.Error(IllegalStateException("held failure"))) }
+        compose.runOnIdle { f.page(
+                emptyList(),
+                PageBoundaries.Complete,
+                LoadState.Error(IllegalStateException("held failure")),
+            ) }
         compose.onNodeWithText("Could not load conversation").assertIsDisplayed()
         compose.onNodeWithText("Retry").assertIsDisplayed()
         compose.runOnIdle {
             assertEquals(listOf(Milestone.Selection, Milestone.PresentationOpen, Milestone.FirstGeneration,
                 Milestone.Failed), f.milestones())
-            assertFalse(f.recorder.observations.any { it.observation is TimelineOpeningObservation.Layout })
+            assertTrue(f.readiness.none { it.second })
+            assertTrue(f.mounts.isEmpty())
         }
     }
 }

@@ -2,6 +2,8 @@ package com.letta.mobile.feature.chat.screen
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyListItemInfo
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.platform.testTag
@@ -25,8 +27,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import kotlinx.coroutines.flow.first
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
+import androidx.paging.LoadStates
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -94,7 +103,9 @@ internal fun residentTargetIndex(
 ): Int? = rows.indexOfFirst { it.containsMessageId(target) }
     .takeIf { it >= 0 }?.let { liveCount + placeholdersBefore + it }
 
-/** S2 readiness preserves the resident-row gate; Ready does not promise an anchored viewport. */
+internal val LocalTimelineReadinessObserver = staticCompositionLocalOf<((androidx.compose.foundation.lazy.LazyListState, Boolean) -> Unit)?> { null }
+
+/** Ready is latched only after source completeness, anchor application and bounded measurement. */
 @Immutable
 internal sealed interface TimelineOpeningState {
     data object Opening : TimelineOpeningState
@@ -193,32 +204,57 @@ private fun PagedChatMessageListContent(
     val live by presentation.live.collectAsStateWithLifecycle()
     val displayedLive = displayedLiveRows(live, pages.itemSnapshotList.items)
     val refresh = pages.loadState.source.refresh
-    val confirmedEmpty = isTimelineConfirmedEmpty(
+    val source = pages.loadState.source
+    val restoreAnchor = remember(presentation) { presentation.viewport?.takeUnless { it.following } }
+    val requestedTarget = routeTarget ?: restoreAnchor?.messageId
+    val targetIndex = requestedTarget?.let {
+        PagedTimelineEffects.resolveTargetScrollPosition(it, displayedLive, pages.itemSnapshotList)
+    }
+    val sourceState = deriveTimelineOpeningSourceState(
+        source = source,
+        refresh = refresh,
+        requestedTarget = requestedTarget,
+        targetIndex = targetIndex,
         itemCount = pages.itemCount,
         displayedLiveEmpty = displayedLive.isEmpty(),
-        initialPageAvailable = PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh),
     )
+    var anchorApplied by remember(presentation, sourceState.requestedTarget) { mutableStateOf(false) }
+    var revealed by remember(presentation) { mutableStateOf(false) }
     val readiness = deriveTimelineOpeningState(
         opening = false,
         openError = null,
-        historyReady = rememberHistoryGate(presentation, pages),
-        confirmedEmpty = confirmedEmpty,
-        refresh = refresh,
+        historyReady = revealed || sourceState.confirmedEmpty,
+        confirmedEmpty = sourceState.confirmedEmpty && !revealed,
+        refresh = sourceState.failure ?: refresh,
     )
-    if (readiness == TimelineOpeningState.Priming || readiness is TimelineOpeningState.Failed) {
-        ObserveOpeningCommit(if (readiness is TimelineOpeningState.Failed) TimelineOpeningObservation.Surface.InitialFailed else TimelineOpeningObservation.Surface.InitialLoading)
-        OpeningTreatment(readiness, state.agentId, pages::retry, modifier)
-        return
-    }
     ObserveOpeningCommit(
-        TimelineOpeningObservation.Surface.Timeline,
-        residentRows = pages.itemSnapshotList.items.size,
-        confirmedEmpty = confirmedEmpty,
+        when (readiness) {
+            TimelineOpeningState.Ready, TimelineOpeningState.Empty -> TimelineOpeningObservation.Surface.Timeline
+            is TimelineOpeningState.Failed -> TimelineOpeningObservation.Surface.InitialFailed
+            else -> TimelineOpeningObservation.Surface.InitialLoading
+        },
+        residentRows = if (revealed) pages.itemSnapshotList.items.size else 0,
+        confirmedEmpty = sourceState.confirmedEmpty,
     )
     ObserveResidentRows(presentation, pages)
     val listState = key(presentation) { rememberLazyListState() }
+    val readinessObserver = LocalTimelineReadinessObserver.current
+    SideEffect { readinessObserver?.invoke(listState, revealed) }
     val missingTarget by presentation.missingTarget.collectAsStateWithLifecycle()
-    val restoreAnchor = remember(presentation) { presentation.viewport?.takeUnless { it.following } }
+    LaunchedEffect(sourceState.sourceReady, anchorApplied, sourceState.requestedTarget, pages.itemSnapshotList, displayedLive) {
+        if (!revealed && sourceState.sourceReady && (sourceState.requestedTarget == null || anchorApplied)) {
+            if (sourceState.requestedTarget == null) listState.scrollToItem(0)
+            snapshotFlow {
+                isViewportReady(
+                    layout = listState.layoutInfo,
+                    targetIndex = sourceState.targetIndex ?: 0,
+                    routeTarget = routeTarget != null,
+                    savedOffset = restoreAnchor?.offset,
+                )
+            }.first { it }
+            revealed = true
+        }
+    }
     var following by remember(presentation, routeTarget) {
         mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
@@ -244,6 +280,7 @@ private fun PagedChatMessageListContent(
             restoreAnchor = restoreAnchor,
             following = following,
             onHighlightTarget = highlightedTargetState.onHighlight,
+            onAnchorApplied = { anchorApplied = true },
         ),
     )
 
@@ -262,29 +299,101 @@ private fun PagedChatMessageListContent(
             missingTarget = missingTarget,
             appearance = appearance,
             callbacks = callbacks,
-            modifier = modifier,
+            modifier = modifier
+                .then(if (revealed) Modifier else Modifier.clearAndSetSemantics { })
+                .focusProperties { canFocus = revealed }
+                // Placement must continue during Priming so lazy measurement and anchoring run.
+                .drawWithContent { if (revealed) drawContent() },
         ),
     )
-    if (readiness == TimelineOpeningState.Empty) OpeningTreatment(readiness, state.agentId, pages::retry)
+    if (!revealed) Box(Modifier.fillMaxSize().pointerInput(Unit) {
+        // This topmost sibling owns hit testing, including empty space around the treatment.
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent(PointerEventPass.Final).changes.forEach { it.consume() }
+            }
+        }
+    }) {
+        OpeningTreatment(readiness, state.agentId, pages::retry)
+    }
 }
 
-@Composable
-private fun rememberHistoryGate(
-    presentation: ChatPagingPresentation,
-    pages: LazyPagingItems<ChatRenderItem>,
-): Boolean {
-    var initialHistoryReady by remember(presentation) { mutableStateOf(false) }
-    val refresh = pages.loadState.source.refresh
-    val initialPageAvailable = PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh)
-    if (initialPageAvailable) SideEffect { initialHistoryReady = true }
-    return initialHistoryReady || initialPageAvailable
-}
+@Immutable
+internal data class TimelineOpeningSourceState(
+    val failure: LoadState.Error?,
+    val confirmedEmpty: Boolean,
+    val requestedTarget: String?,
+    val targetIndex: Int?,
+    val sourceReady: Boolean,
+)
 
-internal fun isTimelineConfirmedEmpty(
+internal fun deriveTimelineOpeningSourceState(
+    source: LoadStates,
+    refresh: LoadState,
+    requestedTarget: String?,
+    targetIndex: Int?,
     itemCount: Int,
     displayedLiveEmpty: Boolean,
-    initialPageAvailable: Boolean,
-): Boolean = itemCount == 0 && displayedLiveEmpty && initialPageAvailable
+): TimelineOpeningSourceState {
+    val failure = listOf(source.refresh, source.prepend, source.append)
+        .filterIsInstance<LoadState.Error>()
+        .firstOrNull()
+    val isRefreshNotLoading = refresh is LoadState.NotLoading
+    val isPrependNotLoading = source.prepend is LoadState.NotLoading
+    val isAppendNotLoading = source.append is LoadState.NotLoading
+
+    val sourceReady = failure == null && isRefreshNotLoading && if (requestedTarget == null) {
+        isPrependNotLoading && source.prepend.endOfPaginationReached
+    } else {
+        targetIndex != null && isPrependNotLoading && isAppendNotLoading
+    }
+
+    val confirmedEmpty = isRefreshNotLoading &&
+        source.prepend.endOfPaginationReached &&
+        source.append.endOfPaginationReached &&
+        itemCount == 0 &&
+        displayedLiveEmpty
+
+    return TimelineOpeningSourceState(
+        failure = failure,
+        confirmedEmpty = confirmedEmpty,
+        requestedTarget = requestedTarget,
+        targetIndex = targetIndex,
+        sourceReady = sourceReady,
+    )
+}
+
+internal fun isLayoutBounded(layout: LazyListLayoutInfo): Boolean =
+    layout.viewportSize.width > 0 && layout.viewportSize.height > 0
+
+internal fun isAnchorItemPositioned(
+    item: LazyListItemInfo,
+    targetIndex: Int,
+    expectedOffset: Int,
+    layout: LazyListLayoutInfo,
+): Boolean {
+    if (item.index != targetIndex || item.size <= 0) return false
+    if (item.offset != expectedOffset) return false
+    return item.offset < layout.viewportEndOffset && item.offset + item.size > layout.viewportStartOffset
+}
+
+internal fun isViewportReady(
+    layout: LazyListLayoutInfo,
+    targetIndex: Int,
+    routeTarget: Boolean,
+    savedOffset: Int?,
+): Boolean {
+    if (!isLayoutBounded(layout)) return false
+    return layout.visibleItemsInfo.any { item ->
+        val expectedOffset = PagedTimelineEffects.openingAnchorOffset(
+            layout = layout,
+            itemSize = item.size,
+            routeTarget = routeTarget,
+            savedOffset = savedOffset,
+        )
+        isAnchorItemPositioned(item, targetIndex, expectedOffset, layout)
+    }
+}
 
 @Immutable
 private data class HighlightedTargetState(
