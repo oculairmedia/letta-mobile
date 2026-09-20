@@ -42,6 +42,18 @@ internal class PagedTimelineTargetEffectsParams(
     val restoreAnchor: ChatPagingViewport?,
     val following: Boolean,
     val onHighlightTarget: (String?) -> Unit,
+) {
+    fun shouldRestoreMissingTail(missingTarget: String?): Boolean =
+        routeTarget == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId
+
+    fun canSaveViewport(targetPositioned: Boolean): Boolean =
+        targetPositioned || (restoreAnchor == null && routeTarget == null)
+}
+
+internal class TimelinePinchZoomParams(
+    val pinch: PinchScalePreviewController,
+    val activeFontScale: Float,
+    val onScaleChange: (Float) -> Unit,
 )
 
 internal object PagedTimelineEffects {
@@ -52,9 +64,9 @@ internal object PagedTimelineEffects {
                 if (interaction is DragInteraction.Start) params.onFollowingChange(false)
             }
         }
-        observeScrollSettlement(params.listState, params.pages.loadState.prepend.endOfPaginationReached, params.onFollowingChange)
+        observeScrollSettlement(params)
         LaunchedEffect(params.live) { RenderDiagnostics.newRenderGeneration() }
-        observeLiveUserPrompt(params.live, params.presentation, params.listState, params.onFollowingChange)
+        observeLiveUserPrompt(params)
         LaunchedEffect(params.live, params.pages.itemSnapshotList, params.following) {
             if (params.following && !params.listState.isScrollInProgress) {
                 params.listState.scrollToItem(0)
@@ -63,17 +75,15 @@ internal object PagedTimelineEffects {
     }
 
     @Composable
-    private fun observeScrollSettlement(
-        listState: LazyListState,
-        prependDone: Boolean,
-        onFollowingChange: (Boolean) -> Unit,
-    ) {
+    private fun observeScrollSettlement(params: PagedTimelineScrollEffectsParams) {
+        val listState = params.listState
+        val prependDone = params.pages.loadState.prepend.endOfPaginationReached
         LaunchedEffect(listState, prependDone) {
             var wasScrolling = false
             snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
                 val atEdge = !listState.canScrollBackward
                 if (!scrolling && followNewestEdge(wasScrolling, atEdge, prependDone)) {
-                    onFollowingChange(true)
+                    params.onFollowingChange(true)
                 }
                 wasScrolling = scrolling
             }
@@ -81,23 +91,18 @@ internal object PagedTimelineEffects {
     }
 
     @Composable
-    private fun observeLiveUserPrompt(
-        live: List<ChatRenderItem>,
-        presentation: ChatPagingPresentation,
-        listState: LazyListState,
-        onFollowingChange: (Boolean) -> Unit,
-    ) {
-        var previousLiveUser by remember(presentation) {
-            mutableStateOf((live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
+    private fun observeLiveUserPrompt(params: PagedTimelineScrollEffectsParams) {
+        var previousLiveUser by remember(params.presentation) {
+            mutableStateOf((params.live.firstOrNull() as? ChatRenderItem.Single)?.message?.id)
         }
-        LaunchedEffect(live) {
-            val newest = (live.firstOrNull() as? ChatRenderItem.Single)?.message
+        LaunchedEffect(params.live) {
+            val newest = (params.live.firstOrNull() as? ChatRenderItem.Single)?.message
             if (newest?.role == "user" && newest.id != previousLiveUser) {
-                if (presentation.isAnchoredAwayFromTail) {
-                    presentation.requestTail()
+                if (params.presentation.isAnchoredAwayFromTail) {
+                    params.presentation.requestTail()
                 } else {
-                    listState.scrollToItem(0)
-                    onFollowingChange(true)
+                    params.listState.scrollToItem(0)
+                    params.onFollowingChange(true)
                 }
             }
             previousLiveUser = newest?.id
@@ -106,15 +111,15 @@ internal object PagedTimelineEffects {
 
     @Composable
     fun TargetEffects(params: PagedTimelineTargetEffectsParams) {
-        var targetPositioned by remember(params.presentation, params.routeTarget) { mutableStateOf(false) }
+        val targetPositioned = remember(params.presentation, params.routeTarget) { mutableStateOf(false) }
         val missingTarget by params.presentation.missingTarget.collectAsStateWithLifecycle()
 
         LaunchedEffect(params.pages.loadState.refresh) {
-            if (shouldRepositionAfterPagerRefresh(params.pages.loadState.refresh)) targetPositioned = false
+            if (shouldRepositionAfterPagerRefresh(params.pages.loadState.refresh)) targetPositioned.value = false
         }
-        observeTargetPositioning(params, targetPositioned) { targetPositioned = it }
+        observeTargetPositioning(params, targetPositioned)
         LaunchedEffect(params.presentation, missingTarget) {
-            if (shouldRestoreMissingTail(params.routeTarget, params.restoreAnchor, missingTarget)) {
+            if (params.shouldRestoreMissingTail(missingTarget)) {
                 params.presentation.requestTail()
             }
         }
@@ -124,16 +129,15 @@ internal object PagedTimelineEffects {
     @Composable
     private fun observeTargetPositioning(
         params: PagedTimelineTargetEffectsParams,
-        targetPositioned: Boolean,
-        onPositioned: (Boolean) -> Unit,
+        targetPositioned: androidx.compose.runtime.MutableState<Boolean>,
     ) {
         LaunchedEffect(params.presentation, params.routeTarget, params.pages.itemSnapshotList, params.displayedLive) {
             val target = params.routeTarget ?: params.restoreAnchor?.messageId ?: return@LaunchedEffect
-            if (!targetPositioned) {
+            if (!targetPositioned.value) {
                 val index = resolveTargetScrollPosition(target, params.displayedLive, params.pages.itemSnapshotList)
                 if (index != null) {
-                    applyTargetScroll(params, index, target)
-                    onPositioned(true)
+                    applyTargetScroll(params, index)
+                    targetPositioned.value = true
                 }
             }
         }
@@ -142,10 +146,10 @@ internal object PagedTimelineEffects {
     @Composable
     private fun observeViewportSaving(
         params: PagedTimelineTargetEffectsParams,
-        targetPositioned: Boolean,
+        targetPositioned: androidx.compose.runtime.MutableState<Boolean>,
     ) {
-        LaunchedEffect(params.presentation, targetPositioned, params.displayedLive, params.pages.itemSnapshotList, params.following) {
-            if (!canSaveViewport(targetPositioned, params.restoreAnchor, params.routeTarget)) return@LaunchedEffect
+        LaunchedEffect(params.presentation, targetPositioned.value, params.displayedLive, params.pages.itemSnapshotList, params.following) {
+            if (!params.canSaveViewport(targetPositioned.value)) return@LaunchedEffect
             snapshotFlow { params.listState.firstVisibleItemIndex to params.listState.firstVisibleItemScrollOffset }
                 .collect { (index, offset) ->
                     val messageId = resolveFirstVisibleMessageId(index, params.displayedLive, params.pages)
@@ -157,8 +161,8 @@ internal object PagedTimelineEffects {
     private suspend fun applyTargetScroll(
         params: PagedTimelineTargetEffectsParams,
         index: Int,
-        target: String,
     ) {
+        val target = params.routeTarget ?: params.restoreAnchor?.messageId ?: return
         if (params.routeTarget == null) {
             params.listState.scrollToItem(index, params.restoreAnchor?.offset ?: 0)
         } else {
@@ -173,18 +177,6 @@ internal object PagedTimelineEffects {
             params.onHighlightTarget(target)
         }
     }
-
-    private fun shouldRestoreMissingTail(
-        routeTarget: String?,
-        restoreAnchor: ChatPagingViewport?,
-        missingTarget: String?,
-    ): Boolean = routeTarget == null && restoreAnchor != null && missingTarget == restoreAnchor.messageId
-
-    private fun canSaveViewport(
-        targetPositioned: Boolean,
-        restoreAnchor: ChatPagingViewport?,
-        routeTarget: String?,
-    ): Boolean = targetPositioned || (restoreAnchor == null && routeTarget == null)
 
     fun resolveTargetScrollPosition(
         target: String,
@@ -206,30 +198,26 @@ internal object PagedTimelineEffects {
         return row?.newestMessage()?.id
     }
 
-    fun Modifier.timelinePinchZoom(
-        pinch: PinchScalePreviewController,
-        activeFontScale: Float,
-        onScaleChange: (Float) -> Unit,
-    ): Modifier {
-        return pointerInput(pinch) {
+    fun Modifier.timelinePinchZoom(params: TimelinePinchZoomParams): Modifier {
+        return pointerInput(params.pinch) {
             try {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         if (event.changes.count { it.pressed } >= 2) {
-                            if (!pinch.isPinching) pinch.begin(activeFontScale)
-                            pinch.applyZoom(event.calculateZoom())
+                            if (!params.pinch.isPinching) params.pinch.begin(params.activeFontScale)
+                            params.pinch.applyZoom(event.calculateZoom())
                             event.changes.forEach { it.consume() }
                         }
                     } while (event.changes.any { it.pressed })
-                    if (pinch.isPinching) {
-                        val scale = pinch.finishPreview()
-                        onScaleChange(scale)
+                    if (params.pinch.isPinching) {
+                        val scale = params.pinch.finishPreview()
+                        params.onScaleChange(scale)
                     }
                 }
             } finally {
-                pinch.cancel()
+                params.pinch.cancel()
             }
         }
     }

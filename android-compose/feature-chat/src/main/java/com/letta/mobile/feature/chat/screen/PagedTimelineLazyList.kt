@@ -245,12 +245,14 @@ internal object PagedTimelineLazyLayout {
             modifier = params.modifier
                 .fillMaxSize()
                 .timelinePinchZoom(
-                    pinch = pinch,
-                    activeFontScale = currentActiveScale,
-                    onScaleChange = { scale ->
-                        currentCallbacks.onActiveFontScaleChange(scale)
-                        currentCallbacks.onFontScaleChange(scale)
-                    },
+                    TimelinePinchZoomParams(
+                        pinch = pinch,
+                        activeFontScale = currentActiveScale,
+                        onScaleChange = { scale ->
+                            currentCallbacks.onActiveFontScaleChange(scale)
+                            currentCallbacks.onFontScaleChange(scale)
+                        },
+                    ),
                 ),
         ) {
             val newestMessage = resolveNewestMessage(
