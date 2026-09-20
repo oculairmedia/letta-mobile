@@ -1,8 +1,26 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import com.letta.mobile.feature.chat.screen.TimelineOpeningState
+import com.letta.mobile.feature.chat.screen.deriveTimelineOpeningState
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.paging.LoadState
@@ -53,6 +71,8 @@ class TimelineOpeningObservationTest {
         }
         val delivery = Channel<PagingData<ChatRenderItem>>(Channel.UNLIMITED)
         var generations = 0
+        val shellMounts = mutableListOf<Any>()
+        val shellDisposals = mutableListOf<Any>()
         // A fixture-only boundary; no claim about canonical transport or process-cold IO.
         val freshness = kotlinx.coroutines.CompletableDeferred<Unit>()
         val settled = delivery.receiveAsFlow().onEach {
@@ -70,16 +90,21 @@ class TimelineOpeningObservationTest {
                 refresh, LoadState.NotLoading(true), LoadState.NotLoading(true),
             ))).isSuccess)
         }
-        fun mount() {
+        fun mount(modifier: Modifier = Modifier) {
             recorder.mark(Milestone.Selection)
             compose.setContent {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalTimelineOpeningObserver provides recorder::observe) {
+                    CompositionLocalProvider(
+                        LocalTimelineOpeningObserver provides recorder::observe,
+                        com.letta.mobile.feature.chat.screen.LocalTimelineShellLifecycleObserver provides { mounted, identity ->
+                            if (mounted) shellMounts += identity else shellDisposals += identity
+                        },
+                    ) {
                         PagedChatMessageList(current.value, ChatUiState(), ChatContentCallbacks(
                             onSendMessage = {}, onRerunMessage = {}, onLoadOlderMessages = {},
                             onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
                             onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
-                        ), ChatContentAppearance())
+                        ), ChatContentAppearance(), modifier)
                     }
                 }
             }
@@ -88,6 +113,26 @@ class TimelineOpeningObservationTest {
             (it.observation as? TimelineOpeningObservation.Committed)?.surface
         }.distinct()
         fun milestones() = recorder.milestones.map { it.second }
+    }
+
+    @Test fun callerModifierConstrainsLoadingAndTimelineContentExactlyOnce() {
+        val f = Fixture()
+        f.mount(Modifier.size(300.dp, 240.dp).testTag("caller-viewport").padding(20.dp))
+        fun assertContent(matcher: SemanticsMatcher) {
+            compose.onNode(matcher and hasAnyAncestor(hasTestTag("caller-viewport")))
+                .assertIsDisplayed()
+                .assertWidthIsEqualTo(260.dp)
+                .assertHeightIsEqualTo(200.dp)
+        }
+        fun assertLoading() = assertContent(SemanticsMatcher.keyIsDefined(SemanticsProperties.StateDescription)
+            and SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+        assertLoading()
+        compose.runOnIdle { f.open() }
+        assertLoading()
+        compose.runOnIdle { f.page(f.rows.take(1)) }
+        compose.onNodeWithText("first").assertIsDisplayed()
+        assertContent(hasScrollToIndexAction())
+        compose.onNodeWithTag("caller-viewport").assertWidthIsEqualTo(300.dp).assertHeightIsEqualTo(240.dp)
     }
 
     @Test fun residentPageReachesBoundedAnchoredViewportWithoutFreshness() {
@@ -213,7 +258,69 @@ class TimelineOpeningObservationTest {
         assertEquals(1, recorder.milestones.count { it.second == Milestone.ViewportReady })
     }
 
-    @Test fun confirmedEmptyRetainsCurrentEmptyTimelineRatherThanInventingEmptyUi() {
+    @Test fun typedReadinessPreservesResidentGateWithoutViewportOrTimer() {
+        assertEquals(TimelineOpeningState.Opening, deriveTimelineOpeningState(true, null))
+        assertEquals(TimelineOpeningState.Priming, deriveTimelineOpeningState(false, null))
+        assertEquals(TimelineOpeningState.Ready, deriveTimelineOpeningState(false, null, historyReady = true))
+        assertEquals(TimelineOpeningState.Priming, deriveTimelineOpeningState(false, null,
+            refresh = LoadState.NotLoading(false)))
+        assertEquals(TimelineOpeningState.Empty, deriveTimelineOpeningState(false, null,
+            historyReady = true, confirmedEmpty = true))
+        assertEquals(TimelineOpeningState.Failed("open failed", true), deriveTimelineOpeningState(true, "open failed"))
+        assertEquals(TimelineOpeningState.Failed("Could not load conversation", false),
+            deriveTimelineOpeningState(false, null, refresh = LoadState.Error(IllegalStateException())))
+    }
+
+    @Test fun actualShellNodeSurvivesOpeningFailurePrimingEmptyAndResidentRows() {
+        val f = Fixture()
+        f.mount()
+        // Semantics IDs belong to the actual mounted layout node, not an observer outside it.
+        // Replacing the Box/root on any branch produces a different ID and fails this probe.
+        fun shellId(): Int {
+            val id = compose.onNodeWithTag("timeline-opening-shell").fetchSemanticsNode().id
+            compose.runOnIdle {
+                assertEquals(1, f.shellMounts.size)
+                assertTrue(f.shellDisposals.isEmpty())
+            }
+            return id
+        }
+        val original = shellId()
+        fun loading() = compose.onNode(SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo.Indeterminate)
+            and SemanticsMatcher.keyIsDefined(SemanticsProperties.StateDescription)).assertIsDisplayed()
+        loading()
+        var retries = 0
+        compose.runOnIdle {
+            f.current.value = ChatPagingPresentation(f.settled, MutableStateFlow(emptyList()), {},
+                openError = "open failed", retryOpen = { retries++ })
+        }
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.Error, "open failed")).assertIsDisplayed()
+        compose.onNodeWithText("Retry").assertHasClickAction().performClick()
+        assertEquals(1, retries)
+        assertEquals(original, shellId())
+        compose.runOnIdle { f.open() }
+        loading()
+        assertEquals(original, shellId())
+        compose.runOnIdle { f.page(emptyList(), LoadState.Loading) }
+        loading()
+        compose.onNodeWithText("No messages yet").assertDoesNotExist()
+        compose.runOnIdle { f.page(emptyList(), LoadState.Error(IllegalStateException())) }
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.Error, "Could not load conversation")).assertIsDisplayed()
+        compose.onNodeWithText("Retry").assertHasClickAction().performClick()
+        assertEquals(original, shellId())
+        compose.runOnIdle { f.page(emptyList()) }
+        compose.onNodeWithText("No messages yet").assertIsDisplayed()
+        assertEquals(original, shellId())
+        compose.runOnIdle { f.page(f.rows.take(1)) }
+        compose.onNodeWithText("first").assertIsDisplayed()
+        compose.onNodeWithText("No messages yet").assertDoesNotExist()
+        assertEquals(original, shellId())
+        compose.runOnIdle { f.page(f.rows) }
+        compose.onNodeWithText("third").assertIsDisplayed()
+        assertEquals(original, shellId())
+    }
+
+    @Test fun confirmedEmptyAddsExplicitTreatmentAndRetainsS1EmptyObservation() {
         val f = Fixture()
         f.mount()
         compose.runOnIdle { f.open() }
