@@ -517,16 +517,28 @@ private fun resizeVertical(y: Float, height: Float, handle: ResizeHandle, dy: Fl
 }
 
 private val ResizeHandle.movesLeft: Boolean
-    get() = this == ResizeHandle.TopLeft || this == ResizeHandle.Left || this == ResizeHandle.BottomLeft
+    get() = when (this) {
+        ResizeHandle.TopLeft, ResizeHandle.Left, ResizeHandle.BottomLeft -> true
+        else -> false
+    }
 
 private val ResizeHandle.movesRight: Boolean
-    get() = this == ResizeHandle.TopRight || this == ResizeHandle.Right || this == ResizeHandle.BottomRight
+    get() = when (this) {
+        ResizeHandle.TopRight, ResizeHandle.Right, ResizeHandle.BottomRight -> true
+        else -> false
+    }
 
 private val ResizeHandle.movesTop: Boolean
-    get() = this == ResizeHandle.TopLeft || this == ResizeHandle.Top || this == ResizeHandle.TopRight
+    get() = when (this) {
+        ResizeHandle.TopLeft, ResizeHandle.Top, ResizeHandle.TopRight -> true
+        else -> false
+    }
 
 private val ResizeHandle.movesBottom: Boolean
-    get() = this == ResizeHandle.BottomLeft || this == ResizeHandle.Bottom || this == ResizeHandle.BottomRight
+    get() = when (this) {
+        ResizeHandle.BottomLeft, ResizeHandle.Bottom, ResizeHandle.BottomRight -> true
+        else -> false
+    }
 
 /** Type may be scaled this far by dragging a text element's box, and no further. */
 private const val MIN_FONT_SCALE = 0.4f
@@ -538,7 +550,9 @@ private fun computeScaledStyle(
     committed: CanvasDocumentFrame,
     currentStyle: CanvasTextStyle?,
 ): CanvasTextStyle? {
-    if (!plain || started == null || started.height <= 0f) return null
+    if (!plain) return null
+    if (started == null) return null
+    if (started.height <= 0f) return null
     val factor = committed.height / started.height
     if (factor == 1f) return null
     val style = currentStyle ?: CanvasTextStyle()
