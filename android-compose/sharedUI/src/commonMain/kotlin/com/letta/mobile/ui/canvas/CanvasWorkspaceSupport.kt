@@ -89,6 +89,13 @@ internal data class FollowConnectorsParams(
     val lastFrames: Map<String, CanvasDocumentFrame>,
 )
 
+internal data class ConnectorUpdateParams(
+    val elementId: String,
+    val binding: CanvasArrowBinding,
+    val documentId: String,
+    val frame: CanvasDocumentFrame,
+)
+
 internal data class ExternalSyncParams(
     val doc: CanvasDocument?,
     val lastImportedRev: Long,
@@ -416,22 +423,27 @@ internal object CanvasWorkspaceSupport {
 
     private fun updateConnectorsForFrame(params: FollowConnectorsParams, id: String, frame: CanvasDocumentFrame) {
         for ((elementId, binding) in params.arrowBindings) {
-            updateSingleConnector(params, elementId, binding, id, frame)
+            updateSingleConnector(
+                params = params,
+                update = ConnectorUpdateParams(
+                    elementId = elementId,
+                    binding = binding,
+                    documentId = id,
+                    frame = frame,
+                ),
+            )
         }
     }
 
     private fun updateSingleConnector(
         params: FollowConnectorsParams,
-        elementId: String,
-        binding: CanvasArrowBinding,
-        id: String,
-        frame: CanvasDocumentFrame,
+        update: ConnectorUpdateParams,
     ) {
-        val connector = params.elements.firstOrNull { it.id == elementId } as? Element.Shape ?: return
-        val geometry = CanvasSnapping.follow(connector, binding, id, frame) ?: return
-        params.controller.onIntent(Intent.SetElementPoints(elementId, geometry.points))
+        val connector = params.elements.firstOrNull { it.id == update.elementId } as? Element.Shape ?: return
+        val geometry = CanvasSnapping.follow(connector, update.binding, update.documentId, update.frame) ?: return
+        params.controller.onIntent(Intent.SetElementPoints(update.elementId, geometry.points))
         if (geometry.bend != connector.bend) {
-            params.controller.onIntent(Intent.SetLineBend(elementId, geometry.bend))
+            params.controller.onIntent(Intent.SetLineBend(update.elementId, geometry.bend))
         }
     }
 
