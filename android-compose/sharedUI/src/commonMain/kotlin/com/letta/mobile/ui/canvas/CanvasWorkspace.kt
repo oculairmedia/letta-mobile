@@ -409,15 +409,10 @@ fun CanvasWorkspace(
             applyingHistory = true
             val applied = runCatching { s.applyLocalStamped(ops) }
             applyingHistory = false
-            if (applied.isSuccess) {
-                statusMessage = if (redo) "Redid ${step.label}" else "Undid ${step.label}"
-            } else {
-                // The step moved across the stacks before this ran, so a storage, ACL or
-                // transport failure would leave the history insisting it happened. Put it
-                // back where it was: pressing undo again should retry, not skip.
+            if (!applied.isSuccess) {
                 if (redo) history.undo() else history.redo()
-                statusMessage = "Could not ${if (redo) "redo" else "undo"} ${step.label}"
             }
+            statusMessage = documentHistoryMessage(step.label, redo, applied.isSuccess)
         }
     }
 
@@ -758,9 +753,7 @@ fun CanvasWorkspace(
             // The stroke under the nib, until DrawBox owns it.
             CanvasPenPreview(
                 samples = penPreview,
-                viewport = state.viewport,
-                color = state.strokeColor,
-                alpha = state.opacity,
+                state = state,
                 modifier = Modifier.fillMaxSize(),
             )
 
@@ -1333,3 +1326,9 @@ private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
 private const val WHEEL_ZOOM_STEP = 1.1f
+
+private fun documentHistoryMessage(label: String, redo: Boolean, success: Boolean): String {
+    val verb = if (redo) "redo" else "undo"
+    val past = if (redo) "Redid" else "Undid"
+    return if (success) "$past $label" else "Could not $verb $label"
+}

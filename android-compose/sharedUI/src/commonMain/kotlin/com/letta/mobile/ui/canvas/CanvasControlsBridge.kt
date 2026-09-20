@@ -117,6 +117,14 @@ object CanvasControlsBridge {
         }
     }
 
+    private inline fun applyTarget(
+        hasSelection: Boolean,
+        onSelection: () -> Unit,
+        onTool: () -> Unit,
+    ) {
+        if (hasSelection) onSelection() else onTool()
+    }
+
     /**
      * Applies a property change to every selected element, or to the tool defaults when nothing
      * is selected. DrawBox keeps opacity per stroke and per text but not per shape, and has no
@@ -130,57 +138,19 @@ object CanvasControlsBridge {
     ) {
         val hasSelection = state.selectedIds.isNotEmpty()
         when (intent) {
-            is CanvasPropertyIntent.SetFontSize,
-            is CanvasPropertyIntent.SetFontFamily,
-            is CanvasPropertyIntent.SetTextAlignment -> dispatchTextProperty(controller, intent, hasSelection)
+            is CanvasPropertyIntent.SetFontSize ->
+                applyTarget(hasSelection, { controller.setSelectionFontSize(intent.size) }, { controller.setFontSize(intent.size) })
+            is CanvasPropertyIntent.SetFontFamily ->
+                applyTarget(hasSelection, { controller.setSelectionFontFamily(intent.key) }, { controller.setFontFamily(intent.key) })
+            is CanvasPropertyIntent.SetTextAlignment ->
+                applyTarget(hasSelection, { controller.setSelectionTextAlignment(intent.alignment) }, { controller.setTextAlignment(intent.alignment) })
+            is CanvasPropertyIntent.SetStrokeWidth ->
+                applyTarget(hasSelection, { controller.setSelectionStrokeWidth(intent.width) }, { controller.setStrokeWidth(intent.width) })
+            is CanvasPropertyIntent.SetStrokeStyle ->
+                applyTarget(hasSelection, { controller.setSelectionStrokeStyle(intent.style) }, { controller.setStrokeStyle(intent.style) })
+            is CanvasPropertyIntent.SetCornerRadius ->
+                applyTarget(hasSelection, { controller.setSelectionCornerRadius(intent.radius) }, { controller.setCornerRadius(intent.radius) })
             is CanvasPropertyIntent.SetOpacity -> applyOpacity(controller, intent.opacity, state, hasSelection)
-            is CanvasPropertyIntent.SetStrokeWidth,
-            is CanvasPropertyIntent.SetStrokeStyle,
-            is CanvasPropertyIntent.SetCornerRadius -> dispatchStrokeProperty(controller, intent, hasSelection)
-        }
-    }
-
-    private fun dispatchTextProperty(
-        controller: DrawBoxController,
-        intent: CanvasPropertyIntent,
-        hasSelection: Boolean,
-    ) {
-        when (intent) {
-            is CanvasPropertyIntent.SetFontSize -> {
-                if (hasSelection) controller.setSelectionFontSize(intent.size)
-                else controller.setFontSize(intent.size)
-            }
-            is CanvasPropertyIntent.SetFontFamily -> {
-                if (hasSelection) controller.setSelectionFontFamily(intent.key)
-                else controller.setFontFamily(intent.key)
-            }
-            is CanvasPropertyIntent.SetTextAlignment -> {
-                if (hasSelection) controller.setSelectionTextAlignment(intent.alignment)
-                else controller.setTextAlignment(intent.alignment)
-            }
-            else -> Unit
-        }
-    }
-
-    private fun dispatchStrokeProperty(
-        controller: DrawBoxController,
-        intent: CanvasPropertyIntent,
-        hasSelection: Boolean,
-    ) {
-        when (intent) {
-            is CanvasPropertyIntent.SetStrokeWidth -> {
-                if (hasSelection) controller.setSelectionStrokeWidth(intent.width)
-                else controller.setStrokeWidth(intent.width)
-            }
-            is CanvasPropertyIntent.SetStrokeStyle -> {
-                if (hasSelection) controller.setSelectionStrokeStyle(intent.style)
-                else controller.setStrokeStyle(intent.style)
-            }
-            is CanvasPropertyIntent.SetCornerRadius -> {
-                if (hasSelection) controller.setSelectionCornerRadius(intent.radius)
-                else controller.setCornerRadius(intent.radius)
-            }
-            else -> Unit
         }
     }
 

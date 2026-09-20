@@ -109,9 +109,7 @@ internal fun State.beginPenStroke(): CanvasPenStroke = CanvasPenStroke(
 @androidx.compose.runtime.Composable
 internal fun CanvasPenPreview(
     samples: List<Element.PathSample>,
-    viewport: io.ak1.drawbox.domain.model.Viewport,
-    color: androidx.compose.ui.graphics.Color,
-    alpha: Float,
+    state: State,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
 ) {
     if (samples.size < 2) return
@@ -120,12 +118,12 @@ internal fun CanvasPenPreview(
             val from = samples[index]
             val to = samples[index + 1]
             drawLine(
-                color = color,
-                start = viewport.worldToScreen(from.position),
-                end = viewport.worldToScreen(to.position),
-                strokeWidth = ((from.width + to.width) / 2f) * viewport.scale,
+                color = state.strokeColor,
+                start = state.viewport.worldToScreen(from.position),
+                end = state.viewport.worldToScreen(to.position),
+                strokeWidth = ((from.width + to.width) / 2f) * state.viewport.scale,
                 cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                alpha = alpha.coerceIn(0f, 1f),
+                alpha = state.opacity.coerceIn(0f, 1f),
             )
         }
     }

@@ -405,6 +405,14 @@ object CanvasOpProjector {
         val actor = runCatching { entry[ACTOR]?.jsonPrimitive?.content }.getOrNull().orEmpty()
         return WriterProvenance(lamport, actor)
     }
+    private data class DocumentWriteInput(
+        val documentId: String,
+        val provenance: WriterProvenance,
+        val json: String?,
+        val frame: CanvasDocumentFrame? = null,
+        val color: String? = null,
+        val style: CanvasTextStyle? = null,
+    )
 
     /**
      * Last writer wins per document id, like elements. A removal stays in the array as a removed
@@ -413,29 +421,24 @@ object CanvasOpProjector {
      */
     private fun writeDocument(
         sceneJson: String,
-        documentId: String,
-        provenance: WriterProvenance,
-        json: String?,
-        frame: CanvasDocumentFrame? = null,
-        color: String? = null,
-        style: CanvasTextStyle? = null,
+        input: DocumentWriteInput,
     ): String {
         val parsed = parseScene(sceneJson)
         val entries = documentEntries(parsed).toMutableList()
-        val index = entries.indexOfFirst { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull() == documentId }
-        if (index >= 0 && !wins(provenance, documentProvenance(entries[index]))) return sceneJson
+        val index = entries.indexOfFirst { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull() == input.documentId }
+        if (index >= 0 && !wins(input.provenance, documentProvenance(entries[index]))) return sceneJson
         val existing = entries.getOrNull(index)?.takeIf { !isRemovedDocument(it) }
-        val keptFrame = frame ?: existing?.let(::documentFrame)
-        val keptColor = color ?: existing?.let(::documentColor)
-        val keptStyle = style ?: existing?.let(::documentStyle)
+        val keptFrame = input.frame ?: existing?.let(::documentFrame)
+        val keptColor = input.color ?: existing?.let(::documentColor)
+        val keptStyle = input.style ?: existing?.let(::documentStyle)
         val entry = buildJsonObject {
-            put("id", JsonPrimitive(documentId))
-            if (json != null) put(DOC_JSON, JsonPrimitive(json)) else put(DOC_REMOVED, JsonPrimitive(true))
-            if (json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
-            if (json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
-            if (json != null && keptStyle != null) put(DOC_STYLE, styleJson(keptStyle))
-            put(LAMPORT, JsonPrimitive(provenance.lamport))
-            put(ACTOR, JsonPrimitive(provenance.actorId))
+            put("id", JsonPrimitive(input.documentId))
+            if (input.json != null) put(DOC_JSON, JsonPrimitive(input.json)) else put(DOC_REMOVED, JsonPrimitive(true))
+            if (input.json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
+            if (input.json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
+            if (input.json != null && keptStyle != null) put(DOC_STYLE, styleJson(keptStyle))
+            put(LAMPORT, JsonPrimitive(input.provenance.lamport))
+            put(ACTOR, JsonPrimitive(input.provenance.actorId))
         }
         if (index >= 0) entries[index] = entry else entries.add(entry)
         entries.sortBy { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty() }
@@ -448,10 +451,27 @@ object CanvasOpProjector {
     }
 
     private fun upsertDocumentWithLww(sceneJson: String, op: CanvasOp.SetDocumentOp): String =
-        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), op.documentJson, op.frame, op.color, op.style)
+        writeDocument(
+            sceneJson,
+            DocumentWriteInput(
+                documentId = op.documentId,
+                provenance = WriterProvenance(op.lamport, op.actorId),
+                json = op.documentJson,
+                frame = op.frame,
+                color = op.color,
+                style = op.style,
+            ),
+        )
 
     private fun removeDocumentWithLww(sceneJson: String, op: CanvasOp.RemoveDocumentOp): String =
-        writeDocument(sceneJson, op.documentId, WriterProvenance(op.lamport, op.actorId), null)
+        writeDocument(
+            sceneJson,
+            DocumentWriteInput(
+                documentId = op.documentId,
+                provenance = WriterProvenance(op.lamport, op.actorId),
+                json = null,
+            ),
+        )
 
     private fun tombstonesOf(scene: JsonObject): Map<String, WriterProvenance> {
         val raw = runCatching { scene[TOMBSTONES]?.jsonObject }.getOrNull() ?: return emptyMap()

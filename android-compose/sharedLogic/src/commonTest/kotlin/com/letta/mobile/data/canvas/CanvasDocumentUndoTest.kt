@@ -17,8 +17,6 @@ class CanvasDocumentUndoTest {
         id: String = "note-1",
         json: String = """{"blocks":[]}""",
         frame: CanvasDocumentFrame? = null,
-        color: String? = null,
-        style: CanvasTextStyle? = null,
     ) = CanvasOp.SetDocumentOp(
         opId = "op-1",
         actorId = "local_user",
@@ -26,8 +24,8 @@ class CanvasDocumentUndoTest {
         documentId = id,
         documentJson = json,
         frame = frame,
-        color = color,
-        style = style,
+        color = null,
+        style = null,
     )
 
     private fun document(

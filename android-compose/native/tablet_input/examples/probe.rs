@@ -40,50 +40,59 @@ fn main() {
     let mut seen = 0u32;
     event_loop
         .run(move |event, target| {
-            match event {
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    target.exit();
-                    return;
-                }
-                // Pump once per idle turn rather than per event, and sleep between turns: a bare
-                // Poll loop spins a core flat out and Windows paints the window as "not
-                // responding" even though it is fine.
-                winit::event::Event::AboutToWait => {}
-                _ => return,
-            }
-
-            let Ok(events) = manager.pump() else {
-                std::thread::sleep(std::time::Duration::from_millis(5));
+            if should_exit_probe(&event) {
+                target.exit();
                 return;
-            };
-            for event in events {
-                if let octotablet::events::Event::Tool { event, .. } = event {
-                    match event {
-                        octotablet::events::ToolEvent::Pose(pose) => {
-                            seen += 1;
-                            if seen % 20 == 1 {
-                                println!(
-                                    "PROBE: pose at {:?} pressure={:?}",
-                                    pose.position,
-                                    pose.pressure.get()
-                                );
-                            }
-                        }
-                        octotablet::events::ToolEvent::Down => println!("PROBE: DOWN"),
-                        octotablet::events::ToolEvent::Up => println!("PROBE: UP"),
-                        octotablet::events::ToolEvent::In { .. } => println!("PROBE: IN range"),
-                        octotablet::events::ToolEvent::Out => println!("PROBE: OUT of range"),
-                        octotablet::events::ToolEvent::Added => println!("PROBE: tool added"),
-                        _ => {}
-                    }
-                }
             }
-            std::thread::sleep(std::time::Duration::from_millis(5));
+            if event == winit::event::Event::AboutToWait {
+                pump_probe_events(&mut manager, &mut seen);
+            }
         })
         .expect("run");
+}
+
+#[cfg(windows)]
+fn should_exit_probe(event: &winit::event::Event<()>) -> bool {
+    matches!(
+        event,
+        winit::event::Event::WindowEvent {
+            event: winit::event::WindowEvent::CloseRequested,
+            ..
+        }
+    )
+}
+
+#[cfg(windows)]
+fn pump_probe_events(manager: &mut octotablet::Manager, seen: &mut u32) {
+    let Ok(events) = manager.pump();
+    for event in events {
+        if let octotablet::events::Event::Tool { event, .. } = event {
+            log_tool_event(event, seen);
+        }
+    }
+    std::thread::sleep(std::time::Duration::from_millis(5));
+}
+
+#[cfg(windows)]
+fn log_tool_event(event: octotablet::events::ToolEvent, seen: &mut u32) {
+    match event {
+        octotablet::events::ToolEvent::Pose(pose) => {
+            *seen += 1;
+            if *seen % 20 == 1 {
+                println!(
+                    "PROBE: pose at {:?} pressure={:?}",
+                    pose.position,
+                    pose.pressure.get()
+                );
+            }
+        }
+        octotablet::events::ToolEvent::Down => println!("PROBE: DOWN"),
+        octotablet::events::ToolEvent::Up => println!("PROBE: UP"),
+        octotablet::events::ToolEvent::In { .. } => println!("PROBE: IN range"),
+        octotablet::events::ToolEvent::Out => println!("PROBE: OUT of range"),
+        octotablet::events::ToolEvent::Added => println!("PROBE: tool added"),
+        _ => {}
+    }
 }
 
 #[cfg(not(windows))]

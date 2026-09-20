@@ -82,21 +82,23 @@ object CanvasDocumentUndo {
         }
 
     private fun inverseOfSet(change: CanvasOp.SetDocumentOp, previous: CanvasSceneDocument?): CanvasOp? {
-        // A document that did not exist is undone by removing it again.
-        if (previous == null) {
-            return CanvasOp.RemoveDocumentOp(
-                opId = CanvasOpDiffer.generateOpId("undo"),
-                actorId = change.actorId,
-                lamport = change.lamport,
-                documentId = change.documentId,
-            )
-        }
-        val wouldChange = previous.json != change.documentJson ||
+        if (previous == null) return removeFor(change)
+        return if (documentDiffers(change, previous)) restore(previous) else null
+    }
+
+    private fun documentDiffers(change: CanvasOp.SetDocumentOp, previous: CanvasSceneDocument): Boolean =
+        previous.json != change.documentJson ||
             (change.frame != null && change.frame != previous.frame) ||
             (change.color != null && change.color != previous.color) ||
             (change.style != null && change.style != previous.style)
-        return if (wouldChange) restore(previous) else null
-    }
+
+    private fun removeFor(change: CanvasOp.SetDocumentOp): CanvasOp.RemoveDocumentOp =
+        CanvasOp.RemoveDocumentOp(
+            opId = CanvasOpDiffer.generateOpId("undo"),
+            actorId = change.actorId,
+            lamport = change.lamport,
+            documentId = change.documentId,
+        )
 
     /**
      * The history step that turns [before] into [after], or null when nothing changed.

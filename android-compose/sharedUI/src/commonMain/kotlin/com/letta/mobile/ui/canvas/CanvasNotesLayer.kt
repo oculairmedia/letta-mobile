@@ -500,29 +500,40 @@ private val HANDLE_HEIGHT = LettaDimens.Control.iconButton
  * clamped at [NOTE_MIN_SIZE] rather than inverting the frame, which is what a shape does too.
  */
 internal fun CanvasDocumentFrame.resizedBy(handle: ResizeHandle, delta: Offset): CanvasDocumentFrame {
-    val movesLeft = handle == ResizeHandle.TopLeft || handle == ResizeHandle.Left || handle == ResizeHandle.BottomLeft
-    val movesRight = handle == ResizeHandle.TopRight || handle == ResizeHandle.Right || handle == ResizeHandle.BottomRight
-    val movesTop = handle == ResizeHandle.TopLeft || handle == ResizeHandle.Top || handle == ResizeHandle.TopRight
-    val movesBottom = handle == ResizeHandle.BottomLeft || handle == ResizeHandle.Bottom || handle == ResizeHandle.BottomRight
-
-    var x = x
-    var y = y
-    var width = width
-    var height = height
-    if (movesLeft) {
-        val dx = delta.x.coerceAtMost(width - NOTE_MIN_SIZE)
-        x += dx
-        width -= dx
-    }
-    if (movesRight) width = (width + delta.x).coerceAtLeast(NOTE_MIN_SIZE)
-    if (movesTop) {
-        val dy = delta.y.coerceAtMost(height - NOTE_MIN_SIZE)
-        y += dy
-        height -= dy
-    }
-    if (movesBottom) height = (height + delta.y).coerceAtLeast(NOTE_MIN_SIZE)
-    return copy(x = x, y = y, width = width, height = height)
+    val (newX, newWidth) = resizeHorizontal(x, width, handle, delta.x)
+    val (newY, newHeight) = resizeVertical(y, height, handle, delta.y)
+    return copy(x = newX, y = newY, width = newWidth, height = newHeight)
 }
+
+private fun resizeHorizontal(x: Float, width: Float, handle: ResizeHandle, dx: Float): Pair<Float, Float> = when {
+    handle.movesLeft -> {
+        val clamped = dx.coerceAtMost(width - NOTE_MIN_SIZE)
+        (x + clamped) to (width - clamped)
+    }
+    handle.movesRight -> x to (width + dx).coerceAtLeast(NOTE_MIN_SIZE)
+    else -> x to width
+}
+
+private fun resizeVertical(y: Float, height: Float, handle: ResizeHandle, dy: Float): Pair<Float, Float> = when {
+    handle.movesTop -> {
+        val clamped = dy.coerceAtMost(height - NOTE_MIN_SIZE)
+        (y + clamped) to (height - clamped)
+    }
+    handle.movesBottom -> y to (height + dy).coerceAtLeast(NOTE_MIN_SIZE)
+    else -> y to height
+}
+
+private val ResizeHandle.movesLeft: Boolean
+    get() = this == ResizeHandle.TopLeft || this == ResizeHandle.Left || this == ResizeHandle.BottomLeft
+
+private val ResizeHandle.movesRight: Boolean
+    get() = this == ResizeHandle.TopRight || this == ResizeHandle.Right || this == ResizeHandle.BottomRight
+
+private val ResizeHandle.movesTop: Boolean
+    get() = this == ResizeHandle.TopLeft || this == ResizeHandle.Top || this == ResizeHandle.TopRight
+
+private val ResizeHandle.movesBottom: Boolean
+    get() = this == ResizeHandle.BottomLeft || this == ResizeHandle.Bottom || this == ResizeHandle.BottomRight
 
 /** Type may be scaled this far by dragging a text element's box, and no further. */
 private const val MIN_FONT_SCALE = 0.4f
