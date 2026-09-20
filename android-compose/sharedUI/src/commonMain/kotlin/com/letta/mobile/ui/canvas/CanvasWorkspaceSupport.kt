@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import com.letta.mobile.data.canvas.CanvasArrowBinding
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasDocumentUndo
 import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
@@ -47,6 +48,37 @@ internal data class HistoryActionContext(
     val scope: CoroutineScope,
     val onApplyingHistory: (Boolean) -> Unit,
     val onStatusMessage: (String) -> Unit,
+)
+
+internal data class DocumentRecorderContext(
+    val session: CanvasSession?,
+    val history: CanvasHistory,
+    val isApplyingHistory: () -> Boolean,
+)
+
+internal data class PenConsumerParams(
+    val controller: DrawBoxController,
+    val session: CanvasSession?,
+    val boardBounds: Rect?,
+    val chromeRegions: CanvasChromeRegions,
+    val penDensity: Float,
+    val penPreview: MutableList<Element.PathSample>,
+    val onEraseArea: (EraserArea) -> Unit,
+)
+
+internal data class DrawPhaseParams(
+    val event: CanvasPenEvent,
+    val world: Offset,
+    val controller: DrawBoxController,
+    val penPreview: MutableList<Element.PathSample>,
+)
+
+internal data class FollowConnectorsParams(
+    val controller: DrawBoxController,
+    val elements: List<Element>,
+    val arrowBindings: Map<String, CanvasArrowBinding>,
+    val documents: List<CanvasSceneDocument>,
+    val lastFrames: Map<String, CanvasDocumentFrame>,
 )
 
 internal object CanvasWorkspaceSupport {
@@ -266,6 +298,134 @@ internal object CanvasWorkspaceSupport {
         } else if (canRedo) {
             context.onApplyingHistory(true)
             context.controller.redo()
+        }
+    }
+
+    suspend fun recordDocumentChange(
+        context: DocumentRecorderContext,
+        request: DocumentChangeRequest,
+        block: suspend () -> Unit,
+    ) {
+        val s = context.session
+        if (s == null || context.isApplyingHistory()) {
+            block()
+            return
+        }
+        val before = s.documents()
+        block()
+        val step = CanvasDocumentUndo.stepBetween(before, s.documents(), request.label) ?: return
+        val attached = request.attachToLastDrawing && context.history.addToLastDrawing(step)
+        if (!attached) {
+            context.history.record(step)
+        }
+    }
+
+    fun detectNewEmptyTextElement(
+        elements: List<Element>,
+        previousIds: Set<String>?,
+    ): Pair<Set<String>, String?> {
+        val ids = CanvasTextElements.ids(elements)
+        if (previousIds == null) return ids to null
+        val added = ids - previousIds
+        val emptyId = added.firstOrNull { CanvasTextElements.byId(elements, it)?.text.isNullOrEmpty() }
+        return ids to emptyId
+    }
+
+    fun followConnectors(params: FollowConnectorsParams): Map<String, CanvasDocumentFrame> {
+        val frames = params.documents.mapNotNull { doc -> doc.frame?.let { doc.id to it } }.toMap()
+        frames.forEach { (id, frame) ->
+            if (params.lastFrames[id] == frame || id !in params.lastFrames) return@forEach
+            params.arrowBindings.forEach { (elementId, binding) ->
+                val connector = params.elements.firstOrNull { it.id == elementId } as? Element.Shape
+                    ?: return@forEach
+                CanvasSnapping.follow(connector, binding, id, frame)?.let { geometry ->
+                    params.controller.onIntent(Intent.SetElementPoints(elementId, geometry.points))
+                    if (geometry.bend != connector.bend) {
+                        params.controller.onIntent(Intent.SetLineBend(elementId, geometry.bend))
+                    }
+                }
+            }
+        }
+        return frames
+    }
+
+    private fun validatePenPosition(
+        event: CanvasPenEvent,
+        params: PenConsumerParams,
+    ): Offset? {
+        val current = params.controller.state.value
+        if (current.tempPanActive) return null
+        val board = params.boardBounds ?: return null
+        val inRoot = Offset(event.x * params.penDensity, event.y * params.penDensity)
+        if (!isPointInsideBounds(inRoot, board)) return null
+        if (params.chromeRegions.contains(inRoot)) return null
+        val onBoard = Offset(inRoot.x - board.left, inRoot.y - board.top)
+        return current.viewport.screenToWorld(onBoard)
+    }
+
+    private fun handleEraserEvent(
+        event: CanvasPenEvent,
+        world: Offset,
+        controller: DrawBoxController,
+        onEraseArea: (EraserArea) -> Unit,
+    ): Boolean {
+        val isErasing = event.phase == CanvasPenEvent.Phase.DOWN || event.phase == CanvasPenEvent.Phase.MOVE
+        if (!isErasing) return false
+        val current = controller.state.value
+        controller.onIntent(Intent.EraseAt(world, current.eraserSize))
+        onEraseArea(EraserArea(world, current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f)))
+        return true
+    }
+
+    private fun handleDrawPhase(
+        params: DrawPhaseParams,
+        activeStroke: CanvasPenStroke?,
+    ): Pair<CanvasPenStroke?, Boolean> {
+        val current = params.controller.state.value
+        val event = params.event
+        val world = params.world
+        val preview = params.penPreview
+        return when (event.phase) {
+            CanvasPenEvent.Phase.DOWN -> {
+                preview.clear()
+                val started = current.beginPenStroke()
+                val added = started.add(world, event.pressure)
+                if (added != null) preview += added
+                started to true
+            }
+            CanvasPenEvent.Phase.MOVE -> {
+                val added = activeStroke?.add(world, event.pressure)
+                if (added != null) preview += added
+                activeStroke to (activeStroke != null)
+            }
+            CanvasPenEvent.Phase.UP, CanvasPenEvent.Phase.OUT -> {
+                preview.clear()
+                val path = activeStroke?.finish("pen-${Clock.System.now().toEpochMilliseconds()}")
+                if (path != null) params.controller.onIntent(Intent.AddElement(path))
+                null to (activeStroke != null)
+            }
+            CanvasPenEvent.Phase.IN -> activeStroke to false
+        }
+    }
+
+    fun createPenConsumer(params: PenConsumerParams): (CanvasPenEvent) -> Boolean {
+        var stroke: CanvasPenStroke? = null
+        var strokeStartedOnDocument = false
+        return consumer@{ event ->
+            val world = validatePenPosition(event, params) ?: return@consumer false
+            if (event.tool == CanvasPenTool.ERASER) {
+                return@consumer handleEraserEvent(event, world, params.controller, params.onEraseArea)
+            }
+            val current = params.controller.state.value
+            if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
+            if (event.phase == CanvasPenEvent.Phase.DOWN) {
+                strokeStartedOnDocument = isWorldPointInDocuments(world, params.session?.documents().orEmpty())
+            }
+            if (strokeStartedOnDocument) return@consumer false
+            val drawParams = DrawPhaseParams(event, world, params.controller, params.penPreview)
+            val (updatedStroke, handled) = handleDrawPhase(drawParams, stroke)
+            stroke = updatedStroke
+            handled
         }
     }
 }

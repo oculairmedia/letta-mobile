@@ -2,7 +2,6 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,13 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -343,22 +336,18 @@ fun CanvasWorkspace(
     }
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
 
+    val documentRecorderContext = remember(session, history) {
+        DocumentRecorderContext(
+            session = session,
+            history = history,
+            isApplyingHistory = { applyingHistory },
+        )
+    }
+
     suspend fun recordDocumentChange(
         request: DocumentChangeRequest,
         block: suspend () -> Unit,
-    ) {
-        val s = session
-        if (s == null || applyingHistory) {
-            block()
-            return
-        }
-        val before = s.documents()
-        block()
-        val step = CanvasDocumentUndo.stepBetween(before, s.documents(), request.label) ?: return
-        if (!request.attachToLastDrawing || !history.addToLastDrawing(step)) {
-            history.record(step)
-        }
-    }
+    ) = CanvasWorkspaceSupport.recordDocumentChange(documentRecorderContext, request, block)
 
     /**
      * Runs a document change and records it as one undoable step.
@@ -666,16 +655,9 @@ fun CanvasWorkspace(
             // caret that sometimes does not appear is worse than no caret at all.
             var knownTextIds by remember(session) { mutableStateOf<Set<String>?>(null) }
             LaunchedEffect(state.elements) {
-                val ids = CanvasTextElements.ids(state.elements)
-                val previous = knownTextIds
-                if (previous == null) {
-                    knownTextIds = ids
-                    return@LaunchedEffect
-                }
-                val added = ids - previous
+                val (ids, emptyId) = CanvasWorkspaceSupport.detectNewEmptyTextElement(state.elements, knownTextIds)
                 knownTextIds = ids
-                added.firstOrNull { CanvasTextElements.byId(state.elements, it)?.text.isNullOrEmpty() }
-                    ?.let { editingTextId = it }
+                if (emptyId != null) editingTextId = emptyId
             }
 
             // The caret, where DrawBox asked for one. Its own editor, placed by its own viewport:
@@ -765,72 +747,20 @@ fun CanvasWorkspace(
             val penTarget = LocalCanvasPenTarget.current
             // The registry belongs to the host that reads the tablet, not to the process.
             val penRegistry = LocalCanvasPenRegistry.current
-            DisposableEffect(session, state.mode, penDensity, penTarget, penRegistry) {
-                var stroke: CanvasPenStroke? = null
-                // True while the stroke in progress began on a note: the whole stroke belongs to
-                // the note, not only the samples that happen to fall inside it.
-                var strokeStartedOnDocument = false
-                val penConsumer: (CanvasPenEvent) -> Boolean = consumer@{ event ->
-                    val current = controller.state.value
-                    // The pen reports against the window; the board sits somewhere inside it. Going
-                    // straight to screenToWorld skips the offset that Compose's own hit testing
-                    // would have applied, and the ink lands away from the nib by however far the
-                    // board is inset.
-                    // Holding space pans the board, and a pan is a pan whatever is in your hand.
-                    // DrawBox knows it is panning and the mouse follows it, but the pen was only
-                    // consulting the TOOL - still the pencil - so it drew a stroke across the
-                    // board while the person was repositioning it.
-                    if (current.tempPanActive) return@consumer false
-                    val board = boardBounds ?: return@consumer false
-                    val inRoot = Offset(event.x * penDensity, event.y * penDensity)
-                    if (!CanvasWorkspaceSupport.isPointInsideBounds(inRoot, board)) return@consumer false
-                    // Inside the board, but over one of its own controls: the rail, a bar, an
-                    // opened note. Those are pressed, not drawn on, and the pen is offered events
-                    // by position rather than by hit testing, so it has to decline them itself.
-                    if (chromeRegions.contains(inRoot)) return@consumer false
-                    val onBoard = Offset(inRoot.x - board.left, inRoot.y - board.top)
-                    val world = current.viewport.screenToWorld(onBoard)
-                    if (event.tool == CanvasPenTool.ERASER) {
-                        if (event.phase == CanvasPenEvent.Phase.DOWN || event.phase == CanvasPenEvent.Phase.MOVE) {
-                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.EraseAt(world, current.eraserSize))
-                            eraseNotesAt(EraserArea(world, current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f)))
-                            return@consumer true
-                        }
-                        return@consumer false
-                    }
-                    if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
-                    // A note is written in, not drawn on. Tested by the note's own frame in world space.
-                    if (event.phase == CanvasPenEvent.Phase.DOWN) {
-                        strokeStartedOnDocument = CanvasWorkspaceSupport.isWorldPointInDocuments(
-                            world = world,
-                            documents = session?.documents().orEmpty(),
-                        )
-                    }
-                    if (strokeStartedOnDocument) return@consumer false
-                    when (event.phase) {
-                        CanvasPenEvent.Phase.DOWN -> {
-                            penPreview.clear()
-                            stroke = current.beginPenStroke().also { started ->
-                                started.add(world, event.pressure)?.let { penPreview += it }
-                            }
-                            true
-                        }
-                        CanvasPenEvent.Phase.MOVE -> stroke?.let { active ->
-                            active.add(world, event.pressure)?.let { penPreview += it }
-                            true
-                        } ?: false
-                        CanvasPenEvent.Phase.UP, CanvasPenEvent.Phase.OUT -> {
-                            val finished = stroke ?: return@consumer false
-                            stroke = null
-                            penPreview.clear()
-                            finished.finish("pen-${Clock.System.now().toEpochMilliseconds()}")?.let { path ->
-                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(path))
-                            }
-                            true
-                        }
-                        CanvasPenEvent.Phase.IN -> false
-                    }
-                }
+            val penConsumer = remember(session, state.mode, penDensity, penTarget, penRegistry, boardBounds) {
+                CanvasWorkspaceSupport.createPenConsumer(
+                    PenConsumerParams(
+                        controller = controller,
+                        session = session,
+                        boardBounds = boardBounds,
+                        chromeRegions = chromeRegions,
+                        penDensity = penDensity,
+                        penPreview = penPreview,
+                        onEraseArea = { eraseNotesAt(it) },
+                    ),
+                )
+            }
+            DisposableEffect(penConsumer, penTarget, penRegistry) {
                 val disposePen = penRegistry.register(penTarget, penConsumer)
                 onDispose { disposePen() }
             }
@@ -869,21 +799,15 @@ fun CanvasWorkspace(
             // would throw the camera back.
             var lastFrames by remember { mutableStateOf<Map<String, CanvasDocumentFrame>>(emptyMap()) }
             LaunchedEffect(documents, arrowBindings) {
-                val frames = documents.mapNotNull { doc -> doc.frame?.let { doc.id to it } }.toMap()
-                frames.forEach { (id, frame) ->
-                    if (lastFrames[id] == frame || id !in lastFrames) return@forEach
-                    arrowBindings.forEach { (elementId, binding) ->
-                        val connector = state.elements.firstOrNull { it.id == elementId } as? io.ak1.drawbox.domain.model.Element.Shape
-                            ?: return@forEach
-                        CanvasSnapping.follow(connector, binding, id, frame)?.let { geometry ->
-                            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetElementPoints(elementId, geometry.points))
-                            if (geometry.bend != connector.bend) {
-                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetLineBend(elementId, geometry.bend))
-                            }
-                        }
-                    }
-                }
-                lastFrames = frames
+                lastFrames = CanvasWorkspaceSupport.followConnectors(
+                    FollowConnectorsParams(
+                        controller = controller,
+                        elements = state.elements,
+                        arrowBindings = arrowBindings,
+                        documents = documents,
+                        lastFrames = lastFrames,
+                    ),
+                )
             }
             val connectorMode = state.mode == io.ak1.drawbox.domain.model.Mode.LINE || state.mode == io.ak1.drawbox.domain.model.Mode.ARROW
             val snapAnchor = drawingConnectorAt?.takeIf { connectorMode && !altHeld }?.let { at ->
@@ -971,86 +895,27 @@ fun CanvasWorkspace(
             )
 
 
-            // History dialog
-            if (showHistoryDialog && session != null) {
-                AlertDialog(
-                    onDismissRequest = { showHistoryDialog = false },
-                    title = {
-                        Text("Revision History", style = MaterialTheme.typography.titleMedium)
-                    },
-                    text = {
-                        if (checkpoints.isEmpty()) {
-                            Text("No revision checkpoints recorded yet.", style = MaterialTheme.typography.bodyMedium)
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth().height(300.dp),
-                                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                            ) {
-                                items(checkpoints) { cp ->
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
-                                        ),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "Revision ${cp.revision}",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                )
-                                                val desc = if (cp.description.isNotBlank()) cp.description else "Actor: ${cp.actorId}"
-                                                Text(
-                                                    text = desc,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                            Button(
-                                                onClick = {
-                                                    coroutineScope.launch {
-                                                        runCatching {
-                                                            session.restoreCheckpoint(cp.checkpointId)
-                                                        }.onSuccess { restored ->
-                                                            // Claim the restored scene as ours first, or the external-update
-                                                            // collector sees the revision bump, imports it again and overwrites
-                                                            // this status with "Agent updated canvas".
-                                                            lastExportedJson = restored.sceneJson
-                                                            controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
-                                                            // The board has been replaced wholesale; the steps before it
-                                                            // would undo into a board that no longer exists.
-                                                            history.clear()
-                                                            statusMessage = "Restored to revision ${cp.revision}"
-                                                            showHistoryDialog = false
-                                                        }.onFailure { err ->
-                                                            statusMessage = "Restore failed: ${err.message}"
-                                                        }
-                                                    }
-                                                },
-                                                contentPadding = PaddingValues(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
-                                            ) {
-                                                Text("Restore", style = MaterialTheme.typography.labelSmall)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+            CanvasHistoryDialog(
+                show = showHistoryDialog && session != null,
+                checkpoints = checkpoints,
+                onDismiss = { showHistoryDialog = false },
+                onRestore = { cp ->
+                    val s = session ?: return@CanvasHistoryDialog
+                    coroutineScope.launch {
+                        runCatching {
+                            s.restoreCheckpoint(cp.checkpointId)
+                        }.onSuccess { restored ->
+                            lastExportedJson = restored.sceneJson
+                            controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
+                            history.clear()
+                            statusMessage = "Restored to revision ${cp.revision}"
+                            showHistoryDialog = false
+                        }.onFailure { err ->
+                            statusMessage = "Restore failed: ${err.message}"
                         }
-                    },
-                    confirmButton = {
-                        Button(onClick = { showHistoryDialog = false }) {
-                            Text("Close")
-                        }
-                    },
-                )
-            }
+                    }
+                },
+            )
 
             // Undo and redo are the board's, not the drawing's: a note edit and a stroke are both
             // things the person did, and they undo in the order they were done.
