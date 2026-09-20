@@ -63,3 +63,31 @@ internal fun Modifier.canvasChrome(regions: CanvasChromeRegions?): Modifier {
 private class ChromeBounds {
     var bounds: Rect? = null
 }
+
+/**
+ * How a document edit gets into the board's undo history.
+ *
+ * The editor writes a note's text itself, on its own cadence, and those writes have to become
+ * steps or undo has nothing between "the note exists" and "the note does not": pressing it after
+ * typing a word took the whole note away, which is not undo, it is a different disaster.
+ *
+ * Provided by the workspace; null anywhere there is no history to record into.
+ */
+fun interface CanvasDocumentRecorder {
+    /** Runs [block] and records whatever it changed as one step called [label]. */
+    suspend fun recording(label: String, block: suspend () -> Unit)
+}
+
+/** The board's recorder, for editors composed inside it. */
+val LocalCanvasDocumentRecorder = androidx.compose.runtime.compositionLocalOf<CanvasDocumentRecorder?> { null }
+
+/**
+ * Records [block] as one step when there is a board listening, and simply runs it otherwise.
+ *
+ * Every document change a PERSON makes goes through here - the text, the colour, the style, the
+ * frame - because undo that covers only some of them is worse than none: it teaches you it works
+ * and then quietly drops the change you cared about.
+ */
+suspend fun CanvasDocumentRecorder?.recordingOrJust(label: String, block: suspend () -> Unit) {
+    if (this == null) block() else recording(label, block)
+}

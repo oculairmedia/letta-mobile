@@ -243,7 +243,15 @@ internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFacto
             // when a new canvas was opened: the race below is Compose's, but killing the process
             // over it was ours. Logged once so the underlying race stays visible without filling
             // the log a frame at a time.
-            if (loggedRecoverableRenderError.compareAndSet(false, true)) {
+            // Counted, not just noticed. Logging once per session answers "did it happen" and
+            // nothing else - not how often, not whether a flash is one dropped frame or twenty in
+            // a row. The count and the gap since the previous drop are what say how bad it is.
+            val dropped = recoverableRenderFrames.incrementAndGet()
+            val now = System.nanoTime()
+            val previous = lastRecoverableRenderFrame.getAndSet(now)
+            val sincePrevious = if (previous == 0L) -1L else (now - previous) / NANOS_PER_MILLI
+            println("RENDER: dropped frame #$dropped" + if (sincePrevious < 0) " (first)" else " (+${sincePrevious}ms)")
+            if (dropped == 1L) {
                 DesktopCrashReporter.logCrash(throwable, context = "recoverable render frame")
             }
             return@WindowExceptionHandler
@@ -261,8 +269,13 @@ internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFacto
     }
 }
 
-/** Said once: a dropped frame is worth knowing about, not worth a log entry per frame. */
-private val loggedRecoverableRenderError = java.util.concurrent.atomic.AtomicBoolean(false)
+/** How many frames this session has lost to the disposed-layer race. */
+private val recoverableRenderFrames = java.util.concurrent.atomic.AtomicLong(0)
+
+/** When the last one was, so the gap between drops says whether they cascade. */
+private val lastRecoverableRenderFrame = java.util.concurrent.atomic.AtomicLong(0)
+
+private const val NANOS_PER_MILLI = 1_000_000L
 
 /**
  * True for the render errors the app should survive rather than exit on.

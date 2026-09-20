@@ -2,7 +2,11 @@
 
 package com.letta.mobile.desktop.canvas
 
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasCreateOptions
@@ -92,5 +96,58 @@ class CanvasUnifiedUndoUiTest {
         // The note goes first, because it was done last - and the drawing is left alone.
         waitUntil(timeoutMillis = 10_000) { session.documents().isEmpty() }
         assertEquals(1, controller.state.value.elements.size, "the stroke was undone out of order")
+    }
+
+    @Test
+    fun typingInANoteUndoesTheTypingBeforeTheNote() = runComposeUiTest {
+        val session = session()
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session, controller = controller) }
+
+        onNodeWithContentDescription("Add note").performClick()
+        waitUntil(timeoutMillis = 10_000) { session.documents().size == 1 }
+        val note = session.documents().single()
+
+        // Typed into the note itself, so the editor writes it the way it does in the app: the
+        // point of this test is the editor's OWN writes becoming steps.
+        onNode(hasSetTextAction() and hasAnyAncestor(hasContentDescription("Note ${note.id}")))
+            .performTextInput("hello")
+        waitUntil(timeoutMillis = 10_000) { session.documents().single().json.contains("hello") }
+
+        // Undo takes the TYPING back, not the whole note: losing a note you were writing in
+        // because you wanted the last word back is not undo, it is a different disaster.
+        onNodeWithContentDescription("Undo").performClick()
+        waitUntil(timeoutMillis = 10_000) { !session.documents().single().json.contains("hello") }
+        assertEquals(1, session.documents().size, "undo took the whole note instead of the typing")
+
+        // And redo puts the typing back.
+        onNodeWithContentDescription("Redo").performClick()
+        waitUntil(timeoutMillis = 10_000) { session.documents().single().json.contains("hello") }
+    }
+
+    @Test
+    fun recolouringANoteCanBeUndone() = runComposeUiTest {
+        val session = session()
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session, controller = controller) }
+
+        onNodeWithContentDescription("Add note").performClick()
+        waitUntil(timeoutMillis = 10_000) { session.documents().size == 1 }
+        val note = session.documents().single()
+        val original = note.color
+
+        // The note's own colour control, as a person reaches it.
+        onNodeWithContentDescription("Properties").performClick()
+        // The panel colours the text by default; the card is what this test is about.
+        onNodeWithContentDescription("Target card").performClick()
+        onNodeWithContentDescription("Color green").performClick()
+        waitUntil(timeoutMillis = 10_000) { session.documents().single().color != original }
+        onNodeWithContentDescription("Close properties").performClick()
+
+        // Undo puts the colour back, and leaves the note where it is: a colour change that undo
+        // does not cover teaches you undo works and then drops the change you cared about.
+        onNodeWithContentDescription("Undo").performClick()
+        waitUntil(timeoutMillis = 10_000) { session.documents().single().color == original }
+        assertEquals(1, session.documents().size, "undo took the note instead of the colour")
     }
 }

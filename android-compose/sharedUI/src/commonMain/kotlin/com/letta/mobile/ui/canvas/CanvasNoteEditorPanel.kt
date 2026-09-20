@@ -28,9 +28,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Type
 import com.composables.icons.lucide.Minimize2
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasTextStyle
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -52,6 +54,7 @@ fun CanvasNoteEditorPanel(
     chromeRegions: CanvasChromeRegions? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val recorder = LocalCanvasDocumentRecorder.current
     val tint = parseHexColor(document.color)?.takeIf { it.alpha > 0f }
     Box(
         modifier = modifier
@@ -87,12 +90,36 @@ fun CanvasNoteEditorPanel(
                         color = onCard,
                     )
                     Spacer(modifier = Modifier.weight(1f))
+                    // Text colour as well as card colour. Opened large, this panel is where a
+                    // person does the rest of their writing, and the colour of the writing was
+                    // the one property they had to close the note to reach.
+                    ColorSwatchPicker(
+                        current = parseHexColor(document.style?.textColor) ?: onCard,
+                        palette = StrokePalette,
+                        label = "Text color",
+                        glyph = Lucide.Type,
+                        onPick = { picked ->
+                            scope.launch {
+                                recorder.recordingOrJust("recolouring the text") {
+                                    val style = document.style ?: CanvasTextStyle()
+                                    runCatching {
+                                        session.restyleDocument(document.id, style.copy(textColor = picked.toHex()))
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(LettaDimens.Orb.lg),
+                    )
                     ColorSwatchPicker(
                         current = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
                         palette = NoteColors,
                         label = "Note color",
                         onPick = { picked ->
-                            scope.launch { runCatching { session.recolorDocument(document.id, picked.toHex()) } }
+                            scope.launch {
+                                recorder.recordingOrJust("recolouring a note") {
+                                    runCatching { session.recolorDocument(document.id, picked.toHex()) }
+                                }
+                            }
                         },
                         modifier = Modifier.size(LettaDimens.Orb.lg),
                     )

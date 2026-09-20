@@ -148,6 +148,7 @@ private fun CanvasNoteCard(
     onErase: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    val recorder = LocalCanvasDocumentRecorder.current
     val density = LocalDensity.current
     var frame by remember(document.id) { mutableStateOf(document.frame ?: defaultFrame) }
     var gestureActive by remember(document.id) { mutableStateOf(false) }
@@ -194,11 +195,13 @@ private fun CanvasNoteCard(
             null
         }
         scope.launch {
-            // One commit, not two. A frame op followed by a style op can half-succeed, leaving a
-            // box that grew with type that did not - and the second op runs even when the first
-            // has already failed.
-            runCatching {
-                session.setDocument(document.id, document.json, frame = committed, style = scaledStyle)
+            recorder.recordingOrJust("moving a note") {
+                // One commit, not two. A frame op followed by a style op can half-succeed, leaving
+                // a box that grew with type that did not - and the second op runs even when the
+                // first has already failed.
+                runCatching {
+                    session.setDocument(document.id, document.json, frame = committed, style = scaledStyle)
+                }
             }
         }
     }
@@ -274,7 +277,13 @@ private fun CanvasNoteCard(
                 onDrag = onMove,
                 onDragEnd = onMoveEnd,
                 onExpand = onExpand,
-                onRemove = { scope.launch { runCatching { session.removeDocument(document.id) } } },
+                onRemove = {
+                    scope.launch {
+                        recorder.recordingOrJust("deleting a note") {
+                            runCatching { session.removeDocument(document.id) }
+                        }
+                    }
+                },
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (expanded) {

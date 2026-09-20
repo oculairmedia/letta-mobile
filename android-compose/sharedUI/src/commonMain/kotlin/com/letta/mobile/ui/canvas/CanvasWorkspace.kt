@@ -202,6 +202,11 @@ fun CanvasWorkspace(
                 }
                 importedRevision = lastImportedRev
                 delay(100)
+                // The baseline is the board AS LOADED, set before any edit is accepted. Left null
+                // until the first save, the first drawing change only initialises it and records
+                // nothing - so a note done first and a stroke done second undid in the wrong
+                // order, taking the older note back before the newer stroke.
+                lastSavedElements = controller.state.value.elements
                 initialLoadDone = true
 
                 // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
@@ -231,6 +236,7 @@ fun CanvasWorkspace(
                 statusMessage = "Loaded diagram (${state.elements.size} elements)"
             }
             delay(100)
+            lastSavedElements = controller.state.value.elements
             initialLoadDone = true
         }
     }
@@ -285,7 +291,7 @@ fun CanvasWorkspace(
                         if (applyingHistory) {
                             applyingHistory = false
                         } else if (elementsBefore != null && elementsBefore != elementsNow) {
-                            history.record(CanvasHistory.Step.Drawing)
+                            history.record(CanvasHistory.Step.Drawing())
                         }
                     }
                     onExportJson?.invoke(event.json)
@@ -361,15 +367,32 @@ fun CanvasWorkspace(
                 // The elements are DrawBox's; only it can put them back.
                 applyingHistory = true
                 if (redo) controller.redo() else controller.undo()
+                // A labelled shape takes its label with it, so the same step carries the document
+                // work: restoring the shape without its text hands back an empty box.
+                val documents = step.documents
+                val s = session
+                if (documents != null && s != null) {
+                    coroutineScope.launch {
+                        runCatching { s.applyLocalStamped(if (redo) documents.redo else documents.undo) }
+                    }
+                }
             }
             is CanvasHistory.Step.Documents -> {
                 val s = session ?: return
                 val ops = if (redo) step.redo else step.undo
                 coroutineScope.launch {
                     applyingHistory = true
-                    runCatching { s.applyLocalStamped(ops) }
+                    val applied = runCatching { s.applyLocalStamped(ops) }
                     applyingHistory = false
-                    statusMessage = if (redo) "Redid ${step.label}" else "Undid ${step.label}"
+                    if (applied.isSuccess) {
+                        statusMessage = if (redo) "Redid ${step.label}" else "Undid ${step.label}"
+                    } else {
+                        // The step moved across the stacks before this ran, so a storage, ACL or
+                        // transport failure would leave the history insisting it happened. Put it
+                        // back where it was: pressing undo again should retry, not skip.
+                        if (redo) history.undo() else history.redo()
+                        statusMessage = "Could not ${if (redo) "redo" else "undo"} ${step.label}"
+                    }
                 }
             }
         }
@@ -437,7 +460,9 @@ fun CanvasWorkspace(
         val frames = documents.filter { it.id in selectedNoteIds }.mapNotNull { doc ->
             doc.frame?.let { doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y) }
         }.toMap()
-        coroutineScope.launch { runCatching { session.moveDocuments(frames) } }
+        coroutineScope.launch {
+            recordingDocuments("moving notes") { runCatching { session.moveDocuments(frames) } }
+        }
     }
 
     // The eraser is a drag, not a click, and DrawBoxController does not surface EraseAt on its
@@ -530,6 +555,13 @@ fun CanvasWorkspace(
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
         null -> false
     }
+    // Everything composed inside the board records its document edits into the board's history,
+    // so an editor writing a note's text produces undo steps of its own rather than leaving undo
+    // with nothing between "the note exists" and "it does not".
+    val documentRecorder = remember(session) {
+        CanvasDocumentRecorder { label, block -> recordingDocuments(label, block) }
+    }
+    CompositionLocalProvider(LocalCanvasDocumentRecorder provides documentRecorder) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -735,6 +767,11 @@ fun CanvasWorkspace(
                     // straight to screenToWorld skips the offset that Compose's own hit testing
                     // would have applied, and the ink lands away from the nib by however far the
                     // board is inset.
+                    // Holding space pans the board, and a pan is a pan whatever is in your hand.
+                    // DrawBox knows it is panning and the mouse follows it, but the pen was only
+                    // consulting the TOOL - still the pencil - so it drew a stroke across the
+                    // board while the person was repositioning it.
+                    if (current.tempPanActive) return@consumer false
                     val board = boardBounds ?: return@consumer false
                     val inRoot = Offset(event.x * penDensity, event.y * penDensity)
                     val onBoard = Offset(inRoot.x - board.left, inRoot.y - board.top)
@@ -1061,11 +1098,19 @@ fun CanvasWorkspace(
                             },
                             style = activeNote.style,
                             onStyle = { style ->
-                                coroutineScope.launch { runCatching { session.restyleDocument(activeNote.id, style) } }
+                                coroutineScope.launch {
+                                    recordingDocuments("restyling a note") {
+                                        runCatching { session.restyleDocument(activeNote.id, style) }
+                                    }
+                                }
                             },
                             color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
                             onColor = { color ->
-                                coroutineScope.launch { runCatching { session.recolorDocument(activeNote.id, color.toHex()) } }
+                                coroutineScope.launch {
+                                    recordingDocuments("recolouring a note") {
+                                        runCatching { session.recolorDocument(activeNote.id, color.toHex()) }
+                                    }
+                                }
                             },
                             defaultTextColor = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurface,
                             plain = plain,
@@ -1160,6 +1205,7 @@ fun CanvasWorkspace(
                 )
             }
         }
+    }
     }
     }
 }

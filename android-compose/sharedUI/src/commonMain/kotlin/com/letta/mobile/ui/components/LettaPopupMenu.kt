@@ -13,8 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -84,7 +84,12 @@ fun LettaPopupMenu(
                         action()
                     } else {
                         actionScope.launch {
-                            delay(MENU_ACTION_DELAY_MS)
+                            // A frame boundary, not a guess at one. A fixed delay says nothing
+                            // about whether Compose has applied the dismissal and torn the
+                            // popup's scene layer down - and on a slow frame the action would
+                            // replace the screen before it had, which is the failure this
+                            // deferral exists to avoid.
+                            withFrameNanos { }
                             action()
                         }
                     }
@@ -105,5 +110,4 @@ fun LettaPopupMenu(
  */
 val LocalMenuActionScope = compositionLocalOf<CoroutineScope?> { null }
 
-/** One frame at 60Hz: the dismissal is laid out before the action replaces what is on screen. */
-private const val MENU_ACTION_DELAY_MS = 16L
+

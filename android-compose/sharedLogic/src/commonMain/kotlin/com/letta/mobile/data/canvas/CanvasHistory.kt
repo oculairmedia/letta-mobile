@@ -27,8 +27,12 @@ class CanvasHistory(private val limit: Int = DEFAULT_LIMIT) {
         /**
          * A change DrawBox recorded in its own stack. Undoing it means asking DrawBox to undo,
          * because the elements it holds are not ours to reconstruct.
+         *
+         * [documents] carries the document work that belongs to the SAME action: deleting a
+         * labelled shape takes its label with it, and a step that restored the shape without its
+         * text would hand back an empty box and call it undone.
          */
-        data object Drawing : Step
+        data class Drawing(val documents: Documents? = null) : Step
 
         /**
          * A change to the documents, with the ops that undo it and the ops that do it again.
@@ -51,6 +55,31 @@ class CanvasHistory(private val limit: Int = DEFAULT_LIMIT) {
 
     private val _canRedo = MutableStateFlow(false)
     val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
+
+    /**
+     * Folds [documents] into the most recent drawing step.
+     *
+     * The board notices a shape's label has to go a moment AFTER the shape itself does - the
+     * reconciler runs when the elements settle - so the two halves of one action arrive
+     * separately. Joining them here is what makes undo give back the shape and its text together,
+     * rather than in two presses with an empty box in between.
+     *
+     * Returns false when there is no drawing step to fold into, so the caller can record the
+     * document work as a step of its own rather than lose it.
+     */
+    fun addToLastDrawing(documents: Step.Documents): Boolean {
+        val last = done.lastOrNull() as? Step.Drawing ?: return false
+        val merged = last.documents?.let {
+            Step.Documents(
+                undo = it.undo + documents.undo,
+                redo = it.redo + documents.redo,
+                label = it.label,
+            )
+        } ?: documents
+        done.removeLast()
+        done.addLast(Step.Drawing(merged))
+        return true
+    }
 
     /**
      * Records something the person just did.
