@@ -71,6 +71,7 @@ class CanvasUnifiedUndoUiTest {
         // must move the board, not sit there live and inert.
         onNodeWithContentDescription("Undo").performClick()
         waitForIdle()
+        assertEquals(0, session.documents().size)
     }
 
     @Test

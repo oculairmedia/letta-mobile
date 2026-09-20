@@ -348,8 +348,7 @@ fun CanvasWorkspace(
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
 
     suspend fun recordDocumentChange(
-        label: String,
-        attachToLastDrawing: Boolean = false,
+        request: DocumentChangeRequest,
         block: suspend () -> Unit,
     ) {
         val s = session
@@ -359,8 +358,8 @@ fun CanvasWorkspace(
         }
         val before = s.documents()
         block()
-        val step = CanvasDocumentUndo.stepBetween(before, s.documents(), label) ?: return
-        if (!attachToLastDrawing || !history.addToLastDrawing(step)) {
+        val step = CanvasDocumentUndo.stepBetween(before, s.documents(), request.label) ?: return
+        if (!request.attachToLastDrawing || !history.addToLastDrawing(step)) {
             history.record(step)
         }
     }
@@ -373,7 +372,7 @@ fun CanvasWorkspace(
      * the person is the state they had.
      */
     suspend fun recordingDocuments(label: String, block: suspend () -> Unit) =
-        recordDocumentChange(label = label, attachToLastDrawing = false, block = block)
+        recordDocumentChange(DocumentChangeRequest(label = label, attachToLastDrawing = false), block)
 
     /**
      * Records document work that belongs to the drawing change just made.
@@ -385,43 +384,49 @@ fun CanvasWorkspace(
      * When there is no drawing step to fold into, it is recorded on its own rather than lost.
      */
     suspend fun recordingWithLastDrawing(label: String, block: suspend () -> Unit) =
-        recordDocumentChange(label = label, attachToLastDrawing = true, block = block)
+        recordDocumentChange(DocumentChangeRequest(label = label, attachToLastDrawing = true), block)
 
-    fun applyDrawingStep(step: CanvasHistory.Step.Drawing, redo: Boolean) {
+    fun applyDrawingStep(step: CanvasHistory.Step.Drawing, direction: HistoryDirection) {
         // The elements are DrawBox's; only it can put them back.
         applyingHistory = true
-        if (redo) controller.redo() else controller.undo()
+        if (direction.isRedo) controller.redo() else controller.undo()
         // A labelled shape takes its label with it, so the same step carries the document
         // work: restoring the shape without its text hands back an empty box.
         val documents = step.documents
         val s = session
         if (documents != null && s != null) {
             coroutineScope.launch {
-                runCatching { s.applyLocalStamped(if (redo) documents.redo else documents.undo) }
+                runCatching { s.applyLocalStamped(if (direction.isRedo) documents.redo else documents.undo) }
             }
         }
     }
 
-    fun applyDocumentsStep(step: CanvasHistory.Step.Documents, redo: Boolean) {
+    fun applyDocumentsStep(step: CanvasHistory.Step.Documents, direction: HistoryDirection) {
         val s = session ?: return
-        val ops = if (redo) step.redo else step.undo
+        val ops = if (direction.isRedo) step.redo else step.undo
         coroutineScope.launch {
             applyingHistory = true
             val applied = runCatching { s.applyLocalStamped(ops) }
             applyingHistory = false
             if (!applied.isSuccess) {
-                if (redo) history.undo() else history.redo()
+                if (direction.isRedo) history.undo() else history.redo()
             }
-            statusMessage = documentHistoryMessage(step.label, redo, applied.isSuccess)
+            statusMessage = documentHistoryMessage(
+                HistoryMessageContext(
+                    label = step.label,
+                    direction = direction,
+                    success = applied.isSuccess,
+                ),
+            )
         }
     }
 
     /** Applies one history step, without recording what it causes as a new step. */
-    fun applyHistory(step: CanvasHistory.Step?, redo: Boolean) {
+    fun applyHistory(step: CanvasHistory.Step?, direction: HistoryDirection) {
         when (step) {
             null -> Unit
-            is CanvasHistory.Step.Drawing -> applyDrawingStep(step, redo)
-            is CanvasHistory.Step.Documents -> applyDocumentsStep(step, redo)
+            is CanvasHistory.Step.Drawing -> applyDrawingStep(step, direction)
+            is CanvasHistory.Step.Documents -> applyDocumentsStep(step, direction)
         }
     }
 
@@ -448,7 +453,7 @@ fun CanvasWorkspace(
         if (step == null) {
             if (canUndo) controller.undo()
         } else {
-            applyHistory(step, redo = false)
+            applyHistory(step, HistoryDirection.Undo)
         }
     }
 
@@ -457,7 +462,7 @@ fun CanvasWorkspace(
         if (step == null) {
             if (canRedo) controller.redo()
         } else {
-            applyHistory(step, redo = true)
+            applyHistory(step, HistoryDirection.Redo)
         }
     }
 
@@ -494,11 +499,16 @@ fun CanvasWorkspace(
 
     // The eraser is a drag, not a click, and DrawBoxController does not surface EraseAt on its
     // intent flow, so notes are taken by watching the eraser's own pointer instead.
-    fun eraseNotesAt(world: Offset, radius: Float) {
+    fun eraseNotesAt(area: EraserArea) {
         if (session == null) return
         val hit = liveDocuments.filter { doc ->
             val f = doc.frame ?: return@filter false
-            Rect(f.x - radius, f.y - radius, f.x + f.width + radius, f.y + f.height + radius).contains(world)
+            Rect(
+                f.x - area.radius,
+                f.y - area.radius,
+                f.x + f.width + area.radius,
+                f.y + f.height + area.radius,
+            ).contains(area.world)
         }
         if (hit.isEmpty()) return
         val ids = hit.map { it.id }.toSet()
@@ -567,34 +577,42 @@ fun CanvasWorkspace(
     // lets both go, Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) undo and redo the drawing, Ctrl/Cmd+D
     // duplicates. Handled where they bubble to, so a note editor keeps every key it consumes.
     val boardFocus = remember { FocusRequester() }
-    fun deleteFocused(): Boolean {
-        if (selectedNoteIds.isNotEmpty() && session != null) {
-            val ids = selectedNoteIds
-            selectedNoteIds = emptySet()
-            coroutineScope.launch {
+    fun deleteSelectedNotes(): Boolean {
+        if (selectedNoteIds.isEmpty() || session == null) return false
+        val ids = selectedNoteIds
+        selectedNoteIds = emptySet()
+        coroutineScope.launch {
             recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session.removeDocument(id) } } }
         }
-            if (hasSelection) controller.deleteSelected()
-            return true
-        }
-        if (hasSelection) { controller.deleteSelected(); return true }
+        if (hasSelection) controller.deleteSelected()
+        return true
+    }
+
+    fun deleteActiveNote(): Boolean {
         val id = activeNoteId ?: return false
         if (session == null || expandedNoteId != null) return false
         activeNoteId = null
         coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
         return true
     }
-    // Duplicate: the drawn selection as offset copies with fresh ids (selected afterwards), or
-    // the active note as a new document with the same text, colour and style, 20 units away.
-    fun duplicateFocused(): Boolean {
-        if (hasSelection) {
-            val copies = state.elements.filter { it.id in state.selectedIds }.map { duplicateElement(it) }
-            copies.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(it)) }
-            controller.clearSelection()
-            copies.forEach { copy -> controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(selectionPointOf(copy), 4f)) }
-            statusMessage = "Duplicated ${copies.size} element(s)"
-            return true
-        }
+
+    fun deleteFocused(): Boolean {
+        if (deleteSelectedNotes()) return true
+        if (hasSelection) { controller.deleteSelected(); return true }
+        return deleteActiveNote()
+    }
+
+    fun duplicateDrawnSelection(): Boolean {
+        if (!hasSelection) return false
+        val copies = state.elements.filter { it.id in state.selectedIds }.map { duplicateElement(it) }
+        copies.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(it)) }
+        controller.clearSelection()
+        copies.forEach { copy -> controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(selectionPointOf(copy), 4f)) }
+        statusMessage = "Duplicated ${copies.size} element(s)"
+        return true
+    }
+
+    fun duplicateActiveNote(): Boolean {
         val note = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } } ?: return false
         if (session == null) return false
         val frame = (note.frame ?: defaultNoteFrame(0)).let { it.copy(x = it.x + DUPLICATE_OFFSET, y = it.y + DUPLICATE_OFFSET) }
@@ -608,6 +626,13 @@ fun CanvasWorkspace(
             }
         }
         return true
+    }
+
+    // Duplicate: the drawn selection as offset copies with fresh ids (selected afterwards), or
+    // the active note as a new document with the same text, colour and style, 20 units away.
+    fun duplicateFocused(): Boolean {
+        if (duplicateDrawnSelection()) return true
+        return duplicateActiveNote()
     }
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
@@ -704,8 +729,10 @@ fun CanvasWorkspace(
                                     position != null && event.changes.any { it.pressed }
                                 ) {
                                     eraseNotesAt(
-                                        current.viewport.screenToWorld(position),
-                                        current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f),
+                                        EraserArea(
+                                            world = current.viewport.screenToWorld(position),
+                                            radius = current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f),
+                                        ),
                                     )
                                 }
                                 when {
@@ -729,10 +756,15 @@ fun CanvasWorkspace(
             // ELEMENTS rather than from the insert intent: DrawBox republishes intents through a
             // shared flow with no buffer, which drops them when the collector is busy, and a
             // caret that sometimes does not appear is worse than no caret at all.
-            var knownTextIds by remember(session) { mutableStateOf(emptySet<String>()) }
+            var knownTextIds by remember(session) { mutableStateOf<Set<String>?>(null) }
             LaunchedEffect(state.elements) {
                 val ids = CanvasTextElements.ids(state.elements)
-                val added = ids - knownTextIds
+                val previous = knownTextIds
+                if (previous == null) {
+                    knownTextIds = ids
+                    return@LaunchedEffect
+                }
+                val added = ids - previous
                 knownTextIds = ids
                 added.firstOrNull { CanvasTextElements.byId(state.elements, it)?.text.isNullOrEmpty() }
                     ?.let { editingTextId = it }
@@ -857,7 +889,7 @@ fun CanvasWorkspace(
                     if (event.tool == CanvasPenTool.ERASER) {
                         if (event.phase == CanvasPenEvent.Phase.DOWN || event.phase == CanvasPenEvent.Phase.MOVE) {
                             controller.onIntent(io.ak1.drawbox.domain.model.Intent.EraseAt(world, current.eraserSize))
-                            eraseNotesAt(world, current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f))
+                            eraseNotesAt(EraserArea(world, current.eraserSize / current.viewport.scale.coerceAtLeast(0.01f)))
                             return@consumer true
                         }
                         return@consumer false
@@ -1305,16 +1337,20 @@ private fun duplicateElement(element: io.ak1.drawbox.domain.model.Element): io.a
     }
 }
 
+private fun shapeSelectionPoint(shape: io.ak1.drawbox.domain.model.Element.Shape): Offset =
+    when (shape.shapeType) {
+        io.ak1.drawbox.domain.model.ShapeType.LINE,
+        io.ak1.drawbox.domain.model.ShapeType.ARROW -> shape.points.first()
+        else -> shape.bounds().let { Offset(it.center.x, it.top) }
+    }
+
 /**
  * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
  * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
  * for text (hit by its box).
  */
 private fun selectionPointOf(element: io.ak1.drawbox.domain.model.Element): Offset = when (element) {
-    is io.ak1.drawbox.domain.model.Element.Shape -> when (element.shapeType) {
-        io.ak1.drawbox.domain.model.ShapeType.LINE, io.ak1.drawbox.domain.model.ShapeType.ARROW -> element.points.first()
-        else -> element.bounds().let { Offset(it.center.x, it.top) }
-    }
+    is io.ak1.drawbox.domain.model.Element.Shape -> shapeSelectionPoint(element)
     is io.ak1.drawbox.domain.model.Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
     else -> element.bounds().center
 }
@@ -1327,8 +1363,33 @@ private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
 private const val WHEEL_ZOOM_STEP = 1.1f
 
-private fun documentHistoryMessage(label: String, redo: Boolean, success: Boolean): String {
-    val verb = if (redo) "redo" else "undo"
-    val past = if (redo) "Redid" else "Undid"
-    return if (success) "$past $label" else "Could not $verb $label"
+internal enum class HistoryDirection {
+    Undo,
+    Redo;
+
+    val isRedo: Boolean get() = this == Redo
+    val verb: String get() = if (isRedo) "redo" else "undo"
+    val past: String get() = if (isRedo) "Redid" else "Undid"
+}
+
+internal data class HistoryMessageContext(
+    val label: String,
+    val direction: HistoryDirection,
+    val success: Boolean,
+)
+
+internal data class DocumentChangeRequest(
+    val label: String,
+    val attachToLastDrawing: Boolean = false,
+)
+
+internal data class EraserArea(
+    val world: Offset,
+    val radius: Float,
+)
+
+private fun documentHistoryMessage(context: HistoryMessageContext): String {
+    val verb = context.direction.verb
+    val past = context.direction.past
+    return if (context.success) "$past ${context.label}" else "Could not $verb ${context.label}"
 }

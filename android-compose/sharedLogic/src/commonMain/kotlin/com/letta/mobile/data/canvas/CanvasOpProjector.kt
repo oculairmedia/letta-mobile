@@ -151,7 +151,7 @@ object CanvasOpProjector {
         // ever clean it up.
         val current = parseScene(sceneJson)
         val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else current[DOCUMENTS]
-        val carriedLabelOwners = if (incoming.containsKey(LABEL_OWNERS)) null else current[LABEL_OWNERS]
+        val carriedLabelOwners = if (carriedDocuments != null && !incoming.containsKey(LABEL_OWNERS)) current[LABEL_OWNERS] else null
         val provenance = WriterProvenance(op.lamport, op.actorId)
         val stamped = incoming["elements"]?.jsonArray?.map { element ->
             val obj = runCatching { element.jsonObject }.getOrNull() ?: return@map element
