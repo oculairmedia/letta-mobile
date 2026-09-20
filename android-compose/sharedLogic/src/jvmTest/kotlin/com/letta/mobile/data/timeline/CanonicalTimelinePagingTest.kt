@@ -218,6 +218,52 @@ class CanonicalTimelinePagingTest {
         }
     }
 
+    @Test fun resolvedStreamedKeyIsPreservedAcrossPostSettlementPagingRevisions() = runBlocking {
+        val streamedId = "cm-stream-m-0"
+        val canonicalId = "m-0"
+        val store = InMemoryTimelineStore()
+        store.putEvidence("identity/serverId/$streamedId", canonicalId.encodeToByteArray())
+        val transport = PageTransport(records = 1)
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        val fence = coordinator.beginLive(owner)
+        val streamedMsg = AssistantMessage(
+            id = streamedId,
+            contentRaw = JsonPrimitive("streamed content"),
+            date = "2026-01-01T00:00:00Z",
+        )
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(streamedMsg)))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        try {
+            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            presenter.awaitRows(1) { "initial page never arrived" }
+            presenter.awaitIdle()
+            val initialRow = presenter.snapshot().items.single()
+            assertEquals(TimelineMessageId(canonicalId), initialRow.identity)
+            assertEquals("segment-$streamedId", initialRow.item.key)
+
+            // Acknowledge settlement: this clears owner.session.live
+            presentation.onResidentRows(listOf(initialRow))
+            awaitCondition({ "live did not clear on settlement" }) { owner.session.live.value == null }
+
+            // Advance a durable revision to invalidate Paging and force a new paging generation
+            owner.session.engine.advanceToolSweep(owner.selection)
+            presenter.awaitIdle()
+
+            // Post-settlement paging generation must retain the streamed key rather than reverting to canonical identity
+            val postSettlementRow = presenter.snapshot().items.single()
+            assertEquals(TimelineMessageId(canonicalId), postSettlementRow.identity)
+            assertEquals("segment-$streamedId", postSettlementRow.item.key)
+            presentation.close()
+        } finally {
+            ui.cancel()
+        }
+    }
+
     private class RecordingPresenter<T : Any> : PagingDataPresenter<T>(Dispatchers.Default, null) {
         override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) = Unit
 

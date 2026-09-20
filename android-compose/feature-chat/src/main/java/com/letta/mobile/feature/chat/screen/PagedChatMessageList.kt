@@ -129,6 +129,7 @@ private fun PagedChatMessageListContent(
             state = state,
             pages = pages,
             displayedLive = displayedLive,
+            live = live,
             listState = listState,
             following = following,
             onFollowingChange = { following = it },

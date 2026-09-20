@@ -1,11 +1,15 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.ui.components.SCROLL_TO_BOTTOM_FAB_TAG
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -210,6 +214,49 @@ class PagedChatContentTest {
         compose.onNodeWithText("live-new").assertIsDisplayed()
         compose.runOnIdle { live.value = listOf(row("live-updated")) }
         compose.onNodeWithText("live-updated").assertIsDisplayed()
+    }
+
+    @Test fun viewportObservesCollectedLiveRowsForNewestMessageAndDisplay() {
+        var liveRows by mutableStateOf<List<ChatRenderItem>>(listOf(row("live-initial")))
+        val presentation = ChatPagingPresentation(
+            flowOf(PagingData.from(listOf(row("settled-1")))),
+            MutableStateFlow(emptyList()),
+            {},
+        )
+        compose.setContent {
+            LettaChatTheme {
+                val pages = presentation.settled.collectAsLazyPagingItems()
+                val listState = rememberLazyListState()
+                PagedTimelineLazyLayout.Viewport(
+                    PagedTimelineViewportParams(
+                        presentation = presentation,
+                        state = ChatUiState(),
+                        pages = pages,
+                        displayedLive = liveRows,
+                        live = liveRows,
+                        listState = listState,
+                        following = true,
+                        onFollowingChange = {},
+                        highlightedTarget = null,
+                        routeTarget = null,
+                        missingTarget = null,
+                        appearance = ChatContentAppearance(),
+                        callbacks = ChatContentCallbacks(
+                            onSendMessage = {}, onRerunMessage = {}, onLoadOlderMessages = {},
+                            onSubmitApproval = { _, _, _, _ -> }, onToggleRunCollapsed = {},
+                            onToggleReasoningExpanded = {}, onAttachmentImageTap = null,
+                        ),
+                        modifier = Modifier,
+                    ),
+                )
+            }
+        }
+        compose.onNodeWithText("live-initial").assertIsDisplayed()
+        compose.runOnIdle {
+            liveRows = listOf(row("live-updated"))
+        }
+        compose.onNodeWithText("live-updated").assertIsDisplayed()
+        compose.onNodeWithText("live-initial").assertDoesNotExist()
     }
 
     @Test fun pinchCommitsScaleThroughBothHostCallbacks() {

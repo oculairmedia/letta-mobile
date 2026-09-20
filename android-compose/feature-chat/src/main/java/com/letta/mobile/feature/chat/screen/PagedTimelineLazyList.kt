@@ -70,6 +70,7 @@ internal class PagedTimelineViewportParams(
     val state: ChatUiState,
     val pages: LazyPagingItems<ChatRenderItem>,
     val displayedLive: List<ChatRenderItem>,
+    val live: List<ChatRenderItem> = emptyList(),
     val listState: LazyListState,
     val following: Boolean,
     val onFollowingChange: (Boolean) -> Unit,
@@ -256,7 +257,7 @@ internal object PagedTimelineLazyLayout {
                 ),
         ) {
             val newestMessage = resolveNewestMessage(
-                live = params.presentation.live.value,
+                live = params.live,
                 resident = params.pages.itemSnapshotList.items,
             )
             val context = ChatMessageListLazyContext(
