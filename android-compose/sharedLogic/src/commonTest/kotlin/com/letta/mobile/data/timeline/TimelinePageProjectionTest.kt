@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.StoredToolCall
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.test.runTest
@@ -30,6 +31,106 @@ class TimelinePageProjectionTest {
         assertEquals(record.presentation("own-agent"), record.preparedPresentation)
         assertEquals(2, store.reads, "open and prepare each use one snapshot")
         assertEquals(0, store.puts)
+    }
+
+    @Test fun hydratedFourToolRunProjectsOneAggregateWithoutConstituentRows() = runTest {
+        val store = InMemoryTimelineStore()
+        repeat(4) { index -> seedToolCall(store, index + 1) }
+        val engine = engine(store, TimelinePageBudget(8, 64 * 1024))
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+
+        val page = engine.preparePage(
+            selection,
+            TimelineReadPosition.Tail,
+            8,
+            "own-agent",
+            DefaultTimelineSettledProjectionAdapter,
+        )
+
+        val rendered = page.records.mapNotNull {
+            (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
+        }
+        val block = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock>(rendered.single())
+        assertEquals("run-four-tools", block.runId)
+        assertEquals(4, block.messages.sumOf { it.first.toolCalls.orEmpty().size })
+        assertEquals(3, page.records.count { it.preparedPresentation is TimelineSettledPresentation.Drop })
+    }
+
+    @Test fun liveAndHydratedToolRunsUseTheSameAggregateKeyAndContent() = runTest {
+        val store = InMemoryTimelineStore()
+        repeat(4) { index -> seedToolCall(store, index + 1) }
+        val engine = engine(store, TimelinePageBudget(8, 64 * 1024))
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val page = engine.preparePage(
+            selection,
+            TimelineReadPosition.Tail,
+            8,
+            "own-agent",
+            DefaultTimelineSettledProjectionAdapter,
+        )
+        val hydrated = page.records.mapNotNull {
+            (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
+        }.single()
+        val liveMessages = page.projectionInput.records.mapNotNull { input ->
+            input.event?.let { com.letta.mobile.data.chat.projection.timelineEventToUiMessage(it, "own-agent") }
+        }
+        val live = com.letta.mobile.data.chat.projection.buildChatRenderModel(
+            liveMessages,
+            com.letta.mobile.data.chat.projection.ChatDisplayMode.Interactive,
+            "own-agent",
+        ).renderItems.single()
+
+        assertEquals(live.key, hydrated.key)
+        assertEquals(live, hydrated)
+    }
+
+    @Test fun toolRunCrossingPageBoundaryRemainsLosslessInsteadOfPartiallyAggregating() = runTest {
+        val store = InMemoryTimelineStore()
+        repeat(4) { index -> seedToolCall(store, index + 1) }
+        val engine = engine(store, TimelinePageBudget(2, 64 * 1024))
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+
+        val page = engine.preparePage(
+            selection,
+            TimelineReadPosition.Tail,
+            2,
+            "own-agent",
+            DefaultTimelineSettledProjectionAdapter,
+        )
+
+        assertEquals(TimelineRunBoundary.Continues("run-four-tools"), page.projectionInput.envelope.older)
+        assertEquals(2, page.records.count { it.preparedPresentation is TimelineSettledPresentation.Render })
+        assertEquals(0, page.records.count { it.preparedPresentation is TimelineSettledPresentation.Drop })
+    }
+
+    @Test fun excludedInteriorRecordPreventsRunAggregationAcrossTheGap() = runTest {
+        val store = InMemoryTimelineStore()
+        repeat(3) { index -> seedToolCall(store, index + 1) }
+        val engine = engine(store, TimelinePageBudget(3, 64 * 1024))
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val droppingAdapter = TimelineSettledProjectionAdapter(
+            decode = DefaultTimelineSettledProjectionAdapter.decode,
+            project = { record, event, ownAgentId ->
+                if (event.serverId == "id-2") null
+                else DefaultTimelineSettledProjectionAdapter.project(record, event, ownAgentId)
+            },
+        )
+
+        val page = engine.preparePage(
+            selection,
+            TimelineReadPosition.Tail,
+            3,
+            "own-agent",
+            droppingAdapter,
+        )
+
+        assertEquals(2, page.records.count { it.preparedPresentation is TimelineSettledPresentation.Render })
+        assertEquals(1, page.records.count { it.preparedPresentation is TimelineSettledPresentation.Drop })
+        assertTrue(page.records.mapNotNull {
+            (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
+        }.none { item ->
+            item is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock && item.messages.size == 2
+        })
     }
 
     @Test fun pageEnvelopeMarksRunContinuationAcrossOlderBoundary() = runTest {
@@ -137,6 +238,24 @@ class TimelinePageProjectionTest {
             "2026-01-01T00:00:00Z", runId = run)
         store.rows[key(id)] = TimelineStoredRecord(key(id), TIMELINE_EVENT_CONTENT_TYPE,
             TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event).encodeToByteArray())
+    }
+    private fun seedToolCall(store: InMemoryTimelineStore, id: Int) {
+        val event = StoredTimelineEvent(
+            position = id.toDouble(),
+            otid = "otid-$id",
+            serverId = "id-$id",
+            messageType = "tool_call_message",
+            dateIso = "2026-01-01T00:00:0${id}Z",
+            runId = "run-four-tools",
+            toolCalls = listOf(StoredToolCall("call-$id", "Bash", "command-$id")),
+            toolReturnContentByCallId = mapOf("call-$id" to "output-$id"),
+        )
+        val key = key(id)
+        store.rows[key] = TimelineStoredRecord(
+            key,
+            TIMELINE_EVENT_CONTENT_TYPE,
+            TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event).encodeToByteArray(),
+        )
     }
     private fun engine(store: TimelineBoundedStore, budget: TimelinePageBudget = TimelinePageBudget(1, 64 * 1024)) =
         CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 64 * 1024), budget, enabled = true)
