@@ -32,6 +32,7 @@ import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.LettaChatTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -97,8 +98,13 @@ class PagedTimelineViewportLifecycleTest {
     @Test fun fiveLiveToSettledHandoffsKeepActualComposeSlotsMounted() {
         val unrelated = row("unrelated")
         val live = MutableStateFlow<List<ChatRenderItem>>(emptyList())
-        val settled = MutableStateFlow<PagingData<ChatRenderItem>>(PagingData.from(listOf(unrelated)))
-        val presentation = ChatPagingPresentation(settled, live, {})
+        val settled = MutableStateFlow<PagingData<ChatRenderItem>>(PagingData.from(listOf(unrelated), androidx.paging.LoadStates(
+            androidx.paging.LoadState.NotLoading(false),
+            androidx.paging.LoadState.NotLoading(true),
+            androidx.paging.LoadState.NotLoading(true),
+        )))
+        // Do not expose replayCache: Paging's cached-event fast path omits explicit source states.
+        val presentation = ChatPagingPresentation(settled.onEach { }, live, {})
         val mounts = mutableMapOf<String, Int>()
         val disposes = mutableMapOf<String, Int>()
         compose.setContent {
@@ -119,6 +125,7 @@ class PagedTimelineViewportLifecycleTest {
             }
         }
 
+        compose.onNodeWithText("unrelated").assertIsDisplayed()
         repeat(5) { cycle ->
             val key = "segment-stream-$cycle"
             val liveRow = row("live-$cycle").copy(keyOverride = key)
