@@ -67,6 +67,49 @@ private val SwipeUpToCanvasVelocityThresholdDpPerSec = 800.dp
 private val SwipeUpToCanvasSlopDp = 12.dp
 private const val SwipeUpToCanvasVerticalDominanceRatio = 1.6f
 
+private fun isVerticalDominant(totalDx: Float, totalDy: Float): Boolean =
+    abs(totalDy) > abs(totalDx) * SwipeUpToCanvasVerticalDominanceRatio
+
+private fun isDragAbandoned(verticalDominant: Boolean, totalDx: Float, totalDy: Float): Boolean =
+    !verticalDominant && abs(totalDx) > abs(totalDy) * 2f
+
+private fun isReleaseCommitted(
+    thresholdCrossed: Boolean,
+    distanceUp: Float,
+    totalDx: Float,
+    totalDy: Float,
+    velocityUp: Float,
+    distanceThresholdPx: Float,
+    velocityThresholdPx: Float,
+): Boolean {
+    val distanceCommitted = thresholdCrossed || distanceUp >= distanceThresholdPx
+    if (distanceCommitted) return true
+    val upward = distanceUp > 0f
+    val verticalDominant = isVerticalDominant(totalDx, totalDy)
+    return upward && verticalDominant && velocityUp >= velocityThresholdPx
+}
+
+private fun processDragEvent(
+    change: PointerInputChange,
+    distanceUp: Float,
+    verticalDominant: Boolean,
+    slopPx: Float,
+    distanceThresholdPx: Float,
+    thresholdCrossed: Boolean,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    view: android.view.View?,
+): Boolean {
+    val upward = distanceUp > 0f
+    val pastSlop = upward && verticalDominant && distanceUp > slopPx
+    if (!pastSlop) return thresholdCrossed
+    change.consume()
+    if (!thresholdCrossed && distanceUp >= distanceThresholdPx) {
+        HapticEffects.gestureThreshold(haptic, view)
+        return true
+    }
+    return thresholdCrossed
+}
+
 /**
  * Detect the swipe-up gesture within a [PointerInputScope]. The scope gives
  * us access to density (for dp -> px conversion) and the awaitPointerEvent
@@ -102,44 +145,43 @@ private suspend fun PointerInputScope.runSwipeUpToCanvasGesture(
             val change: PointerInputChange = event.changes.firstOrNull() ?: break
 
             if (!change.pressed) {
-                // Release. Commit if either threshold met at this moment.
+                // Release. Commit if distance or dominant upward velocity threshold met.
                 val velocityY = velocityTracker.calculateVelocity().y
                 val velocityUp = -velocityY // pointer Y grows downward
                 val distanceUp = -totalDy
-                val committed = thresholdCrossed ||
-                    distanceUp >= distanceThresholdPx ||
-                    velocityUp >= velocityThresholdPx
+                val committed = isReleaseCommitted(
+                    thresholdCrossed = thresholdCrossed,
+                    distanceUp = distanceUp,
+                    totalDx = totalDx,
+                    totalDy = totalDy,
+                    velocityUp = velocityUp,
+                    distanceThresholdPx = distanceThresholdPx,
+                    velocityThresholdPx = velocityThresholdPx,
+                )
                 if (committed) onTrigger()
                 break
             }
 
-            if (change.isConsumed) {
-                // Another handler (LazyColumn, scroll) took the pointer — bail.
-                break
-            }
+            if (change.isConsumed) break
 
             val delta = change.positionChange()
             totalDy += delta.y
             totalDx += delta.x
             velocityTracker.addPosition(change.uptimeMillis, change.position)
 
-            val upward = totalDy < 0f
-            val distanceUp = -totalDy
-            val verticalDominant =
-                abs(totalDy) > abs(totalDx) * SwipeUpToCanvasVerticalDominanceRatio
+            val verticalDominant = isVerticalDominant(totalDx, totalDy)
+            if (isDragAbandoned(verticalDominant, totalDx, totalDy)) break
 
-            // Horizontal-dominant drag — abandon so the message list can scroll.
-            if (!verticalDominant && abs(totalDx) > abs(totalDy) * 2f) {
-                break
-            }
-
-            if (upward && verticalDominant && distanceUp > slopPx) {
-                change.consume()
-                if (!thresholdCrossed && distanceUp >= distanceThresholdPx) {
-                    thresholdCrossed = true
-                    HapticEffects.gestureThreshold(haptic, view)
-                }
-            }
+            thresholdCrossed = processDragEvent(
+                change = change,
+                distanceUp = -totalDy,
+                verticalDominant = verticalDominant,
+                slopPx = slopPx,
+                distanceThresholdPx = distanceThresholdPx,
+                thresholdCrossed = thresholdCrossed,
+                haptic = haptic,
+                view = view,
+            )
         }
     }
 }
