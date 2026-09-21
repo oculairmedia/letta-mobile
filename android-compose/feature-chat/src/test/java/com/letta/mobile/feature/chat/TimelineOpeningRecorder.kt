@@ -58,10 +58,16 @@ internal class TimelineOpeningRecorder(
     private fun visible(row: TimelineOpeningObservation.VisibleRow, layout: TimelineOpeningObservation.Layout) =
         row.size > 0 && row.offset < layout.viewportEnd && row.offset + row.size > layout.viewportStart
 
+    private fun hasExpectedWindow(visible: List<TimelineOpeningObservation.VisibleRow>): Boolean =
+        expectedKeys.isNotEmpty() && visible.map { it.key } == expectedKeys
+
+    private fun hasResolvedAnchor(visible: List<TimelineOpeningObservation.VisibleRow>): Boolean =
+        anchorResolved && visible.any { it.key == anchorKey && it.offset == anchorOffset }
+
     private fun checkReady(layout: TimelineOpeningObservation.Layout) {
         val visible = layout.rows.filter { visible(it, layout) }
-        if (anchorResolved && expectedKeys.isNotEmpty() && visible.map { it.key } == expectedKeys &&
-            visible.any { it.key == anchorKey && it.offset == anchorOffset }
-        ) mark(Milestone.ViewportReady)
+        if (!hasExpectedWindow(visible)) return
+        if (!hasResolvedAnchor(visible)) return
+        mark(Milestone.ViewportReady)
     }
 }
