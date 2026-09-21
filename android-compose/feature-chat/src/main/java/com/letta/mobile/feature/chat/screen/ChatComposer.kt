@@ -247,7 +247,21 @@ private fun ChatComposerContent(
             onPreviewAttachment = { previewAttachment = it },
         )
 
-        Box(Modifier.fillMaxWidth().mascotGazeTarget(MascotGazeSurface.INPUT)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                // letta-mobile-swup: swipe-up on the prompt card to expand
+                // into the canvas surface. Hybrid velocity/distance commit
+                // (see SwipeUpToCanvasModifier). Disabled while the IME is
+                // open so the gesture does not fight the keyboard, and
+                // while the agent is streaming so a swipe mid-turn does
+                // not abandon the active run.
+                .swipeUpToCanvas(
+                    enabled = !keyboardOpen && !model.isStreaming,
+                    onTrigger = callbacks.onOpenCanvas,
+                )
+                .mascotGazeTarget(MascotGazeSurface.INPUT),
+        ) {
             ChatComposerInput(
                 state = ChatComposerInputState(
                     model = model,
