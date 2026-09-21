@@ -68,7 +68,17 @@ private fun ObserveOpeningCommit(
     }
 }
 
-internal val LocalTimelineShellLifecycleObserver = staticCompositionLocalOf<((Boolean, Any) -> Unit)?> { null }
+internal class TimelineShellToken
+
+internal sealed interface TimelineShellLifecycle {
+    val token: TimelineShellToken
+
+    data class Mounted(override val token: TimelineShellToken) : TimelineShellLifecycle
+    data class Disposed(override val token: TimelineShellToken) : TimelineShellLifecycle
+}
+
+internal val LocalTimelineShellLifecycleObserver =
+    staticCompositionLocalOf<((TimelineShellLifecycle) -> Unit)?> { null }
 
 internal enum class TimelineRowLifecycle { Mount, Dispose }
 
@@ -151,11 +161,11 @@ internal fun PagedChatMessageList(
     // Internal fill consumes its content bounds; the separate shell tag cannot replace a caller tag.
     Box(modifier = modifier, propagateMinConstraints = true) {
         Box(Modifier.fillMaxSize().testTag("timeline-opening-shell")) {
-            val shellIdentity = remember { Any() }
+            val shellToken = remember { TimelineShellToken() }
             val shellObserver = LocalTimelineShellLifecycleObserver.current
-            androidx.compose.runtime.DisposableEffect(shellIdentity) {
-                shellObserver?.invoke(true, shellIdentity)
-                onDispose { shellObserver?.invoke(false, shellIdentity) }
+            androidx.compose.runtime.DisposableEffect(shellToken) {
+                shellObserver?.invoke(TimelineShellLifecycle.Mounted(shellToken))
+                onDispose { shellObserver?.invoke(TimelineShellLifecycle.Disposed(shellToken)) }
             }
             key(presentation) {
                 val readiness = deriveTimelineOpeningState(presentation.opening, presentation.openError)
@@ -183,12 +193,16 @@ private fun PagedChatMessageListContent(
     val live by presentation.live.collectAsStateWithLifecycle()
     val displayedLive = displayedLiveRows(live, pages.itemSnapshotList.items)
     val refresh = pages.loadState.source.refresh
+    val confirmedEmpty = isTimelineConfirmedEmpty(
+        itemCount = pages.itemCount,
+        displayedLiveEmpty = displayedLive.isEmpty(),
+        initialPageAvailable = PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh),
+    )
     val readiness = deriveTimelineOpeningState(
         opening = false,
         openError = null,
         historyReady = rememberHistoryGate(presentation, pages),
-        confirmedEmpty = pages.itemCount == 0 && displayedLive.isEmpty() &&
-            PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh),
+        confirmedEmpty = confirmedEmpty,
         refresh = refresh,
     )
     if (readiness == TimelineOpeningState.Priming || readiness is TimelineOpeningState.Failed) {
@@ -199,8 +213,7 @@ private fun PagedChatMessageListContent(
     ObserveOpeningCommit(
         TimelineOpeningObservation.Surface.Timeline,
         residentRows = pages.itemSnapshotList.items.size,
-        confirmedEmpty = pages.itemCount == 0 && displayedLive.isEmpty() &&
-            PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh),
+        confirmedEmpty = confirmedEmpty,
     )
     ObserveResidentRows(presentation, pages)
     val listState = key(presentation) { rememberLazyListState() }
@@ -209,7 +222,7 @@ private fun PagedChatMessageListContent(
     var following by remember(presentation, routeTarget) {
         mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
-    val (highlightedTarget, onHighlightTarget) = rememberHighlightedTarget(presentation, routeTarget)
+    val highlightedTargetState = rememberHighlightedTarget(presentation, routeTarget)
 
     PagedTimelineEffects.ScrollEffects(
         params = PagedTimelineScrollEffectsParams(
@@ -230,7 +243,7 @@ private fun PagedChatMessageListContent(
             routeTarget = routeTarget,
             restoreAnchor = restoreAnchor,
             following = following,
-            onHighlightTarget = onHighlightTarget,
+            onHighlightTarget = highlightedTargetState.onHighlight,
         ),
     )
 
@@ -244,7 +257,7 @@ private fun PagedChatMessageListContent(
             listState = listState,
             following = following,
             onFollowingChange = { following = it },
-            highlightedTarget = highlightedTarget,
+            highlightedTarget = highlightedTargetState.target,
             routeTarget = routeTarget,
             missingTarget = missingTarget,
             appearance = appearance,
@@ -267,6 +280,35 @@ private fun rememberHistoryGate(
     return initialHistoryReady || initialPageAvailable
 }
 
+internal fun isTimelineConfirmedEmpty(
+    itemCount: Int,
+    displayedLiveEmpty: Boolean,
+    initialPageAvailable: Boolean,
+): Boolean = itemCount == 0 && displayedLiveEmpty && initialPageAvailable
+
+@Immutable
+private data class HighlightedTargetState(
+    val target: String?,
+    val onHighlight: (String?) -> Unit,
+)
+
+@Composable
+private fun rememberHighlightedTarget(
+    presentation: ChatPagingPresentation,
+    routeTarget: String?,
+): HighlightedTargetState {
+    var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
+    LaunchedEffect(highlightedTarget) {
+        if (highlightedTarget != null) {
+            kotlinx.coroutines.delay(2_000)
+            highlightedTarget = null
+        }
+    }
+    return remember(highlightedTarget) {
+        HighlightedTargetState(highlightedTarget) { highlightedTarget = it }
+    }
+}
+
 @Composable
 private fun ObserveResidentRows(
     presentation: ChatPagingPresentation,
@@ -285,20 +327,6 @@ private fun ObserveResidentRows(
     }
 }
 
-@Composable
-private fun rememberHighlightedTarget(
-    presentation: ChatPagingPresentation,
-    routeTarget: String?,
-): Pair<String?, (String?) -> Unit> {
-    var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
-    LaunchedEffect(highlightedTarget) {
-        if (highlightedTarget != null) {
-            kotlinx.coroutines.delay(2_000)
-            highlightedTarget = null
-        }
-    }
-    return highlightedTarget to { highlightedTarget = it }
-}
 
 internal fun pagedBoundaryDate(newer: ChatRenderItem, older: ChatRenderItem?): LocalDate? {
     if (older == null || newer.boundaryTimestamp.take(10) == older.boundaryTimestamp.take(10)) return null

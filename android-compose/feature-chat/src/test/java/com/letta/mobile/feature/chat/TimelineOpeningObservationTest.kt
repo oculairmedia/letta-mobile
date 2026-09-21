@@ -71,8 +71,8 @@ class TimelineOpeningObservationTest {
         }
         val delivery = Channel<PagingData<ChatRenderItem>>(Channel.UNLIMITED)
         var generations = 0
-        val shellMounts = mutableListOf<Any>()
-        val shellDisposals = mutableListOf<Any>()
+        val shellMounts = mutableListOf<com.letta.mobile.feature.chat.screen.TimelineShellToken>()
+        val shellDisposals = mutableListOf<com.letta.mobile.feature.chat.screen.TimelineShellToken>()
         // A fixture-only boundary; no claim about canonical transport or process-cold IO.
         val freshness = kotlinx.coroutines.CompletableDeferred<Unit>()
         val settled = delivery.receiveAsFlow().onEach {
@@ -96,8 +96,11 @@ class TimelineOpeningObservationTest {
                 LettaChatTheme {
                     CompositionLocalProvider(
                         LocalTimelineOpeningObserver provides recorder::observe,
-                        com.letta.mobile.feature.chat.screen.LocalTimelineShellLifecycleObserver provides { mounted, identity ->
-                            if (mounted) shellMounts += identity else shellDisposals += identity
+                        com.letta.mobile.feature.chat.screen.LocalTimelineShellLifecycleObserver provides { event ->
+                            when (event) {
+                                is com.letta.mobile.feature.chat.screen.TimelineShellLifecycle.Mounted -> shellMounts += event.token
+                                is com.letta.mobile.feature.chat.screen.TimelineShellLifecycle.Disposed -> shellDisposals += event.token
+                            }
                         },
                     ) {
                         PagedChatMessageList(current.value, ChatUiState(), ChatContentCallbacks(
