@@ -31,6 +31,7 @@ data class TimelineLiveBlock(
 data class TimelinePreparedPage(
     val metadata: TimelineMetadataPage,
     val records: List<TimelineSettledRecord>,
+    val projectionInput: TimelinePageProjectionInput,
 )
 
 data class TimelineSettledRecord(
@@ -147,7 +148,7 @@ internal fun TimelineSettledRecord.presentationWithAdapter(
  * can reach; the live/hydration/stream reducers filter it earlier. Without this check a
  * `<skill_content …>` body persisted as a USER row renders as a real "You" bubble on relaunch.
  */
-private fun TimelineEvent.Confirmed.isSyntheticSkillEnvelope(): Boolean =
+internal fun TimelineEvent.Confirmed.isSyntheticSkillEnvelope(): Boolean =
     com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(
         role = when (messageType) {
             TimelineMessageType.USER -> "user"
