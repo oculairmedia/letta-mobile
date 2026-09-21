@@ -1,6 +1,17 @@
 package com.letta.mobile.feature.chat.screen
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,6 +68,18 @@ private fun ObserveOpeningCommit(
     }
 }
 
+internal class TimelineShellToken
+
+internal sealed interface TimelineShellLifecycle {
+    val token: TimelineShellToken
+
+    data class Mounted(override val token: TimelineShellToken) : TimelineShellLifecycle
+    data class Disposed(override val token: TimelineShellToken) : TimelineShellLifecycle
+}
+
+internal val LocalTimelineShellLifecycleObserver =
+    staticCompositionLocalOf<((TimelineShellLifecycle) -> Unit)?> { null }
+
 internal enum class TimelineRowLifecycle { Mount, Dispose }
 
 internal val LocalTimelineRowLifecycleObserver = staticCompositionLocalOf<(TimelineRowLifecycle, String) -> Unit> {
@@ -71,6 +94,58 @@ internal fun residentTargetIndex(
 ): Int? = rows.indexOfFirst { it.containsMessageId(target) }
     .takeIf { it >= 0 }?.let { liveCount + placeholdersBefore + it }
 
+/** S2 readiness preserves the resident-row gate; Ready does not promise an anchored viewport. */
+@Immutable
+internal sealed interface TimelineOpeningState {
+    data object Opening : TimelineOpeningState
+    data object Priming : TimelineOpeningState
+    data object Ready : TimelineOpeningState
+    data object Empty : TimelineOpeningState
+    data class Failed(val message: String, val duringOpen: Boolean) : TimelineOpeningState
+}
+
+internal fun deriveTimelineOpeningState(
+    opening: Boolean,
+    openError: String?,
+    historyReady: Boolean = false,
+    confirmedEmpty: Boolean = false,
+    refresh: LoadState = LoadState.Loading,
+): TimelineOpeningState = when {
+    openError != null -> TimelineOpeningState.Failed(openError, duringOpen = true)
+    opening -> TimelineOpeningState.Opening
+    historyReady -> if (confirmedEmpty) TimelineOpeningState.Empty else TimelineOpeningState.Ready
+    refresh is LoadState.Error -> TimelineOpeningState.Failed("Could not load conversation", duringOpen = false)
+    else -> TimelineOpeningState.Priming
+}
+
+@Composable
+private fun OpeningTreatment(
+    readiness: TimelineOpeningState,
+    agentId: String?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxSize(),
+) {
+    val label = when (readiness) {
+        TimelineOpeningState.Opening -> "Opening conversation..."
+        TimelineOpeningState.Priming -> "Loading conversation..."
+        TimelineOpeningState.Empty -> "No messages yet"
+        is TimelineOpeningState.Failed -> readiness.message
+        TimelineOpeningState.Ready -> return
+    }
+    androidx.compose.foundation.layout.Column(modifier.semantics {
+        stateDescription = label
+        liveRegion = LiveRegionMode.Polite
+        if (readiness is TimelineOpeningState.Failed) error(label)
+        if (readiness == TimelineOpeningState.Opening || readiness == TimelineOpeningState.Priming) {
+            progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+        }
+    }) {
+        if (readiness == TimelineOpeningState.Opening || readiness == TimelineOpeningState.Priming) MascotLoading(agentId)
+        Text(label)
+        if (readiness is TimelineOpeningState.Failed) TextButton(onClick = onRetry) { Text("Retry") }
+    }
+}
+
 /** Paging owns load hints, retries and dropping. Never materialize the settled snapshot. */
 @Composable
 internal fun PagedChatMessageList(
@@ -80,20 +155,28 @@ internal fun PagedChatMessageList(
     appearance: ChatContentAppearance,
     modifier: Modifier = Modifier,
 ) {
-    if (presentation.opening || presentation.openError != null) {
-        ObserveOpeningCommit(if (presentation.openError == null) TimelineOpeningObservation.Surface.Opening else TimelineOpeningObservation.Surface.OpenFailed)
-        androidx.compose.foundation.layout.Column(modifier) {
-            // The agent opening its own conversation, not an anonymous wait (wbin4.2).
-            if (presentation.openError == null) MascotLoading(state.agentId)
-            Text(presentation.openError ?: "Opening conversation...")
-            if (presentation.openError != null) TextButton(onClick = presentation.retryOpen) {
-                Text("Retry")
+    // Outside the open/content branches: the actual surface survives even the immutable
+    // opening-placeholder -> opened-presentation handoff. Paging state remains presentation-keyed.
+    // Caller constraints, padding and semantics belong exclusively to this outer container.
+    // Internal fill consumes its content bounds; the separate shell tag cannot replace a caller tag.
+    Box(modifier = modifier, propagateMinConstraints = true) {
+        Box(Modifier.fillMaxSize().testTag("timeline-opening-shell")) {
+            val shellToken = remember { TimelineShellToken() }
+            val shellObserver = LocalTimelineShellLifecycleObserver.current
+            androidx.compose.runtime.DisposableEffect(shellToken) {
+                shellObserver?.invoke(TimelineShellLifecycle.Mounted(shellToken))
+                onDispose { shellObserver?.invoke(TimelineShellLifecycle.Disposed(shellToken)) }
+            }
+            key(presentation) {
+                val readiness = deriveTimelineOpeningState(presentation.opening, presentation.openError)
+                if (readiness == TimelineOpeningState.Opening || readiness is TimelineOpeningState.Failed) {
+                    ObserveOpeningCommit(if (readiness is TimelineOpeningState.Failed) TimelineOpeningObservation.Surface.OpenFailed else TimelineOpeningObservation.Surface.Opening)
+                    OpeningTreatment(readiness, state.agentId, presentation.retryOpen)
+                } else {
+                    PagedChatMessageListContent(presentation, state, callbacks, appearance, Modifier.fillMaxSize())
+                }
             }
         }
-        return
-    }
-    key(presentation) {
-        PagedChatMessageListContent(presentation, state, callbacks, appearance, modifier)
     }
 }
 
@@ -110,16 +193,27 @@ private fun PagedChatMessageListContent(
     val live by presentation.live.collectAsStateWithLifecycle()
     val displayedLive = displayedLiveRows(live, pages.itemSnapshotList.items)
     val refresh = pages.loadState.source.refresh
-    if (!rememberHistoryGate(presentation, pages)) {
-        ObserveOpeningCommit(if (refresh is LoadState.Error) TimelineOpeningObservation.Surface.InitialFailed else TimelineOpeningObservation.Surface.InitialLoading)
-        PagedTimelineLazyLayout.InitialLoadingView(refresh = refresh, onRetry = pages::retry, modifier = modifier)
+    val confirmedEmpty = isTimelineConfirmedEmpty(
+        itemCount = pages.itemCount,
+        displayedLiveEmpty = displayedLive.isEmpty(),
+        initialPageAvailable = PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh),
+    )
+    val readiness = deriveTimelineOpeningState(
+        opening = false,
+        openError = null,
+        historyReady = rememberHistoryGate(presentation, pages),
+        confirmedEmpty = confirmedEmpty,
+        refresh = refresh,
+    )
+    if (readiness == TimelineOpeningState.Priming || readiness is TimelineOpeningState.Failed) {
+        ObserveOpeningCommit(if (readiness is TimelineOpeningState.Failed) TimelineOpeningObservation.Surface.InitialFailed else TimelineOpeningObservation.Surface.InitialLoading)
+        OpeningTreatment(readiness, state.agentId, pages::retry, modifier)
         return
     }
     ObserveOpeningCommit(
         TimelineOpeningObservation.Surface.Timeline,
         residentRows = pages.itemSnapshotList.items.size,
-        confirmedEmpty = pages.itemCount == 0 && displayedLive.isEmpty() &&
-            PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh),
+        confirmedEmpty = confirmedEmpty,
     )
     ObserveResidentRows(presentation, pages)
     val listState = key(presentation) { rememberLazyListState() }
@@ -128,7 +222,7 @@ private fun PagedChatMessageListContent(
     var following by remember(presentation, routeTarget) {
         mutableStateOf(routeTarget == null && restoreAnchor == null)
     }
-    val (highlightedTarget, onHighlightTarget) = rememberHighlightedTarget(presentation, routeTarget)
+    val highlightedTargetState = rememberHighlightedTarget(presentation, routeTarget)
 
     PagedTimelineEffects.ScrollEffects(
         params = PagedTimelineScrollEffectsParams(
@@ -149,7 +243,7 @@ private fun PagedChatMessageListContent(
             routeTarget = routeTarget,
             restoreAnchor = restoreAnchor,
             following = following,
-            onHighlightTarget = onHighlightTarget,
+            onHighlightTarget = highlightedTargetState.onHighlight,
         ),
     )
 
@@ -163,7 +257,7 @@ private fun PagedChatMessageListContent(
             listState = listState,
             following = following,
             onFollowingChange = { following = it },
-            highlightedTarget = highlightedTarget,
+            highlightedTarget = highlightedTargetState.target,
             routeTarget = routeTarget,
             missingTarget = missingTarget,
             appearance = appearance,
@@ -171,6 +265,7 @@ private fun PagedChatMessageListContent(
             modifier = modifier,
         ),
     )
+    if (readiness == TimelineOpeningState.Empty) OpeningTreatment(readiness, state.agentId, pages::retry)
 }
 
 @Composable
@@ -183,6 +278,35 @@ private fun rememberHistoryGate(
     val initialPageAvailable = PagedTimelineLazyLayout.isInitialPageAvailable(pages, refresh)
     if (initialPageAvailable) SideEffect { initialHistoryReady = true }
     return initialHistoryReady || initialPageAvailable
+}
+
+internal fun isTimelineConfirmedEmpty(
+    itemCount: Int,
+    displayedLiveEmpty: Boolean,
+    initialPageAvailable: Boolean,
+): Boolean = itemCount == 0 && displayedLiveEmpty && initialPageAvailable
+
+@Immutable
+private data class HighlightedTargetState(
+    val target: String?,
+    val onHighlight: (String?) -> Unit,
+)
+
+@Composable
+private fun rememberHighlightedTarget(
+    presentation: ChatPagingPresentation,
+    routeTarget: String?,
+): HighlightedTargetState {
+    var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
+    LaunchedEffect(highlightedTarget) {
+        if (highlightedTarget != null) {
+            kotlinx.coroutines.delay(2_000)
+            highlightedTarget = null
+        }
+    }
+    return remember(highlightedTarget) {
+        HighlightedTargetState(highlightedTarget) { highlightedTarget = it }
+    }
 }
 
 @Composable
@@ -203,20 +327,6 @@ private fun ObserveResidentRows(
     }
 }
 
-@Composable
-private fun rememberHighlightedTarget(
-    presentation: ChatPagingPresentation,
-    routeTarget: String?,
-): Pair<String?, (String?) -> Unit> {
-    var highlightedTarget by remember(presentation, routeTarget) { mutableStateOf<String?>(null) }
-    LaunchedEffect(highlightedTarget) {
-        if (highlightedTarget != null) {
-            kotlinx.coroutines.delay(2_000)
-            highlightedTarget = null
-        }
-    }
-    return highlightedTarget to { highlightedTarget = it }
-}
 
 internal fun pagedBoundaryDate(newer: ChatRenderItem, older: ChatRenderItem?): LocalDate? {
     if (older == null || newer.boundaryTimestamp.take(10) == older.boundaryTimestamp.take(10)) return null
