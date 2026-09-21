@@ -500,13 +500,21 @@ class CanonicalTimelineEngine(
             val records = page.metadata.rows.zip(page.bodies) { metadata, body ->
                 TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
             }.map { record ->
-                val presentation = record.presentationWithAdapter(ownAgentId, adapter)
-                val prepared = if (presentation is TimelineSettledPresentation.Render &&
-                    isSuppressed(record.key.identity, record.revision, presentation.event)
-                ) TimelineSettledPresentation.Drop else presentation
-                record.copy(preparedPresentation = prepared)
+                val event = if (record.contentType == TIMELINE_EVENT_CONTENT_TYPE && !record.isPreview) {
+                    adapter.decode(record)
+                } else null
+                val excluded = record.contentType != TIMELINE_EVENT_CONTENT_TYPE ||
+                    (event != null && (event.isSyntheticSkillEnvelope() ||
+                        isSuppressed(record.key.identity, record.revision, event)))
+                TimelineProjectionRecord(record, event, excluded)
             }
-            TimelinePreparedPage(page.metadata, records)
+            val remaining = minOf(budget.maxDecodedBodyBytes, TimelineBoundedReader.MAX_PAGE_BODY_BYTES) -
+                page.bodies.sumOf { it.size.toLong() }
+            val input = TimelinePageProjectionInput(
+                TimelineProjectionContext(selection.scope, ownAgentId), records,
+                runEnvelope(page.metadata, records, remaining, adapter),
+            )
+            TimelinePreparedPage(page.metadata, input.project(adapter), input)
         }
     }
 
