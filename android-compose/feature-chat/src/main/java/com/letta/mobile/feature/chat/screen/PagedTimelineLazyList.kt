@@ -22,6 +22,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
@@ -117,9 +118,21 @@ internal object PagedTimelineLazyLayout {
         modifier: Modifier = Modifier,
     ) {
         val dimens = MaterialTheme.chatDimens
+        val openingObserver = LocalTimelineOpeningObserver.current
+        val observedModifier = if (openingObserver == null) modifier else modifier.onGloballyPositioned {
+            val layout = params.listState.layoutInfo
+            // Layout metadata only: no pages[index] reads and therefore no additional load hints.
+            openingObserver(TimelineOpeningObservation.Layout(
+                rows = layout.visibleItemsInfo.map {
+                    TimelineOpeningObservation.VisibleRow(it.key.toString(), it.offset, it.size)
+                },
+                viewportStart = layout.viewportStartOffset,
+                viewportEnd = layout.viewportEndOffset,
+            ))
+        }
         LazyColumn(
             overscrollEffect = params.kineticOverscroll,
-            modifier = modifier,
+            modifier = observedModifier,
             state = params.listState,
             reverseLayout = true,
             contentPadding = PaddingValues(
