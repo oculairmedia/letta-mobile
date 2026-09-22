@@ -213,12 +213,15 @@ class CanonicalTimelineEngine(
         val event: TimelineEvent.Confirmed,
         val identity: TimelineMessageId,
         val isNew: Boolean,
+        val orderDate: String,
+        val orderOtid: String,
     )
 
     private fun adoptCommittedIdentities(committed: List<CommittedRow>) {
         val live = mutableLive.value ?: return
         if (live.settlementRevision == null) return
-        val adopted = live.adoptionsFrom(committed)
+        val ordered = committed.sortedWith(compareBy({ it.orderDate }, { it.orderOtid }))
+        val adopted = live.adoptionsFrom(ordered)
         if (adopted.isEmpty()) return
         mutableLive.value = live.copy(aliases = live.aliases + adopted)
     }
@@ -456,7 +459,13 @@ class CanonicalTimelineEngine(
                 // After the merge: a tool call's stored key is its group owner, which the tool
                 // index only knows once this record has been written.
                 if (writer is TimelineExactCanonicalWriter && event != null) {
-                    committed += CommittedRow(event, writer.canonicalEventIdentity(this, event), isNew = !existed)
+                    committed += CommittedRow(
+                        event = event,
+                        identity = writer.canonicalEventIdentity(this, event),
+                        isNew = !existed,
+                        orderDate = record.message.date.orEmpty(),
+                        orderOtid = record.message.otid ?: record.message.id,
+                    )
                 }
             }
             currentCoroutineContext().ensureActive()

@@ -125,10 +125,12 @@ class TimelineExactCanonicalWriterTest {
         }
         live.forEach { assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(it))) }
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
-        val settled = listOf("server-thought-1", "server-thought-2").map { id ->
-            ReasoningMessage(id = id, reasoning = "Check both inputs", runId = null, date = "2026-01-01T00:00:01Z")
-        }
-        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *settled.map(::record).toTypedArray()))
+        val settled = listOf(
+            ReasoningMessage(id = "server-thought-1", reasoning = "Check both inputs", runId = null, date = "2026-01-01T00:00:01Z"),
+            ReasoningMessage(id = "server-thought-2", reasoning = "Check both inputs", runId = null, date = "2026-01-01T00:00:02Z"),
+        )
+        // A custom transport may return newest first; adoption still follows chronological order.
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *settled.reversed().map(::record).toTypedArray()))
         val publication = kotlin.test.assertNotNull(engine.live.value)
         assertEquals(
             listOf(TimelineMessageId("server-thought-1"), TimelineMessageId("server-thought-2")),
