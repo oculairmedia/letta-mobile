@@ -61,15 +61,18 @@ class RoomTimelineBoundedStore(
 
     private inner class Session(val scope: ByteArray, val writable: Boolean) : TimelineStoreTransaction, TimelineImageBodyWriter {
         override suspend fun persistImage(base64: String): StoredImageBodyReference {
-            write()
+            checkOpen()
+            check(writable) { "Read-only snapshot" }
             require(base64.length <= ((MAX_IMAGE_BYTES + 2) / 3) * 4) { "Image exceeds budget" }
             currentCoroutineContext().ensureActive()
             val bytes = Base64.getDecoder().decode(base64)
             require(bytes.size in 1..MAX_IMAGE_BYTES)
+            require(Base64.getEncoder().encodeToString(bytes) == base64) { "Non-canonical image base64" }
             val hash = checksum(bytes)
             val reference = StoredImageBodyReference(hash, bytes.size.toLong())
             val pointer = "image-sha256:$hash"
             if (dao.blob(scope, pointer) == null) {
+                write()
                 persist(bytes, pointer)
             } else {
                 check(resolveImage(reference) != null) { "Existing image body is corrupt" }

@@ -276,13 +276,19 @@ suspend fun TimelineEvent.Confirmed.toStoredTimelineEventWithImageBodies(
 
 /** Resolve only a selected event, never during metadata enumeration. Missing bytes stay placeholders. */
 suspend fun StoredTimelineEvent.toConfirmedTimelineEventWithImageBodies(
-    bodies: TimelineImageBodyReader,
+    bodies: TimelineImageBodyReader?,
 ): TimelineEvent.Confirmed = copy(
     attachments = attachments.map { pointer ->
         val reference = pointer.bodyReference
-        if (reference == null) pointer else pointer.copy(
-            thumbnailBase64 = bodies.resolveImage(reference),
-        )
+        if (reference == null) pointer else {
+            val resolved = if (pointer.byteSize == reference.decodedBytes) bodies?.resolveImage(reference) else null
+            if (resolved == null) com.letta.mobile.util.Telemetry.event(
+                "TimelineImageBody", "resolve.unavailable",
+                "bytes" to reference.decodedBytes,
+                level = com.letta.mobile.util.Telemetry.Level.WARN,
+            )
+            pointer.copy(thumbnailBase64 = resolved)
+        }
     },
 ).toConfirmedTimelineEvent()
 

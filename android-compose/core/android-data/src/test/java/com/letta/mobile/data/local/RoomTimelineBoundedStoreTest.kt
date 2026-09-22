@@ -38,7 +38,7 @@ class RoomTimelineBoundedStoreTest {
     }
     @After fun teardown() { db.close() }
 
-    /** Dormant codec integration, deliberately not an activated CanonicalTimelineEngine test. */
+    /** Real writer and fresh engine, with no surviving in-memory image after Room reopens. */
     @Test fun largeInlineImageSurvivesCanonicalColdReopenByteIdentically() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val name = "image-cold-${java.util.UUID.randomUUID()}.db"
@@ -46,24 +46,35 @@ class RoomTimelineBoundedStoreTest {
         db = Room.databaseBuilder(context, TimelineLedgerDatabase::class.java, name).build()
         store = RoomTimelineBoundedStore(db)
         try {
-            val bytes = ByteArray(192 * 1024 + 7) { (it % 251).toByte() }
+            val bytes = ByteArray(105_868) { (it % 251).toByte() }
             val encoded = Base64.getEncoder().encodeToString(bytes)
             val source = StoredTimelineEvent(1.0, "otid", serverId = "image", messageType = "USER",
                 dateIso = "2026-01-01T00:00:00Z", attachments = listOf(
                     StoredImageAttachmentPointer("image/png", bytes.size.toLong(), thumbnailBase64 = encoded),
                 )).toConfirmedTimelineEvent()
             store.transaction(scope) {
-                val event = source.toStoredTimelineEventWithImageBodies(this as TimelineImageBodyWriter)
-                assertEquals(event, source.toStoredTimelineEventWithImageBodies(this as TimelineImageBodyWriter))
-                val payload = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event)
+                assertTrue(TimelineExactCanonicalWriter(scope, 100_000).mergeEvent(this, source))
+                val row = metadata(TimelineReadPosition.Tail, 1).rows.single()
+                val payload = body(row.body, 0, 2048).decodeToString()
                 assertFalse(payload.contains(encoded))
                 assertTrue(payload.length < 2048)
-                put(TimelineStoredRecord(TimelinePageKey(1, TimelineMessageId("image")), "event", payload.encodeToByteArray()))
+                assertTrue(payload.contains("bodyReference"))
                 nextRevision()
+            }
+            store.transaction(scope) {
+                assertFalse(TimelineExactCanonicalWriter(scope, 100_000).mergeEvent(this, source))
             }
             db.close()
             db = Room.databaseBuilder(context, TimelineLedgerDatabase::class.java, name).build()
             store = RoomTimelineBoundedStore(db)
+            val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+            val selection = (engine.open(scope) as TimelineEngineOpen.Opened).selection
+            val page = engine.preparePage(selection, TimelineReadPosition.Tail, 1, null)
+            val presentation = page.records.single().preparedPresentation as TimelineSettledPresentation.Render
+            val ui = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(presentation.event, null)!!
+            val rendered = Base64.getDecoder().decode(ui.attachments.single().base64)
+            assertArrayEquals(bytes, rendered)
+            assertEquals(checksum(bytes), checksum(rendered))
             store.read(scope) {
                 val metadata = metadata(TimelineReadPosition.Tail, 1).rows.single()
                 assertTrue(metadata.body.encodedBytes < 2048)
@@ -78,6 +89,16 @@ class RoomTimelineBoundedStoreTest {
                 assertArrayEquals(bytes, actual)
                 assertNull(imageBodies.resolveImage(reference.copy(sha256 = "0".repeat(64))))
                 assertNull(imageBodies.resolveImage(reference.copy(decodedBytes = reference.decodedBytes + 1)))
+                for (invalid in listOf(
+                    reference.copy(sha256 = "0".repeat(64)),
+                    reference.copy(decodedBytes = reference.decodedBytes + 1),
+                    reference.copy(provenance = "unknown"),
+                )) {
+                    val unavailable = stored.copy(attachments = listOf(stored.attachments.single().copy(bodyReference = invalid)))
+                        .toConfirmedTimelineEventWithImageBodies(imageBodies).attachments.single()
+                    assertEquals("", unavailable.base64)
+                    assertEquals(bytes.size.toLong(), unavailable.storedByteSize)
+                }
                 val pointer = "image-sha256:${reference.sha256}"
                 db.openHelper.writableDatabase.execSQL(
                     "UPDATE ledger_chunk SET payload = ? WHERE scope = ? AND pointer = ? AND ordinal = 0",
