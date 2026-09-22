@@ -18,14 +18,14 @@ class TimelineExactCanonicalWriter(
     init { require(maxHistoricalBytes > 0) }
 
     override suspend fun merge(transaction: TimelineStoreTransaction, record: TimelineRemoteRecord): Boolean {
+        val returned = record.message as? com.letta.mobile.data.model.ToolReturnMessage
+        val callId = returned?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
+        if (returned != null && callId != null) {
+            return mergeToolReturn(transaction, callId, returned)
+        }
         val incoming = record.message.toTimelineEvent(0.0)
         if (incoming != null) {
-            // toTimelineEvent intentionally omits the return's call ID; capture the wire identity
-            // before projection so returns on a different history page resolve old owners.
-            val returned = record.message as? com.letta.mobile.data.model.ToolReturnMessage
-            val callId = returned?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
-            val indexed = if (callId != null) CanonicalToolIndex.observe(transaction, callId, null, true) else false
-            return mergeEvent(transaction, incoming) || indexed
+            return mergeEvent(transaction, incoming)
         }
         // Opaque protocol records must survive even when the current renderer cannot project them.
         val key = transaction.locate(record.identity) ?: TimelinePageKey(
@@ -36,6 +36,53 @@ class TimelineExactCanonicalWriter(
         val bytes = TimelineSnapshotCodec.json.encodeToString(com.letta.mobile.data.model.LettaMessage.serializer(), record.message).encodeToByteArray()
         transaction.put(TimelineStoredRecord(key, "application/vnd.letta.message+json;version=1", bytes))
         return true
+    }
+
+    private suspend fun mergeToolReturn(
+        transaction: TimelineStoreTransaction,
+        callId: String,
+        returned: com.letta.mobile.data.model.ToolReturnMessage,
+    ): Boolean {
+        val indexed = transaction.toolCall(callId)
+        val owner = indexed?.owner
+        if (owner == null) {
+            // A return may lead its call across a page boundary. Retain the exact
+            // return until the owner appears; the later call merge consumes it.
+            val incoming = returned.toTimelineEvent(0.0) ?: return false
+            return mergeEvent(transaction, incoming) || CanonicalToolIndex.observe(transaction, callId, null, true)
+        }
+        val ownerKey = transaction.locate(owner) ?: throw TimelineMergeUnavailable(owner, "tool_owner_missing")
+        val metadata = transaction.metadata(TimelineReadPosition.Around(ownerKey), 1)
+            .rows.singleOrNull { it.key == ownerKey }
+            ?: throw TimelineMergeUnavailable(owner, "tool_owner_body_missing")
+        if (metadata.body.encodedBytes > maxHistoricalBytes) {
+            throw TimelineMergeUnavailable(owner, "historical_body_budget")
+        }
+        val bytes = transaction.body(metadata.body, 0, metadata.body.encodedBytes.toInt())
+        if (bytes.size.toLong() != metadata.body.encodedBytes) {
+            throw TimelineMergeUnavailable(owner, "incomplete_historical_body")
+        }
+        val ownerEvent = TimelineSnapshotCodec.json.decodeFromString(
+            StoredTimelineEvent.serializer(), bytes.decodeToString(),
+        ).toConfirmedTimelineEvent()
+        val fold = foldToolReturnBodies(
+            ownerEvent.toolReturnContentByCallId,
+            ownerEvent.toolReturnTruncationByCallId,
+            listOf(callId to returned),
+        )
+        val body = fold.contentByCallId[callId] ?: ""
+        val enriched = ownerEvent.copy(
+            approvalDecided = ownerEvent.approvalDecided || ownerEvent.willCompleteWith(callId),
+            toolReturnContent = body.ifBlank { ownerEvent.toolReturnContent ?: body },
+            toolReturnIsError = returned.isErr == true || returned.status == "error",
+            toolReturnContentByCallId = (fold.contentByCallId + (callId to body)).toTimelinePersistentMap(),
+            toolReturnIsErrorByCallId = (ownerEvent.toolReturnIsErrorByCallId +
+                (callId to (returned.isErr == true || returned.status == "error"))).toTimelinePersistentMap(),
+            toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
+            attachments = (ownerEvent.attachments + returned.attachments).distinct().toTimelinePersistentList(),
+        )
+        val merged = mergeEvent(transaction, enriched)
+        return CanonicalToolIndex.observe(transaction, callId, owner, true) || merged
     }
 
     suspend fun mergeEvent(transaction: TimelineStoreTransaction, incoming: TimelineEvent.Confirmed): Boolean {
