@@ -68,7 +68,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * [ControlsBarIntent]s (colour, outline) and [CanvasPropertyIntent]s (width, opacity, dash,
  * radius) for [CanvasControlsBridge] to apply to the selection or the tool.
  *
- * [beside] places the popover to the right of the opener (for the tool rail) rather than below it.
+ * [placement] puts the popover below the opener, to its right (for the tool rail), or above it
+ * (for the phone's bottom tool bar).
  */
 @Composable
 fun CanvasPropertyControl(
@@ -79,7 +80,7 @@ fun CanvasPropertyControl(
     modifier: Modifier = Modifier,
     note: NoteBarActions? = null,
     label: String = "Properties",
-    beside: Boolean = false,
+    placement: PropertyPopoverPlacement = PropertyPopoverPlacement.BELOW,
 ) {
     var open by remember { mutableStateOf(false) }
     val swatch = when {
@@ -105,10 +106,18 @@ fun CanvasPropertyControl(
             )
         }
         if (open) {
-            val besideOffset = with(androidx.compose.ui.platform.LocalDensity.current) { IntOffset((OPENER_SIZE + LettaDimens.Space.md).roundToPx(), 0) }
+            val gap = with(androidx.compose.ui.platform.LocalDensity.current) { (OPENER_SIZE + LettaDimens.Space.md).roundToPx() }
             Popup(
-                alignment = if (beside) Alignment.TopStart else Alignment.TopCenter,
-                offset = if (beside) besideOffset else IntOffset.Zero,
+                alignment = when (placement) {
+                    PropertyPopoverPlacement.BELOW -> Alignment.TopCenter
+                    PropertyPopoverPlacement.BESIDE -> Alignment.TopStart
+                    PropertyPopoverPlacement.ABOVE -> Alignment.BottomCenter
+                },
+                offset = when (placement) {
+                    PropertyPopoverPlacement.BELOW -> IntOffset.Zero
+                    PropertyPopoverPlacement.BESIDE -> IntOffset(gap, 0)
+                    PropertyPopoverPlacement.ABOVE -> IntOffset(0, -gap)
+                },
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
@@ -124,6 +133,9 @@ fun CanvasPropertyControl(
         }
     }
 }
+
+/** Where [CanvasPropertyControl] opens its panel relative to the opener. */
+enum class PropertyPopoverPlacement { BELOW, BESIDE, ABOVE }
 
 /** Which colour of the target the embedded picker edits. */
 private enum class ColorTarget(val label: String, val glyph: ImageVector) {

@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -66,8 +68,9 @@ fun CanvasSelectionBar(
         tonalElevation = LettaDimens.Space.hair,
         shadowElevation = LettaDimens.Space.sm,
     ) {
+        // Scrolls rather than clips when the board is narrower than the bar, as on a phone.
         Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {

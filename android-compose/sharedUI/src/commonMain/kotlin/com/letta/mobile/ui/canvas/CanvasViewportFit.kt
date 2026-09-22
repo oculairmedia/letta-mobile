@@ -28,10 +28,10 @@ internal object CanvasViewportFit {
     }
 
     /** The camera that fits [content] into a board of [boardWidth] x [boardHeight] screen px. */
-    fun fit(content: Rect, boardWidth: Float, boardHeight: Float, padding: Float = PADDING): CanvasFit {
+    fun fit(content: Rect, boardWidth: Float, boardHeight: Float, padding: Float = PADDING, maxScale: Float = MAX_SCALE): CanvasFit {
         val width = (content.width + padding * 2).coerceAtLeast(1f)
         val height = (content.height + padding * 2).coerceAtLeast(1f)
-        val scale = minOf(boardWidth / width, boardHeight / height).coerceIn(MIN_SCALE, MAX_SCALE)
+        val scale = minOf(boardWidth / width, boardHeight / height).coerceIn(MIN_SCALE, maxScale)
         val centre = content.center
         val offset = Offset(boardWidth / 2f - centre.x * scale, boardHeight / 2f - centre.y * scale)
         return CanvasFit(scale, offset)

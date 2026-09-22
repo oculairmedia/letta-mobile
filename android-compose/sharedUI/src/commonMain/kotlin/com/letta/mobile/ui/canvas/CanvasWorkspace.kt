@@ -27,6 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.focusable
@@ -98,6 +101,8 @@ fun CanvasWorkspace(
     onShareToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
     /** False when the host already shows the canvas title and a way back, as the desktop side pane does. */
     showTitle: Boolean = true,
+    /** Phone or desktop chrome; [CanvasLayout.AUTO] decides by the board's width. */
+    layout: CanvasLayout = CanvasLayout.AUTO,
 ) {
     val state by controller.state.collectAsState()
     val canUndo by controller.canUndo.collectAsState()
@@ -318,6 +323,35 @@ fun CanvasWorkspace(
         CanvasControlsBridge.dispatchProperty(controller = controller, intent = intent, state = state)
     }
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
+    // Unknown until the board has been measured, so neither tool bar flashes up in the wrong
+    // layout for the first frame.
+    val boardWidth = with(LocalDensity.current) { boardSize.width.toDp() }
+    val resolvedLayout = if (boardSize.width > 0) layout.resolve(boardWidth) else null
+    val compact = resolvedLayout == CanvasLayout.COMPACT
+
+    // Fit everything on the board (elements and notes) with padding; an empty board just goes back
+    // to 100% at the origin. [maxScale] lets the open-time fit shrink a board without enlarging it.
+    fun fitToContent(maxScale: Float = CanvasViewportFit.MAX_SCALE): Boolean {
+        val content = CanvasViewportFit.contentBounds(state.elements, documents)
+        controller.resetCamera()
+        if (content == null || boardSize.width <= 0 || boardSize.height <= 0) return false
+        val fit = CanvasViewportFit.fit(content, boardSize.width.toFloat(), boardSize.height.toFloat(), maxScale = maxScale)
+        // From the reset camera (scale 1, no offset): zooming about the origin leaves the offset
+        // at zero, then one pan places the content.
+        controller.zoomBy(fit.scale, Offset.Zero)
+        controller.panBy(fit.offset)
+        return true
+    }
+
+    // A board drawn on a desktop is mostly off the edge of a phone, which opened on an empty
+    // corner of it. On a phone the board opens fitted, once, and never zoomed in past 100%.
+    var fittedOnOpen by remember(session) { mutableStateOf(false) }
+    LaunchedEffect(initialLoadDone, compact) {
+        if (initialLoadDone && compact && !fittedOnOpen) {
+            fittedOnOpen = true
+            fitToContent(maxScale = 1f)
+        }
+    }
 
     val documentRecorderContext = remember(session, history) {
         DocumentRecorderContext(
@@ -768,7 +802,9 @@ fun CanvasWorkspace(
                             back()
                         }
                     },
-                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET).canvasChrome(chromeRegions),
+                    compact = compact,
+                    modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(CHROME_INSET).canvasChrome(chromeRegions),
                 )
             }
 
@@ -780,16 +816,7 @@ fun CanvasWorkspace(
                     // Fit everything on the board (elements and notes) with padding; an empty
                     // board just goes back to 100% at the origin.
                     onReset = {
-                        val content = CanvasViewportFit.contentBounds(state.elements, documents)
-                        controller.resetCamera()
-                        if (content != null && boardSize.width > 0 && boardSize.height > 0) {
-                            val fit = CanvasViewportFit.fit(content, boardSize.width.toFloat(), boardSize.height.toFloat())
-                            // From the reset camera (scale 1, no offset): zooming about the origin
-                            // leaves the offset at zero, then one pan places the content.
-                            controller.zoomBy(fit.scale, Offset.Zero)
-                            controller.panBy(fit.offset)
-                            statusMessage = "Fitted to content"
-                        }
+                        if (fitToContent()) statusMessage = "Fitted to content"
                     },
                     onActualSize = { controller.zoomTo(1f, boardCenter) },
                 ),
@@ -833,7 +860,18 @@ fun CanvasWorkspace(
                         statusMessage = "Background pattern: ${pattern.kind}"
                     },
                 ),
-                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET).canvasChrome(chromeRegions),
+                undo = if (compact) {
+                    CanvasUndoActions(
+                        canUndo = controlsBarState.canUndo,
+                        canRedo = controlsBarState.canRedo,
+                        onUndo = ::undoBoard,
+                        onRedo = ::redoBoard,
+                    )
+                } else {
+                    null
+                },
+                modifier = Modifier.align(Alignment.TopEnd).windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(CHROME_INSET).canvasChrome(chromeRegions),
             )
 
 
@@ -927,8 +965,11 @@ fun CanvasWorkspace(
                     } else {
                         null
                     },
+                    // On a phone the title and actions pills fill the top row, so the bar goes
+                    // below them even when the host hides the title.
                     modifier = Modifier.align(Alignment.TopCenter)
-                        .padding(top = if (showTitle) 64.dp else CHROME_INSET)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(top = if (showTitle || compact) 64.dp else CHROME_INSET, start = CHROME_INSET, end = CHROME_INSET)
                         .canvasChrome(chromeRegions),
                 )
             }
@@ -936,12 +977,7 @@ fun CanvasWorkspace(
             // The tool rail down the left, clear of the title pill above and the foot row below.
             // Our own: the drawbox-ui one loads drawables its Android artifact never ships
             // (letta-mobile-r5f3r). See CanvasControlsBar.
-            CanvasControlsBar(
-                state = controlsBarState,
-                dispatch = dispatch,
-                properties = properties,
-                dispatchProperty = dispatchProperty,
-                onAddNote = session?.let { s ->
+            val onAddNote: (() -> Unit)? = session?.let { s ->
                     {
                         val frame = clearOfExisting(
                             newNoteFrame(state.viewport.screenToWorld(boardCenter)),
@@ -959,12 +995,21 @@ fun CanvasWorkspace(
                             }
                         }
                     }
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
-                    .canvasChrome(chromeRegions),
-            )
+                }
+            if (resolvedLayout == CanvasLayout.EXPANDED) {
+                CanvasControlsBar(
+                    state = controlsBarState,
+                    dispatch = dispatch,
+                    properties = properties,
+                    dispatchProperty = dispatchProperty,
+                    onAddNote = onAddNote,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
+                        .canvasChrome(chromeRegions),
+                )
+            }
 
             // A note opened large sits over the board, under the foot bar so formatting stays reachable.
             val expanded = documents.firstOrNull { it.id == expandedNoteId }
@@ -975,12 +1020,16 @@ fun CanvasWorkspace(
                     onClose = { expandedNoteId = null },
                     onToolbar = { noteToolbar = it },
                     chromeRegions = chromeRegions,
+                    compact = compact,
                 )
             }
 
-            // The foot of the board: the active note's formatting bar, centred, above the status line.
+            // The foot of the board: the active note's formatting bar, centred, above the status line
+            // on a desktop and above the tool bar on a phone. Inset from the system bars and the
+            // keyboard, so on a phone the formatting bar rides up with the keyboard.
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET)
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing).padding(CHROME_INSET)
                     .canvasChrome(chromeRegions),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -989,10 +1038,21 @@ fun CanvasWorkspace(
                 if (toolbar != null && (activeNoteId != null || expandedNoteId != null)) {
                     CanvasFormattingBar(toolbar = toolbar)
                 }
-                CanvasStatusLine(
-                    text = "Elements: ${state.elements.size} | $statusMessage",
-                    modifier = Modifier.align(Alignment.Start),
-                )
+                when (resolvedLayout) {
+                    CanvasLayout.COMPACT -> if (expanded == null) {
+                        CanvasCompactToolbar(
+                            state = controlsBarState,
+                            dispatch = dispatch,
+                            properties = properties,
+                            dispatchProperty = dispatchProperty,
+                            onAddNote = onAddNote,
+                        )
+                    }
+                    else -> CanvasStatusLine(
+                        text = "Elements: ${state.elements.size} | $statusMessage",
+                        modifier = Modifier.align(Alignment.Start),
+                    )
+                }
             }
         }
     }
