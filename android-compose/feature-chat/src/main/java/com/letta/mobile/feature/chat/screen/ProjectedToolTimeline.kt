@@ -269,7 +269,11 @@ private fun ToolRunSummaryRow(
                 contentDescription = "Tool run summary"
                 stateDescription = "${summary.toolCount} ${toolNoun(summary.toolCount)}, ${summary.failureCount} failed, " +
                     "${summary.awaitingApprovalCount} awaiting approval, " +
-                    if (summary.running) "running" else "settled"
+                    when {
+                        summary.awaitingApprovalCount > 0 -> "awaiting approval"
+                        summary.running -> "running"
+                        else -> "settled"
+                    }
             }
             .clickable(onClick = onClick)
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.md),

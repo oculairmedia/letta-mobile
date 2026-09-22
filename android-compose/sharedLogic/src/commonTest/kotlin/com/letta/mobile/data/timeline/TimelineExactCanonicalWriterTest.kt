@@ -12,7 +12,9 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TimelineExactCanonicalWriterTest {
@@ -621,6 +623,26 @@ class TimelineExactCanonicalWriterTest {
         ).toConfirmedTimelineEvent()
         assertEquals("exact result", persisted.toolReturnContentByCallId["call-1"])
         store.read(scope) { assertEquals(TimelineMessageId("call-owner"), toolCall("call-1")?.owner) }
+    }
+
+    @Test fun oversizedDeferredReturnFailsBeforeEvidenceIsPersisted() = runTest {
+        val store = InMemoryTimelineStore()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-large", toolCallId = "call-large",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("x".repeat(70_000)),
+            date = "2026-01-01T00:00:00Z",
+        )
+
+        val failure = assertFailsWith<TimelineMergeUnavailable> {
+            store.transaction(scope) { writer.merge(this, record(returned)) }
+        }
+
+        assertEquals("deferred_tool_return_budget", failure.reason)
+        store.read(scope) {
+            assertNull(toolCall("call-large"))
+            assertNull(evidence("tool-return/deferred/call-large", 64 * 1024))
+        }
     }
 
     @Test fun indexedOwnerBodyOver64KiBIsReadInBoundedChunks() = runTest {

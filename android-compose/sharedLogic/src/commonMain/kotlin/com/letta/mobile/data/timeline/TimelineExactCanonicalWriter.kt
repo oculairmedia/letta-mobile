@@ -18,6 +18,7 @@ private data class DeferredToolReturn(
 )
 
 private const val HISTORICAL_BODY_CHUNK_BYTES = 64 * 1024
+private const val DEFERRED_RETURN_MAX_BYTES = 64 * 1024
 
 class TimelineExactCanonicalWriter(
     private val scope: TimelineScope,
@@ -56,9 +57,13 @@ class TimelineExactCanonicalWriter(
         if (owner == null) {
             // A return may lead its call across a page boundary. Keep its exact wire body so
             // the later owner merge can fold it instead of leaving a completed standalone row.
-            transaction.putEvidence(deferredReturnKey(callId), TimelineSnapshotCodec.json.encodeToString(
+            val deferred = TimelineSnapshotCodec.json.encodeToString(
                 DeferredToolReturn.serializer(), DeferredToolReturn(returned),
-            ).encodeToByteArray())
+            ).encodeToByteArray()
+            if (deferred.size > DEFERRED_RETURN_MAX_BYTES) {
+                throw TimelineMergeUnavailable(TimelineMessageId(returned.id), "deferred_tool_return_budget")
+            }
+            transaction.putEvidence(deferredReturnKey(callId), deferred)
             return CanonicalToolIndex.observe(transaction, callId, null, true)
         }
         val ownerKey = transaction.locate(owner) ?: throw TimelineMergeUnavailable(owner, "tool_owner_missing")
@@ -131,7 +136,7 @@ class TimelineExactCanonicalWriter(
         } else historical?.let { TimelineHydrationReducer.mergeRicherEventFacts(incoming, it).copy(position = it.position, otid = it.otid) } ?: incoming
         for (call in merged.toolCalls) {
             val callId = call.effectiveId.takeIf { it.isNotBlank() } ?: continue
-            val deferred = transaction.evidence(deferredReturnKey(callId), 64 * 1024)?.let {
+            val deferred = transaction.evidence(deferredReturnKey(callId), DEFERRED_RETURN_MAX_BYTES)?.let {
                 TimelineSnapshotCodec.json.decodeFromString(DeferredToolReturn.serializer(), it.decodeToString())
             } ?: continue
             val fold = foldToolReturnBodies(
