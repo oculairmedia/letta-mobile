@@ -6,6 +6,7 @@ import androidx.paging.PagingDataPresenter
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -218,6 +219,80 @@ class CanonicalTimelinePagingTest {
         }
     }
 
+    @Test fun reasoningHandoffHasOneOrderedRowBeforeAndAfterSettlementAndReopen() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val thought = ReasoningMessage(
+            id = "server-thought", reasoning = "Inspect the state", date = "2026-01-01T00:00:01Z",
+        )
+        val reply = AssistantMessage(
+            id = "server-reply", contentRaw = JsonPrimitive("It is current"), date = "2026-01-01T00:00:02Z",
+        )
+        val transport = object : TimelineTransport by PageTransport(0) {
+            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
+                TimelineRemotePageResult.Page(
+                    request.requestId, request.selectionGeneration,
+                    listOf(TimelineRemoteRecord(TimelineMessageId(thought.id), thought, 0), TimelineRemoteRecord(TimelineMessageId(reply.id), reply, 0)),
+                    null, false, 0,
+                )
+        }
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        val fence = coordinator.beginLive(owner)
+        val liveThought = thought.copy(id = "cm-stream-thought", runId = "local-run-1967")
+        val liveReply = reply.copy(id = "cm-stream-reply", runId = "local-run-1967")
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(liveThought)))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(liveReply)))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        try {
+            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            presenter.awaitRows(2) { "settled rows never arrived" }
+            presenter.awaitIdle()
+            val settledRows = presenter.snapshot().items
+            val before = settledRows.map { it.item.key to renderSignature(it.item) } +
+                presentation.live.value.map { it.key to renderSignature(it) }
+            assertEquals(
+                listOf(
+                    "segment-cm-stream-reply" to "assistant:It is current",
+                    "segment-cm-stream-thought" to "reasoning:Inspect the state",
+                    "run-local-run-1967" to "run:local-run-1967:Inspect the state|It is current",
+                ),
+                before,
+            )
+            presentation.onResidentRows(settledRows)
+            awaitCondition({ "live overlay did not drain" }) { owner.session.live.value == null }
+            assertEquals(emptyList(), presentation.live.value)
+            val after = presenter.snapshot().items.map { it.item.key to renderSignature(it.item) }
+            assertEquals(
+                listOf(
+                    "segment-cm-stream-reply" to "assistant:It is current",
+                    "segment-cm-stream-thought" to "reasoning:Inspect the state",
+                ),
+                after,
+            )
+            val reopened = coordinator.acquire(scope)
+            val reopenedPresentation = CanonicalTimelinePresentation.open(coordinator, reopened, ui)
+            val reopenedRows = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+            ui.launch { reopenedPresentation.settled.collectLatest { reopenedRows.collectFrom(it) } }
+            reopenedRows.awaitRows(2) { "reopened settled rows never arrived" }
+            reopenedRows.awaitIdle()
+            assertEquals(
+                listOf(
+                    "segment-server-reply" to "assistant:It is current",
+                    "segment-server-thought" to "reasoning:Inspect the state",
+                ),
+                reopenedRows.snapshot().items.map { it.item.key to renderSignature(it.item) },
+            )
+            reopenedPresentation.close()
+            presentation.close()
+        } finally {
+            ui.cancel()
+        }
+    }
+
     @Test fun resolvedStreamedKeyIsPreservedAcrossPostSettlementPagingRevisions() = runBlocking {
         val streamedId = "cm-stream-m-0"
         val canonicalId = "m-0"
@@ -329,6 +404,14 @@ class CanonicalTimelinePagingTest {
 
     companion object {
         private val scope = TimelineScope("backend", "conversation", "agent")
+
+        private fun renderSignature(item: com.letta.mobile.data.chat.projection.ChatRenderItem): String = when (item) {
+            is com.letta.mobile.data.chat.projection.ChatRenderItem.Single ->
+                "${if (item.message.isReasoning) "reasoning" else item.message.role}:${item.message.content}"
+            is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock ->
+                "run:${item.runId}:${item.messages.joinToString("|") { it.first.content }}"
+        }
+
 
         /** Real-time wait for async pipeline work that has no flow to observe. */
         private suspend fun awaitCondition(detail: () -> String, condition: () -> Boolean) {

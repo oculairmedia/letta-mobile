@@ -271,14 +271,14 @@ class CanonicalTimelineEngine(
 
     /**
      * What names the same message on both sides of the boundary. A tool call and its return are
-     * named by the call, which the stream and the ledger agree on exactly. An assistant reply has
-     * no shared id at all - the stream and the server each derive an otid from their own name - so
-     * its content is the only thing left to match on.
+     * named by the call, which the stream and the ledger agree on exactly. Assistant replies and
+     * reasoning frames have no shared id: the stream and server each derive their otid from their
+     * own name, so exact turn-local content is the remaining adoption evidence.
      */
     private fun TimelineEvent.Confirmed.adoptionKey(): String? = when (messageType) {
         TimelineMessageType.TOOL_CALL -> toolCalls.firstNotNullOfOrNull { it.effectiveId.takeIf(String::isNotBlank) }
         TimelineMessageType.TOOL_RETURN -> toolReturnContentByCallId.keys.firstOrNull { it.isNotBlank() }
-        TimelineMessageType.ASSISTANT -> content.takeIf { it.isNotBlank() }
+        TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING -> content.takeIf { it.isNotBlank() }
         else -> null
     }
 
@@ -305,7 +305,9 @@ class CanonicalTimelineEngine(
         val match = unclaimed.firstOrNull {
             it.event.messageType == messageType && it.event.adoptionKey() == key
         } ?: return null
-        if (messageType == TimelineMessageType.ASSISTANT) unclaimed.remove(match)
+        if (messageType == TimelineMessageType.ASSISTANT || messageType == TimelineMessageType.REASONING) {
+            unclaimed.remove(match)
+        }
         return if (match.identity.value == serverId) Adoption.AlreadyNamed
         else Adoption.Alias(serverId, match.identity)
     }
