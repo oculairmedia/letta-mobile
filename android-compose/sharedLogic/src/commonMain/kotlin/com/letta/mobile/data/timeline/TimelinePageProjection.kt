@@ -80,7 +80,14 @@ internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
         val sources = renderable.filter { it.message.id in members }
         if (sources.size != item.messages.size) return@forEach
         val sourceIndexes = sources.map { it.index }.sorted()
-        if (sourceIndexes.zipWithNext().any { (left, right) -> right != left + 1 }) return@forEach
+        // Skill instruction envelopes are hidden model context, not human turn boundaries.
+        // Returns are folded into their canonical owners before projection; do not infer
+        // ownership for arbitrary hidden rows (including orphan returns).
+        if (sourceIndexes.zipWithNext().any { (left, right) ->
+                (left + 1 until right).any { index ->
+                    records[index].event?.isSyntheticSkillEnvelope() != true
+                }
+            }) return@forEach
         val owner = sources.minBy { it.index }
         output[owner.index] = owner.record.copy(
             preparedPresentation = TimelineSettledPresentation.Render(

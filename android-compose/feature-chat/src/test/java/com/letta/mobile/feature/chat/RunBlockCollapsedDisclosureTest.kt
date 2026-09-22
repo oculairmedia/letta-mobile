@@ -94,7 +94,7 @@ class RunBlockCollapsedDisclosureTest {
         composeRule.onNodeWithTag(ToolRunSummaryTestTags.Row).assertIsDisplayed()
             .assert(SemanticsMatcher.expectValue(
                 androidx.compose.ui.semantics.SemanticsProperties.StateDescription,
-                "1 commands, 0 failed, 0 awaiting approval, settled",
+                "1 command, 0 failed, 0 awaiting approval, settled",
             ))
         composeRule.onNodeWithTag("run-row-reasoning-1").assertIsDisplayed()
         composeRule.onNodeWithText("Bash(collapse-check)").assertDoesNotExist()

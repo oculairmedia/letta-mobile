@@ -267,7 +267,7 @@ private fun ToolRunSummaryRow(
             .testTag(ToolRunSummaryTestTags.Row)
             .semantics {
                 contentDescription = "Tool run summary"
-                stateDescription = "${summary.toolCount} commands, ${summary.failureCount} failed, " +
+                stateDescription = "${summary.toolCount} ${toolNoun(summary.toolCount)}, ${summary.failureCount} failed, " +
                     "${summary.awaitingApprovalCount} awaiting approval, " +
                     if (summary.running) "running" else "settled"
             }

@@ -84,6 +84,57 @@ class TimelinePageProjectionTest {
         assertEquals(live, hydrated)
     }
 
+    @Test fun syntheticSkillEnvelopeDoesNotSplitNullRunColdProjection() = runTest {
+        val store = InMemoryTimelineStore()
+        repeat(7) { index ->
+            val id = index + 1
+            val callId = "call-$id"
+            val event = StoredTimelineEvent(
+                position = id.toDouble(), otid = "otid-$id", serverId = "id-$id",
+                messageType = if (index == 1) "user_message" else "tool_call_message",
+                dateIso = "2026-09-22T03:49:00Z",
+                content = if (index == 1) "<skill_content name=\"review-gate\">${"instructions ".repeat(20)}</skill_content>" else "",
+                toolCalls = if (index == 1) emptyList() else listOf(StoredToolCall(callId,
+                    when (index) { 0 -> "Skill"; 2 -> "Agent"; 5 -> "TaskOutput"; else -> "exec_command" }, "{}")),
+                toolReturnContentByCallId = if (index == 1) emptyMap() else mapOf(callId to "completed"),
+            )
+            store.rows[key(id)] = TimelineStoredRecord(key(id), TIMELINE_EVENT_CONTENT_TYPE,
+                TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), event).encodeToByteArray())
+        }
+        val engine = engine(store, TimelinePageBudget(32, 64 * 1024))
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val page = engine.preparePage(selection, TimelineReadPosition.Tail, 32, "own-agent",
+            DefaultTimelineSettledProjectionAdapter)
+        val live = com.letta.mobile.data.chat.projection.buildChatRenderModel(
+            page.projectionInput.records.mapNotNull { input -> input.event?.let {
+                com.letta.mobile.data.chat.projection.timelineEventToUiMessage(it, "own-agent")
+            } }, com.letta.mobile.data.chat.projection.ChatDisplayMode.Interactive,
+        ).renderItems.single()
+        val hydrated = page.records.mapNotNull {
+            (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
+        }
+        assertEquals(listOf(live), hydrated)
+        val block = assertIs<com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock>(hydrated.single())
+        assertEquals(6, block.messages.sumOf { it.first.toolCalls.orEmpty().size })
+
+        // A real user turn or an unrelated return must still break physical ownership.
+        for (type in listOf("user_message", "tool_return_message")) {
+            val barrier = StoredTimelineEvent(
+                position = 2.0, otid = "barrier", serverId = "id-2", messageType = type,
+                dateIso = "2026-09-22T03:49:00Z", content = "next user turn",
+            )
+            store.rows[key(2)] = TimelineStoredRecord(key(2), TIMELINE_EVENT_CONTENT_TYPE,
+                TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), barrier).encodeToByteArray())
+            val reopened = engine(store, TimelinePageBudget(32, 64 * 1024))
+            val reopenedSelection = assertIs<TimelineEngineOpen.Opened>(reopened.open(scope)).selection
+            val isolated = reopened.preparePage(reopenedSelection, TimelineReadPosition.Tail, 32, "own-agent",
+                DefaultTimelineSettledProjectionAdapter)
+            assertTrue(isolated.records.mapNotNull {
+                (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
+            }.none { it is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock && it.messages.size == 6 })
+        }
+    }
+
     @Test fun toolRunCrossingPageBoundaryRemainsLosslessInsteadOfPartiallyAggregating() = runTest {
         val store = InMemoryTimelineStore()
         repeat(4) { index -> seedToolCall(store, index + 1) }
