@@ -58,6 +58,10 @@ internal fun AnchoredToSelection(
     }
 }
 
+/** Where [notes] sit on the board, moved by [offset] (a group drag in progress). */
+internal fun noteRects(notes: List<CanvasSceneDocument>, offset: Offset): List<Rect> =
+    notes.mapNotNull { doc -> doc.frame?.let { f -> Rect(f.x, f.y, f.x + f.width, f.y + f.height).translate(offset) } }
+
 /**
  * Where the selection is on screen: the union of the selected drawn elements and notes, mapped
  * through [viewport]. Null when nothing is selected.
@@ -65,12 +69,10 @@ internal fun AnchoredToSelection(
 internal fun selectionScreenRect(
     elements: List<Element>,
     selectedIds: Set<String>,
-    notes: List<CanvasSceneDocument>,
+    noteRects: List<Rect>,
     viewport: Viewport,
-    noteOffset: Offset = Offset.Zero,
 ): Rect? {
-    val world = elements.filter { it.id in selectedIds }.map { it.bounds() } +
-        notes.mapNotNull { doc -> doc.frame?.let { f -> Rect(f.x, f.y, f.x + f.width, f.y + f.height).translate(noteOffset) } }
+    val world = elements.filter { it.id in selectedIds }.map { it.bounds() } + noteRects
     if (world.isEmpty()) return null
     val union = world.reduce { acc, r ->
         Rect(minOf(acc.left, r.left), minOf(acc.top, r.top), maxOf(acc.right, r.right), maxOf(acc.bottom, r.bottom))

@@ -46,13 +46,19 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectSe
     awaitPointerEventScope {
         while (true) {
             val event = awaitPointerEvent(PointerEventPass.Initial)
-            val change = event.changes.firstOrNull() ?: continue
-            if (event.type == PointerEventType.Press && change.type == PointerType.Mouse && event.buttons.isSecondaryPressed) {
-                event.changes.forEach { it.consume() }
-                onContext(change.position)
-            }
+            val position = event.rightClickPosition() ?: continue
+            event.changes.forEach { it.consume() }
+            onContext(position)
         }
     }
+}
+
+/** Where a right-button mouse press happened, or null for any other event. */
+private fun androidx.compose.ui.input.pointer.PointerEvent.rightClickPosition(): Offset? {
+    if (type != PointerEventType.Press) return null
+    if (!buttons.isSecondaryPressed) return null
+    val change = changes.firstOrNull() ?: return null
+    return change.position.takeIf { change.type == PointerType.Mouse }
 }
 
 private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectBoardContext(onContext: (Offset) -> Unit) {

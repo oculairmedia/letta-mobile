@@ -41,17 +41,23 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
  *
  * The property control opens its panel above the bar, since beside a bottom bar is off screen.
  */
+/** What the phone bar's buttons do. */
+internal class CompactToolbarActions(
+    val dispatch: (ControlsBarIntent) -> Unit,
+    val dispatchProperty: (CanvasPropertyIntent) -> Unit,
+    val insert: BoardInsertActions,
+    /** Where the add button puts things: the middle of what is on screen, in board coordinates. */
+    val addAt: () -> Offset,
+)
+
 @Composable
 internal fun CanvasCompactToolbar(
     state: ControlsBarState,
-    dispatch: (ControlsBarIntent) -> Unit,
     properties: CanvasProperties,
-    dispatchProperty: (CanvasPropertyIntent) -> Unit,
-    insert: BoardInsertActions,
-    /** Where the add button puts things: the middle of what is on screen, in board coordinates. */
-    addAt: () -> Offset,
+    actions: CompactToolbarActions,
     modifier: Modifier = Modifier,
 ) {
+    val dispatch = actions.dispatch
     Surface(
         modifier = modifier,
         // A full pill, the shape Craft, Freeform and Obsidian's canvas all float their tools in.
@@ -70,12 +76,12 @@ internal fun CanvasCompactToolbar(
                     dispatch(ControlsBarIntent.SelectMode(mode))
                 }
             }
-            AddButton(insert, addAt)
+            AddButton(actions.insert, actions.addAt)
             CanvasPropertyControl(
                 state = state,
                 properties = properties,
                 dispatch = dispatch,
-                dispatchProperty = dispatchProperty,
+                dispatchProperty = actions.dispatchProperty,
                 label = "Stroke color",
                 placement = PropertyPopoverPlacement.ABOVE,
                 modifier = Modifier.size(COMPACT_BUTTON),

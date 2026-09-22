@@ -734,12 +734,12 @@ internal object CanvasWorkspaceSupport {
             params.activeNote != null && labelShapeId == null -> listOf(params.activeNote)
             else -> emptyList()
         }
+        val offset = if (params.selectedNoteIds.isNotEmpty()) params.groupOffset else Offset.Zero
         return selectionScreenRect(
             elements = state.elements,
             selectedIds = state.selectedIds + listOfNotNull(labelShapeId),
-            notes = notes,
+            noteRects = noteRects(notes, offset),
             viewport = state.viewport,
-            noteOffset = if (params.selectedNoteIds.isNotEmpty()) params.groupOffset else Offset.Zero,
         )
     }
 

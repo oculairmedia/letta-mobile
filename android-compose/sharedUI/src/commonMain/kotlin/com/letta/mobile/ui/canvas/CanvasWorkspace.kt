@@ -330,7 +330,7 @@ fun CanvasWorkspace(
     // Unknown until the board has been measured, so neither tool bar flashes up in the wrong
     // layout for the first frame.
     val boardWidth = with(LocalDensity.current) { boardSize.width.toDp() }
-    val resolvedLayout = if (boardSize.width > 0) layout.resolve(boardWidth) else null
+    val resolvedLayout = layout.resolveMeasured(boardSize.width, boardWidth)
     val compact = resolvedLayout == CanvasLayout.COMPACT
 
     // Fit everything on the board (elements and notes) with padding; an empty board just goes back
@@ -1098,7 +1098,7 @@ fun CanvasWorkspace(
                     // On a phone the title and actions pills fill the top row, so the bar stays
                     // below them even when the host hides the title.
                     topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
-                    startClearance = if (resolvedLayout == CanvasLayout.EXPANDED) RAIL_CLEARANCE else 0.dp,
+                    startClearance = resolvedLayout.railClearance(),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                 CanvasSelectionBar(
@@ -1169,11 +1169,13 @@ fun CanvasWorkspace(
                     CanvasLayout.COMPACT -> if (expanded == null) {
                         CanvasCompactToolbar(
                             state = controlsBarState,
-                            dispatch = dispatch,
                             properties = properties,
-                            dispatchProperty = dispatchProperty,
-                            insert = insertActions,
-                            addAt = { controller.state.value.viewport.screenToWorld(boardCenter) },
+                            actions = CompactToolbarActions(
+                                dispatch = dispatch,
+                                dispatchProperty = dispatchProperty,
+                                insert = insertActions,
+                                addAt = { controller.state.value.viewport.screenToWorld(boardCenter) },
+                            ),
                         )
                     }
                     else -> CanvasStatusLine(
@@ -1209,8 +1211,6 @@ fun CanvasWorkspace(
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
-/** The tool rail's width and its inset: what the floating bar keeps clear of on a desktop. */
-private val RAIL_CLEARANCE = 64.dp
 /** How near, in screen pixels at 100%, a press has to be to an element to pick it. */
 private const val TEXT_HIT_TOLERANCE = 8f
 internal const val WHEEL_ZOOM_STEP = 1.1f
