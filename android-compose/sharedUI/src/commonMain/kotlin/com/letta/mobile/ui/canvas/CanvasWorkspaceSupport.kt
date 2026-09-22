@@ -117,6 +117,15 @@ internal data class FinalPointerPassParams(
     val onSnapLatestConnector: () -> Unit,
 )
 
+/** What the floating selection bar is anchored to. */
+internal data class BarAnchorParams(
+    val state: DrawBoxState,
+    val documents: List<com.letta.mobile.data.canvas.CanvasSceneDocument>,
+    val selectedNoteIds: Set<String>,
+    val activeNote: com.letta.mobile.data.canvas.CanvasSceneDocument?,
+    val groupOffset: Offset,
+)
+
 internal data class FinalPointerPassResult(
     val altHeld: Boolean,
     val drawingConnectorAt: Offset?,
@@ -675,6 +684,52 @@ internal object CanvasWorkspaceSupport {
         return FinalPointerPassResult(altHeld = altHeld, drawingConnectorAt = connectorAt)
     }
 
+    /** True when [element] is somewhere to type: a text element, or a closed shape (which needs a session for its label). */
+    fun holdsText(element: Element?, hasSession: Boolean): Boolean = when {
+        element is Element.Text -> true
+        element == null -> false
+        else -> hasSession && CanvasShapeLabels.canLabel(element)
+    }
+
+    /** The topmost element under [world], within [tolerance] board units of its bounds. */
+    fun elementAt(elements: List<Element>, world: Offset, tolerance: Float): Element? =
+        elements.asReversed().firstOrNull { it.bounds().inflate(tolerance).contains(world) }
+
+    /**
+     * The closed shape a gesture just drew, if it drew one: new since the press ([idsAtPress]), and
+     * large enough to be a shape rather than a stray tap. Drawing a shape is how you say you want
+     * one with something in it, so the board opens its text straight away.
+     */
+    fun shapeJustDrawn(state: DrawBoxState, idsAtPress: Set<String>): Element? {
+        if (idsAtPress.isEmpty() && state.elements.isEmpty()) return null
+        val drawn = state.elements.lastOrNull { it.id !in idsAtPress && CanvasShapeLabels.canLabel(it) } ?: return null
+        val bounds = drawn.bounds()
+        return drawn.takeIf { bounds.width >= MIN_DRAWN_SHAPE && bounds.height >= MIN_DRAWN_SHAPE }
+    }
+
+    /**
+     * Where on screen the selection bar should float: the drawn selection and the selected notes,
+     * or the active note - and for a shape's label, the shape itself, so the bar clears the shape
+     * rather than sitting on its outline. Null with nothing to float on.
+     */
+    fun barAnchor(params: BarAnchorParams): Rect? {
+        val state = params.state
+        val labelShapeId = params.activeNote?.id?.let(CanvasShapeLabels::shapeIdOf)
+            ?.takeIf { id -> state.elements.any { it.id == id } }
+        val notes = when {
+            params.selectedNoteIds.isNotEmpty() -> params.documents.filter { it.id in params.selectedNoteIds }
+            params.activeNote != null && labelShapeId == null -> listOf(params.activeNote)
+            else -> emptyList()
+        }
+        return selectionScreenRect(
+            elements = state.elements,
+            selectedIds = state.selectedIds + listOfNotNull(labelShapeId),
+            notes = notes,
+            viewport = state.viewport,
+            noteOffset = if (params.selectedNoteIds.isNotEmpty()) params.groupOffset else Offset.Zero,
+        )
+    }
+
     suspend fun reconcileShapeLabels(params: ReconcileShapeLabelsParams) {
         val s = params.session ?: return
         val work = CanvasShapeLabels.reconcile(params.elements, params.liveDocuments, s.labelOwners())
@@ -689,3 +744,6 @@ internal object CanvasWorkspaceSupport {
         }
     }
 }
+
+/** Smaller than this (in board units) a "shape" is a tap that slipped, not a shape to type into. */
+private const val MIN_DRAWN_SHAPE = 16f

@@ -13,7 +13,9 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.canvas.CanvasLayout
 import com.letta.mobile.ui.canvas.CanvasWorkspace
+import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Mode
+import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -31,7 +33,7 @@ class CanvasResponsiveLayoutUiTest {
 
         onNodeWithContentDescription("Rectangle").assertExists()
         onNodeWithContentDescription("Zoom in").assertExists()
-        onNodeWithContentDescription("Shapes").assertDoesNotExist()
+        onNodeWithContentDescription("Add").assertDoesNotExist()
     }
 
     @Test
@@ -40,7 +42,7 @@ class CanvasResponsiveLayoutUiTest {
             Box(modifier = Modifier.width(360.dp)) { CanvasWorkspace() }
         }
 
-        onNodeWithContentDescription("Shapes").assertIsDisplayed()
+        onNodeWithContentDescription("Add").assertIsDisplayed()
         onNodeWithContentDescription("Rectangle").assertDoesNotExist()
         onNodeWithContentDescription("Zoom in").assertDoesNotExist()
         onNodeWithContentDescription("Undo").assertExists()
@@ -48,13 +50,17 @@ class CanvasResponsiveLayoutUiTest {
     }
 
     @Test
-    fun theCompactBarReachesEveryShapeThroughItsMenu() = runComposeUiTest {
+    fun theCompactBarAddsEveryShapeThroughItsAddMenu() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(controller = controller, layout = CanvasLayout.COMPACT) }
 
-        onNodeWithContentDescription("Shapes").performClick()
+        // The bar keeps only the tools a hand switches between; shapes are added, not drawn.
+        onNodeWithContentDescription("Rectangle").assertDoesNotExist()
+        onNodeWithContentDescription("Add").performClick()
         onNodeWithText("Triangle").performClick()
-        waitUntil(timeoutMillis = 5000) { controller.state.value.mode == Mode.TRIANGLE }
+        waitUntil(timeoutMillis = 5000) {
+            controller.state.value.elements.any { it is Element.Shape && it.shapeType == ShapeType.TRIANGLE }
+        }
 
         onNodeWithContentDescription("Draw").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.mode == Mode.PEN }

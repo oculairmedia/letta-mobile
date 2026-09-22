@@ -31,6 +31,7 @@ import com.composables.icons.lucide.AArrowUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.SendToBack
+import com.composables.icons.lucide.TextCursorInput
 import com.composables.icons.lucide.Trash2
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
@@ -38,8 +39,7 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The contextual bar at the top of the board, the way Concepts and Miro show what applies to the
- * selection: one master control ([CanvasPropertyControl]) for every colour and property of the
+ * The contextual bar that floats on the selection, the way Miro shows what applies to it: one master control ([CanvasPropertyControl]) for every colour and property of the
  * target, then ordering and delete for a drawn selection, or open-large and delete for the
  * active note or text element.
  *
@@ -60,6 +60,8 @@ fun CanvasSelectionBar(
     modifier: Modifier = Modifier,
     note: NoteBarActions? = null,
     onDuplicate: (() -> Unit)? = null,
+    /** Puts the caret in the selected shape; offered only when the selection is one that holds text. */
+    onEditText: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -88,6 +90,10 @@ fun CanvasSelectionBar(
                 onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
                 BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
             } else if (hasSelection) {
+                onEditText?.let {
+                    Divider()
+                    BarButton(Lucide.TextCursorInput, "Edit text", onClick = it)
+                }
                 // Text is sized from the bar it is selected on, not from a panel behind a swatch:
                 // it is the one property you reach for over and over, and a step up or a step down
                 // is the whole of what that needs.

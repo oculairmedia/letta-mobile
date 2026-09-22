@@ -9,11 +9,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,24 +18,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.StickyNote
+import com.composables.icons.lucide.Plus
 import com.letta.mobile.ui.theme.LettaDimens
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
 
 /**
- * The phone board's tools: one bar along the bottom edge instead of the rail down the left.
+ * The phone board's tools: one pill bar along the bottom edge instead of the rail down the left.
  *
- * A phone is too narrow for sixteen buttons in a row, so the bar keeps the tools a hand switches
- * between constantly - select, pan, draw, text, eraser - as buttons of their own and gathers the
- * shapes behind a single button that shows whichever shape is current. Undo and redo are not here:
- * [CanvasActionsPill] carries them in the compact layout, where the top of the screen has room.
+ * It keeps only the tools a hand switches between constantly - select, pan, draw, eraser - plus one
+ * add button and the property control. Everything that puts something on the board (notes, text,
+ * every shape) is in the add menu, which is the same menu a long press opens on the board itself,
+ * where it adds at the finger instead of the middle of the screen. Undo and redo are not here:
+ * [CanvasActionsPill] carries them in the compact layout.
  *
- * The property control opens its panel above the bar rather than beside it, since beside a
- * bottom bar is off the screen.
+ * The property control opens its panel above the bar, since beside a bottom bar is off screen.
  */
 @Composable
 internal fun CanvasCompactToolbar(
@@ -46,8 +44,10 @@ internal fun CanvasCompactToolbar(
     dispatch: (ControlsBarIntent) -> Unit,
     properties: CanvasProperties,
     dispatchProperty: (CanvasPropertyIntent) -> Unit,
+    insert: BoardInsertActions,
+    /** Where the add button puts things: the middle of what is on screen, in board coordinates. */
+    addAt: () -> Offset,
     modifier: Modifier = Modifier,
-    onAddNote: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -58,17 +58,16 @@ internal fun CanvasCompactToolbar(
         shadowElevation = LettaDimens.Space.sm,
     ) {
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CompactPrimaryModes.forEach { (mode, label) ->
-                ModeButton(mode, label, state, dispatch)
-                if (mode == Mode.PEN) ShapesButton(state, dispatch)
+                ControlButton(Control(iconFor(mode), label, selected = state.currentMode == mode), size = COMPACT_BUTTON) {
+                    dispatch(ControlsBarIntent.SelectMode(mode))
+                }
             }
-            if (onAddNote != null) {
-                ControlButton(Control(Lucide.StickyNote, "Add note"), size = COMPACT_BUTTON, onClick = onAddNote)
-            }
+            AddButton(insert, addAt)
             CanvasPropertyControl(
                 state = state,
                 properties = properties,
@@ -82,45 +81,21 @@ internal fun CanvasCompactToolbar(
     }
 }
 
+/** The bar's one way to put things on the board; the same entries a long press offers. */
 @Composable
-private fun ModeButton(mode: Mode, label: String, state: ControlsBarState, dispatch: (ControlsBarIntent) -> Unit) {
-    ControlButton(Control(iconFor(mode), label, selected = state.currentMode == mode), size = COMPACT_BUTTON) {
-        dispatch(ControlsBarIntent.SelectMode(mode))
-    }
-}
-
-/** One button for every shape, showing the current one; the menu picks another. */
-@Composable
-private fun ShapesButton(state: ControlsBarState, dispatch: (ControlsBarIntent) -> Unit) {
+private fun AddButton(insert: BoardInsertActions, addAt: () -> Offset) {
     var open by remember { mutableStateOf(false) }
-    val current = CompactShapeModes.firstOrNull { it.first == state.currentMode }
     Box {
-        ControlButton(
-            Control(iconFor(current?.first ?: Mode.RECTANGLE), "Shapes", selected = current != null),
-            size = COMPACT_BUTTON,
-        ) { open = true }
+        ControlButton(Control(Lucide.Plus, "Add"), size = COMPACT_BUTTON) { open = true }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            CompactShapeModes.forEach { (mode, label) ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    leadingIcon = { Icon(iconFor(mode), contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
-                    onClick = {
-                        open = false
-                        dispatch(ControlsBarIntent.SelectMode(mode))
-                    },
-                )
-            }
+            CanvasInsertMenuItems(insert, at = addAt(), onDismiss = { open = false })
         }
     }
 }
 
 /** The tools that keep a button of their own on the phone bar, in bar order. */
 internal val CompactPrimaryModes: List<Pair<Mode, String>> =
-    CanvasModes.filter { (mode, _) -> mode in setOf(Mode.SELECT, Mode.PAN, Mode.PEN, Mode.TEXT, Mode.ERASER) }
-
-/** The tools the phone bar gathers behind its shapes button. */
-internal val CompactShapeModes: List<Pair<Mode, String>> =
-    CanvasModes.filter { (mode, _) -> mode !in CompactPrimaryModes.map { it.first } }
+    CanvasModes.filter { (mode, _) -> mode in setOf(Mode.SELECT, Mode.PAN, Mode.PEN, Mode.ERASER) }
 
 /** Big enough for a fingertip and small enough that the bar fits a 360dp phone. */
 private val COMPACT_BUTTON = 40.dp

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
+import io.github.linreal.cascade.editor.action.FocusBlock
 import io.github.linreal.cascade.editor.core.Block
 import io.github.linreal.cascade.editor.serialization.loadFromJson
 import io.github.linreal.cascade.editor.serialization.toJson
@@ -122,6 +123,15 @@ fun CanvasBlockEditor(
             }
         }
         else -> ToolbarSlot.Default()
+    }
+    // Take the caret when the board asks for this document: a shape just drawn, "Edit text". The
+    // last block, so a label that already says something is added to rather than typed over.
+    val focusRequest = LocalCanvasFocusRequest.current
+    val wantsFocus = active && focusRequest != null && focusRequest.documentId == documentId
+    LaunchedEffect(wantsFocus) {
+        if (!wantsFocus) return@LaunchedEffect
+        stateHolder.state.blocks.lastOrNull()?.let { stateHolder.dispatch(FocusBlock(it.id)) }
+        focusRequest?.documentId = null
     }
     CascadeEditor(
         stateHolder = stateHolder,

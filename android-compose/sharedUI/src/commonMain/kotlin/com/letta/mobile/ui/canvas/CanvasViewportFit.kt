@@ -2,6 +2,8 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.bounds
@@ -27,13 +29,24 @@ internal object CanvasViewportFit {
         }
     }
 
-    /** The camera that fits [content] into a board of [boardWidth] x [boardHeight] screen px. */
-    fun fit(content: Rect, boardWidth: Float, boardHeight: Float, padding: Float = PADDING, maxScale: Float = MAX_SCALE): CanvasFit {
+    /**
+     * The camera that fits [content] into [board], or null when there is nothing to fit or no
+     * board to fit it into yet.
+     */
+    fun fitOrNull(content: Rect?, board: IntSize, maxScale: Float = MAX_SCALE): CanvasFit? {
+        if (content == null) return null
+        if (board.width <= 0) return null
+        if (board.height <= 0) return null
+        return fit(content, Size(board.width.toFloat(), board.height.toFloat()), maxScale = maxScale)
+    }
+
+    /** The camera that fits [content] into a [board] of screen px. */
+    fun fit(content: Rect, board: Size, padding: Float = PADDING, maxScale: Float = MAX_SCALE): CanvasFit {
         val width = (content.width + padding * 2).coerceAtLeast(1f)
         val height = (content.height + padding * 2).coerceAtLeast(1f)
-        val scale = minOf(boardWidth / width, boardHeight / height).coerceIn(MIN_SCALE, maxScale)
+        val scale = minOf(board.width / width, board.height / height).coerceIn(MIN_SCALE, maxScale)
         val centre = content.center
-        val offset = Offset(boardWidth / 2f - centre.x * scale, boardHeight / 2f - centre.y * scale)
+        val offset = Offset(board.width / 2f - centre.x * scale, board.height / 2f - centre.y * scale)
         return CanvasFit(scale, offset)
     }
 }
