@@ -207,6 +207,11 @@ internal object StoredEnvelopeFingerprint {
                 mix(attachment.byteSize)
                 mixString(attachment.uriOrUrl)
                 mixString(attachment.thumbnailBase64)
+                attachment.bodyReference?.let {
+                    mixString(it.sha256)
+                    mix(it.decodedBytes)
+                    mixString(it.provenance)
+                }
             }
         }
     }
@@ -254,6 +259,32 @@ fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
             )
         },
     )
+
+/** Opt-in S1/S2 path: caller must commit the event in the same scoped ledger transaction. */
+suspend fun TimelineEvent.Confirmed.toStoredTimelineEventWithImageBodies(
+    bodies: TimelineImageBodyWriter,
+): StoredTimelineEvent = toStoredTimelineEvent().copy(
+    attachments = attachments.mapNotNull { image ->
+        if (image.base64.isEmpty()) {
+            image.storedByteSize?.let { StoredImageAttachmentPointer(image.mediaType, it) }
+        } else {
+            val reference = bodies.persistImage(image.base64)
+            StoredImageAttachmentPointer(image.mediaType, reference.decodedBytes, bodyReference = reference)
+        }
+    },
+)
+
+/** Resolve only a selected event, never during metadata enumeration. Missing bytes stay placeholders. */
+suspend fun StoredTimelineEvent.toConfirmedTimelineEventWithImageBodies(
+    bodies: TimelineImageBodyReader,
+): TimelineEvent.Confirmed = copy(
+    attachments = attachments.map { pointer ->
+        val reference = pointer.bodyReference
+        if (reference == null) pointer else pointer.copy(
+            thumbnailBase64 = bodies.resolveImage(reference),
+        )
+    },
+).toConfirmedTimelineEvent()
 
 fun StoredTimelineEvent.toConfirmedTimelineEvent(): TimelineEvent.Confirmed {
     val resolvedType = when (messageType.lowercase()) {
