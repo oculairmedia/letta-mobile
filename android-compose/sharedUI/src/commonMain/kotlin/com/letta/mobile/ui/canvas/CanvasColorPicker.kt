@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -154,6 +155,8 @@ fun CanvasColorPicker(
     onPick: (color: Color, done: Boolean) -> Unit,
     /** True when embedded in another panel, which then owns the surface and padding. */
     flat: Boolean = false,
+    /** False for the phone's short form: the preset swatches only, no recents, sliders or hex. */
+    showCustom: Boolean = true,
 ) {
     var hsl by remember(current) { mutableStateOf(current.toHsl()) }
     var hexText by remember(current) { mutableStateOf(current.toHex()) }
@@ -168,6 +171,7 @@ fun CanvasColorPicker(
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             SwatchRow(current = current, entries = palette.map { it.color to it.name }, allowNone = allowNone) { onPick(it, true) }
+            if (!showCustom) return@Column
             if (recent.colors.isNotEmpty()) {
                 Text("Recent", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 SwatchRow(
@@ -225,7 +229,11 @@ fun CanvasColorPicker(
 
 @Composable
 private fun SwatchRow(current: Color, entries: List<Pair<Color, String>>, allowNone: Boolean, onPick: (Color) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+    // Scrolls rather than clipping the last swatches on a narrow panel.
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
         if (allowNone) {
             PaletteEntry(color = Color.Transparent, name = "none", selected = current.alpha == 0f) { onPick(Color.Transparent) }
         }

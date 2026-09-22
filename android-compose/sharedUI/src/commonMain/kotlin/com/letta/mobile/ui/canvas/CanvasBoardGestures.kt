@@ -2,6 +2,10 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -82,4 +86,56 @@ private suspend fun AwaitPointerEventScope.consumeUntilRelease() {
         val event = awaitPointerEvent(PointerEventPass.Initial)
         event.changes.forEach { it.consume() }
     } while (event.changes.any { it.pressed })
+}
+
+/**
+ * Moving around the board by touch. Two fingers pinch to zoom and drag to pan, in every tool -
+ * DrawBox has no pinch of its own. With [panWithOneFinger] (a phone), one finger dragged from
+ * open board ([canPanFrom], in the board's own space) pans as well, which is what a finger on a
+ * phone board means; on an element or a selection it is left to DrawBox to move or resize.
+ *
+ * Nothing is taken until the gesture is recognised: a tap, a long press and a drag that starts on
+ * an element all still reach DrawBox. Once it is navigating, it consumes the gesture in the
+ * Initial pass, so DrawBox sees a cancelled drag rather than a marquee or a stroke.
+ */
+@Composable
+internal fun Modifier.touchNavigation(
+    panWithOneFinger: Boolean,
+    canPanFrom: (Offset) -> Boolean,
+    onPan: (Offset) -> Unit,
+    onZoom: (factor: Float, pivot: Offset) -> Unit,
+): Modifier {
+    val oneFinger by rememberUpdatedState(panWithOneFinger)
+    val canPan by rememberUpdatedState(canPanFrom)
+    val pan by rememberUpdatedState(onPan)
+    val zoom by rememberUpdatedState(onZoom)
+    return pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.type != PointerType.Touch) return@awaitEachGesture
+            val panAllowed = oneFinger && canPan(down.position)
+            var navigating = false
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val pressed = event.changes.filter { it.pressed }
+                when {
+                    pressed.size >= 2 -> {
+                        navigating = true
+                        val factor = event.calculateZoom()
+                        if (factor != 1f) zoom(factor, event.calculateCentroid(useCurrent = true))
+                        pan(event.calculatePan())
+                    }
+                    pressed.size == 1 && navigating -> pan(pressed.first().positionChange())
+                    pressed.size == 1 && panAllowed -> {
+                        val change = pressed.first()
+                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                            navigating = true
+                            pan(change.position - down.position)
+                        }
+                    }
+                }
+                if (navigating) event.changes.forEach { it.consume() }
+            } while (pressed.isNotEmpty())
+        }
+    }
 }

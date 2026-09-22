@@ -25,5 +25,11 @@ enum class CanvasLayout {
     }
 }
 
+/**
+ * True inside a board laid out [CanvasLayout.COMPACT], for controls that shrink on a phone - the
+ * property panel, the formatting bar - without the flag threaded through every call.
+ */
+internal val LocalCanvasCompact = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 /** Below this width the board is phone-sized: Material's compact window class. */
 internal val COMPACT_CANVAS_WIDTH: Dp = 600.dp

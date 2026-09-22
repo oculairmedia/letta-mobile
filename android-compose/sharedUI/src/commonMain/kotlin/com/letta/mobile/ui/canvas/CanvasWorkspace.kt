@@ -353,6 +353,8 @@ fun CanvasWorkspace(
         if (initialLoadDone && compact && !fittedOnOpen) {
             fittedOnOpen = true
             fitToContent(maxScale = 1f)
+            // And in the select tool, where a drag moves around the board rather than drawing.
+            controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
         }
     }
 
@@ -453,6 +455,15 @@ fun CanvasWorkspace(
         }
     }
 
+    // Picks [element] alone, in the select tool, where DrawBox will select it. By a point on its
+    // outline: an unfilled shape is picked by its stroke only.
+    fun selectElement(element: io.ak1.drawbox.domain.model.Element) {
+        if (controller.state.value.selectedIds == setOf(element.id)) return
+        controller.clearSelection()
+        controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
+        controller.selectAt(CanvasWorkspaceSupport.selectionPointOf(element), TEXT_HIT_TOLERANCE / controller.state.value.viewport.scale)
+    }
+
     // Marquee and move are DrawBox gestures; the notes follow the same intents so a marquee
     // takes in note cards and dragging the selection moves them too, committed on release.
     LaunchedEffect(controller, session) {
@@ -480,9 +491,14 @@ fun CanvasWorkspace(
                                 elements = controller.state.value.elements,
                                 session = session,
                                 onEditText = { editingTextId = it },
-                                onActivateShapeLabel = {
-                                    activeNoteId = it
-                                    focusRequest.documentId = it
+                                onActivateShapeLabel = { labelId ->
+                                    // However the text was asked for (a double click, the menu),
+                                    // the shape is what is selected while it is typed.
+                                    CanvasShapeLabels.shapeIdOf(labelId)
+                                        ?.let { shapeId -> controller.state.value.elements.firstOrNull { it.id == shapeId } }
+                                        ?.let(::selectElement)
+                                    activeNoteId = labelId
+                                    focusRequest.documentId = labelId
                                 },
                             ),
                         )
@@ -561,12 +577,14 @@ fun CanvasWorkspace(
         null -> false
     }
     // Puts the caret in [element]: a text element's own editor, or a closed shape's label (created
-    // on first use). The selection lets go so the bar that floats up is the text's.
+    // on first use).
     fun openTextIn(element: io.ak1.drawbox.domain.model.Element) {
         when {
             element is io.ak1.drawbox.domain.model.Element.Text -> editingTextId = element.id
             CanvasShapeLabels.canLabel(element) && session != null -> {
-                controller.clearSelection()
+                // The shape stays selected while its text is typed: the menu that floats up is the
+                // shape's (stroke, fill, order), because the shape is the thing being worked on.
+                selectElement(element)
                 focusRequest.documentId = CanvasShapeLabels.labelIdOf(element.id)
                 controller.onIntent(
                     io.ak1.drawbox.domain.model.Intent.RequestTextEditAt(element.bounds().center, TEXT_HIT_TOLERANCE),
@@ -611,7 +629,7 @@ fun CanvasWorkspace(
             when {
                 added == null -> Unit
                 CanvasShapeLabels.canLabel(added) && session != null -> openTextIn(added)
-                else -> controller.selectAt(CanvasWorkspaceSupport.selectionPointOf(added), TEXT_HIT_TOLERANCE)
+                else -> selectElement(added)
             }
         },
     )
@@ -624,13 +642,7 @@ fun CanvasWorkspace(
         // DrawBox only selects in the select tool, so the board hit-tests itself and, on an
         // element, moves to the select tool with that element picked - where Miro leaves you too.
         val hit = CanvasWorkspaceSupport.elementAt(current.elements, world, TEXT_HIT_TOLERANCE / current.viewport.scale)
-        controller.clearSelection()
-        if (hit != null) {
-            controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
-            // By a point on its outline: DrawBox picks an unfilled shape by its stroke only, and
-            // a finger lands inside it.
-            controller.selectAt(CanvasWorkspaceSupport.selectionPointOf(hit), TEXT_HIT_TOLERANCE / current.viewport.scale)
-        }
+        if (hit != null) selectElement(hit) else controller.clearSelection()
         boardMenu = BoardMenuRequest(
             screen = screen,
             world = world,
@@ -648,6 +660,7 @@ fun CanvasWorkspace(
     CompositionLocalProvider(
         LocalCanvasDocumentRecorder provides documentRecorder,
         LocalCanvasFocusRequest provides focusRequest,
+        LocalCanvasCompact provides compact,
     ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -692,6 +705,16 @@ fun CanvasWorkspace(
                     .clipToBounds()
                     .semantics { contentDescription = "Canvas board" }
                     .boardContextGesture(::openBoardMenu)
+                    // Two fingers always pinch and pan. On a phone one finger on empty board in the
+                    // select tool pans too: dragging is how you move around a board on a phone.
+                    .touchNavigation(
+                        panWithOneFinger = compact,
+                        canPanFrom = { screen ->
+                            CanvasWorkspaceSupport.isOpenBoard(controller.state.value, screen, TEXT_HIT_TOLERANCE)
+                        },
+                        onPan = { delta -> controller.panBy(delta) },
+                        onZoom = { factor, pivot -> controller.zoomBy(factor, pivot) },
+                    )
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
                             while (true) {
@@ -788,8 +811,10 @@ fun CanvasWorkspace(
                         } else if (id !in selectedNoteIds) {
                             // Picking a note replaces the board's selection, exactly as picking a
                             // shape does. Without this the drawn selection stayed put and the note
-                            // joined it, so a plain click read as a shift-click.
-                            controller.clearSelection()
+                            // joined it, so a plain click read as a shift-click. A shape's label
+                            // picks its shape: the text is the shape's.
+                            val owner = CanvasShapeLabels.shapeIdOf(id)?.let { shapeId -> state.elements.firstOrNull { it.id == shapeId } }
+                            if (owner != null) selectElement(owner) else controller.clearSelection()
                             selectedNoteIds = emptySet()
                             activeNoteId = id
                         }
@@ -807,7 +832,11 @@ fun CanvasWorkspace(
             )
 
             // Picking a drawing element hands the selection to DrawBox; the note lets go.
-            LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
+            // A shape's label is the exception: its shape being selected is how its text is edited.
+    LaunchedEffect(hasSelection) {
+        val labelOf = activeNoteId?.let(CanvasShapeLabels::shapeIdOf)
+        if (hasSelection && labelOf !in state.selectedIds) activeNoteId = null
+    }
 
             // The pen draws its own strokes.
             //
@@ -1019,6 +1048,39 @@ fun CanvasWorkspace(
             // and nothing drawn selected, the bar is the note's.
             val activeNote = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } }
             val notesSelected = selectedNoteIds.isNotEmpty()
+            // The active note's (or shape label's) bar actions, built once for whichever bar shows them.
+            val activeNoteActions = if (activeNote != null && session != null) {
+                val tint = parseHexColor(activeNote.color)
+                val plain = tint != null && tint.alpha == 0f
+                NoteBarActions(
+                    onOpen = { expandedNoteId = activeNote.id },
+                    onDelete = {
+                        val id = activeNote.id
+                        activeNoteId = null
+                        coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
+                    },
+                    style = activeNote.style,
+                    onStyle = { style ->
+                        coroutineScope.launch {
+                            recordingDocuments("restyling a note") {
+                                runCatching { session.restyleDocument(activeNote.id, style) }
+                            }
+                        }
+                    },
+                    color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
+                    onColor = { color ->
+                        coroutineScope.launch {
+                            recordingDocuments("recolouring a note") {
+                                runCatching { session.recolorDocument(activeNote.id, color.toHex()) }
+                            }
+                        }
+                    },
+                    defaultTextColor = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurface,
+                    plain = plain,
+                )
+            } else {
+                null
+            }
             if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
                 val editable = state.elements.singleOrNull { it.id in state.selectedIds }
                     ?.takeIf { CanvasWorkspaceSupport.holdsText(it, hasSession = session != null) }
@@ -1050,38 +1112,8 @@ fun CanvasWorkspace(
                     onDelete = { deleteFocused() },
                     onDuplicate = { duplicateFocused() },
                     onEditText = editable?.let { element -> { openTextIn(element) } },
-                    note = if (activeNote != null && session != null && !hasSelection && !notesSelected) {
-                        val tint = parseHexColor(activeNote.color)
-                        val plain = tint != null && tint.alpha == 0f
-                        NoteBarActions(
-                            onOpen = { expandedNoteId = activeNote.id },
-                            onDelete = {
-                                val id = activeNote.id
-                                activeNoteId = null
-                                coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
-                            },
-                            style = activeNote.style,
-                            onStyle = { style ->
-                                coroutineScope.launch {
-                                    recordingDocuments("restyling a note") {
-                                        runCatching { session.restyleDocument(activeNote.id, style) }
-                                    }
-                                }
-                            },
-                            color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
-                            onColor = { color ->
-                                coroutineScope.launch {
-                                    recordingDocuments("recolouring a note") {
-                                        runCatching { session.recolorDocument(activeNote.id, color.toHex()) }
-                                    }
-                                }
-                            },
-                            defaultTextColor = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurface,
-                            plain = plain,
-                        )
-                    } else {
-                        null
-                    },
+                    note = activeNoteActions.takeIf { !hasSelection && !notesSelected },
+                    shapeText = activeNoteActions.takeIf { activeNote?.id?.let(CanvasShapeLabels::shapeIdOf) in state.selectedIds },
                     modifier = Modifier.canvasChrome(chromeRegions),
                 )
                 }

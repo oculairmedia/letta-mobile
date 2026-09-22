@@ -30,11 +30,14 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
 /**
  * The phone board's tools: one pill bar along the bottom edge instead of the rail down the left.
  *
- * It keeps only the tools a hand switches between constantly - select, pan, draw, eraser - plus one
+ * It keeps only the tools a hand switches between constantly - select, draw, eraser - plus one
  * add button and the property control. Everything that puts something on the board (notes, text,
  * every shape) is in the add menu, which is the same menu a long press opens on the board itself,
  * where it adds at the finger instead of the middle of the screen. Undo and redo are not here:
  * [CanvasActionsPill] carries them in the compact layout.
+ *
+ * There is no pan tool: on a phone a finger dragged across open board pans, and two fingers pinch
+ * (see [touchNavigation]).
  *
  * The property control opens its panel above the bar, since beside a bottom bar is off screen.
  */
@@ -95,7 +98,7 @@ private fun AddButton(insert: BoardInsertActions, addAt: () -> Offset) {
 
 /** The tools that keep a button of their own on the phone bar, in bar order. */
 internal val CompactPrimaryModes: List<Pair<Mode, String>> =
-    CanvasModes.filter { (mode, _) -> mode in setOf(Mode.SELECT, Mode.PAN, Mode.PEN, Mode.ERASER) }
+    CanvasModes.filter { (mode, _) -> mode in setOf(Mode.SELECT, Mode.PEN, Mode.ERASER) }
 
 /** Big enough for a fingertip and small enough that the bar fits a 360dp phone. */
 private val COMPACT_BUTTON = 40.dp

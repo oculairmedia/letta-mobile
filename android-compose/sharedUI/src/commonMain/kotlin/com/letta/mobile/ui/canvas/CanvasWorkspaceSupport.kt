@@ -691,6 +691,19 @@ internal object CanvasWorkspaceSupport {
         else -> hasSession && CanvasShapeLabels.canLabel(element)
     }
 
+    /**
+     * True when a finger at [screen] is on open board in the select tool: not on an element and not
+     * on the current selection (whose handles reach just outside it). That is where a one-finger
+     * drag pans on a phone instead of starting a marquee.
+     */
+    fun isOpenBoard(state: DrawBoxState, screen: Offset, tolerance: Float): Boolean {
+        if (state.mode != io.ak1.drawbox.domain.model.Mode.SELECT) return false
+        val world = state.viewport.screenToWorld(screen)
+        val slack = tolerance * HANDLE_SLACK / state.viewport.scale
+        if (state.elements.any { it.id in state.selectedIds && it.bounds().inflate(slack).contains(world) }) return false
+        return elementAt(state.elements, world, tolerance / state.viewport.scale) == null
+    }
+
     /** The topmost element under [world], within [tolerance] board units of its bounds. */
     fun elementAt(elements: List<Element>, world: Offset, tolerance: Float): Element? =
         elements.asReversed().firstOrNull { it.bounds().inflate(tolerance).contains(world) }
@@ -747,3 +760,6 @@ internal object CanvasWorkspaceSupport {
 
 /** Smaller than this (in board units) a "shape" is a tap that slipped, not a shape to type into. */
 private const val MIN_DRAWN_SHAPE = 16f
+
+/** How far past a selection its handles reach, in multiples of the pick tolerance. */
+private const val HANDLE_SLACK = 3f

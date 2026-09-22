@@ -199,13 +199,16 @@ class CanvasWorkspaceUiTest {
             session.documents().first { it.id == text.id }.json.contains("\"todo\"")
         }
 
-        // A plain document has no note chrome, and its bar sets size, family, alignment and
-        // colour, all of which persist with the document.
+        // A shape's text is the shape's: it has no note chrome and no grip of its own (the shape
+        // moves it), the shape stays selected, and the shape's panel carries a Text target whose
+        // size, family, alignment and colour persist with the label document.
         // The one "Move note" grip on the board belongs to the sticky note placed above.
         onAllNodesWithContentDescription("Move note").assertCountEquals(1)
-        onNodeWithContentDescription("Move text").assertExists()
+        onAllNodesWithContentDescription("Move text").assertCountEquals(0)
+        kotlin.test.assertEquals(setOf("rect-1"), controller.state.value.selectedIds)
         onNodeWithContentDescription("Properties").performClick()
         onAllNodesWithContentDescription("Target card").assertCountEquals(0)
+        onNodeWithContentDescription("Target text").performClick()
         onNodeWithContentDescription("Size L").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontScale == 1.4f }
         onNodeWithContentDescription("Font Serif").performClick()
@@ -218,10 +221,10 @@ class CanvasWorkspaceUiTest {
         kotlin.test.assertEquals(1.4f, styled.fontScale, "colour must not reset the size")
         onNodeWithContentDescription("Close properties").performClick()
 
-        // The active note's bar deletes it.
-        onNodeWithContentDescription("Delete note").performClick()
+        // Deleting the shape takes its text with it.
+        onNodeWithContentDescription("Delete selection").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().none { it.id == text.id } }
-        onAllNodesWithContentDescription("Delete note").assertCountEquals(0)
+        onAllNodesWithContentDescription("Delete selection").assertCountEquals(0)
     }
 
     @Test
