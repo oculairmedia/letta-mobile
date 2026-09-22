@@ -5,6 +5,8 @@ import androidx.paging.cachedIn
 import androidx.paging.map
 import androidx.paging.filter
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.ChatDisplayMode
+import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
@@ -70,6 +72,8 @@ class CanonicalTimelinePresentation private constructor(
         val otid: String = "",
         // Storage identity may be remapped; server identity still matches the live event.
         val serverId: String = "",
+        // A grouped run owns several durable records; all must count as resident for settlement.
+        val residentEvents: List<TimelineResidentEvent> = emptyList(),
     )
 
     private val anchor = MutableStateFlow(lease.anchor)
@@ -129,12 +133,15 @@ class CanonicalTimelinePresentation private constructor(
         echoedOtids.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
         val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in settledOtids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
-        val active = events.mapNotNull { event ->
-            timelineEventToUiMessage(event, owner.selection.scope.agentId)?.let {
-                ChatRenderItem.Single(it, GroupPosition.None, keyOverride = "segment-${event.serverId}")
-            }
+        val activeMessages = events.mapNotNull { event ->
+            timelineEventToUiMessage(event, owner.selection.scope.agentId)
         }
-        active.asReversed() + optimistic.asReversed()
+        val active = buildChatRenderModel(
+            messages = activeMessages,
+            mode = ChatDisplayMode.Interactive,
+            activeAgentId = owner.selection.scope.agentId,
+        ).renderItems
+        active + optimistic.asReversed()
     }
 
     private fun cacheStreamedAliases(publication: TimelineLivePublication?) {
@@ -154,10 +161,15 @@ class CanonicalTimelinePresentation private constructor(
     /** Only actual resident rows count, never prefetched rows or a remembered revision watermark. */
     fun onResidentRows(rows: List<Row>) {
         if (!job.isActive) return
-        val presented = rows.take(128).associate { it.identity to it.revision }
+        val residents = rows.take(128).flatMap { row ->
+            row.residentEvents.ifEmpty {
+                listOf(TimelineResidentEvent(row.identity, row.revision, row.otid, row.serverId))
+            }
+        }
+        val presented = residents.associate { it.identity to it.revision }
         resident.value = presented
-        residentOtids.value = rows.take(128).mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
-        residentServerIds.value = rows.take(128).mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) }
+        residentOtids.value = residents.mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
+        residentServerIds.value = residents.mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) }
         val fence = owner.session.live.value?.fence ?: return
         scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
     }
@@ -207,7 +219,8 @@ class CanonicalTimelinePresentation private constructor(
 
     private fun ChatRenderItem.withKeyOverride(key: String): ChatRenderItem = when (this) {
         is ChatRenderItem.Single -> copy(keyOverride = key)
-        is ChatRenderItem.RunBlock -> copy(keyOverride = key)
+        // A run block's existing key is shared by live and hydrated projection.
+        is ChatRenderItem.RunBlock -> this
         else -> this
     }
 
@@ -232,6 +245,9 @@ class CanonicalTimelinePresentation private constructor(
             presentation.item.settledToolCalls().withKeyOverride(replacementKey(record.key.identity)),
             otid = presentation.event.otid,
             serverId = presentation.event.serverId,
+            residentEvents = presentation.residentEvents.ifEmpty {
+                listOf(TimelineResidentEvent(record.key.identity, record.revision, presentation.event.otid, presentation.event.serverId))
+            },
         )
         is TimelineSettledPresentation.Defer -> Row(
             record.key.identity,
@@ -247,6 +263,7 @@ class CanonicalTimelinePresentation private constructor(
                 record.contentType,
                 record.revision,
             ),
+            residentEvents = listOf(TimelineResidentEvent(record.key.identity, record.revision, "", "")),
         )
         TimelineSettledPresentation.Drop -> error("Dropped records must not reach projection")
     }

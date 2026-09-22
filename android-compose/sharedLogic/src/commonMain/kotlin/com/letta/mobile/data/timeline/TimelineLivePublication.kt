@@ -88,8 +88,16 @@ sealed interface TimelineSettledPresentation {
     data class Render(
         val event: TimelineEvent.Confirmed,
         val item: com.letta.mobile.data.chat.projection.ChatRenderItem,
+        val residentEvents: List<TimelineResidentEvent> = emptyList(),
     ) : TimelineSettledPresentation
 }
+
+data class TimelineResidentEvent(
+    val identity: TimelineMessageId,
+    val revision: Long,
+    val otid: String,
+    val serverId: String,
+)
 
 /** Testable seam for the complete-record decode and UI projection used by the settled pager. */
 data class TimelineSettledProjectionAdapter(

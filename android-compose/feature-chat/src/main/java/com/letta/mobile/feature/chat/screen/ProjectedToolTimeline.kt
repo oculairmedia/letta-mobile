@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
@@ -264,6 +265,16 @@ private fun ToolRunSummaryRow(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ToolRunSummaryTestTags.Row)
+            .semantics {
+                contentDescription = "Tool run summary"
+                stateDescription = "${summary.toolCount} ${toolNoun(summary.toolCount)}, ${summary.failureCount} failed, " +
+                    "${summary.awaitingApprovalCount} awaiting approval, " +
+                    when {
+                        summary.awaitingApprovalCount > 0 -> "awaiting approval"
+                        summary.running -> "running"
+                        else -> "settled"
+                    }
+            }
             .clickable(onClick = onClick)
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,

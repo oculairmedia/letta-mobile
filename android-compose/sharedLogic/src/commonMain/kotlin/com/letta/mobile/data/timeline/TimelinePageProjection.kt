@@ -1,5 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.chat.projection.ChatDisplayMode
+import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.buildChatRenderModel
+import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
 /** Canonical ownership, shared by settled and live projection; never inferred from message content. */
@@ -43,6 +47,78 @@ internal fun TimelinePageProjectionInput.project(adapter: TimelineSettledProject
         }
         record.copy(preparedPresentation = presentation)
     }
+
+/**
+ * Groups renderable residents before Paging creates rows. Per-record projection is still retained
+ * on every source record for deferred bodies and settlement provenance; only the first record in a
+ * render block owns the combined item and the remaining records are dropped from presentation.
+ */
+internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
+    prepared: List<TimelineSettledRecord>,
+): List<TimelineSettledRecord> {
+    val renderable = prepared.mapIndexedNotNull { index, record ->
+        val presentation = record.preparedPresentation as? TimelineSettledPresentation.Render
+            ?: return@mapIndexedNotNull null
+        val message = timelineEventToUiMessage(presentation.event, context.ownAgentId)
+            ?: return@mapIndexedNotNull null
+        IndexedRenderedRecord(index, record, presentation, message)
+    }
+    if (renderable.size < 2) return prepared
+
+    val grouped = buildChatRenderModel(
+        messages = renderable.map { it.message },
+        mode = ChatDisplayMode.Interactive,
+        activeAgentId = context.scope.agentId,
+    ).renderItems
+    if (grouped.size == renderable.size) return prepared
+
+    val output = prepared.toMutableList()
+    grouped.forEach { item ->
+        if (item !is ChatRenderItem.RunBlock || item.messages.size < 2) return@forEach
+        if (!envelope.containsComplete(item.runId)) return@forEach
+        val members = item.messages.map { it.first.id }.toSet()
+        val sources = renderable.filter { it.message.id in members }
+        if (sources.size != item.messages.size) return@forEach
+        val sourceIndexes = sources.map { it.index }.sorted()
+        // Skill instruction envelopes are hidden model context, not human turn boundaries.
+        // Returns are folded into their canonical owners before projection; do not infer
+        // ownership for arbitrary hidden rows (including orphan returns).
+        if (sourceIndexes.zipWithNext().any { (left, right) ->
+                (left + 1 until right).any { index ->
+                    records[index].event?.isSyntheticSkillEnvelope() != true
+                }
+            }) return@forEach
+        val owner = sources.minBy { it.index }
+        output[owner.index] = owner.record.copy(
+            preparedPresentation = TimelineSettledPresentation.Render(
+                event = owner.presentation.event,
+                item = item,
+                residentEvents = sources.map { source ->
+                    TimelineResidentEvent(
+                        identity = source.record.key.identity,
+                        revision = source.record.revision,
+                        otid = source.presentation.event.otid,
+                        serverId = source.presentation.event.serverId,
+                    )
+                },
+            ),
+        )
+        sources.drop(1).forEach { source ->
+            output[source.index] = source.record.copy(preparedPresentation = TimelineSettledPresentation.Drop)
+        }
+    }
+    return output
+}
+
+private fun TimelineRunEnvelope.containsComplete(runId: String): Boolean =
+    older != TimelineRunBoundary.Continues(runId) && newer != TimelineRunBoundary.Continues(runId)
+
+private data class IndexedRenderedRecord(
+    val index: Int,
+    val record: TimelineSettledRecord,
+    val presentation: TimelineSettledPresentation.Render,
+    val message: com.letta.mobile.data.model.UiMessage,
+)
 
 /** At most two metadata queries (one row each), two body reads, and 32 KiB additional bytes.
  * Body bytes also consume the remaining configured page budget; no scanning past an unknown edge.

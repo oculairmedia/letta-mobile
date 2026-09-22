@@ -5,12 +5,21 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
+import kotlinx.serialization.Serializable
 
 /** Retry the same page/frame after resolving this condition; the transaction has not committed. */
 class TimelineMergeUnavailable(val identity: TimelineMessageId, val reason: String) :
     IllegalStateException("Canonical merge unavailable for ${identity.value}: $reason")
 
 /** Exact terminal ownership and stable indexed positions, with no history-wide materialization. */
+@Serializable
+private data class DeferredToolReturn(
+    val message: com.letta.mobile.data.model.ToolReturnMessage,
+)
+
+private const val HISTORICAL_BODY_CHUNK_BYTES = 64 * 1024
+private const val DEFERRED_RETURN_MAX_BYTES = 64 * 1024
+
 class TimelineExactCanonicalWriter(
     private val scope: TimelineScope,
     private val maxHistoricalBytes: Int,
@@ -18,14 +27,14 @@ class TimelineExactCanonicalWriter(
     init { require(maxHistoricalBytes > 0) }
 
     override suspend fun merge(transaction: TimelineStoreTransaction, record: TimelineRemoteRecord): Boolean {
+        val returned = record.message as? com.letta.mobile.data.model.ToolReturnMessage
+        val callId = returned?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
+        if (returned != null && callId != null) {
+            return mergeToolReturn(transaction, callId, returned)
+        }
         val incoming = record.message.toTimelineEvent(0.0)
         if (incoming != null) {
-            // toTimelineEvent intentionally omits the return's call ID; capture the wire identity
-            // before projection so returns on a different history page resolve old owners.
-            val returned = record.message as? com.letta.mobile.data.model.ToolReturnMessage
-            val callId = returned?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
-            val indexed = if (callId != null) CanonicalToolIndex.observe(transaction, callId, null, true) else false
-            return mergeEvent(transaction, incoming) || indexed
+            return mergeEvent(transaction, incoming)
         }
         // Opaque protocol records must survive even when the current renderer cannot project them.
         val key = transaction.locate(record.identity) ?: TimelinePageKey(
@@ -36,6 +45,57 @@ class TimelineExactCanonicalWriter(
         val bytes = TimelineSnapshotCodec.json.encodeToString(com.letta.mobile.data.model.LettaMessage.serializer(), record.message).encodeToByteArray()
         transaction.put(TimelineStoredRecord(key, "application/vnd.letta.message+json;version=1", bytes))
         return true
+    }
+
+    private suspend fun mergeToolReturn(
+        transaction: TimelineStoreTransaction,
+        callId: String,
+        returned: com.letta.mobile.data.model.ToolReturnMessage,
+    ): Boolean {
+        val indexed = transaction.toolCall(callId)
+        val owner = indexed?.owner
+        if (owner == null) {
+            // A return may lead its call across a page boundary. Keep its exact wire body so
+            // the later owner merge can fold it instead of leaving a completed standalone row.
+            val deferred = TimelineSnapshotCodec.json.encodeToString(
+                DeferredToolReturn.serializer(), DeferredToolReturn(returned),
+            ).encodeToByteArray()
+            if (deferred.size > DEFERRED_RETURN_MAX_BYTES) {
+                throw TimelineMergeUnavailable(TimelineMessageId(returned.id), "deferred_tool_return_budget")
+            }
+            transaction.putEvidence(deferredReturnKey(callId), deferred)
+            return CanonicalToolIndex.observe(transaction, callId, null, true)
+        }
+        val ownerKey = transaction.locate(owner) ?: throw TimelineMergeUnavailable(owner, "tool_owner_missing")
+        val metadata = transaction.metadata(TimelineReadPosition.Around(ownerKey), 1)
+            .rows.singleOrNull { it.key == ownerKey }
+            ?: throw TimelineMergeUnavailable(owner, "tool_owner_body_missing")
+        if (metadata.body.encodedBytes > maxHistoricalBytes) {
+            throw TimelineMergeUnavailable(owner, "historical_body_budget")
+        }
+        val bytes = transaction.readHistoricalBody(owner, metadata.body)
+        val ownerEvent = TimelineSnapshotCodec.json.decodeFromString(
+            StoredTimelineEvent.serializer(), bytes.decodeToString(),
+        ).toConfirmedTimelineEvent()
+        val fold = foldToolReturnBodies(
+            ownerEvent.toolReturnContentByCallId,
+            ownerEvent.toolReturnTruncationByCallId,
+            listOf(callId to returned),
+        )
+        transaction.deleteEvidence(deferredReturnKey(callId))
+        val body = fold.contentByCallId[callId] ?: ""
+        val enriched = ownerEvent.copy(
+            approvalDecided = ownerEvent.approvalDecided || ownerEvent.willCompleteWith(callId),
+            toolReturnContent = body.ifBlank { ownerEvent.toolReturnContent ?: body },
+            toolReturnIsError = returned.isErr == true || returned.status == "error",
+            toolReturnContentByCallId = (fold.contentByCallId + (callId to body)).toTimelinePersistentMap(),
+            toolReturnIsErrorByCallId = (ownerEvent.toolReturnIsErrorByCallId +
+                (callId to (returned.isErr == true || returned.status == "error"))).toTimelinePersistentMap(),
+            toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
+            attachments = (ownerEvent.attachments + returned.attachments).distinct().toTimelinePersistentList(),
+        )
+        val merged = mergeEvent(transaction, enriched)
+        return CanonicalToolIndex.observe(transaction, callId, owner, true) || merged
     }
 
     suspend fun mergeEvent(transaction: TimelineStoreTransaction, incoming: TimelineEvent.Confirmed): Boolean {
@@ -60,18 +120,13 @@ class TimelineExactCanonicalWriter(
         var historicalBytes: ByteArray? = null
         if (old != null) {
             if (old.body.encodedBytes > maxHistoricalBytes) throw TimelineMergeUnavailable(identity, "historical_body_budget")
-            val stored = ByteArray(old.body.encodedBytes.toInt())
-            var offset = 0
-            while (offset < stored.size) {
-                val chunk = transaction.body(old.body, offset.toLong(), minOf(64 * 1024, stored.size - offset))
-                if (chunk.isEmpty() || chunk.size > stored.size - offset) throw TimelineMergeUnavailable(identity, "incomplete_historical_body")
-                chunk.copyInto(stored, offset)
-                offset += chunk.size
-            }
-            historicalBytes = stored
-            historical = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), stored.decodeToString()).toConfirmedTimelineEvent()
+            val bytes = transaction.readHistoricalBody(identity, old.body)
+            historicalBytes = bytes
+            historical = TimelineSnapshotCodec.json.decodeFromString(
+                StoredTimelineEvent.serializer(), bytes.decodeToString(),
+            ).toConfirmedTimelineEvent()
         }
-        val merged = if (owner != null) {
+        var merged = if (owner != null) {
             when (val decision = mergeOwnedTerminal(scope, owner, incoming, maxHistoricalBytes.toLong(),
                 TerminalHistoricalBodyReader { _, _, _ -> historical })) {
                 is TerminalEvidenceDecision.Changed -> decision.event
@@ -79,6 +134,29 @@ class TimelineExactCanonicalWriter(
                 is TerminalEvidenceDecision.Unavailable -> throw TimelineMergeUnavailable(identity, decision.reason)
             }
         } else historical?.let { TimelineHydrationReducer.mergeRicherEventFacts(incoming, it).copy(position = it.position, otid = it.otid) } ?: incoming
+        for (call in merged.toolCalls) {
+            val callId = call.effectiveId.takeIf { it.isNotBlank() } ?: continue
+            val deferred = transaction.evidence(deferredReturnKey(callId), DEFERRED_RETURN_MAX_BYTES)?.let {
+                TimelineSnapshotCodec.json.decodeFromString(DeferredToolReturn.serializer(), it.decodeToString())
+            } ?: continue
+            val fold = foldToolReturnBodies(
+                merged.toolReturnContentByCallId,
+                merged.toolReturnTruncationByCallId,
+                listOf(callId to deferred.message),
+            )
+            val body = fold.contentByCallId[callId] ?: ""
+            merged = merged.copy(
+                approvalDecided = merged.approvalDecided || merged.willCompleteWith(callId),
+                toolReturnContent = body.ifBlank { merged.toolReturnContent ?: body },
+                toolReturnIsError = deferred.message.isErr == true || deferred.message.status == "error",
+                toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
+                toolReturnIsErrorByCallId = (merged.toolReturnIsErrorByCallId +
+                    (callId to (deferred.message.isErr == true || deferred.message.status == "error"))).toTimelinePersistentMap(),
+                toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
+                attachments = (merged.attachments + deferred.message.attachments).distinct().toTimelinePersistentList(),
+            )
+            transaction.deleteEvidence(deferredReturnKey(callId))
+        }
         // The echo and optimistic removal share the caller's transaction, even on replay.
         // Assistant frames can carry an otid too; only a user echo confirms a local send.
         var indexed = false
@@ -137,6 +215,25 @@ class TimelineExactCanonicalWriter(
         }
         return indexed
     }
+
+    private suspend fun TimelineStoreTransaction.readHistoricalBody(
+        identity: TimelineMessageId,
+        pointer: TimelineBodyPointer,
+    ): ByteArray {
+        val stored = ByteArray(pointer.encodedBytes.toInt())
+        var offset = 0
+        while (offset < stored.size) {
+            val chunk = body(pointer, offset.toLong(), minOf(HISTORICAL_BODY_CHUNK_BYTES, stored.size - offset))
+            if (chunk.isEmpty() || chunk.size > stored.size - offset) {
+                throw TimelineMergeUnavailable(identity, "incomplete_historical_body")
+            }
+            chunk.copyInto(stored, offset)
+            offset += chunk.size
+        }
+        return stored
+    }
+
+    private fun deferredReturnKey(callId: String) = "tool-return/deferred/$callId"
 
     /**
      * The identity this event is stored under. For a tool call that is the group owner, which is

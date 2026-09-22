@@ -514,7 +514,8 @@ class CanonicalTimelineEngine(
                 TimelineProjectionContext(selection.scope, ownAgentId), records,
                 runEnvelope(page.metadata, records, remaining, adapter),
             )
-            TimelinePreparedPage(page.metadata, input.project(adapter), input)
+            val prepared = input.project(adapter)
+            TimelinePreparedPage(page.metadata, input.aggregatePreparedRuns(prepared), input)
         }
     }
 

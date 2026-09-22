@@ -243,7 +243,7 @@ class LocalBackendAdminStoreTest {
         assertEquals("tool_call_message", tc["message_type"]!!.jsonPrimitive.content)
         assertEquals("toolcall-call-1", tc["id"]!!.jsonPrimitive.content)
         assertEquals("Bash", tc["name"]!!.jsonPrimitive.content)
-        assertEquals("ui-2", tc["otid"]!!.jsonPrimitive.content)
+        assertEquals("toolcall-call-1", tc["otid"]!!.jsonPrimitive.content)
         assertEquals("2025-06-01T12:00:00.020Z", tc["date"]!!.jsonPrimitive.content)
         val call = tc["tool_call"]!!.jsonObject
         assertEquals("Bash", call["name"]!!.jsonPrimitive.content)

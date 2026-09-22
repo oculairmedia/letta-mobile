@@ -2,6 +2,8 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -10,10 +12,74 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TimelineExactCanonicalWriterTest {
+    @Test fun alternatingNativeTurnHasIdenticalLiveAndColdCanonicalShape() = runTest {
+        val store = InMemoryTimelineStore()
+        fun engine() = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val liveEngine = engine()
+        val selection = assertIs<TimelineEngineOpen.Opened>(liveEngine.open(scope)).selection
+        val fence = liveEngine.beginLive(selection)
+        val messages = buildList<com.letta.mobile.data.model.LettaMessage> {
+            add(com.letta.mobile.data.model.UserMessage(id = "ui-msg-9170340",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("Run four commands"), date = "2026-01-01T00:00:00Z"))
+            repeat(4) { index ->
+                add(com.letta.mobile.data.model.ToolCallMessage(
+                    id = "ui-msg-${9170341 + index * 2}",
+                    toolCall = com.letta.mobile.data.model.ToolCall(id = "call-$index",
+                        name = if (index % 2 == 0) "exec_command" else "write_stdin", arguments = "{}"),
+                    date = "2026-01-01T00:00:0${index * 2 + 1}Z"))
+                add(com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "ui-msg-${9170342 + index * 2}", toolCallId = "call-$index",
+                    toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("result-$index"),
+                    date = "2026-01-01T00:00:0${index * 2 + 2}Z"))
+            }
+            add(AssistantMessage(id = "ui-msg-9170349",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("Done"), date = "2026-01-01T00:00:09Z"))
+        }
+        messages.forEach { assertTrue(liveEngine.ingest(fence, TimelineStreamFrame.Message(it))) }
+        assertTrue(liveEngine.ingest(fence, TimelineStreamFrame.Done))
+        val live = kotlin.test.assertNotNull(liveEngine.live.value).block.events
+        // Exercise sync's durable writer, not a hand-seeded StoredTimelineEvent page.
+        messages.chunked(3).forEach { page ->
+            assertEquals(TimelineEnginePageOutcome.Applied, reconcile(liveEngine, selection, *page.map(::record).toTypedArray()))
+        }
+        val cold = engine()
+        val coldSelection = assertIs<TimelineEngineOpen.Opened>(cold.open(scope)).selection
+        val page = cold.preparePage(coldSelection, TimelineReadPosition.Tail, 32, null,
+            DefaultTimelineSettledProjectionAdapter)
+        val reopened = page.projectionInput.records.mapNotNull { it.event }
+        assertEquals(live.map { it.messageType }, reopened.map { it.messageType },
+            "Cold canonical rows must have the live shape, including attached rather than standalone returns")
+        assertEquals(live.map { it.copy(position = 0.0) }, reopened,
+            "Durable ordering lives in TimelinePageKey; decoded canonical facts must match live")
+        val liveItems = com.letta.mobile.data.chat.projection.buildChatRenderModel(
+            messages = live.mapNotNull { com.letta.mobile.data.chat.projection.timelineEventToUiMessage(it) },
+            mode = com.letta.mobile.data.chat.projection.ChatDisplayMode.Interactive).renderItems
+        val reopenedItems = page.records.mapNotNull {
+            (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
+        }
+        fun normalized(items: List<com.letta.mobile.data.chat.projection.ChatRenderItem>) =
+            items.map { item ->
+                val identity = when (item) {
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.Single -> item.message.id
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item.runId
+                }
+                identity to when (item) {
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.Single -> item.copy(keyOverride = null)
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item
+                }
+            }.sortedBy { it.first }
+        assertEquals(liveItems.size, reopenedItems.size,
+            "Parity must retain duplicate render identities rather than overwriting them")
+        assertEquals(normalized(liveItems), normalized(reopenedItems),
+            "Live and reopened render items must have the same identity multiplicity and content")
+    }
+
     @Test fun assistantAliasRequiresSharedSegmentProvenanceNotTextOrRun() = runTest {
         val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
@@ -533,6 +599,72 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(1, results.count { it == TimelineEnginePageOutcome.Applied })
         assertEquals(63, results.count { it == TimelineEnginePageOutcome.Stale })
         assertEquals(1L, store.current.revision)
+    }
+
+    @Test fun returnBeforeCallAcrossPagesFoldsExactBodyIntoOwner() = runTest {
+        val store = InMemoryTimelineStore()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-1", toolCallId = "call-1",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("exact result"),
+            date = "2026-01-01T00:00:00Z",
+        )
+        val call = com.letta.mobile.data.model.ToolCallMessage(
+            id = "call-owner", date = "2026-01-01T00:00:01Z",
+            toolCall = com.letta.mobile.data.model.ToolCall(id = "call-1", name = "Bash", arguments = "{}"),
+        )
+        store.transaction(scope) { writer.merge(this, record(returned)); nextRevision() }
+        assertEquals(0, store.rows.size, "an ownerless return must not become a standalone canonical row")
+        store.transaction(scope) { writer.merge(this, record(call)); nextRevision() }
+
+        val persisted = TimelineSnapshotCodec.json.decodeFromString(
+            com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+            store.rows.values.single().body.decodeToString(),
+        ).toConfirmedTimelineEvent()
+        assertEquals("exact result", persisted.toolReturnContentByCallId["call-1"])
+        store.read(scope) { assertEquals(TimelineMessageId("call-owner"), toolCall("call-1")?.owner) }
+    }
+
+    @Test fun oversizedDeferredReturnFailsBeforeEvidenceIsPersisted() = runTest {
+        val store = InMemoryTimelineStore()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-large", toolCallId = "call-large",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("x".repeat(70_000)),
+            date = "2026-01-01T00:00:00Z",
+        )
+
+        val failure = assertFailsWith<TimelineMergeUnavailable> {
+            store.transaction(scope) { writer.merge(this, record(returned)) }
+        }
+
+        assertEquals("deferred_tool_return_budget", failure.reason)
+        store.read(scope) {
+            assertNull(toolCall("call-large"))
+            assertNull(evidence("tool-return/deferred/call-large", 64 * 1024))
+        }
+    }
+
+    @Test fun indexedOwnerBodyOver64KiBIsReadInBoundedChunks() = runTest {
+        val store = InMemoryTimelineStore()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val call = kotlin.test.assertNotNull(message("x".repeat(70_000)).toTimelineEvent(0.0)).copy(
+            serverId = "call-owner", otid = "call-owner", messageType = TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(id = "call-1", name = "Bash")).toTimelinePersistentList(),
+        )
+        store.transaction(scope) { writer.mergeEvent(this, call); nextRevision() }
+        store.bodyReads = 0
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-1", toolCallId = "call-1",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("done"), date = "2026-01-01T00:00:01Z",
+        )
+        store.transaction(scope) { writer.merge(this, record(returned)); nextRevision() }
+        assertTrue(store.bodyReads >= 2, "owner body larger than 64 KiB must be read in bounded chunks")
+        val persisted = TimelineSnapshotCodec.json.decodeFromString(
+            com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+            store.rows.values.single().body.decodeToString(),
+        ).toConfirmedTimelineEvent()
+        assertEquals("done", persisted.toolReturnContentByCallId["call-1"])
     }
 
     @Test fun historicalCorrectionReadsOneBodyAmong28kRows() = runTest {
