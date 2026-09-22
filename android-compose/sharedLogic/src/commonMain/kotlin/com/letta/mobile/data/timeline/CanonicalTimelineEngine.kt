@@ -213,12 +213,15 @@ class CanonicalTimelineEngine(
         val event: TimelineEvent.Confirmed,
         val identity: TimelineMessageId,
         val isNew: Boolean,
+        val orderDate: String,
+        val orderOtid: String,
     )
 
     private fun adoptCommittedIdentities(committed: List<CommittedRow>) {
         val live = mutableLive.value ?: return
         if (live.settlementRevision == null) return
-        val adopted = live.adoptionsFrom(committed)
+        val ordered = committed.sortedWith(compareBy({ it.orderDate }, { it.orderOtid }))
+        val adopted = live.adoptionsFrom(ordered)
         if (adopted.isEmpty()) return
         mutableLive.value = live.copy(aliases = live.aliases + adopted)
     }
@@ -271,14 +274,14 @@ class CanonicalTimelineEngine(
 
     /**
      * What names the same message on both sides of the boundary. A tool call and its return are
-     * named by the call, which the stream and the ledger agree on exactly. An assistant reply has
-     * no shared id at all - the stream and the server each derive an otid from their own name - so
-     * its content is the only thing left to match on.
+     * named by the call, which the stream and the ledger agree on exactly. Assistant replies and
+     * reasoning frames have no shared id: the stream and server each derive their otid from their
+     * own name, so exact turn-local content is the remaining adoption evidence.
      */
     private fun TimelineEvent.Confirmed.adoptionKey(): String? = when (messageType) {
         TimelineMessageType.TOOL_CALL -> toolCalls.firstNotNullOfOrNull { it.effectiveId.takeIf(String::isNotBlank) }
         TimelineMessageType.TOOL_RETURN -> toolReturnContentByCallId.keys.firstOrNull { it.isNotBlank() }
-        TimelineMessageType.ASSISTANT -> content.takeIf { it.isNotBlank() }
+        TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING -> content.takeIf { it.isNotBlank() }
         else -> null
     }
 
@@ -305,7 +308,9 @@ class CanonicalTimelineEngine(
         val match = unclaimed.firstOrNull {
             it.event.messageType == messageType && it.event.adoptionKey() == key
         } ?: return null
-        if (messageType == TimelineMessageType.ASSISTANT) unclaimed.remove(match)
+        if (messageType == TimelineMessageType.ASSISTANT || messageType == TimelineMessageType.REASONING) {
+            unclaimed.remove(match)
+        }
         return if (match.identity.value == serverId) Adoption.AlreadyNamed
         else Adoption.Alias(serverId, match.identity)
     }
@@ -454,7 +459,13 @@ class CanonicalTimelineEngine(
                 // After the merge: a tool call's stored key is its group owner, which the tool
                 // index only knows once this record has been written.
                 if (writer is TimelineExactCanonicalWriter && event != null) {
-                    committed += CommittedRow(event, writer.canonicalEventIdentity(this, event), isNew = !existed)
+                    committed += CommittedRow(
+                        event = event,
+                        identity = writer.canonicalEventIdentity(this, event),
+                        isNew = !existed,
+                        orderDate = record.message.date.orEmpty(),
+                        orderOtid = record.message.otid ?: record.message.id,
+                    )
                 }
             }
             currentCoroutineContext().ensureActive()
