@@ -6,6 +6,8 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEventWithImageBodies
+import com.letta.mobile.data.timeline.snapshot.TimelineImageBodyReader
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -489,7 +491,7 @@ class CanonicalTimelineEngine(
         position: TimelineReadPosition,
         maxRows: Int,
         ownAgentId: String?,
-        adapter: TimelineSettledProjectionAdapter,
+        adapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
     ): TimelinePreparedPage = mutex.withLock {
         check(selection === mutablePublication.value.selection) { "Stale selection" }
         require(maxRows > 0)
@@ -497,11 +499,29 @@ class CanonicalTimelineEngine(
             val page = TimelineBoundedReader(store).run {
                 preview(position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
             }
+            // Separate decoded-image budget; metadata and adjacent run context never resolve blobs.
+            var imageBytesRemaining = 16L * 1024 * 1024
+            val imageReader = this as? TimelineImageBodyReader
+            val boundedImages = object : TimelineImageBodyReader {
+                override suspend fun resolveImage(reference: com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference): String? {
+                    if (reference.decodedBytes !in 1..imageBytesRemaining) return null
+                    imageBytesRemaining -= reference.decodedBytes
+                    return imageReader?.resolveImage(reference)
+                }
+            }
             val records = page.metadata.rows.zip(page.bodies) { metadata, body ->
                 TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
             }.map { record ->
                 val event = if (record.contentType == TIMELINE_EVENT_CONTENT_TYPE && !record.isPreview) {
-                    adapter.decode(record)
+                    val decoded = adapter.decode(record)
+                    if (decoded.attachments.any { it.base64.isEmpty() }) {
+                        val stored = TimelineSnapshotCodec.json.decodeFromString(
+                            StoredTimelineEvent.serializer(), record.body.decodeToString(),
+                        )
+                        if (stored.attachments.any { it.bodyReference != null }) decoded.copy(
+                            attachments = stored.toConfirmedTimelineEventWithImageBodies(boundedImages).attachments,
+                        ) else decoded
+                    } else decoded
                 } else null
                 val excluded = record.contentType != TIMELINE_EVENT_CONTENT_TYPE ||
                     (event != null && (event.isSyntheticSkillEnvelope() ||

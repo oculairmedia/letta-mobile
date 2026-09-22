@@ -5,6 +5,8 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEventWithImageBodies
+import com.letta.mobile.data.timeline.snapshot.TimelineImageBodyWriter
 import kotlinx.serialization.Serializable
 
 /** Retry the same page/frame after resolving this condition; the transaction has not committed. */
@@ -173,7 +175,21 @@ class TimelineExactCanonicalWriter(
         }
         indexed = transaction.indexIdentityAliases(incoming, merged.otid, identity) || indexed
         val canonical = merged.copy(serverId = identity.value)
-        val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), canonical.toStoredTimelineEvent()).encodeToByteArray()
+        val stored = (transaction as? TimelineImageBodyWriter)?.let {
+            canonical.toStoredTimelineEventWithImageBodies(it)
+        } ?: canonical.toStoredTimelineEvent()
+        // Metadata-only merges must retain durable pointers, including temporarily missing bodies.
+        val previous = historicalBytes?.let {
+            TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), it.decodeToString())
+        }
+        val retained = stored.copy(attachments = stored.attachments.mapIndexed { index, attachment ->
+            val oldAttachment = previous?.attachments?.getOrNull(index)
+            if (attachment.bodyReference == null && attachment.thumbnailBase64 == null &&
+                oldAttachment?.bodyReference != null && oldAttachment.mediaType == attachment.mediaType &&
+                oldAttachment.byteSize == attachment.byteSize
+            ) oldAttachment else attachment
+        })
+        val bytes = TimelineSnapshotCodec.json.encodeToString(StoredTimelineEvent.serializer(), retained).encodeToByteArray()
         if (historicalBytes != null && bytes.contentEquals(historicalBytes)) return indexed
         if (canonical.otid.isNotBlank()) transaction.putEvidence("identity/otid/${canonical.otid}", identity.value.encodeToByteArray())
         transaction.put(TimelineStoredRecord(key, TIMELINE_EVENT_CONTENT_TYPE, bytes))

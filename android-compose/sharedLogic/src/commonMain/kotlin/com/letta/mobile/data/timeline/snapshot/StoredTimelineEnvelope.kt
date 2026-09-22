@@ -80,4 +80,22 @@ data class StoredImageAttachmentPointer(
     val byteSize: Long = -1L,
     val uriOrUrl: String? = null,
     val thumbnailBase64: String? = null,
+    val bodyReference: StoredImageBodyReference? = null,
 )
+
+/** Scoped ledger content identity, never a filesystem path. */
+@Serializable
+data class StoredImageBodyReference(
+    val sha256: String,
+    val decodedBytes: Long,
+    val provenance: String = "canonical-inline-v1",
+)
+
+/** Optional capability of the existing scoped ledger callback; not a separate store. */
+interface TimelineImageBodyReader {
+    suspend fun resolveImage(reference: StoredImageBodyReference): String?
+}
+
+interface TimelineImageBodyWriter : TimelineImageBodyReader {
+    suspend fun persistImage(base64: String): StoredImageBodyReference
+}

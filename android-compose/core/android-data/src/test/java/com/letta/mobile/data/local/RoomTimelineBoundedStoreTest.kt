@@ -3,7 +3,8 @@ package com.letta.mobile.data.local
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.timeline.*
-import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.*
+import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -36,6 +37,96 @@ class RoomTimelineBoundedStoreTest {
         store = RoomTimelineBoundedStore(db, codec)
     }
     @After fun teardown() { db.close() }
+
+    /** Real writer and fresh engine, with no surviving in-memory image after Room reopens. */
+    @Test fun largeInlineImageSurvivesCanonicalColdReopenByteIdentically() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val name = "image-cold-${java.util.UUID.randomUUID()}.db"
+        db.close()
+        db = Room.databaseBuilder(context, TimelineLedgerDatabase::class.java, name).build()
+        store = RoomTimelineBoundedStore(db)
+        try {
+            val bytes = ByteArray(105_868) { (it % 251).toByte() }
+            val encoded = Base64.getEncoder().encodeToString(bytes)
+            val source = StoredTimelineEvent(1.0, "otid", serverId = "image", messageType = "USER",
+                dateIso = "2026-01-01T00:00:00Z", attachments = listOf(
+                    StoredImageAttachmentPointer("image/png", bytes.size.toLong(), thumbnailBase64 = encoded),
+                )).toConfirmedTimelineEvent()
+            store.transaction(scope) {
+                assertTrue(TimelineExactCanonicalWriter(scope, 100_000).mergeEvent(this, source))
+                val row = metadata(TimelineReadPosition.Tail, 1).rows.single()
+                val payload = body(row.body, 0, 2048).decodeToString()
+                assertFalse(payload.contains(encoded))
+                assertTrue(payload.length < 2048)
+                assertTrue(payload.contains("bodyReference"))
+                nextRevision()
+            }
+            store.transaction(scope) {
+                assertFalse(TimelineExactCanonicalWriter(scope, 100_000).mergeEvent(this, source))
+            }
+            db.close()
+            db = Room.databaseBuilder(context, TimelineLedgerDatabase::class.java, name).build()
+            store = RoomTimelineBoundedStore(db)
+            val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+            val selection = (engine.open(scope) as TimelineEngineOpen.Opened).selection
+            val page = engine.preparePage(selection, TimelineReadPosition.Tail, 1, null)
+            val presentation = page.records.single().preparedPresentation as TimelineSettledPresentation.Render
+            val ui = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(presentation.event, null)!!
+            val rendered = Base64.getDecoder().decode(ui.attachments.single().base64)
+            assertArrayEquals(bytes, rendered)
+            assertEquals(checksum(bytes), checksum(rendered))
+            store.read(scope) {
+                val metadata = metadata(TimelineReadPosition.Tail, 1).rows.single()
+                assertTrue(metadata.body.encodedBytes < 2048)
+                val stored = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(),
+                    body(metadata.body, 0, 2048).decodeToString())
+                val reference = stored.attachments.single().bodyReference!!
+                assertEquals(checksum(bytes), reference.sha256)
+                val imageBodies = this as TimelineImageBodyReader
+                val restored = stored.toConfirmedTimelineEventWithImageBodies(imageBodies)
+                val actual = Base64.getDecoder().decode(restored.attachments.single().base64)
+                assertEquals(checksum(bytes), checksum(actual))
+                assertArrayEquals(bytes, actual)
+                assertNull(imageBodies.resolveImage(reference.copy(sha256 = "0".repeat(64))))
+                assertNull(imageBodies.resolveImage(reference.copy(decodedBytes = reference.decodedBytes + 1)))
+                for (invalid in listOf(
+                    reference.copy(sha256 = "0".repeat(64)),
+                    reference.copy(decodedBytes = reference.decodedBytes + 1),
+                    reference.copy(provenance = "unknown"),
+                )) {
+                    val unavailable = stored.copy(attachments = listOf(stored.attachments.single().copy(bodyReference = invalid)))
+                        .toConfirmedTimelineEventWithImageBodies(imageBodies).attachments.single()
+                    assertEquals("", unavailable.base64)
+                    assertEquals(bytes.size.toLong(), unavailable.storedByteSize)
+                }
+                val pointer = "image-sha256:${reference.sha256}"
+                db.openHelper.writableDatabase.execSQL(
+                    "UPDATE ledger_chunk SET payload = ? WHERE scope = ? AND pointer = ? AND ordinal = 0",
+                    arrayOf(byteArrayOf(9), ledgerScopeKey(scope), pointer),
+                )
+                assertNull(imageBodies.resolveImage(reference))
+                assertEquals("", stored.toConfirmedTimelineEventWithImageBodies(imageBodies).attachments.single().base64)
+            }
+        } finally {
+            db.close()
+            context.deleteDatabase(name)
+        }
+    }
+
+    @Test fun cancelledImageTransactionLeavesNoReferenceTarget() = runBlocking {
+        var reference: StoredImageBodyReference? = null
+        try {
+            store.transaction(scope) {
+                reference = (this as TimelineImageBodyWriter).persistImage(Base64.getEncoder().encodeToString(ByteArray(20000)))
+                nextRevision()
+                throw CancellationException("abort image and event")
+            }
+        } catch (_: CancellationException) { }
+        store.read(scope) {
+            assertNull((this as TimelineImageBodyReader).resolveImage(reference!!))
+            assertEquals(0L, checkpoint().revision)
+        }
+    }
 
     @Test fun pendingSaveAndDeliveryChangesAllocateExactlyOneRevision() = runBlocking {
         val pending = CanonicalPendingLocalStore(store)
