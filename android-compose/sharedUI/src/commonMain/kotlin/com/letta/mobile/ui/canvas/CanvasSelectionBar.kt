@@ -29,6 +29,10 @@ import kotlin.math.roundToInt
 import com.composables.icons.lucide.AArrowDown
 import com.composables.icons.lucide.AArrowUp
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Type
+import com.composables.icons.lucide.AlignRight
+import com.composables.icons.lucide.AlignLeft
+import com.composables.icons.lucide.AlignCenter
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.SendToBack
 import com.composables.icons.lucide.TextCursorInput
@@ -100,7 +104,10 @@ fun CanvasSelectionBar(
                 // Text is sized from the bar it is selected on, not from a panel behind a swatch:
                 // it is the one property you reach for over and over, and a step up or a step down
                 // is the whole of what that needs.
-                if (properties.showFontSize) {
+                // A shape's text, right on the bar the way Miro puts it: colour, a step smaller or
+                // larger, and alignment. The panel's Text tab has the rest (font, exact sizes).
+                shapeText?.let { text -> ShapeTextButtons(text) }
+                if (properties.showFontSize && shapeText == null) {
                     Divider()
                     BarButton(Lucide.AArrowDown, "Smaller text") {
                         dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(properties.fontSize, up = false)))
@@ -154,6 +161,27 @@ internal val TextSizes: List<Pair<String, Float>> = listOf("S" to 0.85f, "M" to 
 
 /** Font families the control offers, label to the key the document stores. */
 internal val TextFamilies: List<Pair<String, String>> = listOf("Sans" to "sans", "Serif" to "serif", "Mono" to "mono")
+
+@Composable
+private fun ShapeTextButtons(text: ShapeTextActions) {
+    Divider()
+    ColorSwatchPicker(
+        current = text.color,
+        palette = StrokePalette,
+        label = "Text color",
+        glyph = Lucide.Type,
+        onPick = text.onColor,
+        modifier = Modifier.size(BAR_BUTTON),
+    )
+    BarButton(Lucide.AArrowDown, "Smaller text") { text.onFontSize(steppedFontSize(text.fontSize, up = false)) }
+    BarButton(Lucide.AArrowUp, "Larger text") { text.onFontSize(steppedFontSize(text.fontSize, up = true)) }
+    val (icon, next) = when (text.alignment) {
+        io.ak1.drawbox.domain.model.TextAlignment.LEFT -> Lucide.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
+        io.ak1.drawbox.domain.model.TextAlignment.CENTER -> Lucide.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
+        io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> Lucide.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
+    }
+    BarButton(icon, "Text alignment") { text.onAlignment(next) }
+}
 
 @Composable
 private fun BarButton(icon: ImageVector, label: String, selected: Boolean = false, onClick: () -> Unit) {

@@ -193,4 +193,26 @@ class CanvasTouchAndShapeTextUiTest {
         val after = shapes(controller).single().bounds()
         assertEquals(before.left + 60f, after.left, 2f, "the shape should follow a drag that starts on its text")
     }
+
+    @Test
+    fun aShapesTextControlsAreOnItsBar() = runComposeUiTest {
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session(), controller = controller) }
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(hollowRect("r1").copy(text = "Plan")))
+        controller.setMode(Mode.SELECT)
+        controller.selectAt(Offset(300f, 360f), 4f)
+        waitForIdle()
+        fun rect() = shapes(controller).single()
+
+        onNodeWithContentDescription("Larger text").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().fontSize == 25f }
+        onNodeWithContentDescription("Smaller text").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().fontSize == 20f }
+        onNodeWithContentDescription("Text alignment").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().textAlignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT }
+        onNodeWithContentDescription("Text color").performClick()
+        onNodeWithContentDescription("Color blue").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().textColor == androidx.compose.ui.graphics.Color(0xFF3B82F6) }
+        assertEquals(androidx.compose.ui.graphics.Color.Black, rect().strokeColor, "only the text changed colour")
+    }
 }
