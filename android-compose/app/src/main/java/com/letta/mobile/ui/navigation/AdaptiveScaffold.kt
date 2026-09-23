@@ -67,7 +67,11 @@ fun AdaptiveScaffold(
     } else {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
-        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination)
+        // Screens that lay themselves out edge to edge, drawing behind the system bars and insetting
+        // only their own controls: the chat, and the canvas (its board and the note opened full
+        // screen). Padding them here boxed the board in between two bars of scaffold colour.
+        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination) ||
+            currentDestination?.hasRoute(CanvasRoute::class) == true
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
