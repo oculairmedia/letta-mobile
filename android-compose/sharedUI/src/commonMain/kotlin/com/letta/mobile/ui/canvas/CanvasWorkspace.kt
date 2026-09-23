@@ -290,9 +290,12 @@ fun CanvasWorkspace(
     var isAutosaving by remember { mutableStateOf(false) }
 
     // Card I1.6: Autosave debounce
-    // Debounce ~500ms on dirty signal (elements change) -> exportJson()
-    // The resulting Event.JsonExported persists the updated scene off the main thread.
-    LaunchedEffect(state.elements, initialLoadDone, session) {
+    // Debounce ~500ms on dirty signal (elements or background colour change) -> exportJson()
+    // The resulting Event.JsonExported persists the updated scene off the main thread. The
+    // background colour is part of the exported drawing, and the export is the only way it
+    // becomes an op: keyed on the elements alone, a new colour stayed on this board until the
+    // next stroke carried it along.
+    LaunchedEffect(state.elements, state.bgColor, initialLoadDone, session) {
         if (!initialLoadDone || session == null) return@LaunchedEffect
         delay(500)
         isAutosaving = true
