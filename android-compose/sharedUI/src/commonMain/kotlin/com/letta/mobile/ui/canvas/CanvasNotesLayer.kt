@@ -247,7 +247,8 @@ private fun CanvasNoteCard(
     // chrome's margin on every side: the chrome sits OUTSIDE the card, and a handle hanging past
     // its parent's bounds is drawn but never hit, which is how the handles came to look draggable
     // without being draggable.
-    val chromeInset = canvasSelectionStyle().chromeInset()
+    // In the card's own (zoomed) units, so the margin is one size on screen like the chrome in it.
+    val chromeInset = canvasSelectionStyle().chromeInset() / (if (scale <= 0f) 1f else scale)
     val insetPx = with(density) { chromeInset.toPx() } * scale
     Box(
         modifier = Modifier
@@ -533,7 +534,9 @@ internal const val NOTE_DEFAULT_HEIGHT = 240f
 private const val TEXT_DEFAULT_WIDTH = 360f
 private const val TEXT_DEFAULT_HEIGHT = 120f
 private const val NOTE_DEFAULT_ORIGIN = 80f
-private const val NOTE_STAGGER = 40f
+// Far enough that the note underneath keeps its first line clear of the new note's corner handle,
+// whose grab area is a shape handle's (see canvasSelectionStyle), not just the handle drawn.
+private const val NOTE_STAGGER = 64f
 
 /** How far a new note will cascade before it is left to overlap: a board can be crowded. */
 private const val MAX_CASCADE = 24
