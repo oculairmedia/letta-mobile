@@ -112,8 +112,6 @@ compose-desktop-material-icons = "1.7.3"
 compose-web = "1.10.0"
 compose-web-material3 = "1.9.0"
 compose-web-material-icons = "1.7.3"
-drawbox = "2.1.0"
-drawbox-ui = "0.0.1-alpha01"
 
 [libraries]
 androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
@@ -313,8 +311,6 @@ compose-web-foundation = { module = "org.jetbrains.compose.foundation:foundation
 compose-web-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-web-material3" }
 compose-web-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-web" }
 compose-web-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-web-material-icons" }
-drawbox = { module = "io.ak1:drawbox", version.ref = "drawbox" }
-drawbox-ui = { module = "io.ak1:drawbox-ui", version.ref = "drawbox-ui" }
 
 [plugins]
 
