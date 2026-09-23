@@ -243,6 +243,10 @@ class CanvasRelayClient(
                 lock.withLock { refusal = message.reason }
                 return false
             }
+            // Replies about assets (w3nb2.3): this client does not ask for them yet, but a host that
+            // sends one is speaking the protocol, not breaking it.
+            is CanvasRelayMessage.AssetStored, is CanvasRelayMessage.AssetData,
+            is CanvasRelayMessage.AssetMissing, is CanvasRelayMessage.AssetRejected -> Unit
             // App-to-host messages coming this way: not a host speaking the protocol.
             else -> {
                 lock.withLock { refusal = "the host sent ${message::class.simpleName}" }

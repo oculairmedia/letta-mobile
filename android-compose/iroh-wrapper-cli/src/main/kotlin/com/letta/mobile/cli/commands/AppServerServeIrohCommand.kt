@@ -209,6 +209,13 @@ class AppServerServeIrohCommand : CliktCommand(
             "Apps that were offline catch up from it.",
     )
 
+    private val canvasAssetsDir by option(
+        "--canvas-assets-dir",
+        envvar = "LETTA_CANVAS_ASSETS_DIR",
+        help = "Directory for the assets (images, files) apps put on shared canvases " +
+            "(default ~/.letta/canvas-relay/assets), kept by their hash and served to the other apps.",
+    )
+
     private val pairingStoreFile by option(
         "--pairing-store-file",
         envvar = "LETTA_IROH_PAIRING_STORE",
@@ -398,11 +405,14 @@ class AppServerServeIrohCommand : CliktCommand(
             // Canvases: every app connected here shares them through this host.
             val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) }
                 ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "topics")
+            val canvasAssets = canvasAssetsDir?.let { java.nio.file.Path.of(it) }
+                ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "assets")
             val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
                 scope = scope,
                 store = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps),
+                assets = com.letta.mobile.data.storage.FileAssetStore(canvasAssets.toFile()),
             )
-            println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps)")
+            println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets)")
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
