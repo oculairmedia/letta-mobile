@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
 import com.composables.icons.lucide.BringToFront
 import com.composables.icons.lucide.Copy
+import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.SendToBack
 import com.composables.icons.lucide.StickyNote
@@ -45,6 +46,8 @@ internal class BoardInsertActions(
     val onAddNote: ((Offset) -> Unit)?,
     val onAddText: (Offset) -> Unit,
     val onAddShape: (Mode, Offset) -> Unit,
+    /** Opens the image picker; what is picked goes on the board at the point. */
+    val onAddImages: ((Offset) -> Unit)? = null,
 )
 
 /** What the board can do to the element a menu was opened on. */
@@ -90,6 +93,7 @@ internal fun CanvasBoardMenu(
 internal fun CanvasInsertMenuItems(insert: BoardInsertActions, at: Offset, onDismiss: () -> Unit) {
     insert.onAddNote?.let { addNote -> MenuItem(Lucide.StickyNote, "Note", onDismiss) { addNote(at) } }
     MenuItem(Lucide.Type, "Text", onDismiss) { insert.onAddText(at) }
+    insert.onAddImages?.let { addImages -> MenuItem(Lucide.Image, "Image", onDismiss) { addImages(at) } }
     HorizontalDivider()
     CanvasInsert.ShapeModes.forEach { (mode, label) ->
         MenuItem(iconFor(mode), label, onDismiss) { insert.onAddShape(mode, at) }

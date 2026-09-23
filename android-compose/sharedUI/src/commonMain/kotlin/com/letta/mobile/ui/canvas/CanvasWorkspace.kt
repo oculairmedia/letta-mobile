@@ -62,6 +62,8 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
+import io.ak1.drawbox.input.imageDragAndDropTarget
+import io.github.vinceglb.filekit.readBytes
 import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.bounds
@@ -197,6 +199,8 @@ fun CanvasWorkspace(
     val focusRequest = remember { CanvasFocusRequest() }
     // The long-press / right-click menu, while it is open.
     var boardMenu by remember { mutableStateOf<BoardMenuRequest?>(null) }
+    // Notes being dragged or resized, by id, at their live (uncommitted) frame.
+    val liveNoteFrames = remember { androidx.compose.runtime.mutableStateMapOf<String, CanvasDocumentFrame>() }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
@@ -363,10 +367,13 @@ fun CanvasWorkspace(
 
     // A board drawn on a desktop is mostly off the edge of a phone, which opened on an empty
     // corner of it. On a phone the board opens fitted, once, and never zoomed in past 100%.
+    // Decided at the first measured layout after the load: a wide pane narrowed later must not
+    // reset the camera and the tool under the user.
     var fittedOnOpen by remember(session) { mutableStateOf(false) }
-    LaunchedEffect(initialLoadDone, compact) {
-        if (initialLoadDone && compact && !fittedOnOpen) {
-            fittedOnOpen = true
+    LaunchedEffect(initialLoadDone, resolvedLayout) {
+        if (!initialLoadDone || resolvedLayout == null || fittedOnOpen) return@LaunchedEffect
+        fittedOnOpen = true
+        if (resolvedLayout == CanvasLayout.COMPACT) {
             fitToContent(maxScale = 1f)
             // And in the select tool, where a drag moves around the board rather than drawing.
             controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
@@ -571,6 +578,37 @@ fun CanvasWorkspace(
             },
         )
     }
+    // Images: picked (several at once), pasted or dropped, each made ready off the main thread
+    // (see prepareCanvasImage) and placed where it was asked for.
+    fun placeImages(sources: List<ByteArray>, at: Offset) {
+        if (sources.isEmpty()) return
+        coroutineScope.launch {
+            val images = withContext(Dispatchers.Default) { sources.mapNotNull { prepareCanvasImage(it) } }
+            if (images.isEmpty()) {
+                statusMessage = "Could not read that image"
+                return@launch
+            }
+            CanvasImages.insert(controller, images, at)
+            statusMessage = if (images.size == 1) "Added an image" else "Added ${images.size} images"
+        }
+    }
+    var imagesAt by remember { mutableStateOf(Offset.Zero) }
+    val imagePicker = io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher(
+        type = io.github.vinceglb.filekit.dialogs.FileKitType.Image,
+        mode = io.github.vinceglb.filekit.dialogs.FileKitMode.Multiple(maxItems = CanvasImages.MAX_PICK),
+    ) { files ->
+        if (files.isNullOrEmpty()) return@rememberFilePickerLauncher
+        coroutineScope.launch {
+            val bytes = withContext(Dispatchers.Default) {
+                files.mapNotNull { file -> runCatching { file.readBytes() }.getOrNull() }
+            }
+            placeImages(bytes, imagesAt)
+        }
+    }
+    fun pasteImage(at: Offset) {
+        io.ak1.drawbox.input.pasteImageFromClipboard { bytes, _ -> placeImages(listOf(bytes), at) }
+    }
+
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
         CanvasKeyAction.ESCAPE -> {
@@ -584,6 +622,10 @@ fun CanvasWorkspace(
         CanvasKeyAction.UNDO -> { undoBoard(); true }
         CanvasKeyAction.REDO -> { redoBoard(); true }
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
+        CanvasKeyAction.PASTE -> {
+            pasteImage(controller.state.value.viewport.screenToWorld(boardCenter))
+            true
+        }
         null -> false
     }
     // Puts the caret in [element]: a text element's own editor, or the text of a shape that holds
@@ -623,11 +665,16 @@ fun CanvasWorkspace(
         val shape = current.elements.singleOrNull { it.id in current.selectedIds } as? io.ak1.drawbox.domain.model.Element.Shape
         if (shape != null && shape.canHoldText) {
             val next = CanvasQuickCreate.nextShape(shape, direction, current.elements.maxOfOrNull { it.zIndex } ?: 0)
+            val undoStepsBefore = current.history.size
             controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(next))
             val (start, end) = CanvasQuickCreate.connector(shape.bounds(), next.bounds(), direction)
             CanvasQuickCreate.addArrow(controller, start, end)?.let { arrowId ->
                 controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(arrowId))
             }
+            // The shape and its arrow are one action: one undo takes both.
+            controller.onIntent(
+                io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
+            )
             openTextIn(next)
             return
         }
@@ -663,6 +710,10 @@ fun CanvasWorkspace(
                 current.currentItemTextAlignment,
                 current.strokeColor,
             )
+        },
+        onAddImages = { world ->
+            imagesAt = world
+            imagePicker.launch()
         },
         onAddShape = { mode, world ->
             val id = CanvasInsert.addShape(controller, mode, world)
@@ -715,6 +766,11 @@ fun CanvasWorkspace(
                 .onKeyEvent(::onBoardKey)
                 .semantics { contentDescription = "Canvas workspace" }
                 .onSizeChanged { boardSize = it }
+                // Image files dragged in from the desktop land where they are dropped.
+                .imageDragAndDropTarget { drops ->
+                    val first = drops.firstOrNull() ?: return@imageDragAndDropTarget
+                    placeImages(drops.map { it.bytes }, controller.state.value.viewport.screenToWorld(first.dropPositionScreen))
+                }
                 .onGloballyPositioned { boardBounds = it.boundsInRoot() }
                 .pointerInput(controller) {
                     awaitPointerEventScope {
@@ -840,6 +896,7 @@ fun CanvasWorkspace(
             // Block documents live on the board as note cards, in world coordinates.
             if (session != null && documents.isNotEmpty()) {
                 CanvasNotesLayer(
+                    onLiveFrame = { id, frame -> if (frame == null) liveNoteFrames.remove(id) else liveNoteFrames[id] = frame },
                     session = session,
                     documents = documents,
                     viewport = state.viewport,
@@ -1101,7 +1158,9 @@ fun CanvasWorkspace(
             // Properties for the selection, floating on it the way Miro does; top-centre for the
             // closed shape about to be drawn, when there is nothing to float on. With a note active
             // and nothing drawn selected, the bar is the note's.
-            val activeNote = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } }
+            // Where each note is on screen right now: mid-drag, the card's live frame.
+            val anchorDocuments = documents.map { d -> liveNoteFrames[d.id]?.let { d.copy(frame = it) } ?: d }
+            val activeNote = activeNoteId?.let { id -> anchorDocuments.firstOrNull { it.id == id } }
             val notesSelected = selectedNoteIds.isNotEmpty()
             // The active note's (or shape label's) bar actions, built once for whichever bar shows them.
             val activeNoteActions = if (activeNote != null && session != null) {
@@ -1159,7 +1218,7 @@ fun CanvasWorkspace(
                     anchor = CanvasWorkspaceSupport.barAnchor(
                         BarAnchorParams(
                             state = state,
-                            documents = documents,
+                            documents = anchorDocuments,
                             selectedNoteIds = selectedNoteIds,
                             activeNote = activeNote,
                             groupOffset = groupOffset,

@@ -95,6 +95,12 @@ fun CanvasNotesLayer(
     /** True while the eraser tool is held: a press on a card removes it instead of selecting it. */
     eraseMode: Boolean = false,
     onErase: (String) -> Unit = {},
+    /**
+     * A card's frame while it is being dragged or resized, before the move is committed; null
+     * when the gesture ends. Lets chrome anchored to a note (its menu, its quick-create targets)
+     * follow the card instead of trailing at the committed position.
+     */
+    onLiveFrame: (id: String, frame: CanvasDocumentFrame?) -> Unit = { _, _ -> },
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         documents.forEachIndexed { index, document ->
@@ -111,6 +117,7 @@ fun CanvasNotesLayer(
                 onToolbar = onToolbar,
                 eraseMode = eraseMode,
                 onErase = { onErase(document.id) },
+                onLiveFrame = { frame -> onLiveFrame(document.id, frame) },
                 selection = NoteSelection(
                     selected = selected,
                     groupOffset = if (selected) groupOffset else Offset.Zero,
@@ -146,6 +153,7 @@ private fun CanvasNoteCard(
     selection: NoteSelection,
     eraseMode: Boolean = false,
     onErase: () -> Unit = {},
+    onLiveFrame: (CanvasDocumentFrame?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val recorder = LocalCanvasDocumentRecorder.current
@@ -156,6 +164,7 @@ private fun CanvasNoteCard(
     // it bigger has to make the text bigger — otherwise the box grows and the words stay put,
     // which reads as a bug rather than a scale.
     var resizeStartFrame by remember(document.id) { mutableStateOf<CanvasDocumentFrame?>(null) }
+    LaunchedEffect(frame, gestureActive) { onLiveFrame(if (gestureActive) frame else null) }
     LaunchedEffect(document.frame) {
         if (!gestureActive) frame = document.frame ?: defaultFrame
     }
