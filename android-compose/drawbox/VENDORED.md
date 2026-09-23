@@ -64,12 +64,40 @@ another was pending was lost (for example an SVG export requested during an auto
 export). The buffer is now 64. Test: `DrawBoxControllerTest.eventsEmittedInABurstAllArrive` (fails
 with the old buffer).
 
-### 5. A cancelled capture is not a failed save (letta-mobile-nq2w1)
+### 5. Gestures can read the host's live state (letta-mobile-8cik1)
+
+Gesture callbacks read `State` through `rememberUpdatedState`, the value `DrawBox` was last composed
+with, so an intent the host dispatched during a press (selecting what was pressed, say) was not
+seen by that same gesture until the next frame. New optional `DrawBox(liveState = { ... })`, for
+example `{ controller.state.value }`; null keeps the old behaviour.
+
+### 6. Text inside shapes (letta-mobile-8cik1)
+
+`Element.Shape` gains `text`, `textColor` (null = stroke colour), `fontSize`, `fontFamilyKey` and
+`textAlignment` (default centre), all defaulted so existing drawings load unchanged. Rectangles,
+circles and triangles hold text (`canHoldText`); it is wrapped to `textBox()` (inset rectangle,
+inscribed square, lower middle of a triangle), centred in it vertically, drawn through the text
+layout cache, turned with the shape, exported to SVG, and serialised on the existing text wire
+fields plus a new `textColor`. `Intent.UpdateText` and the selection text intents apply to such
+shapes; new `Intent.SetSelectedTextColor`. `RequestTextEditAt`, and a second tap on a selected shape,
+emit `TextEditRequested` for shapes too. New `InlineShapeTextEditor`, and
+`DrawBox(hiddenTextElementIds)` to hide a shape's text (not the shape) while it is edited; such a
+shape renders live so the cached layer never replays its text. Tests: `ShapeTextTest`; Letta's
+`CanvasShapeTextRenderUiTest` and canvas UI tests.
+
+### 7. Aligned text is laid out at its full width (letta-mobile-8cik1)
+
+`TextLayoutCache` measured with a maximum width only, so a short line's layout shrank to the text
+and centre or right alignment happened inside that, leaving short centred text at the left of its
+box (text elements as well as shapes). Text is now laid out at exactly the wrap width. Covered by
+`CanvasShapeTextRenderUiTest`, which fails without it.
+
+### 8. A cancelled capture is not a failed save (letta-mobile-nq2w1)
 
 The bitmap capture coroutine caught `Throwable`, so cancelling it reported a failed
 `Intent.SaveBitmap`. `CancellationException` is now rethrown.
 
-### 6. Review fixes (letta-mobile-8cik1)
+### 9. Review fixes (letta-mobile-8cik1)
 
 Each small and separately offerable upstream:
 
@@ -100,13 +128,6 @@ Each small and separately offerable upstream:
   caps files at 20 and 50 MB each.
 
 Tests: `SvgExporterTest`, `SerializationTest`, `GeometryTest`, `DrawBoxControllerTest`.
-
-### Candidates not done yet
-
-- Text inside shapes as part of the shape element (Letta layers a separate text document over each
-  shape today).
-- Gesture classification reads `State` through `rememberUpdatedState`, one recomposition behind the
-  controller; intents dispatched during the same press are not seen until the next frame.
 
 ## Repository policies
 

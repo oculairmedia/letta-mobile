@@ -294,6 +294,20 @@ sealed class Element {
         val endBinding: String? = null,
         override val createdAt: Long = 0L,
         override val modifiedAt: Long = 0L,
+        /**
+         * Text inside the shape (see [canHoldText]): wrapped to [textBox] and
+         * centred in it. Empty for none. Carried by the shape, so it moves,
+         * resizes, rotates, undoes and exports with it.
+         */
+        val text: String = "",
+        /** Colour of [text]; null draws it in [strokeColor]. */
+        val textColor: Color? = null,
+        /** Em size of [text] in world units. */
+        val fontSize: Float = DEFAULT_SHAPE_FONT_SIZE,
+        /** Font family key of [text], resolved by the font registry. */
+        val fontFamilyKey: String = DEFAULT_FONT_FAMILY_KEY,
+        /** Horizontal alignment of [text] inside [textBox]. */
+        val textAlignment: TextAlignment = TextAlignment.CENTER,
     ) : Element()
 }
 

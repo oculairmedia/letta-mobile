@@ -82,8 +82,8 @@ fun CanvasPropertyControl(
     dispatchProperty: (CanvasPropertyIntent) -> Unit,
     modifier: Modifier = Modifier,
     note: NoteBarActions? = null,
-    /** The selected shape's own text, when it has some: offered as a Text target beside stroke and fill. */
-    shapeText: NoteBarActions? = null,
+    /** The selected shape's text: offered as a Text target beside stroke and fill. */
+    shapeText: ShapeTextActions? = null,
     label: String = "Properties",
     placement: PropertyPopoverPlacement = PropertyPopoverPlacement.BELOW,
 ) {
@@ -158,7 +158,7 @@ private fun CanvasPropertyPanel(
     dispatch: (ControlsBarIntent) -> Unit,
     dispatchProperty: (CanvasPropertyIntent) -> Unit,
     note: NoteBarActions?,
-    shapeText: NoteBarActions?,
+    shapeText: ShapeTextActions?,
     onClose: () -> Unit,
 ) {
     val targets = when {
@@ -167,8 +167,8 @@ private fun CanvasPropertyPanel(
         note.plain -> listOf(ColorTarget.TEXT)
         else -> listOf(ColorTarget.TEXT, ColorTarget.CARD)
     } + if (note == null && shapeText != null) listOf(ColorTarget.TEXT) else emptyList()
-    // Whose text the Text target sets: the note's, or the selected shape's label.
-    val textOwner = note ?: shapeText
+    // The Text target is the note's text, else the selected shape's.
+    val textOwner = note
     var target by remember(targets) { mutableStateOf(targets.first()) }
     val recent = rememberRecentColors()
     // On a phone the panel opens short - the colours and the one size you reach for - and the rest
@@ -180,7 +180,7 @@ private fun CanvasPropertyPanel(
     val current = when (target) {
         ColorTarget.STROKE -> state.strokeColor
         ColorTarget.FILL -> state.fillColor ?: Color.Transparent
-        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
+        ColorTarget.TEXT -> shapeText?.color ?: parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
         ColorTarget.CARD -> note?.color ?: Color.Transparent
     }
     Surface(
@@ -220,7 +220,7 @@ private fun CanvasPropertyPanel(
                     val color = when (t) {
                         ColorTarget.STROKE -> state.strokeColor
                         ColorTarget.FILL -> state.fillColor ?: Color.Transparent
-                        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
+                        ColorTarget.TEXT -> shapeText?.color ?: parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
                         ColorTarget.CARD -> note?.color ?: Color.Transparent
                     }
                     TargetChip(target = t, color = color, selected = t == target) { target = t }
@@ -245,7 +245,7 @@ private fun CanvasPropertyPanel(
                     when (target) {
                         ColorTarget.STROKE -> dispatch(ControlsBarIntent.SetStrokeColor(color))
                         ColorTarget.FILL -> dispatch(ControlsBarIntent.SetFillColor(color))
-                        ColorTarget.TEXT -> textOwner?.onStyle(style.copy(textColor = color.toHex()))
+                        ColorTarget.TEXT -> if (shapeText != null) shapeText.onColor(color) else textOwner?.onStyle(style.copy(textColor = color.toHex()))
                         ColorTarget.CARD -> note?.onColor(color)
                     }
                     if (done) recent.remember(color)
@@ -257,7 +257,7 @@ private fun CanvasPropertyPanel(
             when {
                 // A shape with text: the settings below follow the chosen colour target, like tabs,
                 // so the panel is the shape's or its text's and never both at once.
-                note == null && full && target == ColorTarget.TEXT && shapeText != null -> NoteProperties(note = shapeText, style = style)
+                note == null && full && target == ColorTarget.TEXT && shapeText != null -> ShapeTextProperties(shapeText)
                 note == null && full -> DrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
                 note == null -> ShortDrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
                 full -> NoteProperties(note = note, style = style)
@@ -354,6 +354,46 @@ private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (C
             range = 0f..MAX_CORNER_RADIUS,
             onChange = { dispatchProperty(CanvasPropertyIntent.SetCornerRadius(it)) },
         )
+    }
+}
+
+/** What the Text target of a selected shape shows and sets: the shape's own text settings. */
+class ShapeTextActions(
+    val color: Color,
+    val onColor: (Color) -> Unit,
+    val fontSize: Float,
+    val onFontSize: (Float) -> Unit,
+    val fontFamily: String,
+    val onFontFamily: (String) -> Unit,
+    val alignment: io.ak1.drawbox.domain.model.TextAlignment,
+    val onAlignment: (io.ak1.drawbox.domain.model.TextAlignment) -> Unit,
+)
+
+@Composable
+private fun ShapeTextProperties(text: ShapeTextActions) {
+    SectionLabel("Text size")
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        FontSizes.forEach { (label, size) ->
+            Chip(label = label, description = "Text size $label", selected = text.fontSize == size) { text.onFontSize(size) }
+        }
+    }
+    SectionLabel("Font")
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        FontFamilies.forEach { (label, key) ->
+            Chip(label = label, description = "Font $label", selected = text.fontFamily == key) { text.onFontFamily(key) }
+        }
+    }
+    SectionLabel("Alignment")
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        Toggle("Align start", Lucide.AlignLeft, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.LEFT) {
+            text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.LEFT)
+        }
+        Toggle("Align center", Lucide.AlignCenter, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.CENTER) {
+            text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.CENTER)
+        }
+        Toggle("Align end", Lucide.AlignRight, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT) {
+            text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.RIGHT)
+        }
     }
 }
 

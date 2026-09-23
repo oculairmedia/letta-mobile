@@ -62,8 +62,8 @@ fun CanvasSelectionBar(
     onDuplicate: (() -> Unit)? = null,
     /** Puts the caret in the selected shape; offered only when the selection is one that holds text. */
     onEditText: (() -> Unit)? = null,
-    /** The selected shape's text while it is being edited, for the property panel's Text target. */
-    shapeText: NoteBarActions? = null,
+    /** The selected shape's text, for the property panel's Text target. */
+    shapeText: ShapeTextActions? = null,
 ) {
     Surface(
         modifier = modifier,

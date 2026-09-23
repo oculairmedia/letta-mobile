@@ -24,6 +24,8 @@ internal data class DesktopAgentSidebarState(
     /** Every canvas, newest first; canvases are shared so this is not scoped to the agent. */
     val canvases: List<com.letta.mobile.data.canvas.CanvasDocument> = emptyList(),
     val activeCanvasId: com.letta.mobile.data.canvas.CanvasId? = null,
+    /** Which of [canvases] are archived, so each row offers archive or restore. */
+    val archivedCanvasIds: Set<com.letta.mobile.data.canvas.CanvasId> = emptySet(),
 )
 
 internal data class DesktopAgentSidebarActions(
@@ -37,6 +39,7 @@ internal data class DesktopAgentSidebarActions(
     val onEditAgent: () -> Unit,
     val onOpenCanvas: (com.letta.mobile.data.canvas.CanvasId) -> Unit = {},
     val onNewCanvas: () -> Unit = {},
+    val onArchiveCanvas: (id: com.letta.mobile.data.canvas.CanvasId, archived: Boolean) -> Unit = { _, _ -> },
 )
 
 @Immutable

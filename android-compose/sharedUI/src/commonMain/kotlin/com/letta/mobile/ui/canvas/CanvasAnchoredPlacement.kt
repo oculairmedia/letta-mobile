@@ -28,6 +28,8 @@ internal fun AnchoredToSelection(
     bottomClearance: Dp = 72.dp,
     /** Room kept free on the left, for the desktop tool rail the bar must not slide under. */
     startClearance: Dp = 0.dp,
+    /** Space between the anchor and the content; more when quick-create targets sit in it. */
+    gap: Dp = ANCHOR_GAP,
     content: @Composable () -> Unit,
 ) {
     Layout(content = content, modifier = modifier) { measurables, constraints ->
@@ -36,7 +38,7 @@ internal fun AnchoredToSelection(
         val height = constraints.maxHeight
         val margin = EDGE_MARGIN.roundToPx()
         val start = margin + startClearance.roundToPx()
-        val gap = ANCHOR_GAP.roundToPx()
+        val gap = gap.roundToPx()
         val top = topClearance.roundToPx()
         val bottomLimit = height - bottomClearance.roundToPx() - placeable.height
         val (x, y) = if (anchor == null) {

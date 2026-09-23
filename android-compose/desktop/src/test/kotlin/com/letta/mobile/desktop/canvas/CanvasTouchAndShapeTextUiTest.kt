@@ -175,8 +175,7 @@ class CanvasTouchAndShapeTextUiTest {
         onNodeWithText("Rectangle").performClick()
         waitUntil(timeoutMillis = 5000) { onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
         onAllNodes(isFocused() and hasSetTextAction())[0].performTextInput("Plan")
-        val shape = shapes(controller).single()
-        waitUntil(timeoutMillis = 10_000) { session.documents().any { it.id == "label-${shape.id}" && it.json.contains("Plan") } }
+        waitUntil(timeoutMillis = 5000) { shapes(controller).single().text == "Plan" }
 
         // Done typing: click away, then drag the shape by its middle, where the text is.
         onNodeWithContentDescription("Canvas board").performMouseInput { click(Offset(900f, 700f)) }

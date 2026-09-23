@@ -9,6 +9,11 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.Unarchive
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -284,10 +290,13 @@ internal fun ColumnScope.SidebarConversationList(
             SidebarSection("Canvases")
         }
         items(items = state.canvases, key = { "canvas-" + it.id.value }) { canvas ->
+            val archived = canvas.id in state.archivedCanvasIds
             SidebarCanvasListItem(
                 canvas = canvas,
                 selected = canvas.id == state.activeCanvasId,
+                archived = archived,
                 onClick = { actions.onOpenCanvas(canvas.id) },
+                onArchiveToggle = { actions.onArchiveCanvas(canvas.id, !archived) },
             )
         }
         if (state.canvases.isEmpty()) {
@@ -346,13 +355,22 @@ private fun SidebarConversationListItem(
 @Composable
 private fun SidebarEmptyHint(text: String) = LettaEmptyHint(text)
 
-/** One shared canvas in the sidebar library: icon, title, last-edit time. */
+/**
+ * One shared canvas in the sidebar library: icon, title, last-edit time. On hover, or while the
+ * row or its button has keyboard focus, the icon becomes a one-click archive (or restore) button,
+ * as a conversation's does.
+ */
 @Composable
 private fun SidebarCanvasListItem(
     canvas: com.letta.mobile.data.canvas.CanvasDocument,
     selected: Boolean,
+    archived: Boolean,
     onClick: () -> Unit,
+    onArchiveToggle: () -> Unit,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    var focused by remember { mutableStateOf(false) }
     LettaListRow(
         spec = LettaListRowSpec(
             title = canvas.title,
@@ -361,6 +379,32 @@ private fun SidebarCanvasListItem(
             selected = selected,
         ),
         onClick = onClick,
+        modifier = Modifier
+            .hoverable(interaction)
+            .onFocusChanged { focused = it.hasFocus },
+        leading = {
+            if (hovered || focused) {
+                Icon(
+                    imageVector = if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                    contentDescription = if (archived) "Restore canvas" else "Archive canvas",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(LettaDimens.Control.icon)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onArchiveToggle,
+                        ),
+                )
+            } else {
+                Icon(
+                    imageVector = Lucide.Palette,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(LettaDimens.Control.icon),
+                )
+            }
+        },
     )
 }
 

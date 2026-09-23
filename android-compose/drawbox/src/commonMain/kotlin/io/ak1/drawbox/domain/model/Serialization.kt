@@ -176,6 +176,11 @@ data class ElementDto(
     val textTopLeft: String? = null,
     /** World-space wrap width for a text element. */
     val wrapWidth: Float? = null,
+    /**
+     * Colour of a shape's text (`text`), as `#rrggbbaa`. Omitted when the text
+     * takes the stroke colour. Text elements keep theirs in `strokeColor`.
+     */
+    val textColor: String? = null,
 )
 
 fun Element.toDto(): ElementDto = when (this) {
@@ -253,6 +258,12 @@ fun Element.toDto(): ElementDto = when (this) {
         createdAt = createdAt.takeIf { it != 0L },
         modifiedAt = modifiedAt.takeIf { it != 0L },
         strokeEnabled = false.takeIf { !strokeEnabled },
+        // A shape's text, only when it has some, and only what differs from the defaults.
+        text = text.takeIf { it.isNotEmpty() },
+        textColor = textColor?.takeIf { text.isNotEmpty() }?.toHexString(),
+        fontSize = fontSize.takeIf { text.isNotEmpty() && it != DEFAULT_SHAPE_FONT_SIZE },
+        fontFamilyKey = fontFamilyKey.takeIf { text.isNotEmpty() && it != DEFAULT_FONT_FAMILY_KEY },
+        alignment = textAlignment.name.takeIf { text.isNotEmpty() && textAlignment != TextAlignment.CENTER },
     )
 }
 
@@ -340,6 +351,15 @@ fun ElementDto.toElement(): Element = when (type) {
         endBinding = endBinding,
         createdAt = createdAt ?: 0L,
         modifiedAt = modifiedAt ?: createdAt ?: 0L,
+        text = text ?: "",
+        textColor = textColor?.toColor(),
+        fontSize = fontSize ?: DEFAULT_SHAPE_FONT_SIZE,
+        fontFamilyKey = fontFamilyKey ?: DEFAULT_FONT_FAMILY_KEY,
+        textAlignment = when (alignment) {
+            "LEFT" -> TextAlignment.LEFT
+            "RIGHT" -> TextAlignment.RIGHT
+            else -> TextAlignment.CENTER
+        },
     )
     else -> Element.Path(
         id = id,
@@ -402,6 +422,7 @@ data class SerializableElement(
     val alignment: String? = null,
     val textTopLeft: String? = null,
     val wrapWidth: Float? = null,
+    val textColor: String? = null,
 )
 
 @kotlinx.serialization.Serializable
@@ -452,6 +473,7 @@ object DrawingSerializer {
                     alignment = element.alignment,
                     textTopLeft = element.textTopLeft,
                     wrapWidth = element.wrapWidth,
+                    textColor = element.textColor,
                 )
             },
         )
@@ -493,6 +515,7 @@ object DrawingSerializer {
                     alignment = element.alignment,
                     textTopLeft = element.textTopLeft,
                     wrapWidth = element.wrapWidth,
+                    textColor = element.textColor,
                 )
             },
         )

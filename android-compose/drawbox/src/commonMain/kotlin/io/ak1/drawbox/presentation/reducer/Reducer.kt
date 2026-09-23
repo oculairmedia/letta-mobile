@@ -2,6 +2,7 @@ package io.ak1.drawbox.presentation.reducer
 
 import androidx.compose.ui.geometry.Offset
 import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.HISTORY_CAP
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
@@ -201,7 +202,7 @@ class Reducer(
             // the controller emits Event.TextEditRequested off this. Leave
             // selection untouched when the topmost hit isn't a text element.
             val hit = useCase.hitTopmost(state.elements, intent.offset, intent.tolerance, state.selectInsideHollowShapes)
-            if (hit is Element.Text) state.copy(selectedIds = setOf(hit.id)) else state
+            if (hit.holdsText()) state.copy(selectedIds = setOf(hit!!.id)) else state
         }
         is Intent.SetMarqueeRect -> state.copy(marqueeRect = intent.rect)
         is Intent.CommitMarquee -> state.copy(
@@ -327,6 +328,12 @@ class Reducer(
         }
         is Intent.SetEraserSize -> state.copy(eraserSize = intent.size)
         is Intent.SetSelectInsideHollowShapes -> state.copy(selectInsideHollowShapes = intent.enabled)
+        is Intent.SetSelectedTextColor -> {
+            if (state.selectedIds.isEmpty()) state
+            else state.snapshot().copy(
+                elements = useCase.setSelectedTextColor(state.elements, state.selectedIds, intent.color),
+            )
+        }
 
         is Intent.BringSelectionToFront -> {
             if (state.selectedIds.isEmpty()) state
@@ -395,3 +402,7 @@ class Reducer(
         future = emptyList(),
     )
 }
+
+/** Whether [this] is something a text edit applies to: a text element or a text-holding shape. */
+internal fun Element?.holdsText(): Boolean =
+    this is Element.Text || (this is Element.Shape && this.canHoldText)
