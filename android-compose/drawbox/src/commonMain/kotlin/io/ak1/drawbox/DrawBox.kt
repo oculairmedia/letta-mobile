@@ -1427,17 +1427,40 @@ private fun DrawScope.drawSelectionForElement(
         right = bounds.right + pad,
         bottom = bounds.bottom + pad,
     )
-    val strokeWorld = metrics.strokeWidthPx * inverseScale
-    val cornerWorld = metrics.cornerRadiusPx * inverseScale
-    val handleRadius = metrics.handleSizePx * 0.5f * inverseScale
-    val edgeRadius = handleRadius * 0.8f
-    val rotHandle = rotationHandleLocal(box, rotationOffsetWorld)
+    drawSelectionFrame(
+        box = box,
+        handleRadius = metrics.handleSizePx * 0.5f * inverseScale,
+        strokeWidth = metrics.strokeWidthPx * inverseScale,
+        cornerRadius = metrics.cornerRadiusPx * inverseScale,
+        accent = metrics.accent,
+        rotationHandle = rotationHandleLocal(box, rotationOffsetWorld),
+    )
+}
 
+/**
+ * The selection chrome every selected thing on a board wears, in this scope's units: the [box]
+ * outline, a hollow rounded-square handle on each corner and a slightly smaller one on each edge
+ * midpoint, and, when there is one, the [rotationHandle] joined to the top edge. The outline is
+ * cut away under every handle so it never shows through one.
+ *
+ * Public so a host drawing chrome for its own elements (a board's note cards, say) draws the very
+ * same thing rather than a look-alike: pass sizes already divided by the zoom to keep them one
+ * size on screen, as DrawBox does.
+ */
+fun DrawScope.drawSelectionFrame(
+    box: Rect,
+    handleRadius: Float,
+    strokeWidth: Float,
+    cornerRadius: Float,
+    accent: Color,
+    rotationHandle: Offset? = null,
+) {
+    val edgeRadius = handleRadius * EDGE_HANDLE_RATIO
     // Every handle as (center, radius): full-size rounded squares on the corners
     // (both-axis resize), slightly smaller on the edge midpoints (single-axis),
     // plus the rotation handle floated above the box.
     val handles = buildList {
-        add(rotHandle to handleRadius)
+        rotationHandle?.let { add(it to handleRadius) }
         resizeHandlesLocal(box).forEach { (handle, p) ->
             add(p to if (handle.isCorner()) handleRadius else edgeRadius)
         }
@@ -1449,7 +1472,7 @@ private fun DrawScope.drawSelectionForElement(
         addRect(
             Rect(
                 left = box.left - handleRadius,
-                top = rotHandle.y - handleRadius,
+                top = (rotationHandle?.y ?: box.top) - handleRadius,
                 right = box.right + handleRadius,
                 bottom = box.bottom + handleRadius,
             ),
@@ -1465,25 +1488,24 @@ private fun DrawScope.drawSelectionForElement(
         fillType = PathFillType.EvenOdd
     }
     clipPath(mask) {
-        // Rounded bounding box.
         drawRoundRect(
-            color = metrics.accent,
+            color = accent,
             topLeft = box.topLeft,
             size = Size(box.width, box.height),
-            cornerRadius = CornerRadius(cornerWorld, cornerWorld),
-            style = Stroke(width = strokeWorld),
+            cornerRadius = CornerRadius(cornerRadius, cornerRadius),
+            style = Stroke(width = strokeWidth),
         )
         // Rotation connector: short line from the box up to the rotation handle.
-        drawLine(
-            color = metrics.accent,
-            start = Offset(box.center.x, box.top),
-            end = rotHandle,
-            strokeWidth = strokeWorld,
-        )
+        rotationHandle?.let { handle ->
+            drawLine(color = accent, start = Offset(box.center.x, box.top), end = handle, strokeWidth = strokeWidth)
+        }
     }
     // Handles drawn on top, unclipped, so their outlines stay whole.
-    handles.forEach { (c, r) -> drawSquareHandle(c, r, strokeWorld, metrics.accent) }
+    handles.forEach { (c, r) -> drawSquareHandle(c, r, strokeWidth, accent) }
 }
+
+/** An edge-midpoint handle's size against a corner's: it resizes one axis, so it reads as lesser. */
+const val EDGE_HANDLE_RATIO: Float = 0.8f
 
 /**
  * A single handle: a hollow rounded-corner square outlined in the accent color.
