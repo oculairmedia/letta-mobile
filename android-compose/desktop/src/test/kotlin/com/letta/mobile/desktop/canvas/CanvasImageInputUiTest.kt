@@ -39,7 +39,7 @@ class CanvasImageInputUiTest {
     @Test
     fun ctrlVPastesAnImageFromTheClipboard() {
         // The system clipboard needs a display; headless CI has none (HeadlessException).
-        org.junit.Assume.assumeFalse("No system clipboard when headless", java.awt.GraphicsEnvironment.isHeadless())
+        org.junit.jupiter.api.Assumptions.assumeFalse(java.awt.GraphicsEnvironment.isHeadless(), "No system clipboard when headless")
         pastesAnImageFromTheClipboard()
     }
 
