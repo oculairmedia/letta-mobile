@@ -64,9 +64,20 @@ another was pending was lost (for example an SVG export requested during an auto
 export). The buffer is now 64. Test: `DrawBoxControllerTest.eventsEmittedInABurstAllArrive` (fails
 with the old buffer).
 
+### 5. A cancelled capture is not a failed save (letta-mobile-nq2w1)
+
+The bitmap capture coroutine caught `Throwable`, so cancelling it reported a failed
+`Intent.SaveBitmap`. `CancellationException` is now rethrown.
+
 ### Candidates not done yet
 
 - Text inside shapes as part of the shape element (Letta layers a separate text document over each
   shape today).
 - Gesture classification reads `State` through `rememberUpdatedState`, one recomposition behind the
   controller; intents dispatched during the same press are not seen until the next frame.
+
+## Repository policies
+
+Letta's first-party checks do not apply here, so the code stays diffable against upstream: the
+architecture test's package and `commonMain` import rules skip this module, and the detekt
+guardrail skips its files. Build, tests and compiler warnings still apply.

@@ -97,6 +97,7 @@ import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBoundsForElement
 import io.ak1.drawbox.domain.model.rotateAround
 import io.ak1.drawbox.domain.model.topmostHit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.absoluteValue
@@ -927,6 +928,8 @@ fun DrawBox(
                 scope.launch {
                     try {
                         onIntent(Intent.SaveBitmap(captureLayer.toImageBitmap(), null))
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Throwable) {
                         onIntent(Intent.SaveBitmap(null, e))
                     }

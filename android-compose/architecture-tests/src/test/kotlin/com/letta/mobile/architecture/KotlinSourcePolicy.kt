@@ -13,6 +13,10 @@ internal object KotlinSourcePolicy {
         "javax.",
     )
 
+    // Third-party source kept under its upstream package so fixes can be contributed back
+    // (see android-compose/drawbox/VENDORED.md); Letta's conventions do not apply to it.
+    private val vendoredModules = listOf("drawbox")
+
     private val generatedPathSegments = listOf(
         "/build/",
         "/generated/",
@@ -27,6 +31,7 @@ internal object KotlinSourcePolicy {
                 file.isDirectory &&
                     file.name.endsWith("Main") &&
                     file.parentFile?.name == "src" &&
+                    file.parentFile?.parentFile?.name !in vendoredModules &&
                     !isGenerated(file.toPath())
             }
             .map { it.absolutePath }
