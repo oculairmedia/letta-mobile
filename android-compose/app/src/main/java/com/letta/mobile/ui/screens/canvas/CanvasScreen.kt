@@ -83,9 +83,14 @@ fun CanvasScreen(
     val session by viewModel.session.collectAsStateWithLifecycle()
     val activeSession = session
     if (activeSession != null) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val assets = androidx.compose.runtime.remember(context) {
+            com.letta.mobile.data.storage.FileAssetStore(java.io.File(context.filesDir, "canvas-assets"))
+        }
         CanvasWorkspace(
             session = activeSession,
             presenceTransport = viewModel.presenceTransport,
+            assets = assets,
             onNavigateBack = onNavigateBack,
             onShareToChat = onShareToChat,
         )

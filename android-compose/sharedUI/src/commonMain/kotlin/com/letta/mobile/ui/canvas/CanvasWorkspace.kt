@@ -100,6 +100,11 @@ fun CanvasWorkspace(
     sessionRegistry: CanvasSessionRegistry? = null,
     initialJson: String? = null,
     presenceTransport: CanvasPresenceTransport? = null,
+    /**
+     * Where this board keeps its images (and later other large things) instead of only inside the
+     * drawing; see [CanvasImageAssets]. Null keeps them inline only, as a session-less preview does.
+     */
+    assets: com.letta.mobile.data.storage.AssetStore? = null,
     currentPeerId: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
@@ -243,6 +248,7 @@ fun CanvasWorkspace(
                         null
                     } else {
                         runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(stripped) }.getOrNull()
+                            ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
                     }
                 }
                 // Known even for an empty canvas, or the first note placed on it would read as
@@ -287,6 +293,7 @@ fun CanvasWorkspace(
                         val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params) ?: return@withContext null
                         val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }?.let { json ->
                             runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()
+                                ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
                         }
                         evaluated to payload
                     } ?: return@collect
@@ -340,6 +347,27 @@ fun CanvasWorkspace(
         delay(500)
         isAutosaving = true
         controller.exportJson()
+    }
+
+    // Images placed on this board, and those of boards made before it kept images as assets, are
+    // moved into the asset store: their bytes stored once under their hash, the image given the
+    // ref and a preview. Updated in place, outside undo: nothing the person did changed.
+    LaunchedEffect(state.elements, assets, initialLoadDone) {
+        val store = assets ?: return@LaunchedEffect
+        if (!initialLoadDone) return@LaunchedEffect
+        val pending = state.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
+            .filter { it.assetRef == null && it.bytes.isNotEmpty() }
+        if (pending.isEmpty()) return@LaunchedEffect
+        val adopted = withContext(Dispatchers.Default) { pending.map { CanvasImageAssets.adopt(it, store) } }
+        val now = controller.state.value.elements.associateBy { it.id }
+        adopted.forEach { image ->
+            val current = now[image.id] as? io.ak1.drawbox.domain.model.Element.Image ?: return@forEach
+            // Only if it is still the image that was adopted: moved or replaced meanwhile, it is
+            // adopted again on the next pass rather than overwritten with a stale copy.
+            if (image.assetRef != null && current.assetRef == null && current == image.copy(assetRef = null, mediaType = null, preview = current.preview)) {
+                controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(image))
+            }
+        }
     }
 
     // Collect export/error events from DrawBoxController
