@@ -142,6 +142,26 @@ class CanvasDocumentBlocksTest {
     }
 
     @Test
+    fun aNoteKeepsItsTitleAcrossWritesUntilRenamedOrCleared() = runTest {
+        fun titled(title: String?, lamport: Long) = CanvasOp.SetDocumentOp(
+            opId = "t$lamport", actorId = "a", lamport = lamport, documentId = "n", documentJson = "{}", title = title,
+        )
+        val s1 = CanvasOpProjector.project("", listOf(titled("Plan", 1)))
+        assertEquals("Plan", CanvasOpProjector.documentsOf(s1).single().title)
+        val s2 = CanvasOpProjector.project(s1, listOf(set("n", "{\"v\":2}", lamport = 2)))
+        assertEquals("Plan", CanvasOpProjector.documentsOf(s2).single().title, "typing must not rename the note")
+        val s3 = CanvasOpProjector.project(s2, listOf(titled("", 3)))
+        assertNull(CanvasOpProjector.documentsOf(s3).single().title, "an empty title clears it")
+
+        val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("c5")))
+        session.setDocument("n", "")
+        assertNull(session.retitleDocument("missing", "x"))
+        session.retitleDocument("n", "Groceries")
+        assertEquals("Groceries", session.documents().single().title)
+        assertNull(session.retitleDocument("n", "Groceries"), "an unchanged title is not written again")
+    }
+
+    @Test
     fun sessionMovesANoteWithoutRewritingItsText() = runTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(store, CanvasCreateOptions(title = "t", canvasId = CanvasId("c2")))

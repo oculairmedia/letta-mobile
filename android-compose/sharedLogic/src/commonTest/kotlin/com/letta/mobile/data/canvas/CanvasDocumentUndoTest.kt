@@ -59,6 +59,17 @@ class CanvasDocumentUndoTest {
     }
 
     @Test
+    fun namingANoteThatHadNoTitleIsUndoneByClearingIt() {
+        val before = CanvasSceneDocument(id = "note-1", json = "{}")
+        val rename = CanvasOp.SetDocumentOp(
+            opId = "r", actorId = "a", lamport = 2, documentId = "note-1", documentJson = "{}", title = "Plan",
+        )
+        val inverse = CanvasDocumentUndo.inverseOf(rename, listOf(before))
+        assertTrue(inverse is CanvasOp.SetDocumentOp)
+        assertEquals("", inverse.title)
+    }
+
+    @Test
     fun removingANoteIsUndoneByPuttingItBackWhole() {
         val before = document()
         val remove = CanvasOp.RemoveDocumentOp(

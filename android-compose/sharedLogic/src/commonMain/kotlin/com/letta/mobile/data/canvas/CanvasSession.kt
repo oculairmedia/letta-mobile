@@ -268,12 +268,14 @@ class CanvasSession(
         frame: CanvasDocumentFrame? = null,
         color: String? = null,
         style: CanvasTextStyle? = null,
+        title: String? = null,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId }
         val unchanged = existing?.json == documentJson &&
             (frame == null || frame == existing.frame) &&
             (color == null || color == existing.color) &&
-            (style == null || style == existing.style)
+            (style == null || style == existing.style) &&
+            (title == null || title.ifBlank { null } == existing.title)
         if (unchanged) return null
         return applyLocal(
             CanvasOp.SetDocumentOp(
@@ -285,8 +287,19 @@ class CanvasSession(
                 frame = frame,
                 color = color,
                 style = style,
+                title = title,
             ),
         )
+    }
+
+    /** Renames a block document; an empty [title] clears it. A no-op for a document that is not there. */
+    suspend fun retitleDocument(
+        documentId: String,
+        title: String,
+        actorId: String = LOCAL_USER_ACTOR_ID,
+    ): CanvasDocument? {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        return setDocument(documentId, existing.json, actorId, title = title)
     }
 
     /** Changes how a block document's text is set; a no-op for a document that is not there. */
