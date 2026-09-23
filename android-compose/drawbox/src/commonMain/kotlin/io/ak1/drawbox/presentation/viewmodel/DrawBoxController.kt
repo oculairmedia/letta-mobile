@@ -166,6 +166,9 @@ class DrawBoxController(
     fun onIntent(intent: Intent) {
         val prev = _state.value
         val newState = reducer.reduce(prev, intent)
+        // invokeBitmap is a body property, so copy() drops it; carry it so saveBitmap() right
+        // after an intent still captures instead of silently doing nothing.
+        if (newState !== prev) newState.invokeBitmap = prev.invokeBitmap
         _state.value = newState
         updateHistoryState()
         // Emit AFTER state has been updated so subscribers reading state.value
@@ -366,6 +369,9 @@ class DrawBoxController(
     /** Clear the current selection. */
     fun clearSelection() = onIntent(Intent.ClearSelection)
 
+    /** Select exactly the elements with these ids. */
+    fun selectIds(ids: Set<String>) = onIntent(Intent.SelectIds(ids))
+
     /** Delete every selected element. */
     fun deleteSelected() = onIntent(Intent.DeleteSelected)
 
@@ -481,14 +487,18 @@ class DrawBoxController(
     fun importPath(jsonString: String) {
         try {
             val payLoad = DrawingSerializer.deserialize(jsonString)
+            // The host's settings, read before reset() replaces them with defaults.
+            val before = _state.value
             reset()
             _state.value = State(
                 elements = payLoad.elements,
-                strokeColor = _state.value.strokeColor,
-                strokeWidth = _state.value.strokeWidth,
-                opacity = _state.value.opacity,
+                strokeColor = before.strokeColor,
+                strokeWidth = before.strokeWidth,
+                opacity = before.opacity,
                 bgColor = payLoad.bgColor,
-            )
+                bgPattern = before.bgPattern,
+                selectInsideHollowShapes = before.selectInsideHollowShapes,
+            ).also { it.invokeBitmap = before.invokeBitmap }
         } catch (e: Exception) {
             // Handle deserialization error
             _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))

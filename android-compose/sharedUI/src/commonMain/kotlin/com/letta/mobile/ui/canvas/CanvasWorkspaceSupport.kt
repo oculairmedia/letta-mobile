@@ -18,7 +18,6 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import io.ak1.drawbox.domain.model.State as DrawBoxState
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
-import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -202,26 +201,8 @@ internal object CanvasWorkspaceSupport {
             is Element.Shape -> moved.copy(id = id, startBinding = null, endBinding = null)
             is Element.Path -> moved.copy(id = id)
             is Element.Text -> moved.copy(id = id)
-            else -> moved
+            is Element.Image -> moved.copy(id = id)
         }
-    }
-
-    fun shapeSelectionPoint(shape: Element.Shape): Offset =
-        when (shape.shapeType) {
-            ShapeType.LINE,
-            ShapeType.ARROW -> shape.points.first()
-            else -> shape.bounds().let { Offset(it.center.x, it.top) }
-        }
-
-    /**
-     * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
-     * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
-     * for text (hit by its box).
-     */
-    fun selectionPointOf(element: Element): Offset = when (element) {
-        is Element.Shape -> shapeSelectionPoint(element)
-        is Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
-        else -> element.bounds().center
     }
 
     fun documentHistoryMessage(context: HistoryMessageContext): String =
@@ -237,10 +218,7 @@ internal object CanvasWorkspaceSupport {
         if (selectedIds.isEmpty()) return false
         val copies = elements.filter { it.id in selectedIds }.map { duplicateElement(it) }
         copies.forEach { controller.onIntent(Intent.AddElement(it)) }
-        controller.clearSelection()
-        copies.forEach { copy ->
-            controller.onIntent(Intent.SelectAt(selectionPointOf(copy), 4f))
-        }
+        controller.selectIds(copies.map { it.id }.toSet())
         onStatus("Duplicated ${copies.size} element(s)")
         return true
     }
@@ -701,12 +679,15 @@ internal object CanvasWorkspaceSupport {
         val world = state.viewport.screenToWorld(screen)
         val slack = tolerance * HANDLE_SLACK / state.viewport.scale
         if (state.elements.any { it.id in state.selectedIds && it.bounds().inflate(slack).contains(world) }) return false
-        return elementAt(state.elements, world, tolerance / state.viewport.scale) == null
+        return elementAt(state, world, tolerance / state.viewport.scale) == null
     }
 
-    /** The topmost element under [world], within [tolerance] board units of its bounds. */
-    fun elementAt(elements: List<Element>, world: Offset, tolerance: Float): Element? =
-        elements.asReversed().firstOrNull { it.bounds().inflate(tolerance).contains(world) }
+    /**
+     * The topmost element under [world], by DrawBox's own hit test (geometry, z-order, and inside
+     * hollow shapes when the board picks there), so the board agrees with what a press selects.
+     */
+    fun elementAt(state: DrawBoxState, world: Offset, tolerance: Float): Element? =
+        io.ak1.drawbox.domain.model.topmostHit(state.elements, world, tolerance, state.selectInsideHollowShapes)
 
     /**
      * The closed shape a gesture just drew, if it drew one: new since the press ([idsAtPress]), and

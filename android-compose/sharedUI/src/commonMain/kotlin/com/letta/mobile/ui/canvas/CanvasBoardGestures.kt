@@ -78,11 +78,14 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectBo
 private suspend fun AwaitPointerEventScope.awaitHoldEnds(down: PointerInputChange): Boolean {
     while (true) {
         val event = awaitPointerEvent(PointerEventPass.Initial)
-        val change = event.changes.firstOrNull { it.id == down.id }
-        val moved = change != null && (change.position - down.position).getDistance() > viewConfiguration.touchSlop
-        if (event.changes.size > 1 || change == null || !change.pressed || moved) return true
+        if (event.changes.size > 1) return true
+        val change = event.changes.firstOrNull { it.id == down.id } ?: return true
+        if (!change.pressed || movedPastSlop(change, down)) return true
     }
 }
+
+private fun AwaitPointerEventScope.movedPastSlop(change: PointerInputChange, down: PointerInputChange): Boolean =
+    (change.position - down.position).getDistance() > viewConfiguration.touchSlop
 
 private suspend fun AwaitPointerEventScope.consumeUntilRelease() {
     do {

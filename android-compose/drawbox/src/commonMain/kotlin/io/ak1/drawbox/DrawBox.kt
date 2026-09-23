@@ -896,7 +896,9 @@ fun DrawBox(
                 // and outside ERASER mode.
                 if (state.effectiveMode == Mode.ERASER) {
                     eraserPointerWorld?.let { center ->
-                        val r = state.eraserSize
+                        // The gestures erase within eraserSize screen pixels (eraserSize / scale in
+                        // world units); the ring is drawn in world units, so it scales the same way.
+                        val r = state.eraserSize / vp.scale
                         val ringColor = if (state.bgColor.luminance() < 0.5f) {
                             Color.White
                         } else {
@@ -1640,8 +1642,13 @@ private fun DrawScope.drawImageElement(
     // A 600 px placement on a HiDPI 2× display at 1.5× zoom decodes at
     // 1800 px, not 600 (or 4096 source).
     val targetDimPx = (maxOf(targetW, targetH) * viewportScale).toInt()
-    val bitmap = imageCache?.bitmapFor(image.id, image.bytes, targetDimPx)
-        ?: decodeImageBitmap(image.bytes)
+    // With a cache, null means "decoding, or undecodable": show the placeholder. Decoding here
+    // instead would run a full-resolution decode on every frame until the cache fills.
+    val bitmap = if (imageCache != null) {
+        imageCache.bitmapFor(image.id, image.bytes, targetDimPx)
+    } else {
+        decodeImageBitmap(image.bytes)
+    }
     if (bitmap == null) {
         // Visible placeholder so a corrupt / unsupported payload doesn't render
         // as an invisible hole that's still selectable/movable.
@@ -1946,8 +1953,16 @@ private fun DrawScope.drawVariableWidthPath(
     // caps read as a single translucent stroke instead of a chain of dots.
     val useLayer = alpha < 1f
     if (useLayer) {
+        // Bounds are in the current (world) space: the stroke's own extent, not the canvas size,
+        // which clipped strokes at negative or far world coordinates.
+        val pad = samples.maxOf { it.width }
         drawContext.canvas.saveLayer(
-            bounds = Rect(Offset.Zero, size),
+            bounds = Rect(
+                left = samples.minOf { it.position.x } - pad,
+                top = samples.minOf { it.position.y } - pad,
+                right = samples.maxOf { it.position.x } + pad,
+                bottom = samples.maxOf { it.position.y } + pad,
+            ),
             paint = Paint().apply { this.alpha = alpha },
         )
     }

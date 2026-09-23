@@ -25,11 +25,14 @@ import kotlin.time.ExperimentalTime
 class UseCase {
     // Element operations
     fun addElement(element: Element, currentElements: List<Element>): List<Element> {
+        // Above everything already there: after bring-to-front or a delete the list size can be at
+        // or below an existing zIndex, which drew the new element underneath and lost it hit tests.
+        val nextZ = (currentElements.maxOfOrNull { it.zIndex } ?: -1) + 1
         val newElement = when (element) {
-            is Element.Path -> element.copy(zIndex = currentElements.size)
-            is Element.Shape -> element.copy(zIndex = currentElements.size)
-            is Element.Image -> element.copy(zIndex = currentElements.size)
-            is Element.Text -> element.copy(zIndex = currentElements.size)
+            is Element.Path -> element.copy(zIndex = nextZ)
+            is Element.Shape -> element.copy(zIndex = nextZ)
+            is Element.Image -> element.copy(zIndex = nextZ)
+            is Element.Text -> element.copy(zIndex = nextZ)
         }
         return currentElements + newElement
     }

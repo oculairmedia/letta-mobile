@@ -182,7 +182,8 @@ class Reducer(
                 strokeWidth = restored?.strokeWidth ?: state.strokeWidth,
                 currentItemStrokeStyle = restored?.strokeStyle ?: state.currentItemStrokeStyle,
                 currentItemCornerRadius = restored?.cornerRadius ?: state.currentItemCornerRadius,
-                currentItemFillColor = restored?.fillColor ?: state.currentItemFillColor,
+                // A saved null fill means stroke-only; only fall back when nothing was saved.
+                currentItemFillColor = if (restored != null) restored.fillColor else state.currentItemFillColor,
                 currentItemStrokeEnabled = restored?.strokeEnabled ?: state.currentItemStrokeEnabled,
                 currentItemFontSize = restored?.fontSize ?: state.currentItemFontSize,
                 currentItemFontFamilyKey = restored?.fontFamilyKey ?: state.currentItemFontFamilyKey,
@@ -208,6 +209,7 @@ class Reducer(
             marqueeRect = null,
         )
         is Intent.ClearSelection -> state.copy(selectedIds = emptySet())
+        is Intent.SelectIds -> state.copy(selectedIds = state.elements.map { it.id }.filter { it in intent.ids }.toSet())
         is Intent.DeleteSelected -> {
             if (state.selectedIds.isEmpty()) state
             else state.snapshot().copy(
