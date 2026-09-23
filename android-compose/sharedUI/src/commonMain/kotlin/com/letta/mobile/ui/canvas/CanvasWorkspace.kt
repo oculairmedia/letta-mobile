@@ -679,6 +679,10 @@ fun CanvasWorkspace(
             val next = CanvasQuickCreate.nextShape(shape, direction, current.elements.maxOfOrNull { it.zIndex } ?: 0)
             val undoStepsBefore = current.history.size
             controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(next))
+            // A phone shows little of the board, so the new shape is centred for typing into it;
+            // a wide board only moves when the new shape would land off its edge.
+            CanvasViewportFit.panToShow(next.bounds(), controller.state.value.viewport, boardSize, centre = compact)
+                ?.let(controller::panBy)
             val (start, end) = CanvasQuickCreate.connector(shape.bounds(), next.bounds(), direction)
             CanvasQuickCreate.addArrow(controller, start, end)?.let { arrowId ->
                 controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(arrowId))
@@ -1267,6 +1271,12 @@ fun CanvasWorkspace(
                     shapeText = (editable as? io.ak1.drawbox.domain.model.Element.Shape)?.let { shape ->
                         CanvasWorkspaceSupport.shapeTextActions(shape, controller)
                     },
+                    reshape = state.elements.filter { it.id in state.selectedIds && CanvasReshape.canReshape(it) }
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { shapes ->
+                            val types = shapes.map { (it as io.ak1.drawbox.domain.model.Element.Shape).shapeType }.distinct()
+                            ShapeReshapeActions(current = types.singleOrNull()) { type -> CanvasReshape.apply(controller, type) }
+                        },
                     modifier = Modifier.canvasChrome(chromeRegions),
                 )
                 }

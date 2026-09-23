@@ -6,6 +6,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.Viewport
 import io.ak1.drawbox.domain.model.bounds
 
 /** A camera that shows a whole region: the scale and the viewport offset to apply. */
@@ -48,5 +49,21 @@ internal object CanvasViewportFit {
         val centre = content.center
         val offset = Offset(board.width / 2f - centre.x * scale, board.height / 2f - centre.y * scale)
         return CanvasFit(scale, offset)
+    }
+
+    /**
+     * The screen pan that brings [target] (board units) into view on a [board] of screen px, at the
+     * current zoom, or null when no pan is needed. With [centre] the target always lands in the
+     * middle of the board; otherwise the camera only moves when part of it is off the board.
+     */
+    fun panToShow(target: Rect, viewport: Viewport, board: IntSize, centre: Boolean): Offset? {
+        if (board.width <= 0 || board.height <= 0) return null
+        val topLeft = viewport.worldToScreen(target.topLeft)
+        val bottomRight = viewport.worldToScreen(target.bottomRight)
+        val onBoard = topLeft.x >= 0f && topLeft.y >= 0f &&
+            bottomRight.x <= board.width && bottomRight.y <= board.height
+        if (!centre && onBoard) return null
+        val delta = Offset(board.width / 2f, board.height / 2f) - viewport.worldToScreen(target.center)
+        return delta.takeIf { it.getDistance() >= 0.5f }
     }
 }

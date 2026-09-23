@@ -11,12 +11,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -24,7 +31,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BringToFront
+import com.composables.icons.lucide.Circle
 import com.composables.icons.lucide.Copy
+import com.composables.icons.lucide.Square
+import com.composables.icons.lucide.Triangle
 import kotlin.math.roundToInt
 import com.composables.icons.lucide.AArrowDown
 import com.composables.icons.lucide.AArrowUp
@@ -38,6 +48,7 @@ import com.composables.icons.lucide.SendToBack
 import com.composables.icons.lucide.TextCursorInput
 import com.composables.icons.lucide.Trash2
 import com.letta.mobile.data.canvas.CanvasTextStyle
+import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
 import com.letta.mobile.ui.theme.LettaDimens
@@ -68,6 +79,8 @@ fun CanvasSelectionBar(
     onEditText: (() -> Unit)? = null,
     /** The selected shape's text, for the property panel's Text target. */
     shapeText: ShapeTextActions? = null,
+    /** Turns the selected box, circle or triangle into another of them; null when none is selected. */
+    reshape: ShapeReshapeActions? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -97,6 +110,7 @@ fun CanvasSelectionBar(
                 onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
                 BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
             } else if (hasSelection) {
+                reshape?.let { ShapeTypeButton(it) }
                 onEditText?.let {
                     Divider()
                     BarButton(Lucide.TextCursorInput, "Edit text", onClick = it)
@@ -181,6 +195,39 @@ private fun ShapeTextButtons(text: ShapeTextActions) {
         io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> Lucide.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
     }
     BarButton(icon, "Text alignment") { text.onAlignment(next) }
+}
+
+@Composable
+private fun ShapeTypeButton(reshape: ShapeReshapeActions) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        BarButton(shapeIcon(reshape.current ?: ShapeType.RECTANGLE), "Change shape") { open = true }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            CanvasReshape.Types.forEach { type ->
+                DropdownMenuItem(
+                    text = { Text(shapeLabel(type)) },
+                    leadingIcon = { Icon(shapeIcon(type), contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+                    enabled = type != reshape.current,
+                    onClick = {
+                        open = false
+                        reshape.onPick(type)
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun shapeIcon(type: ShapeType): ImageVector = when (type) {
+    ShapeType.CIRCLE -> Lucide.Circle
+    ShapeType.TRIANGLE -> Lucide.Triangle
+    else -> Lucide.Square
+}
+
+private fun shapeLabel(type: ShapeType): String = when (type) {
+    ShapeType.CIRCLE -> "Circle"
+    ShapeType.TRIANGLE -> "Triangle"
+    else -> "Rectangle"
 }
 
 @Composable
