@@ -605,6 +605,7 @@ class CanvasSession(
             options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
             val createOptions = CanvasCreateOptions(
+                canvasId = CanvasId.forConversation(conversationId),
                 title = options.title,
                 conversationId = conversationId,
                 agentId = options.agentId,

@@ -1,7 +1,5 @@
-package com.letta.mobile.desktop.canvas
+package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.canvas.CanvasId
-import com.letta.mobile.data.canvas.CanvasOp
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.test.runTest
@@ -12,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class DesktopCanvasOpLogTest {
+class FileCanvasOpLogTest {
 
     private lateinit var tempDir: Path
 
@@ -51,7 +49,7 @@ class DesktopCanvasOpLogTest {
         )
 
         // Step 1: Write using first op log instance
-        val log1 = DesktopCanvasOpLog(rootDirectory = tempDir)
+        val log1 = FileCanvasOpLog(rootDirectory = tempDir)
         log1.append(canvasId, op1)
         log1.append(canvasId, op2)
         log1.append(canvasId, op3)
@@ -59,7 +57,7 @@ class DesktopCanvasOpLogTest {
         assertEquals(3, log1.getOps(canvasId, 0L).size)
 
         // Step 2: "Process kill" — abandon log1 instance completely and instantiate a fresh log instance
-        val log2 = DesktopCanvasOpLog(rootDirectory = tempDir)
+        val log2 = FileCanvasOpLog(rootDirectory = tempDir)
 
         // Step 3: Verify fresh log2 recovers all ops from disk in order
         val allRecovered = log2.getOps(canvasId, 0L)

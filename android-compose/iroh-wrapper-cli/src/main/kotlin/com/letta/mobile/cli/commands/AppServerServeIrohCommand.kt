@@ -201,6 +201,13 @@ class AppServerServeIrohCommand : CliktCommand(
             "Server-side localhost only.",
     ).default("http://127.0.0.1:3099")
 
+    private val canvasOpsDir by option(
+        "--canvas-ops-dir",
+        envvar = "LETTA_CANVAS_OPS_DIR",
+        help = "Directory for the op log of the canvases this host relays between apps " +
+            "(default ~/.letta/canvas-relay/ops). Apps that were offline catch up from it.",
+    )
+
     private val pairingStoreFile by option(
         "--pairing-store-file",
         envvar = "LETTA_IROH_PAIRING_STORE",
@@ -387,6 +394,15 @@ class AppServerServeIrohCommand : CliktCommand(
 
             println("[iroh-app-server] Starting Iroh endpoint...")
             
+            // Canvases: every app connected here shares them through this host.
+            val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) }
+                ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "ops")
+            val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
+                scope = scope,
+                opLog = com.letta.mobile.data.canvas.FileCanvasOpLog(canvasOps),
+            )
+            println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps)")
+
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
                 scope = scope,
@@ -394,6 +410,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 secretKeyPath = irohSecretKeyPath,
                 authPolicy = authPolicy,
                 pairingService = pairingService,
+                canvasRelay = canvasRelay,
             )
             irohEndpoint = endpoint
             endpoint.create()

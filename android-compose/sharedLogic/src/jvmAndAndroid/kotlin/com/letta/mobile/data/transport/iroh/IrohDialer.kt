@@ -121,6 +121,9 @@ internal class IrohDialer(
         transport = components.transport,
         turnEngine = components.engine,
         serverCapabilities = components.serverCapabilities,
+        openConnection = { alpn ->
+            components.localEndpoint.connect(IrohAppServerTransportAdapter.parseIrohAddress(components.ticket), alpn)
+        },
         close = { reason ->
             components.eventRouter.detach()
             onCloseResources(reason)

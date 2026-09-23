@@ -51,6 +51,11 @@ data class IrohConnectionHandle(
      * without dialing a real QUIC endpoint.
      */
     val connectionAlive: (() -> Boolean)? = null,
+    /**
+     * Opens another connection to the same host from the same local endpoint, on another ALPN
+     * (canvas sync and presence ride beside the App Server this way). Null on test handles.
+     */
+    val openConnection: (suspend (alpn: ByteArray) -> computer.iroh.Connection)? = null,
     val close: suspend (String) -> Unit,
 ) {
     /** The flow the observer ingests: the test override if present, else the live transport's stream. */
