@@ -48,13 +48,14 @@ internal fun AnchoredToSelection(
             val maxX = (width - placeable.width - margin).coerceAtLeast(start)
             val above = anchor.top.roundToInt() - gap - placeable.height
             val below = anchor.bottom.roundToInt() + gap
-            val chosenY = when {
+            val preferredY = when {
                 above >= top -> above
                 below <= bottomLimit -> below
                 // A selection taller than the board: hold the bar at the top of it.
                 else -> top
             }
-            centredX.coerceIn(start, maxX) to chosenY
+            // A selection panned off the bottom would put the bar there too, out of reach.
+            centredX.coerceIn(start, maxX) to preferredY.coerceIn(top, bottomLimit.coerceAtLeast(top))
         }
         layout(width, height) { placeable.place(x, y) }
     }

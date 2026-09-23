@@ -8,12 +8,13 @@ import androidx.compose.ui.graphics.Color
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.json.Json
+import kotlin.math.roundToInt
 
 fun Color.toHexString(): String {
-    val r = (red * 255).toInt().toString(16).padStart(2, '0')
-    val g = (green * 255).toInt().toString(16).padStart(2, '0')
-    val b = (blue * 255).toInt().toString(16).padStart(2, '0')
-    val a = (alpha * 255).toInt().toString(16).padStart(2, '0')
+    val r = (red * 255).roundToInt().toString(16).padStart(2, '0')
+    val g = (green * 255).roundToInt().toString(16).padStart(2, '0')
+    val b = (blue * 255).roundToInt().toString(16).padStart(2, '0')
+    val a = (alpha * 255).roundToInt().toString(16).padStart(2, '0')
     return "#$r$g$b$a"
 }
 
@@ -431,7 +432,11 @@ data class SerializableDrawing(
 )
 
 object DrawingSerializer {
-    private val json = Json { prettyPrint = true }
+    // Tolerate fields written by a newer schema instead of failing the whole import.
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+    }
 
     fun serialize(payLoad: PayLoad): String {
         val dto = payLoad.toDto()

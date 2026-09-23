@@ -119,7 +119,7 @@ fun CanvasPropertyControl(
                     PropertyPopoverPlacement.ABOVE -> Alignment.BottomCenter
                 },
                 offset = when (placement) {
-                    PropertyPopoverPlacement.BELOW -> IntOffset.Zero
+                    PropertyPopoverPlacement.BELOW -> IntOffset(0, gap)
                     PropertyPopoverPlacement.BESIDE -> IntOffset(gap, 0)
                     PropertyPopoverPlacement.ABOVE -> IntOffset(0, -gap)
                 },
