@@ -115,7 +115,7 @@ fun CanvasControlsBar(
                 dispatch = dispatch,
                 dispatchProperty = dispatchProperty,
                 label = "Stroke color",
-                beside = true,
+                placement = PropertyPopoverPlacement.BESIDE,
                 modifier = Modifier.size(BUTTON_SIZE),
             )
             RailDivider()
@@ -130,7 +130,7 @@ fun CanvasControlsBar(
  * appearance in one value the rail can build per tool, rather than a widening parameter list that
  * every call site has to read positionally.
  */
-private data class Control(
+internal data class Control(
     val icon: ImageVector,
     val label: String,
     val selected: Boolean = false,
@@ -138,11 +138,11 @@ private data class Control(
 )
 
 @Composable
-private fun ControlButton(control: Control, onClick: () -> Unit) {
+internal fun ControlButton(control: Control, size: androidx.compose.ui.unit.Dp = BUTTON_SIZE, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
         enabled = control.enabled,
-        modifier = Modifier.size(BUTTON_SIZE).semantics { contentDescription = control.label },
+        modifier = Modifier.size(size).semantics { contentDescription = control.label },
         colors = if (control.selected) {
             IconButtonDefaults.filledIconButtonColors()
         } else {
@@ -188,7 +188,7 @@ internal val DrawingModes: List<Pair<Mode, String>> = listOf(
 /** Every drawing mode the rail offers, for callers that iterate them regardless of group. */
 internal val CanvasModes: List<Pair<Mode, String>> = PointerModes + DrawingModes
 
-private fun iconFor(mode: Mode): ImageVector = when (mode) {
+internal fun iconFor(mode: Mode): ImageVector = when (mode) {
     Mode.SELECT -> Lucide.MousePointer
     Mode.PAN -> Lucide.Hand
     Mode.PEN -> Lucide.Pencil

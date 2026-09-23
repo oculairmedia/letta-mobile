@@ -27,6 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.focusable
@@ -98,6 +101,8 @@ fun CanvasWorkspace(
     onShareToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
     /** False when the host already shows the canvas title and a way back, as the desktop side pane does. */
     showTitle: Boolean = true,
+    /** Phone or desktop chrome; [CanvasLayout.AUTO] decides by the board's width. */
+    layout: CanvasLayout = CanvasLayout.AUTO,
 ) {
     val state by controller.state.collectAsState()
     val canUndo by controller.canUndo.collectAsState()
@@ -154,10 +159,9 @@ fun CanvasWorkspace(
         localPattern
     }
     LaunchedEffect(backgroundPattern) {
-        // The grid is DrawBox's own (see showGrid below), so the tiled pattern is left unset for
-        // it; otherwise both would draw and we would be back to two grids.
-        val tiled = backgroundPattern.takeIf { it.kind != CanvasBackgroundPattern.GRID }
-        controller.setBackgroundPattern(tiled?.painter(), backgroundPattern.tint())
+        // Every pattern, the grid included, is the board's own tile: DrawBox's grid has one fixed
+        // colour, so the pattern colour control did nothing to it.
+        controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
     }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
@@ -173,6 +177,10 @@ fun CanvasWorkspace(
     // Which of DrawBox's text elements has the caret. DrawBox places text, measures it, wraps it
     // and says when one is to be edited; the editor itself is the host's to render, which is this.
     var editingTextId by remember { mutableStateOf<String?>(null) }
+    // Which note or label editor takes the caret next; see CanvasFocusRequest.
+    val focusRequest = remember { CanvasFocusRequest() }
+    // The long-press / right-click menu, while it is open.
+    var boardMenu by remember { mutableStateOf<BoardMenuRequest?>(null) }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
@@ -318,6 +326,36 @@ fun CanvasWorkspace(
         CanvasControlsBridge.dispatchProperty(controller = controller, intent = intent, state = state)
     }
     val boardCenter = Offset(boardSize.width / 2f, boardSize.height / 2f)
+    // Unknown until the board has been measured, so neither tool bar flashes up in the wrong
+    // layout for the first frame.
+    val boardWidth = with(LocalDensity.current) { boardSize.width.toDp() }
+    val resolvedLayout = layout.resolveMeasured(boardSize.width, boardWidth)
+    val compact = resolvedLayout == CanvasLayout.COMPACT
+
+    // Fit everything on the board (elements and notes) with padding; an empty board just goes back
+    // to 100% at the origin. [maxScale] lets the open-time fit shrink a board without enlarging it.
+    fun fitToContent(maxScale: Float = CanvasViewportFit.MAX_SCALE): Boolean {
+        val fit = CanvasViewportFit.fitOrNull(CanvasViewportFit.contentBounds(state.elements, documents), boardSize, maxScale)
+        controller.resetCamera()
+        if (fit == null) return false
+        // From the reset camera (scale 1, no offset): zooming about the origin leaves the offset
+        // at zero, then one pan places the content.
+        controller.zoomBy(fit.scale, Offset.Zero)
+        controller.panBy(fit.offset)
+        return true
+    }
+
+    // A board drawn on a desktop is mostly off the edge of a phone, which opened on an empty
+    // corner of it. On a phone the board opens fitted, once, and never zoomed in past 100%.
+    var fittedOnOpen by remember(session) { mutableStateOf(false) }
+    LaunchedEffect(initialLoadDone, compact) {
+        if (initialLoadDone && compact && !fittedOnOpen) {
+            fittedOnOpen = true
+            fitToContent(maxScale = 1f)
+            // And in the select tool, where a drag moves around the board rather than drawing.
+            controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
+        }
+    }
 
     val documentRecorderContext = remember(session, history) {
         DocumentRecorderContext(
@@ -416,6 +454,15 @@ fun CanvasWorkspace(
         }
     }
 
+    // Picks [element] alone, in the select tool, where DrawBox will select it. By a point on its
+    // outline: an unfilled shape is picked by its stroke only.
+    fun selectElement(element: io.ak1.drawbox.domain.model.Element) {
+        if (controller.state.value.selectedIds == setOf(element.id)) return
+        controller.clearSelection()
+        controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
+        controller.selectAt(CanvasWorkspaceSupport.selectionPointOf(element), TEXT_HIT_TOLERANCE / controller.state.value.viewport.scale)
+    }
+
     // Marquee and move are DrawBox gestures; the notes follow the same intents so a marquee
     // takes in note cards and dragging the selection moves them too, committed on release.
     LaunchedEffect(controller, session) {
@@ -443,7 +490,15 @@ fun CanvasWorkspace(
                                 elements = controller.state.value.elements,
                                 session = session,
                                 onEditText = { editingTextId = it },
-                                onActivateShapeLabel = { activeNoteId = it },
+                                onActivateShapeLabel = { labelId ->
+                                    // However the text was asked for (a double click, the menu),
+                                    // the shape is what is selected while it is typed.
+                                    CanvasShapeLabels.shapeIdOf(labelId)
+                                        ?.let { shapeId -> controller.state.value.elements.firstOrNull { it.id == shapeId } }
+                                        ?.let(::selectElement)
+                                    activeNoteId = labelId
+                                    focusRequest.documentId = labelId
+                                },
                             ),
                         )
                     }
@@ -520,13 +575,92 @@ fun CanvasWorkspace(
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
         null -> false
     }
+    // Puts the caret in [element]: a text element's own editor, or a closed shape's label (created
+    // on first use).
+    fun openTextIn(element: io.ak1.drawbox.domain.model.Element) {
+        when {
+            element is io.ak1.drawbox.domain.model.Element.Text -> editingTextId = element.id
+            CanvasShapeLabels.canLabel(element) && session != null -> {
+                // The shape stays selected while its text is typed: the menu that floats up is the
+                // shape's (stroke, fill, order), because the shape is the thing being worked on.
+                selectElement(element)
+                focusRequest.documentId = CanvasShapeLabels.labelIdOf(element.id)
+                controller.onIntent(
+                    io.ak1.drawbox.domain.model.Intent.RequestTextEditAt(element.bounds().center, TEXT_HIT_TOLERANCE),
+                )
+            }
+        }
+    }
+
+    fun addNoteAt(world: Offset) {
+        val s = session ?: return
+        val frame = clearOfExisting(newNoteFrame(world), liveDocuments.mapNotNull { it.frame })
+        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
+        coroutineScope.launch {
+            recordingDocuments("adding a note") {
+                runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
+                    .onSuccess {
+                        activeNoteId = id
+                        focusRequest.documentId = id
+                        statusMessage = "Added note"
+                    }
+                    .onFailure { statusMessage = "Error: could not add note (${it.message})" }
+            }
+        }
+    }
+
+    val insertActions = BoardInsertActions(
+        onAddNote = if (session != null) ::addNoteAt else null,
+        onAddText = { world ->
+            val current = controller.state.value
+            controller.insertText(
+                "",
+                world,
+                current.currentItemFontSize,
+                current.currentItemFontFamilyKey,
+                current.currentItemTextAlignment,
+                current.strokeColor,
+            )
+        },
+        onAddShape = { mode, world ->
+            val id = CanvasInsert.addShape(controller, mode, world)
+            val added = controller.state.value.elements.firstOrNull { it.id == id }
+            when {
+                added == null -> Unit
+                CanvasShapeLabels.canLabel(added) && session != null -> openTextIn(added)
+                else -> selectElement(added)
+            }
+        },
+    )
+
+    // A long press or right click: pick what is under it, then open the menu for that, or the
+    // add menu on empty board.
+    fun openBoardMenu(screen: Offset) {
+        val current = controller.state.value
+        val world = current.viewport.screenToWorld(screen)
+        // DrawBox only selects in the select tool, so the board hit-tests itself and, on an
+        // element, moves to the select tool with that element picked - where Miro leaves you too.
+        val hit = CanvasWorkspaceSupport.elementAt(current.elements, world, TEXT_HIT_TOLERANCE / current.viewport.scale)
+        if (hit != null) selectElement(hit) else controller.clearSelection()
+        boardMenu = BoardMenuRequest(
+            screen = screen,
+            world = world,
+            onElement = hit != null,
+            canEditText = CanvasWorkspaceSupport.holdsText(hit, hasSession = session != null),
+        )
+    }
+
     // Everything composed inside the board records its document edits into the board's history,
     // so an editor writing a note's text produces undo steps of its own rather than leaving undo
     // with nothing between "the note exists" and "it does not".
     val documentRecorder = remember(session) {
         CanvasDocumentRecorder { label, block -> recordingDocuments(label, block) }
     }
-    CompositionLocalProvider(LocalCanvasDocumentRecorder provides documentRecorder) {
+    CompositionLocalProvider(
+        LocalCanvasDocumentRecorder provides documentRecorder,
+        LocalCanvasFocusRequest provides focusRequest,
+        LocalCanvasCompact provides compact,
+    ) {
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
@@ -556,19 +690,40 @@ fun CanvasWorkspace(
                 onIntent = controller::onIntent,
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
-                // DrawBox draws a grid of its own, on by default, and the board draws a pattern of
-                // its own on top: two grids at two spacings, which is why the background could not
-                // be turned off — ours went away and its did not.
-                //
-                // Now the setting picks exactly one of them. A grid IS DrawBox's grid, drawn by the
-                // engine that owns the viewport, so it stays crisp at every zoom. Dots and lines
-                // are the board's tiled pattern, which DrawBox has no equivalent for. "None" turns
-                // off both, so none means none.
-                showGrid = backgroundPattern.kind == CanvasBackgroundPattern.GRID,
+                // DrawBox draws a grid of its own, on by default, in one fixed colour. The board's pattern
+                // (grid, dots or lines) is its own tile in the colour the menu sets, so DrawBox's
+                // stays off and "none" means none.
+                showGrid = false,
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
                     .semantics { contentDescription = "Canvas board" }
+                    .boardContextGesture(::openBoardMenu)
+                    // DrawBox picks an outline-only shape by its stroke alone; the board takes a
+                    // press inside one itself, to pick it, drag it or double-click into its text.
+                    .hollowShapeGrab(
+                        HollowShapeGrab(
+                            shapeAt = { screen -> CanvasWorkspaceSupport.hollowShapeUnder(controller.state.value, screen, TEXT_HIT_TOLERANCE) },
+                            onPick = ::selectElement,
+                            onBegin = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.BeginTransform) },
+                            onMoveBy = { screenDelta ->
+                                val scale = controller.state.value.viewport.scale
+                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.MoveSelected(screenDelta / scale))
+                            },
+                            onEnd = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.EndTransform) },
+                            onDoubleTap = ::openTextIn,
+                        ),
+                    )
+                    // Two fingers always pinch and pan. On a phone one finger on empty board in the
+                    // select tool pans too: dragging is how you move around a board on a phone.
+                    .touchNavigation(
+                        panWithOneFinger = compact,
+                        canPanFrom = { screen ->
+                            CanvasWorkspaceSupport.isOpenBoard(controller.state.value, screen, TEXT_HIT_TOLERANCE)
+                        },
+                        onPan = { delta -> controller.panBy(delta) },
+                        onZoom = { factor, pivot -> controller.zoomBy(factor, pivot) },
+                    )
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
                             while (true) {
@@ -582,8 +737,15 @@ fun CanvasWorkspace(
                     // while a connector is drawn, and on release snap the connector just finished.
                     .pointerInput(session) {
                         awaitPointerEventScope {
+                            // What was on the board when the press began, so the release can tell
+                            // a shape that was just drawn from one that was already there.
+                            var idsAtPress: Set<String> = emptySet()
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Final)
+                                if (event.type == PointerEventType.Press) idsAtPress = controller.state.value.elements.mapTo(HashSet()) { it.id }
+                                if (event.type == PointerEventType.Release) {
+                                    CanvasWorkspaceSupport.shapeJustDrawn(controller.state.value, idsAtPress)?.let(::openTextIn)
+                                }
                                 val result = CanvasWorkspaceSupport.handleFinalPointerPass(
                                     FinalPointerPassParams(
                                         event = event,
@@ -658,8 +820,10 @@ fun CanvasWorkspace(
                         } else if (id !in selectedNoteIds) {
                             // Picking a note replaces the board's selection, exactly as picking a
                             // shape does. Without this the drawn selection stayed put and the note
-                            // joined it, so a plain click read as a shift-click.
-                            controller.clearSelection()
+                            // joined it, so a plain click read as a shift-click. A shape's label
+                            // picks its shape: the text is the shape's.
+                            val owner = CanvasShapeLabels.shapeIdOf(id)?.let { shapeId -> state.elements.firstOrNull { it.id == shapeId } }
+                            if (owner != null) selectElement(owner) else controller.clearSelection()
                             selectedNoteIds = emptySet()
                             activeNoteId = id
                         }
@@ -677,7 +841,11 @@ fun CanvasWorkspace(
             )
 
             // Picking a drawing element hands the selection to DrawBox; the note lets go.
-            LaunchedEffect(hasSelection) { if (hasSelection) activeNoteId = null }
+            // A shape's label is the exception: its shape being selected is how its text is edited.
+    LaunchedEffect(hasSelection) {
+        val labelOf = activeNoteId?.let(CanvasShapeLabels::shapeIdOf)
+        if (hasSelection && labelOf !in state.selectedIds) activeNoteId = null
+    }
 
             // The pen draws its own strokes.
             //
@@ -768,7 +936,9 @@ fun CanvasWorkspace(
                             back()
                         }
                     },
-                    modifier = Modifier.align(Alignment.TopStart).padding(CHROME_INSET).canvasChrome(chromeRegions),
+                    compact = compact,
+                    modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(CHROME_INSET).canvasChrome(chromeRegions),
                 )
             }
 
@@ -780,16 +950,7 @@ fun CanvasWorkspace(
                     // Fit everything on the board (elements and notes) with padding; an empty
                     // board just goes back to 100% at the origin.
                     onReset = {
-                        val content = CanvasViewportFit.contentBounds(state.elements, documents)
-                        controller.resetCamera()
-                        if (content != null && boardSize.width > 0 && boardSize.height > 0) {
-                            val fit = CanvasViewportFit.fit(content, boardSize.width.toFloat(), boardSize.height.toFloat())
-                            // From the reset camera (scale 1, no offset): zooming about the origin
-                            // leaves the offset at zero, then one pan places the content.
-                            controller.zoomBy(fit.scale, Offset.Zero)
-                            controller.panBy(fit.offset)
-                            statusMessage = "Fitted to content"
-                        }
+                        if (fitToContent()) statusMessage = "Fitted to content"
                     },
                     onActualSize = { controller.zoomTo(1f, boardCenter) },
                 ),
@@ -833,7 +994,18 @@ fun CanvasWorkspace(
                         statusMessage = "Background pattern: ${pattern.kind}"
                     },
                 ),
-                modifier = Modifier.align(Alignment.TopEnd).padding(CHROME_INSET).canvasChrome(chromeRegions),
+                undo = if (compact) {
+                    CanvasUndoActions(
+                        canUndo = controlsBarState.canUndo,
+                        canRedo = controlsBarState.canRedo,
+                        onUndo = ::undoBoard,
+                        onRedo = ::redoBoard,
+                    )
+                } else {
+                    null
+                },
+                modifier = Modifier.align(Alignment.TopEnd).windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(CHROME_INSET).canvasChrome(chromeRegions),
             )
 
 
@@ -880,11 +1052,64 @@ fun CanvasWorkspace(
                 )
             }
 
-            // Properties for the selection, or for the closed shape about to be drawn, top-centre.
-            // With a note active and nothing drawn selected, the bar is the note's.
+            // Properties for the selection, floating on it the way Miro does; top-centre for the
+            // closed shape about to be drawn, when there is nothing to float on. With a note active
+            // and nothing drawn selected, the bar is the note's.
             val activeNote = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } }
             val notesSelected = selectedNoteIds.isNotEmpty()
+            // The active note's (or shape label's) bar actions, built once for whichever bar shows them.
+            val activeNoteActions = if (activeNote != null && session != null) {
+                val tint = parseHexColor(activeNote.color)
+                val plain = tint != null && tint.alpha == 0f
+                NoteBarActions(
+                    onOpen = { expandedNoteId = activeNote.id },
+                    onDelete = {
+                        val id = activeNote.id
+                        activeNoteId = null
+                        coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
+                    },
+                    style = activeNote.style,
+                    onStyle = { style ->
+                        coroutineScope.launch {
+                            recordingDocuments("restyling a note") {
+                                runCatching { session.restyleDocument(activeNote.id, style) }
+                            }
+                        }
+                    },
+                    color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
+                    onColor = { color ->
+                        coroutineScope.launch {
+                            recordingDocuments("recolouring a note") {
+                                runCatching { session.recolorDocument(activeNote.id, color.toHex()) }
+                            }
+                        }
+                    },
+                    defaultTextColor = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurface,
+                    plain = plain,
+                )
+            } else {
+                null
+            }
             if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
+                val editable = state.elements.singleOrNull { it.id in state.selectedIds }
+                    ?.takeIf { CanvasWorkspaceSupport.holdsText(it, hasSession = session != null) }
+                val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
+                AnchoredToSelection(
+                    anchor = CanvasWorkspaceSupport.barAnchor(
+                        BarAnchorParams(
+                            state = state,
+                            documents = documents,
+                            selectedNoteIds = selectedNoteIds,
+                            activeNote = activeNote,
+                            groupOffset = groupOffset,
+                        ),
+                    ),
+                    // On a phone the title and actions pills fill the top row, so the bar stays
+                    // below them even when the host hides the title.
+                    topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
+                    startClearance = resolvedLayout.railClearance(),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
                 CanvasSelectionBar(
                     state = controlsBarState,
                     properties = properties,
@@ -895,76 +1120,32 @@ fun CanvasWorkspace(
                     onSendToBack = { controller.sendSelectionToBack() },
                     onDelete = { deleteFocused() },
                     onDuplicate = { duplicateFocused() },
-                    note = if (activeNote != null && session != null && !hasSelection && !notesSelected) {
-                        val tint = parseHexColor(activeNote.color)
-                        val plain = tint != null && tint.alpha == 0f
-                        NoteBarActions(
-                            onOpen = { expandedNoteId = activeNote.id },
-                            onDelete = {
-                                val id = activeNote.id
-                                activeNoteId = null
-                                coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
-                            },
-                            style = activeNote.style,
-                            onStyle = { style ->
-                                coroutineScope.launch {
-                                    recordingDocuments("restyling a note") {
-                                        runCatching { session.restyleDocument(activeNote.id, style) }
-                                    }
-                                }
-                            },
-                            color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
-                            onColor = { color ->
-                                coroutineScope.launch {
-                                    recordingDocuments("recolouring a note") {
-                                        runCatching { session.recolorDocument(activeNote.id, color.toHex()) }
-                                    }
-                                }
-                            },
-                            defaultTextColor = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurface,
-                            plain = plain,
-                        )
-                    } else {
-                        null
-                    },
-                    modifier = Modifier.align(Alignment.TopCenter)
-                        .padding(top = if (showTitle) 64.dp else CHROME_INSET)
-                        .canvasChrome(chromeRegions),
+                    onEditText = editable?.let { element -> { openTextIn(element) } },
+                    note = activeNoteActions.takeIf { !hasSelection && !notesSelected },
+                    shapeText = activeNoteActions.takeIf { activeNote?.id?.let(CanvasShapeLabels::shapeIdOf) in state.selectedIds },
+                    modifier = Modifier.canvasChrome(chromeRegions),
                 )
+                }
             }
 
             // The tool rail down the left, clear of the title pill above and the foot row below.
             // Our own: the drawbox-ui one loads drawables its Android artifact never ships
             // (letta-mobile-r5f3r). See CanvasControlsBar.
-            CanvasControlsBar(
-                state = controlsBarState,
-                dispatch = dispatch,
-                properties = properties,
-                dispatchProperty = dispatchProperty,
-                onAddNote = session?.let { s ->
-                    {
-                        val frame = clearOfExisting(
-                            newNoteFrame(state.viewport.screenToWorld(boardCenter)),
-                            liveDocuments.mapNotNull { it.frame },
-                        )
-                        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
-                        coroutineScope.launch {
-                            recordingDocuments("adding a note") {
-                                runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
-                                    .onSuccess {
-                                        activeNoteId = id
-                                        statusMessage = "Added note"
-                                    }
-                                    .onFailure { statusMessage = "Error: could not add note (${it.message})" }
-                            }
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
-                    .canvasChrome(chromeRegions),
-            )
+            val onAddNote: (() -> Unit)? = if (session != null) ({ addNoteAt(state.viewport.screenToWorld(boardCenter)) }) else null
+            if (resolvedLayout == CanvasLayout.EXPANDED) {
+                CanvasControlsBar(
+                    state = controlsBarState,
+                    dispatch = dispatch,
+                    properties = properties,
+                    dispatchProperty = dispatchProperty,
+                    onAddNote = onAddNote,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
+                        .canvasChrome(chromeRegions),
+                )
+            }
 
             // A note opened large sits over the board, under the foot bar so formatting stays reachable.
             val expanded = documents.firstOrNull { it.id == expandedNoteId }
@@ -975,12 +1156,16 @@ fun CanvasWorkspace(
                     onClose = { expandedNoteId = null },
                     onToolbar = { noteToolbar = it },
                     chromeRegions = chromeRegions,
+                    compact = compact,
                 )
             }
 
-            // The foot of the board: the active note's formatting bar, centred, above the status line.
+            // The foot of the board: the active note's formatting bar, centred, above the status line
+            // on a desktop and above the tool bar on a phone. Inset from the system bars and the
+            // keyboard, so on a phone the formatting bar rides up with the keyboard.
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(CHROME_INSET)
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.safeDrawing).padding(CHROME_INSET)
                     .canvasChrome(chromeRegions),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -989,9 +1174,41 @@ fun CanvasWorkspace(
                 if (toolbar != null && (activeNoteId != null || expandedNoteId != null)) {
                     CanvasFormattingBar(toolbar = toolbar)
                 }
-                CanvasStatusLine(
-                    text = "Elements: ${state.elements.size} | $statusMessage",
-                    modifier = Modifier.align(Alignment.Start),
+                when (resolvedLayout) {
+                    CanvasLayout.COMPACT -> if (expanded == null) {
+                        CanvasCompactToolbar(
+                            state = controlsBarState,
+                            properties = properties,
+                            actions = CompactToolbarActions(
+                                dispatch = dispatch,
+                                dispatchProperty = dispatchProperty,
+                                insert = insertActions,
+                                addAt = { controller.state.value.viewport.screenToWorld(boardCenter) },
+                            ),
+                        )
+                    }
+                    else -> CanvasStatusLine(
+                        text = "Elements: ${state.elements.size} | $statusMessage",
+                        modifier = Modifier.align(Alignment.Start),
+                    )
+                }
+            }
+
+            boardMenu?.let { request ->
+                CanvasBoardMenu(
+                    request = request,
+                    insert = insertActions,
+                    element = BoardElementActions(
+                        onEditText = {
+                            val current = controller.state.value
+                            current.elements.singleOrNull { it.id in current.selectedIds }?.let(::openTextIn)
+                        },
+                        onDuplicate = { duplicateFocused() },
+                        onBringToFront = { controller.bringSelectionToFront() },
+                        onSendToBack = { controller.sendSelectionToBack() },
+                        onDelete = { deleteFocused() },
+                    ),
+                    onDismiss = { boardMenu = null },
                 )
             }
         }
@@ -1003,4 +1220,6 @@ fun CanvasWorkspace(
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
 private const val ZOOM_STEP = 1.25f
+/** How near, in screen pixels at 100%, a press has to be to an element to pick it. */
+private const val TEXT_HIT_TOLERANCE = 8f
 internal const val WHEEL_ZOOM_STEP = 1.1f

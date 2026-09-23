@@ -5,6 +5,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +55,8 @@ fun CanvasNoteEditorPanel(
     onToolbar: ((NoteToolbar?) -> Unit)? = null,
     /** The whole overlay, scrim included, is chrome: nothing behind it is drawable. */
     chromeRegions: CanvasChromeRegions? = null,
+    /** A phone: the panel takes nearly the whole board instead of floating with wide margins. */
+    compact: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val recorder = LocalCanvasDocumentRecorder.current
@@ -68,7 +73,9 @@ fun CanvasNoteEditorPanel(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = LettaDimens.Space.xl, vertical = 56.dp)
+                // Clear of the system bars, and of the keyboard while typing into the note.
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(horizontal = if (compact) LettaDimens.Space.sm else LettaDimens.Space.xl, vertical = 56.dp)
                 .widthIn(max = 880.dp)
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .semantics { contentDescription = "Note editor" },
@@ -135,7 +142,7 @@ fun CanvasNoteEditorPanel(
                     onLightSurface = tint != null,
                     onToolbar = onToolbar,
                     style = document.style,
-                    modifier = Modifier.fillMaxHeight().fillMaxWidth().padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth().padding(horizontal = if (compact) LettaDimens.Space.md else LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
                 )
             }
         }

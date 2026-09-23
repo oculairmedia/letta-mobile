@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -29,6 +31,7 @@ import com.composables.icons.lucide.AArrowUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.SendToBack
+import com.composables.icons.lucide.TextCursorInput
 import com.composables.icons.lucide.Trash2
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
@@ -36,8 +39,7 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The contextual bar at the top of the board, the way Concepts and Miro show what applies to the
- * selection: one master control ([CanvasPropertyControl]) for every colour and property of the
+ * The contextual bar that floats on the selection, the way Miro shows what applies to it: one master control ([CanvasPropertyControl]) for every colour and property of the
  * target, then ordering and delete for a drawn selection, or open-large and delete for the
  * active note or text element.
  *
@@ -58,6 +60,10 @@ fun CanvasSelectionBar(
     modifier: Modifier = Modifier,
     note: NoteBarActions? = null,
     onDuplicate: (() -> Unit)? = null,
+    /** Puts the caret in the selected shape; offered only when the selection is one that holds text. */
+    onEditText: (() -> Unit)? = null,
+    /** The selected shape's text while it is being edited, for the property panel's Text target. */
+    shapeText: NoteBarActions? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -66,8 +72,9 @@ fun CanvasSelectionBar(
         tonalElevation = LettaDimens.Space.hair,
         shadowElevation = LettaDimens.Space.sm,
     ) {
+        // Scrolls rather than clips when the board is narrower than the bar, as on a phone.
         Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -77,6 +84,7 @@ fun CanvasSelectionBar(
                 dispatch = dispatch,
                 dispatchProperty = dispatchProperty,
                 note = note,
+                shapeText = shapeText,
                 modifier = Modifier.size(BAR_BUTTON),
             )
             if (note != null) {
@@ -85,6 +93,10 @@ fun CanvasSelectionBar(
                 onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
                 BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
             } else if (hasSelection) {
+                onEditText?.let {
+                    Divider()
+                    BarButton(Lucide.TextCursorInput, "Edit text", onClick = it)
+                }
                 // Text is sized from the bar it is selected on, not from a panel behind a swatch:
                 // it is the one property you reach for over and over, and a step up or a step down
                 // is the whole of what that needs.
