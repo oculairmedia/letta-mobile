@@ -119,6 +119,13 @@ internal data class FinalPointerPassParams(
     val onSnapLatestConnector: () -> Unit,
 )
 
+/** What decides whether quick-create targets show, and where. */
+internal data class QuickCreateAnchorParams(
+    val state: DrawBoxState,
+    val activeNote: com.letta.mobile.data.canvas.CanvasSceneDocument?,
+    val editing: Boolean,
+)
+
 /** What the floating selection bar is anchored to. */
 internal data class BarAnchorParams(
     val state: DrawBoxState,
@@ -750,6 +757,25 @@ internal object CanvasWorkspaceSupport {
         return elementAt(state.elements, world, tolerance / state.viewport.scale) == null
     }
 
+    /**
+     * Where quick-create targets go, on screen: around the one selected shape that holds text, or
+     * the active note when nothing drawn is selected. None while typing, when they would crowd
+     * the text, and none for lines, strokes or a shape's legacy label.
+     */
+    fun quickCreateAnchor(params: QuickCreateAnchorParams): Rect? {
+        if (params.editing) return null
+        val state = params.state
+        val shape = state.elements.singleOrNull { it.id in state.selectedIds }
+        if (state.selectedIds.size == 1 && shape is Element.Shape && shape.canHoldText) {
+            return selectionScreenRect(state.elements, state.selectedIds, emptyList(), state.viewport)
+        }
+        if (state.selectedIds.isNotEmpty()) return null
+        val note = params.activeNote ?: return null
+        if (CanvasShapeLabels.shapeIdOf(note.id) != null) return null
+        val frame = note.frame ?: return null
+        return selectionScreenRect(emptyList(), emptySet(), listOf(frame.toRect()), state.viewport)
+    }
+
     /** The topmost element under [world], within [tolerance] board units of its bounds. */
     fun elementAt(elements: List<Element>, world: Offset, tolerance: Float): Element? =
         elements.asReversed().firstOrNull { it.bounds().inflate(tolerance).contains(world) }
@@ -809,3 +835,6 @@ private const val MIN_DRAWN_SHAPE = 16f
 
 /** How far past a selection its handles reach, in multiples of the pick tolerance. */
 private const val HANDLE_SLACK = 3f
+
+/** This frame as a board rectangle. */
+internal fun com.letta.mobile.data.canvas.CanvasDocumentFrame.toRect(): Rect = Rect(x, y, x + width, y + height)

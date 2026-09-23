@@ -617,6 +617,41 @@ fun CanvasWorkspace(
         }
     }
 
+    // Miro's quick create: an empty copy of the selected shape (or note) one gap away, joined to
+    // it by an arrow, with the caret in it.
+    fun quickCreate(direction: QuickCreateDirection) {
+        val current = controller.state.value
+        val shape = current.elements.singleOrNull { it.id in current.selectedIds } as? io.ak1.drawbox.domain.model.Element.Shape
+        if (shape != null && shape.canHoldText) {
+            val next = CanvasQuickCreate.nextShape(shape, direction, current.elements.maxOfOrNull { it.zIndex } ?: 0)
+            controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(next))
+            val (start, end) = CanvasQuickCreate.connector(shape.bounds(), next.bounds(), direction)
+            CanvasQuickCreate.addArrow(controller, start, end)?.let { arrowId ->
+                controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(arrowId))
+            }
+            openTextIn(next)
+            return
+        }
+        val s = session ?: return
+        val note = activeNoteId?.let { id -> liveDocuments.firstOrNull { it.id == id } } ?: return
+        val frame = note.frame ?: return
+        val nextFrame = CanvasQuickCreate.nextFrame(frame, direction)
+        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
+        coroutineScope.launch {
+            recordingDocuments("adding a note") {
+                runCatching { s.setDocument(id, "", frame = nextFrame, color = note.color) }.onSuccess {
+                    val (start, end) = CanvasQuickCreate.connector(frame.toRect(), nextFrame.toRect(), direction)
+                    if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
+                        // The session's documents, which already hold the note just added.
+                        CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
+                    }
+                    activeNoteId = id
+                    focusRequest.documentId = id
+                }
+            }
+        }
+    }
+
     val insertActions = BoardInsertActions(
         onAddNote = if (session != null) ::addNoteAt else null,
         onAddText = { world ->
@@ -1100,6 +1135,21 @@ fun CanvasWorkspace(
             } else {
                 null
             }
+            val quickAnchor = CanvasWorkspaceSupport.quickCreateAnchor(
+                QuickCreateAnchorParams(
+                    state = state,
+                    activeNote = activeNote?.takeIf { expandedNoteId == null && !notesSelected },
+                    editing = editingTextId != null,
+                ),
+            )
+            if (quickAnchor != null) {
+                CanvasQuickCreateTargets(
+                    anchor = quickAnchor,
+                    onCreate = ::quickCreate,
+                    chromeRegions = chromeRegions,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
                 val editable = state.elements.singleOrNull { it.id in state.selectedIds }
                     ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
@@ -1118,6 +1168,8 @@ fun CanvasWorkspace(
                     // below them even when the host hides the title.
                     topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
                     startClearance = resolvedLayout.railClearance(),
+                    // Above the quick-create target, when there is one, not on it.
+                    gap = if (quickAnchor != null) 56.dp else 12.dp,
                     modifier = Modifier.fillMaxSize(),
                 ) {
                 CanvasSelectionBar(
