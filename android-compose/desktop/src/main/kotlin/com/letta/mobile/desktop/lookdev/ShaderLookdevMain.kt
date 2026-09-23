@@ -409,6 +409,10 @@ private fun PreviewPane(
             if (state.source.contains("uniform float uPalettePull")) {
                 active.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
             }
+            if (state.source.contains("uniform float uBandTop")) {
+                active.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
+                active.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)
+            }
             if (state.source.contains("uniform float uStreamEnergy")) {
                 active.uniform("uStreamEnergy", 0f)
             }
