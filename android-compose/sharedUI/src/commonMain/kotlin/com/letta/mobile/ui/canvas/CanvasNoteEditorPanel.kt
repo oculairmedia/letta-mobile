@@ -140,7 +140,7 @@ fun CanvasNoteEditorPanel(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    NoteIcon(Lucide.ArrowLeft, "Close note", onCard, onClick = onClose)
+                    NoteIcon(Lucide.ArrowLeft, "Close note editor", onCard, onClick = onClose)
                 }
                 NoteTitleField(session, document, onCard, compact)
                 CanvasBlockEditor(

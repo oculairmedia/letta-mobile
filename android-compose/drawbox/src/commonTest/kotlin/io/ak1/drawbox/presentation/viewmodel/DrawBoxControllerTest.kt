@@ -157,4 +157,21 @@ class DrawBoxControllerTest {
         controller.onIntent(Intent.Undo)
         assertEquals(listOf("a"), controller.state.value.elements.map { it.id })
     }
+
+    @Test
+    fun anAdditiveTapTogglesAnElementInAndOutOfTheSelection() {
+        val controller = newController()
+        controller.onIntent(Intent.AddElement(square("a")))
+        controller.onIntent(
+            Intent.AddElement(
+                square("b").copy(points = listOf(androidx.compose.ui.geometry.Offset(50f, 50f), androidx.compose.ui.geometry.Offset(60f, 60f))),
+            ),
+        )
+        val a = square("a").points.first()
+        controller.selectIds(setOf("b"))
+        controller.onIntent(Intent.SelectAt(a + androidx.compose.ui.geometry.Offset(1f, 1f), 4f, additive = true))
+        assertTrue("a" in controller.state.value.selectedIds && "b" in controller.state.value.selectedIds)
+        controller.onIntent(Intent.SelectAt(a + androidx.compose.ui.geometry.Offset(1f, 1f), 4f, additive = true))
+        assertEquals(setOf("b"), controller.state.value.selectedIds)
+    }
 }

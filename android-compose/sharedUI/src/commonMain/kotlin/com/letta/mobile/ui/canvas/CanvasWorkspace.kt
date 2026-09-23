@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -398,9 +399,13 @@ fun CanvasWorkspace(
     // The keyboard covers the bottom of a phone's board. While it is up, the camera (never the
     // element) moves the note or text being typed into clear of it and of the bars riding on it,
     // then moves back when the keyboard goes, unless the board was moved in between.
-    // Top of the bars at the foot of the board, in board px; they ride up with the keyboard.
-    var footTop by remember { mutableStateOf<Float?>(null) }
+    // Height of the bars at the foot of the board, which ride up on the keyboard. Kept from their
+    // size alone, not their position: watching the position on every layout starved the board's
+    // pinch gesture. Read once the keyboard has settled.
+    val footHeight = remember { IntArray(1) }
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val safeBottom by rememberUpdatedState(WindowInsets.safeDrawing.getBottom(LocalDensity.current))
+    val chromeInsetPx = with(LocalDensity.current) { CHROME_INSET.toPx() }
     val topReserve = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this) + KEYBOARD_TOP_RESERVE.roundToPx() }
     val typingTarget: Rect? = when {
         expandedNoteId != null -> null
@@ -408,11 +413,12 @@ fun CanvasWorkspace(
         else -> editingTextId?.let { id -> state.elements.firstOrNull { it.id == id }?.bounds() }
     }
     var keyboardPan by remember { mutableStateOf<Pair<Offset, Viewport>?>(null) }
-    LaunchedEffect(imeBottom > 0, typingTarget, footTop) {
-        val bottom = footTop
-        if (imeBottom > 0 && typingTarget != null && bottom != null) {
+    LaunchedEffect(imeBottom > 0, typingTarget) {
+        if (imeBottom > 0 && typingTarget != null) {
             // The keyboard slides in over a few frames; pan once it has settled.
             delay(KEYBOARD_SETTLE_MS)
+            // The foot column sits on the bottom inset (the keyboard's, now) plus the chrome inset.
+            val bottom = boardSize.height - safeBottom - chromeInsetPx - footHeight[0]
             val band = Rect(0f, topReserve.toFloat(), boardSize.width.toFloat(), bottom)
             CanvasViewportFit.panIntoBand(typingTarget, controller.state.value.viewport, band)?.let { delta ->
                 controller.panBy(delta)
@@ -525,6 +531,14 @@ fun CanvasWorkspace(
 
     // Picks [element] alone, in the select tool. By id, not by a point on it: a point can land
     // on something covering it, such as the connector quick-create ends on the new shape.
+    // A phone's multi-selection: a long press on a shape picks it as well, and from then on a
+    // tap adds or removes one, until the selection is emptied.
+    var multiSelecting by remember { mutableStateOf(false) }
+    // An arrow being pulled out of a quick-create target, and one let go whose menu is open.
+    var quickDrag by remember { mutableStateOf<QuickCreateDrag?>(null) }
+    var quickDrop by remember { mutableStateOf<QuickCreateDrag?>(null) }
+    LaunchedEffect(state.selectedIds.isEmpty()) { if (state.selectedIds.isEmpty()) multiSelecting = false }
+
     fun selectElement(element: io.ak1.drawbox.domain.model.Element) {
         if (controller.state.value.selectedIds == setOf(element.id)) return
         controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
@@ -704,6 +718,34 @@ fun CanvasWorkspace(
         }
     }
 
+    // Adds [next] joined to the element at [from] by an arrow off its [direction] side, as one undo
+    // step, and puts the caret in it. [fromNote]: the arrow starts on a note card, which DrawBox
+    // does not bind, so the board snaps it.
+    fun addJoinedShape(
+        from: Rect,
+        next: io.ak1.drawbox.domain.model.Element.Shape,
+        direction: QuickCreateDirection,
+        fromNote: Boolean = false,
+    ) {
+        val undoStepsBefore = controller.state.value.history.size
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(next))
+        // A phone shows little of the board, so the new shape is centred for typing into it;
+        // a wide board only moves when the new shape would land off its edge.
+        CanvasViewportFit.panToShow(next.bounds(), controller.state.value.viewport, boardSize, centre = compact)
+            ?.let(controller::panBy)
+        val (start, end) = CanvasQuickCreate.connector(from, next.bounds(), direction)
+        CanvasQuickCreate.addArrow(controller, start, end)?.let { arrowId ->
+            controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(arrowId))
+        }
+        // The shape and its arrow are one action: one undo takes both.
+        controller.onIntent(
+            io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
+        )
+        val s = session
+        if (fromNote && s != null) CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
+        openTextIn(next)
+    }
+
     // Miro's quick create: an empty copy of the selected shape (or note) one gap away, joined to
     // it by an arrow, with the caret in it.
     fun quickCreate(direction: QuickCreateDirection) {
@@ -711,21 +753,7 @@ fun CanvasWorkspace(
         val shape = current.elements.singleOrNull { it.id in current.selectedIds } as? io.ak1.drawbox.domain.model.Element.Shape
         if (shape != null && shape.canHoldText) {
             val next = CanvasQuickCreate.nextShape(shape, direction, current.elements.maxOfOrNull { it.zIndex } ?: 0)
-            val undoStepsBefore = current.history.size
-            controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(next))
-            // A phone shows little of the board, so the new shape is centred for typing into it;
-            // a wide board only moves when the new shape would land off its edge.
-            CanvasViewportFit.panToShow(next.bounds(), controller.state.value.viewport, boardSize, centre = compact)
-                ?.let(controller::panBy)
-            val (start, end) = CanvasQuickCreate.connector(shape.bounds(), next.bounds(), direction)
-            CanvasQuickCreate.addArrow(controller, start, end)?.let { arrowId ->
-                controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(arrowId))
-            }
-            // The shape and its arrow are one action: one undo takes both.
-            controller.onIntent(
-                io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
-            )
-            openTextIn(next)
+            addJoinedShape(shape.bounds(), next, direction)
             return
         }
         val s = session ?: return
@@ -744,6 +772,58 @@ fun CanvasWorkspace(
                     activeNoteId = id
                     focusRequest.documentId = id
                 }
+            }
+        }
+    }
+
+    // An arrow pulled out of a quick-create target and let go: what the menu there picked goes
+    // where it was let go, joined to the element it came out of.
+    fun quickCreateAt(drop: QuickCreateDrag, kind: QuickCreateKind) {
+        val current = controller.state.value
+        val world = current.viewport.screenToWorld(drop.to)
+        val shape = (current.elements.singleOrNull { it.id in current.selectedIds } as? io.ak1.drawbox.domain.model.Element.Shape)
+            ?.takeIf { it.canHoldText }
+        val note = if (shape == null) activeNoteId?.let { id -> liveDocuments.firstOrNull { it.id == id } } else null
+        val from = shape?.bounds() ?: note?.frame?.toRect() ?: return
+        val direction = CanvasQuickCreate.directionToward(from, world)
+        when (kind) {
+            QuickCreateKind.NOTE -> {
+                val s = session ?: return
+                val frame = newNoteFrame(world)
+                val id = "note-${Clock.System.now().toEpochMilliseconds()}"
+                coroutineScope.launch {
+                    recordingDocuments("adding a note") {
+                        runCatching { s.setDocument(id, "", frame = frame, color = note?.color ?: NoteColors.first().hex) }.onSuccess {
+                            val (start, end) = CanvasQuickCreate.connector(from, frame.toRect(), direction)
+                            if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
+                                CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
+                            }
+                            activeNoteId = id
+                            focusRequest.documentId = id
+                        }
+                    }
+                }
+            }
+            QuickCreateKind.TEXT -> {
+                val undoStepsBefore = current.history.size
+                val before = current.elements.mapTo(HashSet()) { it.id }
+                controller.insertText(
+                    "", world, current.currentItemFontSize, current.currentItemFontFamilyKey,
+                    current.currentItemTextAlignment, current.strokeColor,
+                )
+                val (start, _) = CanvasQuickCreate.connector(from, androidx.compose.ui.geometry.Rect(world, world), direction)
+                CanvasQuickCreate.addArrow(controller, start, world)
+                controller.onIntent(
+                    io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
+                )
+                controller.state.value.elements
+                    .firstOrNull { it.id !in before && it is io.ak1.drawbox.domain.model.Element.Text }
+                    ?.let(::openTextIn)
+            }
+            else -> {
+                val base = shape ?: CanvasQuickCreate.defaultShape(current.strokeColor, current.strokeWidth)
+                val next = CanvasQuickCreate.shapeAt(base, world, kind, current.elements.maxOfOrNull { it.zIndex } ?: 0)
+                addJoinedShape(from, next, direction, fromNote = shape == null)
             }
         }
     }
@@ -793,6 +873,20 @@ fun CanvasWorkspace(
         )
     }
 
+    fun longPressAt(screen: Offset) {
+        val current = controller.state.value
+        val world = current.viewport.screenToWorld(screen)
+        val hit = CanvasWorkspaceSupport.elementAt(current, world, TEXT_HIT_TOLERANCE / current.viewport.scale)
+        if (!compact || hit == null) {
+            openBoardMenu(screen)
+            return
+        }
+        controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
+        val ids = current.selectedIds
+        controller.selectIds(if (hit.id in ids && ids.size > 1) ids - hit.id else ids + hit.id)
+        multiSelecting = true
+    }
+
     // Everything composed inside the board records its document edits into the board's history,
     // so an editor writing a note's text produces undo steps of its own rather than leaving undo
     // with nothing between "the note exists" and "it does not".
@@ -838,6 +932,7 @@ fun CanvasWorkspace(
                 onIntent = controller::onIntent,
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
+                additiveTaps = compact && multiSelecting,
                 // Gestures read the controller's state as it is now, not as of the last frame, so
                 // anything the board dispatches during a press is already seen by that press.
                 liveState = { controller.state.value },
@@ -853,7 +948,7 @@ fun CanvasWorkspace(
                     .fillMaxSize()
                     .clipToBounds()
                     .semantics { contentDescription = "Canvas board" }
-                    .boardContextGesture(::openBoardMenu)
+                    .boardContextGesture(onContext = ::openBoardMenu, onLongPress = ::longPressAt)
                     // On a phone one finger on open board in the select tool pans: dragging is how
                     // you move around a board on a phone. (Two-finger pinch is DrawBox's.)
                     .touchNavigation(
@@ -1266,7 +1361,37 @@ fun CanvasWorkspace(
                     onCreate = ::quickCreate,
                     chromeRegions = chromeRegions,
                     modifier = Modifier.fillMaxSize(),
+                    compact = compact,
+                    onDrag = { quickDrag = it },
+                    // A pull that barely left the target was a fumbled press, not an arrow.
+                    onDrop = { drop -> if ((drop.to - drop.from).getDistance() > QUICK_PULL_MIN_PX) quickDrop = drop },
                 )
+            }
+            // The arrow being pulled out, and while its menu is open, the arrow it will become.
+            (quickDrag ?: quickDrop)?.let { pulled ->
+                val tint = MaterialTheme.colorScheme.primary
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawQuickCreateArrow(pulled.from, pulled.to, tint)
+                }
+            }
+            quickDrop?.let { drop ->
+                Box(modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(drop.to.x.toInt(), drop.to.y.toInt()) }) {
+                    androidx.compose.material3.DropdownMenu(expanded = true, onDismissRequest = { quickDrop = null }) {
+                        QuickCreateKind.entries
+                            // "Same as this" copies a shape; out of a note it would only be a note.
+                            .filter { it != QuickCreateKind.SAME || activeNote == null }
+                            .filter { it != QuickCreateKind.NOTE || session != null }
+                            .forEach { kind ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(kind.label) },
+                                    onClick = {
+                                        quickDrop = null
+                                        quickCreateAt(drop, kind)
+                                    },
+                                )
+                            }
+                    }
+                }
             }
             if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
                 val editable = state.elements.singleOrNull { it.id in state.selectedIds }
@@ -1371,7 +1496,7 @@ fun CanvasWorkspace(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.safeDrawing).padding(CHROME_INSET)
                     .canvasChrome(chromeRegions)
-                    .onGloballyPositioned { foot -> boardBounds?.let { footTop = foot.boundsInRoot().top - it.top } },
+                    .onSizeChanged { footHeight[0] = it.height },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
@@ -1425,6 +1550,27 @@ fun CanvasWorkspace(
 
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
+/** How far (board px) an arrow must be pulled out of a quick-create target to count as one. */
+private const val QUICK_PULL_MIN_PX = 24f
+private const val QUICK_ARROW_HEAD_PX = 14f
+
+/** The arrow being pulled out of a quick-create target: a line with a head at the pointer. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawQuickCreateArrow(
+    from: Offset,
+    to: Offset,
+    color: androidx.compose.ui.graphics.Color,
+) {
+    val stroke = 2.dp.toPx()
+    drawLine(color, from, to, strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+    val d = to - from
+    val length = d.getDistance()
+    if (length < 1f) return
+    val unit = d / length
+    val normal = Offset(-unit.y, unit.x)
+    val back = to - unit * QUICK_ARROW_HEAD_PX
+    drawLine(color, to, back + normal * (QUICK_ARROW_HEAD_PX * 0.6f), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+    drawLine(color, to, back - normal * (QUICK_ARROW_HEAD_PX * 0.6f), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+}
 /** Room kept at the top of the board for its title and sync bar when the keyboard moves the camera. */
 private val KEYBOARD_TOP_RESERVE = 72.dp
 private const val KEYBOARD_SETTLE_MS = 150L

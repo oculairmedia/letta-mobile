@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import io.ak1.drawbox.presentation.PanFling
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -216,7 +217,10 @@ fun DrawBox(
      * showing, so the two do not double-paint.
      */
     hiddenTextElementIds: Set<String> = emptySet(),
+    /** Taps in the select tool toggle elements in and out of the selection instead of replacing it. */
+    additiveTaps: Boolean = false,
 ) {
+    val additiveTapsNow by rememberUpdatedState(additiveTaps)
     // Two-layer split:
     //   - finalizedLayer: cached display list of "static" elements (everything not
     //     currently being mutated). Re-recorded only when the static set OR the
@@ -311,8 +315,8 @@ fun DrawBox(
         state.bgPattern?.toTiledBrush(density, layoutDirection)
     }
 
-    val handleHitPx = with(density) { 16.dp.toPx() }
-    val rotationOffsetPx = with(density) { 28.dp.toPx() }
+    val handleHitPx = with(density) { selectionStyle.hitRadius.toPx() }
+    val rotationOffsetPx = with(density) { selectionStyle.rotationOffset.toPx() }
     val pickTolerancePx = with(density) { 12.dp.toPx() }
     // Screen-space metrics for the selection chrome. Kept in px here (resolved
     // once per density change) and scaled by inverseScale at draw time so the
@@ -335,6 +339,8 @@ fun DrawBox(
     // What gestures act on: the host's live state when it provides one, else the composed one.
     fun stateNow(): State = liveStateRef.value?.invoke() ?: composedState.value
     val latestOnIntent by rememberUpdatedState(onIntent)
+    // A two-finger pan coasts on after the fingers lift, like the one-finger pan a host adds.
+    val pinchFling = remember(scope) { PanFling(scope) { delta -> latestOnIntent(Intent.PanBy(delta)) } }
     // Screen position of the latest press; see the drag handler. A plain holder, not state:
     // nothing draws from it, so writing it must not recompose.
     val press = remember { PressOrigin() }
@@ -496,6 +502,8 @@ fun DrawBox(
                     var multi = false
                     while (true) {
                         val event = awaitPointerEvent()
+                        // Any new touch catches a coasting board.
+                        if (event.changes.any { it.pressed && !it.previousPressed }) pinchFling.stop()
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.size >= 2) {
                             val p1 = pressed[0].position
@@ -506,6 +514,7 @@ fun DrawBox(
                                 multi = true
                                 prevDistance = d
                                 prevCentroid = centroid
+                                pinchFling.begin(pressed[0].uptimeMillis, centroid)
                                 // Cancel any in-progress marquee on the other handler.
                                 if (stateNow().marqueeRect != null) {
                                     latestOnIntent(Intent.SetMarqueeRect(null))
@@ -515,12 +524,15 @@ fun DrawBox(
                                     latestOnIntent(Intent.ZoomBy(d / prevDistance, centroid))
                                 }
                                 latestOnIntent(Intent.PanBy(centroid - prevCentroid))
+                                pinchFling.track(pressed[0].uptimeMillis, centroid)
                                 prevDistance = d
                                 prevCentroid = centroid
                             }
                             event.changes.forEach { it.consume() }
                         } else if (multi) {
                             multi = false
+                            // The pinch ended (fingers rarely lift together): throw at its last speed.
+                            pinchFling.release()
                             event.changes.forEach { it.consume() }
                         }
                     }
@@ -576,7 +588,7 @@ fun DrawBox(
                         val world = s.viewport.screenToWorld(screenPos)
                         val tol = pickTolerancePx / s.viewport.scale
                         when (s.effectiveMode) {
-                            Mode.SELECT -> latestOnIntent(Intent.SelectAt(world, tol))
+                            Mode.SELECT -> latestOnIntent(Intent.SelectAt(world, tol, additive = additiveTapsNow))
                             Mode.PEN -> {
                                 latestOnIntent(Intent.InsertNewPath(world))
                                 latestOnIntent(Intent.UpdateLatestPath(world))
@@ -1275,6 +1287,10 @@ data class SelectionChromeStyle(
     val cornerRadius: Dp = 8.dp,
     val strokeWidth: Dp = 1.5.dp,
     val accent: Color = Color(0xFF2196F3),
+    /** How near a handle a press still grabs it; a finger needs more than a mouse. */
+    val hitRadius: Dp = 16.dp,
+    /** How far above the box the rotation handle floats. */
+    val rotationOffset: Dp = 28.dp,
 ) {
     companion object {
         val Default = SelectionChromeStyle()
