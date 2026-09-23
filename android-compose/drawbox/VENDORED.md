@@ -31,4 +31,11 @@ apps, docs, and upstream's publishing, Dokka, Spotless and lint setup.
 Every change to upstream code is listed here, newest last, with the bead that made it. Keep each
 one small and self-contained so it can be offered back as its own upstream pull request.
 
-_None yet: this module is byte-for-byte upstream v2.1.0 apart from the build file above._
+- `DrawBox.kt` capture: a cancelled bitmap capture rethrows `CancellationException` instead of
+  reporting it as a failed save (letta-mobile-nq2w1).
+
+## Repository policies
+
+Letta's first-party checks do not apply here, so the code stays diffable against upstream: the
+architecture test's package and `commonMain` import rules skip this module, and the detekt
+guardrail skips its files. Build, tests and compiler warnings still apply.

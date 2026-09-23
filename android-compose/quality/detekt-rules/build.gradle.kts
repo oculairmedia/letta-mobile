@@ -42,6 +42,8 @@ val changedKotlinFiles = providers.provider {
     paths.asSequence()
         .filter { it.startsWith("android-compose/") && it.endsWith(".kt") }
         .filterNot { "/build/" in it || "/generated/" in it || "/quality/detekt-rules/" in it }
+        // Vendored upstream source (android-compose/drawbox/VENDORED.md) keeps upstream's API and style.
+        .filterNot { it.startsWith("android-compose/drawbox/") }
         .map(repositoryRoot::resolve)
         .filter(File::isFile)
         .toList()
