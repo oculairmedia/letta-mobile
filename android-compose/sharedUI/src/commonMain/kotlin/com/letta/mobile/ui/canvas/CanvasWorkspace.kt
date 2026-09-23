@@ -164,6 +164,9 @@ fun CanvasWorkspace(
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
     // the board and throws the camera back.
     var lastDrawing by remember { mutableStateOf<String?>(null) }
+    // The text elements this board already knows, so a new, empty one is the text tool's and gets
+    // the caret (see the effect on state.elements below).
+    var knownTextIds by remember(session) { mutableStateOf<Set<String>?>(null) }
     // The active note's formatting controls, drawn at the foot of the board.
     var noteToolbar by remember { mutableStateOf<NoteToolbar?>(null) }
     var isSharingToChat by remember { mutableStateOf(false) }
@@ -263,6 +266,9 @@ fun CanvasWorkspace(
                     if (result.shouldImport && result.cleanJson != null) {
                         // A change from another app must not move this one's camera or tool.
                         controller.importExternal(result.cleanJson)
+                        // Nor put a caret in text placed there: it is known before the caret
+                        // effect sees it, or text placed on a desktop opened a phone's keyboard.
+                        knownTextIds = CanvasTextElements.ids(controller.state.value.elements)
                         lastDrawing = result.cleanJson
                         result.statusMessage?.let { statusMessage = it }
                     }
@@ -1002,7 +1008,6 @@ fun CanvasWorkspace(
             // ELEMENTS rather than from the insert intent: the intent flow is a buffered broadcast
             // that still drops for a subscriber that falls far enough behind, and the elements are
             // the state itself, so a caret read from them cannot go missing.
-            var knownTextIds by remember(session) { mutableStateOf<Set<String>?>(null) }
             LaunchedEffect(state.elements) {
                 val (ids, emptyId) = CanvasWorkspaceSupport.detectNewEmptyTextElement(state.elements, knownTextIds)
                 knownTextIds = ids
