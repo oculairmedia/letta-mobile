@@ -88,6 +88,10 @@ kotlin {
                 // zero-drift conversions, published for android and jvm like everything else here.
                 // Replaces three hand-rolled sliders that only spoke HSL and drifted on round trip.
                 implementation(libs.colorpicker)
+                // Picking images for a canvas: the system photo picker (several at once) on
+                // Android, a file dialog on desktop. The same library the hosts already use.
+                implementation(libs.filekit.core)
+                implementation(libs.filekit.dialogs.compose)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
             }
@@ -96,6 +100,13 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
+            }
+        }
+
+        androidMain {
+            dependencies {
+                // Turning picked photos upright before they go on a canvas.
+                implementation(libs.androidx.exifinterface)
             }
         }
 

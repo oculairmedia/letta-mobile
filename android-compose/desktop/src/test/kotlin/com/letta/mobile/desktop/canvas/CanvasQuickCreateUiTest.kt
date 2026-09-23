@@ -102,4 +102,25 @@ class CanvasQuickCreateUiTest {
             controller.state.value.elements.any { it is Element.Shape && it.shapeType == ShapeType.ARROW }
         }
     }
+
+    @Test
+    fun theTargetsFollowANoteWhileItIsDragged() = runComposeUiTest {
+        val session = session()
+        setContent { CanvasWorkspace(session = session) }
+        onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(500f, 400f)) }
+        onNodeWithText("Note").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        val id = session.documents().single().id
+
+        onNodeWithContentDescription("Move note").performMouseInput {
+            moveTo(center); press(); moveTo(center + Offset(60f, 40f)); moveTo(center + Offset(200f, 100f))
+        }
+        waitForIdle()
+        // Mid-drag, before anything is committed: the target hugs the card where it is now.
+        val card = onNodeWithContentDescription("Note $id").fetchSemanticsNode().boundsInRoot
+        val right = onNodeWithContentDescription("Add to the right").fetchSemanticsNode().boundsInRoot
+        assertTrue(right.left > card.right && right.left - card.right < 40f, "the right target should sit just off the card at ${card.right}, it is at ${right.left}")
+        assertEquals(card.center.y, right.center.y, 1f)
+        onNodeWithContentDescription("Move note").performMouseInput { release() }
+    }
 }

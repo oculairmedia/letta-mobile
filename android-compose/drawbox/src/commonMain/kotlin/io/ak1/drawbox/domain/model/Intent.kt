@@ -259,6 +259,12 @@ sealed class Intent {
     data class SelectIds(val ids: Set<String>) : Intent()
 
     /**
+     * Merge the last [count] undo steps into one, so a host action made of several intents (a
+     * shape and the arrow joining it, say) undoes in one go. The redo stack is untouched.
+     */
+    data class MergeUndoSteps(val count: Int) : Intent()
+
+    /**
      * Request in-place text editing at [offset] (dispatched on a double-tap in
      * [Mode.SELECT]). Selects the topmost [Element.Text] under the point within
      * [tolerance]; when one is hit, the controller emits
