@@ -209,6 +209,31 @@ private fun CanvasNoteCard(
         }
     }
 
+    if (isLabel && !active) {
+        // Not being typed into, a shape's text is only shown: drawn and never hit, so a press
+        // anywhere in the shape reaches the shape - to pick it up, drag it or double-click into
+        // its text - instead of landing on a card in front of it.
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(screenTopLeft.x.roundToInt(), screenTopLeft.y.roundToInt()) }
+                .size(width = widthDp, height = heightDp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
+                .semantics { contentDescription = "Note ${document.id}" },
+            contentAlignment = Alignment.Center,
+        ) {
+            CanvasBlockPreview(
+                json = document.json,
+                style = textStyle,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs),
+            )
+        }
+        return
+    }
+
     // The card and its selection chrome share one placed, scaled box, and the box carries the
     // chrome's margin on every side: the chrome sits OUTSIDE the card, and a handle hanging past
     // its parent's bounds is drawn but never hit, which is how the handles came to look draggable

@@ -3,6 +3,7 @@
 package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -126,5 +127,71 @@ class CanvasTouchAndShapeTextUiTest {
         onNodeWithContentDescription("More options").performClick()
         onNodeWithContentDescription("Hex color").assertExists()
         onNodeWithContentDescription("Opacity").assertExists()
+    }
+
+    private fun hollowRect(id: String) = Element.Shape(
+        id = id,
+        shapeType = io.ak1.drawbox.domain.model.ShapeType.RECTANGLE,
+        points = listOf(Offset(300f, 300f), Offset(500f, 420f)),
+        strokeColor = androidx.compose.ui.graphics.Color.Black,
+        strokeWidth = 2f,
+    )
+
+    @Test
+    fun anOutlineOnlyShapeIsDraggedFromAnywhereInside() = runComposeUiTest {
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session(), controller = controller) }
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(hollowRect("r1")))
+        controller.setMode(Mode.SELECT)
+        waitForIdle()
+
+        // A tap inside picks it, and it stays picked once the tap is over.
+        onNodeWithContentDescription("Canvas board").performMouseInput { click(Offset(400f, 360f)) }
+        mainClock.advanceTimeBy(1000)
+        waitForIdle()
+        assertEquals(setOf("r1"), controller.state.value.selectedIds, "a tap inside an outline-only shape should select it")
+
+        controller.clearSelection()
+        waitForIdle()
+        onNodeWithContentDescription("Canvas board").performMouseInput {
+            moveTo(Offset(400f, 360f))
+            press()
+            moveTo(Offset(430f, 380f))
+            moveTo(Offset(480f, 400f))
+            release()
+        }
+        waitForIdle()
+        val moved = shapes(controller).single().bounds()
+        assertEquals(380f, moved.left, 2f, "dragging from inside should move the shape, it is at $moved")
+        assertEquals(340f, moved.top, 2f, "dragging from inside should move the shape, it is at $moved")
+    }
+
+    @Test
+    fun aShapesTextDoesNotStopTheShapeBeingDragged() = runComposeUiTest {
+        val session = session()
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session, controller = controller) }
+        onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(500f, 400f)) }
+        onNodeWithText("Rectangle").performClick()
+        waitUntil(timeoutMillis = 5000) { onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
+        onAllNodes(isFocused() and hasSetTextAction())[0].performTextInput("Plan")
+        val shape = shapes(controller).single()
+        waitUntil(timeoutMillis = 10_000) { session.documents().any { it.id == "label-${shape.id}" && it.json.contains("Plan") } }
+
+        // Done typing: click away, then drag the shape by its middle, where the text is.
+        onNodeWithContentDescription("Canvas board").performMouseInput { click(Offset(900f, 700f)) }
+        mainClock.advanceTimeBy(1000)
+        waitForIdle()
+        val before = shapes(controller).single().bounds()
+        onNodeWithContentDescription("Canvas board").performMouseInput {
+            moveTo(Offset(500f, 400f))
+            press()
+            moveTo(Offset(530f, 420f))
+            moveTo(Offset(560f, 440f))
+            release()
+        }
+        waitForIdle()
+        val after = shapes(controller).single().bounds()
+        assertEquals(before.left + 60f, after.left, 2f, "the shape should follow a drag that starts on its text")
     }
 }

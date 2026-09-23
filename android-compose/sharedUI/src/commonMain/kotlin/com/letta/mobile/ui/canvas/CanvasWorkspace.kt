@@ -159,10 +159,9 @@ fun CanvasWorkspace(
         localPattern
     }
     LaunchedEffect(backgroundPattern) {
-        // The grid is DrawBox's own (see showGrid below), so the tiled pattern is left unset for
-        // it; otherwise both would draw and we would be back to two grids.
-        val tiled = backgroundPattern.takeIf { it.kind != CanvasBackgroundPattern.GRID }
-        controller.setBackgroundPattern(tiled?.painter(), backgroundPattern.tint())
+        // Every pattern, the grid included, is the board's own tile: DrawBox's grid has one fixed
+        // colour, so the pattern colour control did nothing to it.
+        controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
     }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
@@ -691,20 +690,30 @@ fun CanvasWorkspace(
                 onIntent = controller::onIntent,
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
-                // DrawBox draws a grid of its own, on by default, and the board draws a pattern of
-                // its own on top: two grids at two spacings, which is why the background could not
-                // be turned off — ours went away and its did not.
-                //
-                // Now the setting picks exactly one of them. A grid IS DrawBox's grid, drawn by the
-                // engine that owns the viewport, so it stays crisp at every zoom. Dots and lines
-                // are the board's tiled pattern, which DrawBox has no equivalent for. "None" turns
-                // off both, so none means none.
-                showGrid = backgroundPattern.kind == CanvasBackgroundPattern.GRID,
+                // DrawBox draws a grid of its own, on by default, in one fixed colour. The board's pattern
+                // (grid, dots or lines) is its own tile in the colour the menu sets, so DrawBox's
+                // stays off and "none" means none.
+                showGrid = false,
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
                     .semantics { contentDescription = "Canvas board" }
                     .boardContextGesture(::openBoardMenu)
+                    // DrawBox picks an outline-only shape by its stroke alone; the board takes a
+                    // press inside one itself, to pick it, drag it or double-click into its text.
+                    .hollowShapeGrab(
+                        HollowShapeGrab(
+                            shapeAt = { screen -> CanvasWorkspaceSupport.hollowShapeUnder(controller.state.value, screen, TEXT_HIT_TOLERANCE) },
+                            onPick = ::selectElement,
+                            onBegin = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.BeginTransform) },
+                            onMoveBy = { screenDelta ->
+                                val scale = controller.state.value.viewport.scale
+                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.MoveSelected(screenDelta / scale))
+                            },
+                            onEnd = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.EndTransform) },
+                            onDoubleTap = ::openTextIn,
+                        ),
+                    )
                     // Two fingers always pinch and pan. On a phone one finger on empty board in the
                     // select tool pans too: dragging is how you move around a board on a phone.
                     .touchNavigation(

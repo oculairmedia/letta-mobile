@@ -152,7 +152,9 @@ fun CanvasBlockEditor(
             config = CascadeEditorConfig(
                 blockSelectionEnabled = active,
                 blockDraggingEnabled = active,
-                emptyDocumentPlaceholderEnabled = true,
+                // Cascade sets its placeholder at the start of the line whatever the alignment,
+                // so in a centred label it sat apart from the caret; the caret is enough there.
+                emptyDocumentPlaceholderEnabled = !centerVertically,
             ),
         )
     }

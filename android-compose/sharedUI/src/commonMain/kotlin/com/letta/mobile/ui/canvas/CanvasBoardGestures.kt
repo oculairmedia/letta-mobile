@@ -3,6 +3,7 @@ package com.letta.mobile.ui.canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -16,6 +17,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 
@@ -142,6 +144,77 @@ internal fun Modifier.touchNavigation(
                 }
                 if (navigating) event.changes.forEach { it.consume() }
             } while (pressed.isNotEmpty())
+        }
+    }
+}
+
+/** What [hollowShapeGrab] needs from the board. Screen positions and deltas, board-space shapes. */
+internal class HollowShapeGrab(
+    /** The outline-only shape a press at this screen position is inside, or null to leave it alone. */
+    val shapeAt: (Offset) -> io.ak1.drawbox.domain.model.Element?,
+    val onPick: (io.ak1.drawbox.domain.model.Element) -> Unit,
+    val onBegin: () -> Unit,
+    val onMoveBy: (screenDelta: Offset) -> Unit,
+    val onEnd: () -> Unit,
+    val onDoubleTap: (io.ak1.drawbox.domain.model.Element) -> Unit,
+)
+
+/**
+ * Picking up an outline-only shape by its inside. DrawBox hit-tests such a shape on its stroke
+ * alone, so a press in the middle of a rectangle fell through to the board: it could not be
+ * dragged from there, and a tap selected nothing. A press inside one is taken here instead - it
+ * picks the shape, a drag moves it (one undo step, through DrawBox's own transform intents), and a
+ * second tap on it opens its text.
+ *
+ * Only such presses are taken: anything else, including the shape's stroke and its handles, goes
+ * on to DrawBox untouched.
+ */
+@Composable
+internal fun Modifier.hollowShapeGrab(grab: HollowShapeGrab): Modifier {
+    val latest by rememberUpdatedState(grab)
+    return pointerInput(Unit) {
+        var lastTap: Pair<String, Long>? = null
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.type == PointerType.Mouse && !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+            val shape = latest.shapeAt(down.position) ?: return@awaitEachGesture
+            down.consume()
+            latest.onPick(shape)
+            val dragged = followDrag(down, latest)
+            if (dragged) {
+                latest.onEnd()
+                lastTap = null
+                return@awaitEachGesture
+            }
+            val previous = lastTap
+            lastTap = if (previous != null && previous.first == shape.id &&
+                down.uptimeMillis - previous.second < viewConfiguration.doubleTapTimeoutMillis
+            ) {
+                latest.onDoubleTap(shape)
+                null
+            } else {
+                shape.id to down.uptimeMillis
+            }
+        }
+    }
+}
+
+/** Follows the pointer that went [down] until it lifts, moving once past the slop; true if it moved. */
+private suspend fun AwaitPointerEventScope.followDrag(down: PointerInputChange, grab: HollowShapeGrab): Boolean {
+    var dragging = false
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val change = event.changes.firstOrNull { it.id == down.id } ?: return dragging
+        // Read before consuming: a consumed change reports no movement.
+        val delta = change.positionChangeIgnoreConsumed()
+        change.consume()
+        if (!change.pressed) return dragging
+        if (dragging) {
+            grab.onMoveBy(delta)
+        } else if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+            dragging = true
+            grab.onBegin()
+            grab.onMoveBy(change.position - down.position)
         }
     }
 }
