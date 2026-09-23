@@ -258,7 +258,8 @@ fun CanvasWorkspace(
                     lastImportedRev = result.newImportedRev
                     importedRevision = result.newImportedRev
                     if (result.shouldImport && result.cleanJson != null) {
-                        controller.importPath(result.cleanJson)
+                        // A change from another app must not move this one's camera or tool.
+                        controller.importExternal(result.cleanJson)
                         lastDrawing = result.cleanJson
                         result.statusMessage?.let { statusMessage = it }
                     }

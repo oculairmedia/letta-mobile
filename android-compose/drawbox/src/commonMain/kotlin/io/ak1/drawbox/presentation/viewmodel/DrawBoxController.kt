@@ -505,6 +505,29 @@ class DrawBoxController(
             _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))
         }
     }
+
+    /**
+     * Take in a drawing changed somewhere else (another app, the agent) without disturbing the
+     * person looking at this one: only the elements and background are replaced. Their camera,
+     * tool and its settings stay, and so does the selection of anything that still exists.
+     * Undo history is dropped as [importPath] drops it, since it no longer matches the board.
+     */
+    fun importExternal(jsonString: String) {
+        try {
+            val payLoad = DrawingSerializer.deserialize(jsonString)
+            val ids = payLoad.elements.mapTo(HashSet()) { it.id }
+            val before = _state.value
+            _state.value = before.copy(
+                elements = payLoad.elements,
+                bgColor = payLoad.bgColor,
+                selectedIds = before.selectedIds.filterTo(HashSet()) { it in ids },
+                history = emptyList(),
+                future = emptyList(),
+            ).also { it.invokeBitmap = before.invokeBitmap }
+        } catch (e: Exception) {
+            _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))
+        }
+    }
 }
 
 /**
