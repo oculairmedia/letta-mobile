@@ -319,7 +319,7 @@ class IrohNodeEndpoint(
             return
         }
         Telemetry.event("IrohNode", "canvas.accepted", "remoteEndpointId" to remoteId, "alpn" to alpn.decodeToString())
-        relay.accept(alpn, connection)
+        relay.accept(alpn, connection, origin = remoteId, hostNodeId = nodeIdHex())
     }
 
     private fun isPeerAllowed(remoteId: String): Boolean =
