@@ -118,6 +118,26 @@ class DrawBoxControllerTest {
     }
 
     @Test
+    fun aDrawingChangedElsewhereKeepsThisBoardsCameraToolAndSelection() {
+        val controller = newController()
+        listOf("a", "b").forEach { controller.onIntent(Intent.AddElement(square(it))) }
+        controller.onIntent(Intent.SetMode(io.ak1.drawbox.domain.model.Mode.SELECT))
+        controller.panBy(androidx.compose.ui.geometry.Offset(-420f, 260f))
+        controller.zoomBy(2f, androidx.compose.ui.geometry.Offset.Zero)
+        controller.selectIds(setOf("a", "b"))
+        val camera = controller.state.value.viewport
+        val json = io.ak1.drawbox.domain.model.DrawingSerializer.serialize(
+            io.ak1.drawbox.domain.model.PayLoad(bgColor = Color.White, elements = listOf(square("a"), square("c"))),
+        )
+        controller.importExternal(json)
+        val state = controller.state.value
+        assertEquals(listOf("a", "c"), state.elements.map { it.id })
+        assertEquals(camera, state.viewport)
+        assertEquals(io.ak1.drawbox.domain.model.Mode.SELECT, state.mode)
+        assertEquals(setOf("a"), state.selectedIds)
+    }
+
+    @Test
     fun saveBitmapStillCapturesRightAfterAnIntent() {
         val controller = newController()
         var captured = 0
