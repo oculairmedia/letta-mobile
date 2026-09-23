@@ -48,6 +48,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -121,6 +122,7 @@ class IrohCanvasRelayEndToEndTest {
                 delay(300.milliseconds)
             }
         }
+        assertTrue(seen.any { it.displayName == "Android" })
         watch.cancel()
     }
 
