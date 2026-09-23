@@ -6,6 +6,9 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import io.ak1.drawbox.presentation.PanFling
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
@@ -28,10 +31,15 @@ import androidx.compose.ui.input.pointer.pointerInput
  * A stylus is left alone: a pen held still is a pen about to draw.
  */
 @Composable
-internal fun Modifier.boardContextGesture(onContext: (Offset) -> Unit): Modifier {
+internal fun Modifier.boardContextGesture(
+    onContext: (Offset) -> Unit,
+    /** A finger's long press, when it means something other than a right click. */
+    onLongPress: (Offset) -> Unit = onContext,
+): Modifier {
     // Read through state so a new lambda each recomposition does not restart a gesture mid-press.
     val latest by rememberUpdatedState(onContext)
-    return pointerInput(Unit) { detectBoardContext { latest(it) } }
+    val latestLong by rememberUpdatedState(onLongPress)
+    return pointerInput(Unit) { detectBoardContext { latestLong(it) } }
         .pointerInput(Unit) { detectSecondaryClick { latest(it) } }
 }
 
@@ -113,20 +121,33 @@ internal fun Modifier.touchNavigation(
     val on by rememberUpdatedState(enabled)
     val canPan by rememberUpdatedState(canPanFrom)
     val pan by rememberUpdatedState(onPan)
+    // A thrown board coasts on after the finger lifts; the next touch anywhere catches it.
+    val scope = rememberCoroutineScope()
+    val fling = remember(scope) { PanFling(scope) { delta -> pan(delta) } }
     return pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            fling.stop()
             if (down.type != PointerType.Touch || !on || !canPan(down.position)) return@awaitEachGesture
             var panning = false
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val pressed = event.changes.filter { it.pressed }
+                if (pressed.isEmpty() && panning) {
+                    fling.release()
+                    return@awaitEachGesture
+                }
+                // Lifted without panning, or a second finger for DrawBox's pinch: no throw.
                 if (pressed.size != 1) return@awaitEachGesture
                 val change = pressed.first()
                 when {
-                    panning -> pan(change.positionChange())
+                    panning -> {
+                        pan(change.positionChange())
+                        fling.track(change.uptimeMillis, change.position)
+                    }
                     (change.position - down.position).getDistance() > viewConfiguration.touchSlop -> {
                         panning = true
+                        fling.begin(change.uptimeMillis, change.position)
                         pan(change.position - down.position)
                     }
                 }

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
@@ -72,6 +73,40 @@ class CanvasQuickCreateUiTest {
         waitUntil(timeoutMillis = 5000) { onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
         onAllNodes(isFocused() and hasSetTextAction())[0].performTextInput("Second")
         waitUntil(timeoutMillis = 5000) { rects().first { it.id == next.id }.text == "Second" }
+    }
+
+    @Test
+    fun anArrowPulledOutOfATargetMakesThePickedShapeWhereItIsLetGo() = runComposeUiTest {
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session(), controller = controller) }
+        controller.onIntent(
+            Intent.AddElement(
+                Element.Shape(
+                    id = "a", shapeType = ShapeType.RECTANGLE,
+                    points = listOf(Offset(200f, 200f), Offset(360f, 300f)),
+                    strokeColor = Color.Black, strokeWidth = 2f, text = "First",
+                ),
+            ),
+        )
+        controller.setMode(Mode.SELECT)
+        controller.selectAt(Offset(200f, 250f), 4f)
+        waitForIdle()
+
+        onNodeWithContentDescription("Add to the right").performTouchInput {
+            down(center)
+            repeat(10) { moveBy(Offset(30f, 12f)) }
+            up()
+        }
+        waitUntil(timeoutMillis = 5000) { onAllNodes(androidx.compose.ui.test.hasText("Circle")).fetchSemanticsNodes().isNotEmpty() }
+        onNodeWithText("Circle").performClick()
+
+        fun circles() = controller.state.value.elements.filterIsInstance<Element.Shape>().filter { it.shapeType == ShapeType.CIRCLE }
+        waitUntil(timeoutMillis = 5000) { circles().size == 1 }
+        val circle = circles().single()
+        assertTrue(circle.bounds().center.x > 400f, "out where the arrow was let go, got ${circle.bounds()}")
+        val arrow = controller.state.value.elements.filterIsInstance<Element.Shape>().single { it.shapeType == ShapeType.ARROW }
+        assertEquals("a", arrow.startBinding, "the arrow is bound to the shape it came out of")
+        assertEquals(circle.id, arrow.endBinding, "and to the new one")
     }
 
     @Test

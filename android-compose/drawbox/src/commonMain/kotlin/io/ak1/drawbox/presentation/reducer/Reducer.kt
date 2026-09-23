@@ -195,7 +195,14 @@ class Reducer(
         // Selection
         is Intent.SelectAt -> {
             val hit = useCase.hitTopmost(state.elements, intent.offset, intent.tolerance, state.selectInsideHollowShapes)
-            state.copy(selectedIds = if (hit == null) emptySet() else setOf(hit.id))
+            state.copy(
+                selectedIds = when {
+                    hit == null -> emptySet()
+                    intent.additive && hit.id in state.selectedIds -> state.selectedIds - hit.id
+                    intent.additive -> state.selectedIds + hit.id
+                    else -> setOf(hit.id)
+                },
+            )
         }
         is Intent.RequestTextEditAt -> {
             // Select the tapped text so the edit target is the sole selection;

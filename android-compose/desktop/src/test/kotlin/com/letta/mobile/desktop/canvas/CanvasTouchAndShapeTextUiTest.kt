@@ -98,6 +98,9 @@ class CanvasTouchAndShapeTextUiTest {
     fun twoFingersPinchToZoom() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(controller = controller, layout = CanvasLayout.COMPACT) }
+        // Past the load: a phone board fits its camera once it has loaded, and a pinch made before
+        // that (the fling after it runs the clock on) would be undone by the fit.
+        mainClock.advanceTimeBy(1_000)
         waitForIdle()
 
         onNodeWithContentDescription("Canvas board").performTouchInput {
