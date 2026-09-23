@@ -2,6 +2,7 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import kotlin.test.Test
@@ -15,7 +16,7 @@ class CanvasViewportFitTest {
     @Test
     fun fitScalesAndCentresTheContentInsideTheBoard() {
         val content = Rect(100f, 200f, 1700f, 1000f)
-        val fit = CanvasViewportFit.fit(content, boardWidth = 800f, boardHeight = 600f)
+        val fit = CanvasViewportFit.fit(content, Size(800f, 600f))
         val topLeft = screen(fit, Offset(content.left, content.top))
         val bottomRight = screen(fit, Offset(content.right, content.bottom))
         assertTrue(topLeft.x >= 0f && topLeft.y >= 0f, "$topLeft")
@@ -27,8 +28,8 @@ class CanvasViewportFitTest {
 
     @Test
     fun fitNeverZoomsBeyondTheLimits() {
-        assertEquals(CanvasViewportFit.MAX_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 1f, 1f), 1000f, 1000f).scale)
-        assertEquals(CanvasViewportFit.MIN_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 100000f, 100000f), 100f, 100f).scale)
+        assertEquals(CanvasViewportFit.MAX_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 1f, 1f), Size(1000f, 1000f)).scale)
+        assertEquals(CanvasViewportFit.MIN_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 100000f, 100000f), Size(100f, 100f)).scale)
     }
 
     @Test

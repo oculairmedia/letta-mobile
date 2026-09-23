@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,7 +71,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * [ControlsBarIntent]s (colour, outline) and [CanvasPropertyIntent]s (width, opacity, dash,
  * radius) for [CanvasControlsBridge] to apply to the selection or the tool.
  *
- * [beside] places the popover to the right of the opener (for the tool rail) rather than below it.
+ * [placement] puts the popover below the opener, to its right (for the tool rail), or above it
+ * (for the phone's bottom tool bar).
  */
 @Composable
 fun CanvasPropertyControl(
@@ -78,8 +82,10 @@ fun CanvasPropertyControl(
     dispatchProperty: (CanvasPropertyIntent) -> Unit,
     modifier: Modifier = Modifier,
     note: NoteBarActions? = null,
+    /** The selected shape's own text, when it has some: offered as a Text target beside stroke and fill. */
+    shapeText: NoteBarActions? = null,
     label: String = "Properties",
-    beside: Boolean = false,
+    placement: PropertyPopoverPlacement = PropertyPopoverPlacement.BELOW,
 ) {
     var open by remember { mutableStateOf(false) }
     val swatch = when {
@@ -105,10 +111,18 @@ fun CanvasPropertyControl(
             )
         }
         if (open) {
-            val besideOffset = with(androidx.compose.ui.platform.LocalDensity.current) { IntOffset((OPENER_SIZE + LettaDimens.Space.md).roundToPx(), 0) }
+            val gap = with(androidx.compose.ui.platform.LocalDensity.current) { (OPENER_SIZE + LettaDimens.Space.md).roundToPx() }
             Popup(
-                alignment = if (beside) Alignment.TopStart else Alignment.TopCenter,
-                offset = if (beside) besideOffset else IntOffset.Zero,
+                alignment = when (placement) {
+                    PropertyPopoverPlacement.BELOW -> Alignment.TopCenter
+                    PropertyPopoverPlacement.BESIDE -> Alignment.TopStart
+                    PropertyPopoverPlacement.ABOVE -> Alignment.BottomCenter
+                },
+                offset = when (placement) {
+                    PropertyPopoverPlacement.BELOW -> IntOffset.Zero
+                    PropertyPopoverPlacement.BESIDE -> IntOffset(gap, 0)
+                    PropertyPopoverPlacement.ABOVE -> IntOffset(0, -gap)
+                },
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
@@ -118,12 +132,16 @@ fun CanvasPropertyControl(
                     dispatch = dispatch,
                     dispatchProperty = dispatchProperty,
                     note = note,
+                    shapeText = shapeText,
                     onClose = { open = false },
                 )
             }
         }
     }
 }
+
+/** Where [CanvasPropertyControl] opens its panel relative to the opener. */
+enum class PropertyPopoverPlacement { BELOW, BESIDE, ABOVE }
 
 /** Which colour of the target the embedded picker edits. */
 private enum class ColorTarget(val label: String, val glyph: ImageVector) {
@@ -140,6 +158,7 @@ private fun CanvasPropertyPanel(
     dispatch: (ControlsBarIntent) -> Unit,
     dispatchProperty: (CanvasPropertyIntent) -> Unit,
     note: NoteBarActions?,
+    shapeText: NoteBarActions?,
     onClose: () -> Unit,
 ) {
     val targets = when {
@@ -147,14 +166,21 @@ private fun CanvasPropertyPanel(
         note == null -> listOf(ColorTarget.STROKE)
         note.plain -> listOf(ColorTarget.TEXT)
         else -> listOf(ColorTarget.TEXT, ColorTarget.CARD)
-    }
+    } + if (note == null && shapeText != null) listOf(ColorTarget.TEXT) else emptyList()
+    // Whose text the Text target sets: the note's, or the selected shape's label.
+    val textOwner = note ?: shapeText
     var target by remember(targets) { mutableStateOf(targets.first()) }
     val recent = rememberRecentColors()
-    val style = note?.style ?: CanvasTextStyle()
+    // On a phone the panel opens short - the colours and the one size you reach for - and the rest
+    // waits behind "More options", so it never covers the thing being edited.
+    val compact = LocalCanvasCompact.current
+    var more by remember { mutableStateOf(false) }
+    val full = !compact || more
+    val style = textOwner?.style ?: CanvasTextStyle()
     val current = when (target) {
         ColorTarget.STROKE -> state.strokeColor
         ColorTarget.FILL -> state.fillColor ?: Color.Transparent
-        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: note?.defaultTextColor ?: Color.Black
+        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
         ColorTarget.CARD -> note?.color ?: Color.Transparent
     }
     Surface(
@@ -164,7 +190,11 @@ private fun CanvasPropertyPanel(
         modifier = Modifier.semantics { contentDescription = "Property panel" },
     ) {
         Column(
-            modifier = Modifier.width(PANEL_WIDTH).verticalScroll(rememberScrollState()).padding(LettaDimens.Space.md),
+            modifier = Modifier
+                .width(if (compact) COMPACT_PANEL_WIDTH else PANEL_WIDTH)
+                .heightIn(max = if (compact) COMPACT_PANEL_MAX_HEIGHT else androidx.compose.ui.unit.Dp.Infinity)
+                .verticalScroll(rememberScrollState())
+                .padding(if (compact) LettaDimens.Space.sm else LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -190,7 +220,7 @@ private fun CanvasPropertyPanel(
                     val color = when (t) {
                         ColorTarget.STROKE -> state.strokeColor
                         ColorTarget.FILL -> state.fillColor ?: Color.Transparent
-                        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: note?.defaultTextColor ?: Color.Black
+                        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
                         ColorTarget.CARD -> note?.color ?: Color.Transparent
                     }
                     TargetChip(target = t, color = color, selected = t == target) { target = t }
@@ -215,18 +245,51 @@ private fun CanvasPropertyPanel(
                     when (target) {
                         ColorTarget.STROKE -> dispatch(ControlsBarIntent.SetStrokeColor(color))
                         ColorTarget.FILL -> dispatch(ControlsBarIntent.SetFillColor(color))
-                        ColorTarget.TEXT -> note?.onStyle(style.copy(textColor = color.toHex()))
+                        ColorTarget.TEXT -> textOwner?.onStyle(style.copy(textColor = color.toHex()))
                         ColorTarget.CARD -> note?.onColor(color)
                     }
                     if (done) recent.remember(color)
                 },
                 flat = true,
+                showCustom = full,
             )
 
-            if (note == null) {
-                DrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
-            } else {
-                NoteProperties(note = note, style = style)
+            when {
+                // A shape with text: the settings below follow the chosen colour target, like tabs,
+                // so the panel is the shape's or its text's and never both at once.
+                note == null && full && target == ColorTarget.TEXT && shapeText != null -> NoteProperties(note = shapeText, style = style)
+                note == null && full -> DrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
+                note == null -> ShortDrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
+                full -> NoteProperties(note = note, style = style)
+            }
+            if (!full) {
+                TextButton(onClick = { more = true }, modifier = Modifier.semantics { contentDescription = "More options" }) {
+                    Text("More options", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+/** The phone's short form: the size you reach for most, nothing else. */
+@Composable
+private fun ShortDrawingProperties(properties: CanvasProperties, dispatchProperty: (CanvasPropertyIntent) -> Unit) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (properties.showFontSize) {
+            FontSizes.forEach { (label, size) ->
+                Chip(label = label, description = "Text size $label", selected = properties.fontSize == size) {
+                    dispatchProperty(CanvasPropertyIntent.SetFontSize(size))
+                }
+            }
+        } else {
+            StrokeWidths.forEach { (label, width) ->
+                Chip(label = label, description = "Width $label", selected = properties.strokeWidth == width) {
+                    dispatchProperty(CanvasPropertyIntent.SetStrokeWidth(width))
+                }
             }
         }
     }
@@ -430,3 +493,9 @@ private const val MAX_CORNER_RADIUS = 64f
 private val OPENER_SIZE = LettaDimens.Space.xl
 private val CHIP_HEIGHT = LettaDimens.Control.fieldHeight
 private val PANEL_WIDTH = 280.dp
+
+/** Narrow enough to sit on a 360dp phone with room either side. */
+private val COMPACT_PANEL_WIDTH = 296.dp
+
+/** Short enough to leave the element it edits in view. */
+private val COMPACT_PANEL_MAX_HEIGHT = 320.dp

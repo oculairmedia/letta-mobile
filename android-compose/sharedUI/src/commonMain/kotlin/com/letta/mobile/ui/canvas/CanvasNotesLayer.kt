@@ -167,6 +167,19 @@ private fun CanvasNoteCard(
     // while you work in it: the translucent slab that used to appear on activation read as a
     // half-loaded card. Selection is said by the chrome now, which is what the shapes use.
     val plain = tint != null && tint.alpha == 0f
+    // A shape's label is the shape's text, not a thing of its own: it sits centred in the shape
+    // the way Miro sets it, and the shape carries the selection handles and the moving.
+    val isLabel = plain && CanvasShapeLabels.shapeIdOf(document.id) != null
+    val textStyle = if (isLabel) {
+        (document.style ?: CanvasTextStyle()).let { if (it.align == null) it.copy(align = "center") else it }
+    } else {
+        document.style
+    }
+    val textModifier = if (isLabel) {
+        Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.xs)
+    } else {
+        Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs)
+    }
     val cardColor = when {
         plain -> Color.Transparent
         else -> tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
@@ -194,6 +207,31 @@ private fun CanvasNoteCard(
                 }
             }
         }
+    }
+
+    if (isLabel && !active) {
+        // Not being typed into, a shape's text is only shown: drawn and never hit, so a press
+        // anywhere in the shape reaches the shape - to pick it up, drag it or double-click into
+        // its text - instead of landing on a card in front of it.
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(screenTopLeft.x.roundToInt(), screenTopLeft.y.roundToInt()) }
+                .size(width = widthDp, height = heightDp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
+                .semantics { contentDescription = "Note ${document.id}" },
+            contentAlignment = Alignment.Center,
+        ) {
+            CanvasBlockPreview(
+                json = document.json,
+                style = textStyle,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs),
+            )
+        }
+        return
     }
 
     // The card and its selection chrome share one placed, scaled box, and the box carries the
@@ -279,13 +317,16 @@ private fun CanvasNoteCard(
                     }
                 },
             )
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = if (isLabel) Alignment.Center else Alignment.TopStart,
+            ) {
                 if (expanded) {
                     CanvasBlockPreview(
                         json = document.json,
                         onLightSurface = tint != null && !plain,
-                        style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
+                        style = textStyle,
+                        modifier = textModifier,
                     )
                 } else {
                     CanvasBlockEditor(
@@ -295,11 +336,12 @@ private fun CanvasNoteCard(
                         active = active,
                         onLightSurface = tint != null && !plain,
                         onToolbar = onToolbar,
-                        style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
+                        style = textStyle,
+                        centerVertically = isLabel,
+                        modifier = textModifier,
                     )
                 }
-                if (plain && active) {
+                if (plain && active && !isLabel) {
                     TextMoveGrip(
                         modifier = Modifier.align(Alignment.TopStart),
                         onDragStart = { if (groupDrag == null) gestureActive = true },
@@ -313,7 +355,7 @@ private fun CanvasNoteCard(
 
         // The same chrome a selected shape gets — outline, eight handles, and resize — over the
         // card and reaching outside it, so the outer half of each handle can still be grabbed.
-        if (active || selection.selected) {
+        if ((active || selection.selected) && !isLabel) {
             CanvasSelectionChrome(
                 style = canvasSelectionStyle(),
                 scale = scale,

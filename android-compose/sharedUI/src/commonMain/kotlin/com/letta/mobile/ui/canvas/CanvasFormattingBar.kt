@@ -78,29 +78,45 @@ fun CanvasFormattingBar(
         tonalElevation = LettaDimens.Space.hair,
         shadowElevation = LettaDimens.Space.sm,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BlockButtons.forEach { button ->
-                    val active = focusedType != null && button.matches(focusedType)
-                    BarButton(button.icon, button.label, active) { toolbar.apply(button) }
-                }
+        val blockButtons: @Composable () -> Unit = {
+            BlockButtons.forEach { button ->
+                val active = focusedType != null && button.matches(focusedType)
+                BarButton(button.icon, button.label, active) { toolbar.apply(button) }
             }
+        }
+        val styleButtons: @Composable () -> Unit = {
+            FormattingButtons.forEach { (style, icon, label) ->
+                val active = formatting.styleStatusOf(style) != StyleStatus.Absent
+                BarButton(icon, label, active, enabled = formatting.canFormat) { toolbar.actions.toggleStyle(style) }
+            }
+        }
+        if (LocalCanvasCompact.current) {
+            // A phone keeps it to one row above the keyboard, the way Obsidian does: the inline
+            // styles first, since they are what a caret in a sentence reaches for.
             Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FormattingButtons.forEach { (style, icon, label) ->
-                    val active = formatting.styleStatusOf(style) != StyleStatus.Absent
-                    BarButton(icon, label, active, enabled = formatting.canFormat) { toolbar.actions.toggleStyle(style) }
-                }
+                styleButtons()
+                BarDivider()
+                blockButtons()
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { blockButtons() }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { styleButtons() }
             }
         }
     }
@@ -118,7 +134,6 @@ private fun BarButton(icon: ImageVector, label: String, active: Boolean, enabled
     }
 }
 
-@Suppress("unused")
 @Composable
 private fun BarDivider() {
     Box(
