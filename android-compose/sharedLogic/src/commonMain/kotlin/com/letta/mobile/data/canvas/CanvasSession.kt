@@ -483,9 +483,7 @@ class CanvasSession(
     fun startSync(scope: CoroutineScope): Job? {
         val transport = syncTransport ?: return null
         return scope.launch {
-            transport.subscribe(canvasId).collect { remoteOp ->
-                applyRemote(remoteOp)
-            }
+            transport.deliverTo(canvasId) { remoteOp -> applyRemote(remoteOp) }
         }
     }
 

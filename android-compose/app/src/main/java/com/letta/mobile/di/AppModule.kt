@@ -10,6 +10,7 @@ import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasExternalTools
+import com.letta.mobile.data.canvas.relayTopicOf
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.health.IServerHealthRepository
@@ -137,30 +138,43 @@ abstract class AppModule {
 
         /**
          * Shares canvases through the Iroh host every session graph connects to (attached by
-         * SessionChannelTransportFactory); without one, sessions in this process still share.
+         * SessionChannelTransportFactory). Edits are queued durably in the app's files until the
+         * host acknowledges them; without a host every canvas reports itself local-only.
          */
         @Provides
         @Singleton
-        @Suppress("NoDetachedCoroutineLifecycle") // Process lifetime, like the canvas op log.
-        fun provideIrohCanvasClient(
+        fun provideCanvasRelayClient(
+            @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
             opLog: com.letta.mobile.data.canvas.CanvasOpLog,
-        ): com.letta.mobile.data.transport.iroh.IrohCanvasClient =
-            com.letta.mobile.data.transport.iroh.IrohCanvasClient(
+            documents: com.letta.mobile.data.canvas.CanvasDocumentStore,
+        ): com.letta.mobile.data.canvas.CanvasRelayClient = com.letta.mobile.data.canvas.CanvasRelayClient(
+            opLog = opLog,
+            delivery = com.letta.mobile.data.canvas.FileCanvasDeliveryStore(java.io.File(context.filesDir, "canvas-delivery.json")),
+            topicOf = { id -> documents.relayTopicOf(id) },
+        )
+
+        @Provides
+        @Singleton
+        @Suppress("NoDetachedCoroutineLifecycle") // Process lifetime, like the canvas op log.
+        fun provideIrohCanvasRelayClient(
+            relay: com.letta.mobile.data.canvas.CanvasRelayClient,
+        ): com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient =
+            com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient(
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
-                opLog,
+                relay,
             )
 
         @Provides
         @Singleton
         fun provideCanvasSyncTransport(
-            client: com.letta.mobile.data.transport.iroh.IrohCanvasClient,
-        ): com.letta.mobile.data.canvas.CanvasSyncTransport = client.sync
+            relay: com.letta.mobile.data.canvas.CanvasRelayClient,
+        ): com.letta.mobile.data.canvas.CanvasSyncTransport = relay
 
         @Provides
         @Singleton
         fun provideCanvasPresenceTransport(
-            client: com.letta.mobile.data.transport.iroh.IrohCanvasClient,
-        ): com.letta.mobile.data.canvas.CanvasPresenceTransport = client.presence
+            relay: com.letta.mobile.data.canvas.CanvasRelayClient,
+        ): com.letta.mobile.data.canvas.CanvasPresenceTransport = relay
 
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
         // admin_rpc when the active backend is iroh://. Injected into

@@ -132,3 +132,11 @@ sealed interface CanvasRelayMessage {
     @SerialName("refused")
     data class Refused(val reason: String) : CanvasRelayMessage
 }
+
+/**
+ * The relay topic [id] syncs under in this store: its conversation's (every app opening that
+ * conversation shares one canvas), or its own for a canvas that belongs to no conversation.
+ */
+suspend fun CanvasDocumentStore.relayTopicOf(id: CanvasId): String =
+    get(id)?.conversationId?.takeIf { it.isNotBlank() }?.let(CanvasRelayProtocol::conversationTopic)
+        ?: CanvasRelayProtocol.canvasTopic(id)
