@@ -72,4 +72,69 @@ class DrawBoxControllerTest {
 
         assertEquals(Color.Blue, stateAtEmission)
     }
+
+    private fun square(id: String) = io.ak1.drawbox.domain.model.Element.Shape(
+        id = id,
+        shapeType = io.ak1.drawbox.domain.model.ShapeType.RECTANGLE,
+        points = listOf(androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(10f, 10f)),
+        strokeColor = Color.Black,
+        strokeWidth = 2f,
+    )
+
+    @Test
+    fun aNewElementLandsAboveOneBroughtToFront() {
+        val controller = newController()
+        listOf("a", "b", "c").forEach { controller.onIntent(Intent.AddElement(square(it))) }
+        controller.selectIds(setOf("a"))
+        controller.onIntent(Intent.BringSelectionToFront)
+        controller.selectIds(setOf("b"))
+        controller.onIntent(Intent.DeleteSelected)
+        controller.onIntent(Intent.AddElement(square("d")))
+        val z = controller.state.value.elements.associate { it.id to it.zIndex }
+        assertTrue(z.getValue("d") > z.getValue("a"), "zIndex $z")
+    }
+
+    @Test
+    fun selectIdsSelectsExactlyTheElementsThatExist() {
+        val controller = newController()
+        listOf("a", "b").forEach { controller.onIntent(Intent.AddElement(square(it))) }
+        controller.selectIds(setOf("b", "missing"))
+        assertEquals(setOf("b"), controller.state.value.selectedIds)
+    }
+
+    @Test
+    fun importingADrawingKeepsTheHostsSettings() {
+        val controller = newController()
+        controller.onIntent(Intent.SetSelectInsideHollowShapes(true))
+        controller.onIntent(Intent.SetStrokeColor(Color.Blue))
+        val json = io.ak1.drawbox.domain.model.DrawingSerializer.serialize(
+            io.ak1.drawbox.domain.model.PayLoad(bgColor = Color.White, elements = listOf(square("a"))),
+        )
+        controller.importPath(json)
+        val state = controller.state.value
+        assertEquals(listOf("a"), state.elements.map { it.id })
+        assertTrue(state.selectInsideHollowShapes)
+        assertEquals(Color.Blue, state.strokeColor)
+    }
+
+    @Test
+    fun saveBitmapStillCapturesRightAfterAnIntent() {
+        val controller = newController()
+        var captured = 0
+        controller.state.value.invokeBitmap = { captured++ }
+        controller.onIntent(Intent.SetStrokeWidth(3f))
+        controller.saveBitmap()
+        assertEquals(1, captured)
+    }
+
+    @Test
+    fun mergedUndoStepsUndoTogether() {
+        val controller = newController()
+        controller.onIntent(Intent.AddElement(square("a")))
+        controller.onIntent(Intent.AddElement(square("b")))
+        controller.onIntent(Intent.AddElement(square("c")))
+        controller.onIntent(Intent.MergeUndoSteps(2))
+        controller.onIntent(Intent.Undo)
+        assertEquals(listOf("a"), controller.state.value.elements.map { it.id })
+    }
 }

@@ -12,6 +12,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.compose.ui.geometry.Size
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 /**
  * Android clipboard paste. Reads `ClipboardManager.primaryClip` for an
@@ -70,33 +71,38 @@ actual fun pasteImageFromClipboard(
 private data class ImagePayload(val bytes: ByteArray, val size: Size)
 
 private fun Uri.toImagePayload(resolver: ContentResolver): ImagePayload? {
+    // A clipboard URI can point at any stream: read at most MAX_PASTE_BYTES.
     val raw = try {
-        resolver.openInputStream(this)?.use { it.readBytes() }
-    } catch (e: Throwable) {
+        resolver.openInputStream(this)?.use { it.readAtMost(MAX_PASTE_BYTES) }
+    } catch (e: Exception) {
         null
     } ?: return null
 
     val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(raw, 0, raw.size, opts)
     if (opts.outWidth <= 0 || opts.outHeight <= 0) return null
+    if (opts.outWidth.toLong() * opts.outHeight > MAX_PASTE_PIXELS) return null
 
-    // If the source is already PNG, ship the bytes as-is; otherwise
-    // re-encode through the bitmap path so the SDK's decoder sees a
-    // known PNG container (matches the JVM + iOS behaviour).
-    val mime = opts.outMimeType
-    val bytes = if (mime == "image/png") {
-        raw
-    } else {
-        val bmp = BitmapFactory.decodeByteArray(raw, 0, raw.size) ?: return null
-        ByteArrayOutputStream(64 * 1024).use { out ->
-            if (!bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)) {
-                return null
-            }
-            out.toByteArray()
-        }
-    }
-    return ImagePayload(bytes, Size(opts.outWidth.toFloat(), opts.outHeight.toFloat()))
+    // The original bytes, not a PNG re-encode: re-encoding needed a full-resolution decode (an
+    // out-of-memory risk on large photos) and dropped the EXIF orientation. Every format
+    // BitmapFactory measured above is one the canvas can decode.
+    return ImagePayload(raw, Size(opts.outWidth.toFloat(), opts.outHeight.toFloat()))
 }
+
+/** The whole stream, or null when it is longer than [limit] bytes. */
+private fun InputStream.readAtMost(limit: Int): ByteArray? {
+    val out = ByteArrayOutputStream(64 * 1024)
+    val buffer = ByteArray(64 * 1024)
+    while (true) {
+        val read = read(buffer)
+        if (read < 0) return out.toByteArray()
+        if (out.size() + read > limit) return null
+        out.write(buffer, 0, read)
+    }
+}
+
+private const val MAX_PASTE_BYTES = 50 * 1024 * 1024
+private const val MAX_PASTE_PIXELS = 100_000_000L
 
 private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 

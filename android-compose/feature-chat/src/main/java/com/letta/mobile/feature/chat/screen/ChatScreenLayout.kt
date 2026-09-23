@@ -521,6 +521,7 @@ private fun ChatScreenComposerInputSection(
         onPicked = { viewModel.addAttachment(it) },
         onError = { viewModel.reportComposerError(it) },
         limits = viewModel.attachmentLimits,
+        pendingCount = composerState.pendingAttachments.size,
     )
     val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
     ChatComposer(

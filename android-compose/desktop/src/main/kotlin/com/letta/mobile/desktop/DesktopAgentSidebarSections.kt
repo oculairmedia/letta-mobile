@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -355,8 +356,9 @@ private fun SidebarConversationListItem(
 private fun SidebarEmptyHint(text: String) = LettaEmptyHint(text)
 
 /**
- * One shared canvas in the sidebar library: icon, title, last-edit time. On hover the icon
- * becomes a one-click archive (or restore) button, as a conversation's does.
+ * One shared canvas in the sidebar library: icon, title, last-edit time. On hover, or while the
+ * row or its button has keyboard focus, the icon becomes a one-click archive (or restore) button,
+ * as a conversation's does.
  */
 @Composable
 private fun SidebarCanvasListItem(
@@ -368,6 +370,7 @@ private fun SidebarCanvasListItem(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    var focused by remember { mutableStateOf(false) }
     LettaListRow(
         spec = LettaListRowSpec(
             title = canvas.title,
@@ -376,9 +379,11 @@ private fun SidebarCanvasListItem(
             selected = selected,
         ),
         onClick = onClick,
-        modifier = Modifier.hoverable(interaction),
+        modifier = Modifier
+            .hoverable(interaction)
+            .onFocusChanged { focused = it.hasFocus },
         leading = {
-            if (hovered) {
+            if (hovered || focused) {
                 Icon(
                     imageVector = if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
                     contentDescription = if (archived) "Restore canvas" else "Archive canvas",
