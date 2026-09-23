@@ -13,6 +13,7 @@ import com.letta.mobile.avatar.rive.RiveAvatarRuntime
 import com.letta.mobile.ui.mascot.MascotEntries
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
+import com.letta.mobile.ui.mascot.MascotStills
 import kotlinx.coroutines.withContext
 
 /**
@@ -100,6 +101,20 @@ object DesktopMascotHost : MascotHost {
         // Nothing until the scene is up; the entry's state flips and this recomposes into it.
         val scene = (entry as DesktopMascotEntry).scene ?: return
         RiveDesktopSurface(scene, modifier, playing = playing)
+    }
+
+    /** Captured once per identity and kept on disk; see [MascotStills]. */
+    override val stills: MascotStills? by lazy {
+        val bytes = mascotBytes
+        if (bytes == null || !RiveBridgeNative.AVAILABLE) {
+            null
+        } else {
+            MascotStills(
+                assetVersion = mascotAssetVersion(bytes),
+                store = DesktopMascotStillStore(),
+                capture = { identity -> captureDesktopMascotStill(bytes, identity) },
+            )
+        }
     }
 
     fun closeAll() = entries.closeAll()
