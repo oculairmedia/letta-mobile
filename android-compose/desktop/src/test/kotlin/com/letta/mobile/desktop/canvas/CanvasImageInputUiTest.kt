@@ -37,7 +37,13 @@ class CanvasImageInputUiTest {
     }
 
     @Test
-    fun ctrlVPastesAnImageFromTheClipboard() = runComposeUiTest {
+    fun ctrlVPastesAnImageFromTheClipboard() {
+        // The system clipboard needs a display; headless CI has none (HeadlessException).
+        org.junit.Assume.assumeFalse("No system clipboard when headless", java.awt.GraphicsEnvironment.isHeadless())
+        pastesAnImageFromTheClipboard()
+    }
+
+    private fun pastesAnImageFromTheClipboard() = runComposeUiTest {
         val image = BufferedImage(320, 200, BufferedImage.TYPE_INT_RGB)
         Toolkit.getDefaultToolkit().systemClipboard.setContents(
             object : Transferable {
