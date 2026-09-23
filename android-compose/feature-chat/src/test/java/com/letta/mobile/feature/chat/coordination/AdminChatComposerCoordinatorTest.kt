@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -17,18 +18,21 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AdminChatComposerCoordinatorTest {
 
     private lateinit var coordinator: AdminChatComposerCoordinator
@@ -121,6 +125,44 @@ class AdminChatComposerCoordinatorTest {
         
         verify { composerController.setError(any()) }
         verify(exactly = 0) { chatSendStrategySelector.send(any(), any(), any()) }
+    }
+
+    @Test
+    fun `free text answers a pending single question instead of starting a turn`() {
+        val submitted = mutableListOf<Pair<AdminChatComposerCoordinator.PendingUserInput, String>>()
+        val pending = AdminChatComposerCoordinator.PendingUserInput(
+            requestId = "req-1",
+            toolCallId = "tool-1",
+            arguments = """{"questions":[{"question":"Which route?","options":[{"label":"Direct"}]}]}""",
+            question = "Which route?",
+        )
+        coordinator = AdminChatComposerCoordinator(
+            scope = testScope,
+            composerController = composerController,
+            chatSendStrategySelector = chatSendStrategySelector,
+            chatBannerController = chatBannerController,
+            uiState = uiState,
+            agentId = AgentId("agent_123"),
+            explicitConversationId = "conv_123",
+            backendKind = { BackendKind.REST },
+            sessionManager = sessionManager,
+            messageRepository = messageRepository,
+            slashCommandRepository = slashCommandRepository,
+            isStreaming = { true },
+            pendingUserInput = { pending },
+            submitUserInput = { input, reason -> submitted += input to reason },
+            projectContextAvailable = true,
+        )
+
+        coordinator.submitComposer("route over Iroh")
+
+        assertEquals(1, submitted.size)
+        assertEquals(pending, submitted.single().first)
+        val updatedInput = AskUserQuestion.decodeAnswerReason(submitted.single().second)
+        assertEquals("route over Iroh", updatedInput?.get("answers")?.jsonObject?.get("Which route?")?.jsonPrimitive?.content)
+        verify { composerController.clearText() }
+        verify(exactly = 0) { chatSendStrategySelector.send(any(), any(), any()) }
+        verify(exactly = 0) { composerController.setError(any()) }
     }
 
     @Test

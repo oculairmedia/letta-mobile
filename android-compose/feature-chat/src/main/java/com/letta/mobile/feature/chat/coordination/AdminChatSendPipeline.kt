@@ -1,13 +1,14 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AskUserQuestion
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.WsChatBridge
-import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.send.IrohChatSendStrategy
 import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
@@ -41,6 +42,7 @@ internal class AdminChatSendPipeline(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val composerController: ChatComposerController,
     private val chatBannerController: ChatBannerController,
+    private val submitApproval: (String, List<String>, Boolean, String?) -> Unit,
     private val backendKind: () -> BackendKind,
     private val activeConversationId: () -> String?,
     private val setActiveConversationId: (String?) -> Unit,
@@ -158,6 +160,28 @@ internal class AdminChatSendPipeline(
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
             isStreaming = { uiState.value.isStreaming },
+            pendingUserInput = {
+                uiState.value.messages.asReversed().firstNotNullOfOrNull { message ->
+                    val approval = message.approvalRequest ?: return@firstNotNullOfOrNull null
+                    val toolCall = approval.toolCalls.singleOrNull {
+                        it.name == AskUserQuestion.ASK_USER_QUESTION_TOOL
+                    } ?: return@firstNotNullOfOrNull null
+                    val question = AskUserQuestion.parse(toolCall.arguments)
+                        ?.questions
+                        ?.singleOrNull()
+                        ?.question
+                        ?: return@firstNotNullOfOrNull null
+                    AdminChatComposerCoordinator.PendingUserInput(
+                        requestId = approval.requestId,
+                        toolCallId = toolCall.toolCallId,
+                        arguments = toolCall.arguments,
+                        question = question,
+                    )
+                }
+            },
+            submitUserInput = { pending, reason ->
+                submitApproval(pending.requestId, listOf(pending.toolCallId), true, reason)
+            },
             projectContextAvailable = projectContextAvailable,
         )
     }
