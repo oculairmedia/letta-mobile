@@ -11,6 +11,7 @@ import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.domain.usecase.SvgExporter
 import io.ak1.drawbox.presentation.reducer.Reducer
+import io.ak1.drawbox.presentation.reducer.holdsText
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -178,13 +179,13 @@ class DrawBoxController(
             // Double-tap in SELECT mode: open the editor for the hit text.
             is Intent.RequestTextEditAt ->
                 reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance, prev.selectInsideHollowShapes)
-                    .let { it as? Element.Text }
+                    ?.takeIf { it.holdsText() }
                     ?.let { _events.tryEmit(Event.TextEditRequested(it.id)) }
             // Second tap on an already-sole-selected text opens the editor too
             // (tldraw/Figma pattern). `prev` is the pre-reduce selection.
             is Intent.SelectAt -> {
                 val hit = reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance, prev.selectInsideHollowShapes)
-                if (hit is Element.Text && prev.selectedIds == setOf(hit.id)) {
+                if (hit != null && hit.holdsText() && prev.selectedIds == setOf(hit.id)) {
                     _events.tryEmit(Event.TextEditRequested(hit.id))
                 }
             }

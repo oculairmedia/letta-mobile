@@ -4,6 +4,10 @@ package io.ak1.drawbox.domain.usecase
 
 import androidx.compose.ui.graphics.Color
 import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.bounds
+import io.ak1.drawbox.domain.model.textBox
+import io.ak1.drawbox.domain.model.resolvedTextColor
+import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.StrokeStyle
 import androidx.compose.ui.geometry.Offset
@@ -40,7 +44,10 @@ object SvgExporter {
         elements.sortedBy { it.zIndex }.forEach { element ->
             when (element) {
                 is Element.Path -> svgElements.add(pathToSvg(element))
-                is Element.Shape -> svgElements.add(shapeToSvg(element))
+                is Element.Shape -> {
+                    svgElements.add(shapeToSvg(element))
+                    shapeTextToSvg(element)?.let(svgElements::add)
+                }
                 is Element.Image -> svgElements.add(imageToSvg(element))
                 is Element.Text -> svgElements.add(textToSvg(element))
             }
@@ -385,6 +392,32 @@ object SvgExporter {
     private fun normalize(v: Offset): Offset {
         val len = sqrt(v.x * v.x + v.y * v.y)
         return if (len > 0f) Offset(v.x / len, v.y / len) else Offset.Zero
+    }
+
+    /**
+     * A shape's text as a text block in the shape's text box, centred top to bottom by the same
+     * line estimate [wrapTextForSvg] makes, and turned with the shape.
+     */
+    private fun shapeTextToSvg(shape: Element.Shape): String? {
+        if (shape.text.isEmpty() || !shape.canHoldText) return null
+        val box = shape.textBox()
+        val lines = wrapTextForSvg(shape.text, box.width, shape.fontSize, shape.fontFamilyKey).size
+        val height = shape.fontSize + (lines - 1) * shape.fontSize * 1.25f
+        val block = Element.Text(
+            id = shape.id,
+            text = shape.text,
+            fontFamilyKey = shape.fontFamilyKey,
+            fontSize = shape.fontSize,
+            color = shape.resolvedTextColor,
+            alignment = shape.textAlignment,
+            topLeft = androidx.compose.ui.geometry.Offset(box.left, box.center.y - height / 2f),
+            wrapWidth = box.width,
+            measuredHeight = height,
+        )
+        val svg = textToSvg(block)
+        if (shape.rotation == 0f) return svg
+        val c = shape.bounds().center
+        return """<g transform="rotate(${shape.rotation}, ${c.x}, ${c.y})">$svg</g>"""
     }
 
     private fun textToSvg(text: Element.Text): String {

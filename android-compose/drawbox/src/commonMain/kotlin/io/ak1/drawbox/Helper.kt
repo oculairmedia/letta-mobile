@@ -121,7 +121,8 @@ internal class PathCache {
      */
     fun retainOnly(liveIds: Set<String>) {
         if (byId.isEmpty()) return
-        byId.keys.retainAll(liveIds)
+        // A shape's text is cached under its id plus SHAPE_TEXT_KEY and lives as long as the shape.
+        byId.keys.retainAll { it.removeSuffix(SHAPE_TEXT_KEY) in liveIds }
     }
 
     fun size(): Int = byId.size
@@ -302,7 +303,10 @@ internal class TextLayoutCache {
         val layout = measurer.measure(
             text = text,
             style = style,
-            constraints = Constraints(maxWidth = wrapWidth.toInt().coerceAtLeast(1)),
+            // The full wrap width, not just a cap on it: with only a maximum the layout shrinks to
+            // the text, and centring or right-aligning then happens inside that shrunken box, so
+            // a short centred line sat at the left of its box.
+            constraints = Constraints.fixedWidth(wrapWidth.toInt().coerceAtLeast(1)),
             softWrap = true,
         )
         byId[id] = Entry(key, layout)
@@ -311,7 +315,8 @@ internal class TextLayoutCache {
 
     fun retainOnly(liveIds: Set<String>) {
         if (byId.isEmpty()) return
-        byId.keys.retainAll(liveIds)
+        // A shape's text is cached under its id plus SHAPE_TEXT_KEY and lives as long as the shape.
+        byId.keys.retainAll { it.removeSuffix(SHAPE_TEXT_KEY) in liveIds }
     }
 
     fun size(): Int = byId.size
@@ -322,3 +327,6 @@ private fun TextAlignment.toComposeAlign(): TextAlign = when (this) {
     TextAlignment.CENTER -> TextAlign.Center
     TextAlignment.RIGHT -> TextAlign.Right
 }
+
+/** Suffix of a shape's text entry in [TextLayoutCache], after the shape's id. */
+internal const val SHAPE_TEXT_KEY: String = "#text"

@@ -97,6 +97,10 @@ import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBoundsForElement
 import io.ak1.drawbox.domain.model.rotateAround
 import io.ak1.drawbox.domain.model.topmostHit
+import io.ak1.drawbox.domain.model.textTopLeft
+import io.ak1.drawbox.domain.model.textBox
+import io.ak1.drawbox.domain.model.resolvedTextColor
+import io.ak1.drawbox.domain.model.canHoldText
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.absoluteValue
@@ -197,6 +201,20 @@ fun DrawBox(
      * grow or shrink the gap between an element and its selection box.
      */
     selectionStyle: SelectionChromeStyle = SelectionChromeStyle.Default,
+    /**
+     * Where gestures read the state from, when the host has it live (for example
+     * `{ controller.state.value }`). Gestures otherwise read [state], which is the
+     * value this composable was last composed with: an intent the host dispatches
+     * during a press (selecting what was pressed, say) is not seen by the same
+     * gesture until the next frame. Null keeps that behaviour.
+     */
+    liveState: (() -> State)? = null,
+    /**
+     * Shapes whose text is not drawn, the shape itself still is: the one whose
+     * text an editor (such as [io.ak1.drawbox.text.InlineShapeTextEditor]) is
+     * showing, so the two do not double-paint.
+     */
+    hiddenTextElementIds: Set<String> = emptySet(),
 ) {
     // Two-layer split:
     //   - finalizedLayer: cached display list of "static" elements (everything not
@@ -311,7 +329,10 @@ fun DrawBox(
     // The pointerInput coroutines are long-lived; reading state/onIntent through
     // rememberUpdatedState lets gesture callbacks see the current value without
     // re-keying (and re-allocating) the pointerInput block on every state change.
-    val latestState by rememberUpdatedState(state)
+    val composedState = rememberUpdatedState(state)
+    val liveStateRef = rememberUpdatedState(liveState)
+    // What gestures act on: the host's live state when it provides one, else the composed one.
+    fun stateNow(): State = liveStateRef.value?.invoke() ?: composedState.value
     val latestOnIntent by rememberUpdatedState(onIntent)
     // Screen position of the latest press; see the drag handler. A plain holder, not state:
     // nothing draws from it, so writing it must not recompose.
@@ -351,13 +372,13 @@ fun DrawBox(
                 if (event.key == Key.Spacebar) {
                     when (event.type) {
                         KeyEventType.KeyDown -> {
-                            if (!latestState.tempPanActive) {
+                            if (!stateNow().tempPanActive) {
                                 latestOnIntent(Intent.SetTempPan(true))
                             }
                             true
                         }
                         KeyEventType.KeyUp -> {
-                            if (latestState.tempPanActive) {
+                            if (stateNow().tempPanActive) {
                                 latestOnIntent(Intent.SetTempPan(false))
                             }
                             true
@@ -416,7 +437,7 @@ fun DrawBox(
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        if (latestState.effectiveMode != Mode.ERASER) continue
+                        if (stateNow().effectiveMode != Mode.ERASER) continue
                         when (event.type) {
                             PointerEventType.Move,
                             PointerEventType.Enter,
@@ -424,7 +445,7 @@ fun DrawBox(
                             -> {
                                 val pos = event.changes.firstOrNull()?.position
                                 eraserPointerWorld = pos?.let {
-                                    latestState.viewport.screenToWorld(it)
+                                    stateNow().viewport.screenToWorld(it)
                                 }
                             }
                             PointerEventType.Exit -> {
@@ -485,7 +506,7 @@ fun DrawBox(
                                 prevDistance = d
                                 prevCentroid = centroid
                                 // Cancel any in-progress marquee on the other handler.
-                                if (latestState.marqueeRect != null) {
+                                if (stateNow().marqueeRect != null) {
                                     latestOnIntent(Intent.SetMarqueeRect(null))
                                 }
                             } else {
@@ -542,7 +563,7 @@ fun DrawBox(
                         // in-place edit. The controller resolves the hit and
                         // emits Event.TextEditRequested for the host to open its
                         // editor; non-text hits are no-ops.
-                        val s = latestState
+                        val s = stateNow()
                         if (s.effectiveMode == Mode.SELECT) {
                             val world = s.viewport.screenToWorld(screenPos)
                             val tol = pickTolerancePx / s.viewport.scale
@@ -550,7 +571,7 @@ fun DrawBox(
                         }
                     },
                     onTap = { screenPos ->
-                        val s = latestState
+                        val s = stateNow()
                         val world = s.viewport.screenToWorld(screenPos)
                         val tol = pickTolerancePx / s.viewport.scale
                         when (s.effectiveMode) {
@@ -609,7 +630,7 @@ fun DrawBox(
                 detectDragGestures(
                     onDragStart = { slopScreenPos ->
                         val screenPos = press.screen ?: slopScreenPos
-                        val s = latestState
+                        val s = stateNow()
                         val world = s.viewport.screenToWorld(screenPos)
                         lastWorld = world
                         when (s.effectiveMode) {
@@ -671,7 +692,7 @@ fun DrawBox(
                         }
                     },
                     onDragEnd = {
-                        val s = latestState
+                        val s = stateNow()
                         if (s.mode == Mode.SELECT) {
                             val rect = s.marqueeRect
                             if (interaction is SelectionInteraction.Marquee && rect != null) {
@@ -701,12 +722,12 @@ fun DrawBox(
                         dragInProgress = false
                     },
                     onDragCancel = {
-                        if (latestState.mode == Mode.SELECT &&
+                        if (stateNow().mode == Mode.SELECT &&
                             interaction is SelectionInteraction.Marquee
                         ) {
                             latestOnIntent(Intent.SetMarqueeRect(null))
                         }
-                        if (latestState.mode == Mode.ERASER) {
+                        if (stateNow().mode == Mode.ERASER) {
                             latestOnIntent(Intent.EndErase)
                         }
                         latestOnIntent(Intent.EndTransform)
@@ -714,7 +735,7 @@ fun DrawBox(
                         dragInProgress = false
                     },
                 ) { change, dragAmount ->
-                    val s = latestState
+                    val s = stateNow()
                     val world = s.viewport.screenToWorld(change.position)
                     when (s.effectiveMode) {
                         Mode.PAN -> latestOnIntent(Intent.PanBy(dragAmount))
@@ -806,7 +827,7 @@ fun DrawBox(
             // - PEN / shape modes: the just-inserted element (always elements.last())
             // - SELECT (Move/Resize/Rotate/LineEndpoint/LineBend): state.selectedIds
             // - Marquee / Pan / no drag: empty
-            val activeIds: Set<String> = if (!dragInProgress) {
+            val draggedIds: Set<String> = if (!dragInProgress) {
                 emptySet()
             } else {
                 when (state.effectiveMode) {
@@ -828,6 +849,10 @@ fun DrawBox(
                     }
                 }
             }
+
+            // A shape whose text is being edited is drawn live too, without its text: the cached
+            // layer would otherwise keep replaying the text under the editor.
+            val activeIds: Set<String> = if (hiddenTextElementIds.isEmpty()) draggedIds else draggedIds + hiddenTextElementIds
 
             // Freshness check on the cached layer. Walks orderedElements once,
             // comparing non-active and non-hidden entries against
@@ -856,7 +881,7 @@ fun DrawBox(
                     }) {
                         orderedElements.forEach { el ->
                             if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale)
+                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
                             }
                         }
                     }
@@ -878,7 +903,7 @@ fun DrawBox(
             }) {
                 if (activeIds.isNotEmpty()) {
                     orderedElements.forEach { el ->
-                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale)
+                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
                     }
                 }
                 drawSelectionChrome(
@@ -1498,12 +1523,13 @@ private fun DrawScope.renderElement(
     textCache: TextLayoutCache? = null,
     textMeasurer: androidx.compose.ui.text.TextMeasurer? = null,
     viewportScale: Float = 1f,
+    hideShapeText: Boolean = false,
 ) {
     if (element.rotation == 0f) {
-        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale)
+        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
     } else {
         withTransform({ rotate(element.rotation, pivot = element.bounds().center) }) {
-            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale)
+            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
         }
     }
 }
@@ -1515,6 +1541,7 @@ private fun DrawScope.renderElementContent(
     textCache: TextLayoutCache?,
     textMeasurer: androidx.compose.ui.text.TextMeasurer?,
     viewportScale: Float,
+    hideShapeText: Boolean = false,
 ) {
     when (element) {
         is Element.Path -> {
@@ -1560,6 +1587,7 @@ private fun DrawScope.renderElementContent(
         }
         is Element.Shape -> {
             drawShape(element)
+            if (!hideShapeText) drawShapeText(element, textCache, textMeasurer)
         }
         is Element.Image -> {
             drawImageElement(element, imageCache, viewportScale)
@@ -1568,6 +1596,35 @@ private fun DrawScope.renderElementContent(
             drawTextElement(element, textCache, textMeasurer)
         }
     }
+}
+
+/**
+ * A shape's text, wrapped to [textBox] and centred in it. Laid out through the same
+ * [TextLayoutCache] as text elements, under the shape's id plus [SHAPE_TEXT_KEY]. Skipped on
+ * the read-only preview path, which has no measurer.
+ */
+private fun DrawScope.drawShapeText(
+    shape: Element.Shape,
+    textCache: TextLayoutCache?,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer?,
+) {
+    if (shape.text.isEmpty() || !shape.canHoldText) return
+    if (textCache == null || textMeasurer == null) return
+    val box = shape.textBox()
+    val layout = textCache.layoutFor(
+        id = shape.id + SHAPE_TEXT_KEY,
+        text = shape.text,
+        fontFamilyKey = shape.fontFamilyKey,
+        fontSize = shape.fontSize,
+        alignment = shape.textAlignment,
+        wrapWidth = box.width.coerceAtLeast(1f),
+        measurer = textMeasurer,
+    )
+    drawText(
+        textLayoutResult = layout,
+        color = shape.resolvedTextColor,
+        topLeft = shape.textTopLeft(layout.size.height.toFloat()),
+    )
 }
 
 /**

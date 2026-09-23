@@ -396,6 +396,12 @@ sealed class Intent {
     /** Change the world-space eraser radius used by [Mode.ERASER]. */
     data class SetEraserSize(val size: Float) : Intent()
 
+    /**
+     * Colour of the selection's text: an [Element.Text]'s colour, or a shape's
+     * [Element.Shape.textColor]. Snapshots history.
+     */
+    data class SetSelectedTextColor(val color: androidx.compose.ui.graphics.Color) : Intent()
+
     /** Set [State.selectInsideHollowShapes]. No history snapshot: it is not drawing content. */
     data class SetSelectInsideHollowShapes(val enabled: Boolean) : Intent()
 

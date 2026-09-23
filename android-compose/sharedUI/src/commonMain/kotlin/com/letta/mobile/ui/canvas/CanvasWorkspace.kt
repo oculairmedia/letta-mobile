@@ -62,6 +62,7 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
+import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.usecase.UseCase
@@ -158,6 +159,15 @@ fun CanvasWorkspace(
     } else {
         localPattern
     }
+    // Shape text used to be a separate "label" document laid over the shape. It is the shape's
+    // own now; any label still on the board (an older canvas, or a peer on an older app) is folded
+    // into its shape's text and removed.
+    LaunchedEffect(documents, state.elements, session, initialLoadDone) {
+        val s = session ?: return@LaunchedEffect
+        if (!initialLoadDone) return@LaunchedEffect
+        CanvasWorkspaceSupport.foldLabelsIntoShapes(s, controller)
+    }
+
     // A shape on this board is a box you grab and type into, so a hollow one is picked anywhere
     // inside it, not only on its outline (DrawBox's default, where hollow shapes are frames).
     LaunchedEffect(controller) {
@@ -494,16 +504,12 @@ fun CanvasWorkspace(
                                 offset = intent.offset,
                                 tolerance = intent.tolerance,
                                 elements = controller.state.value.elements,
-                                session = session,
                                 onEditText = { editingTextId = it },
-                                onActivateShapeLabel = { labelId ->
-                                    // However the text was asked for (a double click, the menu),
-                                    // the shape is what is selected while it is typed.
-                                    CanvasShapeLabels.shapeIdOf(labelId)
-                                        ?.let { shapeId -> controller.state.value.elements.firstOrNull { it.id == shapeId } }
-                                        ?.let(::selectElement)
-                                    activeNoteId = labelId
-                                    focusRequest.documentId = labelId
+                                // However the text was asked for (a double click, the menu), the
+                                // shape is what is selected while it is typed.
+                                onEditShapeText = { shape ->
+                                    selectElement(shape)
+                                    editingTextId = shape.id
                                 },
                             ),
                         )
@@ -581,19 +587,15 @@ fun CanvasWorkspace(
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
         null -> false
     }
-    // Puts the caret in [element]: a text element's own editor, or a closed shape's label (created
-    // on first use).
+    // Puts the caret in [element]: a text element's own editor, or the text of a shape that holds
+    // it. A shape stays selected while its text is typed: the menu that floats up is the shape's,
+    // because the shape is the thing being worked on.
     fun openTextIn(element: io.ak1.drawbox.domain.model.Element) {
         when {
             element is io.ak1.drawbox.domain.model.Element.Text -> editingTextId = element.id
-            CanvasShapeLabels.canLabel(element) && session != null -> {
-                // The shape stays selected while its text is typed: the menu that floats up is the
-                // shape's (stroke, fill, order), because the shape is the thing being worked on.
+            element is io.ak1.drawbox.domain.model.Element.Shape && element.canHoldText -> {
                 selectElement(element)
-                focusRequest.documentId = CanvasShapeLabels.labelIdOf(element.id)
-                controller.onIntent(
-                    io.ak1.drawbox.domain.model.Intent.RequestTextEditAt(element.bounds().center, TEXT_HIT_TOLERANCE),
-                )
+                editingTextId = element.id
             }
         }
     }
@@ -652,7 +654,7 @@ fun CanvasWorkspace(
             screen = screen,
             world = world,
             onElement = hit != null,
-            canEditText = CanvasWorkspaceSupport.holdsText(hit, hasSession = session != null),
+            canEditText = CanvasWorkspaceSupport.holdsText(hit),
         )
     }
 
@@ -696,6 +698,11 @@ fun CanvasWorkspace(
                 onIntent = controller::onIntent,
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
+                // Gestures read the controller's state as it is now, not as of the last frame, so
+                // anything the board dispatches during a press is already seen by that press.
+                liveState = { controller.state.value },
+                // The shape whose text is being typed keeps its outline; its text is the editor's.
+                hiddenTextElementIds = setOfNotNull(editingShapeText(state.elements, editingTextId)?.id),
                 // A grid is DrawBox's: crisp one-pixel lines at every zoom, in the colour and spacing the
                 // background menu sets. Dots and lines are the board's tile instead, and "none"
                 // turns both off.
@@ -721,6 +728,7 @@ fun CanvasWorkspace(
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                                 if (event.type == PointerEventType.Press && expandedNoteId == null) activeNoteId = null
+                                if (event.type == PointerEventType.Press) editingTextId = null
                                 if (event.type == PointerEventType.Press) runCatching { boardFocus.requestFocus() }
                             }
                         }
@@ -776,6 +784,16 @@ fun CanvasWorkspace(
                     state.viewport,
                     editingText.text,
                 ) { typed -> controller.updateText(editingText.id, typed) }
+            }
+            // A shape's text is typed in place, over the shape, the same way.
+            val editingShape = editingShapeText(state.elements, editingTextId)
+            if (editingShape != null) {
+                io.ak1.drawbox.text.InlineShapeTextEditor(
+                    editingShape,
+                    state.viewport,
+                    editingShape.text,
+                    onDraftChange = { typed -> controller.updateText(editingShape.id, typed) },
+                )
             }
 
             // The stroke under the nib, until DrawBox owns it.
@@ -1084,7 +1102,7 @@ fun CanvasWorkspace(
             }
             if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
                 val editable = state.elements.singleOrNull { it.id in state.selectedIds }
-                    ?.takeIf { CanvasWorkspaceSupport.holdsText(it, hasSession = session != null) }
+                    ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
                 val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
                 AnchoredToSelection(
                     anchor = CanvasWorkspaceSupport.barAnchor(
@@ -1114,7 +1132,9 @@ fun CanvasWorkspace(
                     onDuplicate = { duplicateFocused() },
                     onEditText = editable?.let { element -> { openTextIn(element) } },
                     note = activeNoteActions.takeIf { !hasSelection && !notesSelected },
-                    shapeText = activeNoteActions.takeIf { activeNote?.id?.let(CanvasShapeLabels::shapeIdOf) in state.selectedIds },
+                    shapeText = (editable as? io.ak1.drawbox.domain.model.Element.Shape)?.let { shape ->
+                        CanvasWorkspaceSupport.shapeTextActions(shape, controller)
+                    },
                     modifier = Modifier.canvasChrome(chromeRegions),
                 )
                 }
@@ -1215,3 +1235,11 @@ private const val ZOOM_STEP = 1.25f
 /** How near, in screen pixels at 100%, a press has to be to an element to pick it. */
 private const val TEXT_HIT_TOLERANCE = 8f
 internal const val WHEEL_ZOOM_STEP = 1.1f
+
+/** The shape whose text is being typed, when [editingId] names one that holds text. */
+private fun editingShapeText(
+    elements: List<io.ak1.drawbox.domain.model.Element>,
+    editingId: String?,
+): io.ak1.drawbox.domain.model.Element.Shape? =
+    editingId?.let { id -> elements.firstOrNull { it.id == id } as? io.ak1.drawbox.domain.model.Element.Shape }
+        ?.takeIf { it.canHoldText }

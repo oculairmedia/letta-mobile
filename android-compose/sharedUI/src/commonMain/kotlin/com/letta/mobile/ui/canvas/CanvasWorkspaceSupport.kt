@@ -20,6 +20,8 @@ import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.bounds
+import io.ak1.drawbox.domain.model.canHoldText
+import io.ak1.drawbox.domain.model.resolvedTextColor
 import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CoroutineScope
@@ -146,9 +148,8 @@ internal data class RequestTextEditParams(
     val offset: Offset,
     val tolerance: Float,
     val elements: List<Element>,
-    val session: CanvasSession?,
     val onEditText: (String) -> Unit,
-    val onActivateShapeLabel: (String) -> Unit,
+    val onEditShapeText: (Element.Shape) -> Unit,
 )
 
 internal data class ReconcileShapeLabelsParams(
@@ -604,21 +605,19 @@ internal object CanvasWorkspaceSupport {
         return true
     }
 
-    suspend fun handleRequestTextEdit(params: RequestTextEditParams) {
+    /**
+     * Where a request for a caret lands: an existing text element, else the shape under it that
+     * holds text (its own text, native to the shape since letta-mobile-8cik1).
+     */
+    fun handleRequestTextEdit(params: RequestTextEditParams) {
         val text = CanvasTextElements.at(params.elements, params.offset, params.tolerance)
         if (text != null) {
             params.onEditText(text.id)
             return
         }
-        val shape = CanvasShapeLabels.shapeAt(params.elements, params.offset) ?: return
-        val s = params.session ?: return
-        val labelId = CanvasShapeLabels.labelIdOf(shape.id)
-        val frame = CanvasShapeLabels.frameFor(shape.bounds())
-        if (s.documents().none { it.id == labelId }) {
-            runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
-            runCatching { s.setLabelOwner(labelId, shape.id) }
-        }
-        params.onActivateShapeLabel(labelId)
+        val shape = io.ak1.drawbox.domain.model.topmostHit(params.elements, params.offset, params.tolerance, hollowInterior = true)
+            as? Element.Shape ?: return
+        if (shape.canHoldText) params.onEditShapeText(shape)
     }
 
     fun handleWheelZoom(
@@ -684,12 +683,59 @@ internal object CanvasWorkspaceSupport {
         return FinalPointerPassResult(altHeld = altHeld, drawingConnectorAt = connectorAt)
     }
 
-    /** True when [element] is somewhere to type: a text element, or a closed shape (which needs a session for its label). */
-    fun holdsText(element: Element?, hasSession: Boolean): Boolean = when {
-        element is Element.Text -> true
-        element == null -> false
-        else -> hasSession && CanvasShapeLabels.canLabel(element)
+    /** The selected [shape]'s text, as the property panel's Text target edits it. */
+    fun shapeTextActions(shape: Element.Shape, controller: DrawBoxController): ShapeTextActions = ShapeTextActions(
+        color = shape.resolvedTextColor,
+        onColor = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedTextColor(it)) },
+        fontSize = shape.fontSize,
+        onFontSize = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedFontSize(it)) },
+        fontFamily = shape.fontFamilyKey,
+        onFontFamily = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedFontFamily(it)) },
+        alignment = shape.textAlignment,
+        onAlignment = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedTextAlignment(it)) },
+    )
+
+    /**
+     * Folds each shape label document (see [CanvasShapeLabels]) into its shape: the label's words
+     * become the shape's text, its colour and alignment the text's, and the document and its
+     * ownership record go. A shape that already has text keeps it; its label is dropped.
+     */
+    suspend fun foldLabelsIntoShapes(session: CanvasSession, controller: DrawBoxController) {
+        val owners = session.labelOwners()
+        if (owners.isEmpty()) return
+        val labels = session.documents().filter { it.id in owners }
+        labels.forEach { label ->
+            // Not loaded yet (or already gone): leave it. Folding needs the shape to fold into, and an
+            // orphaned label is the reconciler's to remove, not this.
+            val shape = controller.state.value.elements.firstOrNull { it.id == owners[label.id] } as? Element.Shape
+                ?: return@forEach
+            if (shape.canHoldText && shape.text.isEmpty()) {
+                val words = com.letta.mobile.data.canvas.CanvasDocumentText.plainText(label.json)
+                if (words.isNotEmpty()) {
+                    controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(labelledShape(shape, words, label.style)))
+                }
+            }
+            runCatching { session.removeDocument(label.id) }
+            runCatching { session.setLabelOwner(label.id, null) }
+        }
     }
+
+    private fun labelledShape(shape: Element.Shape, words: String, style: com.letta.mobile.data.canvas.CanvasTextStyle?): Element.Shape =
+        shape.copy(
+            text = words,
+            textColor = parseHexColor(style?.textColor) ?: shape.textColor,
+            textAlignment = when (style?.align) {
+                "start" -> io.ak1.drawbox.domain.model.TextAlignment.LEFT
+                "end" -> io.ak1.drawbox.domain.model.TextAlignment.RIGHT
+                else -> shape.textAlignment
+            },
+            fontFamilyKey = style?.fontFamily ?: shape.fontFamilyKey,
+            fontSize = style?.fontScale?.let { shape.fontSize * it } ?: shape.fontSize,
+        )
+
+    /** True when [element] is somewhere to type: a text element, or a shape that holds text. */
+    fun holdsText(element: Element?): Boolean =
+        element is Element.Text || (element is Element.Shape && element.canHoldText)
 
     /**
      * True when a finger at [screen] is on open board in the select tool: not on an element and not
