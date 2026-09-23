@@ -58,6 +58,8 @@ fun LettaListRow(
     spec: LettaListRowSpec,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Drawn where the icon goes, instead of it: a row that swaps its icon for an action on hover. */
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val (title, icon, trailing, selected) = spec
     val background = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
@@ -71,7 +73,9 @@ fun LettaListRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        if (icon != null) {
+        if (leading != null) {
+            leading()
+        } else if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
