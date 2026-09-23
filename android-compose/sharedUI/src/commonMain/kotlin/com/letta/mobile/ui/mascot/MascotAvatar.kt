@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -68,6 +70,12 @@ interface MascotHost {
      */
     @Composable
     fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean)
+
+    /**
+     * Captured stills by identity (see [MascotStills]). With them, a mascot that is not moving is an
+     * image and brings up no renderer scene at all; null keeps the paused-scene still.
+     */
+    val stills: MascotStills? get() = null
 }
 
 /** No renderer: every mascot draws its fallback. Platforms provide a real host at their root. */
@@ -243,6 +251,19 @@ private fun MascotStill(
     modifier: Modifier = Modifier,
 ) {
     val host = LocalMascotHost.current
+    val stills = host.stills
+    if (stills != null) {
+        // The identity's captured still: an image, no scene. Empty for the moment the one capture
+        // of a new identity takes; after that, and on every later launch, it is simply there.
+        val image = stills.get(identity)
+        LaunchedEffect(stills, identity) { stills.ensure(identity) }
+        if (image != null) {
+            Image(image, contentDescription = null, modifier = modifier.requiredSize(size), contentScale = ContentScale.Fit)
+        } else {
+            Box(modifier.requiredSize(size))
+        }
+        return
+    }
     val registry = LocalMascotRegistry.current
     val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
