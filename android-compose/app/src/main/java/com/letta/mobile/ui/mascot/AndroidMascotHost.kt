@@ -2,8 +2,16 @@ package com.letta.mobile.ui.mascot
 
 import android.content.res.Resources
 import android.util.Log
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import java.security.MessageDigest
+import java.io.File
+import java.io.ByteArrayOutputStream
+import com.letta.mobile.ui.mascot.MascotStills
+import com.letta.mobile.ui.mascot.MascotStillStore
+import com.letta.mobile.avatar.rive.MascotStillRenderer
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -11,8 +19,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import app.rive.core.ComposeFrameTicker
 import kotlinx.coroutines.flow.collectLatest
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +65,8 @@ class AndroidMascotEntry(val scene: AndroidMascotScene, runtime: RiveAvatarRunti
 class AndroidMascotHost(
     private val worker: RiveWorker,
     private val resources: Resources,
+    /** Where captured stills are kept between launches (the app's cache directory). */
+    stillsDirectory: File,
 ) : MascotHost {
     /** Compose state so every tile drawing its fallback recomposes into the live mascot once the file lands. */
     private var file by mutableStateOf<RiveFile?>(null)
@@ -70,9 +78,46 @@ class AndroidMascotHost(
      * mascot is drawn or not; here it runs only while a Rive surface is composed (a live companion,
      * a still being captured) or the file is loading (the load completes through a polled message).
      */
-    val pollNeeded: Boolean get() = loading || activeSurfaces > 0
+    val pollNeeded: Boolean get() = loading || activeSurfaces > 0 || capturing > 0
     private var loading by mutableStateOf(false)
     private var activeSurfaces by mutableIntStateOf(0)
+    private var capturing by mutableIntStateOf(0)
+
+    /**
+     * One still per identity, rendered offscreen once with the state machine settled and kept on
+     * disk (see [MascotStills]); every mascot that is not moving draws it as an image.
+     */
+    override val stills: MascotStills = MascotStills(
+        assetVersion = mascotAssetVersion(resources),
+        store = AndroidMascotStillStore(File(stillsDirectory, "mascot-stills")),
+        capture = ::captureStill,
+    )
+
+    /** The one offscreen scene stills are rendered in; main thread only (see [MascotStillRenderer]). */
+    private var stillRenderer: MascotStillRenderer? = null
+
+    private suspend fun captureStill(identity: MascotIdentity): ByteArray? {
+        val loaded = file ?: return null
+        capturing++
+        try {
+            // On the main thread, which drives the worker; one small offscreen render per identity, ever.
+            val bitmap = withContext(Dispatchers.Main) {
+                val renderer = stillRenderer ?: MascotStillRenderer(
+                    loaded,
+                    worker,
+                    sizePx = MascotStills.SIZE_PX,
+                    settleFrames = MascotStills.SETTLE_FRAMES,
+                    frameSeconds = MascotStills.FRAME_SECONDS,
+                ).also { stillRenderer = it }
+                renderer.render(identity)
+            } ?: return null
+            return withContext(Dispatchers.Default) {
+                ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+            }
+        } finally {
+            capturing--
+        }
+    }
 
     /** Loads the shipped mascot once; a failure leaves every avatar on its fallback rather than crashing. */
     suspend fun load() {
@@ -102,12 +147,6 @@ class AndroidMascotHost(
     override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? =
         if (file == null) null else entries.get(agentId, identity)
 
-    /**
-     * Stills by identity and pixel width: a still is one Rive frame captured from the first tile that
-     * asked for it, then an [Image] for every tile after - a list of forty rows costs one GL surface
-     * per identity and size, not forty. Compose state so tiles waiting on a capture redraw with it.
-     */
-    private val stills = mutableStateMapOf<Pair<MascotIdentity, Int>, ImageBitmap>()
 
     /**
      * Which surface drives each agent's scene. The Rive composable advances its own state machine
@@ -141,33 +180,18 @@ class AndroidMascotHost(
         }
     }
 
+    /** A surface of an agent that is live elsewhere: its captured still, or nothing until it exists. */
     @Composable
     private fun MascotStill(entry: AndroidMascotEntry, modifier: Modifier) {
-        BoxWithConstraints(modifier) {
-            val key = entry.identity to constraints.maxWidth
-            val still = stills[key]
-            if (still != null) {
-                Image(still, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Fit)
-            } else {
-                CountedSurface {
-                    RiveMascotSurface(
-                        entry.scene,
-                        modifier = Modifier.matchParentSize(),
-                        playing = false,
-                        // Mid-morph the scene draws an in-between look under the target's key; a still
-                        // cached then would be wrong for as long as the cache lives. Wait for the target.
-                        onFirstFrame = { getBitmap ->
-                            if (entry.shownIdentity() == entry.identity) runCatching { stills[key] = getBitmap().asImageBitmap() }
-                        },
-                    )
-                }
-            }
-        }
+        val identity = entry.identity
+        LaunchedEffect(identity) { stills.ensure(identity) }
+        stills.get(identity)?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit) }
     }
 
     fun close() {
         liveDrivers.clear()
-        stills.clear()
+        stillRenderer?.close()
+        stillRenderer = null
         entries.closeAll()
         file?.let { runCatching { it.close() } }
         file = null
@@ -219,7 +243,7 @@ fun rememberAndroidMascotHost(): MascotHost {
     val workerError = remember { mutableStateOf<Throwable?>(null) }
     // autoPoll off: the host decides when the per-frame poll runs (see [AndroidMascotHost.pollNeeded]).
     val worker = rememberRiveWorkerOrNull(workerError, autoPoll = false) ?: return NoMascotHost
-    val host = remember(worker) { AndroidMascotHost(worker, context.resources) }
+    val host = remember(worker) { AndroidMascotHost(worker, context.resources, context.cacheDir) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(host) {
         snapshotFlow { host.pollNeeded }.collectLatest { needed ->
@@ -232,4 +256,26 @@ fun rememberAndroidMascotHost(): MascotHost {
     }
     DisposableEffect(host) { onDispose { host.close() } }
     return host
+}
+
+/** A short, stable fingerprint of the shipped mascot: a new file means new stills. */
+private fun mascotAssetVersion(resources: Resources): String = runCatching {
+    val bytes = resources.openRawResource(R.raw.mascot).use { it.readBytes() }
+    MessageDigest.getInstance("SHA-256").digest(bytes).take(6).joinToString("") { "%02x".format(it) }
+}.getOrDefault("unknown")
+
+/** Stills in the app's cache directory as `<key>.png`: the system may clear it, and they are recaptured. */
+private class AndroidMascotStillStore(private val directory: File) : MascotStillStore {
+    override suspend fun read(key: String): ByteArray? = withContext(Dispatchers.IO) {
+        File(directory, "$key.png").takeIf { it.isFile }?.readBytes()
+    }
+
+    override suspend fun write(key: String, png: ByteArray) {
+        withContext(Dispatchers.IO) {
+            directory.mkdirs()
+            val temp = File(directory, "$key.tmp")
+            temp.writeBytes(png)
+            if (!temp.renameTo(File(directory, "$key.png"))) temp.delete()
+        }
+    }
 }

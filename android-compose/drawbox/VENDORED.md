@@ -92,12 +92,20 @@ and centre or right alignment happened inside that, leaving short centred text a
 box (text elements as well as shapes). Text is now laid out at exactly the wrap width. Covered by
 `CanvasShapeTextRenderUiTest`, which fails without it.
 
-### 8. A cancelled capture is not a failed save (letta-mobile-nq2w1)
+### 8. Images keep their proportions when resized (letta-mobile-k42fs)
+
+Resize handles stretched an image freely. The circle's keep-it-square constraint is generalised to
+a locked aspect ratio, and an image now keeps the ratio of its pixels (`intrinsicSize`), so one
+stretched before snaps back to its true shape on its next resize. Edge handles set the dragged
+dimension and centre the other on the anchor; corner handles grow to encompass the drag. Circles
+behave as before (ratio 1). Tests: `GeometryTest` (image corner, edge, restore).
+
+### 9. A cancelled capture is not a failed save (letta-mobile-nq2w1)
 
 The bitmap capture coroutine caught `Throwable`, so cancelling it reported a failed
 `Intent.SaveBitmap`. `CancellationException` is now rethrown.
 
-### 9. Review fixes (letta-mobile-8cik1)
+### 10. Review fixes (letta-mobile-8cik1)
 
 Each small and separately offerable upstream:
 
@@ -106,6 +114,7 @@ Each small and separately offerable upstream:
   ties toward the later element, the one drawn on top.
 - New `Intent.SelectIds` / `DrawBoxController.selectIds`: select by id, for hosts that know what to
   select (a point can land on a connector ending on the element).
+- New `Intent.MergeUndoSteps(count)`: a host action made of several intents undoes in one step.
 - `DrawBoxController.importPath` keeps the host's stroke colour, width, opacity, background pattern
   and `selectInsideHollowShapes` (it read them after `reset()`, so got defaults). `onIntent` and
   `importPath` carry `State.invokeBitmap`, a body property `copy()` drops, so `saveBitmap()` right

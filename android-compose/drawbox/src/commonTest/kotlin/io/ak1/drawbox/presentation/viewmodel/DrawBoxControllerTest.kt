@@ -126,4 +126,15 @@ class DrawBoxControllerTest {
         controller.saveBitmap()
         assertEquals(1, captured)
     }
+
+    @Test
+    fun mergedUndoStepsUndoTogether() {
+        val controller = newController()
+        controller.onIntent(Intent.AddElement(square("a")))
+        controller.onIntent(Intent.AddElement(square("b")))
+        controller.onIntent(Intent.AddElement(square("c")))
+        controller.onIntent(Intent.MergeUndoSteps(2))
+        controller.onIntent(Intent.Undo)
+        assertEquals(listOf("a"), controller.state.value.elements.map { it.id })
+    }
 }

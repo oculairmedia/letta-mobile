@@ -122,7 +122,7 @@ class IrohCanvasRelayEndToEndTest {
                 delay(300.milliseconds)
             }
         }
-        assertTrue(seen.any { it.displayName == "Android" })
+        assertTrue(seen.any { it.displayName == "Android" }, "desktop sees the Android cursor")
         watch.cancel()
     }
 
