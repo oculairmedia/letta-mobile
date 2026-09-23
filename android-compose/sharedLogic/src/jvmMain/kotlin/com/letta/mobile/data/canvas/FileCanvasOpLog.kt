@@ -1,8 +1,5 @@
-package com.letta.mobile.desktop.canvas
+package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.canvas.CanvasId
-import com.letta.mobile.data.canvas.CanvasOp
-import com.letta.mobile.data.canvas.CanvasOpLog
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -20,12 +17,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 /**
- * Desktop file-backed append-only JSONL implementation of [CanvasOpLog].
+ * File-backed append-only JSONL implementation of [CanvasOpLog], for the desktop app and for
+ * the Iroh host that relays canvases between apps.
  *
  * Persists ops for each canvas into `{rootDirectory}/ops/{canvasId_sha256}.jsonl`
  * while keeping an in-memory index of seen op IDs for O(1) deduplication.
  */
-class DesktopCanvasOpLog(
+class FileCanvasOpLog(
     private val rootDirectory: Path = defaultOpsDirectory(),
 ) : CanvasOpLog {
 

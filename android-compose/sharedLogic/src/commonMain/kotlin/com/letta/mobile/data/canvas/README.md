@@ -53,6 +53,9 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
      - `IrohCanvasPresenceTransport`: Full live endpoint lifecycle with accept loop, dial APIs, length-prefixed framing, and 10-second TTL heartbeat with background reaper. Fallback to `InMemoryCanvasPresenceTransport` when endpoint is absent.
      - Multi-process verification runbook available at `CANVAS-P31-IROH-SMOKE.md`.
      - Labeled honestly as LAN / direct QUIC MVP (hard NAT traversal and production relay fleet hardening deferred to P4).
+   - **Shared through the host (hub and spoke)**: apps do not dial each other. Each app's `IrohCanvasClient` follows its App Server connection (`IrohChannelTransport.readyHandle`) and, while it is ready, keeps a canvas-sync and a canvas-presence connection open to the same host from the same endpoint (`IrohConnectionHandle.openConnection`), re-dialing with backoff. The host (`iroh-wrapper-cli`, `IrohNodeEndpoint(canvasRelay = IrohCanvasRelay(...))`) accepts the canvas ALPNs only from peers with an authenticated App Server connection and relays: an op is logged once in its `FileCanvasOpLog` (`--canvas-ops-dir`, default `~/.letta/canvas-relay/ops`) and forwarded to every other app; presence is forwarded as is.
+   - **Catch-up both ways**: a dialing app greets at once (a QUIC stream is invisible until it carries data) with a catch-up request per open canvas; the host answers from its log and asks back, so edits an app made offline reach the host and everyone else.
+   - **Same canvas everywhere**: a conversation's canvas id is derived from the conversation (`CanvasId.forConversation`), not random per app, so every app opens the same board. Live test: `IrohCanvasRelayEndToEndTest` (opt-in, `-DrunIrohLiveE2E=true`).
 
 5. **Op Log Durability & Cold Recovery (P3.1)**:
    - **Android**: `RoomCanvasOpLog` backed by Room table `canvas_ops` in `letta_database` (Schema version 16, created via explicit `MIGRATION_15_16`).

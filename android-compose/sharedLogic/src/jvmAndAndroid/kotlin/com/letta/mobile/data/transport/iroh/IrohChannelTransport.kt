@@ -35,6 +35,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -210,6 +212,15 @@ class IrohChannelTransport(
         dialer = { config -> testDialer?.invoke(config) ?: dialConnection(config) },
         onStateChanged = ::handleSupervisorStateChange,
     )
+
+    /**
+     * The host connection while it is ready, else null: side protocols that share its endpoint
+     * (shared canvases, see [IrohCanvasRelayClient]) connect and reconnect on this.
+     */
+    val readyHandle: kotlinx.coroutines.flow.Flow<IrohConnectionHandle?>
+        get() = supervisor.state
+            .map { (it as? IrohConnectionState.Ready)?.handle }
+            .distinctUntilChanged { a, b -> a === b }
 
     private fun handleCloseResources(reason: String) {
         turnRegistry.allSendJobEntries().forEach { registration ->

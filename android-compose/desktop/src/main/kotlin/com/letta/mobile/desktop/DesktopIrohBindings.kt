@@ -48,7 +48,10 @@ private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
         // d6e8g.9: reuse the persisted, vault-encrypted desktop identity so this
         // machine keeps one stable NodeId across reconnects (enables pairing).
         secretKeyStore = { com.letta.mobile.desktop.security.DesktopIrohIdentity.loadOrCreate() },
-    )
+    ).also { transport ->
+        // Canvases ride beside the App Server on the same host, so every app on it shares them.
+        com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.client.attach(transport.readyHandle)
+    }
 
 internal data class DesktopConnectParams(
     val baseShimUrl: String,
@@ -161,7 +164,10 @@ internal fun rememberIrohTransport(
     chatScope: CoroutineScope,
 ): IrohChannelTransport? {
     val irohTransport = remember(activeConfig) {
-        activeConfig.takeIf(::shouldBindIrohTransport)?.let(::createIrohTransport)
+        activeConfig.takeIf(::shouldBindIrohTransport)?.let(::createIrohTransport).also { transport ->
+            // No Iroh host behind this backend: canvases stay on this device, and say so.
+            if (transport == null) com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.client.detach()
+        }
     }
     DesktopTransportLifecycleEffect(
         DesktopTransportLifecycleRequest(

@@ -57,7 +57,16 @@ class IrohNodeEndpoint(
     private val authPolicy: IrohAuthPolicy,
     /** Optional pairing service (d6e8g.5); shared across every accepted connection. */
     private val pairingService: IrohPairingService? = null,
+    /**
+     * Relays shared canvases between the apps connected here. When set, the endpoint also
+     * accepts the canvas ALPNs, from peers with an authenticated App Server connection only.
+     */
+    private val canvasRelay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay? = null,
 ) {
+    /** Live App Server connections by peer id, to gate that peer's canvas connections. */
+    private val appServerConnections =
+        java.util.concurrent.ConcurrentHashMap<String, MutableSet<IrohNodeConnection>>()
+
     // d6e8g.3: ONE verifier across every connection this endpoint accepts, so
     // per-NodeId auth-failure rate limiting survives redials.
     private val authVerifier = IrohBearerAuthVerifier(authPolicy)
@@ -135,7 +144,7 @@ class IrohNodeEndpoint(
                 },
                 bindAddr = bindAddr,
                 secretKey = resolveSecretKeyStore().loadOrCreate(),
-                alpns = listOf(alpn),
+                alpns = listOf(alpn) + canvasRelay?.alpns.orEmpty(),
                 relayMode = relayMode,
             )
         ).also { ep ->
@@ -247,6 +256,7 @@ class IrohNodeEndpoint(
     private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController) {
         try {
             val accepting = incoming.accept()
+            val peerAlpn = accepting.alpn()
             val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
             val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
             Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
@@ -255,7 +265,12 @@ class IrohNodeEndpoint(
                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                 return
             }
-            IrohNodeConnection(
+            val relay = canvasRelay
+            if (relay != null && relay.handles(peerAlpn)) {
+                serveCanvas(relay, peerAlpn, connection, remoteId)
+                return
+            }
+            val nodeConnection = IrohNodeConnection(
                 connection = connection,
                 controller = controller,
                 adminRpcRouter = adminRpcRouter,
@@ -264,7 +279,16 @@ class IrohNodeEndpoint(
                 pairingService = pairingService,
                 remoteEndpointId = remoteId,
                 connectionRegistry = connectionRegistry,
-            ).serve()
+            )
+            val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
+                java.util.concurrent.ConcurrentHashMap.newKeySet()
+            }
+            peerConnections.add(nodeConnection)
+            try {
+                nodeConnection.serve()
+            } finally {
+                peerConnections.remove(nodeConnection)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -275,6 +299,27 @@ class IrohNodeEndpoint(
                 level = Telemetry.Level.WARN,
             )
         }
+    }
+
+    /**
+     * A canvas connection is served only for a peer that is signed in on the App Server here: the
+     * canvas protocols carry no credentials of their own, and the apps open them once their App
+     * Server connection is ready.
+     */
+    private fun serveCanvas(
+        relay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay,
+        alpn: ByteArray,
+        connection: computer.iroh.Connection,
+        remoteId: String,
+    ) {
+        val authenticated = appServerConnections[remoteId].orEmpty().any { it.isAuthenticated }
+        if (!authenticated) {
+            Telemetry.event("IrohNode", "canvas.rejected", "remoteEndpointId" to remoteId, "reason" to "not_authenticated")
+            runCatching { connection.close(4401L, "not_authenticated".encodeToByteArray()) }
+            return
+        }
+        Telemetry.event("IrohNode", "canvas.accepted", "remoteEndpointId" to remoteId, "alpn" to alpn.decodeToString())
+        relay.accept(alpn, connection, origin = remoteId, hostNodeId = nodeIdHex())
     }
 
     private fun isPeerAllowed(remoteId: String): Boolean =
