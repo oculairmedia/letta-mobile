@@ -197,6 +197,8 @@ fun CanvasWorkspace(
     val focusRequest = remember { CanvasFocusRequest() }
     // The long-press / right-click menu, while it is open.
     var boardMenu by remember { mutableStateOf<BoardMenuRequest?>(null) }
+    // Notes being dragged or resized, by id, at their live (uncommitted) frame.
+    val liveNoteFrames = remember { androidx.compose.runtime.mutableStateMapOf<String, CanvasDocumentFrame>() }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
@@ -841,6 +843,7 @@ fun CanvasWorkspace(
             // Block documents live on the board as note cards, in world coordinates.
             if (session != null && documents.isNotEmpty()) {
                 CanvasNotesLayer(
+                    onLiveFrame = { id, frame -> if (frame == null) liveNoteFrames.remove(id) else liveNoteFrames[id] = frame },
                     session = session,
                     documents = documents,
                     viewport = state.viewport,
@@ -1100,7 +1103,9 @@ fun CanvasWorkspace(
             // Properties for the selection, floating on it the way Miro does; top-centre for the
             // closed shape about to be drawn, when there is nothing to float on. With a note active
             // and nothing drawn selected, the bar is the note's.
-            val activeNote = activeNoteId?.let { id -> documents.firstOrNull { it.id == id } }
+            // Where each note is on screen right now: mid-drag, the card's live frame.
+            val anchorDocuments = documents.map { d -> liveNoteFrames[d.id]?.let { d.copy(frame = it) } ?: d }
+            val activeNote = activeNoteId?.let { id -> anchorDocuments.firstOrNull { it.id == id } }
             val notesSelected = selectedNoteIds.isNotEmpty()
             // The active note's (or shape label's) bar actions, built once for whichever bar shows them.
             val activeNoteActions = if (activeNote != null && session != null) {
@@ -1158,7 +1163,7 @@ fun CanvasWorkspace(
                     anchor = CanvasWorkspaceSupport.barAnchor(
                         BarAnchorParams(
                             state = state,
-                            documents = documents,
+                            documents = anchorDocuments,
                             selectedNoteIds = selectedNoteIds,
                             activeNote = activeNote,
                             groupOffset = groupOffset,
