@@ -55,14 +55,16 @@ internal fun CanvasSyncStatusBadge(health: CanvasSyncHealth, modifier: Modifier 
         is CanvasSyncHealth.LocalOnly -> MaterialTheme.colorScheme.outline to true
         is CanvasSyncHealth.Failed -> MaterialTheme.colorScheme.error to true
     }
+    // In the header bar it is part of the bar; on its own it is a pill of its own.
+    val inBar = LocalInHeaderBar.current
     Surface(
         modifier = modifier.clearAndSetSemantics {
             contentDescription = text.description
             liveRegion = LiveRegionMode.Polite
         },
         shape = RoundedCornerShape(LettaDimens.Radius.md),
-        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        color = if (inBar) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
+        border = if (inBar) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),

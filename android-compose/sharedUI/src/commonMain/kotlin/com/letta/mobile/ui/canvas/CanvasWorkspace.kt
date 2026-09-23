@@ -1079,6 +1079,11 @@ fun CanvasWorkspace(
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
+            // One bar across the top: back and title, the sync status, then the board's actions.
+            CanvasHeaderBar(
+                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(CHROME_INSET).canvasChrome(chromeRegions),
+            ) {
             if (showTitle) {
                 CanvasTitlePill(
                     title = sessionDoc?.title ?: "Canvas",
@@ -1090,18 +1095,12 @@ fun CanvasWorkspace(
                         }
                     },
                     compact = compact,
-                    modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing)
-                        .padding(CHROME_INSET).canvasChrome(chromeRegions),
+                    modifier = Modifier.weight(1f, fill = false),
                 )
             }
 
-            syncHealth?.let { health ->
-                CanvasSyncStatusBadge(
-                    health = health,
-                    modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing)
-                        .padding(top = CHROME_INSET).canvasChrome(chromeRegions),
-                )
-            }
+            syncHealth?.let { health -> CanvasSyncStatusBadge(health = health) }
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
 
             CanvasActionsPill(
                 zoom = CanvasZoom(
@@ -1165,9 +1164,8 @@ fun CanvasWorkspace(
                 } else {
                     null
                 },
-                modifier = Modifier.align(Alignment.TopEnd).windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(CHROME_INSET).canvasChrome(chromeRegions),
             )
+            }
 
 
             CanvasHistoryDialog(
