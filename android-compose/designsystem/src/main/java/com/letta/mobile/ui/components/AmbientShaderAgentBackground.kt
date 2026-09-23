@@ -218,6 +218,8 @@ private fun AmbientCanvas(
             shader.setFloatUniform("uEnvelope", envelope.value)
             shader.setFloatUniform("uStreamEnergy", motion.streamEnergy)
             shader.setFloatUniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
+            shader.setFloatUniform("uBandTop", AmbientMotion.ABOVE_COMPOSER_BAND.top)
+            shader.setFloatUniform("uBandPeak", AmbientMotion.ABOVE_COMPOSER_BAND.peak)
             shader.setFloatUniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
             drawRect(brush = shaderBrush)
         }

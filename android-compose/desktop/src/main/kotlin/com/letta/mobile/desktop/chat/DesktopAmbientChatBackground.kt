@@ -180,6 +180,8 @@ internal fun DesktopAmbientChatBackground(
                     shaderBuilder.uniform("uEnvelope", intensity)
                     shaderBuilder.uniform("uStreamEnergy", 0f)
                     shaderBuilder.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
+                    shaderBuilder.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
+                    shaderBuilder.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)
                     shaderBuilder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
                     // One native Shader per frame is unavoidable (uniforms bake
                     // in at makeShader time), but leaving it to the cleaner is
