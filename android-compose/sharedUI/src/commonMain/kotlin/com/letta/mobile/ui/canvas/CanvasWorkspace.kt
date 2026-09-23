@@ -109,6 +109,18 @@ fun CanvasWorkspace(
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
     val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
+    // Whether this board is shared right now; shown on the board, never assumed.
+    val syncHealth by (
+        remember(session) {
+            session?.let {
+                it.syncTransport?.health(it.canvasId)
+                    ?: kotlinx.coroutines.flow.MutableStateFlow(
+                        com.letta.mobile.data.canvas.CanvasSyncHealth.LocalOnly("This canvas has no sync transport"),
+                    )
+            }
+        }?.collectAsState()
+            ?: remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSyncHealth?>(null) }
+        )
     val presences by if (presenceTransport != null && session != null) {
         presenceTransport.observePresence(session.canvasId).collectAsState(emptyList())
     } else {
@@ -985,6 +997,14 @@ fun CanvasWorkspace(
                     compact = compact,
                     modifier = Modifier.align(Alignment.TopStart).windowInsetsPadding(WindowInsets.safeDrawing)
                         .padding(CHROME_INSET).canvasChrome(chromeRegions),
+                )
+            }
+
+            syncHealth?.let { health ->
+                CanvasSyncStatusBadge(
+                    health = health,
+                    modifier = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(top = CHROME_INSET).canvasChrome(chromeRegions),
                 )
             }
 
