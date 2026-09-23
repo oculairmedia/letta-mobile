@@ -10,7 +10,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 
 /** What a key press on the board asks for, the way every whiteboard maps its keys. */
-internal enum class CanvasKeyAction { DELETE, ESCAPE, UNDO, REDO, DUPLICATE }
+internal enum class CanvasKeyAction { DELETE, ESCAPE, UNDO, REDO, DUPLICATE, PASTE }
 
 /**
  * Maps a key event to a board action, or null. Ctrl on Windows and Linux, Cmd on macOS, both
@@ -26,6 +26,7 @@ internal fun canvasKeyAction(event: KeyEvent): CanvasKeyAction? {
         command && event.key == Key.Z -> CanvasKeyAction.UNDO
         command && event.key == Key.Y -> CanvasKeyAction.REDO
         command && event.key == Key.D -> CanvasKeyAction.DUPLICATE
+        command && event.key == Key.V -> CanvasKeyAction.PASTE
         !command && (event.key == Key.Delete || event.key == Key.Backspace) -> CanvasKeyAction.DELETE
         !command && event.key == Key.Escape -> CanvasKeyAction.ESCAPE
         else -> null

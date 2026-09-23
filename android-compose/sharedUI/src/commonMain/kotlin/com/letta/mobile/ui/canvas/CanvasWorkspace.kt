@@ -62,6 +62,8 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
+import io.ak1.drawbox.input.imageDragAndDropTarget
+import io.github.vinceglb.filekit.readBytes
 import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.bounds
@@ -574,6 +576,37 @@ fun CanvasWorkspace(
             },
         )
     }
+    // Images: picked (several at once), pasted or dropped, each made ready off the main thread
+    // (see prepareCanvasImage) and placed where it was asked for.
+    fun placeImages(sources: List<ByteArray>, at: Offset) {
+        if (sources.isEmpty()) return
+        coroutineScope.launch {
+            val images = withContext(Dispatchers.Default) { sources.mapNotNull { prepareCanvasImage(it) } }
+            if (images.isEmpty()) {
+                statusMessage = "Could not read that image"
+                return@launch
+            }
+            CanvasImages.insert(controller, images, at)
+            statusMessage = if (images.size == 1) "Added an image" else "Added ${images.size} images"
+        }
+    }
+    var imagesAt by remember { mutableStateOf(Offset.Zero) }
+    val imagePicker = io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher(
+        type = io.github.vinceglb.filekit.dialogs.FileKitType.Image,
+        mode = io.github.vinceglb.filekit.dialogs.FileKitMode.Multiple(maxItems = CanvasImages.MAX_PICK),
+    ) { files ->
+        if (files.isNullOrEmpty()) return@rememberFilePickerLauncher
+        coroutineScope.launch {
+            val bytes = withContext(Dispatchers.Default) {
+                files.mapNotNull { file -> runCatching { file.readBytes() }.getOrNull() }
+            }
+            placeImages(bytes, imagesAt)
+        }
+    }
+    fun pasteImage(at: Offset) {
+        io.ak1.drawbox.input.pasteImageFromClipboard { bytes, _ -> placeImages(listOf(bytes), at) }
+    }
+
     fun onBoardKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean = when (canvasKeyAction(event)) {
         CanvasKeyAction.DELETE -> deleteFocused()
         CanvasKeyAction.ESCAPE -> {
@@ -587,6 +620,10 @@ fun CanvasWorkspace(
         CanvasKeyAction.UNDO -> { undoBoard(); true }
         CanvasKeyAction.REDO -> { redoBoard(); true }
         CanvasKeyAction.DUPLICATE -> duplicateFocused()
+        CanvasKeyAction.PASTE -> {
+            pasteImage(controller.state.value.viewport.screenToWorld(boardCenter))
+            true
+        }
         null -> false
     }
     // Puts the caret in [element]: a text element's own editor, or the text of a shape that holds
@@ -667,6 +704,11 @@ fun CanvasWorkspace(
                 current.strokeColor,
             )
         },
+        onAddImages = { world ->
+            imagesAt = world
+            imagePicker.launch()
+        },
+        onPasteImage = ::pasteImage,
         onAddShape = { mode, world ->
             val id = CanvasInsert.addShape(controller, mode, world)
             val added = controller.state.value.elements.firstOrNull { it.id == id }
@@ -718,6 +760,11 @@ fun CanvasWorkspace(
                 .onKeyEvent(::onBoardKey)
                 .semantics { contentDescription = "Canvas workspace" }
                 .onSizeChanged { boardSize = it }
+                // Image files dragged in from the desktop land where they are dropped.
+                .imageDragAndDropTarget { drops ->
+                    val first = drops.firstOrNull() ?: return@imageDragAndDropTarget
+                    placeImages(drops.map { it.bytes }, controller.state.value.viewport.screenToWorld(first.dropPositionScreen))
+                }
                 .onGloballyPositioned { boardBounds = it.boundsInRoot() }
                 .pointerInput(controller) {
                     awaitPointerEventScope {

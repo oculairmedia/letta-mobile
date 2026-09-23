@@ -10,7 +10,6 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.name
 import com.letta.mobile.feature.chat.util.uri
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
@@ -46,20 +45,49 @@ internal fun rememberImageAttachmentPicker(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Reads, normalises and attaches one picked image; a failure is reported for that image alone.
+    suspend fun attachOne(file: PlatformFile) {
+        runCatching {
+            withContext(Dispatchers.IO) { loadAndNormalize(context, file.uri, limits) }
+        }.fold(
+            onSuccess = {
+                Telemetry.event(
+                    "ChatComposerAttach",
+                    "attach.pickResult",
+                    "result" to "decodedOk",
+                    "mediaType" to it.mediaType,
+                    "base64Len" to it.base64.length,
+                )
+                onPicked(it)
+            },
+            onFailure = {
+                val errorMessage = it.message ?: it.javaClass.simpleName
+                Telemetry.error(
+                    "ChatComposerAttach",
+                    "attach.pickResult",
+                    it,
+                    "result" to "decodeFailed",
+                )
+                Log.w("ChatComposerAttach", "loadAndNormalize failed", it)
+                onError(errorMessage)
+            },
+        )
+    }
+
     val launcher = rememberFilePickerLauncher(
         type = FileKitType.Image,
-        mode = FileKitMode.Single,
-    ) { file: PlatformFile? ->
+        // Several photos in one pick, up to what a message can carry. Android's multi-select
+        // photo picker needs a limit of at least two, so a one-attachment limit still asks for
+        // two and the view model's own cap keeps the extra off the message.
+        mode = FileKitMode.Multiple(maxItems = limits.maxAttachmentCount.coerceAtLeast(2)),
+    ) { files: List<PlatformFile>? ->
         // Proof-of-callback trace. If this line does not appear in logcat
         // after the picker activity closes, the ActivityResult contract
         // never delivered the result to this Composable's launcher — the
         // most likely cause is composition destruction across process
         // death while DocumentsUI was foreground (see letta-mobile-jng2).
-            Log.i(
-                "ChatComposerAttach",
-                "launcher.onResult file=${if (file == null) "<null>" else file?.name}",
-            )
-        if (file == null) {
+        Log.i("ChatComposerAttach", "launcher.onResult files=${files?.size ?: "<null>"}")
+        if (files.isNullOrEmpty()) {
             Telemetry.event(
                 "ChatComposerAttach",
                 "attach.pickResult",
@@ -67,37 +95,8 @@ internal fun rememberImageAttachmentPicker(
             )
             return@rememberFilePickerLauncher
         }
-
-        scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val uri = file.uri
-                    loadAndNormalize(context, uri, limits)
-                }
-            }.fold(
-                onSuccess = {
-                    Telemetry.event(
-                        "ChatComposerAttach",
-                        "attach.pickResult",
-                        "result" to "decodedOk",
-                        "mediaType" to it.mediaType,
-                        "base64Len" to it.base64.length,
-                    )
-                    onPicked(it)
-                },
-                onFailure = {
-                    val errorMessage = it.message ?: it.javaClass.simpleName
-                    Telemetry.error(
-                        "ChatComposerAttach",
-                        "attach.pickResult",
-                        it,
-                        "result" to "decodeFailed",
-                    )
-                    Log.w("ChatComposerAttach", "loadAndNormalize failed", it)
-                    onError(errorMessage)
-                },
-            )
-        }
+        // One at a time, in the order picked: each is attached as soon as it is ready.
+        scope.launch { files.forEach { file -> attachOne(file) } }
     }
 
     return remember(launcher) {
