@@ -9,6 +9,7 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasArchiveStore
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,8 +40,13 @@ internal class DesktopCanvasLibrary(
     /** Archives [id], or restores it when [archived] is false. */
     fun setArchived(id: CanvasId, archived: Boolean) {
         scope.launch {
-            archive.setArchived(id, archived)
-            _archived.value = archive.archivedIds()
+            // A disk failure leaves the list as it was rather than ending the library's scope.
+            try {
+                archive.setArchived(id, archived)
+                _archived.value = archive.archivedIds()
+            } catch (e: java.io.IOException) {
+                Telemetry.error("DesktopCanvasLibrary", "archive.updateFailed", e)
+            }
         }
     }
 
@@ -74,7 +80,11 @@ internal class DesktopCanvasLibrary(
 
     private suspend fun refreshNow() {
         _documents.value = store.listAll()
-        _archived.value = archive.archivedIds()
+        _archived.value = try {
+            archive.archivedIds()
+        } catch (e: java.io.IOException) {
+            _archived.value
+        }
     }
 
     private fun hostOptions() = CanvasConversationOptions(
