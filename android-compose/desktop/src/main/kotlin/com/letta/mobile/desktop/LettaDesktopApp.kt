@@ -73,6 +73,7 @@ import java.time.Instant
 import dev.nucleusframework.application.NucleusApplicationScope
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
+import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 
 /** Application-scoped inputs the desktop shell composes over. */
 internal data class DesktopAppShellBindings(
@@ -142,6 +143,7 @@ internal fun LettaDesktopApp(
     val railPrefs = rememberDesktopRailPrefs(secureSettingsStore)
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val canvasDocuments by canvasShell.library.documents.collectAsState()
+    val archivedCanvasIds by canvasShell.library.archived.collectAsState()
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
@@ -726,8 +728,14 @@ internal fun LettaDesktopApp(
                             archiveFilter = archiveFilter,
                             selectedDestination = selectedDestination,
                             mode = workPlayMode,
-                            canvases = canvasDocuments,
+                            // The sidebar's Active / Archived / All applies to canvases as to chats.
+                            canvases = com.letta.mobile.data.canvas.CanvasLibrary.filter(
+                                canvasDocuments,
+                                archivedCanvasIds,
+                                archiveFilter.toCanvasArchiveFilter(),
+                            ),
                             activeCanvasId = canvasShell.activeSession?.canvasId,
+                            archivedCanvasIds = archivedCanvasIds,
                         ),
                         actions = DesktopAgentSidebarActions(
                             onArchiveFilterChange = chatController::setArchiveFilter,
@@ -744,6 +752,7 @@ internal fun LettaDesktopApp(
                             onEditAgent = { editAgentId = selectedAgentId },
                             onOpenCanvas = canvasShell::open,
                             onNewCanvas = { canvasShell.createNew(selectedAgentId) },
+                            onArchiveCanvas = canvasShell.library::setArchived,
                         ),
                     )
                     RailDivider()

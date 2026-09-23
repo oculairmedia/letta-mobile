@@ -189,6 +189,22 @@ class SelectionReducerTest {
     }
 
     @Test
+    fun selectAtInsideAHollowShapeFollowsSelectInsideHollowShapes() {
+        val state = State(elements = listOf(rect("r", 0f, 0f, 100f, 100f).copy(fillColor = null)), mode = Mode.SELECT)
+        val inside = Intent.SelectAt(Offset(50f, 50f), 4f)
+        assertTrue(reducer.reduce(state, inside).selectedIds.isEmpty(), "off: the inside of a hollow shape is not the shape")
+        val on = reducer.reduce(state, Intent.SetSelectInsideHollowShapes(true))
+        assertEquals(setOf("r"), reducer.reduce(on, inside).selectedIds)
+        assertTrue(on.history.isEmpty(), "a picking preference is not an undo step")
+    }
+
+    @Test
+    fun resetKeepsSelectInsideHollowShapes() {
+        val on = reducer.reduce(State(), Intent.SetSelectInsideHollowShapes(true))
+        assertTrue(reducer.reduce(on, Intent.Reset).selectInsideHollowShapes)
+    }
+
+    @Test
     fun setStrokeStyleUpdatesDefaultOnly() {
         val initial = State()
         val out = reducer.reduce(initial, Intent.SetStrokeStyle(StrokeStyle.DASHED))

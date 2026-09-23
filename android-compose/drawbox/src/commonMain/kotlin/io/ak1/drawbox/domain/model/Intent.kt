@@ -252,6 +252,13 @@ sealed class Intent {
     data class SelectAt(val offset: Offset, val tolerance: Float = 8f) : Intent()
 
     /**
+     * Make exactly the elements with these [ids] the selection (ids with no element are ignored).
+     * For hosts that already know what to select: picking by a point can land on whatever else
+     * covers it, such as a connector ending on the element.
+     */
+    data class SelectIds(val ids: Set<String>) : Intent()
+
+    /**
      * Request in-place text editing at [offset] (dispatched on a double-tap in
      * [Mode.SELECT]). Selects the topmost [Element.Text] under the point within
      * [tolerance]; when one is hit, the controller emits
@@ -395,6 +402,15 @@ sealed class Intent {
 
     /** Change the world-space eraser radius used by [Mode.ERASER]. */
     data class SetEraserSize(val size: Float) : Intent()
+
+    /**
+     * Colour of the selection's text: an [Element.Text]'s colour, or a shape's
+     * [Element.Shape.textColor]. Snapshots history.
+     */
+    data class SetSelectedTextColor(val color: androidx.compose.ui.graphics.Color) : Intent()
+
+    /** Set [State.selectInsideHollowShapes]. No history snapshot: it is not drawing content. */
+    data class SetSelectInsideHollowShapes(val enabled: Boolean) : Intent()
 
     /** Move selected elements to the top of the z-order. Snapshots history. */
     data object BringSelectionToFront : Intent()

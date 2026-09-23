@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -95,6 +97,10 @@ import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBoundsForElement
 import io.ak1.drawbox.domain.model.rotateAround
 import io.ak1.drawbox.domain.model.topmostHit
+import io.ak1.drawbox.domain.model.textTopLeft
+import io.ak1.drawbox.domain.model.textBox
+import io.ak1.drawbox.domain.model.resolvedTextColor
+import io.ak1.drawbox.domain.model.canHoldText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -165,6 +171,13 @@ fun DrawBox(
     modifier: Modifier = Modifier.fillMaxSize(),
     showGrid: Boolean = true,
     /**
+     * Colour of the grid lines when [showGrid] is on. Null picks one that
+     * contrasts with [State.bgColor] (light lines on dark, dark on light).
+     */
+    gridColor: Color? = null,
+    /** World units between grid lines when [showGrid] is on. */
+    gridSpacing: Float = GRID_BASE_STEP_WORLD,
+    /**
      * IDs of elements that should be skipped entirely by the renderer and
      * the selection chrome. Used by the sample app to suppress the
      * underlying text while an inline editor overlays it; without this the
@@ -189,6 +202,20 @@ fun DrawBox(
      * grow or shrink the gap between an element and its selection box.
      */
     selectionStyle: SelectionChromeStyle = SelectionChromeStyle.Default,
+    /**
+     * Where gestures read the state from, when the host has it live (for example
+     * `{ controller.state.value }`). Gestures otherwise read [state], which is the
+     * value this composable was last composed with: an intent the host dispatches
+     * during a press (selecting what was pressed, say) is not seen by the same
+     * gesture until the next frame. Null keeps that behaviour.
+     */
+    liveState: (() -> State)? = null,
+    /**
+     * Shapes whose text is not drawn, the shape itself still is: the one whose
+     * text an editor (such as [io.ak1.drawbox.text.InlineShapeTextEditor]) is
+     * showing, so the two do not double-paint.
+     */
+    hiddenTextElementIds: Set<String> = emptySet(),
 ) {
     // Two-layer split:
     //   - finalizedLayer: cached display list of "static" elements (everything not
@@ -303,8 +330,14 @@ fun DrawBox(
     // The pointerInput coroutines are long-lived; reading state/onIntent through
     // rememberUpdatedState lets gesture callbacks see the current value without
     // re-keying (and re-allocating) the pointerInput block on every state change.
-    val latestState by rememberUpdatedState(state)
+    val composedState = rememberUpdatedState(state)
+    val liveStateRef = rememberUpdatedState(liveState)
+    // What gestures act on: the host's live state when it provides one, else the composed one.
+    fun stateNow(): State = liveStateRef.value?.invoke() ?: composedState.value
     val latestOnIntent by rememberUpdatedState(onIntent)
+    // Screen position of the latest press; see the drag handler. A plain holder, not state:
+    // nothing draws from it, so writing it must not recompose.
+    val press = remember { PressOrigin() }
 
     // Keyboard focus for the space-bar temp-pan. On platforms without hardware
     // keyboards (mobile) this is harmless dead weight.
@@ -340,13 +373,13 @@ fun DrawBox(
                 if (event.key == Key.Spacebar) {
                     when (event.type) {
                         KeyEventType.KeyDown -> {
-                            if (!latestState.tempPanActive) {
+                            if (!stateNow().tempPanActive) {
                                 latestOnIntent(Intent.SetTempPan(true))
                             }
                             true
                         }
                         KeyEventType.KeyUp -> {
-                            if (latestState.tempPanActive) {
+                            if (stateNow().tempPanActive) {
                                 latestOnIntent(Intent.SetTempPan(false))
                             }
                             true
@@ -379,7 +412,7 @@ fun DrawBox(
                         )
                     }
                 }
-                if (showGrid) drawGrid(vp, state.bgColor)
+                if (showGrid) drawGrid(vp, gridColor ?: autoGridColor(state.bgColor), gridSpacing)
             }
             // Re-acquire keyboard focus on every press. Without this, clicking a
             // Material button (mode menu, zoom toolbar, etc.) steals focus and
@@ -405,7 +438,7 @@ fun DrawBox(
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        if (latestState.effectiveMode != Mode.ERASER) continue
+                        if (stateNow().effectiveMode != Mode.ERASER) continue
                         when (event.type) {
                             PointerEventType.Move,
                             PointerEventType.Enter,
@@ -413,7 +446,7 @@ fun DrawBox(
                             -> {
                                 val pos = event.changes.firstOrNull()?.position
                                 eraserPointerWorld = pos?.let {
-                                    latestState.viewport.screenToWorld(it)
+                                    stateNow().viewport.screenToWorld(it)
                                 }
                             }
                             PointerEventType.Exit -> {
@@ -474,7 +507,7 @@ fun DrawBox(
                                 prevDistance = d
                                 prevCentroid = centroid
                                 // Cancel any in-progress marquee on the other handler.
-                                if (latestState.marqueeRect != null) {
+                                if (stateNow().marqueeRect != null) {
                                     latestOnIntent(Intent.SetMarqueeRect(null))
                                 }
                             } else {
@@ -531,7 +564,7 @@ fun DrawBox(
                         // in-place edit. The controller resolves the hit and
                         // emits Event.TextEditRequested for the host to open its
                         // editor; non-text hits are no-ops.
-                        val s = latestState
+                        val s = stateNow()
                         if (s.effectiveMode == Mode.SELECT) {
                             val world = s.viewport.screenToWorld(screenPos)
                             val tol = pickTolerancePx / s.viewport.scale
@@ -539,7 +572,7 @@ fun DrawBox(
                         }
                     },
                     onTap = { screenPos ->
-                        val s = latestState
+                        val s = stateNow()
                         val world = s.viewport.screenToWorld(screenPos)
                         val tol = pickTolerancePx / s.viewport.scale
                         when (s.effectiveMode) {
@@ -581,13 +614,24 @@ fun DrawBox(
                     },
                 )
             }
+            // Where the current press went down. detectDragGestures reports the
+            // drag starting where the touch slop was crossed, a few pixels on
+            // from the press; starting there made a moved element trail the
+            // pointer by that much, cut the first stretch off a pen stroke, and
+            // anchored a marquee short of where it was begun.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    press.screen = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).position
+                }
+            }
             .pointerInput(Unit) {
                 var interaction: SelectionInteraction? = null
                 var lastWorld = Offset.Zero
 
                 detectDragGestures(
-                    onDragStart = { screenPos ->
-                        val s = latestState
+                    onDragStart = { slopScreenPos ->
+                        val screenPos = press.screen ?: slopScreenPos
+                        val s = stateNow()
                         val world = s.viewport.screenToWorld(screenPos)
                         lastWorld = world
                         when (s.effectiveMode) {
@@ -649,7 +693,7 @@ fun DrawBox(
                         }
                     },
                     onDragEnd = {
-                        val s = latestState
+                        val s = stateNow()
                         if (s.mode == Mode.SELECT) {
                             val rect = s.marqueeRect
                             if (interaction is SelectionInteraction.Marquee && rect != null) {
@@ -679,12 +723,12 @@ fun DrawBox(
                         dragInProgress = false
                     },
                     onDragCancel = {
-                        if (latestState.mode == Mode.SELECT &&
+                        if (stateNow().mode == Mode.SELECT &&
                             interaction is SelectionInteraction.Marquee
                         ) {
                             latestOnIntent(Intent.SetMarqueeRect(null))
                         }
-                        if (latestState.mode == Mode.ERASER) {
+                        if (stateNow().mode == Mode.ERASER) {
                             latestOnIntent(Intent.EndErase)
                         }
                         latestOnIntent(Intent.EndTransform)
@@ -692,7 +736,7 @@ fun DrawBox(
                         dragInProgress = false
                     },
                 ) { change, dragAmount ->
-                    val s = latestState
+                    val s = stateNow()
                     val world = s.viewport.screenToWorld(change.position)
                     when (s.effectiveMode) {
                         Mode.PAN -> latestOnIntent(Intent.PanBy(dragAmount))
@@ -784,7 +828,7 @@ fun DrawBox(
             // - PEN / shape modes: the just-inserted element (always elements.last())
             // - SELECT (Move/Resize/Rotate/LineEndpoint/LineBend): state.selectedIds
             // - Marquee / Pan / no drag: empty
-            val activeIds: Set<String> = if (!dragInProgress) {
+            val draggedIds: Set<String> = if (!dragInProgress) {
                 emptySet()
             } else {
                 when (state.effectiveMode) {
@@ -806,6 +850,10 @@ fun DrawBox(
                     }
                 }
             }
+
+            // A shape whose text is being edited is drawn live too, without its text: the cached
+            // layer would otherwise keep replaying the text under the editor.
+            val activeIds: Set<String> = if (hiddenTextElementIds.isEmpty()) draggedIds else draggedIds + hiddenTextElementIds
 
             // Freshness check on the cached layer. Walks orderedElements once,
             // comparing non-active and non-hidden entries against
@@ -834,7 +882,7 @@ fun DrawBox(
                     }) {
                         orderedElements.forEach { el ->
                             if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale)
+                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
                             }
                         }
                     }
@@ -856,7 +904,7 @@ fun DrawBox(
             }) {
                 if (activeIds.isNotEmpty()) {
                     orderedElements.forEach { el ->
-                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale)
+                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
                     }
                 }
                 drawSelectionChrome(
@@ -873,7 +921,9 @@ fun DrawBox(
                 // and outside ERASER mode.
                 if (state.effectiveMode == Mode.ERASER) {
                     eraserPointerWorld?.let { center ->
-                        val r = state.eraserSize
+                        // The gestures erase within eraserSize screen pixels (eraserSize / scale in
+                        // world units); the ring is drawn in world units, so it scales the same way.
+                        val r = state.eraserSize / vp.scale
                         val ringColor = if (state.bgColor.luminance() < 0.5f) {
                             Color.White
                         } else {
@@ -974,23 +1024,34 @@ fun DrawingPreview(
 
 private val GridLightOnDark = Color(0x40FFFFFF)  // ~25% white over dark bgs
 private val GridDarkOnLight = Color(0x33000000)  // ~20% black over light bgs
-private const val GRID_BASE_STEP_WORLD = 50f
+internal const val GRID_BASE_STEP_WORLD = 50f
 
-private fun DrawScope.drawGrid(vp: Viewport, bgColor: Color) {
-    val step = GRID_BASE_STEP_WORLD * vp.scale
+/**
+ * The centre of the pixel [v] falls in. A one-pixel line drawn on a pixel boundary is
+ * antialiased across two pixels at half strength, which greyed and blurred the grid; on a pixel
+ * centre it is one crisp pixel in its real colour.
+ */
+private fun pixelCentre(v: Float): Float = kotlin.math.floor(v) + 0.5f
+
+/** Auto-contrast: a light grid on a dark background, a dark grid on a light one. */
+private fun autoGridColor(bgColor: Color): Color =
+    if (bgColor.luminance() < 0.5f) GridLightOnDark else GridDarkOnLight
+
+private fun DrawScope.drawGrid(vp: Viewport, color: Color, spacingWorld: Float) {
+    val step = spacingWorld * vp.scale
     if (step < 6f) return // collapse to avoid moiré at extreme zoom-out
-    // Auto-contrast: light grid on dark bg, dark grid on light bg.
-    val color = if (bgColor.luminance() < 0.5f) GridLightOnDark else GridDarkOnLight
     val offX = vp.offset.x.mod(step)
     val offY = vp.offset.y.mod(step)
     var x = offX
     while (x < size.width) {
-        drawLine(color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+        val px = pixelCentre(x)
+        drawLine(color, Offset(px, 0f), Offset(px, size.height), strokeWidth = 1f)
         x += step
     }
     var y = offY
     while (y < size.height) {
-        drawLine(color, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+        val py = pixelCentre(y)
+        drawLine(color, Offset(0f, py), Offset(size.width, py), strokeWidth = 1f)
         y += step
     }
 }
@@ -1126,11 +1187,11 @@ private fun classifySelection(
         }
     }
     // Drag inside already-selected → move existing selection.
-    if (state.elements.any { it.id in state.selectedIds && it.hitTest(pointerWorld, pickToleranceWorld) }) {
+    if (state.elements.any { it.id in state.selectedIds && it.hitTest(pointerWorld, pickToleranceWorld, state.selectInsideHollowShapes) }) {
         return SelectionInteraction.Move
     }
     // Drag on unselected element → select-then-move.
-    val any = topmostHit(state.elements, pointerWorld, pickToleranceWorld)
+    val any = topmostHit(state.elements, pointerWorld, pickToleranceWorld, state.selectInsideHollowShapes)
     if (any != null) return SelectionInteraction.SelectAndMove
     // Empty space → marquee.
     return SelectionInteraction.Marquee(pointerWorld)
@@ -1467,12 +1528,13 @@ private fun DrawScope.renderElement(
     textCache: TextLayoutCache? = null,
     textMeasurer: androidx.compose.ui.text.TextMeasurer? = null,
     viewportScale: Float = 1f,
+    hideShapeText: Boolean = false,
 ) {
     if (element.rotation == 0f) {
-        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale)
+        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
     } else {
         withTransform({ rotate(element.rotation, pivot = element.bounds().center) }) {
-            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale)
+            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
         }
     }
 }
@@ -1484,6 +1546,7 @@ private fun DrawScope.renderElementContent(
     textCache: TextLayoutCache?,
     textMeasurer: androidx.compose.ui.text.TextMeasurer?,
     viewportScale: Float,
+    hideShapeText: Boolean = false,
 ) {
     when (element) {
         is Element.Path -> {
@@ -1529,6 +1592,7 @@ private fun DrawScope.renderElementContent(
         }
         is Element.Shape -> {
             drawShape(element)
+            if (!hideShapeText) drawShapeText(element, textCache, textMeasurer)
         }
         is Element.Image -> {
             drawImageElement(element, imageCache, viewportScale)
@@ -1537,6 +1601,35 @@ private fun DrawScope.renderElementContent(
             drawTextElement(element, textCache, textMeasurer)
         }
     }
+}
+
+/**
+ * A shape's text, wrapped to [textBox] and centred in it. Laid out through the same
+ * [TextLayoutCache] as text elements, under the shape's id plus [SHAPE_TEXT_KEY]. Skipped on
+ * the read-only preview path, which has no measurer.
+ */
+private fun DrawScope.drawShapeText(
+    shape: Element.Shape,
+    textCache: TextLayoutCache?,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer?,
+) {
+    if (shape.text.isEmpty() || !shape.canHoldText) return
+    if (textCache == null || textMeasurer == null) return
+    val box = shape.textBox()
+    val layout = textCache.layoutFor(
+        id = shape.id + SHAPE_TEXT_KEY,
+        text = shape.text,
+        fontFamilyKey = shape.fontFamilyKey,
+        fontSize = shape.fontSize,
+        alignment = shape.textAlignment,
+        wrapWidth = box.width.coerceAtLeast(1f),
+        measurer = textMeasurer,
+    )
+    drawText(
+        textLayoutResult = layout,
+        color = shape.resolvedTextColor,
+        topLeft = shape.textTopLeft(layout.size.height.toFloat()),
+    )
 }
 
 /**
@@ -1606,8 +1699,13 @@ private fun DrawScope.drawImageElement(
     // A 600 px placement on a HiDPI 2× display at 1.5× zoom decodes at
     // 1800 px, not 600 (or 4096 source).
     val targetDimPx = (maxOf(targetW, targetH) * viewportScale).toInt()
-    val bitmap = imageCache?.bitmapFor(image.id, image.bytes, targetDimPx)
-        ?: decodeImageBitmap(image.bytes)
+    // With a cache, null means "decoding, or undecodable": show the placeholder. Decoding here
+    // instead would run a full-resolution decode on every frame until the cache fills.
+    val bitmap = if (imageCache != null) {
+        imageCache.bitmapFor(image.id, image.bytes, targetDimPx)
+    } else {
+        decodeImageBitmap(image.bytes)
+    }
     if (bitmap == null) {
         // Visible placeholder so a corrupt / unsupported payload doesn't render
         // as an invisible hole that's still selectable/movable.
@@ -1912,8 +2010,16 @@ private fun DrawScope.drawVariableWidthPath(
     // caps read as a single translucent stroke instead of a chain of dots.
     val useLayer = alpha < 1f
     if (useLayer) {
+        // Bounds are in the current (world) space: the stroke's own extent, not the canvas size,
+        // which clipped strokes at negative or far world coordinates.
+        val pad = samples.maxOf { it.width }
         drawContext.canvas.saveLayer(
-            bounds = Rect(Offset.Zero, size),
+            bounds = Rect(
+                left = samples.minOf { it.position.x } - pad,
+                top = samples.minOf { it.position.y } - pad,
+                right = samples.maxOf { it.position.x } + pad,
+                bottom = samples.maxOf { it.position.y } + pad,
+            ),
             paint = Paint().apply { this.alpha = alpha },
         )
     }
@@ -2184,4 +2290,9 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
         color = color,
         style = Stroke(width = maxOf(1f, strokeWidth * 0.5f), cap = StrokeCap.Round, join = StrokeJoin.Round)
     )
+}
+
+/** Where the current press went down, for drags that must start there. */
+private class PressOrigin {
+    var screen: Offset? = null
 }

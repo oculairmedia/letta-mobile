@@ -14,6 +14,7 @@ import io.ak1.drawbox.domain.model.connectorAnchor
 import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBounds
 import io.ak1.drawbox.domain.model.topmostHit
+import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.touched
 import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.domain.model.withBounds
@@ -25,11 +26,14 @@ import kotlin.time.ExperimentalTime
 class UseCase {
     // Element operations
     fun addElement(element: Element, currentElements: List<Element>): List<Element> {
+        // Above everything already there: after bring-to-front or a delete the list size can be at
+        // or below an existing zIndex, which drew the new element underneath and lost it hit tests.
+        val nextZ = (currentElements.maxOfOrNull { it.zIndex } ?: -1) + 1
         val newElement = when (element) {
-            is Element.Path -> element.copy(zIndex = currentElements.size)
-            is Element.Shape -> element.copy(zIndex = currentElements.size)
-            is Element.Image -> element.copy(zIndex = currentElements.size)
-            is Element.Text -> element.copy(zIndex = currentElements.size)
+            is Element.Path -> element.copy(zIndex = nextZ)
+            is Element.Shape -> element.copy(zIndex = nextZ)
+            is Element.Image -> element.copy(zIndex = nextZ)
+            is Element.Text -> element.copy(zIndex = nextZ)
         }
         return currentElements + newElement
     }
@@ -178,14 +182,32 @@ class UseCase {
         else el
     }
 
-    /** Replace the [text] field of a single [Element.Text]. Snapshots history. */
+    /** Replace the text of a single [Element.Text], or of a shape that [canHoldText]. */
     fun updateText(
         elements: List<Element>,
         id: String,
         text: String,
     ): List<Element> = elements.map { el ->
-        if (el.id == id && el is Element.Text) el.copy(text = text).touched()
-        else el
+        when {
+            el.id != id -> el
+            el is Element.Text -> el.copy(text = text).touched()
+            el is Element.Shape && el.canHoldText -> el.copy(text = text).touched()
+            else -> el
+        }
+    }
+
+    /** Set the text colour of every selected [Element.Text] and text-holding shape. */
+    fun setSelectedTextColor(
+        elements: List<Element>,
+        ids: Set<String>,
+        color: Color,
+    ): List<Element> = elements.map { el ->
+        when {
+            el.id !in ids -> el
+            el is Element.Text -> el.copy(color = color).touched()
+            el is Element.Shape && el.canHoldText -> el.copy(textColor = color).touched()
+            else -> el
+        }
     }
 
     /** Set font size on every selected [Element.Text]. */
@@ -194,7 +216,12 @@ class UseCase {
         ids: Set<String>,
         size: Float,
     ): List<Element> = elements.map { el ->
-        if (el.id in ids && el is Element.Text) el.copy(fontSize = size).touched() else el
+        when {
+            el.id !in ids -> el
+            el is Element.Text -> el.copy(fontSize = size).touched()
+            el is Element.Shape && el.canHoldText -> el.copy(fontSize = size).touched()
+            else -> el
+        }
     }
 
     /** Set text alignment on every selected [Element.Text]. */
@@ -203,7 +230,12 @@ class UseCase {
         ids: Set<String>,
         alignment: TextAlignment,
     ): List<Element> = elements.map { el ->
-        if (el.id in ids && el is Element.Text) el.copy(alignment = alignment).touched() else el
+        when {
+            el.id !in ids -> el
+            el is Element.Text -> el.copy(alignment = alignment).touched()
+            el is Element.Shape && el.canHoldText -> el.copy(textAlignment = alignment).touched()
+            else -> el
+        }
     }
 
     /** Set font family key on every selected [Element.Text]. */
@@ -212,7 +244,12 @@ class UseCase {
         ids: Set<String>,
         fontFamilyKey: String,
     ): List<Element> = elements.map { el ->
-        if (el.id in ids && el is Element.Text) el.copy(fontFamilyKey = fontFamilyKey).touched() else el
+        when {
+            el.id !in ids -> el
+            el is Element.Text -> el.copy(fontFamilyKey = fontFamilyKey).touched()
+            el is Element.Shape && el.canHoldText -> el.copy(fontFamilyKey = fontFamilyKey).touched()
+            else -> el
+        }
     }
 
     // Image operations
@@ -267,8 +304,12 @@ class UseCase {
     // Selection operations
 
     /** Topmost element at `point`, or null if nothing was hit. */
-    fun hitTopmost(elements: List<Element>, point: Offset, tolerance: Float): Element? =
-        topmostHit(elements, point, tolerance)
+    fun hitTopmost(
+        elements: List<Element>,
+        point: Offset,
+        tolerance: Float,
+        hollowInterior: Boolean = false,
+    ): Element? = topmostHit(elements, point, tolerance, hollowInterior)
 
     /** Set of element IDs whose bounding box intersects `rect`. */
     fun selectInRect(elements: List<Element>, rect: Rect): Set<String> {

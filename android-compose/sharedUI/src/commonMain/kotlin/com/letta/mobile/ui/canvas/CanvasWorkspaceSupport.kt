@@ -18,8 +18,9 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import io.ak1.drawbox.domain.model.State as DrawBoxState
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
-import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.bounds
+import io.ak1.drawbox.domain.model.canHoldText
+import io.ak1.drawbox.domain.model.resolvedTextColor
 import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CoroutineScope
@@ -117,6 +118,13 @@ internal data class FinalPointerPassParams(
     val onSnapLatestConnector: () -> Unit,
 )
 
+/** What decides whether quick-create targets show, and where. */
+internal data class QuickCreateAnchorParams(
+    val state: DrawBoxState,
+    val activeNote: com.letta.mobile.data.canvas.CanvasSceneDocument?,
+    val editing: Boolean,
+)
+
 /** What the floating selection bar is anchored to. */
 internal data class BarAnchorParams(
     val state: DrawBoxState,
@@ -146,9 +154,8 @@ internal data class RequestTextEditParams(
     val offset: Offset,
     val tolerance: Float,
     val elements: List<Element>,
-    val session: CanvasSession?,
     val onEditText: (String) -> Unit,
-    val onActivateShapeLabel: (String) -> Unit,
+    val onEditShapeText: (Element.Shape) -> Unit,
 )
 
 internal data class ReconcileShapeLabelsParams(
@@ -202,26 +209,8 @@ internal object CanvasWorkspaceSupport {
             is Element.Shape -> moved.copy(id = id, startBinding = null, endBinding = null)
             is Element.Path -> moved.copy(id = id)
             is Element.Text -> moved.copy(id = id)
-            else -> moved
+            is Element.Image -> moved.copy(id = id)
         }
-    }
-
-    fun shapeSelectionPoint(shape: Element.Shape): Offset =
-        when (shape.shapeType) {
-            ShapeType.LINE,
-            ShapeType.ARROW -> shape.points.first()
-            else -> shape.bounds().let { Offset(it.center.x, it.top) }
-        }
-
-    /**
-     * A point DrawBox's hit test finds [element] at: on the outline for closed shapes (an unfilled
-     * rectangle is only hit on its stroke), the first point of a line, arrow or stroke, the centre
-     * for text (hit by its box).
-     */
-    fun selectionPointOf(element: Element): Offset = when (element) {
-        is Element.Shape -> shapeSelectionPoint(element)
-        is Element.Path -> element.bounds().let { Offset(it.center.x, it.top) }
-        else -> element.bounds().center
     }
 
     fun documentHistoryMessage(context: HistoryMessageContext): String =
@@ -237,10 +226,7 @@ internal object CanvasWorkspaceSupport {
         if (selectedIds.isEmpty()) return false
         val copies = elements.filter { it.id in selectedIds }.map { duplicateElement(it) }
         copies.forEach { controller.onIntent(Intent.AddElement(it)) }
-        controller.clearSelection()
-        copies.forEach { copy ->
-            controller.onIntent(Intent.SelectAt(selectionPointOf(copy), 4f))
-        }
+        controller.selectIds(copies.map { it.id }.toSet())
         onStatus("Duplicated ${copies.size} element(s)")
         return true
     }
@@ -604,21 +590,19 @@ internal object CanvasWorkspaceSupport {
         return true
     }
 
-    suspend fun handleRequestTextEdit(params: RequestTextEditParams) {
+    /**
+     * Where a request for a caret lands: an existing text element, else the shape under it that
+     * holds text (its own text, native to the shape since letta-mobile-8cik1).
+     */
+    fun handleRequestTextEdit(params: RequestTextEditParams) {
         val text = CanvasTextElements.at(params.elements, params.offset, params.tolerance)
         if (text != null) {
             params.onEditText(text.id)
             return
         }
-        val shape = CanvasShapeLabels.shapeAt(params.elements, params.offset) ?: return
-        val s = params.session ?: return
-        val labelId = CanvasShapeLabels.labelIdOf(shape.id)
-        val frame = CanvasShapeLabels.frameFor(shape.bounds())
-        if (s.documents().none { it.id == labelId }) {
-            runCatching { s.setDocument(labelId, "", frame = frame, color = PLAIN_TEXT_COLOR) }
-            runCatching { s.setLabelOwner(labelId, shape.id) }
-        }
-        params.onActivateShapeLabel(labelId)
+        val shape = io.ak1.drawbox.domain.model.topmostHit(params.elements, params.offset, params.tolerance, hollowInterior = true)
+            as? Element.Shape ?: return
+        if (shape.canHoldText) params.onEditShapeText(shape)
     }
 
     fun handleWheelZoom(
@@ -684,12 +668,59 @@ internal object CanvasWorkspaceSupport {
         return FinalPointerPassResult(altHeld = altHeld, drawingConnectorAt = connectorAt)
     }
 
-    /** True when [element] is somewhere to type: a text element, or a closed shape (which needs a session for its label). */
-    fun holdsText(element: Element?, hasSession: Boolean): Boolean = when {
-        element is Element.Text -> true
-        element == null -> false
-        else -> hasSession && CanvasShapeLabels.canLabel(element)
+    /** The selected [shape]'s text, as the property panel's Text target edits it. */
+    fun shapeTextActions(shape: Element.Shape, controller: DrawBoxController): ShapeTextActions = ShapeTextActions(
+        color = shape.resolvedTextColor,
+        onColor = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedTextColor(it)) },
+        fontSize = shape.fontSize,
+        onFontSize = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedFontSize(it)) },
+        fontFamily = shape.fontFamilyKey,
+        onFontFamily = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedFontFamily(it)) },
+        alignment = shape.textAlignment,
+        onAlignment = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectedTextAlignment(it)) },
+    )
+
+    /**
+     * Folds each shape label document (see [CanvasShapeLabels]) into its shape: the label's words
+     * become the shape's text, its colour and alignment the text's, and the document and its
+     * ownership record go. A shape that already has text keeps it; its label is dropped.
+     */
+    suspend fun foldLabelsIntoShapes(session: CanvasSession, controller: DrawBoxController) {
+        val owners = session.labelOwners()
+        if (owners.isEmpty()) return
+        val labels = session.documents().filter { it.id in owners }
+        labels.forEach { label ->
+            // Not loaded yet (or already gone): leave it. Folding needs the shape to fold into, and an
+            // orphaned label is the reconciler's to remove, not this.
+            val shape = controller.state.value.elements.firstOrNull { it.id == owners[label.id] } as? Element.Shape
+                ?: return@forEach
+            if (shape.canHoldText && shape.text.isEmpty()) {
+                val words = com.letta.mobile.data.canvas.CanvasDocumentText.plainText(label.json)
+                if (words.isNotEmpty()) {
+                    controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(labelledShape(shape, words, label.style)))
+                }
+            }
+            runCatching { session.removeDocument(label.id) }
+            runCatching { session.setLabelOwner(label.id, null) }
+        }
     }
+
+    private fun labelledShape(shape: Element.Shape, words: String, style: com.letta.mobile.data.canvas.CanvasTextStyle?): Element.Shape =
+        shape.copy(
+            text = words,
+            textColor = parseHexColor(style?.textColor) ?: shape.textColor,
+            textAlignment = when (style?.align) {
+                "start" -> io.ak1.drawbox.domain.model.TextAlignment.LEFT
+                "end" -> io.ak1.drawbox.domain.model.TextAlignment.RIGHT
+                else -> shape.textAlignment
+            },
+            fontFamilyKey = style?.fontFamily ?: shape.fontFamilyKey,
+            fontSize = style?.fontScale?.let { shape.fontSize * it } ?: shape.fontSize,
+        )
+
+    /** True when [element] is somewhere to type: a text element, or a shape that holds text. */
+    fun holdsText(element: Element?): Boolean =
+        element is Element.Text || (element is Element.Shape && element.canHoldText)
 
     /**
      * True when a finger at [screen] is on open board in the select tool: not on an element and not
@@ -701,27 +732,34 @@ internal object CanvasWorkspaceSupport {
         val world = state.viewport.screenToWorld(screen)
         val slack = tolerance * HANDLE_SLACK / state.viewport.scale
         if (state.elements.any { it.id in state.selectedIds && it.bounds().inflate(slack).contains(world) }) return false
-        return elementAt(state.elements, world, tolerance / state.viewport.scale) == null
+        return elementAt(state, world, tolerance / state.viewport.scale) == null
     }
 
     /**
-     * The unfilled closed shape a press at [screen] lands inside, in the select tool, when it is
-     * the topmost thing there. DrawBox only hits such a shape on its stroke. "Inside" stops short
-     * of the outline, so the stroke and the resize handles on it stay DrawBox's.
+     * Where quick-create targets go, on screen: around the one selected shape that holds text, or
+     * the active note when nothing drawn is selected. None while typing, when they would crowd
+     * the text, and none for lines, strokes or a shape's legacy label.
      */
-    fun hollowShapeUnder(state: DrawBoxState, screen: Offset, tolerance: Float): Element? {
-        if (state.mode != io.ak1.drawbox.domain.model.Mode.SELECT) return null
-        val world = state.viewport.screenToWorld(screen)
-        val shape = elementAt(state.elements, world, tolerance / state.viewport.scale) as? Element.Shape ?: return null
-        if (!CanvasShapeLabels.canLabel(shape)) return null
-        if (shape.fillColor?.let { it.alpha > 0f } == true) return null
-        val inner = shape.bounds().deflate(tolerance * HANDLE_SLACK / state.viewport.scale)
-        return shape.takeIf { inner.contains(world) }
+    fun quickCreateAnchor(params: QuickCreateAnchorParams): Rect? {
+        if (params.editing) return null
+        val state = params.state
+        val shape = state.elements.singleOrNull { it.id in state.selectedIds }
+        if (state.selectedIds.size == 1 && shape is Element.Shape && shape.canHoldText) {
+            return selectionScreenRect(state.elements, state.selectedIds, emptyList(), state.viewport)
+        }
+        if (state.selectedIds.isNotEmpty()) return null
+        val note = params.activeNote ?: return null
+        if (CanvasShapeLabels.shapeIdOf(note.id) != null) return null
+        val frame = note.frame ?: return null
+        return selectionScreenRect(emptyList(), emptySet(), listOf(frame.toRect()), state.viewport)
     }
 
-    /** The topmost element under [world], within [tolerance] board units of its bounds. */
-    fun elementAt(elements: List<Element>, world: Offset, tolerance: Float): Element? =
-        elements.asReversed().firstOrNull { it.bounds().inflate(tolerance).contains(world) }
+    /**
+     * The topmost element under [world], by DrawBox's own hit test (geometry, z-order, and inside
+     * hollow shapes when the board picks there), so the board agrees with what a press selects.
+     */
+    fun elementAt(state: DrawBoxState, world: Offset, tolerance: Float): Element? =
+        io.ak1.drawbox.domain.model.topmostHit(state.elements, world, tolerance, state.selectInsideHollowShapes)
 
     /**
      * The closed shape a gesture just drew, if it drew one: new since the press ([idsAtPress]), and
@@ -778,3 +816,6 @@ private const val MIN_DRAWN_SHAPE = 16f
 
 /** How far past a selection its handles reach, in multiples of the pick tolerance. */
 private const val HANDLE_SLACK = 3f
+
+/** This frame as a board rectangle. */
+internal fun com.letta.mobile.data.canvas.CanvasDocumentFrame.toRect(): Rect = Rect(x, y, x + width, y + height)

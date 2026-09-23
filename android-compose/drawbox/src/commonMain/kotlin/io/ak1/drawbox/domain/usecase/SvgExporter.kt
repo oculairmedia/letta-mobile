@@ -4,8 +4,14 @@ package io.ak1.drawbox.domain.usecase
 
 import androidx.compose.ui.graphics.Color
 import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.bounds
+import io.ak1.drawbox.domain.model.textBox
+import io.ak1.drawbox.domain.model.resolvedTextColor
+import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.StrokeStyle
+import io.ak1.drawbox.domain.model.bounds
+import io.ak1.drawbox.domain.model.rotateAround
 import androidx.compose.ui.geometry.Offset
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -40,7 +46,10 @@ object SvgExporter {
         elements.sortedBy { it.zIndex }.forEach { element ->
             when (element) {
                 is Element.Path -> svgElements.add(pathToSvg(element))
-                is Element.Shape -> svgElements.add(shapeToSvg(element))
+                is Element.Shape -> {
+                    svgElements.add(shapeToSvg(element))
+                    shapeTextToSvg(element)?.let(svgElements::add)
+                }
                 is Element.Image -> svgElements.add(imageToSvg(element))
                 is Element.Text -> svgElements.add(textToSvg(element))
             }
@@ -49,56 +58,36 @@ object SvgExporter {
         return buildSvgDocument(svgElements, viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight)
     }
 
+    /**
+     * The viewBox content area: the union of every element's drawn extent. Uses [bounds] (which
+     * knows circles, bent connectors and text), turned by the element's rotation, plus half the
+     * widest stroke, so nothing drawn is clipped by the fixed padding.
+     */
     private fun calculateBounds(elements: List<Element>): Bounds {
-        var minX = Float.MAX_VALUE
-        var minY = Float.MAX_VALUE
-        var maxX = Float.MIN_VALUE
-        var maxY = Float.MIN_VALUE
-
+        if (elements.isEmpty()) return Bounds(0f, 0f, 1000f, 1000f)
+        var minX = Float.POSITIVE_INFINITY
+        var minY = Float.POSITIVE_INFINITY
+        var maxX = Float.NEGATIVE_INFINITY
+        var maxY = Float.NEGATIVE_INFINITY
         elements.forEach { element ->
-            when (element) {
-                is Element.Path -> {
-                    element.samples.forEach { sample ->
-                        minX = kotlin.math.min(minX, sample.position.x)
-                        minY = kotlin.math.min(minY, sample.position.y)
-                        maxX = kotlin.math.max(maxX, sample.position.x)
-                        maxY = kotlin.math.max(maxY, sample.position.y)
-                    }
-                }
-                is Element.Shape -> {
-                    element.points.forEach { point ->
-                        minX = kotlin.math.min(minX, point.x)
-                        minY = kotlin.math.min(minY, point.y)
-                        maxX = kotlin.math.max(maxX, point.x)
-                        maxY = kotlin.math.max(maxY, point.y)
-                    }
-                }
-                is Element.Image -> {
-                    element.points.forEach { point ->
-                        minX = kotlin.math.min(minX, point.x)
-                        minY = kotlin.math.min(minY, point.y)
-                        maxX = kotlin.math.max(maxX, point.x)
-                        maxY = kotlin.math.max(maxY, point.y)
-                    }
-                }
-                is Element.Text -> {
-                    val left = element.topLeft.x
-                    val top = element.topLeft.y
-                    val right = left + element.wrapWidth
-                    val bottom = top + element.measuredHeight
-                    minX = kotlin.math.min(minX, left)
-                    minY = kotlin.math.min(minY, top)
-                    maxX = kotlin.math.max(maxX, right)
-                    maxY = kotlin.math.max(maxY, bottom)
-                }
+            val b = element.bounds()
+            val pad = strokeHalfWidth(element)
+            val corners = listOf(b.topLeft, b.topRight, b.bottomLeft, b.bottomRight)
+                .map { if (element.rotation == 0f) it else rotateAround(it, b.center, element.rotation) }
+            corners.forEach { c ->
+                minX = min(minX, c.x - pad)
+                minY = min(minY, c.y - pad)
+                maxX = max(maxX, c.x + pad)
+                maxY = max(maxY, c.y + pad)
             }
         }
+        return Bounds(minX, minY, maxX - minX, maxY - minY)
+    }
 
-        return if (minX == Float.MAX_VALUE) {
-            Bounds(0f, 0f, 1000f, 1000f)
-        } else {
-            Bounds(minX, minY, maxX - minX, maxY - minY)
-        }
+    private fun strokeHalfWidth(element: Element): Float = when (element) {
+        is Element.Path -> (element.samples.maxOfOrNull { it.width } ?: element.strokeWidth) * 0.5f
+        is Element.Shape -> if (element.strokeEnabled) element.strokeWidth * 0.5f else 0f
+        else -> 0f
     }
 
     private fun buildSvgDocument(
@@ -117,6 +106,14 @@ object SvgExporter {
 
     private fun pathToSvg(path: Element.Path): String {
         if (path.samples.isEmpty()) return ""
+        val inner = pathContentToSvg(path)
+        // Turned about the same pivot the canvas renderer uses.
+        if (path.rotation == 0f) return inner
+        val c = path.bounds().center
+        return """<g transform="rotate(${path.rotation}, ${c.x}, ${c.y})">$inner</g>"""
+    }
+
+    private fun pathContentToSvg(path: Element.Path): String {
 
         val color = colorToHex(path.strokeColor)
         val opacity = path.alpha
@@ -128,7 +125,8 @@ object SvgExporter {
         val uniform = path.samples.all { it.width == firstWidth }
         if (uniform) {
             val pathData = buildSmoothPathData(positions)
-            return """<path d="$pathData" stroke="$color" stroke-width="$firstWidth" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="$opacity"/>"""
+            val dashAttr = strokeDashArrayAttr(path.strokeStyle, firstWidth)
+            return """<path d="$pathData" stroke="$color" stroke-width="$firstWidth" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="$opacity"$dashAttr/>"""
         }
 
         // Variable-width path (pen pressure). SVG `<path>` only carries one
@@ -140,8 +138,9 @@ object SvgExporter {
             val a = path.samples[i]
             val b = path.samples[i + 1]
             val w = (a.width + b.width) * 0.5f
+            val dashAttr = strokeDashArrayAttr(path.strokeStyle, w)
             segments.append(
-                """<line x1="${a.position.x}" y1="${a.position.y}" x2="${b.position.x}" y2="${b.position.y}" stroke="$color" stroke-width="$w" stroke-linecap="round" opacity="$opacity"/>""",
+                """<line x1="${a.position.x}" y1="${a.position.y}" x2="${b.position.x}" y2="${b.position.y}" stroke="$color" stroke-width="$w" stroke-linecap="round" opacity="$opacity"$dashAttr/>""",
             )
         }
         return """<g>$segments</g>"""
@@ -178,7 +177,7 @@ object SvgExporter {
         if (shape.points.size < 2) return ""
 
         val start = shape.points[0]
-        val end = shape.points[1]
+        val end = shape.points.last()
         val strokeOn = shape.strokeEnabled && shape.strokeWidth > 0f
         val color = if (strokeOn) colorToHex(shape.strokeColor) else "none"
         val strokeWidth = if (strokeOn) shape.strokeWidth else 0f
@@ -213,14 +212,12 @@ object SvgExporter {
     }
 
     /**
-     * Center point for SVG rotation. For RECTANGLE / TRIANGLE / ARROW / LINE
-     * the AABB center matches the renderer's `bounds().center`; for CIRCLE
-     * the center is the midpoint of the two diameter endpoints. Both reduce
-     * to `((start + end) / 2)` since the renderer's pivot is the bbox center.
+     * Center point for SVG rotation: the renderer's pivot, `bounds().center`. For a bent LINE or
+     * ARROW that includes the curve's control point, so it is not the start/end midpoint.
      */
     private fun Element.Shape.unrotatedCenter(): Pair<Float, Float> {
-        val s = points[0]; val e = points[1]
-        return (s.x + e.x) * 0.5f to (s.y + e.y) * 0.5f
+        val c = bounds().center
+        return c.x to c.y
     }
 
     /**
@@ -385,6 +382,32 @@ object SvgExporter {
     private fun normalize(v: Offset): Offset {
         val len = sqrt(v.x * v.x + v.y * v.y)
         return if (len > 0f) Offset(v.x / len, v.y / len) else Offset.Zero
+    }
+
+    /**
+     * A shape's text as a text block in the shape's text box, centred top to bottom by the same
+     * line estimate [wrapTextForSvg] makes, and turned with the shape.
+     */
+    private fun shapeTextToSvg(shape: Element.Shape): String? {
+        if (shape.text.isEmpty() || !shape.canHoldText) return null
+        val box = shape.textBox()
+        val lines = wrapTextForSvg(shape.text, box.width, shape.fontSize, shape.fontFamilyKey).size
+        val height = shape.fontSize + (lines - 1) * shape.fontSize * 1.25f
+        val block = Element.Text(
+            id = shape.id,
+            text = shape.text,
+            fontFamilyKey = shape.fontFamilyKey,
+            fontSize = shape.fontSize,
+            color = shape.resolvedTextColor,
+            alignment = shape.textAlignment,
+            topLeft = androidx.compose.ui.geometry.Offset(box.left, box.center.y - height / 2f),
+            wrapWidth = box.width,
+            measuredHeight = height,
+        )
+        val svg = textToSvg(block)
+        if (shape.rotation == 0f) return svg
+        val c = shape.bounds().center
+        return """<g transform="rotate(${shape.rotation}, ${c.x}, ${c.y})">$svg</g>"""
     }
 
     private fun textToSvg(text: Element.Text): String {

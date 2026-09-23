@@ -11,6 +11,7 @@ import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.domain.usecase.SvgExporter
 import io.ak1.drawbox.presentation.reducer.Reducer
+import io.ak1.drawbox.presentation.reducer.holdsText
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -108,7 +109,10 @@ class DrawBoxController(
      */
     val intents: SharedFlow<Intent> = _intents.asSharedFlow()
 
-    private val _events = MutableSharedFlow<Event>(extraBufferCapacity = 1)
+    // Room for a burst: with a single slot, tryEmit dropped whatever arrived while one event
+    // was still waiting - an SVG export requested just as an autosave's JSON export was
+    // pending simply never arrived.
+    private val _events = MutableSharedFlow<Event>(extraBufferCapacity = EVENT_BUFFER)
     /**
      * Side effect events like drawing saved, drawing loaded, or errors.
      * Use LaunchedEffect to collect and respond to events:
@@ -163,6 +167,9 @@ class DrawBoxController(
     fun onIntent(intent: Intent) {
         val prev = _state.value
         val newState = reducer.reduce(prev, intent)
+        // invokeBitmap is a body property, so copy() drops it; carry it so saveBitmap() right
+        // after an intent still captures instead of silently doing nothing.
+        if (newState !== prev) newState.invokeBitmap = prev.invokeBitmap
         _state.value = newState
         updateHistoryState()
         // Emit AFTER state has been updated so subscribers reading state.value
@@ -174,14 +181,14 @@ class DrawBoxController(
             is Intent.LoadDrawing -> emitLoadEvent()
             // Double-tap in SELECT mode: open the editor for the hit text.
             is Intent.RequestTextEditAt ->
-                reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance)
-                    .let { it as? Element.Text }
+                reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance, prev.selectInsideHollowShapes)
+                    ?.takeIf { it.holdsText() }
                     ?.let { _events.tryEmit(Event.TextEditRequested(it.id)) }
             // Second tap on an already-sole-selected text opens the editor too
             // (tldraw/Figma pattern). `prev` is the pre-reduce selection.
             is Intent.SelectAt -> {
-                val hit = reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance)
-                if (hit is Element.Text && prev.selectedIds == setOf(hit.id)) {
+                val hit = reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance, prev.selectInsideHollowShapes)
+                if (hit != null && hit.holdsText() && prev.selectedIds == setOf(hit.id)) {
                     _events.tryEmit(Event.TextEditRequested(hit.id))
                 }
             }
@@ -363,6 +370,9 @@ class DrawBoxController(
     /** Clear the current selection. */
     fun clearSelection() = onIntent(Intent.ClearSelection)
 
+    /** Select exactly the elements with these ids. */
+    fun selectIds(ids: Set<String>) = onIntent(Intent.SelectIds(ids))
+
     /** Delete every selected element. */
     fun deleteSelected() = onIntent(Intent.DeleteSelected)
 
@@ -478,14 +488,18 @@ class DrawBoxController(
     fun importPath(jsonString: String) {
         try {
             val payLoad = DrawingSerializer.deserialize(jsonString)
+            // The host's settings, read before reset() replaces them with defaults.
+            val before = _state.value
             reset()
             _state.value = State(
                 elements = payLoad.elements,
-                strokeColor = _state.value.strokeColor,
-                strokeWidth = _state.value.strokeWidth,
-                opacity = _state.value.opacity,
+                strokeColor = before.strokeColor,
+                strokeWidth = before.strokeWidth,
+                opacity = before.opacity,
                 bgColor = payLoad.bgColor,
-            )
+                bgPattern = before.bgPattern,
+                selectInsideHollowShapes = before.selectInsideHollowShapes,
+            ).also { it.invokeBitmap = before.invokeBitmap }
         } catch (e: Exception) {
             // Handle deserialization error
             _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))
@@ -523,3 +537,6 @@ fun rememberDrawBoxController(
         DrawBoxController(/*useCase, */Reducer(useCase), initialState)
     }
 }
+
+/** Events a subscriber can fall behind by before any are dropped. */
+private const val EVENT_BUFFER = 64

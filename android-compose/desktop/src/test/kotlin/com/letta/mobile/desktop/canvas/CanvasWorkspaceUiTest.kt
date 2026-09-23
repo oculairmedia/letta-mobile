@@ -165,9 +165,7 @@ class CanvasWorkspaceUiTest {
         onNodeWithContentDescription("Close note editor").performClick()
         onAllNodesWithContentDescription("Note editor").assertCountEquals(0)
 
-        // A shape's LABEL is the board's plain block document: the text tool itself now places one
-        // of DrawBox's own text elements instead (see CanvasTextToolUiTest), so this is where a
-        // plain document and its formatting still live. Double-clicking a shape opens one.
+        // A shape's text: double-clicking a shape types into the shape itself.
         verifyShapeLabelWorkflow(controller, session, note.id)
     }
 
@@ -182,49 +180,37 @@ class CanvasWorkspaceUiTest {
             "shapeType":"RECTANGLE","modifiedAt":1}]}""",
         )
         waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 1 }
-        // Double-clicking asks for a caret, and asking for one is a Select-tool gesture: DrawBox
-        // reports it only in SELECT, which is where picking things up happens.
         onNodeWithContentDescription("Select").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.mode == io.ak1.drawbox.domain.model.Mode.SELECT }
         val centre = controller.state.value.viewport.worldToScreen(androidx.compose.ui.geometry.Offset(140f, 100f))
         onNodeWithContentDescription("Canvas board").performMouseInput { doubleClick(centre) }
-        waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
-        val text = session.documents().first { it.id != noteId }
-        kotlin.test.assertEquals("#00000000", text.color, "a label is a plain document")
-        waitUntil(timeoutMillis = 5000) {
-            onAllNodesWithContentDescription("Bold").fetchSemanticsNodes().isNotEmpty()
-        }
-        onNodeWithContentDescription("To-do").performClick()
-        waitUntil(timeoutMillis = 5000) {
-            session.documents().first { it.id == text.id }.json.contains("\"todo\"")
-        }
 
-        // A shape's text is the shape's: it has no note chrome and no grip of its own (the shape
-        // moves it), the shape stays selected, and the shape's panel carries a Text target whose
-        // size, family, alignment and colour persist with the label document.
-        // The one "Move note" grip on the board belongs to the sticky note placed above.
-        onAllNodesWithContentDescription("Move note").assertCountEquals(1)
-        onAllNodesWithContentDescription("Move text").assertCountEquals(0)
+        // The shape's text is the shape's own: no document is made for it, and it is typed in place.
+        waitUntil(timeoutMillis = 5000) { onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
+        onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction())[0].performTextInput("Launch")
+        fun rect() = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().single()
+        waitUntil(timeoutMillis = 5000) { rect().text == "Launch" }
+        kotlin.test.assertEquals(listOf(noteId), session.documents().map { it.id }, "shape text is not a document")
         kotlin.test.assertEquals(setOf("rect-1"), controller.state.value.selectedIds)
+
+        // Its panel carries a Text target: size, family, alignment and colour land on the shape.
         onNodeWithContentDescription("Properties").performClick()
         onAllNodesWithContentDescription("Target card").assertCountEquals(0)
         onNodeWithContentDescription("Target text").performClick()
-        onNodeWithContentDescription("Size L").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontScale == 1.4f }
+        onNodeWithContentDescription("Text size L").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().fontSize == 36f }
         onNodeWithContentDescription("Font Serif").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontFamily == "serif" }
-        onNodeWithContentDescription("Align center").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.align == "center" }
+        waitUntil(timeoutMillis = 5000) { rect().fontFamilyKey == io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SERIF }
+        onNodeWithContentDescription("Align end").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().textAlignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT }
         onNodeWithContentDescription("Color blue").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.textColor == "#3b82f6" }
-        val styled = session.documents().first { it.id == text.id }.style!!
-        kotlin.test.assertEquals(1.4f, styled.fontScale, "colour must not reset the size")
+        waitUntil(timeoutMillis = 5000) { rect().textColor == androidx.compose.ui.graphics.Color(0xFF3B82F6) }
+        kotlin.test.assertEquals(androidx.compose.ui.graphics.Color.Black, rect().strokeColor, "the text colour is not the outline")
         onNodeWithContentDescription("Close properties").performClick()
 
-        // Deleting the shape takes its text with it.
+        // Deleting the shape takes its text with it: there is nothing else to clean up.
         onNodeWithContentDescription("Delete selection").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().none { it.id == text.id } }
-        onAllNodesWithContentDescription("Delete selection").assertCountEquals(0)
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.isEmpty() }
     }
 
     @Test

@@ -67,12 +67,12 @@ class CanvasElementInteractionUiTest {
         val shape = shapes(controller).single()
         assertTrue(shape.bounds().contains(Offset(420f, 360f)), "the shape went where the menu was opened, got ${shape.bounds()}")
 
-        // Its label exists and has the caret: typing goes into the shape.
-        val labelId = "label-${shape.id}"
-        waitUntil(timeoutMillis = 5000) { session.documents().any { it.id == labelId } }
+        // The caret is in the shape: typing goes into the shape's own text.
         waitUntil(timeoutMillis = 5000) { onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
         onAllNodes(isFocused() and hasSetTextAction())[0].performTextInput("Plan")
-        waitUntil(timeoutMillis = 10_000) { session.documents().single { it.id == labelId }.json.contains("Plan") }
+        waitUntil(timeoutMillis = 5000) { shapes(controller).single().text == "Plan" }
+        // And it is saved with the drawing, where peers and the agent read it.
+        waitUntil(timeoutMillis = 10_000) { session.sceneJsonOrEmpty().contains("Plan") }
     }
 
     @Test
@@ -90,8 +90,6 @@ class CanvasElementInteractionUiTest {
             release()
         }
         waitUntil(timeoutMillis = 5000) { shapes(controller).size == 1 }
-        val labelId = "label-${shapes(controller).single().id}"
-        waitUntil(timeoutMillis = 5000) { session.documents().any { it.id == labelId } }
         waitUntil(timeoutMillis = 5000) { onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
     }
 
