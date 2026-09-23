@@ -3,10 +3,6 @@ package com.letta.mobile.ui.canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -17,7 +13,6 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerType
-import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 
@@ -83,11 +78,14 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectBo
 private suspend fun AwaitPointerEventScope.awaitHoldEnds(down: PointerInputChange): Boolean {
     while (true) {
         val event = awaitPointerEvent(PointerEventPass.Initial)
-        val change = event.changes.firstOrNull { it.id == down.id }
-        val moved = change != null && (change.position - down.position).getDistance() > viewConfiguration.touchSlop
-        if (event.changes.size > 1 || change == null || !change.pressed || moved) return true
+        if (event.changes.size > 1) return true
+        val change = event.changes.firstOrNull { it.id == down.id } ?: return true
+        if (!change.pressed || movedPastSlop(change, down)) return true
     }
 }
+
+private fun AwaitPointerEventScope.movedPastSlop(change: PointerInputChange, down: PointerInputChange): Boolean =
+    (change.position - down.position).getDistance() > viewConfiguration.touchSlop
 
 private suspend fun AwaitPointerEventScope.consumeUntilRelease() {
     do {
@@ -97,124 +95,43 @@ private suspend fun AwaitPointerEventScope.consumeUntilRelease() {
 }
 
 /**
- * Moving around the board by touch. Two fingers pinch to zoom and drag to pan, in every tool -
- * DrawBox has no pinch of its own. With [panWithOneFinger] (a phone), one finger dragged from
- * open board ([canPanFrom], in the board's own space) pans as well, which is what a finger on a
- * phone board means; on an element or a selection it is left to DrawBox to move or resize.
+ * On a phone, one finger dragged from open board ([canPanFrom], in the board's own space) pans:
+ * that is what a finger on a phone board means, and it spares the bar a pan tool. On an element
+ * or a selection the drag is left to DrawBox, to move or resize. Two-finger pinch and pan are
+ * DrawBox's own.
  *
- * Nothing is taken until the gesture is recognised: a tap, a long press and a drag that starts on
- * an element all still reach DrawBox. Once it is navigating, it consumes the gesture in the
- * Initial pass, so DrawBox sees a cancelled drag rather than a marquee or a stroke.
+ * Nothing is taken until the finger has moved past the slop: a tap and a long press still reach
+ * DrawBox. Once it is panning it consumes the gesture in the Initial pass, so DrawBox sees a
+ * cancelled drag rather than a marquee. A second finger ends it, for DrawBox's pinch.
  */
 @Composable
 internal fun Modifier.touchNavigation(
-    panWithOneFinger: Boolean,
+    enabled: Boolean,
     canPanFrom: (Offset) -> Boolean,
     onPan: (Offset) -> Unit,
-    onZoom: (factor: Float, pivot: Offset) -> Unit,
 ): Modifier {
-    val oneFinger by rememberUpdatedState(panWithOneFinger)
+    val on by rememberUpdatedState(enabled)
     val canPan by rememberUpdatedState(canPanFrom)
     val pan by rememberUpdatedState(onPan)
-    val zoom by rememberUpdatedState(onZoom)
     return pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            if (down.type != PointerType.Touch) return@awaitEachGesture
-            val panAllowed = oneFinger && canPan(down.position)
-            var navigating = false
-            do {
+            if (down.type != PointerType.Touch || !on || !canPan(down.position)) return@awaitEachGesture
+            var panning = false
+            while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val pressed = event.changes.filter { it.pressed }
+                if (pressed.size != 1) return@awaitEachGesture
+                val change = pressed.first()
                 when {
-                    pressed.size >= 2 -> {
-                        navigating = true
-                        val factor = event.calculateZoom()
-                        if (factor != 1f) zoom(factor, event.calculateCentroid(useCurrent = true))
-                        pan(event.calculatePan())
-                    }
-                    pressed.size == 1 && navigating -> pan(pressed.first().positionChange())
-                    pressed.size == 1 && panAllowed -> {
-                        val change = pressed.first()
-                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                            navigating = true
-                            pan(change.position - down.position)
-                        }
+                    panning -> pan(change.positionChange())
+                    (change.position - down.position).getDistance() > viewConfiguration.touchSlop -> {
+                        panning = true
+                        pan(change.position - down.position)
                     }
                 }
-                if (navigating) event.changes.forEach { it.consume() }
-            } while (pressed.isNotEmpty())
-        }
-    }
-}
-
-/** What [hollowShapeGrab] needs from the board. Screen positions and deltas, board-space shapes. */
-internal class HollowShapeGrab(
-    /** The outline-only shape a press at this screen position is inside, or null to leave it alone. */
-    val shapeAt: (Offset) -> io.ak1.drawbox.domain.model.Element?,
-    val onPick: (io.ak1.drawbox.domain.model.Element) -> Unit,
-    val onBegin: () -> Unit,
-    val onMoveBy: (screenDelta: Offset) -> Unit,
-    val onEnd: () -> Unit,
-    val onDoubleTap: (io.ak1.drawbox.domain.model.Element) -> Unit,
-)
-
-/**
- * Picking up an outline-only shape by its inside. DrawBox hit-tests such a shape on its stroke
- * alone, so a press in the middle of a rectangle fell through to the board: it could not be
- * dragged from there, and a tap selected nothing. A press inside one is taken here instead - it
- * picks the shape, a drag moves it (one undo step, through DrawBox's own transform intents), and a
- * second tap on it opens its text.
- *
- * Only such presses are taken: anything else, including the shape's stroke and its handles, goes
- * on to DrawBox untouched.
- */
-@Composable
-internal fun Modifier.hollowShapeGrab(grab: HollowShapeGrab): Modifier {
-    val latest by rememberUpdatedState(grab)
-    return pointerInput(Unit) {
-        var lastTap: Pair<String, Long>? = null
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            if (down.type == PointerType.Mouse && !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
-            val shape = latest.shapeAt(down.position) ?: return@awaitEachGesture
-            down.consume()
-            latest.onPick(shape)
-            val dragged = followDrag(down, latest)
-            if (dragged) {
-                latest.onEnd()
-                lastTap = null
-                return@awaitEachGesture
+                if (panning) change.consume()
             }
-            val previous = lastTap
-            lastTap = if (previous != null && previous.first == shape.id &&
-                down.uptimeMillis - previous.second < viewConfiguration.doubleTapTimeoutMillis
-            ) {
-                latest.onDoubleTap(shape)
-                null
-            } else {
-                shape.id to down.uptimeMillis
-            }
-        }
-    }
-}
-
-/** Follows the pointer that went [down] until it lifts, moving once past the slop; true if it moved. */
-private suspend fun AwaitPointerEventScope.followDrag(down: PointerInputChange, grab: HollowShapeGrab): Boolean {
-    var dragging = false
-    while (true) {
-        val event = awaitPointerEvent(PointerEventPass.Initial)
-        val change = event.changes.firstOrNull { it.id == down.id } ?: return dragging
-        // Read before consuming: a consumed change reports no movement.
-        val delta = change.positionChangeIgnoreConsumed()
-        change.consume()
-        if (!change.pressed) return dragging
-        if (dragging) {
-            grab.onMoveBy(delta)
-        } else if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-            dragging = true
-            grab.onBegin()
-            grab.onMoveBy(change.position - down.position)
         }
     }
 }

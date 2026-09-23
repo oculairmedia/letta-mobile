@@ -289,13 +289,18 @@ private fun pointsBounds(points: List<Offset>): Rect {
  * Hit test against a world-space point. Inverse-rotates the point into the
  * element's logical space, then applies a per-type test that accounts for
  * stroke width and the provided pick tolerance.
+ *
+ * An unfilled closed shape (rectangle, circle, triangle) is hit on its stroke
+ * only, so a click inside a hollow frame reaches what is behind it. With
+ * [hollowInterior] it is hit anywhere inside as well, the way a filled one is
+ * (see [State.selectInsideHollowShapes]).
  */
-fun Element.hitTest(point: Offset, tolerance: Float = 8f): Boolean {
+fun Element.hitTest(point: Offset, tolerance: Float = 8f, hollowInterior: Boolean = false): Boolean {
     val b = bounds()
     val local = if (rotation == 0f) point else rotateAround(point, b.center, -rotation)
     return when (this) {
         is Element.Path -> hitTestPath(this, local, tolerance)
-        is Element.Shape -> hitTestShape(this, local, b, tolerance)
+        is Element.Shape -> hitTestShape(this, local, b, tolerance, hollowInterior)
         is Element.Image -> b.inflate(tolerance).contains(local)
         is Element.Text -> b.inflate(tolerance).contains(local)
     }
@@ -324,14 +329,17 @@ private fun hitTestShape(
     p: Offset,
     bounds: Rect,
     tolerance: Float,
+    hollowInterior: Boolean,
 ): Boolean {
     val hitRadius = tolerance + shape.strokeWidth * 0.5f
     if (shape.points.size < 2) return false
     val start = shape.points[0]
     val end = shape.points.last()
+    // Solid for hit testing: filled, or hollow shapes picked by their inside.
+    val solid = shape.fillColor != null || hollowInterior
     return when (shape.shapeType) {
         ShapeType.RECTANGLE -> {
-            if (shape.fillColor != null) {
+            if (solid) {
                 bounds.inflate(hitRadius).contains(p)
             } else {
                 val outer = bounds.inflate(hitRadius)
@@ -346,7 +354,7 @@ private fun hitTestShape(
             )
             val radius = distance(start, end) * 0.5f
             val d = distance(p, center)
-            if (shape.fillColor != null) {
+            if (solid) {
                 d <= radius + hitRadius
             } else {
                 abs(d - radius) <= hitRadius
@@ -359,7 +367,7 @@ private fun hitTestShape(
             val apex = Offset(tl.x + w * 0.5f, tl.y)
             val br = Offset(tl.x + w, tl.y + h)
             val bl = Offset(tl.x, tl.y + h)
-            if (shape.fillColor != null) {
+            if (solid) {
                 pointInTriangle(p, apex, br, bl)
             } else {
                 distanceToSegment(p, apex, br) <= hitRadius ||
@@ -398,11 +406,18 @@ private fun distanceToQuadraticBezier(p: Offset, p0: Offset, p1: Offset, p2: Off
     return sqrt(best)
 }
 
-/** Topmost element under `point`, picked by descending zIndex. */
-fun topmostHit(elements: List<Element>, point: Offset, tolerance: Float = 8f): Element? {
+/** Topmost element under `point`, picked by descending zIndex. See [hitTest] for [hollowInterior]. */
+fun topmostHit(
+    elements: List<Element>,
+    point: Offset,
+    tolerance: Float = 8f,
+    hollowInterior: Boolean = false,
+): Element? {
+    // Reversed first so equal zIndex values go to the later element, which the renderer draws on top.
     return elements
+        .asReversed()
         .sortedByDescending { it.zIndex }
-        .firstOrNull { it.hitTest(point, tolerance) }
+        .firstOrNull { it.hitTest(point, tolerance, hollowInterior) }
 }
 
 /** Translate all points by `delta`. Rotation unchanged. */

@@ -193,6 +193,17 @@ data class State(
      * [Intent.EndErase]; not persisted.
      */
     val erasingSessionDirty: Boolean = false,
+    /**
+     * Whether an unfilled closed shape (rectangle, circle, triangle) is picked
+     * anywhere inside it, as a filled one is, rather than on its stroke only.
+     * Off by default: a hollow shape then acts as a frame that clicks pass
+     * through to whatever it surrounds. On suits whiteboards where shapes are
+     * boxes to grab and type into. Anything drawn on top of a shape still wins,
+     * since picking goes by z-order. A host preference rather than drawing
+     * content: set by [Intent.SetSelectInsideHollowShapes], kept across
+     * [Intent.Reset], and never serialised.
+     */
+    val selectInsideHollowShapes: Boolean = false,
 ){
     internal var invokeBitmap :(() -> Unit) = {}
 }

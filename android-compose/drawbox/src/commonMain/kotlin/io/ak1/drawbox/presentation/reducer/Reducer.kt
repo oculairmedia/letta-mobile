@@ -182,7 +182,8 @@ class Reducer(
                 strokeWidth = restored?.strokeWidth ?: state.strokeWidth,
                 currentItemStrokeStyle = restored?.strokeStyle ?: state.currentItemStrokeStyle,
                 currentItemCornerRadius = restored?.cornerRadius ?: state.currentItemCornerRadius,
-                currentItemFillColor = restored?.fillColor ?: state.currentItemFillColor,
+                // A saved null fill means stroke-only; only fall back when nothing was saved.
+                currentItemFillColor = if (restored != null) restored.fillColor else state.currentItemFillColor,
                 currentItemStrokeEnabled = restored?.strokeEnabled ?: state.currentItemStrokeEnabled,
                 currentItemFontSize = restored?.fontSize ?: state.currentItemFontSize,
                 currentItemFontFamilyKey = restored?.fontFamilyKey ?: state.currentItemFontFamilyKey,
@@ -192,14 +193,14 @@ class Reducer(
 
         // Selection
         is Intent.SelectAt -> {
-            val hit = useCase.hitTopmost(state.elements, intent.offset, intent.tolerance)
+            val hit = useCase.hitTopmost(state.elements, intent.offset, intent.tolerance, state.selectInsideHollowShapes)
             state.copy(selectedIds = if (hit == null) emptySet() else setOf(hit.id))
         }
         is Intent.RequestTextEditAt -> {
             // Select the tapped text so the edit target is the sole selection;
             // the controller emits Event.TextEditRequested off this. Leave
             // selection untouched when the topmost hit isn't a text element.
-            val hit = useCase.hitTopmost(state.elements, intent.offset, intent.tolerance)
+            val hit = useCase.hitTopmost(state.elements, intent.offset, intent.tolerance, state.selectInsideHollowShapes)
             if (hit is Element.Text) state.copy(selectedIds = setOf(hit.id)) else state
         }
         is Intent.SetMarqueeRect -> state.copy(marqueeRect = intent.rect)
@@ -208,6 +209,7 @@ class Reducer(
             marqueeRect = null,
         )
         is Intent.ClearSelection -> state.copy(selectedIds = emptySet())
+        is Intent.SelectIds -> state.copy(selectedIds = state.elements.map { it.id }.filter { it in intent.ids }.toSet())
         is Intent.DeleteSelected -> {
             if (state.selectedIds.isEmpty()) state
             else state.snapshot().copy(
@@ -324,6 +326,7 @@ class Reducer(
             else state
         }
         is Intent.SetEraserSize -> state.copy(eraserSize = intent.size)
+        is Intent.SetSelectInsideHollowShapes -> state.copy(selectInsideHollowShapes = intent.enabled)
 
         is Intent.BringSelectionToFront -> {
             if (state.selectedIds.isEmpty()) state
@@ -368,7 +371,8 @@ class Reducer(
                 selectedIds = state.selectedIds.intersect(next.map { it.id }.toSet()),
             )
         }
-        is Intent.Reset -> State()
+        // A fresh drawing, but the host's picking preference is not drawing content.
+        is Intent.Reset -> State(selectInsideHollowShapes = state.selectInsideHollowShapes)
 
         else -> state
     }
@@ -378,8 +382,12 @@ class Reducer(
      * pick used by [reduce] so the controller can resolve edit targets for
      * [Event.TextEditRequested] without duplicating hit-test logic.
      */
-    fun hitTopmost(elements: List<Element>, point: Offset, tolerance: Float): Element? =
-        useCase.hitTopmost(elements, point, tolerance)
+    fun hitTopmost(
+        elements: List<Element>,
+        point: Offset,
+        tolerance: Float,
+        hollowInterior: Boolean = false,
+    ): Element? = useCase.hitTopmost(elements, point, tolerance, hollowInterior)
 
     /** Push current elements onto [State.history] and clear [State.future]. */
     private fun State.snapshot(): State = copy(

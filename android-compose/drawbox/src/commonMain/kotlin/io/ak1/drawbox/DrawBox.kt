@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -165,6 +167,13 @@ fun DrawBox(
     modifier: Modifier = Modifier.fillMaxSize(),
     showGrid: Boolean = true,
     /**
+     * Colour of the grid lines when [showGrid] is on. Null picks one that
+     * contrasts with [State.bgColor] (light lines on dark, dark on light).
+     */
+    gridColor: Color? = null,
+    /** World units between grid lines when [showGrid] is on. */
+    gridSpacing: Float = GRID_BASE_STEP_WORLD,
+    /**
      * IDs of elements that should be skipped entirely by the renderer and
      * the selection chrome. Used by the sample app to suppress the
      * underlying text while an inline editor overlays it; without this the
@@ -305,6 +314,9 @@ fun DrawBox(
     // re-keying (and re-allocating) the pointerInput block on every state change.
     val latestState by rememberUpdatedState(state)
     val latestOnIntent by rememberUpdatedState(onIntent)
+    // Screen position of the latest press; see the drag handler. A plain holder, not state:
+    // nothing draws from it, so writing it must not recompose.
+    val press = remember { PressOrigin() }
 
     // Keyboard focus for the space-bar temp-pan. On platforms without hardware
     // keyboards (mobile) this is harmless dead weight.
@@ -379,7 +391,7 @@ fun DrawBox(
                         )
                     }
                 }
-                if (showGrid) drawGrid(vp, state.bgColor)
+                if (showGrid) drawGrid(vp, gridColor ?: autoGridColor(state.bgColor), gridSpacing)
             }
             // Re-acquire keyboard focus on every press. Without this, clicking a
             // Material button (mode menu, zoom toolbar, etc.) steals focus and
@@ -581,12 +593,23 @@ fun DrawBox(
                     },
                 )
             }
+            // Where the current press went down. detectDragGestures reports the
+            // drag starting where the touch slop was crossed, a few pixels on
+            // from the press; starting there made a moved element trail the
+            // pointer by that much, cut the first stretch off a pen stroke, and
+            // anchored a marquee short of where it was begun.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    press.screen = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).position
+                }
+            }
             .pointerInput(Unit) {
                 var interaction: SelectionInteraction? = null
                 var lastWorld = Offset.Zero
 
                 detectDragGestures(
-                    onDragStart = { screenPos ->
+                    onDragStart = { slopScreenPos ->
+                        val screenPos = press.screen ?: slopScreenPos
                         val s = latestState
                         val world = s.viewport.screenToWorld(screenPos)
                         lastWorld = world
@@ -873,7 +896,9 @@ fun DrawBox(
                 // and outside ERASER mode.
                 if (state.effectiveMode == Mode.ERASER) {
                     eraserPointerWorld?.let { center ->
-                        val r = state.eraserSize
+                        // The gestures erase within eraserSize screen pixels (eraserSize / scale in
+                        // world units); the ring is drawn in world units, so it scales the same way.
+                        val r = state.eraserSize / vp.scale
                         val ringColor = if (state.bgColor.luminance() < 0.5f) {
                             Color.White
                         } else {
@@ -974,23 +999,34 @@ fun DrawingPreview(
 
 private val GridLightOnDark = Color(0x40FFFFFF)  // ~25% white over dark bgs
 private val GridDarkOnLight = Color(0x33000000)  // ~20% black over light bgs
-private const val GRID_BASE_STEP_WORLD = 50f
+internal const val GRID_BASE_STEP_WORLD = 50f
 
-private fun DrawScope.drawGrid(vp: Viewport, bgColor: Color) {
-    val step = GRID_BASE_STEP_WORLD * vp.scale
+/**
+ * The centre of the pixel [v] falls in. A one-pixel line drawn on a pixel boundary is
+ * antialiased across two pixels at half strength, which greyed and blurred the grid; on a pixel
+ * centre it is one crisp pixel in its real colour.
+ */
+private fun pixelCentre(v: Float): Float = kotlin.math.floor(v) + 0.5f
+
+/** Auto-contrast: a light grid on a dark background, a dark grid on a light one. */
+private fun autoGridColor(bgColor: Color): Color =
+    if (bgColor.luminance() < 0.5f) GridLightOnDark else GridDarkOnLight
+
+private fun DrawScope.drawGrid(vp: Viewport, color: Color, spacingWorld: Float) {
+    val step = spacingWorld * vp.scale
     if (step < 6f) return // collapse to avoid moiré at extreme zoom-out
-    // Auto-contrast: light grid on dark bg, dark grid on light bg.
-    val color = if (bgColor.luminance() < 0.5f) GridLightOnDark else GridDarkOnLight
     val offX = vp.offset.x.mod(step)
     val offY = vp.offset.y.mod(step)
     var x = offX
     while (x < size.width) {
-        drawLine(color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+        val px = pixelCentre(x)
+        drawLine(color, Offset(px, 0f), Offset(px, size.height), strokeWidth = 1f)
         x += step
     }
     var y = offY
     while (y < size.height) {
-        drawLine(color, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+        val py = pixelCentre(y)
+        drawLine(color, Offset(0f, py), Offset(size.width, py), strokeWidth = 1f)
         y += step
     }
 }
@@ -1126,11 +1162,11 @@ private fun classifySelection(
         }
     }
     // Drag inside already-selected → move existing selection.
-    if (state.elements.any { it.id in state.selectedIds && it.hitTest(pointerWorld, pickToleranceWorld) }) {
+    if (state.elements.any { it.id in state.selectedIds && it.hitTest(pointerWorld, pickToleranceWorld, state.selectInsideHollowShapes) }) {
         return SelectionInteraction.Move
     }
     // Drag on unselected element → select-then-move.
-    val any = topmostHit(state.elements, pointerWorld, pickToleranceWorld)
+    val any = topmostHit(state.elements, pointerWorld, pickToleranceWorld, state.selectInsideHollowShapes)
     if (any != null) return SelectionInteraction.SelectAndMove
     // Empty space → marquee.
     return SelectionInteraction.Marquee(pointerWorld)
@@ -1606,8 +1642,13 @@ private fun DrawScope.drawImageElement(
     // A 600 px placement on a HiDPI 2× display at 1.5× zoom decodes at
     // 1800 px, not 600 (or 4096 source).
     val targetDimPx = (maxOf(targetW, targetH) * viewportScale).toInt()
-    val bitmap = imageCache?.bitmapFor(image.id, image.bytes, targetDimPx)
-        ?: decodeImageBitmap(image.bytes)
+    // With a cache, null means "decoding, or undecodable": show the placeholder. Decoding here
+    // instead would run a full-resolution decode on every frame until the cache fills.
+    val bitmap = if (imageCache != null) {
+        imageCache.bitmapFor(image.id, image.bytes, targetDimPx)
+    } else {
+        decodeImageBitmap(image.bytes)
+    }
     if (bitmap == null) {
         // Visible placeholder so a corrupt / unsupported payload doesn't render
         // as an invisible hole that's still selectable/movable.
@@ -1912,8 +1953,16 @@ private fun DrawScope.drawVariableWidthPath(
     // caps read as a single translucent stroke instead of a chain of dots.
     val useLayer = alpha < 1f
     if (useLayer) {
+        // Bounds are in the current (world) space: the stroke's own extent, not the canvas size,
+        // which clipped strokes at negative or far world coordinates.
+        val pad = samples.maxOf { it.width }
         drawContext.canvas.saveLayer(
-            bounds = Rect(Offset.Zero, size),
+            bounds = Rect(
+                left = samples.minOf { it.position.x } - pad,
+                top = samples.minOf { it.position.y } - pad,
+                right = samples.maxOf { it.position.x } + pad,
+                bottom = samples.maxOf { it.position.y } + pad,
+            ),
             paint = Paint().apply { this.alpha = alpha },
         )
     }
@@ -2184,4 +2233,9 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
         color = color,
         style = Stroke(width = maxOf(1f, strokeWidth * 0.5f), cap = StrokeCap.Round, join = StrokeJoin.Round)
     )
+}
+
+/** Where the current press went down, for drags that must start there. */
+private class PressOrigin {
+    var screen: Offset? = null
 }
