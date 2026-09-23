@@ -108,7 +108,10 @@ class DrawBoxController(
      */
     val intents: SharedFlow<Intent> = _intents.asSharedFlow()
 
-    private val _events = MutableSharedFlow<Event>(extraBufferCapacity = 1)
+    // Room for a burst: with a single slot, tryEmit dropped whatever arrived while one event
+    // was still waiting - an SVG export requested just as an autosave's JSON export was
+    // pending simply never arrived.
+    private val _events = MutableSharedFlow<Event>(extraBufferCapacity = EVENT_BUFFER)
     /**
      * Side effect events like drawing saved, drawing loaded, or errors.
      * Use LaunchedEffect to collect and respond to events:
@@ -174,13 +177,13 @@ class DrawBoxController(
             is Intent.LoadDrawing -> emitLoadEvent()
             // Double-tap in SELECT mode: open the editor for the hit text.
             is Intent.RequestTextEditAt ->
-                reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance)
+                reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance, prev.selectInsideHollowShapes)
                     .let { it as? Element.Text }
                     ?.let { _events.tryEmit(Event.TextEditRequested(it.id)) }
             // Second tap on an already-sole-selected text opens the editor too
             // (tldraw/Figma pattern). `prev` is the pre-reduce selection.
             is Intent.SelectAt -> {
-                val hit = reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance)
+                val hit = reducer.hitTopmost(prev.elements, intent.offset, intent.tolerance, prev.selectInsideHollowShapes)
                 if (hit is Element.Text && prev.selectedIds == setOf(hit.id)) {
                     _events.tryEmit(Event.TextEditRequested(hit.id))
                 }
@@ -523,3 +526,6 @@ fun rememberDrawBoxController(
         DrawBoxController(/*useCase, */Reducer(useCase), initialState)
     }
 }
+
+/** Events a subscriber can fall behind by before any are dropped. */
+private const val EVENT_BUFFER = 64

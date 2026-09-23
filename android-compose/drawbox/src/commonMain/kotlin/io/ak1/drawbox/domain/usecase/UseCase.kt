@@ -267,8 +267,12 @@ class UseCase {
     // Selection operations
 
     /** Topmost element at `point`, or null if nothing was hit. */
-    fun hitTopmost(elements: List<Element>, point: Offset, tolerance: Float): Element? =
-        topmostHit(elements, point, tolerance)
+    fun hitTopmost(
+        elements: List<Element>,
+        point: Offset,
+        tolerance: Float,
+        hollowInterior: Boolean = false,
+    ): Element? = topmostHit(elements, point, tolerance, hollowInterior)
 
     /** Set of element IDs whose bounding box intersects `rect`. */
     fun selectInRect(elements: List<Element>, rect: Rect): Set<String> {

@@ -396,6 +396,9 @@ sealed class Intent {
     /** Change the world-space eraser radius used by [Mode.ERASER]. */
     data class SetEraserSize(val size: Float) : Intent()
 
+    /** Set [State.selectInsideHollowShapes]. No history snapshot: it is not drawing content. */
+    data class SetSelectInsideHollowShapes(val enabled: Boolean) : Intent()
+
     /** Move selected elements to the top of the z-order. Snapshots history. */
     data object BringSelectionToFront : Intent()
 

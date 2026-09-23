@@ -158,10 +158,16 @@ fun CanvasWorkspace(
     } else {
         localPattern
     }
+    // A shape on this board is a box you grab and type into, so a hollow one is picked anywhere
+    // inside it, not only on its outline (DrawBox's default, where hollow shapes are frames).
+    LaunchedEffect(controller) {
+        controller.onIntent(io.ak1.drawbox.domain.model.Intent.SetSelectInsideHollowShapes(true))
+    }
     LaunchedEffect(backgroundPattern) {
-        // Every pattern, the grid included, is the board's own tile: DrawBox's grid has one fixed
-        // colour, so the pattern colour control did nothing to it.
-        controller.setBackgroundPattern(backgroundPattern.painter(), backgroundPattern.tint())
+        // The grid is DrawBox's own (see showGrid below), drawn in the pattern colour; dots and
+        // lines are the board's tile. Only one of them is ever set, or there would be two grids.
+        val tiled = backgroundPattern.takeIf { it.kind != CanvasBackgroundPattern.GRID }
+        controller.setBackgroundPattern(tiled?.painter(), backgroundPattern.tint())
     }
     var boardSize by remember { mutableStateOf(IntSize.Zero) }
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
@@ -690,39 +696,25 @@ fun CanvasWorkspace(
                 onIntent = controller::onIntent,
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
-                // DrawBox draws a grid of its own, on by default, in one fixed colour. The board's pattern
-                // (grid, dots or lines) is its own tile in the colour the menu sets, so DrawBox's
-                // stays off and "none" means none.
-                showGrid = false,
+                // A grid is DrawBox's: crisp one-pixel lines at every zoom, in the colour and spacing the
+                // background menu sets. Dots and lines are the board's tile instead, and "none"
+                // turns both off.
+                showGrid = backgroundPattern.kind == CanvasBackgroundPattern.GRID,
+                gridColor = backgroundPattern.tint(),
+                gridSpacing = backgroundPattern.spacing,
                 modifier = Modifier
                     .fillMaxSize()
                     .clipToBounds()
                     .semantics { contentDescription = "Canvas board" }
                     .boardContextGesture(::openBoardMenu)
-                    // DrawBox picks an outline-only shape by its stroke alone; the board takes a
-                    // press inside one itself, to pick it, drag it or double-click into its text.
-                    .hollowShapeGrab(
-                        HollowShapeGrab(
-                            shapeAt = { screen -> CanvasWorkspaceSupport.hollowShapeUnder(controller.state.value, screen, TEXT_HIT_TOLERANCE) },
-                            onPick = ::selectElement,
-                            onBegin = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.BeginTransform) },
-                            onMoveBy = { screenDelta ->
-                                val scale = controller.state.value.viewport.scale
-                                controller.onIntent(io.ak1.drawbox.domain.model.Intent.MoveSelected(screenDelta / scale))
-                            },
-                            onEnd = { controller.onIntent(io.ak1.drawbox.domain.model.Intent.EndTransform) },
-                            onDoubleTap = ::openTextIn,
-                        ),
-                    )
-                    // Two fingers always pinch and pan. On a phone one finger on empty board in the
-                    // select tool pans too: dragging is how you move around a board on a phone.
+                    // On a phone one finger on open board in the select tool pans: dragging is how
+                    // you move around a board on a phone. (Two-finger pinch is DrawBox's.)
                     .touchNavigation(
-                        panWithOneFinger = compact,
+                        enabled = compact,
                         canPanFrom = { screen ->
                             CanvasWorkspaceSupport.isOpenBoard(controller.state.value, screen, TEXT_HIT_TOLERANCE)
                         },
                         onPan = { delta -> controller.panBy(delta) },
-                        onZoom = { factor, pivot -> controller.zoomBy(factor, pivot) },
                     )
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
@@ -764,9 +756,9 @@ fun CanvasWorkspace(
             )
 
             // The text tool places an element and the board puts the caret in it. Read from the
-            // ELEMENTS rather than from the insert intent: DrawBox republishes intents through a
-            // shared flow with no buffer, which drops them when the collector is busy, and a
-            // caret that sometimes does not appear is worse than no caret at all.
+            // ELEMENTS rather than from the insert intent: the intent flow is a buffered broadcast
+            // that still drops for a subscriber that falls far enough behind, and the elements are
+            // the state itself, so a caret read from them cannot go missing.
             var knownTextIds by remember(session) { mutableStateOf<Set<String>?>(null) }
             LaunchedEffect(state.elements) {
                 val (ids, emptyId) = CanvasWorkspaceSupport.detectNewEmptyTextElement(state.elements, knownTextIds)

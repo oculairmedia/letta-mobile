@@ -64,6 +64,36 @@ class GeometryTest {
     }
 
     @Test
+    fun strokedShapesHitInsideWhenHollowInteriorIsOn() {
+        val rect = rectShape(0f, 0f, 100f, 50f, filled = false)
+        assertTrue(rect.hitTest(Offset(50f, 25f), hollowInterior = true))
+        assertFalse(rect.hitTest(Offset(150f, 25f), hollowInterior = true))
+        val circle = Element.Shape(
+            shapeType = ShapeType.CIRCLE,
+            points = listOf(Offset(0f, 0f), Offset(100f, 0f)),
+            strokeColor = Color.Red,
+            strokeWidth = 4f,
+        )
+        assertTrue(circle.hitTest(Offset(50f, 0f), hollowInterior = true))
+        val triangle = Element.Shape(
+            shapeType = ShapeType.TRIANGLE,
+            points = listOf(Offset(0f, 0f), Offset(100f, 100f)),
+            strokeColor = Color.Red,
+            strokeWidth = 4f,
+        )
+        assertTrue(triangle.hitTest(Offset(50f, 70f), hollowInterior = true))
+        assertFalse(triangle.hitTest(Offset(50f, 70f)))
+    }
+
+    @Test
+    fun topmostHitPrefersWhatIsDrawnInsideAHollowShape() {
+        val frame = rectShape(0f, 0f, 200f, 200f, filled = false)
+        val inner = rectShape(80f, 80f, 120f, 120f, filled = true).copy(id = "inner", zIndex = frame.zIndex + 1)
+        assertEquals("inner", topmostHit(listOf(frame, inner), Offset(100f, 100f), hollowInterior = true)?.id)
+        assertEquals(frame.id, topmostHit(listOf(frame, inner), Offset(20f, 100f), hollowInterior = true)?.id)
+    }
+
+    @Test
     fun circleHitTestStroked() {
         val s = Element.Shape(
             shapeType = ShapeType.CIRCLE,

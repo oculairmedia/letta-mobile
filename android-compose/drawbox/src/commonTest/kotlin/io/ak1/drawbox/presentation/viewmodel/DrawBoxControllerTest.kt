@@ -39,6 +39,22 @@ class DrawBoxControllerTest {
     }
 
     @Test
+    fun eventsEmittedInABurstAllArrive() = runTest(StandardTestDispatcher()) {
+        val controller = newController()
+        val collected = mutableListOf<io.ak1.drawbox.domain.model.Event>()
+        val job = launch { controller.events.take(3).toList(collected) }
+        testScheduler.runCurrent()
+
+        // Back to back, before the collector has had a chance to run.
+        controller.exportJson()
+        controller.exportSvg()
+        controller.exportJson()
+
+        job.join()
+        assertEquals(3, collected.size, "every export in a burst should be delivered")
+    }
+
+    @Test
     fun intentsFlowEmitsAfterStateUpdate() = runTest(StandardTestDispatcher()) {
         val controller = newController()
         var stateAtEmission: Color? = null

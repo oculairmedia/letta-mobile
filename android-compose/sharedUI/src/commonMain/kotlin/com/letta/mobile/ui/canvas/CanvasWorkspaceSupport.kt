@@ -704,21 +704,6 @@ internal object CanvasWorkspaceSupport {
         return elementAt(state.elements, world, tolerance / state.viewport.scale) == null
     }
 
-    /**
-     * The unfilled closed shape a press at [screen] lands inside, in the select tool, when it is
-     * the topmost thing there. DrawBox only hits such a shape on its stroke. "Inside" stops short
-     * of the outline, so the stroke and the resize handles on it stay DrawBox's.
-     */
-    fun hollowShapeUnder(state: DrawBoxState, screen: Offset, tolerance: Float): Element? {
-        if (state.mode != io.ak1.drawbox.domain.model.Mode.SELECT) return null
-        val world = state.viewport.screenToWorld(screen)
-        val shape = elementAt(state.elements, world, tolerance / state.viewport.scale) as? Element.Shape ?: return null
-        if (!CanvasShapeLabels.canLabel(shape)) return null
-        if (shape.fillColor?.let { it.alpha > 0f } == true) return null
-        val inner = shape.bounds().deflate(tolerance * HANDLE_SLACK / state.viewport.scale)
-        return shape.takeIf { inner.contains(world) }
-    }
-
     /** The topmost element under [world], within [tolerance] board units of its bounds. */
     fun elementAt(elements: List<Element>, world: Offset, tolerance: Float): Element? =
         elements.asReversed().firstOrNull { it.bounds().inflate(tolerance).contains(world) }
