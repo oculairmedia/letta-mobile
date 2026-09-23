@@ -66,4 +66,27 @@ internal object CanvasViewportFit {
         val delta = Offset(board.width / 2f, board.height / 2f) - viewport.worldToScreen(target.center)
         return delta.takeIf { it.getDistance() >= 0.5f }
     }
+
+    /**
+     * The smallest screen pan that fits [target] (board units) inside [band] (board px) at the
+     * current zoom, or null when it already fits. A target larger than the band on an axis is
+     * aligned to the band's start on that axis, so its beginning is what shows.
+     */
+    fun panIntoBand(target: Rect, viewport: Viewport, band: Rect): Offset? {
+        if (band.width <= 0f || band.height <= 0f) return null
+        val topLeft = viewport.worldToScreen(target.topLeft)
+        val bottomRight = viewport.worldToScreen(target.bottomRight)
+        val delta = Offset(
+            axisShift(topLeft.x, bottomRight.x, band.left, band.right),
+            axisShift(topLeft.y, bottomRight.y, band.top, band.bottom),
+        )
+        return delta.takeIf { it.getDistance() >= 0.5f }
+    }
+
+    private fun axisShift(start: Float, end: Float, min: Float, max: Float): Float = when {
+        end - start > max - min -> min - start
+        start < min -> min - start
+        end > max -> max - end
+        else -> 0f
+    }
 }
