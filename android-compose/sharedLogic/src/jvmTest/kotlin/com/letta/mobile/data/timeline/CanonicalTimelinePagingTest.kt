@@ -140,6 +140,9 @@ class CanonicalTimelinePagingTest {
         val pagingData = mutableListOf<androidx.paging.PagingData<TimelineSettledRecord>>()
         val presenter = RecordingPresenter<TimelineSettledRecord>()
         val collectors = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        // Every durable revision after this may invalidate the source once: the five tool sweeps
+        // below, and any the newest-end mediator applies on its own, depending on timing.
+        val revisionAtSubscribe = session.publication.value.durableRevision
         try {
             collectors.launch {
                 session.paging(selection).collect { page ->
@@ -159,7 +162,15 @@ class CanonicalTimelinePagingTest {
             }
 
             assertTrue(pagingData.size > 1, "durable revisions must replace invalidated sources")
-            assertTrue(pagingData.size <= 6, "one Pager must coalesce five rapid source invalidations: ${pagingData.size}")
+            // One Pager, at most one generation per durable revision: the initial page plus one per
+            // revision since subscribing. A rebuilt Pager, or an invalidation per emission, exceeds it.
+            val revisions = session.publication.value.durableRevision - revisionAtSubscribe
+            assertTrue(revisions >= 5, "the five tool sweeps each published a revision: $revisions")
+            assertTrue(
+                pagingData.size <= 1 + revisions,
+                "one Pager must coalesce invalidations to one generation per durable revision: " +
+                    "${pagingData.size} generations for $revisions revisions",
+            )
             assertTrue(store.reads > 1, "source refreshes must read new ledger snapshots")
         } finally {
             collectors.cancel()
