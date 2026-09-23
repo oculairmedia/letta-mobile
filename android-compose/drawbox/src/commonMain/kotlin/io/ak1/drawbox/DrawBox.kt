@@ -101,6 +101,7 @@ import io.ak1.drawbox.domain.model.textTopLeft
 import io.ak1.drawbox.domain.model.textBox
 import io.ak1.drawbox.domain.model.resolvedTextColor
 import io.ak1.drawbox.domain.model.canHoldText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.absoluteValue
@@ -952,6 +953,8 @@ fun DrawBox(
                 scope.launch {
                     try {
                         onIntent(Intent.SaveBitmap(captureLayer.toImageBitmap(), null))
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Throwable) {
                         onIntent(Intent.SaveBitmap(null, e))
                     }

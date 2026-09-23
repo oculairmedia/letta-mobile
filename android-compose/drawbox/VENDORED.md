@@ -91,3 +91,14 @@ shape renders live so the cached layer never replays its text. Tests: `ShapeText
 and centre or right alignment happened inside that, leaving short centred text at the left of its
 box (text elements as well as shapes). Text is now laid out at exactly the wrap width. Covered by
 `CanvasShapeTextRenderUiTest`, which fails without it.
+
+### 8. A cancelled capture is not a failed save (letta-mobile-nq2w1)
+
+The bitmap capture coroutine caught `Throwable`, so cancelling it reported a failed
+`Intent.SaveBitmap`. `CancellationException` is now rethrown.
+
+## Repository policies
+
+Letta's first-party checks do not apply here, so the code stays diffable against upstream: the
+architecture test's package and `commonMain` import rules skip this module, and the detekt
+guardrail skips its files. Build, tests and compiler warnings still apply.
