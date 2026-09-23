@@ -50,6 +50,8 @@ data class CanvasSceneDocument(
     val color: String? = null,
     /** How the text is set; null is the editor's default. */
     val style: CanvasTextStyle? = null,
+    /** The note's title, shown over it on the board and at the top of it opened large; null for none. */
+    val title: String? = null,
 )
 
 /**

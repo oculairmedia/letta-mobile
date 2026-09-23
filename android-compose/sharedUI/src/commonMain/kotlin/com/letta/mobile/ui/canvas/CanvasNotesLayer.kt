@@ -312,6 +312,7 @@ private fun CanvasNoteCard(
             val onMove: (Offset) -> Unit = if (groupDrag != null) groupDrag else { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }
             val onMoveEnd: () -> Unit = if (groupDragEnd != null) groupDragEnd else ::commit
             if (!plain) NoteHandleBar(
+                title = document.title,
                 cardColor = cardColor,
                 onCard = onCard,
                 onDragStart = { if (groupDrag == null) gestureActive = true },
@@ -400,6 +401,7 @@ private fun Modifier.dragHandle(onDragStart: () -> Unit, onDrag: (Offset) -> Uni
 
 @Composable
 private fun NoteHandleBar(
+    title: String?,
     cardColor: Color,
     onCard: Color,
     onDragStart: () -> Unit,
@@ -425,10 +427,12 @@ private fun NoteHandleBar(
         )
         Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
         Text(
-            text = "Note",
+            text = title?.takeIf { it.isNotBlank() } ?: "Note",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = onCard,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onExpand, modifier = Modifier.size(HANDLE_HEIGHT)) {

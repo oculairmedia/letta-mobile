@@ -1345,6 +1345,22 @@ fun CanvasWorkspace(
                     onToolbar = { noteToolbar = it },
                     chromeRegions = chromeRegions,
                     compact = compact,
+                    actions = NoteEditorActions(
+                        canUndo = canUndo || historyCanUndo,
+                        canRedo = canRedo || historyCanRedo,
+                        onUndo = ::undoBoard,
+                        onRedo = ::redoBoard,
+                        onDuplicate = {
+                            activeNoteId = expanded.id
+                            duplicateFocused()
+                        },
+                        onDelete = {
+                            val id = expanded.id
+                            expandedNoteId = null
+                            activeNoteId = null
+                            coroutineScope.launch { recordingDocuments("deleting a note") { runCatching { session.removeDocument(id) } } }
+                        },
+                    ),
                 )
             }
 
@@ -1360,7 +1376,8 @@ fun CanvasWorkspace(
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 val toolbar = noteToolbar
-                if (toolbar != null && (activeNoteId != null || expandedNoteId != null)) {
+                // An opened note carries its own formatting in its foot bar.
+                if (toolbar != null && activeNoteId != null && expandedNoteId == null) {
                     CanvasFormattingBar(toolbar = toolbar)
                 }
                 when (resolvedLayout) {

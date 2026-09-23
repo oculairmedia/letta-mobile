@@ -59,6 +59,7 @@ object CanvasOpProjector {
     private const val DOC_FRAME = "frame"
     private const val DOC_COLOR = "color"
     private const val DOC_STYLE = "style"
+    private const val DOC_TITLE = "title"
 
     /**
      * How many tombstones a scene keeps. They cannot grow without bound, and the ones that matter
@@ -389,6 +390,7 @@ object CanvasOpProjector {
                     frame = documentFrame(entry),
                     color = documentColor(entry),
                     style = documentStyle(entry),
+                    title = documentTitle(entry),
                 )
             }
             .sortedBy { it.id }
@@ -413,6 +415,9 @@ object CanvasOpProjector {
 
     private fun documentColor(entry: JsonObject): String? =
         runCatching { entry[DOC_COLOR]?.jsonPrimitive?.content }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    private fun documentTitle(entry: JsonObject): String? =
+        runCatching { entry[DOC_TITLE]?.jsonPrimitive?.content }.getOrNull()?.takeIf { it.isNotBlank() }
 
     private fun documentStyle(entry: JsonObject): CanvasTextStyle? {
         val raw = runCatching { entry[DOC_STYLE]?.jsonObject }.getOrNull() ?: return null
@@ -442,6 +447,7 @@ object CanvasOpProjector {
         val frame: CanvasDocumentFrame? = null,
         val color: String? = null,
         val style: CanvasTextStyle? = null,
+        val title: String? = null,
     )
 
     /**
@@ -461,12 +467,15 @@ object CanvasOpProjector {
         val keptFrame = input.frame ?: existing?.let(::documentFrame)
         val keptColor = input.color ?: existing?.let(::documentColor)
         val keptStyle = input.style ?: existing?.let(::documentStyle)
+        // An empty title clears it; null keeps what the document had.
+        val keptTitle = (input.title ?: existing?.let(::documentTitle))?.takeIf { it.isNotBlank() }
         val entry = buildJsonObject {
             put("id", JsonPrimitive(input.documentId))
             if (input.json != null) put(DOC_JSON, JsonPrimitive(input.json)) else put(DOC_REMOVED, JsonPrimitive(true))
             if (input.json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
             if (input.json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
             if (input.json != null && keptStyle != null) put(DOC_STYLE, styleJson(keptStyle))
+            if (input.json != null && keptTitle != null) put(DOC_TITLE, JsonPrimitive(keptTitle))
             put(LAMPORT, JsonPrimitive(input.provenance.lamport))
             put(ACTOR, JsonPrimitive(input.provenance.actorId))
             put(OP_ID, JsonPrimitive(input.provenance.opId))
@@ -491,6 +500,7 @@ object CanvasOpProjector {
                 frame = op.frame,
                 color = op.color,
                 style = op.style,
+                title = op.title,
             ),
         )
 
