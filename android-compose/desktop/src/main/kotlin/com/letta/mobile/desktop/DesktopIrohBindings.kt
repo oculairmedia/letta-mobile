@@ -164,7 +164,10 @@ internal fun rememberIrohTransport(
     chatScope: CoroutineScope,
 ): IrohChannelTransport? {
     val irohTransport = remember(activeConfig) {
-        activeConfig.takeIf(::shouldBindIrohTransport)?.let(::createIrohTransport)
+        activeConfig.takeIf(::shouldBindIrohTransport)?.let(::createIrohTransport).also { transport ->
+            // No Iroh host behind this backend: canvases stay on this device, and say so.
+            if (transport == null) com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.client.detach()
+        }
     }
     DesktopTransportLifecycleEffect(
         DesktopTransportLifecycleRequest(

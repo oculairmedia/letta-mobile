@@ -215,7 +215,7 @@ class IrohChannelTransport(
 
     /**
      * The host connection while it is ready, else null: side protocols that share its endpoint
-     * (canvas sync and presence, see [IrohCanvasClient]) connect and reconnect on this.
+     * (shared canvases, see [IrohCanvasRelayClient]) connect and reconnect on this.
      */
     val readyHandle: kotlinx.coroutines.flow.Flow<IrohConnectionHandle?>
         get() = supervisor.state

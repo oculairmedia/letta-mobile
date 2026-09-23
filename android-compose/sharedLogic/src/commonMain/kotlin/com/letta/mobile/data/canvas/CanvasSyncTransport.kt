@@ -18,6 +18,16 @@ interface CanvasSyncTransport {
      * default, [CanvasSyncHealth.LocalOnly]: it has no way to claim otherwise.
      */
     fun health(canvasId: CanvasId): StateFlow<CanvasSyncHealth> = LOCAL_PROCESS_ONLY.health
+
+    /**
+     * Hands every remote op for [canvasId] to [apply], one at a time, until cancelled; returns only
+     * when cancelled. [apply] returns once the op is applied and persisted, which lets a transport
+     * that records progress durably (a host cursor) record it only after the op is safe - never
+     * before, where a crash would skip it for good. The default collects [subscribe].
+     */
+    suspend fun deliverTo(canvasId: CanvasId, apply: suspend (CanvasOp) -> Unit) {
+        subscribe(canvasId).collect { apply(it) }
+    }
 }
 
 private val LOCAL_PROCESS_ONLY = LocalOnlyCanvasSyncHealth("Not connected to a host; this canvas stays on this device")

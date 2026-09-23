@@ -29,7 +29,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Wire packet for transmitting [CanvasOp]s over the dedicated Iroh ALPN `meridian/canvas-sync/1`.
@@ -47,21 +46,12 @@ data class CanvasOpWirePacket(
  * Runs independently from App Server chat WebSocket framing, operating over
  * dedicated BiStreams with length-prefixed binary framing on ALPN `meridian/canvas-sync/1`.
  * Supports peer dialing via ticket or address, automatic accept loop, and historical op catch-up.
- *
- * Two roles:
- * - A client (the apps): ops it receives go to its local subscribers. When it dials, it greets
- *   the peer at once (a QUIC stream is invisible to the other side until it carries data) and
- *   asks for catch-up on every canvas it has open, so edits made while it was away arrive.
- * - A [relay] (the host every client already dials): it has no subscribers of its own. An op
- *   from one client is logged once in [opLog] and forwarded to every other client, and catch-up
- *   requests are answered from that log, so clients share canvases without knowing each other.
  */
 class IrohCanvasSyncTransport(
     private val scope: CoroutineScope,
     private val endpoint: Endpoint? = null,
     private val opLog: CanvasOpLog? = null,
     private val fallback: CanvasSyncTransport = LoopbackCanvasSyncTransport(),
-    private val relay: Boolean = false,
 ) : CanvasSyncTransport {
 
     companion object {
@@ -74,9 +64,6 @@ class IrohCanvasSyncTransport(
     private val mutex = Mutex()
     private val activeSendStreams = mutableListOf<SendStream>()
     private val flowsByCanvas = mutableMapOf<CanvasId, MutableSharedFlow<CanvasOp>>()
-
-    /** Canvases this client has open: caught up again whenever a new connection comes up. */
-    private val subscribedCanvases: MutableSet<CanvasId> = ConcurrentHashMap.newKeySet()
     private var acceptJob: Job? = null
 
     init {
@@ -133,7 +120,6 @@ class IrohCanvasSyncTransport(
             mutex.withLock {
                 activeSendStreams.add(sendStream)
             }
-            if (!isInbound) greet(sendStream)
 
             try {
                 consumePackets(recvStream, sendStream)
@@ -155,75 +141,20 @@ class IrohCanvasSyncTransport(
         }
     }
 
-    /**
-     * The first frames on a connection this side opened: catch-up requests for every open canvas,
-     * or an empty hello, so the peer accepts the stream and can send on it straight away.
-     */
-    private suspend fun greet(sendStream: SendStream) {
-        val canvases = subscribedCanvases.toList()
-        val packets = if (canvases.isEmpty()) {
-            listOf(CanvasOpWirePacket(canvasId = ""))
-        } else {
-            canvases.map { CanvasOpWirePacket(canvasId = it.value, requestCatchUpSinceLamport = 0L) }
-        }
-        for (packet in packets) {
-            send(sendStream, packet)
-        }
-    }
-
     private suspend fun dispatchIncomingPacket(frameBytes: ByteArray, sendStream: SendStream) {
         val packet = runCatching {
             json.decodeFromString<CanvasOpWirePacket>(frameBytes.decodeToString())
         }.getOrNull() ?: return
-        if (packet.canvasId.isEmpty()) return // A hello.
 
         val canvasId = CanvasId(packet.canvasId)
         if (packet.op != null) {
-            if (relay) {
-                relayOp(canvasId, packet.op, frameBytes, from = sendStream)
-            } else {
-                val flow = getOrCreateFlow(canvasId)
-                flow.emit(packet.op)
-                fallback.publish(canvasId, packet.op)
-            }
+            val flow = getOrCreateFlow(canvasId)
+            flow.emit(packet.op)
+            fallback.publish(canvasId, packet.op)
         }
         val sinceLamport = packet.requestCatchUpSinceLamport
         if (sinceLamport != null && opLog != null) {
             sendCatchUpOps(canvasId, sinceLamport, sendStream)
-            // The relay asks back: the client may hold edits made while it could not reach the
-            // host. It answers from its own log; ops the relay has not seen are logged and passed on.
-            if (relay) {
-                val askBack = CanvasOpWirePacket(canvasId = canvasId.value, requestCatchUpSinceLamport = 0L)
-                send(sendStream, askBack)
-            }
-        }
-    }
-
-    /** Logs [op] once and passes it on to every peer but the one it came from. */
-    private suspend fun relayOp(canvasId: CanvasId, op: CanvasOp, payload: ByteArray, from: SendStream) {
-        val log = opLog
-        if (log != null) {
-            if (log.has(canvasId, op.opId)) return
-            log.append(canvasId, op)
-        }
-        broadcast(encodeFrame(payload), except = from)
-    }
-
-    private suspend fun broadcast(frame: ByteArray, except: SendStream? = null) {
-        mutex.withLock {
-            val iterator = activeSendStreams.iterator()
-            while (iterator.hasNext()) {
-                val stream = iterator.next()
-                if (stream === except) continue
-                try {
-                    stream.write(frame)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Throwable) {
-                    // A peer that will not take the frame is dropped, not retried.
-                    iterator.remove()
-                }
-            }
         }
     }
 
@@ -231,14 +162,11 @@ class IrohCanvasSyncTransport(
         val log = opLog ?: return
         val historicalOps = log.getOps(canvasId, sinceLamport)
         for (historicalOp in historicalOps) {
-            send(sendStream, CanvasOpWirePacket(canvasId = canvasId.value, op = historicalOp))
+            val replyPacket = CanvasOpWirePacket(canvasId = canvasId.value, op = historicalOp)
+            val payload = json.encodeToString(replyPacket).encodeToByteArray()
+            val frame = encodeFrame(payload)
+            runCatching { sendStream.write(frame) }
         }
-    }
-
-    /** One frame to one peer, under the lock broadcasts take, so frames never interleave on a stream. */
-    private suspend fun send(sendStream: SendStream, packet: CanvasOpWirePacket) {
-        val frame = encodeFrame(json.encodeToString(packet).encodeToByteArray())
-        mutex.withLock { runCatching { sendStream.write(frame) } }
     }
 
     private suspend fun removeActiveSendStream(sendStream: SendStream) {
@@ -256,11 +184,26 @@ class IrohCanvasSyncTransport(
         fallback.publish(canvasId, op)
 
         val packet = CanvasOpWirePacket(canvasId = canvasId.value, op = op)
-        broadcast(encodeFrame(json.encodeToString(packet).encodeToByteArray()))
+        val payload = json.encodeToString(packet).encodeToByteArray()
+        val frame = encodeFrame(payload)
+
+        mutex.withLock {
+            val iterator = activeSendStreams.iterator()
+            while (iterator.hasNext()) {
+                val stream = iterator.next()
+                try {
+                    stream.write(frame)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    // A peer that will not take the frame is dropped, not retried.
+                    iterator.remove()
+                }
+            }
+        }
     }
 
     override fun subscribe(canvasId: CanvasId): Flow<CanvasOp> {
-        subscribedCanvases.add(canvasId)
         scope.launch {
             requestCatchUp(canvasId, sinceLamport = 0L)
         }
@@ -276,7 +219,11 @@ class IrohCanvasSyncTransport(
         val payload = json.encodeToString(packet).encodeToByteArray()
         val frame = encodeFrame(payload)
 
-        broadcast(frame)
+        mutex.withLock {
+            for (stream in activeSendStreams) {
+                runCatching { stream.write(frame) }
+            }
+        }
     }
 
     private fun getOrCreateFlow(canvasId: CanvasId): MutableSharedFlow<CanvasOp> {

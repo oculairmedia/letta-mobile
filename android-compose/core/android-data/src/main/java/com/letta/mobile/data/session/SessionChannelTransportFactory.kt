@@ -31,7 +31,7 @@ class SessionChannelTransportFactory @Inject constructor(
     private val conversationCursorStore: ConversationCursorStore,
     private val externalToolRegistry: ExternalToolRegistry? = null,
     /** Shares canvases through the Iroh host; attached to each Iroh transport this makes. */
-    private val canvasClient: com.letta.mobile.data.transport.iroh.IrohCanvasClient? = null,
+    private val canvasClient: com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient? = null,
 ) {
     fun create(
         scope: CoroutineScope,
@@ -76,10 +76,13 @@ class SessionChannelTransportFactory @Inject constructor(
                 }
             }
             SessionBackendBinding.LocalRuntime -> {
+                // No Iroh host behind this backend: canvases stay on this device, and say so.
+                canvasClient?.detach()
                 reportChoice("noop-local")
                 NoOpChannelTransport()
             }
             SessionBackendBinding.RemoteHttpOrWs -> {
+                canvasClient?.detach()
                 if (localRuntimeBackend != null) {
                     reportChoice("noop-local")
                     NoOpChannelTransport()
