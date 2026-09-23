@@ -37,18 +37,20 @@ internal actual fun prepareCanvasImage(bytes: ByteArray, maxEdge: Int): CanvasIm
     return CanvasImage(out.toByteArray(), scaled.width, scaled.height)
 }
 
-/** A phone photo's pixels are stored as the sensor saw them; EXIF says which way is up. */
+/**
+ * A phone photo's pixels are stored as the sensor saw them; EXIF says which way is up, and for
+ * some front cameras that it is mirrored too (all eight orientations).
+ */
 private fun rotateUpright(bitmap: Bitmap, bytes: ByteArray): Bitmap {
-    val degrees = runCatching {
-        when (ExifInterface(bytes.inputStream()).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
-    }.getOrDefault(0f)
-    if (degrees == 0f) return bitmap
-    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, Matrix().apply { postRotate(degrees) }, true)
+    val exif = runCatching { ExifInterface(bytes.inputStream()) }.getOrNull() ?: return bitmap
+    val degrees = exif.rotationDegrees.toFloat()
+    val flipped = exif.isFlipped
+    if (degrees == 0f && !flipped) return bitmap
+    val matrix = Matrix().apply {
+        if (flipped) postScale(-1f, 1f)
+        postRotate(degrees)
+    }
+    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 }
 
 private const val JPEG_QUALITY = 85

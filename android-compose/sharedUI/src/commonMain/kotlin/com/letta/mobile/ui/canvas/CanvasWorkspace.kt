@@ -367,10 +367,13 @@ fun CanvasWorkspace(
 
     // A board drawn on a desktop is mostly off the edge of a phone, which opened on an empty
     // corner of it. On a phone the board opens fitted, once, and never zoomed in past 100%.
+    // Decided at the first measured layout after the load: a wide pane narrowed later must not
+    // reset the camera and the tool under the user.
     var fittedOnOpen by remember(session) { mutableStateOf(false) }
-    LaunchedEffect(initialLoadDone, compact) {
-        if (initialLoadDone && compact && !fittedOnOpen) {
-            fittedOnOpen = true
+    LaunchedEffect(initialLoadDone, resolvedLayout) {
+        if (!initialLoadDone || resolvedLayout == null || fittedOnOpen) return@LaunchedEffect
+        fittedOnOpen = true
+        if (resolvedLayout == CanvasLayout.COMPACT) {
             fitToContent(maxScale = 1f)
             // And in the select tool, where a drag moves around the board rather than drawing.
             controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
@@ -662,11 +665,16 @@ fun CanvasWorkspace(
         val shape = current.elements.singleOrNull { it.id in current.selectedIds } as? io.ak1.drawbox.domain.model.Element.Shape
         if (shape != null && shape.canHoldText) {
             val next = CanvasQuickCreate.nextShape(shape, direction, current.elements.maxOfOrNull { it.zIndex } ?: 0)
+            val undoStepsBefore = current.history.size
             controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(next))
             val (start, end) = CanvasQuickCreate.connector(shape.bounds(), next.bounds(), direction)
             CanvasQuickCreate.addArrow(controller, start, end)?.let { arrowId ->
                 controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(arrowId))
             }
+            // The shape and its arrow are one action: one undo takes both.
+            controller.onIntent(
+                io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
+            )
             openTextIn(next)
             return
         }

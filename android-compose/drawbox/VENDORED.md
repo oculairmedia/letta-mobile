@@ -105,7 +105,7 @@ behave as before (ratio 1). Tests: `GeometryTest` (image corner, edge, restore).
 The bitmap capture coroutine caught `Throwable`, so cancelling it reported a failed
 `Intent.SaveBitmap`. `CancellationException` is now rethrown.
 
-### 9. Review fixes (letta-mobile-8cik1)
+### 10. Review fixes (letta-mobile-8cik1)
 
 Each small and separately offerable upstream:
 
@@ -114,6 +114,7 @@ Each small and separately offerable upstream:
   ties toward the later element, the one drawn on top.
 - New `Intent.SelectIds` / `DrawBoxController.selectIds`: select by id, for hosts that know what to
   select (a point can land on a connector ending on the element).
+- New `Intent.MergeUndoSteps(count)`: a host action made of several intents undoes in one step.
 - `DrawBoxController.importPath` keeps the host's stroke colour, width, opacity, background pattern
   and `selectInsideHollowShapes` (it read them after `reset()`, so got defaults). `onIntent` and
   `importPath` carry `State.invokeBitmap`, a body property `copy()` drops, so `saveBitmap()` right
