@@ -32,7 +32,8 @@ class CanvasImageInputUiTest {
         setContent { CanvasWorkspace() }
         onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(400f, 300f)) }
         onNodeWithText("Image").assertExists()
-        onNodeWithText("Paste image").assertExists()
+        // Pasting is Ctrl/Cmd+V, not a menu entry.
+        onNodeWithText("Paste image").assertDoesNotExist()
     }
 
     @Test

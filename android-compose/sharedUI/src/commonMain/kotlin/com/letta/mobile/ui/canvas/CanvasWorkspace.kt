@@ -708,7 +708,6 @@ fun CanvasWorkspace(
             imagesAt = world
             imagePicker.launch()
         },
-        onPasteImage = ::pasteImage,
         onAddShape = { mode, world ->
             val id = CanvasInsert.addShape(controller, mode, world)
             val added = controller.state.value.elements.firstOrNull { it.id == id }

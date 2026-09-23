@@ -608,37 +608,46 @@ private fun constrainBoundsForType(
     raw: Rect,
     original: Rect,
 ): Rect {
-    if (element !is Element.Shape || element.shapeType != ShapeType.CIRCLE) return raw
-    // Circle must stay a square AND keep the un-dragged anchor at its local-space
-    // position. Side is the raw dragged dimension for edge handles, max of the
-    // two for corner handles (grows to encompass the drag).
+    val ratio = lockedAspectRatio(element, original) ?: return raw
+    return lockAspect(handle, raw, original, ratio)
+}
+
+/**
+ * The width-to-height ratio [element] keeps while it is resized, or null for none: a circle stays
+ * a circle, and an image keeps the proportions of its pixels (its intrinsic size, so an image that
+ * was stretched before snaps back to its true shape on its next resize).
+ */
+private fun lockedAspectRatio(element: Element, original: Rect): Float? = when {
+    element is Element.Shape && element.shapeType == ShapeType.CIRCLE -> 1f
+    element is Element.Image -> {
+        val intrinsic = element.intrinsicSize
+        if (intrinsic.width > 0f && intrinsic.height > 0f) intrinsic.width / intrinsic.height
+        else original.width / original.height.coerceAtLeast(1f)
+    }
+    else -> null
+}
+
+/**
+ * [raw] resized to keep [ratio] (width / height) with the un-dragged anchor fixed. An edge handle
+ * sets the dimension it drags and the other follows, centred on the anchor; a corner handle grows
+ * to encompass the drag.
+ */
+private fun lockAspect(handle: ResizeHandle, raw: Rect, original: Rect, ratio: Float): Rect {
     val anchor = anchorLocalForHandle(handle, original)
-    val side = when (handle) {
-        ResizeHandle.Top, ResizeHandle.Bottom -> raw.height
-        ResizeHandle.Left, ResizeHandle.Right -> raw.width
-        else -> max(raw.width, raw.height)
-    }.coerceAtLeast(1f)
+    val (w, h) = when (handle) {
+        ResizeHandle.Top, ResizeHandle.Bottom -> raw.height.coerceAtLeast(1f).let { it * ratio to it }
+        ResizeHandle.Left, ResizeHandle.Right -> raw.width.coerceAtLeast(1f).let { it to it / ratio }
+        else -> max(raw.width, raw.height * ratio).coerceAtLeast(1f).let { it to it / ratio }
+    }
     return when (handle) {
-        ResizeHandle.TopLeft -> Rect(anchor.x - side, anchor.y - side, anchor.x, anchor.y)
-        ResizeHandle.TopRight -> Rect(anchor.x, anchor.y - side, anchor.x + side, anchor.y)
-        ResizeHandle.BottomLeft -> Rect(anchor.x - side, anchor.y, anchor.x, anchor.y + side)
-        ResizeHandle.BottomRight -> Rect(anchor.x, anchor.y, anchor.x + side, anchor.y + side)
-        ResizeHandle.Top -> Rect(
-            anchor.x - side * 0.5f, anchor.y - side,
-            anchor.x + side * 0.5f, anchor.y,
-        )
-        ResizeHandle.Bottom -> Rect(
-            anchor.x - side * 0.5f, anchor.y,
-            anchor.x + side * 0.5f, anchor.y + side,
-        )
-        ResizeHandle.Left -> Rect(
-            anchor.x - side, anchor.y - side * 0.5f,
-            anchor.x, anchor.y + side * 0.5f,
-        )
-        ResizeHandle.Right -> Rect(
-            anchor.x, anchor.y - side * 0.5f,
-            anchor.x + side, anchor.y + side * 0.5f,
-        )
+        ResizeHandle.TopLeft -> Rect(anchor.x - w, anchor.y - h, anchor.x, anchor.y)
+        ResizeHandle.TopRight -> Rect(anchor.x, anchor.y - h, anchor.x + w, anchor.y)
+        ResizeHandle.BottomLeft -> Rect(anchor.x - w, anchor.y, anchor.x, anchor.y + h)
+        ResizeHandle.BottomRight -> Rect(anchor.x, anchor.y, anchor.x + w, anchor.y + h)
+        ResizeHandle.Top -> Rect(anchor.x - w * 0.5f, anchor.y - h, anchor.x + w * 0.5f, anchor.y)
+        ResizeHandle.Bottom -> Rect(anchor.x - w * 0.5f, anchor.y, anchor.x + w * 0.5f, anchor.y + h)
+        ResizeHandle.Left -> Rect(anchor.x - w, anchor.y - h * 0.5f, anchor.x, anchor.y + h * 0.5f)
+        ResizeHandle.Right -> Rect(anchor.x, anchor.y - h * 0.5f, anchor.x + w, anchor.y + h * 0.5f)
     }
 }
 

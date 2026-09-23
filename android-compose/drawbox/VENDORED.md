@@ -91,3 +91,11 @@ shape renders live so the cached layer never replays its text. Tests: `ShapeText
 and centre or right alignment happened inside that, leaving short centred text at the left of its
 box (text elements as well as shapes). Text is now laid out at exactly the wrap width. Covered by
 `CanvasShapeTextRenderUiTest`, which fails without it.
+
+### 8. Images keep their proportions when resized (letta-mobile-k42fs)
+
+Resize handles stretched an image freely. The circle's keep-it-square constraint is generalised to
+a locked aspect ratio, and an image now keeps the ratio of its pixels (`intrinsicSize`), so one
+stretched before snaps back to its true shape on its next resize. Edge handles set the dragged
+dimension and centre the other on the anchor; corner handles grow to encompass the drag. Circles
+behave as before (ratio 1). Tests: `GeometryTest` (image corner, edge, restore).

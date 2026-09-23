@@ -93,6 +93,41 @@ class GeometryTest {
         assertEquals(frame.id, topmostHit(listOf(frame, inner), Offset(20f, 100f), hollowInterior = true)?.id)
     }
 
+    private fun image(w: Float, h: Float) = Element.Image(
+        bytes = ByteArray(0),
+        intrinsicSize = androidx.compose.ui.geometry.Size(w * 4, h * 4),
+        points = listOf(Offset(0f, 0f), Offset(w, h)),
+    )
+
+    @Test
+    fun anImageKeepsItsProportionsFromACorner() {
+        val img = image(400f, 200f)
+        val out = resizeBoundsForElement(img, ResizeHandle.BottomRight, Offset(600f, 250f))
+        assertRectEquals(Rect(0f, 0f, 600f, 300f), out)
+        val shrunk = resizeBoundsForElement(img, ResizeHandle.TopLeft, Offset(200f, 180f))
+        assertEquals(2f, shrunk.width / shrunk.height, 0.01f)
+        assertEquals(400f, shrunk.right, 0.01f, "the opposite corner stays put")
+        assertEquals(200f, shrunk.bottom, 0.01f)
+    }
+
+    @Test
+    fun anImageKeepsItsProportionsFromAnEdge() {
+        val out = resizeBoundsForElement(image(400f, 200f), ResizeHandle.Right, Offset(800f, 100f))
+        assertRectEquals(Rect(0f, -100f, 800f, 300f), out)
+    }
+
+    @Test
+    fun aStretchedImageReturnsToItsTrueShapeOnResize() {
+        // Placed 400x100 though its pixels are 2:1.
+        val stretched = Element.Image(
+            bytes = ByteArray(0),
+            intrinsicSize = androidx.compose.ui.geometry.Size(800f, 400f),
+            points = listOf(Offset(0f, 0f), Offset(400f, 100f)),
+        )
+        val out = resizeBoundsForElement(stretched, ResizeHandle.BottomRight, Offset(400f, 100f))
+        assertEquals(2f, out.width / out.height, 0.01f)
+    }
+
     @Test
     fun circleHitTestStroked() {
         val s = Element.Shape(
