@@ -99,3 +99,14 @@ a locked aspect ratio, and an image now keeps the ratio of its pixels (`intrinsi
 stretched before snaps back to its true shape on its next resize. Edge handles set the dragged
 dimension and centre the other on the anchor; corner handles grow to encompass the drag. Circles
 behave as before (ratio 1). Tests: `GeometryTest` (image corner, edge, restore).
+
+### 9. A cancelled capture is not a failed save (letta-mobile-nq2w1)
+
+The bitmap capture coroutine caught `Throwable`, so cancelling it reported a failed
+`Intent.SaveBitmap`. `CancellationException` is now rethrown.
+
+## Repository policies
+
+Letta's first-party checks do not apply here, so the code stays diffable against upstream: the
+architecture test's package and `commonMain` import rules skip this module, and the detekt
+guardrail skips its files. Build, tests and compiler warnings still apply.
