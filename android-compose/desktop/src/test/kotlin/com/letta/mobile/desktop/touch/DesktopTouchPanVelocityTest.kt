@@ -50,6 +50,13 @@ class DesktopTouchPanVelocityTest {
     }
 
     @Test
+    fun `a diagonal throw coasts on both axes`() {
+        // A canvas is thrown corner to corner; locking it to one axis made it veer on release.
+        val coast = pan(majorPixels = 10f, minorPixels = 7f).dominant()
+        assertTrue(coast.dy > 0f && coast.dx > 0f, "expected a diagonal coast, got $coast")
+    }
+
+    @Test
     fun `upward swipe coasts upward`() {
         assertTrue(pan(majorPixels = -10f).dominant().dy < 0f, "an upward pan must coast upward")
     }
