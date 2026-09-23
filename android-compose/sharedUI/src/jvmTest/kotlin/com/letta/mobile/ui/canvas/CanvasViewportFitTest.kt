@@ -60,4 +60,21 @@ class CanvasViewportFitTest {
         assertTrue(CanvasViewportFit.panToShow(offBoard, Viewport(), IntSize(800, 600), centre = false) != null)
         assertNull(CanvasViewportFit.panToShow(target, Viewport(), IntSize.Zero, centre = true))
     }
+
+    @Test
+    fun panIntoBandLiftsANoteCoveredByTheKeyboardJustClearOfIt() {
+        val band = Rect(0f, 80f, 400f, 380f)
+        val note = Rect(50f, 500f, 250f, 700f)
+        val pan = CanvasViewportFit.panIntoBand(note, Viewport(), band)!!
+        assertEquals(Offset(0f, -320f), pan)
+        assertNull(CanvasViewportFit.panIntoBand(note, Viewport().panBy(pan), band))
+    }
+
+    @Test
+    fun panIntoBandShowsTheTopOfANoteTallerThanTheBand() {
+        val band = Rect(0f, 80f, 400f, 380f)
+        val tall = Rect(50f, 500f, 250f, 1500f)
+        assertEquals(Offset(0f, -420f), CanvasViewportFit.panIntoBand(tall, Viewport(), band))
+        assertNull(CanvasViewportFit.panIntoBand(Rect(10f, 100f, 90f, 200f), Viewport(), band))
+    }
 }

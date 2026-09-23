@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Alignment
@@ -66,6 +67,7 @@ import io.ak1.drawbox.input.imageDragAndDropTarget
 import io.github.vinceglb.filekit.readBytes
 import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.Event
+import io.ak1.drawbox.domain.model.Viewport
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
@@ -390,6 +392,37 @@ fun CanvasWorkspace(
             fitToContent(maxScale = 1f)
             // And in the select tool, where a drag moves around the board rather than drawing.
             controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
+        }
+    }
+
+    // The keyboard covers the bottom of a phone's board. While it is up, the camera (never the
+    // element) moves the note or text being typed into clear of it and of the bars riding on it,
+    // then moves back when the keyboard goes, unless the board was moved in between.
+    // Top of the bars at the foot of the board, in board px; they ride up with the keyboard.
+    var footTop by remember { mutableStateOf<Float?>(null) }
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    val topReserve = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this) + KEYBOARD_TOP_RESERVE.roundToPx() }
+    val typingTarget: Rect? = when {
+        expandedNoteId != null -> null
+        activeNoteId != null -> documents.firstOrNull { it.id == activeNoteId }?.frame?.toRect()
+        else -> editingTextId?.let { id -> state.elements.firstOrNull { it.id == id }?.bounds() }
+    }
+    var keyboardPan by remember { mutableStateOf<Pair<Offset, Viewport>?>(null) }
+    LaunchedEffect(imeBottom > 0, typingTarget, footTop) {
+        val bottom = footTop
+        if (imeBottom > 0 && typingTarget != null && bottom != null) {
+            // The keyboard slides in over a few frames; pan once it has settled.
+            delay(KEYBOARD_SETTLE_MS)
+            val band = Rect(0f, topReserve.toFloat(), boardSize.width.toFloat(), bottom)
+            CanvasViewportFit.panIntoBand(typingTarget, controller.state.value.viewport, band)?.let { delta ->
+                controller.panBy(delta)
+                keyboardPan = ((keyboardPan?.first ?: Offset.Zero) + delta) to controller.state.value.viewport
+            }
+        } else if (imeBottom == 0) {
+            keyboardPan?.let { (total, after) ->
+                if (controller.state.value.viewport == after) controller.panBy(-total)
+            }
+            keyboardPan = null
         }
     }
 
@@ -1321,7 +1354,8 @@ fun CanvasWorkspace(
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.safeDrawing).padding(CHROME_INSET)
-                    .canvasChrome(chromeRegions),
+                    .canvasChrome(chromeRegions)
+                    .onGloballyPositioned { foot -> boardBounds?.let { footTop = foot.boundsInRoot().top - it.top } },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
@@ -1374,6 +1408,9 @@ fun CanvasWorkspace(
 
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
+/** Room kept at the top of the board for its title and sync bar when the keyboard moves the camera. */
+private val KEYBOARD_TOP_RESERVE = 72.dp
+private const val KEYBOARD_SETTLE_MS = 150L
 private const val ZOOM_STEP = 1.25f
 /** How near, in screen pixels at 100%, a press has to be to an element to pick it. */
 private const val TEXT_HIT_TOLERANCE = 8f
