@@ -205,7 +205,8 @@ class AppServerServeIrohCommand : CliktCommand(
         "--canvas-ops-dir",
         envvar = "LETTA_CANVAS_OPS_DIR",
         help = "Directory for the op log of the canvases this host relays between apps " +
-            "(default ~/.letta/canvas-relay/ops). Apps that were offline catch up from it.",
+            "(default ~/.letta/canvas-relay/topics): each conversation's canvas binding and op log. " +
+            "Apps that were offline catch up from it.",
     )
 
     private val pairingStoreFile by option(
@@ -396,10 +397,10 @@ class AppServerServeIrohCommand : CliktCommand(
             
             // Canvases: every app connected here shares them through this host.
             val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) }
-                ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "ops")
+                ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "topics")
             val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
                 scope = scope,
-                opLog = com.letta.mobile.data.canvas.FileCanvasOpLog(canvasOps),
+                store = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps),
             )
             println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps)")
 

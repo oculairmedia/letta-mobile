@@ -111,7 +111,7 @@ class IrohCanvasRelayEndToEndTest {
         val server = IrohNodeEndpoint(
             scope = scope,
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
-            canvasRelay = IrohCanvasRelay(scope, InMemoryCanvasOpLog()),
+            canvasRelay = IrohCanvasRelay(scope, com.letta.mobile.data.canvas.InMemoryCanvasRelayStore()),
         )
         server.create()
         server.start(IdleController())

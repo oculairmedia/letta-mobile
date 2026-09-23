@@ -100,37 +100,3 @@ class IrohCanvasClient(
         const val MAX_BACKOFF_MS = 60_000L
     }
 }
-
-/**
- * The host's side of shared canvases: relays canvas ops and presence between every app connected
- * to it, logging ops in [opLog] so an app that was away catches up. The host endpoint accepts the
- * canvas ALPNs ([alpns]) only from peers with an authenticated App Server connection, then hands
- * them to [accept].
- */
-class IrohCanvasRelay(
-    scope: CoroutineScope,
-    opLog: CanvasOpLog,
-) {
-    private val sync = IrohCanvasSyncTransport(scope, opLog = opLog, relay = true)
-    private val presence = IrohCanvasPresenceTransport(scope, relay = true)
-
-    val alpns: List<ByteArray> = listOf(
-        IrohCanvasSyncTransport.CANVAS_SYNC_ALPN,
-        IrohCanvasPresenceTransport.CANVAS_PRESENCE_ALPN,
-    )
-
-    fun handles(alpn: ByteArray): Boolean = alpns.any { it.contentEquals(alpn) }
-
-    /** Serves an accepted canvas connection; false when [alpn] is not a canvas protocol. */
-    fun accept(alpn: ByteArray, connection: Connection): Boolean = when {
-        alpn.contentEquals(IrohCanvasSyncTransport.CANVAS_SYNC_ALPN) -> {
-            sync.registerConnection(connection, isInbound = true)
-            true
-        }
-        alpn.contentEquals(IrohCanvasPresenceTransport.CANVAS_PRESENCE_ALPN) -> {
-            presence.registerConnection(connection, isInbound = true)
-            true
-        }
-        else -> false
-    }
-}
