@@ -10,18 +10,20 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.name
 import com.letta.mobile.feature.chat.util.uri
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +37,8 @@ import java.io.ByteArrayOutputStream
  * and the [AttachmentLimits.minJpegQuality] floor, and hands a
  * Base64-encoded [MessageContentPart.Image] to [onPicked].
  *
+ * Picks are limited to the room left beside the [pendingCount] images already on the message.
+ *
  * Returns a `() -> Unit` that launches the picker when invoked.
  */
 @Composable
@@ -42,24 +46,57 @@ internal fun rememberImageAttachmentPicker(
     onPicked: (MessageContentPart.Image) -> Unit,
     onError: (String) -> Unit = {},
     limits: AttachmentLimits = AttachmentLimits.Default,
+    pendingCount: Int = 0,
 ): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val pending by rememberUpdatedState(pendingCount)
+
+    // Reads, normalises and attaches one picked image; a failure is reported for that image alone.
+    suspend fun attachOne(file: PlatformFile) {
+        runCatching {
+            withContext(Dispatchers.IO) { loadAndNormalize(context, file.uri, limits) }
+        }.fold(
+            onSuccess = {
+                Telemetry.event(
+                    "ChatComposerAttach",
+                    "attach.pickResult",
+                    "result" to "decodedOk",
+                    "mediaType" to it.mediaType,
+                    "base64Len" to it.base64.length,
+                )
+                onPicked(it)
+            },
+            onFailure = {
+                // Leaving the screen mid-decode cancels the attach; that is not a failed image.
+                if (it is CancellationException) throw it
+                val errorMessage = it.message ?: it.javaClass.simpleName
+                Telemetry.error(
+                    "ChatComposerAttach",
+                    "attach.pickResult",
+                    it,
+                    "result" to "decodeFailed",
+                )
+                Log.w("ChatComposerAttach", "loadAndNormalize failed", it)
+                onError(errorMessage)
+            },
+        )
+    }
 
     val launcher = rememberFilePickerLauncher(
         type = FileKitType.Image,
-        mode = FileKitMode.Single,
-    ) { file: PlatformFile? ->
+        // Several photos in one pick, up to the room left on the message. Android's multi-select
+        // photo picker needs a limit of at least two, so with one slot left it still asks for two
+        // and the extra is dropped below, before it is decoded.
+        mode = FileKitMode.Multiple(maxItems = (limits.maxAttachmentCount - pendingCount).coerceAtLeast(2)),
+    ) { files: List<PlatformFile>? ->
         // Proof-of-callback trace. If this line does not appear in logcat
         // after the picker activity closes, the ActivityResult contract
         // never delivered the result to this Composable's launcher — the
         // most likely cause is composition destruction across process
         // death while DocumentsUI was foreground (see letta-mobile-jng2).
-            Log.i(
-                "ChatComposerAttach",
-                "launcher.onResult file=${if (file == null) "<null>" else file?.name}",
-            )
-        if (file == null) {
+        Log.i("ChatComposerAttach", "launcher.onResult files=${files?.size ?: "<null>"}")
+        if (files.isNullOrEmpty()) {
             Telemetry.event(
                 "ChatComposerAttach",
                 "attach.pickResult",
@@ -67,37 +104,12 @@ internal fun rememberImageAttachmentPicker(
             )
             return@rememberFilePickerLauncher
         }
-
-        scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val uri = file.uri
-                    loadAndNormalize(context, uri, limits)
-                }
-            }.fold(
-                onSuccess = {
-                    Telemetry.event(
-                        "ChatComposerAttach",
-                        "attach.pickResult",
-                        "result" to "decodedOk",
-                        "mediaType" to it.mediaType,
-                        "base64Len" to it.base64.length,
-                    )
-                    onPicked(it)
-                },
-                onFailure = {
-                    val errorMessage = it.message ?: it.javaClass.simpleName
-                    Telemetry.error(
-                        "ChatComposerAttach",
-                        "attach.pickResult",
-                        it,
-                        "result" to "decodeFailed",
-                    )
-                    Log.w("ChatComposerAttach", "loadAndNormalize failed", it)
-                    onError(errorMessage)
-                },
-            )
+        val room = (limits.maxAttachmentCount - pending).coerceAtLeast(0)
+        if (files.size > room) {
+            onError("Only ${limits.maxAttachmentCount} images fit in a message; skipped ${files.size - room}.")
         }
+        // One at a time, in the order picked: each is attached as soon as it is ready.
+        scope.launch { files.take(room).forEach { file -> attachOne(file) } }
     }
 
     return remember(launcher) {

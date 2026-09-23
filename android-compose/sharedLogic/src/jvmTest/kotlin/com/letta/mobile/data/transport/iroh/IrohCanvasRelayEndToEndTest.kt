@@ -32,6 +32,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -82,6 +84,7 @@ class IrohCanvasRelayEndToEndTest {
         withTimeout(45.seconds) {
             while (receivedByB.none { it.opId == "op-1" }) delay(100.milliseconds)
         }
+        assertEquals(listOf("op-1"), receivedByB.map { it.opId }, "B receives A's op, once")
     }
 
     @Test
@@ -101,6 +104,7 @@ class IrohCanvasRelayEndToEndTest {
                 delay(300.milliseconds)
             }
         }
+        assertTrue(seenByB.value.any { it.peerId == "app-a" }, "B sees A's cursor")
     }
 
     private suspend fun startHost(): String {
