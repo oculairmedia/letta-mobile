@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -126,6 +127,8 @@ fun InlineTextEditor(
                 IntOffset(screenTopLeft.x.toInt(), screenTopLeft.y.toInt())
             }
             .width(widthDp)
+            // Turned like the rendered element (about its centre), which this field stands in for.
+            .graphicsLayer { rotationZ = element.rotation }
             .focusRequester(focusRequester),
     )
 }

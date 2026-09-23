@@ -33,11 +33,7 @@ class CanvasShapeTextRenderUiTest {
         // "Ideas" is the only red on the board: its pixels centre on the circle's centre (580, 280).
         val red = buildList {
             for (x in 460 until 700) for (y in 170 until 390) {
-                val rgb = image.getRGB(x, y)
-                val r = rgb shr 16 and 0xff
-                val g = rgb shr 8 and 0xff
-                val b = rgb and 0xff
-                if (r > 180 && g < 120 && b < 120) add(x to y)
+                if (isStrongRed(image.getRGB(x, y))) add(x to y)
             }
         }
         kotlin.test.assertTrue(red.size > 20, "the circle's text should be drawn, found ${red.size} red pixels")
@@ -46,4 +42,11 @@ class CanvasShapeTextRenderUiTest {
         kotlin.test.assertTrue(kotlin.math.abs(cx - 580) < 8, "text should be centred across the circle, centre x is $cx")
         kotlin.test.assertTrue(kotlin.math.abs(cy - 280) < 8, "text should be centred down the circle, centre y is $cy")
     }
+}
+
+private fun isStrongRed(rgb: Int): Boolean {
+    val r = rgb shr 16 and 0xff
+    val g = rgb shr 8 and 0xff
+    val b = rgb and 0xff
+    return r > 180 && maxOf(g, b) < 120
 }

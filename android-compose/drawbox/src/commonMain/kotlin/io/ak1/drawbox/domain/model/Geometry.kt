@@ -413,7 +413,9 @@ fun topmostHit(
     tolerance: Float = 8f,
     hollowInterior: Boolean = false,
 ): Element? {
+    // Reversed first so equal zIndex values go to the later element, which the renderer draws on top.
     return elements
+        .asReversed()
         .sortedByDescending { it.zIndex }
         .firstOrNull { it.hitTest(point, tolerance, hollowInterior) }
 }

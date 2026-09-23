@@ -510,4 +510,12 @@ class GeometryTest {
         assertTrue(kotlin.math.abs(topLeftWorld.y - 0f) < eps,
             "topLeft.y ${topLeftWorld.y} drifted from 0")
     }
+
+    @Test
+    fun topmostHitPrefersTheLaterOfTwoEqualZIndexes() {
+        // The renderer draws the later one on top, so a press must pick it.
+        val under = rectShape(0f, 0f, 100f, 100f, filled = true).copy(id = "under", zIndex = 1)
+        val over = rectShape(0f, 0f, 100f, 100f, filled = true).copy(id = "over", zIndex = 1)
+        assertEquals("over", topmostHit(listOf(under, over), Offset(50f, 50f))?.id)
+    }
 }
