@@ -16,6 +16,12 @@ data class CanvasId(val value: String) {
          */
         @OptIn(ExperimentalUuidApi::class)
         fun generate(): CanvasId = CanvasId("canvas-${Uuid.random()}")
+
+        /**
+         * The canvas of conversation [conversationId], the same on every app: apps share a canvas
+         * through their host by id, so a random id per app would give each its own board.
+         */
+        fun forConversation(conversationId: String): CanvasId = CanvasId("canvas-conversation-$conversationId")
     }
 }
 

@@ -36,7 +36,8 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class CanvasPresenceWirePacket(
     val canvasId: String,
-    val presence: CanvasPresence,
+    /** Null in the hello a dialing peer sends so the other side accepts its stream at once. */
+    val presence: CanvasPresence? = null,
 )
 
 /**
@@ -45,6 +46,9 @@ data class CanvasPresenceWirePacket(
  * Transmits [CanvasPresence] state over QUIC streams using ALPN `meridian/canvas-presence/1`.
  * Operates independently from document ops, with automatic 10-second TTL expiry and
  * periodic reaper cleanup.
+ *
+ * A [relay] (the host every client dials) passes each presence update on to every other
+ * connected peer, so clients see each other's cursors without connecting to one another.
  */
 class IrohCanvasPresenceTransport(
     private val scope: CoroutineScope,
@@ -52,6 +56,7 @@ class IrohCanvasPresenceTransport(
     private val ttlMs: Long = 10_000L,
     private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
     private val fallback: CanvasPresenceTransport = InMemoryCanvasPresenceTransport(ttlMs, clock),
+    private val relay: Boolean = false,
 ) : CanvasPresenceTransport {
 
     companion object {
@@ -156,10 +161,14 @@ class IrohCanvasPresenceTransport(
 
             mutex.withLock {
                 activeSendStreams.add(sendStream)
+                // A stream the peer cannot see until it carries data: say hello straight away.
+                if (!isInbound) {
+                    runCatching { sendStream.write(encodeFrame(json.encodeToString(CanvasPresenceWirePacket(canvasId = "")).encodeToByteArray())) }
+                }
             }
 
             try {
-                consumePackets(recvStream)
+                consumePackets(recvStream, sendStream)
             } finally {
                 removeActiveSendStream(sendStream)
             }
@@ -171,21 +180,43 @@ class IrohCanvasPresenceTransport(
         }
     }
 
-    private suspend fun consumePackets(recvStream: RecvStream) {
+    private suspend fun consumePackets(recvStream: RecvStream, sendStream: SendStream) {
         while (true) {
             val frameBytes = readFrame(recvStream) ?: break
-            dispatchIncomingPacket(frameBytes)
+            dispatchIncomingPacket(frameBytes, sendStream)
         }
     }
 
-    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray) {
+    private suspend fun dispatchIncomingPacket(frameBytes: ByteArray, sendStream: SendStream) {
         val packet = runCatching {
             json.decodeFromString<CanvasPresenceWirePacket>(frameBytes.decodeToString())
         }.getOrNull() ?: return
+        val presence = packet.presence ?: return // A hello.
 
         val canvasId = CanvasId(packet.canvasId)
-        applyPresenceInternal(canvasId, packet.presence)
-        fallback.updatePresence(canvasId, packet.presence)
+        if (relay) {
+            broadcast(encodeFrame(frameBytes), except = sendStream)
+            return
+        }
+        applyPresenceInternal(canvasId, presence)
+        fallback.updatePresence(canvasId, presence)
+    }
+
+    private suspend fun broadcast(frame: ByteArray, except: SendStream? = null) {
+        mutex.withLock {
+            val iterator = activeSendStreams.iterator()
+            while (iterator.hasNext()) {
+                val stream = iterator.next()
+                if (stream === except) continue
+                try {
+                    stream.write(frame)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    iterator.remove()
+                }
+            }
+        }
     }
 
     private suspend fun removeActiveSendStream(sendStream: SendStream) {
@@ -202,22 +233,7 @@ class IrohCanvasPresenceTransport(
         fallback.updatePresence(canvasId, presence)
 
         val packet = CanvasPresenceWirePacket(canvasId = canvasId.value, presence = presence)
-        val payload = json.encodeToString(packet).encodeToByteArray()
-        val frame = encodeFrame(payload)
-
-        mutex.withLock {
-            val iterator = activeSendStreams.iterator()
-            while (iterator.hasNext()) {
-                val stream = iterator.next()
-                try {
-                    stream.write(frame)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Throwable) {
-                    iterator.remove()
-                }
-            }
-        }
+        broadcast(encodeFrame(json.encodeToString(packet).encodeToByteArray()))
     }
 
     override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> {

@@ -130,6 +130,9 @@ class IrohNodeConnection(
         authPolicy.requiredBearerToken.isNullOrBlank() ||
             (pairingService?.isPaired(remoteEndpointId) == true),
     )
+
+    /** Whether this peer has authenticated; side protocols from the same peer are gated on it. */
+    val isAuthenticated: Boolean get() = authenticated.get()
     
     /**
      * Mid-turn redial fix: thread-local storage for tracking the active turn's

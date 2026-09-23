@@ -135,15 +135,32 @@ abstract class AppModule {
         fun provideCanvasSessionRegistry(): com.letta.mobile.data.canvas.CanvasSessionRegistry =
             com.letta.mobile.data.canvas.CanvasSessionRegistry()
 
+        /**
+         * Shares canvases through the Iroh host every session graph connects to (attached by
+         * SessionChannelTransportFactory); without one, sessions in this process still share.
+         */
         @Provides
         @Singleton
-        fun provideCanvasSyncTransport(): com.letta.mobile.data.canvas.CanvasSyncTransport =
-            com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport()
+        @Suppress("NoDetachedCoroutineLifecycle") // Process lifetime, like the canvas op log.
+        fun provideIrohCanvasClient(
+            opLog: com.letta.mobile.data.canvas.CanvasOpLog,
+        ): com.letta.mobile.data.transport.iroh.IrohCanvasClient =
+            com.letta.mobile.data.transport.iroh.IrohCanvasClient(
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+                opLog,
+            )
 
         @Provides
         @Singleton
-        fun provideCanvasPresenceTransport(): com.letta.mobile.data.canvas.CanvasPresenceTransport =
-            com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport()
+        fun provideCanvasSyncTransport(
+            client: com.letta.mobile.data.transport.iroh.IrohCanvasClient,
+        ): com.letta.mobile.data.canvas.CanvasSyncTransport = client.sync
+
+        @Provides
+        @Singleton
+        fun provideCanvasPresenceTransport(
+            client: com.letta.mobile.data.transport.iroh.IrohCanvasClient,
+        ): com.letta.mobile.data.canvas.CanvasPresenceTransport = client.presence
 
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
         // admin_rpc when the active backend is iroh://. Injected into
