@@ -48,9 +48,6 @@ object HostCanvasTools {
                 published(backend.publish(caller, entry, ops)) { CanvasApplyOpsResult(ok = true, revision = it) }
             }
         },
-        HostCanvasTool(CanvasToolContract.exportSvg, "Failed to export SVG") { caller, input ->
-            withCanvas(backend, caller, input) { success(CanvasExportSvgResult(svg = CanvasToolContract.PLACEHOLDER_SVG)) }
-        },
         HostCanvasTool(CanvasToolContract.list, "Failed to list canvases") { caller, input -> list(backend, caller, input) },
     )
 

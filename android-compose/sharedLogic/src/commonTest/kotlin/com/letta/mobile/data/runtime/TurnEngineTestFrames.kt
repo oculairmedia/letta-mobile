@@ -95,6 +95,12 @@ internal class TurnEngineTestFrames(
         conversationId = runtime.conversationId,
     )
 
+    /** [run]'s `turn_finished` for turn number [turn], sequenced after the frames already built. */
+    fun turnFinished(run: TestRun, turn: Int): AppServerInboundFrame.TurnFinished {
+        seq += 1
+        return run.turnFinished(turn).copy(eventSeq = seq)
+    }
+
     private companion object {
         const val FIXTURE_EMITTED_AT = "2026-09-24T00:00:00Z"
     }
@@ -143,6 +149,8 @@ internal class TurnEngineTestAckingClient(
     fun emitStreamDelta(messageType: String) = emit(frames.streamDelta(messageType))
 
     fun emitUpdateQueue(update: QueueUpdateFixture) = emit(frames.updateQueue(update))
+
+    fun emitTurnFinished(run: TestRun, turn: Int) = emit(frames.turnFinished(run, turn))
 
     override fun emit(frame: AppServerInboundFrame) {
         (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(

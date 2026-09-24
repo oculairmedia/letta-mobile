@@ -158,9 +158,24 @@ private fun recordRejected(
 
 private const val TELEMETRY_TAG = "AppServerTurnEngine"
 
+private fun TurnCommand.lifecycleDraft(
+    status: RuntimeRunStatus,
+    reason: String? = null,
+    runId: RunId? = null,
+): RuntimeEventDraft =
+    RuntimeEventDraft(
+        backendId = backendId,
+        runtimeId = runtimeId,
+        agentId = agentId,
+        conversationId = conversationId,
+        runId = runId,
+        source = RuntimeEventSource.LocalRuntime,
+        payload = RuntimeEventPayload.RunLifecycleChanged(status, reason = reason),
+    )
+
 /** The visible "queued" lifecycle: Running with a reason, which every chat surface already renders. */
 internal fun TurnCommand.queuedInputDraft(): RuntimeEventDraft =
-    runLifecycleDraft(RuntimeRunStatus.Running, reason = INPUT_QUEUED_REASON)
+    lifecycleDraft(RuntimeRunStatus.Running, reason = INPUT_QUEUED_REASON)
 
 /** Upstream `QueueRemovalTransition.disposition`. */
 internal enum class QueueRemovalDisposition {
@@ -224,16 +239,16 @@ internal class QueuedInputTracker(val clientMessageId: String?) {
 }
 
 internal fun TurnCommand.startedDraft(): RuntimeEventDraft =
-    runLifecycleDraft(RuntimeRunStatus.Started)
+    lifecycleDraft(RuntimeRunStatus.Started)
 
 internal fun TurnCommand.completedDraft(runId: RunId?): RuntimeEventDraft =
-    runLifecycleDraft(RuntimeRunStatus.Completed, runId = runId)
+    lifecycleDraft(RuntimeRunStatus.Completed, runId = runId)
 
 internal fun TurnCommand.failedDraft(reason: String): RuntimeEventDraft =
-    runLifecycleDraft(RuntimeRunStatus.Failed, reason = reason)
+    lifecycleDraft(RuntimeRunStatus.Failed, reason = reason)
 
 internal fun TurnCommand.cancelledDraft(reason: String): RuntimeEventDraft =
-    runLifecycleDraft(RuntimeRunStatus.Cancelled, reason = reason)
+    lifecycleDraft(RuntimeRunStatus.Cancelled, reason = reason)
 
 internal suspend fun enterQueued(
     command: TurnCommand,
@@ -277,15 +292,28 @@ internal fun recordDequeued(lease: LeaseRef, source: String) {
     )
 }
 
+/**
+ * letta-mobile-qygvv.7: while this lease's input is queued, frames on the scope belong to the turn
+ * ahead; only `update_queue` concerns it.
+ */
+internal fun LeaseRef.holdsWhileQueued(received: AppServerReceivedFrame): Boolean =
+    queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue
+
+/** The server dropped this lease's queued input and its `update_queue` frame already reached viewers. */
+internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boolean): Boolean =
+    projected && this == QueueRemovalDisposition.Cancelled
+
 internal fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
 ): QueueRemovalDisposition? {
     val frame = received.frame
     val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
+    // While queued, frames on this scope belong to the turn ahead; only the
+    // dequeue transition for OUR client_message_id proves our input started.
     val startedBy = when {
-        frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
         removal == QueueRemovalDisposition.Dequeued -> "update_queue"
+        frame is AppServerInboundFrame.StreamDelta && !lease.queuedInput.isQueued -> "stream_delta"
         else -> null
     }
     if (startedBy != null && lease.queuedInput.markStarted()) {
@@ -374,7 +402,7 @@ internal suspend fun joinCollectorOrHandleFailure(
     collector: Job,
     inputFailure: InputAcceptance.Failure?,
     onFailure: suspend (String) -> Unit,
-): String {
+): String? {
     if (inputFailure != null) {
         // letta-mobile-qygvv.1: the server will never run this input — fail
         // now instead of waiting out the idle watchdog.
@@ -382,8 +410,10 @@ internal suspend fun joinCollectorOrHandleFailure(
         onFailure(inputFailure.failureReason)
         return "input_rejected"
     }
+    // A normal join decides nothing: the collector's own catch blocks already
+    // recorded why it ended, and that reason must survive (see the engine).
     collector.join()
-    return "normal_completion"
+    return null
 }
 
 /**
@@ -400,5 +430,5 @@ internal enum class AbruptTurnEnding(
     QueuedInputCancelled(RuntimeRunStatus.Cancelled, QUEUED_INPUT_CANCELLED_REASON, "update_queue_cancelled"),
     ;
 
-    fun draftFor(command: TurnCommand): RuntimeEventDraft = command.runLifecycleDraft(status, reason = reason)
+    fun draftFor(command: TurnCommand): RuntimeEventDraft = command.lifecycleDraft(status, reason = reason)
 }

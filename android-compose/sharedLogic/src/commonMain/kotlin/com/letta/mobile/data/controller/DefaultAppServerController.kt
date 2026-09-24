@@ -9,8 +9,10 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.reanswerReplayedApproval
 import com.letta.mobile.data.runtime.releaseUserInputGateUnlessRejected
+import com.letta.mobile.data.runtime.DeviceStateChanger
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnContextPreflight
+import com.letta.mobile.data.runtime.TurnInboundSource
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -153,6 +155,9 @@ class DefaultAppServerController(
     private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
+    /** letta-mobile-qygvv.7: in-place mode changes over the controller-owned router. */
+    private val deviceState = DeviceStateChanger(client, TurnInboundSource(client, eventRouter))
+
     /**
      * Turn engine instance. Created lazily and reused for all turns.
      * The engine itself serializes turns, so we don't need additional locking here.
@@ -232,15 +237,52 @@ class DefaultAppServerController(
         mode: AppServerPermissionMode?,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
-    ): CanonicalRuntime = runtimeMutex.withLock {
-        startRuntimeLocked(
-            agentId = agentId,
-            conversationId = conversationId,
-            cwd = cwd,
-            mode = mode,
-            recoverApprovals = recoverApprovals,
-            forceDeviceStatus = forceDeviceStatus,
-        )
+    ): CanonicalRuntime {
+        val key = RuntimeKey(agentId.value, conversationId.value)
+        when (val lookup = runtimeMutex.withLock { lookupCachedRuntime(key, mode) }) {
+            is CachedRuntimeLookup.Current -> return lookup.runtime
+            is CachedRuntimeLookup.ModeChange -> changeModeInPlace(key, lookup)?.let { return it }
+            null -> Unit
+        }
+        return runtimeMutex.withLock {
+            startRuntimeLocked(
+                agentId = agentId,
+                conversationId = conversationId,
+                cwd = cwd,
+                mode = mode,
+                recoverApprovals = recoverApprovals,
+                forceDeviceStatus = forceDeviceStatus,
+            )
+        }
+    }
+
+    /** letta-mobile-qygvv.7: what the cache holds for [key] under the requested [mode]. */
+    private fun lookupCachedRuntime(key: RuntimeKey, mode: AppServerPermissionMode?): CachedRuntimeLookup? {
+        val cached = runtimeCache[key] ?: return null
+        val effectiveMode = mode ?: runtimePermissionModes[key] ?: defaultPermissionMode()
+        if (runtimePermissionModes[key] == effectiveMode) return CachedRuntimeLookup.Current(cached)
+        return CachedRuntimeLookup.ModeChange(cached, effectiveMode, connectionGeneration.value)
+    }
+
+    /**
+     * letta-mobile-qygvv.7: changes the cached runtime's mode with `change_device_state`. Returns
+     * the runtime when the server confirmed it; otherwise evicts it (unless a reconnect or another
+     * start already replaced it) and returns null so the caller cold-starts.
+     */
+    private suspend fun changeModeInPlace(key: RuntimeKey, change: CachedRuntimeLookup.ModeChange): CanonicalRuntime? {
+        val confirmed = deviceState.changePermissionMode(change.cached.scope, change.effectiveMode)
+        return runtimeMutex.withLock {
+            val stillCached = connectionGeneration.value == change.generation && runtimeCache[key] === change.cached
+            when {
+                !stillCached -> null
+                confirmed -> change.cached.also { runtimePermissionModes[key] = change.effectiveMode }
+                else -> {
+                    runtimeCache.remove(key)
+                    turnEngine.invalidateRuntime(notifyHost = false)
+                    null
+                }
+            }
+        }
     }
 
     private suspend fun startRuntimeLocked(
@@ -314,8 +356,8 @@ class DefaultAppServerController(
                     externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
                 ),
             )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
@@ -497,46 +539,45 @@ class DefaultAppServerController(
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
-    ): AppServerInboundFrame.SyncResponse {
-        return try {
-            client.sync(
-                AppServerCommand.Sync(
-                    runtime = runtime,
-                    requestId = requestIdFactory(),
-                    recoverApprovals = recoverApprovals,
-                    forceDeviceStatus = forceDeviceStatus,
-                ),
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            throw AppServerControllerException("Failed to sync runtime ${runtime.agentId}/${runtime.conversationId}", e)
-        }
+    ): AppServerInboundFrame.SyncResponse = runtime.controllerCall("sync") {
+        client.sync(
+            AppServerCommand.Sync(
+                runtime = runtime,
+                requestId = requestIdFactory(),
+                recoverApprovals = recoverApprovals,
+                forceDeviceStatus = forceDeviceStatus,
+            ),
+        )
     }
 
     override suspend fun abort(
         runtime: AppServerRuntimeScope,
         runId: String?,
-    ): AppServerInboundFrame.AbortMessageResponse {
-        return try {
-            client.abort(
-                AppServerCommand.AbortMessage(
-                    runtime = runtime,
-                    requestId = requestIdFactory(),
-                    runId = runId,
-                ),
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
-        }
+    ): AppServerInboundFrame.AbortMessageResponse = runtime.controllerCall("abort") {
+        client.abort(
+            AppServerCommand.AbortMessage(
+                runtime = runtime,
+                requestId = requestIdFactory(),
+                runId = runId,
+            ),
+        )
     }
 
     /**
      * Internal key for runtime cache.
      */
     private data class RuntimeKey(val agentId: String, val conversationId: String)
+
+    /** letta-mobile-qygvv.7: a cached runtime that already matches, or one whose mode must change. */
+    private sealed interface CachedRuntimeLookup {
+        data class Current(val runtime: CanonicalRuntime) : CachedRuntimeLookup
+
+        data class ModeChange(
+            val cached: CanonicalRuntime,
+            val effectiveMode: AppServerPermissionMode,
+            val generation: Long,
+        ) : CachedRuntimeLookup
+    }
 
     /** Tear down the inbound router collector and controller scope (tests / shutdown). */
     override fun close() {
