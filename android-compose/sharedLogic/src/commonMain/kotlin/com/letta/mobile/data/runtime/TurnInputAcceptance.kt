@@ -342,28 +342,6 @@ internal class TurnInputSender(
         if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, emit)
         return failure
     }
-
-    /**
-     * letta-mobile-qygvv.3: [sendInput], abandoned when [collector] ends first. A turn the
-     * collector already settled (terminal, watchdog, superseded generation) must not stay
-     * parked waiting on an `input_accepted` that will never arrive.
-     */
-    suspend fun sendInputUntilCollectorEnds(
-        command: TurnCommand,
-        scope: AppServerRuntimeScope,
-        lease: LeaseRef,
-        collector: Job,
-        emit: suspend (RuntimeEventDraft) -> Unit,
-    ): InputAcceptance.Failure? = coroutineScope {
-        val ack = async { sendInput(command, scope, lease, emit) }
-        select<InputAcceptance.Failure?> {
-            ack.onAwait { it }
-            collector.onJoin {
-                ack.cancel()
-                null
-            }
-        }
-    }
 }
 
 internal fun TurnCommand.toInputCommand(
@@ -415,11 +393,32 @@ internal fun ToolPolicy.toWireAllowlist(registry: ExternalToolRegistry?): List<S
         .sorted()
 }
 
+/**
+ * letta-mobile-qygvv.3: runs [send] (the input send and its `input_accepted` wait), abandoning it
+ * with a null result when [collector] ends first. A turn the collector already settled (terminal,
+ * watchdog, superseded generation) must not stay parked on an ack that will never arrive.
+ */
+internal suspend fun <T : Any> untilCollectorEnds(collector: Job, send: suspend () -> T?): T? = coroutineScope {
+    val ack = async { send() }
+    select<T?> {
+        ack.onAwait { it }
+        collector.onJoin {
+            ack.cancel()
+            null
+        }
+    }
+}
+
+/**
+ * Waits for [collector], or fails the turn at once on [inputFailure]. Returns the release reason
+ * only when the input failed; after a join the collector has already recorded its own reason
+ * (normal completion, watchdog timeout, ...), which must not be overwritten.
+ */
 internal suspend fun joinCollectorOrHandleFailure(
     collector: Job,
     inputFailure: InputAcceptance.Failure?,
     onFailure: suspend (String) -> Unit,
-): String {
+): String? {
     if (inputFailure != null) {
         // letta-mobile-qygvv.1: the server will never run this input — fail
         // now instead of waiting out the idle watchdog.
@@ -428,7 +427,7 @@ internal suspend fun joinCollectorOrHandleFailure(
         return "input_rejected"
     }
     collector.join()
-    return "normal_completion"
+    return null
 }
 
 /**

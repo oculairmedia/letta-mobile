@@ -76,24 +76,36 @@ internal class UnleasedApprovalAnswerer(
         if (leaseHeld(key)) return UnleasedApprovalOutcome.Deferred
         if (request.request.string("subtype") != CAN_USE_TOOL) return UnleasedApprovalOutcome.NotApproval
         val toolName = request.request.string("tool_name")
-        val mode = permissionModeFor(key)
-        val details = ApprovalDetails(request, key, toolName, mode)
+        val details = ApprovalDetails(request, key, toolName, permissionModeFor(key))
+        return withheldOutcome(details) ?: autoAllow(details, runtime, connectionGeneration)
+    }
+
+    /** Why [details] must not be auto-allowed here, or null when the key's policy allows it. */
+    private fun withheldOutcome(details: ApprovalDetails): UnleasedApprovalOutcome? {
         // Review of PR #1661: `client.events` carries every runtime on a shared App Server. For a
         // key this engine never ran, the mode provider only returns the host DEFAULT (approve-all),
         // which is not the owning client's policy, so auto-allowing would bypass that policy.
-        if (!runtimeOwned(key)) {
+        if (!runtimeOwned(details.key)) {
             record("approval.unleasedNotOwned", details)
             return UnleasedApprovalOutcome.NotOwned
         }
-        if (shouldStayPending(mode, toolName)) {
+        if (shouldStayPending(details.mode, details.toolName)) {
             record("approval.unleasedPending", details)
             return UnleasedApprovalOutcome.LeftPending
         }
+        return null
+    }
+
+    private suspend fun autoAllow(
+        details: ApprovalDetails,
+        runtime: AppServerRuntimeScope,
+        connectionGeneration: Long?,
+    ): UnleasedApprovalOutcome {
         val generation = connectionGeneration ?: connectionGenerationProvider()
-        if (!claim(request, key, generation)) return UnleasedApprovalOutcome.AlreadyClaimed
-        val ref = InboundControlRequestRegistry.RequestRef(request.requestId)
-        val targetRuntime = runtimeScopeFor(key) ?: runtime
-        sendAutoAllow(request.requestId, targetRuntime, ref, generation)
+        if (!claim(details.request, details.key, generation)) return UnleasedApprovalOutcome.AlreadyClaimed
+        val ref = InboundControlRequestRegistry.RequestRef(details.request.requestId)
+        val targetRuntime = runtimeScopeFor(details.key) ?: runtime
+        sendAutoAllow(details.request.requestId, targetRuntime, ref, generation)
         record("approval.unleasedAutoAllow", details)
         return UnleasedApprovalOutcome.AutoAllowed
     }

@@ -500,40 +500,41 @@ class DefaultAppServerController(
         runtime: AppServerRuntimeScope,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
-    ): AppServerInboundFrame.SyncResponse {
-        return try {
-            client.sync(
-                AppServerCommand.Sync(
-                    runtime = runtime,
-                    requestId = requestIdFactory(),
-                    recoverApprovals = recoverApprovals,
-                    forceDeviceStatus = forceDeviceStatus,
-                ),
-            )
-        } catch (c: CancellationException) {
-            throw c
-        } catch (e: Exception) {
-            throw AppServerControllerException("Failed to sync runtime ${runtime.agentId}/${runtime.conversationId}", e)
-        }
+    ): AppServerInboundFrame.SyncResponse = rethrowAsControllerFailure("sync", runtime) {
+        client.sync(
+            AppServerCommand.Sync(
+                runtime = runtime,
+                requestId = requestIdFactory(),
+                recoverApprovals = recoverApprovals,
+                forceDeviceStatus = forceDeviceStatus,
+            ),
+        )
     }
 
     override suspend fun abort(
         runtime: AppServerRuntimeScope,
         runId: String?,
-    ): AppServerInboundFrame.AbortMessageResponse {
-        return try {
-            client.abort(
-                AppServerCommand.AbortMessage(
-                    runtime = runtime,
-                    requestId = requestIdFactory(),
-                    runId = runId,
-                ),
-            )
-        } catch (c: CancellationException) {
-            throw c
-        } catch (e: Exception) {
-            throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
-        }
+    ): AppServerInboundFrame.AbortMessageResponse = rethrowAsControllerFailure("abort", runtime) {
+        client.abort(
+            AppServerCommand.AbortMessage(
+                runtime = runtime,
+                requestId = requestIdFactory(),
+                runId = runId,
+            ),
+        )
+    }
+
+    /** Wraps a runtime RPC failure (never a cancellation) as an [AppServerControllerException]. */
+    private inline fun <T> rethrowAsControllerFailure(
+        action: String,
+        runtime: AppServerRuntimeScope,
+        call: () -> T,
+    ): T = try {
+        call()
+    } catch (c: CancellationException) {
+        throw c
+    } catch (e: Exception) {
+        throw AppServerControllerException("Failed to $action runtime ${runtime.agentId}/${runtime.conversationId}", e)
     }
 
     /**

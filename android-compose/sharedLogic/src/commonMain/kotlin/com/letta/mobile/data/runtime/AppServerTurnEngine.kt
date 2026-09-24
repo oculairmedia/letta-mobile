@@ -579,33 +579,8 @@ class AppServerTurnEngine(
             settleDeadlineMs = terminalSettleQuietMs,
             watchdogDeadlineMs = turnIdleTimeoutMs,
         )
-        if (!slot.casLease(null, lease)) {
-            if (busyOwnerReconciler.reconcile(slot) && slot.casLease(null, lease)) {
-                // letta-mobile-qygvv.3: the server's loop is idle, so the owner was dead.
-            } else {
-                // SENSING (c, letta-mobile-8xxzv): the LEGITIMATE busy — a second
-                // turn for the SAME {agent, conversation} runtime. letta-code
-                // permits at most one active turn per runtime, so this rejection
-                // preserves the server contract rather than serializing the app.
-                val holder = slot.lease
-                Telemetry.event(
-                    "AppServerTurnEngine", "activeTurn.rejectedSameKey",
-                    "key" to slot.key.toString(),
-                    "rejectedLeaseToken" to leaseToken,
-                    "ownerLeaseToken" to holder?.token,
-                    "ownerPhase" to holder?.phase?.name,
-                    "ownerRunId" to (holder?.runId ?: "<none>"),
-                    "ownerHeldForMs" to holder?.acquiredAtMs?.let { acquiredAtMs - it },
-                    "otherBusyKeys" to busyRuntimeKeys().filter { it != slot.key }
-                        .joinToString(",") { it.toString() },
-                    level = Telemetry.Level.WARN,
-                )
-                throw IllegalStateException(
-                    "An App Server turn is already active for ${command.agentId.value}" +
-                        "/${command.conversationId.value}.",
-                )
-            }
-        }
+        // letta-mobile-qygvv.3: a busy key is admitted only when the server's loop is idle.
+        busyOwnerReconciler.acquireOrReject(slot, lease)
         // Re-bind ownerJob after CAS in case a recovery path raced.
         slot.updateLease { cur ->
             if (cur?.token == leaseToken) cur.copy(ownerJob = coroutineContext[Job]) else cur
@@ -673,12 +648,14 @@ class AppServerTurnEngine(
                 }
             }
             collectorReady.await()
-            val inputFailure = inputSender.sendInputUntilCollectorEnds(command, scope, leaseRef, collector) { draft -> send(draft) }
+            val inputFailure = untilCollectorEnds(collector) {
+                inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
+            }
             Telemetry.event("IrohTurn", "input.sent")
-            releaseReason = joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
+            joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
                 noteOwnerTerminal(RuntimeRunStatus.Failed, source = "input_rejected", lease = leaseRef)
                 send(command.failedDraft(failureText))
-            }
+            }?.let { releaseReason = it }
         } finally {
             withContext(NonCancellable) {
                 collector?.cancelAndJoin()
