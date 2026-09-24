@@ -183,9 +183,18 @@ class CanvasSession(
      * Applies a remote [CanvasOp], ignoring if already present in [opLog] (deduplication),
      * appends to [opLog], projects state, and updates persistence.
      */
-    suspend fun applyRemote(op: CanvasOp): CanvasDocument? = mutex.withLock {
+    suspend fun applyRemote(op: CanvasOp, vouchedActor: String? = null): CanvasDocument? = mutex.withLock {
         val current = currentDoc()
-        if (current.acl != null && !current.acl.canWrite(op.actorId)) {
+        // The host vouches for an agent whose op it checked against its own ACL before publishing;
+        // this app's copy of the ACL may predate that agent (a canvas the agent made on the host,
+        // or one opened here without it), and rejecting it would drop every agent edit unseen.
+        val vouched = vouchedActor != null && vouchedActor == op.actorId
+        if (current.acl != null && !vouched && !current.acl.canWrite(op.actorId)) {
+            com.letta.mobile.util.Telemetry.event(
+                "CanvasSession", "remote.rejected",
+                "canvasId" to canvasId.value, "opId" to op.opId, "actorId" to op.actorId,
+                level = com.letta.mobile.util.Telemetry.Level.WARN,
+            )
             return null
         }
         if (opLog.has(canvasId, op.opId)) return null
@@ -500,7 +509,7 @@ class CanvasSession(
     fun startSync(scope: CoroutineScope): Job? {
         val transport = syncTransport ?: return null
         return scope.launch {
-            transport.deliverTo(canvasId) { remoteOp -> applyRemote(remoteOp) }
+            transport.deliverVouchedTo(canvasId) { remoteOp, vouchedActor -> applyRemote(remoteOp, vouchedActor) }
         }
     }
 

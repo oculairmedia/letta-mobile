@@ -153,4 +153,59 @@ class HostCanvasToolsTest {
         val noOps = buildJsonObject { put("canvas_id", JsonPrimitive("x")) }
         assertTrue("ops" in host.call(CanvasToolContract.APPLY_OPS, noOps, "agent-1", "conv-1").error())
     }
+
+    /**
+     * letta-mobile-kuwsf: an app whose own copy of the canvas does not list the agent (a canvas the
+     * agent made on the host, or one opened here without it) still applies every agent edit the
+     * host vouches for, past its own last write. Asserted on the app's session, not the host store:
+     * the store had all of it all along.
+     */
+    @Test
+    fun agentEditsReachAnAppWhoseCopyOfTheCanvasDoesNotListTheAgent() = runTest {
+        val host = Host()
+        val phone = TestApp("phone", backgroundScope).open("conv-1", agentId = null)
+        phone.connect(host.relay)
+        runCurrent()
+        phone.edit(CanvasOp.SetBackgroundOp("phone-bg", CanvasSession.LOCAL_USER_ACTOR_ID, 1L, "#ff000000"))
+        runCurrent()
+        val phoneOwnRevision = phone.session.document.value!!.revision
+
+        val note = CanvasOp.SetDocumentOp(
+            opId = "x", actorId = "x", lamport = 1L, documentId = "doc-agent",
+            documentJson = "{\"version\":2,\"blocks\":[]}",
+        )
+        for (op in listOf<CanvasOp>(
+            CanvasOp.SetBackgroundOp("x", "x", 1L, "#ffffffff"),
+            addText("el-rect", "a shape from the agent"),
+            note,
+        )) {
+            host.call(CanvasToolContract.APPLY_OPS, ops(op), "agent-1", "conv-1").content()
+        }
+        runCurrent()
+
+        val scene = phone.scene()
+        assertTrue("#ffffffff" in scene, "the agent's background: $scene")
+        assertTrue("a shape from the agent" in scene, "the agent's element: $scene")
+        assertTrue("doc-agent" in scene, "the agent's note: $scene")
+        assertTrue(phone.session.document.value!!.revision > phoneOwnRevision, "past the app's own last write")
+    }
+
+    /** Only the host's own agent origin is vouched for: an app cannot write as an actor the ACL leaves out, even named as the agent. */
+    @Test
+    fun anAppsOpFromAnActorItsCopyDoesNotListIsStillDropped() = runTest {
+        val host = Host()
+        val phone = TestApp("phone", backgroundScope).open("conv-1", agentId = null)
+        phone.connect(host.relay)
+        runCurrent()
+        val other = RecordingApp("desktop").connect(host.relay)
+        val topic = CanvasRelayProtocol.conversationTopic("conv-1")
+        other.send(CanvasRelayMessage.Join(topic, CanvasId.forConversation("conv-1").value))
+        other.send(CanvasRelayMessage.Publish(topic, addText("el-stranger", "from a stranger").copy(opId = "s-1", actorId = "stranger", lamport = 9L)))
+        other.send(CanvasRelayMessage.Publish(topic, addText("el-forged", "claims to be the agent").copy(opId = "s-2", actorId = "agent-1", lamport = 10L)))
+        runCurrent()
+
+        val scene = phone.scene()
+        assertTrue("from a stranger" !in scene, scene)
+        assertTrue("claims to be the agent" !in scene, "an app origin is never vouched for: $scene")
+    }
 }

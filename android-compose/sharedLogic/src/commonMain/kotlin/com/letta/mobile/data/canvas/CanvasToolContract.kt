@@ -23,8 +23,14 @@ object CanvasToolContract {
     const val EXPORT_SVG = "canvas.export_svg"
     const val LIST = "canvas.list"
 
-    /** What export_svg returns until a real exporter runs where the tools do. */
-    const val PLACEHOLDER_SVG = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\"></svg>"
+    /**
+     * What export_svg answers until a real exporter runs where the tools do (letta-mobile-qsq7v).
+     * It used to return a constant empty SVG, which an agent took for the canvas's true content.
+     * The tool is not offered ([all] leaves it out); a call that names it anyway is told plainly.
+     */
+    const val EXPORT_SVG_NOT_IMPLEMENTED =
+        "canvas.export_svg is not implemented yet: nothing renders a canvas to SVG where the tools run. " +
+            "Use canvas.get_scene to read the canvas."
 
     val create = CanvasToolDefinition(
         CREATE,
@@ -66,7 +72,11 @@ object CanvasToolContract {
         objectSchema(optional = listOf("conversation_id")),
     )
 
-    val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, exportSvg, list)
+    /**
+     * The tools offered to agents. [exportSvg] is not among them until it renders the real canvas: a
+     * tool that always fails only costs an agent turns (see ExternalToolRegistry.factoryDefault).
+     */
+    val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, list)
 
     /** An object of string properties: [required] ones, [optional] ones, and required [arrays]. */
     private fun objectSchema(
