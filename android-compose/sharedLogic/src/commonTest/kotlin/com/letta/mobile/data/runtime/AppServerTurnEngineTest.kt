@@ -1196,8 +1196,10 @@ class AppServerTurnEngineTest {
             listOf("agent-1", "agent-2"),
             client.runtimeStartCommands.map { it.agentId },
         )
+        // letta-mobile-qygvv.1: each user-message input also draws a request_id
+        // (for input_accepted), so the second runtime_start gets the third id.
         assertEquals(
-            listOf("runtime-start-1", "runtime-start-2"),
+            listOf("runtime-start-1", "runtime-start-3"),
             client.runtimeStartCommands.map { it.requestId },
         )
     }
