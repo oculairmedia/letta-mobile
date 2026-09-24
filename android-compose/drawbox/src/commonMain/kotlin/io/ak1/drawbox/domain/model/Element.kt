@@ -164,6 +164,16 @@ sealed class Element {
         override val rotation: Float = 0f,
         override val createdAt: Long = 0L,
         override val modifiedAt: Long = 0L,
+        /**
+         * Where the bytes live when they are kept out of the drawing: a host's content-addressed
+         * asset (`sha256:...`). Null for an image that carries only its [bytes]. With a ref,
+         * [bytes] may arrive empty and be resolved by the host.
+         */
+        val assetRef: String? = null,
+        /** The image's media type (`image/png`, ...), recorded with [assetRef]. */
+        val mediaType: String? = null,
+        /** A small inline thumbnail, drawn while the full image is being resolved. */
+        val preview: ByteArray? = null,
     ) : Element() {
         // ByteArray defaults to reference equality, which would make two
         // identical-bytes copies of the same image compare unequal. Override
@@ -182,6 +192,7 @@ sealed class Element {
             if (rotation != other.rotation) return false
             if (createdAt != other.createdAt) return false
             if (modifiedAt != other.modifiedAt) return false
+            if (assetRef != other.assetRef) return false
             return bytes.contentEquals(other.bytes)
         }
 
@@ -194,6 +205,7 @@ sealed class Element {
             result = 31 * result + rotation.hashCode()
             result = 31 * result + createdAt.hashCode()
             result = 31 * result + modifiedAt.hashCode()
+            result = 31 * result + (assetRef?.hashCode() ?: 0)
             result = 31 * result + bytes.size
             return result
         }
