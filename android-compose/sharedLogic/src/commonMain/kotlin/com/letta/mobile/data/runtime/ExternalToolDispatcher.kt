@@ -193,6 +193,7 @@ internal class ExternalToolDispatcher(
                         toolName = request.toolName,
                         input = request.input,
                         agentId = request.runtime?.agentId,
+                        conversationId = request.runtime?.conversationId,
                     )
                 } ?: run {
                     Telemetry.event(
