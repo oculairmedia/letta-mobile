@@ -12,6 +12,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRequestFailedException
 import com.letta.mobile.data.transport.appserver.AppServerRequestTimeoutException
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -43,15 +44,27 @@ internal sealed interface InputAcceptance {
     /** The input was queued behind an active turn or a pending approval. */
     data object Queued : InputAcceptance
 
+    /** The input will never run; [failureReason] is what the turn fails with. */
+    sealed interface Failure : InputAcceptance {
+        val failureReason: String
+        val kind: String
+    }
+
     /** `accepted=false`: the input will never run. */
-    data class Rejected(val error: String) : InputAcceptance
+    data class Rejected(val error: String) : Failure {
+        override val failureReason: String get() = error
+        override val kind: String get() = "rejected"
+    }
 
     /**
      * The transport lost the connection generation before the ack arrived. The
      * input may or may not have reached the server, but no frame for it can reach
      * this lease any more.
      */
-    data class ConnectionLost(val error: String) : InputAcceptance
+    data class ConnectionLost(val error: String) : Failure {
+        override val failureReason: String get() = INPUT_CONNECTION_LOST_REASON
+        override val kind: String get() = "connection_lost"
+    }
 
     /**
      * No ack to act on: the client cannot correlate `input_accepted` (a fake or a
@@ -104,41 +117,43 @@ internal fun AppServerInboundFrame.InputAccepted.toInputAcceptance(): InputAccep
 
 /**
  * Records `input.accepted` / `input.rejected` / `input.unacknowledged` telemetry and
- * returns the failure reason when the input will never run, else null.
+ * returns the failure when the input will never run, else null.
  */
-internal fun InputAcceptance.recordAndFailureReason(conversationId: String): String? = when (this) {
+internal fun InputAcceptance.recordAndFailure(conversationId: ConversationId): InputAcceptance.Failure? = when (this) {
     InputAcceptance.Started -> recordAccepted(conversationId, "started")
     InputAcceptance.Queued -> recordAccepted(conversationId, "queued")
-    is InputAcceptance.Rejected -> recordRejected(conversationId, error, "rejected")
-    is InputAcceptance.ConnectionLost -> recordRejected(conversationId, INPUT_CONNECTION_LOST_REASON, "connection_lost")
+    is InputAcceptance.Failure -> recordRejected(conversationId, this)
     is InputAcceptance.Unacknowledged -> {
         Telemetry.event(
             TELEMETRY_TAG, "input.unacknowledged",
-            "conversationId" to conversationId,
+            "conversationId" to conversationId.value,
             "reason" to reason,
         )
         null
     }
 }
 
-private fun recordAccepted(conversationId: String, disposition: String): String? {
+private fun recordAccepted(conversationId: ConversationId, disposition: String): InputAcceptance.Failure? {
     Telemetry.event(
         TELEMETRY_TAG, "input.accepted",
-        "conversationId" to conversationId,
+        "conversationId" to conversationId.value,
         "disposition" to disposition,
     )
     return null
 }
 
-private fun recordRejected(conversationId: String, error: String, kind: String): String {
+private fun recordRejected(
+    conversationId: ConversationId,
+    failure: InputAcceptance.Failure,
+): InputAcceptance.Failure {
     Telemetry.event(
         TELEMETRY_TAG, "input.rejected",
-        "conversationId" to conversationId,
-        "error" to error,
-        "kind" to kind,
+        "conversationId" to conversationId.value,
+        "error" to failure.failureReason,
+        "kind" to failure.kind,
         level = Telemetry.Level.WARN,
     )
-    return error
+    return failure
 }
 
 private const val TELEMETRY_TAG = "AppServerTurnEngine"
@@ -265,6 +280,10 @@ internal fun leaveQueued(lease: LeaseRef, source: String) {
             cur
         }
     }
+    recordDequeued(lease, source)
+}
+
+internal fun recordDequeued(lease: LeaseRef, source: String) {
     Telemetry.event(
         "AppServerTurnEngine", "turn.dequeued",
         "key" to lease.key.toString(),
@@ -300,14 +319,14 @@ internal class TurnInputSender(
         scope: AppServerRuntimeScope,
         lease: LeaseRef,
         emit: suspend (RuntimeEventDraft) -> Unit,
-    ): String? {
+    ): InputAcceptance.Failure? {
         val input = command.toInputCommand(scope, externalToolRegistry)
         if (command.input !is TurnInput.UserMessage) {
             client.input(input)
             return null
         }
         val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
-        val failure = acceptance.recordAndFailureReason(command.conversationId.value)
+        val failure = acceptance.recordAndFailure(command.conversationId)
         if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, emit)
         return failure
     }
@@ -364,16 +383,33 @@ internal fun ToolPolicy.toWireAllowlist(registry: ExternalToolRegistry?): List<S
 
 internal suspend fun joinCollectorOrHandleFailure(
     collector: Job,
-    inputFailure: String?,
+    inputFailure: InputAcceptance.Failure?,
     onFailure: suspend (String) -> Unit,
 ): String {
     if (inputFailure != null) {
         // letta-mobile-qygvv.1: the server will never run this input — fail
         // now instead of waiting out the idle watchdog.
         collector.cancelAndJoin()
-        onFailure(inputFailure)
+        onFailure(inputFailure.failureReason)
         return "input_rejected"
     }
     collector.join()
     return "normal_completion"
+}
+
+/**
+ * A turn ended from inside the frame loop without a server terminal: the
+ * connection generation rolled, or the server dropped this lease's queued input.
+ */
+internal enum class AbruptTurnEnding(
+    val status: RuntimeRunStatus,
+    val reason: String,
+    /** Set when the ending is also recorded as the owner's terminal. */
+    val ownerTerminalSource: String?,
+) {
+    GenerationSuperseded(RuntimeRunStatus.Failed, "Connection generation superseded during turn", null),
+    QueuedInputCancelled(RuntimeRunStatus.Cancelled, QUEUED_INPUT_CANCELLED_REASON, "update_queue_cancelled"),
+    ;
+
+    fun draftFor(command: TurnCommand): RuntimeEventDraft = command.lifecycleDraft(status, reason = reason)
 }

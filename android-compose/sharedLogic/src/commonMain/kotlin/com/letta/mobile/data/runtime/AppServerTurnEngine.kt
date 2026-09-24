@@ -21,7 +21,6 @@ import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
-import com.letta.mobile.runtime.ToolPolicy
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
@@ -669,7 +668,7 @@ class AppServerTurnEngine(
     private fun runObjIsTerminal(obj: JsonObject?): Boolean {
         if (obj == null) return false
         val status = obj["status"]?.jsonPrimitive?.contentOrNull?.lowercase()
-        if (status != null && (status == "completed" || status == "failed" || status == "cancelled" || status == "error" || status == "expired")) return true
+        if (status in TERMINAL_RUN_STATUSES) return true
         // completed_at set is also terminal.
         if (obj["completed_at"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true) return true
         return false
@@ -1109,7 +1108,7 @@ class AppServerTurnEngine(
         budget: FrameProjectionErrorBudget,
     ) {
         if (isConnectionGenerationSuperseded(context.lease)) {
-            completeAbruptTurn(context, RuntimeRunStatus.Failed, "Connection generation superseded during turn")
+            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
         }
         if (received.isStaleGenerationForLease(context.lease)) return
         if (!received.matches(context.runtimeScope, context.lease)) {
@@ -1135,7 +1134,7 @@ class AppServerTurnEngine(
         // The update_queue passthrough draft above still reaches viewers; only then
         // settle a lease whose queued input the server dropped.
         if (queueRemoval == QueueRemovalDisposition.Cancelled) {
-            completeAbruptTurn(context, RuntimeRunStatus.Cancelled, QUEUED_INPUT_CANCELLED_REASON, "update_queue_cancelled")
+            completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
         }
     }
 
@@ -1191,20 +1190,10 @@ class AppServerTurnEngine(
         }
     }
 
-    private suspend fun completeAbruptTurn(
-        context: TurnFrameContext,
-        status: RuntimeRunStatus,
-        reason: String,
-        source: String? = null,
-    ): Nothing {
-        if (source != null) {
-            Telemetry.event(
-                "AppServerTurnEngine", "turn.dequeued",
-                "key" to context.lease.key.toString(),
-                "leaseToken" to context.lease.token,
-                "source" to source,
-            )
-            noteOwnerTerminal(status, source = source, lease = context.lease)
+    private suspend fun completeAbruptTurn(context: TurnFrameContext, ending: AbruptTurnEnding): Nothing {
+        ending.ownerTerminalSource?.let { source ->
+            recordDequeued(context.lease, source)
+            noteOwnerTerminal(ending.status, source = source, lease = context.lease)
         }
         val ledger = context.draftProcessor.ledger
         settleDanglingToolCalls(
@@ -1212,15 +1201,10 @@ class AppServerTurnEngine(
             ledger.emitted,
             ledger.returned,
             context.emit,
-            reason,
+            ending.reason,
         )
         context.draftProcessor.flushTail()
-        val draft = if (status == RuntimeRunStatus.Cancelled) {
-            context.command.cancelledDraft(reason)
-        } else {
-            context.command.failedDraft(reason)
-        }
-        context.emit(draft)
+        context.emit(ending.draftFor(context.command))
         throw TurnCompleted
     }
 
@@ -1532,45 +1516,6 @@ class AppServerTurnEngine(
         )
         return true
     }
-
-    private fun RuntimeEventDraft.toApprovalAutoAllowRequest(): ApprovalAutoAllowRequest? {
-        when (val payload = this.payload) {
-            is RuntimeEventPayload.ApprovalRequested -> return ApprovalAutoAllowRequest(
-                requestId = payload.request.approvalId.value,
-                toolCallId = payload.request.callId.value,
-                toolName = payload.request.toolName.value,
-                source = "control_request",
-            )
-            is RuntimeEventPayload.RemoteStreamFrame -> {
-                if (payload.messageType != "approval_request_message") return null
-                val delta = runCatching {
-                    val raw = AppServerProtocol.json.parseToJsonElement(payload.body).jsonObject
-                    raw["delta"]?.jsonObject ?: raw
-                }.getOrNull() ?: return null
-                val requestId = delta.string("approval_request_id")
-                    ?: delta.string("id")
-                    ?: payload.messageId
-                    ?: payload.frameId
-                val toolCall = delta["tool_call"] as? JsonObject
-                return ApprovalAutoAllowRequest(
-                    requestId = requestId,
-                    toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id"),
-                    toolName = toolCall?.string("name") ?: delta.string("tool_name") ?: delta.string("name"),
-                    source = "approval_request_message",
-                )
-            }
-            else -> return null
-        }
-    }
-
-    private data class ApprovalAutoAllowRequest(
-        val requestId: String,
-        val toolCallId: String?,
-        val toolName: String?,
-        val source: String,
-    )
-
-    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
     /**
      * letta-mobile-8xxzv: the started-runtime cache is KEYED. It used to be one
@@ -2063,36 +2008,12 @@ class AppServerTurnEngine(
         // stale interval. Bounds how stale lastFrameAt can be on resume.
         const val WATCHDOG_PAUSE_RECHECK_MS: Long = 250L
 
+        /** run.get / run.list `status` values that prove a run is over. */
+        private val TERMINAL_RUN_STATUSES = setOf("completed", "failed", "cancelled", "error", "expired")
+
         fun defaultRequestId(): String {
             nextRequestId += 1
             return "app-server-${nextRequestId}"
         }
-    }
-}
-
-/**
- * letta-mobile-aktss: sanitized classification of a terminal failure reason.
- * Returns a fixed category token, never any substring of the reason itself,
- * so the o0atv no-secrets guarantee is preserved. Categories mirror the
- * failure families letta-code actually produces (run error details and
- * provider passthroughs) — extend the list as new families are identified.
- * Order matters: specific families are matched before generic ones.
- */
-internal fun terminalReasonKind(reason: String?): String? {
-    if (reason.isNullOrBlank()) return null
-    val r = reason.lowercase()
-    return when {
-        // Provider refusal surfaced as an OpenAI-compat finish_reason
-        // (e.g. "Model provider error: Provider finish_reason: content_filter").
-        "content_filter" in r || "refusal" in r -> "content_filter"
-        "waiting for approval" in r -> "approval_pending"
-        "invalid tool call ids" in r -> "invalid_tool_call_ids"
-        "conversation" in r && "busy" in r -> "conversation_busy"
-        "empty content in" in r || "empty response" in r -> "empty_response"
-        "rate limit" in r || "429" in r || "overloaded" in r || "529" in r -> "rate_limited"
-        "timed out" in r || "timeout" in r -> "timeout"
-        "model provider error" in r || "provider" in r -> "provider_error"
-        "abort" in r || "cancel" in r || "interrupt" in r -> "aborted"
-        else -> "other"
     }
 }
