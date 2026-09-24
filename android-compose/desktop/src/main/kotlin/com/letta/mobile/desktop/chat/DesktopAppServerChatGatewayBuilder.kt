@@ -110,8 +110,10 @@ class DesktopAppServerChatGatewayBuilder(
             val turnEngine = buildDesktopAppServerTurnEngine(
                 client = client,
                 scope = controllerScope,
+                // On Iroh the host answers canvas.* for every runtime it serves (letta-mobile-aknkw);
+                // the desktop offers its own only against an App Server it reaches directly.
                 externalToolRegistry = ExternalToolRegistry.hostTools(
-                    CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions)
+                    if (isIroh) emptyList() else CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions),
                 ),
                 config = DesktopAppServerEngineConfig(
                     eventRouter = router,

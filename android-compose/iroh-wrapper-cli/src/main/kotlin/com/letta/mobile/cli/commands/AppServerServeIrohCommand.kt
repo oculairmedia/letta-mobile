@@ -407,12 +407,23 @@ class AppServerServeIrohCommand : CliktCommand(
                 ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "topics")
             val canvasAssets = canvasAssetsDir?.let { java.nio.file.Path.of(it) }
                 ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "assets")
+            val canvasStore = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps)
             val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
                 scope = scope,
-                store = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps),
+                store = canvasStore,
                 assets = com.letta.mobile.data.storage.FileAssetStore(canvasAssets.toFile()),
             )
-            println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets)")
+            // The agents this host serves get the canvas.* tools, answered here from the relay's log
+            // (letta-mobile-aknkw): they work on every runtime the host starts, app connected or not.
+            val canvasDirectory = canvasOps.resolveSibling("host-canvases.json")
+            hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(
+                com.letta.mobile.data.canvas.HostCanvasBackend(
+                    relay = canvasRelay.host,
+                    store = canvasStore,
+                    directory = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory),
+                ),
+            )
+            println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
@@ -717,7 +728,11 @@ class AppServerServeIrohCommand : CliktCommand(
             identityDir = a2aIdentityDir,
             addressStore = a2aAddressBook,
             localBackendDir = localBackendDir,
+            hostTools = hostCanvasTools,
         )
+
+    /** The host's canvas.* tools, built with the canvas relay in [run] before the controller is. */
+    private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()
 
     /**
      * Mint one connection generation: a fresh WS transport + client on a job
@@ -946,10 +961,12 @@ internal fun isRealNetworkInterface(iface: java.net.NetworkInterface): Boolean {
  * invocation.
  *
  * Behavior:
- *  - `binary` blank OR equals a sentinel => [ExternalToolRegistry.factoryDefault]
- *    (advertises nothing; matches the pre-1vuec behavior).
+ *  - `binary` blank OR equals a sentinel => [ExternalToolRegistry.hostTools] of
+ *    [hostTools] alone (nothing else; with none, the pre-1vuec behavior).
  *  - `binary` non-blank => registry advertises the Iroh agent-message tool
- *    with `agentMessaging` capability enabled.
+ *    with `agentMessaging` capability enabled, and [hostTools].
+ *  - [hostTools] (the host's canvas.* tools, letta-mobile-aknkw) are advertised either way:
+ *    they need no binary, only the canvas relay this host runs.
  *
  * The agent-message tool uses `identityDir` and `addressStore` only when
  * non-null — the underlying CLI falls back to its own defaults
@@ -960,9 +977,10 @@ internal fun buildProductionExternalToolRegistryForTesting(
     identityDir: String?,
     addressStore: String?,
     localBackendDir: String? = null,
+    hostTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList(),
 ): ExternalToolRegistry {
     if (binary.isBlank()) {
-        return ExternalToolRegistry.factoryDefault()
+        return ExternalToolRegistry.hostTools(hostTools)
     }
     val capabilities = RemoteCapabilities(agentMessaging = true)
     val tool = CustomIrohMessagingTool(
@@ -977,6 +995,7 @@ internal fun buildProductionExternalToolRegistryForTesting(
         capabilities = capabilities,
         customIrohMessagingTool = tool,
         agentDiscoveryTool = discovery,
+        hostTools = hostTools,
     )
 }
 
