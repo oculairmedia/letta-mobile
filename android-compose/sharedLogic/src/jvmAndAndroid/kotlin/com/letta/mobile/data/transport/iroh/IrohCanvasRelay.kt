@@ -27,10 +27,12 @@ import kotlinx.coroutines.withContext
 class IrohCanvasRelay(
     private val scope: CoroutineScope,
     store: CanvasRelayStore,
+    /** Where the host keeps the assets (images, files) apps send beside their ops; null refuses them. */
+    assets: com.letta.mobile.data.storage.AssetStore? = null,
 ) {
     @Volatile
     private var hostId: String = ""
-    private val host = CanvasRelayHost(store, hostId = { hostId })
+    private val host = CanvasRelayHost(store, hostId = { hostId }, assets = assets)
     private val reaper: Job = scope.launch {
         while (isActive) {
             delay(PRESENCE_REAP_MS)
