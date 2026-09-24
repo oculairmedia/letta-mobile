@@ -1,16 +1,9 @@
 package com.letta.mobile.data.runtime
 
-import com.letta.mobile.data.transport.appserver.AppServerChannel
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.RuntimeRunStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** letta-mobile-qygvv.2: the per-key decisions behind authoritative turn boundaries. */
 class TurnBoundaryGateTest {
@@ -18,70 +11,76 @@ class TurnBoundaryGateTest {
 
     @Test
     fun turnFinishedIsAuthoritativeOncePerTurnId() {
-        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decide(turnFinished("turn-1", "run-1"), "run-1", false))
-        val replay = assertIs<TurnBoundaryDecision.Drop>(gate.decide(turnFinished("turn-1", "run-1"), "run-1", false))
+        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decideFrame(run1.turnFinished(1), leaseRun = run1))
+        val replay = assertIs<TurnBoundaryDecision.Drop>(gate.decideFrame(run1.turnFinished(1), leaseRun = run1))
         assertEquals("duplicate_turn_id", replay.reason)
     }
 
     @Test
     fun turnFinishedForASupersededRunIsIgnored() {
-        val decision = assertIs<TurnBoundaryDecision.Drop>(gate.decide(turnFinished("turn-1", "run-old"), "run-new", false))
+        val decision = assertIs<TurnBoundaryDecision.Drop>(gate.decideFrame(runOld.turnFinished(1), leaseRun = runNew))
         assertEquals("superseded_run", decision.reason)
     }
 
     @Test
     fun turnFinishedWithoutRunIdOrLeaseRunIsAccepted() {
-        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decide(turnFinished("turn-1", null), "run-1", false))
-        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decide(turnFinished("turn-2", "run-2"), null, false))
+        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decideFrame(noRun.turnFinished(1), leaseRun = run1))
+        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decideFrame(run2.turnFinished(2)))
     }
 
     @Test
     fun terminalsForASettledRunCannotEndTheNextLease() {
-        gate.noteSettled("run-1")
+        gate.noteSettled(run1.id)
         gate.beginLease(2)
-        assertIs<TurnBoundaryDecision.Drop>(gate.decide(turnFinished("turn-1", "run-1"), null, false))
-        assertIs<TurnBoundaryDecision.Drop>(gate.decide(delta("stop_reason", "run-1", stopReason = "end_turn"), null, false))
+        assertIs<TurnBoundaryDecision.Drop>(gate.decideFrame(run1.turnFinished(1)))
+        assertIs<TurnBoundaryDecision.Drop>(gate.decideFrame(run1.stopDelta()))
         // Non-terminal frames of that run project as settled-run drafts and do not count as evidence.
-        assertEquals(TurnBoundaryDecision.ProjectSettledRunDraft, gate.decide(delta("assistant_message", "run-1"), null, false))
-        assertEquals(TurnBoundaryDecision.Project, gate.decide(loopStatus("WAITING_ON_INPUT"), null, false))
+        assertEquals(TurnBoundaryDecision.ProjectSettledRunDraft, gate.decideFrame(run1.assistantDelta()))
+        assertEquals(TurnBoundaryDecision.Project, gate.decideFrame(TestLoopState.WaitingOnInput.frame()))
     }
 
     @Test
     fun idleLoopStatusBeforeEvidenceDoesNotComplete() {
-        assertEquals(TurnBoundaryDecision.Project, gate.decide(loopStatus("WAITING_ON_INPUT"), null, false))
+        assertEquals(TurnBoundaryDecision.Project, gate.decideFrame(TestLoopState.WaitingOnInput.frame()))
     }
 
     @Test
     fun idleLoopStatusAfterEvidenceCompletes() {
-        gate.decide(delta("assistant_message", "run-1"), null, false)
-        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decide(loopStatus("WAITING_ON_INPUT"), "run-1", false))
+        gate.decideFrame(run1.assistantDelta())
+        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run1))
         assertEquals(RuntimeRunStatus.Completed, idle.status)
     }
 
     @Test
     fun idleLoopStatusAfterAbortCancels() {
-        gate.decide(delta("assistant_message", "run-1"), null, false)
+        gate.decideFrame(run1.assistantDelta())
         gate.noteAbortRequested()
-        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decide(loopStatus("WAITING_ON_INPUT"), "run-1", false))
+        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run1))
         assertEquals(RuntimeRunStatus.Cancelled, idle.status)
     }
 
     @Test
     fun approvalWaitAndActiveRunsNeverComplete() {
-        gate.decide(delta("stop_reason", "run-1", stopReason = "requires_approval"), null, false)
-        assertEquals(TurnBoundaryDecision.Project, gate.decide(loopStatus("WAITING_ON_APPROVAL"), "run-1", false))
-        assertEquals(TurnBoundaryDecision.Project, gate.decide(loopStatus("WAITING_ON_INPUT", listOf("run-1")), "run-1", false))
-        assertEquals(TurnBoundaryDecision.Project, gate.decide(loopStatus("WAITING_ON_INPUT"), "run-1", true))
+        gate.decideFrame(run1.stopDelta(TestStopReason.RequiresApproval))
+        assertEquals(TurnBoundaryDecision.Project, gate.decideFrame(TestLoopState.WaitingOnApproval.frame(), leaseRun = run1))
+        assertEquals(
+            TurnBoundaryDecision.Project,
+            gate.decideFrame(TestLoopState.WaitingOnInput.frame(activeRuns = listOf(run1)), leaseRun = run1),
+        )
+        assertEquals(
+            TurnBoundaryDecision.Project,
+            gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run1, approvalOutstanding = true),
+        )
     }
 
     @Test
     fun newLeaseResetsEvidenceAndAbort() {
-        gate.decide(delta("assistant_message", "run-1"), null, false)
+        gate.decideFrame(run1.assistantDelta())
         gate.noteAbortRequested()
         gate.beginLease(2)
-        assertEquals(TurnBoundaryDecision.Project, gate.decide(loopStatus("WAITING_ON_INPUT"), null, false))
-        gate.decide(delta("assistant_message", "run-2"), null, false)
-        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decide(loopStatus("WAITING_ON_INPUT"), "run-2", false))
+        assertEquals(TurnBoundaryDecision.Project, gate.decideFrame(TestLoopState.WaitingOnInput.frame()))
+        gate.decideFrame(run2.assistantDelta())
+        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run2))
         assertEquals(RuntimeRunStatus.Completed, idle.status)
     }
 
@@ -89,74 +88,31 @@ class TurnBoundaryGateTest {
     fun nonTerminalTurnFinishedProjectsWithoutConsumingTurnId() {
         assertEquals(
             TurnBoundaryDecision.Project,
-            gate.decide(turnFinished("turn-1", "run-1", stopReason = "requires_approval"), "run-1", false),
+            gate.decideFrame(run1.turnFinished(1, TestStopReason.RequiresApproval), leaseRun = run1),
         )
         // Terminal for the same turnId completes authoritatively and records the turnId for subsequent deduplication.
-        assertEquals(
-            TurnBoundaryDecision.ProjectAuthoritative,
-            gate.decide(turnFinished("turn-1", "run-1", stopReason = "end_turn"), "run-1", false),
-        )
-        val duplicate = assertIs<TurnBoundaryDecision.Drop>(
-            gate.decide(turnFinished("turn-1", "run-1", stopReason = "end_turn"), "run-1", false),
-        )
+        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decideFrame(run1.turnFinished(1), leaseRun = run1))
+        val duplicate = assertIs<TurnBoundaryDecision.Drop>(gate.decideFrame(run1.turnFinished(1), leaseRun = run1))
         assertEquals("duplicate_turn_id", duplicate.reason)
     }
 
     @Test
     fun nonTerminalTurnFinishedForSettledRunDoesNotRecordTurnId() {
-        gate.noteSettled("run-1")
+        gate.noteSettled(run1.id)
         gate.beginLease(2)
         val decision = assertIs<TurnBoundaryDecision.Drop>(
-            gate.decide(turnFinished("turn-1", "run-1", stopReason = "requires_approval"), null, false),
+            gate.decideFrame(run1.turnFinished(1, TestStopReason.RequiresApproval)),
         )
         assertEquals("run_already_settled", decision.reason)
         // Since turn-1 was non-terminal, its turnId was not added to finishedTurnIds.
-        assertEquals(
-            TurnBoundaryDecision.ProjectAuthoritative,
-            gate.decide(turnFinished("turn-1", "run-2", stopReason = "end_turn"), "run-2", false),
-        )
+        assertEquals(TurnBoundaryDecision.ProjectAuthoritative, gate.decideFrame(run2.turnFinished(1), leaseRun = run2))
     }
 
-    private fun received(frame: AppServerInboundFrame) =
-        AppServerReceivedFrame(channel = AppServerChannel.Stream, frame = frame, raw = buildJsonObject { put("type", frame.type ?: "") })
-
-    private fun turnFinished(turnId: String, runId: String?, stopReason: String = "end_turn") = received(
-        AppServerInboundFrame.TurnFinished(
-            runtime = runtime,
-            eventSeq = 5,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "turn_finished:$turnId",
-            turnId = turnId,
-            stopReason = stopReason,
-            runId = runId,
-        ),
-    )
-
-    private fun loopStatus(status: String, active: List<String> = emptyList()) = received(
-        AppServerInboundFrame.UpdateLoopStatus(
-            runtime = runtime,
-            eventSeq = 4,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "loop:4",
-            loopStatus = AppServerLoopStatus(status = status, activeRunIds = active),
-        ),
-    )
-
-    private fun delta(messageType: String, runId: String, stopReason: String? = null) = received(
-        AppServerInboundFrame.StreamDelta(
-            runtime = runtime,
-            eventSeq = 3,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "delta:3",
-            delta = buildJsonObject {
-                put("message_type", messageType)
-                put("run_id", runId)
-                stopReason?.let { put("stop_reason", it) }
-            },
-        ),
-    )
-
     private companion object {
-        val runtime = AppServerRuntimeScope("agent-1", "conv-1")
+        val run1 = TestRun("run-1")
+        val run2 = TestRun("run-2")
+        val runOld = TestRun("run-old")
+        val runNew = TestRun("run-new")
+        val noRun = TestRun(null)
     }
 }

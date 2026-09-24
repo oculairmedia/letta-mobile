@@ -34,6 +34,13 @@ internal sealed interface TurnBoundaryDecision {
     }
 }
 
+/** One inbound frame plus the lease facts the boundary decision reads (letta-mobile-qygvv.2). */
+internal data class TurnBoundaryInput(
+    val received: AppServerReceivedFrame,
+    val leaseRunId: String?,
+    val approvalOutstanding: Boolean,
+)
+
 /**
  * letta-mobile-qygvv.2: authoritative turn boundaries for ONE runtime key, mirroring the reference
  * SDK's remote turn coordinator.
@@ -74,15 +81,11 @@ internal class TurnBoundaryGate {
         Unit
     }
 
-    fun decide(
-        received: AppServerReceivedFrame,
-        leaseRunId: String?,
-        approvalOutstanding: Boolean,
-    ): TurnBoundaryDecision = synchronized(lock) {
-        when (val frame = received.frame) {
-            is AppServerInboundFrame.StreamDelta -> decideStreamDelta(received)
-            is AppServerInboundFrame.TurnFinished -> decideTurnFinished(frame, leaseRunId)
-            is AppServerInboundFrame.UpdateLoopStatus -> decideLoopStatus(frame, approvalOutstanding)
+    fun decide(input: TurnBoundaryInput): TurnBoundaryDecision = synchronized(lock) {
+        when (val frame = input.received.frame) {
+            is AppServerInboundFrame.StreamDelta -> decideStreamDelta(input.received)
+            is AppServerInboundFrame.TurnFinished -> decideTurnFinished(frame, input)
+            is AppServerInboundFrame.UpdateLoopStatus -> decideLoopStatus(frame, input)
             else -> TurnBoundaryDecision.Project
         }
     }
@@ -101,8 +104,9 @@ internal class TurnBoundaryGate {
 
     private fun decideTurnFinished(
         frame: AppServerInboundFrame.TurnFinished,
-        leaseRunId: String?,
+        input: TurnBoundaryInput,
     ): TurnBoundaryDecision {
+        val leaseRunId = input.leaseRunId
         if (frame.turnId in finishedTurnIds) return TurnBoundaryDecision.Drop("duplicate_turn_id")
         val terminal = AppServerStopReason.isTerminal(frame.stopReason)
         val runId = frame.runId?.takeIf { it.isNotBlank() }
@@ -122,9 +126,9 @@ internal class TurnBoundaryGate {
 
     private fun decideLoopStatus(
         frame: AppServerInboundFrame.UpdateLoopStatus,
-        approvalOutstanding: Boolean,
+        input: TurnBoundaryInput,
     ): TurnBoundaryDecision {
-        if (!evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
+        if (!evidenceSeen || input.approvalOutstanding) return TurnBoundaryDecision.Project
         if (frame.loopStatus.status != LOOP_WAITING_ON_INPUT) return TurnBoundaryDecision.Project
         if (frame.loopStatus.activeRunIds.isNotEmpty()) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
