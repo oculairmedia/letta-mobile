@@ -81,6 +81,17 @@ internal class IrohViewerHandle(
     }
 
     /**
+     * letta-mobile-qygvv.12: write a non-delta App Server frame (`update_loop_status`,
+     * `turn_finished`, `update_queue`) with this viewer's own envelope: [type], [runtime],
+     * event_seq, emitted_at and idempotency_key, followed by [fields].
+     */
+    suspend fun writeProtocolFrame(
+        type: String,
+        runtime: AppServerRuntimeScope,
+        fields: JsonObject,
+    ): Boolean = writeFrame(protocolFrame(type, runtime, fields, eventSeq.next()).toString())
+
+    /**
      * Write an already-encoded wire frame verbatim (used for redial replay of
      * parked frames, and by [writeBroadcastFrame]). Best-effort; returns false
      * on failure without throwing.
