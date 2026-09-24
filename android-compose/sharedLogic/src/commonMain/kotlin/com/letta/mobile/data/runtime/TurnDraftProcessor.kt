@@ -52,11 +52,22 @@ internal class TurnDraftProcessor(
         pendingUsage = null
     }
 
-    suspend fun process(draft: RuntimeEventDraft, frameSeq: Long?) {
+    /**
+     * [authoritative] marks a draft projected from the server's own end-of-turn signal
+     * (`turn_finished`, or an idle loop status after evidence — letta-mobile-qygvv.2). Its terminal
+     * lifecycle completes the turn immediately, superseding any pending settle window, instead of
+     * waiting out the quiet period the `stop_reason` delta fallback needs.
+     */
+    suspend fun process(draft: RuntimeEventDraft, frameSeq: Long?, authoritative: Boolean = false) {
         if (emitAutoApproved(draft)) return
         callbacks.track(draft, ledger)
         observeContinuedActivity(draft)
         if (bufferTail(draft, frameSeq)) return
+        if (authoritative && draft.isTerminalLifecycle()) {
+            cancelPendingCompletion()
+            emitTerminal(draft, frameSeq)
+            return
+        }
         if (draft.isCompletedLifecycle()) {
             pendingCompleted = draft
             armCompletedTerminalOnce()
@@ -124,6 +135,10 @@ internal class TurnDraftProcessor(
 
     private fun cancelSpeculativeCompletion() {
         if (!speculativeCompletionArmed) return
+        cancelPendingCompletion()
+    }
+
+    private fun cancelPendingCompletion() {
         terminalSettleJob?.cancel()
         terminalSettleJob = null
         terminalArmed = false

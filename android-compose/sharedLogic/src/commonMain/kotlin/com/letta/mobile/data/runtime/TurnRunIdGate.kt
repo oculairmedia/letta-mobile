@@ -84,10 +84,19 @@ internal fun AppServerReceivedFrame.carriesLifecycleTerminal(): Boolean {
         messageType == "loop_error"
 }
 
+/** letta-mobile-qygvv.2: an explicit `is_terminal: false` error is a recoverable notice. */
+internal fun AppServerReceivedFrame.isNonTerminalErrorDelta(): Boolean {
+    val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return false
+    return runCatching {
+        streamDelta.delta.jsonObject["is_terminal"]?.jsonPrimitive?.contentOrNull == "false"
+    }.getOrDefault(false)
+}
+
 internal fun AppServerReceivedFrame.lifecycleStatusFromTerminal(): com.letta.mobile.runtime.RuntimeRunStatus? {
     if (!carriesLifecycleTerminal()) return null
     return when (terminalMessageTypeOrNull()) {
-        "error_message", "loop_error" -> com.letta.mobile.runtime.RuntimeRunStatus.Failed
+        "error_message", "loop_error" ->
+            com.letta.mobile.runtime.RuntimeRunStatus.Failed.takeUnless { isNonTerminalErrorDelta() }
         // Same reading as the mapper: `requires_approval` pauses the run, it never settles it.
         "stop_reason" -> when (AppServerStopReason.boundaryOf(stopReasonOrNull())) {
             AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
