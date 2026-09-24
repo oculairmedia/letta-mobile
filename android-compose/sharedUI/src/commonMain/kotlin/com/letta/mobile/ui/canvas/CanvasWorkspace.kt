@@ -350,15 +350,28 @@ fun CanvasWorkspace(
     }
 
     // Images placed on this board, and those of boards made before it kept images as assets, are
-    // moved into the asset store: their bytes stored once under their hash, the image given the
-    // ref and a preview. Updated in place, outside undo: nothing the person did changed.
+    // moved into the asset store: their bytes stored once under their hash.
+    //
+    // The image itself is given its ref (and a preview) only once drawings stop carrying image
+    // bytes (DrawingSerializer.inlineImageBytes off, w3nb2.3c), when every app reads refs. Before
+    // then, rewriting it fought any older app on the board: that app's drawing drops fields it does
+    // not know, so its next save sent every image back without them, this board adopted them again,
+    // and the two traded the same images forever. So until then the store is only filled, which
+    // needs no one else's agreement. Each image is stored once, not on every change to the board.
+    val storedImages = remember(session) { mutableSetOf<String>() }
     LaunchedEffect(state.elements, assets, initialLoadDone) {
         val store = assets ?: return@LaunchedEffect
         if (!initialLoadDone) return@LaunchedEffect
+        val writeRefs = !io.ak1.drawbox.domain.model.DrawingSerializer.inlineImageBytes
         val pending = state.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
             .filter { it.assetRef == null && it.bytes.isNotEmpty() }
+            .filter { writeRefs || storedKey(it) !in storedImages }
         if (pending.isEmpty()) return@LaunchedEffect
         val adopted = withContext(Dispatchers.Default) { pending.map { CanvasImageAssets.adopt(it, store) } }
+        if (!writeRefs) {
+            pending.forEach { storedImages += storedKey(it) }
+            return@LaunchedEffect
+        }
         val now = controller.state.value.elements.associateBy { it.id }
         adopted.forEach { image ->
             val current = now[image.id] as? io.ak1.drawbox.domain.model.Element.Image ?: return@forEach
@@ -1632,6 +1645,10 @@ fun CanvasWorkspace(
 
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
+
+/** Which image, as stored: an image whose bytes change (replaced in place) is stored again. */
+private fun storedKey(image: io.ak1.drawbox.domain.model.Element.Image): String =
+    "${image.id}:${image.bytes.size}:${image.bytes.contentHashCode()}"
 /** How far (board px) an arrow must be pulled out of a quick-create target to count as one. */
 private const val QUICK_PULL_MIN_PX = 24f
 private const val QUICK_ARROW_HEAD_PX = 14f
