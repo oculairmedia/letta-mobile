@@ -192,6 +192,11 @@ sealed interface AppServerInboundFrame {
         @SerialName("emitted_at") val emittedAt: String,
         @SerialName("idempotency_key") val idempotencyKey: String,
         val queue: List<JsonObject>,
+        /**
+         * Ordered dequeue/cancel transitions since the previous snapshot (0.32+).
+         * Absent on older servers; the raw frame still carries every field.
+         */
+        val removed: List<AppServerQueueRemoval> = emptyList(),
     ) : AppServerInboundFrame {
         @Transient
         override val type: String = "update_queue"
@@ -786,3 +791,14 @@ sealed interface AppServerInboundFrame {
         }
     }
 }
+
+/**
+ * Upstream `QueueRemovalTransition`: `dequeued` means the item left the queue to
+ * start a turn; `cancelled` means it was dropped without running. Kept a string
+ * because the upstream union is open.
+ */
+@Serializable
+data class AppServerQueueRemoval(
+    @SerialName("client_message_id") val clientMessageId: String? = null,
+    val disposition: String? = null,
+)

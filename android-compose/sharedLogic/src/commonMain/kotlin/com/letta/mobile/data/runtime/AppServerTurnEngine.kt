@@ -815,6 +815,7 @@ class AppServerTurnEngine(
             Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
             send(command.startedDraft())
 
+            val queuedInput = QueuedInputTracker((command.input as? TurnInput.UserMessage)?.localMessageId)
             val collectorReady = CompletableDeferred<Unit>()
             collector = launch {
                 try {
@@ -827,6 +828,7 @@ class AppServerTurnEngine(
                         turnPermissionMode,
                         collectorReady,
                         leaseRef,
+                        queuedInput,
                     ) { draft -> send(draft) }
                 } catch (completed: TurnCompletedMarker) {
                     releaseReason = "normal_completion"
@@ -846,9 +848,18 @@ class AppServerTurnEngine(
                 }
             }
             collectorReady.await()
-            client.input(command.toInputCommand(scope))
+            val inputFailure = sendTurnInput(command, scope, leaseRef, queuedInput) { draft -> send(draft) }
             Telemetry.event("IrohTurn", "input.sent")
-            collector.join()
+            if (inputFailure != null) {
+                // letta-mobile-qygvv.1: the server will never run this input — fail
+                // now instead of waiting out the idle watchdog.
+                collector.cancelAndJoin()
+                releaseReason = "input_rejected"
+                noteOwnerTerminal(RuntimeRunStatus.Failed, source = "input_rejected", lease = leaseRef)
+                send(command.failedDraft(inputFailure))
+            } else {
+                collector.join()
+            }
         } finally {
             withContext(NonCancellable) {
                 collector?.cancelAndJoin()
@@ -1061,7 +1072,10 @@ class AppServerTurnEngine(
         approvals.record(key, ApprovalRegistry.Gate(callId, approval.requestId))
     }
 
-    private inner class TurnIdleWatchdog(private val key: TurnRuntimeKey) {
+    private inner class TurnIdleWatchdog(
+        private val key: TurnRuntimeKey,
+        private val isPaused: () -> Boolean = { false },
+    ) {
         private val lastFrameAt = atomic(currentTimeMs())
 
         fun markFrame() {
@@ -1071,7 +1085,7 @@ class AppServerTurnEngine(
         fun launchIn(scope: CoroutineScope): Job = scope.launch {
             val pauseRecheckMs = minOf(turnIdleTimeoutMs, WATCHDOG_PAUSE_RECHECK_MS)
             while (true) {
-                if (approvals.hasOutstanding(key)) {
+                if (approvals.hasOutstanding(key) || isPaused()) {
                     markFrame()
                     delay(pauseRecheckMs.milliseconds)
                     continue
@@ -1090,6 +1104,7 @@ class AppServerTurnEngine(
         val idleWatchdog: TurnIdleWatchdog,
         val draftProcessor: TurnDraftProcessor,
         val externalToolDispatchScope: CoroutineScope,
+        val queuedInput: QueuedInputTracker,
         val emit: suspend (RuntimeEventDraft) -> Unit,
     )
 
@@ -1133,6 +1148,7 @@ class AppServerTurnEngine(
         val slot = context.lease.slot
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
+        val queueRemoval = observeQueueProgress(received, context)
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val frameSeq = received.eventSeqOrNull()
@@ -1153,6 +1169,9 @@ class AppServerTurnEngine(
         if (boundary is TurnBoundaryDecision.LoopIdle) {
             context.draftProcessor.process(context.loopIdleTerminal(boundary.status), frameSeq, authoritative = true)
         }
+        // The update_queue passthrough draft above still reaches viewers; only then
+        // settle a lease whose queued input the server dropped.
+        if (queueRemoval == QueueRemovalDisposition.Cancelled) completeQueueCancelledTurn(context)
     }
 
     /**
@@ -1241,6 +1260,113 @@ class AppServerTurnEngine(
         }
     }
 
+    /**
+     * letta-mobile-qygvv.1: sends the turn's input. A `create_message` carries a
+     * `request_id` and waits for `input_accepted`; approval responses stay
+     * fire-and-forget. Returns the failure reason when the input will never run,
+     * else null. A queued input moves the lease to [TurnLeasePhase.Queued] and
+     * emits a visible Running lifecycle so the UI does not look hung.
+     */
+    private suspend fun sendTurnInput(
+        command: TurnCommand,
+        scope: AppServerRuntimeScope,
+        lease: LeaseRef,
+        queuedInput: QueuedInputTracker,
+        emit: suspend (RuntimeEventDraft) -> Unit,
+    ): String? {
+        val input = command.toInputCommand(scope)
+        if (command.input !is TurnInput.UserMessage) {
+            client.input(input)
+            return null
+        }
+        val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
+        val failure = acceptance.recordAndFailureReason(command.conversationId.value)
+        if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, queuedInput, emit)
+        return failure
+    }
+
+    private suspend fun enterQueued(
+        command: TurnCommand,
+        lease: LeaseRef,
+        queuedInput: QueuedInputTracker,
+        emit: suspend (RuntimeEventDraft) -> Unit,
+    ) {
+        // Started evidence may already have been processed by the collector.
+        if (!queuedInput.markQueued()) return
+        lease.slot.updateLease { cur ->
+            if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Streaming) {
+                cur.copy(phase = TurnLeasePhase.Queued)
+            } else {
+                cur
+            }
+        }
+        Telemetry.event(
+            "AppServerTurnEngine", "turn.queued",
+            "key" to lease.key.toString(),
+            "leaseToken" to lease.token,
+            "clientMessageId" to (queuedInput.clientMessageId ?: "<none>"),
+        )
+        emit(command.queuedInputDraft())
+    }
+
+    /**
+     * letta-mobile-qygvv.1: tracks a queued input through `stream_delta` and
+     * `update_queue`. Returns the removal disposition for this lease's input when
+     * [received] carries one.
+     */
+    private fun observeQueueProgress(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+    ): QueueRemovalDisposition? {
+        val frame = received.frame
+        val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(context.queuedInput::removalIn)
+        val startedBy = when {
+            frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
+            removal == QueueRemovalDisposition.Dequeued -> "update_queue"
+            else -> null
+        }
+        if (startedBy != null && context.queuedInput.markStarted()) leaveQueued(context.lease, startedBy)
+        return removal
+    }
+
+    private fun leaveQueued(lease: LeaseRef, source: String) {
+        lease.slot.updateLease { cur ->
+            if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Queued) {
+                cur.copy(phase = TurnLeasePhase.Streaming)
+            } else {
+                cur
+            }
+        }
+        Telemetry.event(
+            "AppServerTurnEngine", "turn.dequeued",
+            "key" to lease.key.toString(),
+            "leaseToken" to lease.token,
+            "source" to source,
+        )
+    }
+
+    /** The server dropped this lease's queued input (`update_queue` removal `cancelled`). */
+    private suspend fun completeQueueCancelledTurn(context: TurnFrameContext): Nothing {
+        Telemetry.event(
+            "AppServerTurnEngine", "turn.dequeued",
+            "key" to context.lease.key.toString(),
+            "leaseToken" to context.lease.token,
+            "source" to "update_queue_cancelled",
+        )
+        val ledger = context.draftProcessor.ledger
+        settleDanglingToolCalls(
+            context.command,
+            ledger.emitted,
+            ledger.returned,
+            context.emit,
+            QUEUED_INPUT_CANCELLED_REASON,
+        )
+        context.draftProcessor.flushTail()
+        noteOwnerTerminal(RuntimeRunStatus.Cancelled, source = "update_queue_cancelled", lease = context.lease)
+        context.emit(context.command.cancelledDraft(QUEUED_INPUT_CANCELLED_REASON))
+        throw TurnCompleted
+    }
+
     private suspend fun completeSupersededTurn(context: TurnFrameContext): Nothing {
         val ledger = context.draftProcessor.ledger
         settleDanglingToolCalls(
@@ -1288,10 +1414,16 @@ class AppServerTurnEngine(
         turnPermissionMode: AppServerPermissionMode,
         collectorReady: CompletableDeferred<Unit>,
         lease: LeaseRef,
+        queuedInput: QueuedInputTracker,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
         val slot = lease.slot
-        val idleWatchdog = TurnIdleWatchdog(slot.key)
+        // letta-mobile-qygvv.1: a queued input is silent by design until the turn
+        // ahead of it finishes. A superseded connection generation lifts the pause
+        // so a queued lease on a dead link still times out.
+        val idleWatchdog = TurnIdleWatchdog(slot.key) {
+            queuedInput.isQueued && !isConnectionGenerationSuperseded(lease)
+        }
         val watchdog = idleWatchdog.launchIn(this)
         val draftProcessor = TurnDraftProcessor(
             callbacks = TurnDraftCallbacks(
@@ -1353,6 +1485,7 @@ class AppServerTurnEngine(
             idleWatchdog = idleWatchdog,
             draftProcessor = draftProcessor,
             externalToolDispatchScope = externalToolDispatchScope,
+            queuedInput = queuedInput,
             emit = emitDraft,
         )
         try {
