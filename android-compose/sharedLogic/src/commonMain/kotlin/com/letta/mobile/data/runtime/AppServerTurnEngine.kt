@@ -49,13 +49,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonPrimitive
 /**
  * TurnEngine backed by one App Server client/control owner.
@@ -231,6 +228,28 @@ class AppServerTurnEngine(
      */
     fun observeQueueFrame(frame: AppServerInboundFrame) = queueHygiene.observe(frame)
 
+    /** letta-mobile-qygvv.3: busy-path owner liveness from the App Server's own loop state. */
+    private val busyOwnerReconciler = BusyOwnerReconciler(
+        probe = TurnOwnerLivenessProbe(client, eventRouter, requestIdFactory),
+        otherBusyKeys = { key -> busyRuntimeKeys().filter { it != key } },
+    )
+
+    private val unleasedApprovals = UnleasedApprovalAnswerer(
+        client = client,
+        inboundControlRegistry = inboundControlRegistry,
+        connectionGenerationProvider = connectionGenerationProvider,
+        leaseHeld = { key -> leases.peek(key)?.lease != null },
+        runtimeOwned = { key -> leases.peek(key) != null },
+        permissionModeFor = { key -> permissionModeProvider(unleasedCommandFor(key)) },
+        runtimeScopeFor = { key -> leases.peek(key)?.runtimeScope },
+    )
+
+    /** letta-mobile-qygvv.3: a lease released without a server terminal aborts its server turn. */
+    private val orphanAborter = OrphanedTurnAborter(
+        abort = { agentId, conversationId, runId -> abort(agentId, conversationId, runId) },
+        noteSettled = { key, runId -> leases.peek(key)?.boundaryGate?.noteSettled(runId) },
+    )
+
     /** Without an [eventRouter] the engine feeds [queueHygiene] the frames its turns collect. */
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
@@ -250,7 +269,7 @@ class AppServerTurnEngine(
         leases.snapshot().forEach { slot ->
             val lease = slot.lease ?: return@forEach
             if (lease.connectionGeneration > failedGeneration) return@forEach
-            lease.ownerJob?.cancel(CancellationException(reason))
+            lease.ownerJob?.cancel(ConnectionSupersededCancellation(reason))
         }
     }
 
@@ -374,6 +393,16 @@ class AppServerTurnEngine(
         )
         return true
     }
+
+    /**
+     * letta-mobile-qygvv.3: apply the lease's approval policy to a `control_request` that NO
+     * turn lease owns, instead of leaving it in the fanout's pending buffer while the server turn
+     * (and the conversation queue behind it) waits. See [UnleasedApprovalAnswerer].
+     */
+    internal suspend fun answerUnleasedControlRequest(
+        request: AppServerInboundFrame.ControlRequest,
+        connectionGeneration: Long? = null,
+    ): UnleasedApprovalOutcome = unleasedApprovals.answer(request, connectionGeneration)
 
     /**
      * The connection generation matches() validated for [lease], or null when that
@@ -589,192 +618,6 @@ class AppServerTurnEngine(
     suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean =
         deviceState.changeWorkingDirectory(AppServerRuntimeScope(agentId, conversationId), cwd)
 
-    /**
-     * letta-mobile-c4igq.3 / lgns8.22.2: causal liveness recovery.
-     * Clears a dead owner ONLY after authoritative evidence, and only by
-     * cancelling+joining that owner's job — never by Mutex.force-unlock.
-     * Preparing/Starting leases without a run_id are locally alive: idle
-     * run.list must not steal them.
-     *
-     * letta-mobile-8xxzv: operates on ONE [TurnLeaseSlot]. A reconciler run for
-     * conversation A can only ever probe and release A's own lease; B's lease is
-     * not reachable from here.
-     */
-    private suspend fun reconcileOwnerLivenessAndMaybeRelease(slot: TurnLeaseSlot): Boolean {
-        val ownerLease = slot.lease ?: return false
-        if (ownerLease.phase == TurnLeasePhase.Retiring || ownerLease.phase == TurnLeasePhase.Terminal) {
-            return false
-        }
-        val runId = ownerLease.runId?.takeIf { it.isNotBlank() }
-            ?: slot.owner?.runId?.takeIf { it.isNotBlank() }
-        val dead = probeOwnerDead(slot, ownerLease, runId) ?: return false
-        if (dead) return releaseDeadOwnerLease(slot, ownerLease, runId)
-        Telemetry.event(
-            "AppServerTurnEngine", "activeTurn.reconciledAlive",
-            "runId" to (runId ?: "<none>"),
-            "key" to slot.key.toString(),
-        )
-        return false
-    }
-
-    private suspend fun probeOwnerDead(
-        slot: TurnLeaseSlot,
-        ownerLease: TurnLease,
-        runId: String?,
-    ): Boolean? = try {
-        withTimeout(LIVENESS_PROBE_TIMEOUT_MS.milliseconds) {
-            when {
-                runId != null -> probeRunDead(runId)
-                ownerLease.isLocallyAliveWithoutRun -> false
-                else -> conversationHasNoActiveRun(ownerLease.agentId, ownerLease.conversationId)
-            }
-        }
-    } catch (t: TimeoutCancellationException) {
-        Telemetry.event(
-            "AppServerTurnEngine",
-            "activeTurn.reconcileLivenessTimedOut",
-            "runId" to (runId ?: "<none>"),
-            "timeoutMs" to LIVENESS_PROBE_TIMEOUT_MS,
-            "key" to slot.key.toString(),
-            level = Telemetry.Level.WARN,
-        )
-        null
-    } catch (t: CancellationException) {
-        throw t
-    } catch (t: Throwable) {
-        Telemetry.error(
-            "AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t,
-            "runId" to (runId ?: "<none>"),
-            "key" to slot.key.toString(),
-        )
-        null
-    }
-
-    private suspend fun releaseDeadOwnerLease(
-        slot: TurnLeaseSlot,
-        owner: TurnLease,
-        runId: String?,
-    ): Boolean {
-        val retiring = owner.copy(phase = TurnLeasePhase.Retiring)
-        if (!slot.casLease(owner, retiring)) return false
-        // Cancel and join the owning structured scope before admitting a successor.
-        runCatching { owner.ownerJob?.cancelAndJoin() }
-        // Owner's finally may already have cleared the retiring lease via token match.
-        slot.updateLease { cur ->
-            when {
-                cur == null -> null
-                cur.token == owner.token -> null
-                else -> cur // successor already installed
-            }
-        }
-        slot.updateOwner { telemetry ->
-            if (telemetry == null) null
-            else if (
-                telemetry.runtimeId == owner.runtimeId &&
-                    telemetry.conversationId == owner.conversationId &&
-                    telemetry.acquiredAtMs == owner.acquiredAtMs
-            ) {
-                null
-            } else {
-                telemetry
-            }
-        }
-        val admitted = slot.lease?.token != owner.token
-        Telemetry.event(
-            "AppServerTurnEngine", "activeTurn.reconciledDead",
-            "runId" to (runId ?: "<none>"),
-            "agentId" to (owner.agentId ?: ""),
-            "conversationId" to (owner.conversationId ?: ""),
-            "key" to slot.key.toString(),
-            "leaseToken" to owner.token,
-            "reason" to if (runId != null) "run_provably_dead" else "conversation_has_no_active_run",
-        )
-        // SENSING (b, letta-mobile-8xxzv): this lease ended via the liveness
-        // reconciler, NOT via a terminal frame. Scoped to ONE key so it also
-        // proves the reconciler never reaches across runtimes.
-        Telemetry.event(
-            "AppServerTurnEngine", "activeTurn.releasedByReconciler",
-            "key" to slot.key.toString(),
-            "leaseToken" to owner.token,
-            "runId" to (runId ?: "<none>"),
-            "lastTerminal" to (owner.lastTerminal ?: "<none>"),
-            "otherBusyKeys" to busyRuntimeKeys().filter { it != slot.key }.joinToString(",") { it.toString() },
-            level = Telemetry.Level.WARN,
-        )
-        return admitted
-    }
-
-    private suspend fun probeRunDead(runId: String): Boolean {
-        val resp = client.adminRpc(
-            AppServerCommand.AdminRpc(
-                requestId = requestIdFactory(),
-                method = "run.get",
-                params = buildJsonObject { put("run_id", runId) },
-            ),
-        )
-        return when {
-            resp.success -> runResultIsDead(resp.result)
-            resp.error?.let {
-                it.contains("not found", ignoreCase = true) ||
-                    it.contains("no such run", ignoreCase = true)
-            } == true -> true
-            else -> false
-        }
-    }
-
-    /** True iff a run.get result body proves the run is terminal/dead. */
-    private fun runResultIsDead(result: JsonElement?): Boolean = runObjIsTerminal(result as? JsonObject)
-
-    /** True iff a single run JSON object shows a terminal/dead run. */
-    private fun runObjIsTerminal(obj: JsonObject?): Boolean {
-        if (obj == null) return false
-        val status = obj["status"]?.jsonPrimitive?.contentOrNull?.lowercase()
-        if (status in TERMINAL_RUN_STATUSES) return true
-        // completed_at set is also terminal.
-        if (obj["completed_at"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true) return true
-        return false
-    }
-
-    /**
-     * Conversation-scoped liveness probe used when the stuck-lock owner has no
-     * run_id. Queries run.list (server returns the run set) and returns true ONLY
-     * when it can prove there is no NON-terminal run for this agent+conversation.
-     * Any inconclusive result (unsuccessful call, unparseable body) returns false
-     * so a genuinely live run is never interrupted.
-     */
-    private suspend fun conversationHasNoActiveRun(agentId: String?, conversationId: String?): Boolean {
-        if (agentId.isNullOrBlank() && conversationId.isNullOrBlank()) return false
-        val resp = client.adminRpc(
-            AppServerCommand.AdminRpc(requestId = requestIdFactory(), method = "run.list"),
-        )
-        if (!resp.success) return false
-        val runs = runListArray(resp.result) ?: return false
-        // Match this owner's runs: prefer conversation id (always present in
-        // /v1/runs); a run is "active" if it exists for this conversation and is
-        // not terminal.
-        val hasActive = runs.any { element ->
-            val obj = element as? JsonObject ?: return@any false
-            val runConv = obj["conversation_id"]?.jsonPrimitive?.contentOrNull
-                ?: obj["conversationId"]?.jsonPrimitive?.contentOrNull
-            val runAgent = obj["agent_id"]?.jsonPrimitive?.contentOrNull
-                ?: obj["agentId"]?.jsonPrimitive?.contentOrNull
-            val matchesOwner = when {
-                !conversationId.isNullOrBlank() && runConv != null -> runConv == conversationId
-                !agentId.isNullOrBlank() && runAgent != null -> runAgent == agentId
-                else -> false
-            }
-            matchesOwner && !runObjIsTerminal(obj)
-        }
-        return !hasActive
-    }
-
-    /** Extract the runs array from a run.list result (bare array or {runs|data:[…]}). */
-    private fun runListArray(result: JsonElement?): JsonArray? = when (result) {
-        is JsonArray -> result
-        is JsonObject -> (result["runs"] ?: result["data"])?.let { it as? JsonArray }
-        else -> null
-    }
-
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = channelFlow {
         val acquiredAtMs = currentTimeMs()
         val ownerProcessRole = permissionModeProvider(command).name
@@ -795,33 +638,8 @@ class AppServerTurnEngine(
             settleDeadlineMs = terminalSettleQuietMs,
             watchdogDeadlineMs = turnIdleTimeoutMs,
         )
-        if (!slot.casLease(null, lease)) {
-            if (reconcileOwnerLivenessAndMaybeRelease(slot) && slot.casLease(null, lease)) {
-                // Reconciled a dead owner; acquired successor lease.
-            } else {
-                // SENSING (c, letta-mobile-8xxzv): the LEGITIMATE busy — a second
-                // turn for the SAME {agent, conversation} runtime. letta-code
-                // permits at most one active turn per runtime, so this rejection
-                // preserves the server contract rather than serializing the app.
-                val holder = slot.lease
-                Telemetry.event(
-                    "AppServerTurnEngine", "activeTurn.rejectedSameKey",
-                    "key" to slot.key.toString(),
-                    "rejectedLeaseToken" to leaseToken,
-                    "ownerLeaseToken" to holder?.token,
-                    "ownerPhase" to holder?.phase?.name,
-                    "ownerRunId" to (holder?.runId ?: "<none>"),
-                    "ownerHeldForMs" to holder?.acquiredAtMs?.let { acquiredAtMs - it },
-                    "otherBusyKeys" to busyRuntimeKeys().filter { it != slot.key }
-                        .joinToString(",") { it.toString() },
-                    level = Telemetry.Level.WARN,
-                )
-                throw IllegalStateException(
-                    "An App Server turn is already active for ${command.agentId.value}" +
-                        "/${command.conversationId.value}.",
-                )
-            }
-        }
+        // letta-mobile-qygvv.3: a busy key is admitted only when the server's loop is idle.
+        busyOwnerReconciler.acquireOrReject(slot, lease)
         // Re-bind ownerJob after CAS in case a recovery path raced.
         slot.updateLease { cur ->
             if (cur?.token == leaseToken) cur.copy(ownerJob = coroutineContext[Job]) else cur
@@ -844,6 +662,7 @@ class AppServerTurnEngine(
 
         var collector: Job? = null
         var releaseReason = "normal_completion"
+        var releaseCause: Throwable? = null
         try {
             val turnPermissionMode = permissionModeProvider(command)
             prepareContextIfNeeded(command)
@@ -879,14 +698,18 @@ class AppServerTurnEngine(
                     send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
                 } catch (cancellation: CancellationException) {
                     releaseReason = "cancellation"
+                    releaseCause = cancellation
                     throw cancellation
                 } catch (error: Throwable) {
                     releaseReason = "stream_error"
+                    releaseCause = error
                     throw error
                 }
             }
             collectorReady.await()
-            val inputFailure = inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
+            val inputFailure = untilCollectorEnds(collector) {
+                inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
+            }
             Telemetry.event("IrohTurn", "input.sent")
             // letta-mobile-qygvv.1: only an input failure decides the release reason
             // here. A plain join must NOT overwrite the reason the collector already
@@ -900,6 +723,24 @@ class AppServerTurnEngine(
         } finally {
             withContext(NonCancellable) {
                 collector?.cancelAndJoin()
+                // letta-mobile-qygvv.3: abort BEFORE releasing, so no successor input can
+                // queue behind a server turn nobody observes any more.
+                slot.lease?.takeIf { it.token == leaseToken }?.let { held ->
+                    orphanAborter.abortIfOrphaned(
+                        LeaseReleaseFacts(
+                            key = slot.key,
+                            leaseToken = leaseToken,
+                            releaseReason = releaseReason,
+                            releaseCause = releaseCause,
+                            phase = held.phase,
+                            runId = held.runId?.takeIf { it.isNotBlank() },
+                            lastTerminal = held.lastTerminal,
+                            lastTerminalSource = held.lastTerminalSource,
+                            generationSuperseded = held.connectionGeneration != connectionGenerationProvider(),
+                            abortAlreadyRequested = slot.boundaryGate.isAbortRequested(),
+                        ),
+                    )
+                }
                 // Token-validated release: a successor lease is never cleared by
                 // us — and, letta-mobile-8xxzv, only OUR key's slot is touched, so
                 // one conversation's teardown can never free another's lease.
@@ -1142,7 +983,9 @@ class AppServerTurnEngine(
         val draftProcessor: TurnDraftProcessor,
         val externalToolDispatchScope: CoroutineScope,
         val emit: suspend (RuntimeEventDraft) -> Unit,
-    )
+    ) {
+        val queuedFrames = QueuedLeaseFrameGate(lease.queuedInput)
+    }
 
 
     /**
@@ -1197,6 +1040,10 @@ class AppServerTurnEngine(
         context.idleWatchdog.markFrame()
         queueHygiene.observeTurnFrame(received.frame)
         val queueRemoval = observeQueueProgress(received, context.lease)
+        // Review of PR #1661: a queued lease must not adopt the turn ahead of it. The gate runs
+        // first so it records the run ids seen while queued even for frames held below.
+        if (context.queuedFrames.skip(received, context.lease.current?.runId)) return
+        // letta-mobile-qygvv.7: while queued, only update_queue concerns this lease.
         if (context.lease.holdsWhileQueued(received)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
@@ -2065,7 +1912,6 @@ class AppServerTurnEngine(
         internal const val UNLEASED_LEASE_TOKEN: Long = -1L
 
         /** Fail-fast budget for busy-path run.get / run.list liveness probes. */
-        const val LIVENESS_PROBE_TIMEOUT_MS: Long = 3_000L
         /** Aggregate budget for turn-context preflight while activeTurn is held. */
         const val PREFLIGHT_TIMEOUT_MS: Long = 15_000L
 
@@ -2074,9 +1920,6 @@ class AppServerTurnEngine(
         // so it resumes promptly once the gate clears, rather than sleeping a full
         // stale interval. Bounds how stale lastFrameAt can be on resume.
         const val WATCHDOG_PAUSE_RECHECK_MS: Long = 250L
-
-        /** run.get / run.list `status` values that prove a run is over. */
-        private val TERMINAL_RUN_STATUSES = setOf("completed", "failed", "cancelled", "error", "expired")
 
         fun defaultRequestId(): String {
             nextRequestId += 1

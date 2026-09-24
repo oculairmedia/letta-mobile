@@ -73,7 +73,7 @@ internal class TurnEngineTestFrames(
         error = ack.error,
     )
 
-    fun streamDelta(messageType: String): AppServerInboundFrame.StreamDelta {
+    fun streamDelta(messageType: String, run: TestRun = TestRun(runId)): AppServerInboundFrame.StreamDelta {
         seq += 1
         return AppServerInboundFrame.StreamDelta(
             runtime = runtime,
@@ -82,9 +82,14 @@ internal class TurnEngineTestFrames(
             idempotencyKey = "evt-$messageType-$seq",
             delta = buildJsonObject {
                 put("message_type", messageType)
-                put("run_id", runId)
+                put("run_id", run.id)
             },
         )
+    }
+
+    fun loopStatus(state: TestLoopState): AppServerInboundFrame.UpdateLoopStatus {
+        seq += 1
+        return state.frame().copy(eventSeq = seq, idempotencyKey = "loop-$seq")
     }
 
     fun updateQueue(update: QueueUpdateFixture): AppServerInboundFrame.UpdateQueue {
@@ -164,9 +169,13 @@ internal class TurnEngineTestAckingClient(
 
     fun emitStreamDelta(messageType: String) = emit(frames.streamDelta(messageType))
 
+    fun emitStreamDelta(messageType: String, run: TestRun) = emit(frames.streamDelta(messageType, run))
+
     fun emitUpdateQueue(update: QueueUpdateFixture) = emit(frames.updateQueue(update))
 
     fun emitTurnFinished(run: TestRun, turn: Int) = emit(frames.turnFinished(run, turn))
+
+    fun emitLoopStatus(state: TestLoopState) = emit(frames.loopStatus(state))
 
     override fun emit(frame: AppServerInboundFrame) {
         (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(frame.onStreamChannel())
@@ -187,6 +196,8 @@ private fun AppServerInboundFrame.rawJson(): JsonObject = buildJsonObject {
             put("delta", frame.delta)
         }
         is AppServerInboundFrame.UpdateQueue -> put("idempotency_key", frame.idempotencyKey)
+        is AppServerInboundFrame.TurnFinished -> put("idempotency_key", frame.idempotencyKey)
+        is AppServerInboundFrame.UpdateLoopStatus -> put("idempotency_key", frame.idempotencyKey)
         else -> Unit
     }
 }

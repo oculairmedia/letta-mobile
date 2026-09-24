@@ -26,6 +26,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -90,7 +91,7 @@ class DefaultAppServerController(
         RuntimePermissionDefaults.DEFAULT_MODE
     },
 ) : AppServerController {
-    @Suppress("NoDetachedCoroutineLifecycle")
+    @Suppress("NoDetachedCoroutineLifecycle") // Controller lifecycle owned; cancelled in close().
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
@@ -142,13 +143,30 @@ class DefaultAppServerController(
      * and the inbound-control registry makes the claim exclusive even if it raced.
      *
      * Each answer is launched so a slow tool cannot stall this collector.
+     *
+     * letta-mobile-qygvv.3: unleased `control_request` approvals get the same treatment, with
+     * the policy the lease would have applied (auto-allow under Unrestricted, interactive
+     * user-input tools left pending for a viewer). They used to sit in the fanout's pending
+     * buffer while the server turn, and the conversation queue behind it, waited.
      */
     private fun attachUnleasedExternalToolAnswerer() {
         controllerScope.launch {
             client.events.collect { received ->
-                val request = received.frame as? AppServerInboundFrame.ExternalToolCallRequest
-                    ?: return@collect
-                launch { turnEngine.answerUnleasedExternalToolCall(request) }
+                when (val frame = received.frame) {
+                    is AppServerInboundFrame.ExternalToolCallRequest ->
+                        launch { turnEngine.answerUnleasedExternalToolCall(frame) }
+                    is AppServerInboundFrame.ControlRequest -> launch {
+                        runCatching { turnEngine.answerUnleasedControlRequest(frame, received.connectionGeneration) }
+                            .onFailure { error ->
+                                if (error is kotlinx.coroutines.CancellationException) throw error
+                                Telemetry.error(
+                                    "DefaultAppServerController", "approval.unleasedAnswerFailed", error,
+                                    "requestId" to frame.requestId,
+                                )
+                            }
+                    }
+                    else -> Unit
+                }
             }
         }
     }

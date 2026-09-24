@@ -25,7 +25,10 @@ import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -191,14 +194,15 @@ internal enum class QueueRemovalDisposition {
  * the server queue.
  *
  * While queued the idle watchdog is paused — silence is expected until the turn
- * ahead finishes. The pause lifts on the first evidence the input started: a
- * `stream_delta` for the runtime or an `update_queue` removal with disposition
- * `dequeued` for [clientMessageId]. A `cancelled` removal means the input will
- * never run, and the engine settles the lease Cancelled.
+ * ahead finishes. The pause lifts on the only evidence that names THIS input: an
+ * `update_queue` removal with disposition `dequeued` for [clientMessageId]. A
+ * `stream_delta` is not evidence; it may belong to the turn ahead (see
+ * [QueuedLeaseFrameGate]). A `cancelled` removal means the input will never run,
+ * and the engine settles the lease Cancelled.
  *
- * Started evidence can race ahead of the ack (the collector processes frames while
- * the send coroutine is still resuming from `input_accepted`), so [markQueued] is
- * a no-op once the input is known to have started.
+ * The dequeue can race ahead of the ack (the collector processes frames while the
+ * send coroutine is still resuming from `input_accepted`), so [markQueued] is a
+ * no-op once the input is known to have started.
  */
 internal class QueuedInputTracker(val clientMessageId: String?) {
     private val state = atomic(PENDING)
@@ -273,13 +277,18 @@ internal suspend fun enterQueued(
 }
 
 internal fun leaveQueued(lease: LeaseRef, source: String) {
+    var left = false
     lease.slot.updateLease { cur ->
         if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Queued) {
-            cur.copy(phase = TurnLeasePhase.Streaming)
+            left = true
+            // Every run-bearing frame was skipped while queued, so a run id promoted
+            // here came from the turn ahead (frames that raced the queued ack).
+            cur.copy(phase = TurnLeasePhase.Streaming, runId = null)
         } else {
             cur
         }
     }
+    if (left) lease.slot.updateOwner { owner -> owner?.copy(runId = null) }
     recordDequeued(lease, source)
 }
 
@@ -303,21 +312,22 @@ internal fun LeaseRef.holdsWhileQueued(received: AppServerReceivedFrame): Boolea
 internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boolean): Boolean =
     projected && this == QueueRemovalDisposition.Cancelled
 
+/**
+ * letta-mobile-qygvv.1: tracks a queued input through `update_queue`. Returns the
+ * removal disposition for this lease's input when [received] carries one.
+ *
+ * Only the `dequeued` removal of THIS input's client message id ends the queued
+ * wait. A `stream_delta` is not start evidence: while this input is pending or
+ * queued it may belong to the turn ahead (review of PR #1661). Servers that
+ * answer `queued` (0.32+) also send `update_queue.removed`.
+ */
 internal fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
 ): QueueRemovalDisposition? {
-    val frame = received.frame
-    val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
-    // While queued, frames on this scope belong to the turn ahead; only the
-    // dequeue transition for OUR client_message_id proves our input started.
-    val startedBy = when {
-        removal == QueueRemovalDisposition.Dequeued -> "update_queue"
-        frame is AppServerInboundFrame.StreamDelta && !lease.queuedInput.isQueued -> "stream_delta"
-        else -> null
-    }
-    if (startedBy != null && lease.queuedInput.markStarted()) {
-        leaveQueued(lease, startedBy)
+    val removal = (received.frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
+    if (removal == QueueRemovalDisposition.Dequeued && lease.queuedInput.markStarted()) {
+        leaveQueued(lease, "update_queue")
     }
     return removal
 }
@@ -401,6 +411,27 @@ internal fun ToolPolicy.toWireAllowlist(registry: ExternalToolRegistry?): List<S
         .sorted()
 }
 
+/**
+ * letta-mobile-qygvv.3: runs [send] (the input send and its `input_accepted` wait), abandoning it
+ * with a null result when [collector] ends first. A turn the collector already settled (terminal,
+ * watchdog, superseded generation) must not stay parked on an ack that will never arrive.
+ */
+internal suspend fun <T : Any> untilCollectorEnds(collector: Job, send: suspend () -> T?): T? = coroutineScope {
+    val ack = async { send() }
+    select<T?> {
+        ack.onAwait { it }
+        collector.onJoin {
+            ack.cancel()
+            null
+        }
+    }
+}
+
+/**
+ * Waits for [collector], or fails the turn at once on [inputFailure]. Returns the release reason
+ * only when the input failed; after a join the collector has already recorded its own reason
+ * (normal completion, watchdog timeout, ...), which must not be overwritten.
+ */
 internal suspend fun joinCollectorOrHandleFailure(
     collector: Job,
     inputFailure: InputAcceptance.Failure?,
@@ -413,8 +444,6 @@ internal suspend fun joinCollectorOrHandleFailure(
         onFailure(inputFailure.failureReason)
         return "input_rejected"
     }
-    // A normal join decides nothing: the collector's own catch blocks already
-    // recorded why it ended, and that reason must survive (see the engine).
     collector.join()
     return null
 }

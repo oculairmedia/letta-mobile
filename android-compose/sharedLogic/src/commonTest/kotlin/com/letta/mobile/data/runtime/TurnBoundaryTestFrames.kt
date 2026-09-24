@@ -26,6 +26,7 @@ internal enum class TestStopReason(val wire: String) {
 internal enum class TestLoopState(val wire: String) {
     WaitingOnInput("WAITING_ON_INPUT"),
     WaitingOnApproval("WAITING_ON_APPROVAL"),
+    ProcessingApiResponse("PROCESSING_API_RESPONSE"),
     ;
 
     /** An `update_loop_status` frame in this state, with [activeRuns] still running. */
