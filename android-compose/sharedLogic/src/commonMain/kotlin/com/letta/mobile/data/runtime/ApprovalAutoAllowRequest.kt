@@ -1,8 +1,12 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.ApprovalSubmission
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -16,6 +20,40 @@ internal data class ApprovalAutoAllowRequest(
     val source: String,
 )
 
+private const val SOURCE_CONTROL_REQUEST = "control_request"
+private const val SOURCE_STREAM_DELTA = "approval_request_message"
+
+/**
+ * letta-mobile-qygvv.13: an `approval_request_message` delta under Unrestricted is
+ * informational. letta-code (0.32.17, `handleApprovalStop`) classifies every approval
+ * with `checkModeOverride` -> `unrestricted` => allow and executes it without waiting;
+ * only approvals that still need a human (alwaysAsk rules, mod tools, interactive tools)
+ * wait, and those arrive as a real `control_request can_use_tool`. The only resolver an
+ * `approval_response` can hit is keyed by that control request's `perm-<toolCallId>` id,
+ * so a reply to the delta is always acked "Approval request is no longer pending".
+ */
+internal fun ApprovalAutoAllowRequest.isInformationalUnderUnrestricted(): Boolean =
+    source == SOURCE_STREAM_DELTA
+
+internal fun ApprovalAutoAllowRequest.autoAllowSubmission(scope: AppServerRuntimeScope) = ApprovalSubmission(
+    runtime = scope,
+    approvalRequestId = requestId,
+    decision = AppServerApprovalResponseDecision.Allow(message = "Approved by default mobile policy."),
+    source = "auto_allow",
+    answersStreamDelta = source == SOURCE_STREAM_DELTA,
+    toolName = toolName,
+)
+
+internal fun recordAutoAllowSkippedUnrestricted(approval: ApprovalAutoAllowRequest) {
+    Telemetry.event(
+        "IrohTurn", "approval.auto_allow_skipped_unrestricted",
+        "approvalId" to approval.requestId,
+        "toolCallId" to (approval.toolCallId ?: ""),
+        "tool" to (approval.toolName ?: ""),
+        "source" to approval.source,
+    )
+}
+
 internal fun RuntimeEventDraft.toApprovalAutoAllowRequest(): ApprovalAutoAllowRequest? =
     when (val payload = this.payload) {
         is RuntimeEventPayload.ApprovalRequested -> payload.toApprovalAutoAllowRequest()
@@ -28,7 +66,7 @@ private fun RuntimeEventPayload.ApprovalRequested.toApprovalAutoAllowRequest() =
         requestId = request.approvalId.value,
         toolCallId = request.callId.value,
         toolName = request.toolName.value,
-        source = "control_request",
+        source = SOURCE_CONTROL_REQUEST,
     )
 
 private fun RuntimeEventPayload.RemoteStreamFrame.toApprovalAutoAllowRequest(): ApprovalAutoAllowRequest? {
@@ -39,7 +77,7 @@ private fun RuntimeEventPayload.RemoteStreamFrame.toApprovalAutoAllowRequest(): 
         requestId = approvalRequestId(delta),
         toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id"),
         toolName = toolCall?.string("name") ?: delta.toolName(),
-        source = "approval_request_message",
+        source = SOURCE_STREAM_DELTA,
     )
 }
 
