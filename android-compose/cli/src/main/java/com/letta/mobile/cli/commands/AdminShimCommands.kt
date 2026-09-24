@@ -2,42 +2,25 @@ package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.UsageError
-import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
-import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
-import com.letta.mobile.cli.runtime.AdminShimRecorder
 import com.letta.mobile.cli.runtime.CliJson
 import com.letta.mobile.cli.runtime.CliConnection
 import com.letta.mobile.cli.runtime.CliProfileStore
 import com.letta.mobile.cli.runtime.CliRestClient
-import com.letta.mobile.cli.runtime.CliWsSession
 import com.letta.mobile.cli.runtime.ReplayInteractiveShell
-import com.letta.mobile.cli.runtime.readImageAttachments
 import com.letta.mobile.data.timeline.headless.HeadlessReplayDumpOptions
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineReplayer
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
 import com.letta.mobile.data.timeline.headless.HydrationReplayOrder
 import com.letta.mobile.data.timeline.headless.TimelineAssertionOptions
-import com.letta.mobile.data.transport.ChannelTransport
-import com.letta.mobile.data.transport.ChannelTransportState
-import com.letta.mobile.data.transport.RunCursorStore
-import com.letta.mobile.data.transport.ServerFrame
-import com.letta.mobile.data.transport.WsChatBridge
 import java.nio.file.Files
 import java.nio.file.Paths
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -45,8 +28,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 internal abstract class AdminShimCommand(
     name: String,
     @Suppress("unused") help: String,
@@ -99,159 +80,6 @@ internal abstract class AdminShimCommand(
         value ?: defaultConversationId() ?: throw UsageError(
             "Missing conversation id. Pass --conversation, set LETTA_CONVERSATION_ID, or configure profile --conversation."
         )
-}
-
-internal class ConnectCommand : AdminShimCommand(
-    name = "connect",
-    help = "Open admin-shim mobile WebSocket, print welcome/session state, optionally hold.",
-) {
-    private val holdMs by option("--hold-ms", help = "Keep the socket open for this many ms after connect.").long().default(0)
-    private val timeoutMs by option("--timeout-ms").long().default(5_000)
-    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
-    private val runId by option("--run-id")
-    private val resumeCursor by option("--resume-cursor").long()
-
-    override fun run() = runBlocking {
-        val cursorStore = RunCursorStore.inMemory()
-        if (resumeCursor != null || runId != null) {
-            val resolvedRunId = runId ?: throw UsageError("--resume-cursor requires --run-id")
-            val resolvedConversationId = requireConversationId(conversation)
-            cursorStore.record(resolvedConversationId, resolvedRunId, resumeCursor ?: 0)
-        }
-        val transport = ChannelTransport(this, cursorStore)
-        val bridge = WsChatBridge(transport)
-        val collector = launch {
-            transport.events.collect { frame -> println("[frame] ${frame.typeName()}") }
-        }
-        try {
-            bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(timeoutMs.milliseconds) {
-                bridge.state.filterIsInstance<ChannelTransportState.Connected>().first()
-            }
-            val connected = bridge.state.value as ChannelTransportState.Connected
-            println(
-                "[connect] serverId=${connected.serverId} sessionId=${connected.sessionId} " +
-                    "deviceId=${connected.deviceId ?: "<none>"} a2ui=${connected.a2uiEnabled} " +
-                    "canonical=${connected.canonicalLiveTransport ?: "<unspecified>"}"
-            )
-            if (holdMs > 0) delay(holdMs.milliseconds)
-        } finally {
-            bridge.disconnect()
-            collector.cancel()
-        }
-    }
-}
-
-internal class SendCommand : AdminShimCommand(
-    name = "send",
-    help = "Send a message through admin-shim WS and fold frames into the headless timeline.",
-) {
-    private val text by argument("text").optional()
-    private val agentId by option("--agent", envvar = "LETTA_AGENT_ID")
-    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
-    private val images by option(
-        "--image",
-        "-i",
-        help = "Image file path or data:image/*;base64,... URL. Repeatable.",
-    ).multiple()
-    private val waitForStable by option("--wait-for-stable").flag(default = false)
-    private val dumpTimeline by option("--dump-timeline").flag(default = false)
-    private val timeoutMs by option("--timeout-ms").long().default(120_000)
-
-    override fun run() = runBlocking {
-        val rest = CliRestClient(baseUrl, token)
-        try {
-            val resolvedAgentId = requireAgentId(agentId)
-            val conversationId = conversation ?: defaultConversationId() ?: rest.createConversation(resolvedAgentId).id.value
-            val attachments = readImageAttachments(images)
-            val messageText = text.orEmpty()
-            if (messageText.isBlank() && attachments.isEmpty()) {
-                throw UsageError("Pass text, --image, or both")
-            }
-            coroutineScope {
-                val session = CliWsSession(
-                    scope = this,
-                    agentId = resolvedAgentId,
-                    initialConversationId = conversationId,
-                )
-                session.startCollecting()
-                try {
-                    session.connect(baseUrl, token, deviceId, clientVersion, timeoutMs = 5_000)
-                    session.send(
-                        text = messageText,
-                        attachments = attachments,
-                        waitForStable = waitForStable,
-                        timeoutMs = timeoutMs,
-                    )
-                    if (dumpTimeline) println(session.dump())
-                } finally {
-                    session.disconnect()
-                }
-            }
-        } finally {
-            rest.close()
-        }
-    }
-}
-
-internal class CaptureCommand : AdminShimCommand(
-    name = "capture",
-    help = "Capture REST hydrate snapshots and admin-shim mobile WS frames as replayable JSONL.",
-) {
-    private val shimUrl by option("--shim", help = "Admin-shim base URL. Alias for --base-url on this command.")
-    private val out by option("--output", "--out").required()
-    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
-    private val agentId by option("--agent", envvar = "LETTA_AGENT_ID")
-    private val message by option("--message", "-m")
-    private val runId by option("--run-id")
-    private val cursor by option("--cursor").long().default(0)
-    private val timeoutMs by option("--timeout-ms").long().default(120_000)
-    private val restLimit by option("--rest-limit").long().default(200)
-    private val skipRestSnapshot by option("--skip-rest-snapshot").flag(default = false)
-    private val fromPhone by option("--from-phone").flag(default = false)
-    private val adbSerial by option("--adb")
-
-    override fun run() = runBlocking {
-        if (fromPhone || adbSerial != null) {
-            throw UsageError(
-                "--from-phone/--adb capture requires a device-side diagnostic channel that is not " +
-                    "available yet. Use --shim capture against the admin-shim WS fixture path."
-            )
-        }
-        val captureBaseUrl = shimUrl ?: baseUrl
-        val conversationId = requireConversationId(conversation)
-        val resolvedAgentId: String? = if (message != null) requireAgentId(agentId) else agentId ?: defaultAgentId()
-        val restMessages = if (skipRestSnapshot) {
-            null
-        } else {
-            val rest = CliRestClient(captureBaseUrl, token)
-            try {
-                rest.fetchMessages(conversationId, restLimit.validatedIntLimit())
-            } finally {
-                rest.close()
-            }
-        }
-        val count = AdminShimRecorder().record(
-            baseUrl = captureBaseUrl,
-            token = token,
-            agentId = resolvedAgentId,
-            conversationId = conversationId,
-            message = message,
-            attachments = emptyList(),
-            runId = runId,
-            cursor = cursor,
-            out = Paths.get(out),
-            timeoutMs = timeoutMs,
-            deviceId = deviceId,
-            clientVersion = clientVersion,
-            restSnapshot = restMessages,
-            recordCursorEvents = true,
-        )
-        println(
-            "[capture] wrote $count events to $out " +
-                "(restSnapshot=${restMessages?.size ?: 0} messages, conversation=$conversationId)"
-        )
-    }
 }
 
 internal class DumpTimelineCommand : AdminShimCommand(
@@ -435,50 +263,6 @@ internal class ReplayCommand : AdminShimCommand(
     }
 }
 
-internal class RecordCommand : AdminShimCommand(
-    name = "record",
-    help = "Record admin-shim mobile WS wire frames to replay-compatible JSONL.",
-) {
-    private val out by option("--out").required()
-    private val agentId by option("--agent", envvar = "LETTA_AGENT_ID")
-    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
-    private val message by option("--message", "-m")
-    private val images by option(
-        "--image",
-        "-i",
-        help = "Image file path or data:image/*;base64,... URL. Repeatable; can be used with or without --message.",
-    ).multiple()
-    private val runId by option("--run-id")
-    private val cursor by option("--cursor").long().default(0)
-    private val timeoutMs by option("--timeout-ms").long().default(120_000)
-
-    override fun run() = runBlocking {
-        val attachments = readImageAttachments(images)
-        val shouldSendMessage = message != null || attachments.isNotEmpty()
-        val resolvedAgentId: String? = if (shouldSendMessage) requireAgentId(agentId) else agentId ?: defaultAgentId()
-        val resolvedConversationId = if (shouldSendMessage) {
-            requireConversationId(conversation)
-        } else {
-            conversation ?: defaultConversationId()
-        }
-        val count = AdminShimRecorder().record(
-            baseUrl = baseUrl,
-            token = token,
-            agentId = resolvedAgentId,
-            conversationId = resolvedConversationId,
-            message = message,
-            attachments = attachments,
-            runId = runId,
-            cursor = cursor,
-            out = Paths.get(out),
-            timeoutMs = timeoutMs,
-            deviceId = deviceId,
-            clientVersion = clientVersion,
-        )
-        println("[record] wrote $count frames to $out")
-    }
-}
-
 internal class RecordCursorStateCommand : CliktCommand(name = "record-cursor-state") {
     private val recording by option("--recording").required()
 
@@ -486,93 +270,6 @@ internal class RecordCursorStateCommand : CliktCommand(name = "record-cursor-sta
         val output = buildCursorStateSnapshot(Files.readAllLines(Paths.get(recording)))
         println(CliJson.encodeToString(JsonObject.serializer(), output))
     }
-}
-
-internal class DisconnectCommand : AdminShimCommand(
-    name = "disconnect",
-    help = "Open the admin-shim WS and close it cleanly with bye.",
-) {
-    override fun run() = runBlocking {
-        val transport = ChannelTransport(this, RunCursorStore.inMemory())
-        val bridge = WsChatBridge(transport)
-        bridge.connect(baseUrl, token, deviceId, clientVersion)
-        withTimeout(5.seconds) {
-            bridge.state.filterIsInstance<ChannelTransportState.Connected>().first()
-        }
-        println("[disconnect] connected; sending bye")
-        bridge.bye()
-        bridge.disconnect()
-        println("[disconnect] closed")
-    }
-}
-
-internal class ReconnectCommand : AdminShimCommand(
-    name = "reconnect",
-    help = "Connect, disconnect, then reconnect; optionally seed a run cursor to exercise resume.",
-) {
-    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
-    private val runId by option("--run-id")
-    private val cursor by option("--cursor").long().default(0)
-    private val holdMs by option("--hold-ms").long().default(1_000)
-
-    override fun run() = runBlocking {
-        val conversationId = conversation ?: defaultConversationId()
-        val cursorStore = RunCursorStore.inMemory()
-        if (conversationId != null && runId != null && cursor > 0) {
-            cursorStore.record(conversationId, runId.orEmpty(), cursor)
-        }
-        val transport = ChannelTransport(this, cursorStore)
-        val bridge = WsChatBridge(transport)
-        val collector = launch {
-            transport.events.collect { frame -> println("[frame] ${frame.typeName()}") }
-        }
-        try {
-            bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5.seconds) { bridge.state.filterIsInstance<ChannelTransportState.Connected>().first() }
-            println("[reconnect] first connection up")
-            bridge.disconnect()
-            println("[reconnect] disconnected")
-            bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5.seconds) { bridge.state.filterIsInstance<ChannelTransportState.Connected>().first() }
-            println("[reconnect] second connection up")
-            delay(holdMs.milliseconds)
-        } finally {
-            bridge.disconnect()
-            collector.cancel()
-        }
-    }
-}
-
-private fun ServerFrame.typeName(): String = when (this) {
-    is ServerFrame.Welcome -> "welcome"
-    is ServerFrame.Error -> "error:${code}"
-    is ServerFrame.TurnStarted -> "turn_started runId=$runId"
-    is ServerFrame.TurnDone -> "turn_done runId=$runId status=$status"
-    is ServerFrame.StopReason -> "stop_reason $stopReason"
-    is ServerFrame.UsageStatistics -> "usage_statistics total=$totalTokens"
-    is ServerFrame.AssistantMessage -> "assistant_message id=$id seq=${seqId ?: "<none>"}"
-    is ServerFrame.UserMessage -> "user_message id=$id seq=${seqId ?: "<none>"}"
-    is ServerFrame.ReasoningMessage -> "reasoning_message id=$id"
-    is ServerFrame.ToolCallMessage -> "tool_call_message id=$id"
-    is ServerFrame.ToolReturnMessage -> "tool_return_message id=$id"
-    is ServerFrame.SubscribeFrameMessage -> "subscribe_frame runId=$runId seq=$seq"
-    is ServerFrame.SubscribeDone -> "subscribe_done runId=$runId lastSeq=$lastSeq"
-    is ServerFrame.GoalsUpdated -> "goals_updated reason=$reason"
-    is ServerFrame.AgentUpdated -> "agent_updated agentId=$agentId reason=$reason"
-    is ServerFrame.A2ui -> "a2ui_frame id=$id"
-    is ServerFrame.A2uiCapabilities -> "a2ui_capabilities version=$version"
-    is ServerFrame.UserActionAck -> "user_action_ack status=$status"
-    is ServerFrame.UserActionOutcome -> "user_action_outcome outcome=$outcome"
-    is ServerFrame.CronListResponse -> "cron_list_response success=$success"
-    is ServerFrame.CronAddResponse -> "cron_add_response success=$success"
-    is ServerFrame.CronGetResponse -> "cron_get_response success=$success"
-    is ServerFrame.CronDeleteResponse -> "cron_delete_response success=$success"
-    is ServerFrame.CronDeleteAllResponse -> "cron_delete_all_response success=$success"
-    is ServerFrame.CronsUpdated -> "crons_updated reason=$reason"
-    is ServerFrame.SubagentListResponse -> "subagent_list_response success=$success"
-    is ServerFrame.SubagentTodosResponse -> "subagent_todos_response success=$success"
-    is ServerFrame.SubagentsUpdated -> "subagents_updated reason=$reason"
-    is ServerFrame.Unknown -> "unknown:$type"
 }
 
 private fun Long.validatedIntLimit(): Int {
