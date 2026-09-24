@@ -20,13 +20,16 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
  *
  * Only the lease's collector calls [skip], so the foreign set needs no synchronization. Binding a
  * run to this input by `client_message_id` (0.32.17 `client_message_ids_by_run_id`) is left to the
- * turn-run binding; this gate only covers the "queued and run unknown" window.
+ * turn-run binding ([bindRun]), which decides "is this run mine": a [RunOwnership.Own] frame is
+ * never skipped here, and a [RunOwnership.Foreign] one never reaches this gate. This gate only
+ * decides "am I still queued" for the frames the binding cannot place.
  */
 internal class QueuedLeaseFrameGate(private val queuedInput: QueuedInputTracker) {
     private val foreignRunIds = mutableSetOf<String>()
 
     /** Whether [received] must not reach this lease's boundary, run-id promotion or projection. */
-    fun skip(received: AppServerReceivedFrame, leaseRunId: String?): Boolean {
+    fun skip(received: AppServerReceivedFrame, leaseRunId: String?, ownership: RunOwnership): Boolean {
+        if (ownership == RunOwnership.Own) return false
         val frame = received.frame
         if (queuedInput.isQueued) {
             if (!frame.isRunScoped()) return false

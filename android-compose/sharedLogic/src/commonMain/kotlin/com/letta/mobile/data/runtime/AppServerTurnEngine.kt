@@ -1037,14 +1037,18 @@ class AppServerTurnEngine(
         budget: FrameProjectionErrorBudget,
     ) {
         if (!admitFrame(received, context)) return
+        // letta-mobile-qygvv.8: a run bound to another client_message_id never reaches this lease.
+        val ownership = context.lease.slot.bindRun(received, context.lease.token)
+        if (ownership == RunOwnership.Foreign) return
         context.idleWatchdog.markFrame()
         queueHygiene.observeTurnFrame(received.frame)
         val queueRemoval = observeQueueProgress(received, context.lease)
         // Review of PR #1661: a queued lease must not adopt the turn ahead of it. The gate runs
         // first so it records the run ids seen while queued even for frames held below.
-        if (context.queuedFrames.skip(received, context.lease.current?.runId)) return
-        // letta-mobile-qygvv.7: while queued, only update_queue concerns this lease.
-        if (context.lease.holdsWhileQueued(received)) return
+        if (context.queuedFrames.skip(received, context.lease.current?.runId, ownership)) return
+        // letta-mobile-qygvv.7: while queued, only update_queue concerns this lease — unless the
+        // qygvv.8 binding already proved the frame's run is this input's own.
+        if (ownership != RunOwnership.Own && context.lease.holdsWhileQueued(received)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val projected = projectAtBoundary(received, context, budget)
@@ -1234,6 +1238,7 @@ class AppServerTurnEngine(
         // prior ids are superseded and must not complete/mutate this lease.
         slot.runIdGate.beginLease(lease.token)
         slot.boundaryGate.beginLease(lease.token)
+        slot.runBinding.beginLease(lease.token, lease.queuedInput.clientMessageId)
         val (fanoutSubscriberId, inboundEvents) = inboundSource.subscribe(scope)
         val frameContext = TurnFrameContext(
             runtimeScope = scope,
@@ -1310,6 +1315,7 @@ class AppServerTurnEngine(
         // Superseded run IDs must not complete the active lease via the
         // same-conversation mismatch fallback (exact-scope path already gates
         // through runIdGate.accepts).
+        if (lease.slot.bindRun(received, lease.token) == RunOwnership.Foreign) return null
         if (!lease.slot.runIdGate.accepts(received, lease.token)) return null
         noteOwnerScopeDecision(
             scopeMatched = false,
