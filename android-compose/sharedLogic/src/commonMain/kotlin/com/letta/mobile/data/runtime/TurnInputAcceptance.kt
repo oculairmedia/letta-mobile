@@ -302,6 +302,17 @@ internal fun recordDequeued(lease: LeaseRef, source: String) {
 }
 
 /**
+ * letta-mobile-qygvv.7: while this lease's input is queued, frames on the scope belong to the turn
+ * ahead; only `update_queue` concerns it.
+ */
+internal fun LeaseRef.holdsWhileQueued(received: AppServerReceivedFrame): Boolean =
+    queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue
+
+/** The server dropped this lease's queued input and its `update_queue` frame already reached viewers. */
+internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boolean): Boolean =
+    projected && this == QueueRemovalDisposition.Cancelled
+
+/**
  * letta-mobile-qygvv.1: tracks a queued input through `update_queue`. Returns the
  * removal disposition for this lease's input when [received] carries one.
  *
@@ -324,7 +335,10 @@ internal fun observeQueueProgress(
 internal class TurnInputSender(
     private val client: AppServerClient,
     private val requestIdFactory: () -> String,
+    private val approvalSender: ApprovalResponseSender,
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    /** letta-mobile-qygvv.6: records a user input before it is sent, so its queue item is recognised. */
+    private val noteSentInput: (TurnRuntimeKey, String?, TurnCommand) -> Unit = { _, _, _ -> },
 ) {
     suspend fun sendInput(
         command: TurnCommand,
@@ -333,10 +347,14 @@ internal class TurnInputSender(
         emit: suspend (RuntimeEventDraft) -> Unit,
     ): InputAcceptance.Failure? {
         val input = command.toInputCommand(scope, externalToolRegistry)
+        // letta-mobile-qygvv.5: approval responses await input_accepted too; a
+        // rejected decision fails the turn instead of parking it.
+        input.approvalResponseOrNull()?.let { return approvalSender.sendAsTurnInput(scope, it) }
         if (command.input !is TurnInput.UserMessage) {
             client.input(input)
             return null
         }
+        noteSentInput(lease.key, lease.queuedInput.clientMessageId, command)
         val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
         val failure = acceptance.recordAndFailure(command.conversationId)
         if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, emit)

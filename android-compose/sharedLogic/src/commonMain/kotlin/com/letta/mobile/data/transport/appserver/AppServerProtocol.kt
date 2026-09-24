@@ -42,6 +42,9 @@ object AppServerProtocol {
         "turn_finished",
         "sync_response",
         "abort_message_response",
+        // 0.32+ queue control (letta-mobile-qygvv.6).
+        "resume_queue_response",
+        "remove_queue_item_response",
         "external_tool_call_request",
         "control_request",
         "admin_rpc_response",
