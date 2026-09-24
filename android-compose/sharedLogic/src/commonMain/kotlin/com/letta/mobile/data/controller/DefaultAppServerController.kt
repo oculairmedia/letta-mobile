@@ -6,8 +6,10 @@ import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.DeviceStateChanger
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnContextPreflight
+import com.letta.mobile.data.runtime.TurnInboundSource
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -133,6 +135,9 @@ class DefaultAppServerController(
     private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
+    /** letta-mobile-qygvv.7: in-place mode changes over the controller-owned router. */
+    private val deviceState = DeviceStateChanger(client, TurnInboundSource(client, eventRouter))
+
     /**
      * Turn engine instance. Created lazily and reused for all turns.
      * The engine itself serializes turns, so we don't need additional locking here.
@@ -251,7 +256,13 @@ class DefaultAppServerController(
 
     /**
      * Returns a matching cached runtime, or null when a fresh start is required.
-     * Evicts and invalidates the engine when the cached permission mode differs.
+     *
+     * letta-mobile-qygvv.7: a permission-mode change on a cached runtime is applied
+     * in place with `change_device_state{mode}` and confirmed from the scope's
+     * `update_device_status`; the runtime is NOT restarted (runtime_start replays
+     * state and re-registers external tools). Only when the server does not confirm
+     * the new mode is the runtime evicted, so the next start re-attaches with the
+     * requested mode rather than leaving a cached runtime in an unknown mode.
      */
     private suspend fun evictCachedRuntimeIfModeMismatch(
         key: RuntimeKey,
@@ -259,6 +270,10 @@ class DefaultAppServerController(
     ): CanonicalRuntime? {
         val cached = runtimeCache[key] ?: return null
         if (runtimePermissionModes[key] == effectiveMode) return cached
+        if (deviceState.changePermissionMode(cached.scope, effectiveMode)) {
+            runtimePermissionModes[key] = effectiveMode
+            return cached
+        }
         runtimeCache.remove(key)
         turnEngine.invalidateRuntime(notifyHost = false)
         return null

@@ -167,6 +167,7 @@ class AppServerTurnEngine(
     private val leases = TurnLeaseRegistry()
     private val leaseTokenSeq = atomic(0L)
     private val inboundSource = TurnInboundSource(client, eventRouter)
+    private val deviceState = DeviceStateChanger(client, inboundSource)
 
     /**
      * lgns8.22.5: the FULL external-tool invocation lifecycle — claim, generation
@@ -516,29 +517,15 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile folder-settings #2: changes the working directory for
-     * [agentId]/[conversationId] by re-issuing `runtime_start` with `cwd`
-     * set — the only client-facing mechanism the runtime supports for this
-     * (there is no dedicated `set_cwd` command upstream). Mirrors
-     * [ensureRuntime]'s command shape (same `clientInfo` / externalTools
-     * advertisement) so this doesn't clobber the connection's registered
-     * external tools with an empty list. Returns true on success.
+     * letta-mobile folder-settings #2 / letta-mobile-qygvv.7: changes the working
+     * directory for [agentId]/[conversationId] with `change_device_state{cwd}` and
+     * confirms it from the matching `update_device_status` (bounded wait, see
+     * [DeviceStateChanger]). Never re-issues `runtime_start`: that replays full
+     * state and re-registers external tools mid-turn. Returns false when the server
+     * does not confirm the new directory in time.
      */
-    suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean {
-        val response = client.runtimeStart(
-            AppServerCommand.RuntimeStart(
-                requestId = requestIdFactory(),
-                agentId = agentId,
-                conversationId = conversationId,
-                cwd = cwd,
-                clientInfo = clientInfo,
-                recoverApprovals = true,
-                forceDeviceStatus = true,
-                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
-            ),
-        )
-        return response.success
-    }
+    suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean =
+        deviceState.changeWorkingDirectory(AppServerRuntimeScope(agentId, conversationId), cwd)
 
     /**
      * letta-mobile-c4igq.3 / lgns8.22.2: causal liveness recovery.
