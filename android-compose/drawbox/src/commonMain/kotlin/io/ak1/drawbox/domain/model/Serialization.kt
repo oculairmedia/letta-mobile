@@ -189,6 +189,18 @@ data class ElementDto(
     val textColor: String? = null,
 )
 
+/**
+ * The image's bytes as written into the drawing, or null. Inline while every reader still needs the
+ * bytes in the drawing; once assets are served, an image with a ref carries only the ref (see
+ * DrawingSerializer.inlineImageBytes). Bytes that are only its preview, shown until the full asset
+ * arrives, are never written as the image: they would stand in for it wherever the drawing went.
+ */
+private fun Element.Image.inlineImageData(inlineImageBytes: Boolean): String? = when {
+    assetRef == null -> Base64.encode(bytes)
+    !inlineImageBytes || bytes.isEmpty() || isShowingPreview -> null
+    else -> Base64.encode(bytes)
+}
+
 fun Element.toDto(inlineImageBytes: Boolean = DrawingSerializer.inlineImageBytes): ElementDto = when (this) {
     is Element.Path -> ElementDto(
         id = id,
@@ -216,15 +228,7 @@ fun Element.toDto(inlineImageBytes: Boolean = DrawingSerializer.inlineImageBytes
         rotation = rotation.takeIf { it != 0f },
         createdAt = createdAt.takeIf { it != 0L },
         modifiedAt = modifiedAt.takeIf { it != 0L },
-        // Inline while every reader still needs the bytes in the drawing; once assets are served,
-        // an image with a ref carries only the ref (see DrawingSerializer.inlineImageBytes). Bytes
-        // that are only its preview, shown until the full asset arrives, are never written as the
-        // image: they would stand in for it wherever the drawing went.
-        imageData = when {
-            assetRef == null -> Base64.encode(bytes)
-            !inlineImageBytes || bytes.isEmpty() || isShowingPreview -> null
-            else -> Base64.encode(bytes)
-        },
+        imageData = inlineImageData(inlineImageBytes),
         imageRef = assetRef,
         imageMediaType = mediaType,
         imagePreview = preview?.let { Base64.encode(it) },
