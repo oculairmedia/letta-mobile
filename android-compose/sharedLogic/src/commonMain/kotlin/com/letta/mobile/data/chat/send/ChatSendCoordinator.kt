@@ -507,9 +507,16 @@ class ChatSendCoordinator(
         return state.turnId != key && state.identity.isFenced(key)
     }
 
-    /** [resolveStateByTurnId] restricted to frames that may still mutate live turn state. */
-    private fun liveStateForTurn(turnId: String?): ConversationTurnState? =
-        resolveStateByTurnId(turnId)?.takeUnless { isRetiredTurn(it, turnId) }
+    /** Live state a stop/usage tail may mutate; a retired turn's tail is only forwarded ([forwardRetiredTurnTail]). */
+    private fun liveTailStateOrForward(event: WsTimelineEvent, tail: TurnTail): ConversationTurnState? {
+        val state = resolveStateByTurnId(tail.turnId)
+        when {
+            state == null -> reportUnmatchedFrame(event, tail.turnId, tail.runId)
+            !isRetiredTurn(state, tail.turnId) -> return state
+            else -> forwardRetiredTurnTail(runtimeEventBatcher, event, tail, state.localConversationId ?: state.conversationId)
+        }
+        return null
+    }
 
     /**
      * [ChatSendUiSink] is a SINGLETON bound to whatever conversation is on
@@ -959,11 +966,7 @@ class ChatSendCoordinator(
             is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
             is WsTimelineEvent.MessageDelta -> handleMessageDelta(event)
             is WsTimelineEvent.StopReason -> {
-                val state = liveStateForTurn(event.turnId)
-                if (state == null) {
-                    reportUnmatchedFrame(event, event.turnId, event.runId)
-                    return
-                }
+                val state = liveTailStateOrForward(event, TurnTail(event.turnId, event.runId)) ?: return
                 val effectiveConversationId = state.localConversationId ?: state.conversationId
                 runtimeEventBatcher.enqueue(event, effectiveConversationId)
                 if (ignoreForeignTurnStop(state, event)) return
@@ -971,11 +974,7 @@ class ChatSendCoordinator(
                 markTurnVisuallyComplete(state, reason = "stopReason")
             }
             is WsTimelineEvent.UsageStatistics -> {
-                val state = liveStateForTurn(event.turnId)
-                if (state == null) {
-                    reportUnmatchedFrame(event, event.turnId, event.runId)
-                    return
-                }
+                val state = liveTailStateOrForward(event, TurnTail(event.turnId, event.runId)) ?: return
                 val effectiveConversationId = state.localConversationId ?: state.conversationId
                 runtimeEventBatcher.enqueue(event, effectiveConversationId)
                 // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
@@ -1067,7 +1066,7 @@ class ChatSendCoordinator(
         // No conversation on the frame: legacy WS frames only (Iroh always stamps agent, conversation
         // and turn). The WS contract attributes these to this chat's own send or open conversation,
         // pinned by WsChatSendCoordinatorTest (replay, live stream, pre-conversation buffering).
-        val state = boundState ?: event.turnId?.let { liveStateForTurn(it) }
+        val state = boundState ?: event.turnId?.let { id -> resolveStateByTurnId(id)?.takeUnless { isRetiredTurn(it, id) } }
         return state?.let { it.localConversationId ?: it.conversationId }
             ?: lastActiveConversationId
             ?: activeConversationId()
