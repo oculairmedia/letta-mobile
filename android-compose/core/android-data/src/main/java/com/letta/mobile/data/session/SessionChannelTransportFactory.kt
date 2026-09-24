@@ -76,7 +76,7 @@ class SessionChannelTransportFactory @Inject constructor(
                 reportChoice("noop-local")
                 NoOpChannelTransport()
             }
-            SessionBackendBinding.RemoteHttpOrWs -> {
+            SessionBackendBinding.RemoteHttp -> {
                 canvasClient?.detach()
                 reportChoice(if (localRuntimeBackend != null) "noop-local" else "noop-rest")
                 NoOpChannelTransport()

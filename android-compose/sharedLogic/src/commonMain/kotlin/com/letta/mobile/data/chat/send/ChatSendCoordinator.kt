@@ -6,7 +6,6 @@ import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.isIrohBackend
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.TurnFailureNotices
@@ -35,7 +34,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
- * Platform-neutral SEND orchestration for the admin-shim mobile WebSocket
+ * Platform-neutral SEND orchestration for the frame-channel (Iroh) send
  * path, extracted from Android's `WsChatSendCoordinator` (letta-mobile-9ejia.5)
  * so desktop can reuse the exact same logic instead of reimplementing a thinner
  * send path.
@@ -613,26 +612,16 @@ class ChatSendCoordinator(
             "attachments" to attachments.size,
             "activeConversationId" to targetConversationId,
         )
-        // Only the legacy admin-shim WS actually needs a bearer token. The Iroh
-        // transport authenticates the paired peer by NodeID and ignores the
-        // token entirely (IrohChannelTransport sends its auth frame even with a
-        // blank token and only fails on an explicit auth rejection). Gating Iroh
-        // sends on a token was the sole reason paired devices had to carry one —
-        // relaxing it here is the client half of retiring the bearer token
-        // (d6e8g.9). Token-carrying devices are unaffected; this only stops the
-        // client from self-rejecting a BLANK token on an iroh:// backend.
+        // No bearer-token gate: the Iroh transport authenticates the paired
+        // peer by NodeID and ignores the token (d6e8g.9). The legacy shim WS
+        // that needed one is gone (g70jb.4).
         val config = validatedActiveConfig() ?: return
-        // lcp-dlj: multimodal sends now flow through content_parts. The
-        // shim hard-caps the JSON-encoded payload at 10 MB; the client-
-        // side downsample (≤ 4 images, ≤ 1568px longest side, ≤ 2 MB raw
-        // each) is enforced at the composer attachment step before we
-        // get here (TODO: letta-mobile-i9zz once filed). If the shim
-        // still trips its cap we surface protocol_violation as a one-
-        // shot toast via the standard Error path.
+        // Multimodal sends flow through content_parts; the client-side
+        // downsample (≤ 4 images, ≤ 1568px longest side, ≤ 2 MB raw each) is
+        // enforced at the composer attachment step before we get here.
 
-        // The live shim requires every send_message to carry a concrete
-        // conversation_id. Pre-create fresh conversations through REST instead
-        // of sending a blank placeholder and relying on shim-side minting.
+        // Every send carries a concrete conversation_id. Pre-create fresh
+        // conversations through REST instead of sending a blank placeholder.
         val currentConversationId = targetConversationId?.takeIf { it.isNotBlank() }
         val conversationId = when {
             currentConversationId != null -> currentConversationId
@@ -665,7 +654,7 @@ class ChatSendCoordinator(
         val connected = ensureConnected(config)
         Telemetry.event("IrohTrace", "coordinator.ensureConnected.done", "conversationId" to conversationId, "connected" to connected)
         if (!connected) {
-            ui.onSendFailed("Admin-shim WebSocket is not connected")
+            ui.onSendFailed("Chat channel is not connected")
             timer.stop("accepted" to false, "reason" to "not_connected")
             return
         }
@@ -704,10 +693,6 @@ class ChatSendCoordinator(
         )
         if (config == null) {
             ui.onSendFailed("No active backend is configured")
-            return null
-        }
-        if (config.accessToken.isNullOrBlank() && !config.isIrohBackend()) {
-            ui.onSendFailed("Admin-shim WebSocket requires an API token")
             return null
         }
         return config

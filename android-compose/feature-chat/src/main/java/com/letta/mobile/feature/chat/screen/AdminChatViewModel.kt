@@ -253,9 +253,8 @@ internal class AdminChatViewModel @Inject constructor(
         get() = routeArgs.explicitNewChat
     /**
      * lgns8.10.4.1: the chat screen's real question is "is this backend served
-     * by a frame channel?" (Iroh **or** shim WS) — not "is this the shim?".
-     * The detector answers both separately now; the old `activeIsShimBackend`
-     * returned true for Iroh, which is exactly the inversion this bead fixes.
+     * by a frame channel?" — not "is this the shim?". Since g70jb.4 only Iroh
+     * is; a leftover shim-era config classifies as REST.
      */
     private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
         .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveUsesChannelTransport())
@@ -1065,12 +1064,6 @@ internal class AdminChatViewModel @Inject constructor(
     // Keep startup after all backing fields and lazy delegates: Main.immediate can
     // resolve a cached route and start its observer before this constructor returns.
     init {
-        viewModelScope.launch {
-            shimBackendDetector.refreshActive()
-            settingsRepository.activeConfigChanges.collect { config ->
-                shimBackendDetector.refresh(config)
-            }
-        }
         transportCoordinator.startObserving()
         goalCoordinator.startObserving()
         slashCommandsCoordinator.loadSlashCommands()

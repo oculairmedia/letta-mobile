@@ -22,12 +22,6 @@ enum class BackendKind {
     /** Iroh QUIC node (`iroh://…`). Production transport. Never dials the shim. */
     IROH,
 
-    /**
-     * The legacy letta-code admin shim, reached over its mobile WebSocket
-     * channel. Retained only for explicitly shim-configured backends.
-     */
-    SHIM_WS,
-
     /** Vanilla Letta server / Letta Cloud over plain REST. */
     REST;
 
@@ -35,17 +29,11 @@ enum class BackendKind {
      * True when this backend is served by an [com.letta.mobile.data.transport.api.IChannelTransport]
      * (a duplex frame channel) rather than by REST polling.
      *
-     * NOTE: this is the predicate that the chat UI actually wants wherever it
-     * historically asked `isShimBackend` — it covers **both** Iroh and the
-     * shim WS. Keeping the two questions separate is the whole point: "does
-     * this backend stream frames?" is not "is this backend the shim?".
+     * g70jb.4: only Iroh does now. The legacy shim WS backend kind is gone, so
+     * a leftover shim-era config classifies as [REST].
      */
     val usesChannelTransport: Boolean
-        get() = this == IROH || this == SHIM_WS
-
-    /** True only for the genuine LettaShim WS backend. */
-    val isShim: Boolean
-        get() = this == SHIM_WS
+        get() = this == IROH
 }
 
 /**
@@ -68,22 +56,13 @@ fun isIrohBackendUrl(url: String?): Boolean {
 /**
  * Classify a config without a network probe.
  *
- * [shimDetected] is the cached result of the `/v1/health` shim probe and is
- * consulted **only** when the config is neither local nor Iroh — an Iroh
- * config must never be health-probed, because that probe is itself an HTTP
- * dial at the shim's address.
- *
  * [forceIroh] lets a caller feed in the platform transport-selection predicate
  * (`IrohChannelTransport.shouldUseIroh`, which also honours the debug-only
  * `DEBUG_FORCE_IROH_URL`) so classification can never disagree with the
  * transport the session graph actually bound.
  */
-fun LettaConfig.backendKind(
-    shimDetected: Boolean = false,
-    forceIroh: Boolean = false,
-): BackendKind = when {
+fun LettaConfig.backendKind(forceIroh: Boolean = false): BackendKind = when {
     mode == LettaConfig.Mode.LOCAL -> BackendKind.LOCAL_RUNTIME
     forceIroh || isIrohBackend() -> BackendKind.IROH
-    shimDetected -> BackendKind.SHIM_WS
     else -> BackendKind.REST
 }

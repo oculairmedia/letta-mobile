@@ -112,7 +112,7 @@ sealed interface ServerFrame {
      * [UserActionAck], this is UX-facing: it tells mobile whether the
      * action was matched to a tool approval, injected as chat input,
      * recorded for later, rejected, or failed. [frameId] correlates to
-     * the outbound [UserActionFrame.id].
+     * the outbound `user_action` frame id.
      */
     @Serializable
     data class UserActionOutcome(
@@ -237,7 +237,7 @@ sealed interface ServerFrame {
 
     /**
      * Spec §2.2 + §4.2: `id` always carries the `cm-stream-` prefix.
-     * `otid` echoes the client's [SendMessageFrame.otid] when present
+     * `otid` echoes the client's `send_message` `otid` when present
      * so mobile's `dedupeOptimisticContentTwins` can collapse the
      * stream-vs-disk twins on reconcile.
      *
@@ -378,7 +378,7 @@ sealed interface ServerFrame {
     /**
      * letta-mobile-2rkdj — Spec §11/§3.4: a single replayed (or
      * live-tailed) entry from a Run's `frames.jsonl`, emitted in
-     * response to a [com.letta.mobile.data.transport.SubscribeFrame].
+     * response to a `subscribe` request.
      *
      * `seq` is the cursor value to persist; on next reconnect, pass
      * `cursor: seq` to resume after this frame.
@@ -532,7 +532,7 @@ sealed interface ServerFrame {
     // SubagentRepository treats that as broadcast-only.
 
     /**
-     * Response to [SubagentListFrame] (§13.2). `subagents` carries the
+     * Response to a `subagent_list` request (§13.2). `subagents` carries the
      * full enumeration (active-only unless the request set `all`).
      */
     @Serializable
@@ -548,7 +548,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * Response to [SubagentTodosFrame] (§13.3). `subagent` is the matched
+     * Response to a `subagent_todos` request (§13.3). `subagent` is the matched
      * registry entry; `todos` is the latest TodoWrite snapshot. `found`
      * / `todosFound` degrade gracefully when the subagent or its todos
      * could not be resolved.

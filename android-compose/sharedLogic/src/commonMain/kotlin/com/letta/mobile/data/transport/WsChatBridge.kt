@@ -48,7 +48,7 @@ import kotlinx.coroutines.flow.emptyFlow
 class WsChatBridge(
     private val transport: IChannelTransport,
 ) {
-    /** Re-export the connection state without forcing callers to know about ChannelTransport. */
+    /** Re-export the connection state without forcing callers to know about the transport. */
     val state: StateFlow<ChannelTransportState> = transport.state
 
     val connection: Flow<WsConnectionState> = transport.state.map { it.toConnectionState() }
@@ -367,7 +367,7 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     // Welcome carries connection metadata, not chat content; surface via state.
     // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
     // Cron frames (letta-mobile-d52f.1) are observed directly off
-    // ChannelTransport.events by the cron repository — not chat content.
+    // IChannelTransport.events by the cron repository — not chat content.
     is ServerFrame.Welcome,
     is ServerFrame.A2ui,
     is ServerFrame.A2uiCapabilities,

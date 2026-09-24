@@ -108,7 +108,7 @@ object WsFrameMapper {
         is ServerFrame.SubagentsUpdated,
         // letta-mobile-2rkdj: subscribe envelopes are routing-only —
         // SubscribeFrameMessage's inner BridgeFrame is re-routed
-        // through the live handler in ChannelTransport, and
+        // through the transport's live handler, and
         // SubscribeDone is metadata for cursor cleanup.
         is ServerFrame.SubscribeFrameMessage,
         is ServerFrame.SubscribeDone,
