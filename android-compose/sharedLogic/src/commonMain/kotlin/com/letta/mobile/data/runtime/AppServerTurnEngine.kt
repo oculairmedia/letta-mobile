@@ -8,7 +8,6 @@ import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -19,11 +18,9 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
 import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.runtime.RuntimeRunStatus
-import com.letta.mobile.runtime.ToolApprovalDecisionValue
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
-import com.letta.mobile.runtime.ToolPolicy
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
@@ -49,7 +46,6 @@ import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -189,16 +185,10 @@ class AppServerTurnEngine(
      * for why claim/generation ownership stays in [InboundControlRequestRegistry].
      */
     private val approvals = ApprovalRegistry()
+    private val inputSender = TurnInputSender(client, requestIdFactory, externalToolRegistry)
 
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
-
-    /** A slot plus the token of the lease this turn owns inside it. */
-    private class LeaseRef(val slot: TurnLeaseSlot, val token: Long) {
-        val key: TurnRuntimeKey get() = slot.key
-        /** The slot still holds OUR lease (not a successor's). */
-        val current: TurnLease? get() = slot.lease?.takeIf { it.token == token }
-    }
 
     /**
      * lgns8.22.4: cancel the active turn immediately when its connection generation
@@ -667,7 +657,7 @@ class AppServerTurnEngine(
     private fun runObjIsTerminal(obj: JsonObject?): Boolean {
         if (obj == null) return false
         val status = obj["status"]?.jsonPrimitive?.contentOrNull?.lowercase()
-        if (status != null && (status == "completed" || status == "failed" || status == "cancelled" || status == "error" || status == "expired")) return true
+        if (status in TERMINAL_RUN_STATUSES) return true
         // completed_at set is also terminal.
         if (obj["completed_at"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true) return true
         return false
@@ -718,7 +708,8 @@ class AppServerTurnEngine(
         val ownerProcessRole = permissionModeProvider(command).name
         val leaseToken = leaseTokenSeq.incrementAndGet()
         val slot = slotFor(command)
-        val leaseRef = LeaseRef(slot, leaseToken)
+        val queuedInput = QueuedInputTracker((command.input as? TurnInput.UserMessage)?.localMessageId)
+        val leaseRef = LeaseRef(slot, leaseToken, queuedInput)
         val lease = TurnLease(
             token = leaseToken,
             runtimeId = command.runtimeId.value,
@@ -764,17 +755,7 @@ class AppServerTurnEngine(
             if (cur?.token == leaseToken) cur.copy(ownerJob = coroutineContext[Job]) else cur
         }
 
-        slot.owner = ActiveTurnOwner(
-            runId = null,
-            runtimeId = command.runtimeId.value,
-            agentId = command.agentId.value,
-            conversationId = command.conversationId.value,
-            acquiredAtMs = acquiredAtMs,
-            lastTerminal = null,
-            processRole = ownerProcessRole,
-            settleDeadlineMs = terminalSettleQuietMs,
-            watchdogDeadlineMs = turnIdleTimeoutMs,
-        )
+        slot.owner = lease.toInitialOwner()
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.acquired",
             "runtimeId" to command.runtimeId.value,
@@ -802,7 +783,6 @@ class AppServerTurnEngine(
             Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
             send(command.startedDraft())
 
-            val queuedInput = QueuedInputTracker((command.input as? TurnInput.UserMessage)?.localMessageId)
             val collectorReady = CompletableDeferred<Unit>()
             collector = launch {
                 try {
@@ -815,7 +795,6 @@ class AppServerTurnEngine(
                         turnPermissionMode,
                         collectorReady,
                         leaseRef,
-                        queuedInput,
                     ) { draft -> send(draft) }
                 } catch (completed: TurnCompletedMarker) {
                     releaseReason = "normal_completion"
@@ -835,17 +814,11 @@ class AppServerTurnEngine(
                 }
             }
             collectorReady.await()
-            val inputFailure = sendTurnInput(command, scope, leaseRef, queuedInput) { draft -> send(draft) }
+            val inputFailure = inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
             Telemetry.event("IrohTurn", "input.sent")
-            if (inputFailure != null) {
-                // letta-mobile-qygvv.1: the server will never run this input — fail
-                // now instead of waiting out the idle watchdog.
-                collector.cancelAndJoin()
-                releaseReason = "input_rejected"
+            releaseReason = joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
                 noteOwnerTerminal(RuntimeRunStatus.Failed, source = "input_rejected", lease = leaseRef)
-                send(command.failedDraft(inputFailure))
-            } else {
-                collector.join()
+                send(command.failedDraft(failureText))
             }
         } finally {
             withContext(NonCancellable) {
@@ -1091,7 +1064,6 @@ class AppServerTurnEngine(
         val idleWatchdog: TurnIdleWatchdog,
         val draftProcessor: TurnDraftProcessor,
         val externalToolDispatchScope: CoroutineScope,
-        val queuedInput: QueuedInputTracker,
         val emit: suspend (RuntimeEventDraft) -> Unit,
     )
 
@@ -1125,7 +1097,7 @@ class AppServerTurnEngine(
         budget: FrameProjectionErrorBudget,
     ) {
         if (isConnectionGenerationSuperseded(context.lease)) {
-            completeSupersededTurn(context)
+            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
         }
         if (received.isStaleGenerationForLease(context.lease)) return
         if (!received.matches(context.runtimeScope, context.lease)) {
@@ -1135,14 +1107,16 @@ class AppServerTurnEngine(
         val slot = context.lease.slot
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
-        val queueRemoval = observeQueueProgress(received, context)
-        if (context.queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue) return
+        val queueRemoval = observeQueueProgress(received, context.lease)
+        if (context.lease.queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val projected = projectAtBoundary(received, context, budget)
         // The update_queue passthrough draft above still reaches viewers; only then
         // settle a lease whose queued input the server dropped.
-        if (projected && queueRemoval == QueueRemovalDisposition.Cancelled) completeQueueCancelledTurn(context)
+        if (projected && queueRemoval == QueueRemovalDisposition.Cancelled) {
+            completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
+        }
     }
 
     /** letta-mobile-qygvv.2: projects one accepted frame through the [TurnBoundaryGate] decision. */
@@ -1223,126 +1197,21 @@ class AppServerTurnEngine(
         }
     }
 
-    /**
-     * letta-mobile-qygvv.1: sends the turn's input. A `create_message` carries a
-     * `request_id` and waits for `input_accepted`; approval responses stay
-     * fire-and-forget. Returns the failure reason when the input will never run,
-     * else null. A queued input moves the lease to [TurnLeasePhase.Queued] and
-     * emits a visible Running lifecycle so the UI does not look hung.
-     */
-    private suspend fun sendTurnInput(
-        command: TurnCommand,
-        scope: AppServerRuntimeScope,
-        lease: LeaseRef,
-        queuedInput: QueuedInputTracker,
-        emit: suspend (RuntimeEventDraft) -> Unit,
-    ): String? {
-        val input = command.toInputCommand(scope)
-        if (command.input !is TurnInput.UserMessage) {
-            client.input(input)
-            return null
+    private suspend fun completeAbruptTurn(context: TurnFrameContext, ending: AbruptTurnEnding): Nothing {
+        ending.ownerTerminalSource?.let { source ->
+            recordDequeued(context.lease, source)
+            noteOwnerTerminal(ending.status, source = source, lease = context.lease)
         }
-        val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
-        val failure = acceptance.recordAndFailureReason(command.conversationId.value)
-        if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, queuedInput, emit)
-        return failure
-    }
-
-    private suspend fun enterQueued(
-        command: TurnCommand,
-        lease: LeaseRef,
-        queuedInput: QueuedInputTracker,
-        emit: suspend (RuntimeEventDraft) -> Unit,
-    ) {
-        // Started evidence may already have been processed by the collector.
-        if (!queuedInput.markQueued()) return
-        lease.slot.updateLease { cur ->
-            if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Streaming) {
-                cur.copy(phase = TurnLeasePhase.Queued)
-            } else {
-                cur
-            }
-        }
-        Telemetry.event(
-            "AppServerTurnEngine", "turn.queued",
-            "key" to lease.key.toString(),
-            "leaseToken" to lease.token,
-            "clientMessageId" to (queuedInput.clientMessageId ?: "<none>"),
-        )
-        emit(command.queuedInputDraft())
-    }
-
-    /**
-     * letta-mobile-qygvv.1: tracks a queued input through `stream_delta` and
-     * `update_queue`. Returns the removal disposition for this lease's input when
-     * [received] carries one.
-     */
-    private fun observeQueueProgress(
-        received: AppServerReceivedFrame,
-        context: TurnFrameContext,
-    ): QueueRemovalDisposition? {
-        val frame = received.frame
-        val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(context.queuedInput::removalIn)
-        // While queued, frames on this scope belong to the turn ahead; only the
-        // dequeue transition for OUR client_message_id proves our input started.
-        val startedBy = when {
-            removal == QueueRemovalDisposition.Dequeued -> "update_queue"
-            frame is AppServerInboundFrame.StreamDelta && !context.queuedInput.isQueued -> "stream_delta"
-            else -> null
-        }
-        if (startedBy != null && context.queuedInput.markStarted()) leaveQueued(context.lease, startedBy)
-        return removal
-    }
-
-    private fun leaveQueued(lease: LeaseRef, source: String) {
-        lease.slot.updateLease { cur ->
-            if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Queued) {
-                cur.copy(phase = TurnLeasePhase.Streaming)
-            } else {
-                cur
-            }
-        }
-        Telemetry.event(
-            "AppServerTurnEngine", "turn.dequeued",
-            "key" to lease.key.toString(),
-            "leaseToken" to lease.token,
-            "source" to source,
-        )
-    }
-
-    /** The server dropped this lease's queued input (`update_queue` removal `cancelled`). */
-    private suspend fun completeQueueCancelledTurn(context: TurnFrameContext): Nothing {
-        Telemetry.event(
-            "AppServerTurnEngine", "turn.dequeued",
-            "key" to context.lease.key.toString(),
-            "leaseToken" to context.lease.token,
-            "source" to "update_queue_cancelled",
-        )
         val ledger = context.draftProcessor.ledger
         settleDanglingToolCalls(
             context.command,
             ledger.emitted,
             ledger.returned,
             context.emit,
-            QUEUED_INPUT_CANCELLED_REASON,
+            ending.reason,
         )
         context.draftProcessor.flushTail()
-        noteOwnerTerminal(RuntimeRunStatus.Cancelled, source = "update_queue_cancelled", lease = context.lease)
-        context.emit(context.command.cancelledDraft(QUEUED_INPUT_CANCELLED_REASON))
-        throw TurnCompleted
-    }
-
-    private suspend fun completeSupersededTurn(context: TurnFrameContext): Nothing {
-        val ledger = context.draftProcessor.ledger
-        settleDanglingToolCalls(
-            context.command,
-            ledger.emitted,
-            ledger.returned,
-            context.emit,
-            "Connection generation superseded during turn",
-        )
-        context.draftProcessor.flushTail()
-        context.emit(context.command.failedDraft("Connection generation superseded during turn"))
+        context.emit(ending.draftFor(context.command))
         throw TurnCompleted
     }
 
@@ -1379,16 +1248,10 @@ class AppServerTurnEngine(
         turnPermissionMode: AppServerPermissionMode,
         collectorReady: CompletableDeferred<Unit>,
         lease: LeaseRef,
-        queuedInput: QueuedInputTracker,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
         val slot = lease.slot
-        // letta-mobile-qygvv.1: a queued input is silent by design until the turn
-        // ahead of it finishes. A superseded connection generation lifts the pause
-        // so a queued lease on a dead link still times out.
-        val idleWatchdog = TurnIdleWatchdog(slot.key) {
-            queuedInput.isQueued && !isConnectionGenerationSuperseded(lease)
-        }
+        val idleWatchdog = TurnIdleWatchdog(slot.key) { lease.queuedInput.isWatchdogPaused(isConnectionGenerationSuperseded(lease)) }
         val watchdog = idleWatchdog.launchIn(this)
         val draftProcessor = TurnDraftProcessor(
             callbacks = TurnDraftCallbacks(
@@ -1440,7 +1303,6 @@ class AppServerTurnEngine(
             idleWatchdog = idleWatchdog,
             draftProcessor = draftProcessor,
             externalToolDispatchScope = externalToolDispatchScope,
-            queuedInput = queuedInput,
             emit = emitDraft,
         )
         try {
@@ -1655,45 +1517,6 @@ class AppServerTurnEngine(
         return true
     }
 
-    private fun RuntimeEventDraft.toApprovalAutoAllowRequest(): ApprovalAutoAllowRequest? {
-        when (val payload = this.payload) {
-            is RuntimeEventPayload.ApprovalRequested -> return ApprovalAutoAllowRequest(
-                requestId = payload.request.approvalId.value,
-                toolCallId = payload.request.callId.value,
-                toolName = payload.request.toolName.value,
-                source = "control_request",
-            )
-            is RuntimeEventPayload.RemoteStreamFrame -> {
-                if (payload.messageType != "approval_request_message") return null
-                val delta = runCatching {
-                    val raw = AppServerProtocol.json.parseToJsonElement(payload.body).jsonObject
-                    raw["delta"]?.jsonObject ?: raw
-                }.getOrNull() ?: return null
-                val requestId = delta.string("approval_request_id")
-                    ?: delta.string("id")
-                    ?: payload.messageId
-                    ?: payload.frameId
-                val toolCall = delta["tool_call"] as? JsonObject
-                return ApprovalAutoAllowRequest(
-                    requestId = requestId,
-                    toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id"),
-                    toolName = toolCall?.string("name") ?: delta.string("tool_name") ?: delta.string("name"),
-                    source = "approval_request_message",
-                )
-            }
-            else -> return null
-        }
-    }
-
-    private data class ApprovalAutoAllowRequest(
-        val requestId: String,
-        val toolCallId: String?,
-        val toolName: String?,
-        val source: String,
-    )
-
-    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
-
     /**
      * letta-mobile-8xxzv: the started-runtime cache is KEYED. It used to be one
      * `runtime` field, so two concurrent conversations would evict each other's
@@ -1748,83 +1571,6 @@ class AppServerTurnEngine(
 
     private fun AppServerRuntimeScope.matches(command: TurnCommand): Boolean =
         agentId == command.agentId.value && conversationId == command.conversationId.value
-
-    private fun TurnCommand.toInputCommand(scope: AppServerRuntimeScope): AppServerCommand.Input =
-        when (val turnInput = input) {
-            is TurnInput.UserMessage -> AppServerCommand.Input(
-                runtime = scope,
-                payload = AppServerInputPayload.CreateMessage(
-                    messages = listOf(
-                        AppServerInputMessage(
-                            role = "user",
-                            content = turnInput.contentPartsJson
-                                ?.let { AppServerProtocol.json.parseToJsonElement(it) }
-                                ?: JsonPrimitive(turnInput.text),
-                            clientMessageId = turnInput.localMessageId,
-                        ),
-                    ),
-                    clientToolAllowlist = toolPolicy.toWireAllowlist(externalToolRegistry),
-                ),
-            )
-            is TurnInput.ToolApprovalResponse -> AppServerCommand.Input(
-                runtime = scope,
-                payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = turnInput.decision.approvalId.value,
-                    decision = when (turnInput.decision.decision) {
-                        ToolApprovalDecisionValue.Approved -> {
-                            AppServerApprovalResponseDecision.Allow(
-                                message = turnInput.decision.response,
-                            )
-                        }
-                        ToolApprovalDecisionValue.Denied,
-                        ToolApprovalDecisionValue.TimedOut,
-                        -> AppServerApprovalResponseDecision.Deny(
-                            message = turnInput.decision.response ?: "Denied by mobile client.",
-                        )
-                    },
-                ),
-            )
-        }
-
-    /**
-     * App Server applies `client_tool_allowlist` to built-ins and registered
-     * external tools alike. Keep an explicit caller allowlist for built-ins, but
-     * add only the tools this engine advertises for the current runtime.
-     */
-    private fun ToolPolicy.toWireAllowlist(registry: ExternalToolRegistry?): List<String>? {
-        if (allowedTools.isEmpty()) return null
-        return allowedTools
-            .map { it.value }
-            .plus(registry?.listAdvertisedTools().orEmpty().map { it.name })
-            .distinct()
-            .sorted()
-    }
-
-    private fun TurnCommand.startedDraft(): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started),
-        )
-
-    private fun TurnCommand.completedDraft(runId: RunId?): RuntimeEventDraft =
-        runLifecycleDraft(RuntimeRunStatus.Completed, runId = runId)
-
-    private fun TurnCommand.failedDraft(reason: String): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Failed, reason = reason),
-        )
-
-    private fun TurnCommand.cancelledDraft(reason: String): RuntimeEventDraft =
-        runLifecycleDraft(RuntimeRunStatus.Cancelled, reason = reason)
 
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
@@ -2265,36 +2011,12 @@ class AppServerTurnEngine(
         // stale interval. Bounds how stale lastFrameAt can be on resume.
         const val WATCHDOG_PAUSE_RECHECK_MS: Long = 250L
 
+        /** run.get / run.list `status` values that prove a run is over. */
+        private val TERMINAL_RUN_STATUSES = setOf("completed", "failed", "cancelled", "error", "expired")
+
         fun defaultRequestId(): String {
             nextRequestId += 1
             return "app-server-${nextRequestId}"
         }
-    }
-}
-
-/**
- * letta-mobile-aktss: sanitized classification of a terminal failure reason.
- * Returns a fixed category token, never any substring of the reason itself,
- * so the o0atv no-secrets guarantee is preserved. Categories mirror the
- * failure families letta-code actually produces (run error details and
- * provider passthroughs) — extend the list as new families are identified.
- * Order matters: specific families are matched before generic ones.
- */
-internal fun terminalReasonKind(reason: String?): String? {
-    if (reason.isNullOrBlank()) return null
-    val r = reason.lowercase()
-    return when {
-        // Provider refusal surfaced as an OpenAI-compat finish_reason
-        // (e.g. "Model provider error: Provider finish_reason: content_filter").
-        "content_filter" in r || "refusal" in r -> "content_filter"
-        "waiting for approval" in r -> "approval_pending"
-        "invalid tool call ids" in r -> "invalid_tool_call_ids"
-        "conversation" in r && "busy" in r -> "conversation_busy"
-        "empty content in" in r || "empty response" in r -> "empty_response"
-        "rate limit" in r || "429" in r || "overloaded" in r || "529" in r -> "rate_limited"
-        "timed out" in r || "timeout" in r -> "timeout"
-        "model provider error" in r || "provider" in r -> "provider_error"
-        "abort" in r || "cancel" in r || "interrupt" in r -> "aborted"
-        else -> "other"
     }
 }
