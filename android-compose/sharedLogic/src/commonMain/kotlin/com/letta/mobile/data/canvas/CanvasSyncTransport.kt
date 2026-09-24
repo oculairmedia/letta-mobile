@@ -30,6 +30,15 @@ interface CanvasSyncTransport {
     }
 
     /**
+     * [deliverTo], with each op the actor the far end vouches for, when it vouches for one: the
+     * Iroh host vouches for an agent whose op its own canvas tools published after checking that
+     * agent against the host's ACL (letta-mobile-kuwsf). A transport that cannot vouch passes null.
+     */
+    suspend fun deliverVouchedTo(canvasId: CanvasId, apply: suspend (op: CanvasOp, vouchedActor: String?) -> Unit) {
+        deliverTo(canvasId) { apply(it, null) }
+    }
+
+    /**
      * The bytes of asset [ref] (an image on [canvasId], or any other large thing kept out of the
      * ops), fetched from wherever this transport shares the canvas; null when it cannot get them.
      * A transport that never leaves the process has nowhere to fetch from.

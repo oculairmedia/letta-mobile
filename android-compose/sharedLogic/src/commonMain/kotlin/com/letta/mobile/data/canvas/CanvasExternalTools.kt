@@ -348,12 +348,7 @@ class CanvasExportSvgTool(
         runWithContext(agentId, "Failed to export SVG") { context ->
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
-                is CanvasLookupResult.Found -> {
-                    val svgContent = CanvasToolContract.PLACEHOLDER_SVG
-                    ExternalToolResult.Success(
-                        canvasJson.encodeToString(CanvasExportSvgResult(svg = svgContent))
-                    )
-                }
+                is CanvasLookupResult.Found -> ExternalToolResult.Error(CanvasToolContract.EXPORT_SVG_NOT_IMPLEMENTED)
             }
         }
 
@@ -398,7 +393,6 @@ object CanvasExternalTools {
         CanvasGetSceneTool(store, sessions),
         CanvasReplaceSceneTool(store, sessions),
         CanvasApplyOpsTool(store, sessions),
-        CanvasExportSvgTool(store, sessions),
         CanvasListTool(store, sessions),
     )
 }
