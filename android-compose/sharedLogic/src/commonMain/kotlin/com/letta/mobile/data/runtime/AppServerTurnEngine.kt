@@ -36,6 +36,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -154,6 +156,11 @@ class AppServerTurnEngine(
      * elapsed time — the documented flake source.
      */
     private val nowMs: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    /**
+     * letta-mobile-qygvv.6: runs post-abort queue hygiene triggered by a cancelled
+     * `turn_finished`. Null keeps only the abort-response trigger.
+     */
+    private val queueHygieneScope: CoroutineScope? = null,
 ) : TurnEngine {
     /**
      * letta-mobile-8xxzv: owner-token leases KEYED BY {agentId, conversationId}.
@@ -188,6 +195,21 @@ class AppServerTurnEngine(
      * for why claim/generation ownership stays in [InboundControlRequestRegistry].
      */
     private val approvals = ApprovalRegistry()
+
+    private val queueHygiene = AppServerQueueHygiene(client, requestIdFactory, queueHygieneScope)
+
+    /** letta-mobile-qygvv.6: latest `update_queue` snapshot per runtime (items + paused). */
+    val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>> get() = queueHygiene.snapshots
+
+    /** letta-mobile-qygvv.6: this client's queued inputs removed after a user abort. */
+    val cancelledQueuedInputs: SharedFlow<CancelledQueuedInput> get() = queueHygiene.cancelledInputs
+
+    /**
+     * letta-mobile-qygvv.6: feeds a frame seen outside any turn. A host that routes frames through
+     * [eventRouter] must call this for every inbound frame; without a router the engine feeds the
+     * frames its turns collect itself.
+     */
+    fun observeQueueFrame(frame: AppServerInboundFrame) = queueHygiene.observe(frame)
 
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
@@ -473,17 +495,32 @@ class AppServerTurnEngine(
         runId: String?,
     ): AppServerInboundFrame.AbortMessageResponse {
         val key = TurnRuntimeKey(agentId, conversationId)
-        // letta-mobile-qygvv.2: an idle loop status after this reads as Cancelled, not Completed.
-        leases.peek(key)?.boundaryGate?.noteAbortRequested()
         val scope = leases.peek(key)?.runtimeScope
             ?: AppServerRuntimeScope(agentId = agentId, conversationId = conversationId)
-        return client.abort(
+        return abort(scope, runId)
+    }
+
+    /**
+     * Aborts [runtime] with an explicit scope. letta-mobile-qygvv.6: once the server confirms
+     * the abort, this client's queued items for the runtime are removed and the queue resumed
+     * (see [AppServerQueueHygiene]) before this returns.
+     */
+    suspend fun abort(
+        runtime: AppServerRuntimeScope,
+        runId: String?,
+    ): AppServerInboundFrame.AbortMessageResponse {
+        // letta-mobile-qygvv.2: an idle loop status after this reads as Cancelled, not Completed.
+        leases.peek(TurnRuntimeKey(runtime.agentId, runtime.conversationId))?.boundaryGate?.noteAbortRequested()
+        queueHygiene.noteAbortRequested(runtime)
+        val response = client.abort(
             AppServerCommand.AbortMessage(
-                runtime = scope,
+                runtime = runtime,
                 requestId = requestIdFactory(),
                 runId = runId,
             ),
         )
+        queueHygiene.onAbortResponse(runtime, response)
+        return response
     }
 
     /**
@@ -492,13 +529,7 @@ class AppServerTurnEngine(
      */
     suspend fun abort(runId: String?): AppServerInboundFrame.AbortMessageResponse? {
         val scope = leases.snapshot().asReversed().firstNotNullOfOrNull { it.runtimeScope } ?: return null
-        return client.abort(
-            AppServerCommand.AbortMessage(
-                runtime = scope,
-                requestId = requestIdFactory(),
-                runId = runId,
-            ),
-        )
+        return abort(scope, runId)
     }
 
     /**
@@ -1148,6 +1179,7 @@ class AppServerTurnEngine(
         val slot = context.lease.slot
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
+        if (eventRouter == null) queueHygiene.observe(received.frame)
         val queueRemoval = observeQueueProgress(received, context)
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
@@ -1279,6 +1311,7 @@ class AppServerTurnEngine(
             client.input(input)
             return null
         }
+        queueHygiene.noteSentInput(lease.key, queuedInput.clientMessageId, command)
         val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
         val failure = acceptance.recordAndFailureReason(command.conversationId.value)
         if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, queuedInput, emit)

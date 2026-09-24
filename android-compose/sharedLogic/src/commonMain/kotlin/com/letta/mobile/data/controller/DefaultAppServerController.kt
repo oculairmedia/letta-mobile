@@ -5,7 +5,10 @@ import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.AppServerQueueSnapshot
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.CancelledQueuedInput
+import com.letta.mobile.data.runtime.TurnRuntimeKey
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnContextPreflight
 import kotlin.time.Clock
@@ -92,7 +95,25 @@ class DefaultAppServerController(
     init {
         eventRouter.attach(controllerScope, client.events)
         attachUnleasedExternalToolAnswerer()
+        attachQueueObserver()
     }
+
+    /**
+     * letta-mobile-qygvv.6: the engine subscribes through [eventRouter], so it only sees frames
+     * while a turn holds a lease. Queue snapshots and the post-abort `turn_finished` must be seen
+     * between turns too.
+     */
+    private fun attachQueueObserver() {
+        controllerScope.launch {
+            client.events.collect { received -> turnEngine.observeQueueFrame(received.frame) }
+        }
+    }
+
+    override val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>>
+        get() = turnEngine.queueSnapshots
+
+    override val cancelledQueuedInputs: Flow<CancelledQueuedInput>
+        get() = turnEngine.cancelledQueuedInputs
 
     /**
      * lgns8.17(d): standing answerer for `external_tool_call_request` frames that
@@ -162,6 +183,7 @@ class DefaultAppServerController(
             onRuntimeEnsured = { command, response, startedGeneration ->
                 refillEnsuredRuntime(command, response, startedGeneration)
             },
+            queueHygieneScope = controllerScope,
         )
     }
 
@@ -498,13 +520,9 @@ class DefaultAppServerController(
         runId: String?,
     ): AppServerInboundFrame.AbortMessageResponse {
         return try {
-            client.abort(
-                AppServerCommand.AbortMessage(
-                    runtime = runtime,
-                    requestId = requestIdFactory(),
-                    runId = runId,
-                ),
-            )
+            // letta-mobile-qygvv.6: through the engine so a confirmed abort also cleans up this
+            // client's parked queue items and resumes the queue.
+            turnEngine.abort(runtime, runId)
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }

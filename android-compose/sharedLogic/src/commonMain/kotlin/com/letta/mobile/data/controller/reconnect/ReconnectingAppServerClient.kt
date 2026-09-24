@@ -305,6 +305,13 @@ class ReconnectingAppServerClient(
     override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
         ready().abort(command)
 
+    override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse =
+        ready().resumeQueue(command)
+
+    override suspend fun removeQueueItem(
+        command: AppServerCommand.RemoveQueueItem,
+    ): AppServerInboundFrame.RemoveQueueItemResponse = ready().removeQueueItem(command)
+
     override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
         ready().adminRpc(command)
 
