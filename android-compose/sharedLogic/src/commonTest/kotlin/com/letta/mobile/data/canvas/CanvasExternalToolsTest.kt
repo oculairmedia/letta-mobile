@@ -45,7 +45,6 @@ class CanvasExternalToolsTest {
                 "canvas.get_scene",
                 "canvas.replace_scene",
                 "canvas.apply_ops",
-                "canvas.export_svg",
                 "canvas.list",
             ),
             advertised,
@@ -188,11 +187,11 @@ class CanvasExternalToolsTest {
         )
         store.upsert(doc1)
 
+        // Not offered, and plain about it when called anyway: no plausible empty SVG (qsq7v).
         val exportSvgTool = CanvasExportSvgTool(store, sessions)
         val svgResult = exportSvgTool.invoke(buildJsonObject { put("canvas_id", "canvas-svg-1") }, agentId = "agent-1")
-        assertIs<ExternalToolResult.Success>(svgResult)
-        val svg = json.decodeFromString<CanvasExportSvgResult>(svgResult.content)
-        assertTrue(svg.svg.contains("<svg"))
+        assertIs<ExternalToolResult.Error>(svgResult)
+        assertTrue(svgResult.error.contains("not implemented"))
 
         val listTool = CanvasListTool(store, sessions)
         val listResult = listTool.invoke(buildJsonObject { put("conversation_id", "conv-list-1") }, agentId = "agent-1")

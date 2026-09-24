@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
+import com.letta.mobile.data.transport.appserver.AppServerQueueRemoval
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -33,8 +34,35 @@ internal suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminalDraft(): Run
     }
 }
 
-internal class TurnEngineTestStreamClient : AppServerClient {
-    override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 32)
+/**
+ * One `update_queue` snapshot: client message ids still queued, full queue [items], and
+ * removal transitions.
+ */
+internal data class QueueUpdateFixture(
+    val queued: List<String> = emptyList(),
+    val removed: List<AppServerQueueRemoval> = emptyList(),
+    val items: List<QueueItemFixture> = emptyList(),
+) {
+    companion object {
+        fun stillQueued(clientMessageId: String) = QueueUpdateFixture(queued = listOf(clientMessageId))
+
+        fun dequeued(clientMessageId: String) =
+            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "dequeued")))
+
+        fun cancelled(clientMessageId: String) =
+            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "cancelled")))
+
+        fun of(vararg items: QueueItemFixture) = QueueUpdateFixture(items = items.toList())
+    }
+}
+
+/**
+ * The one shared fake App Server for turn-engine tests: starts any runtime, swallows sends and
+ * replays [emit]ted frames on the stream channel. Tests that need acknowledgement extend it
+ * ([TurnEngineTestAckingClient]).
+ */
+internal open class TurnEngineTestStreamClient : AppServerClient {
+    override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
 
     override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
         AppServerInboundFrame.RuntimeStartResponse(
@@ -59,7 +87,7 @@ internal class TurnEngineTestStreamClient : AppServerClient {
 
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
-    fun emit(frame: AppServerInboundFrame) {
+    open fun emit(frame: AppServerInboundFrame) {
         (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
             AppServerReceivedFrame(
                 channel = AppServerChannel.Stream,

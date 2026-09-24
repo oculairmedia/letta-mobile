@@ -120,6 +120,27 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
+    fun earlierTurnFinishedArrivingWhileQueuedDoesNotCompleteTurn() = runTest {
+        val turn = startTurn(InputAckFixture.Queued)
+        assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "queued input must be visible")
+
+        // An earlier turn's turn_finished arriving while queued must be ignored and not complete this turn.
+        turn.client.emitTurnFinished(TestRun("prev-run-1"), turn = 0)
+        runCurrent()
+        assertTrue(turn.isBusy, "turn must remain active when earlier turn finishes")
+        assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
+
+        // Dequeue, then our own turn streams and completes normally.
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        turn.client.emitStreamDelta("assistant_message")
+        turn.client.emitTurnFinished(TestRun("run-1"), turn = 1)
+        finish(turn)
+
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
+        assertFalse(turn.isBusy)
+    }
+
+    @Test
     fun queuedInputThenStreamCompletesNormally() = runTest {
         val turn = startTurn(InputAckFixture.Queued)
 
@@ -170,14 +191,27 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun approvalResponseInputStaysFireAndForget() = runTest {
+    fun approvalResponseInputAwaitsAcceptance() = runTest {
+        // letta-mobile-qygvv.5: approval responses carry a request_id and await the ack too.
         val turn = startTurn(InputAckFixture.NoDisposition, approvalCommand)
 
-        assertTrue(turn.client.acknowledgedInputs.isEmpty())
-        val sent = turn.client.plainInputs.single()
-        assertNull(sent.requestId)
-        assertTrue(sent.payload is AppServerInputPayload.ApprovalResponse)
+        assertTrue(turn.client.plainInputs.isEmpty())
+        val sent = turn.client.acknowledgedInputs.single()
+        assertEquals(TEST_INPUT_REQUEST_ID, sent.requestId)
+        assertEquals("approval-1", (sent.payload as AppServerInputPayload.ApprovalResponse).requestId)
         turn.job.cancel()
+    }
+
+    @Test
+    fun rejectedApprovalResponseInputFailsFastWithServerError() = runTest {
+        val turn = startTurn(InputAckFixture.rejected(APPROVAL_NOT_PENDING_ERROR), approvalCommand)
+        turn.job.join()
+
+        val last = turn.drafts.lastLifecycle()
+        assertEquals(RuntimeRunStatus.Failed, last?.status)
+        assertEquals(APPROVAL_NOT_PENDING_ERROR, last?.reason)
+        assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS, "a rejected decision must not wait for the watchdog")
+        assertFalse(turn.isBusy)
     }
 
     @Test
@@ -221,7 +255,7 @@ class AppServerTurnEngineInputAcceptanceTest {
 
         turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
         // A late turn_finished for the run ahead after the dequeue still belongs to that run.
-        turn.client.emitTurnFinished(2, runAhead)
+        turn.client.emitTurnFinished(runAhead, turn = 2)
         runCurrent()
         assertTrue(turn.isBusy)
 
@@ -243,7 +277,7 @@ class AppServerTurnEngineInputAcceptanceTest {
         runCurrent()
         assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "the input is queued, not started")
 
-        turn.client.emitTurnFinished(1, runAhead)
+        turn.client.emitTurnFinished(runAhead, turn = 1)
         runCurrent()
         assertTrue(turn.isBusy, "the turn ahead's turn_finished must not complete this lease")
 
@@ -258,7 +292,7 @@ class AppServerTurnEngineInputAcceptanceTest {
         val turn = startTurn(InputAckFixture.Started) { ackGate = CompletableDeferred() }
 
         turn.client.emitStreamDelta("assistant_message")
-        turn.client.emitTurnFinished(1, TestRun("run-1"))
+        turn.client.emitTurnFinished(TestRun("run-1"), turn = 1)
         runCurrent()
         advanceTimeBy(IDLE_TIMEOUT_MS / 2)
         runCurrent()
@@ -315,7 +349,7 @@ class AppServerTurnEngineInputAcceptanceTest {
     private fun TestScope.runAheadToIdle(turn: RunningTurn) {
         turn.client.emitStreamDelta("assistant_message", runAhead)
         turn.client.emitStreamDelta("stop_reason", runAhead)
-        turn.client.emitTurnFinished(1, runAhead)
+        turn.client.emitTurnFinished(runAhead, turn = 1)
         turn.client.emitLoopStatus(TestLoopState.WaitingOnInput)
         runCurrent()
     }
@@ -323,7 +357,7 @@ class AppServerTurnEngineInputAcceptanceTest {
     /** This lease's own run streams and finishes; waits for the turn to end. */
     private suspend fun TestScope.finishOwnRun(turn: RunningTurn) {
         turn.client.emitStreamDelta("assistant_message", runOwn)
-        turn.client.emitTurnFinished(3, runOwn)
+        turn.client.emitTurnFinished(runOwn, turn = 3)
         finish(turn)
     }
 

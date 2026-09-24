@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller
 
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.DeviceStateChanger
+import com.letta.mobile.data.runtime.DeviceStatusFixture
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -28,6 +30,7 @@ import kotlin.test.assertNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
@@ -90,14 +93,17 @@ class AppServerControllerTest {
     }
 
     @Test
-    fun startRuntimeRestartsWhenPermissionModeChanges() = runTest {
-        val client = FakeAppServerClient()
+    fun startRuntimeChangesPermissionModeInPlaceWithoutRestart() = runTest {
+        // letta-mobile-qygvv.7: a mode change on a cached runtime is change_device_state{mode},
+        // confirmed by update_device_status; runtime_start stays attach-only.
+        val client = FakeAppServerClient(confirmModeChanges = true)
         val controller = DefaultAppServerController(
             client = client,
             requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
+            parentCoroutineContext = Dispatchers.Unconfined,
         )
         try {
-            controller.startRuntime(
+            val first = controller.startRuntime(
                 agentId = AgentId("agent-1"),
                 conversationId = ConversationId("conv-1"),
                 mode = AppServerPermissionMode.Unrestricted,
@@ -105,13 +111,48 @@ class AppServerControllerTest {
             assertEquals(1, client.runtimeStartCommands.size)
             assertEquals(AppServerPermissionMode.Unrestricted, client.runtimeStartCommands.single().mode)
 
-            controller.startRuntime(
+            val second = controller.startRuntime(
                 agentId = AgentId("agent-1"),
                 conversationId = ConversationId("conv-1"),
                 mode = AppServerPermissionMode.Standard,
             )
+            assertEquals(1, client.runtimeStartCommands.size, "mode change must not restart the runtime")
+            assertEquals(first, second)
+            val change = client.changeDeviceStateCommands.single()
+            assertEquals(AppServerRuntimeScope("agent-1", "conv-1"), change.runtime)
+            assertEquals(AppServerPermissionMode.Standard, change.payload.mode)
+            assertNull(change.payload.cwd)
+
+            // The confirmed mode is now the cached one: the same request is a pure cache hit
+            // and a mode-less restart keeps it.
+            controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"), mode = AppServerPermissionMode.Standard)
+            controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"))
+            assertEquals(1, client.runtimeStartCommands.size)
+            assertEquals(1, client.changeDeviceStateCommands.size)
+        } finally {
+            controller.close()
+        }
+    }
+
+    @Test
+    fun unconfirmedPermissionModeChangeEvictsSoNextStartReattachesWithTheMode() = runTest {
+        // Without an update_device_status confirming the mode, the cached runtime is in an
+        // unknown mode; it is evicted and re-attached with the requested mode.
+        val client = FakeAppServerClient(confirmModeChanges = false)
+        val controller = DefaultAppServerController(
+            client = client,
+            requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
+            parentCoroutineContext = Dispatchers.Unconfined,
+        )
+        try {
+            controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"), mode = AppServerPermissionMode.Unrestricted)
+
+            controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"), mode = AppServerPermissionMode.Strict)
+
+            assertEquals(1, client.changeDeviceStateCommands.size)
+            assertEquals(DeviceStateChanger.DEFAULT_DEVICE_STATE_TIMEOUT_MS, currentTime)
             assertEquals(2, client.runtimeStartCommands.size)
-            assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.last().mode)
+            assertEquals(AppServerPermissionMode.Strict, client.runtimeStartCommands.last().mode)
         } finally {
             controller.close()
         }
@@ -563,6 +604,8 @@ private class FakeAppServerClient(
             ),
         )
     },
+    /** When true, each change_device_state{mode} is answered by a confirming update_device_status. */
+    private val confirmModeChanges: Boolean = false,
 ) : AppServerClient {
     override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 16)
 
@@ -570,6 +613,14 @@ private class FakeAppServerClient(
     val sentCommands = mutableListOf<AppServerCommand>()
     val syncCommands = mutableListOf<AppServerCommand.Sync>()
     val abortCommands = mutableListOf<AppServerCommand.AbortMessage>()
+    val changeDeviceStateCommands = mutableListOf<AppServerCommand.ChangeDeviceState>()
+
+    override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) {
+        changeDeviceStateCommands += command
+        val mode = command.payload.mode ?: return
+        if (!confirmModeChanges) return
+        emit(DeviceStatusFixture.inMode(mode).frame(command.runtime))
+    }
 
     override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse {
         runtimeStartCommands += command

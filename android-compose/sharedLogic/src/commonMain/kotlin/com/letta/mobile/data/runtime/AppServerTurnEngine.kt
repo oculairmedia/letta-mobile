@@ -4,7 +4,10 @@ import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.ApprovalSubmission
+import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -33,6 +36,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -147,7 +152,21 @@ class AppServerTurnEngine(
      * elapsed time — the documented flake source.
      */
     private val nowMs: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    /**
+     * letta-mobile-qygvv.6: runs post-abort queue hygiene triggered by a cancelled
+     * `turn_finished`. Null keeps only the abort-response trigger.
+     */
+    private val queueHygieneScope: CoroutineScope? = null,
+    /**
+     * letta-mobile-qygvv.5: approval decisions this client sent, keyed by
+     * (agent, conversation, request_id). Shared with the controller router when
+     * present so a replayed `control_request` is re-answered, not dropped.
+     */
+    private val approvalDecisionCache: ApprovalDecisionCache =
+        eventRouter?.approvalDecisionCache() ?: ApprovalDecisionCache(),
 ) : TurnEngine {
+    internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
+
     /**
      * letta-mobile-8xxzv: owner-token leases KEYED BY {agentId, conversationId}.
      *
@@ -160,6 +179,7 @@ class AppServerTurnEngine(
     private val leases = TurnLeaseRegistry()
     private val leaseTokenSeq = atomic(0L)
     private val inboundSource = TurnInboundSource(client, eventRouter)
+    private val deviceState = DeviceStateChanger(client, inboundSource)
 
     /**
      * lgns8.22.5: the FULL external-tool invocation lifecycle — claim, generation
@@ -181,7 +201,32 @@ class AppServerTurnEngine(
      * for why claim/generation ownership stays in [InboundControlRequestRegistry].
      */
     private val approvals = ApprovalRegistry()
-    private val inputSender = TurnInputSender(client, requestIdFactory, externalToolRegistry)
+    private val queueHygiene = AppServerQueueHygiene(
+        client,
+        requestIdFactory,
+        queueHygieneScope,
+        routed = eventRouter != null,
+    )
+    private val inputSender = TurnInputSender(
+        client,
+        requestIdFactory,
+        approvalSender,
+        externalToolRegistry,
+        noteSentInput = queueHygiene::noteSentInput,
+    )
+
+    /** letta-mobile-qygvv.6: latest `update_queue` snapshot per runtime (items + paused). */
+    val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>> get() = queueHygiene.snapshots
+
+    /** letta-mobile-qygvv.6: this client's queued inputs removed after a user abort. */
+    val cancelledQueuedInputs: SharedFlow<CancelledQueuedInput> get() = queueHygiene.cancelledInputs
+
+    /**
+     * letta-mobile-qygvv.6: feeds a frame seen outside any turn. A host that routes frames through
+     * [eventRouter] must call this for every inbound frame; without a router the engine feeds the
+     * frames its turns collect itself.
+     */
+    fun observeQueueFrame(frame: AppServerInboundFrame) = queueHygiene.observe(frame)
 
     /** letta-mobile-qygvv.3: busy-path owner liveness from the App Server's own loop state. */
     private val busyOwnerReconciler = BusyOwnerReconciler(
@@ -205,6 +250,7 @@ class AppServerTurnEngine(
         noteSettled = { key, runId -> leases.peek(key)?.boundaryGate?.noteSettled(runId) },
     )
 
+    /** Without an [eventRouter] the engine feeds [queueHygiene] the frames its turns collect. */
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
 
@@ -421,6 +467,24 @@ class AppServerTurnEngine(
         )
     }
 
+    /**
+     * letta-mobile-qygvv.5: send one approval decision with a `request_id` and wait
+     * for `input_accepted`. The inbound control request is marked answered unless
+     * the server REJECTED the decision (e.g. "Approval request is no longer
+     * pending"), which the caller must surface. [claimGeneration] follows the same
+     * capture-before-send rule as [markInboundControlAnswered].
+     */
+    suspend fun submitApprovalResponse(
+        submission: ApprovalSubmission,
+        claimGeneration: Long = connectionGenerationProvider(),
+    ): ApprovalSubmitResult {
+        val result = approvalSender.send(submission)
+        if (result !is ApprovalSubmitResult.Rejected) {
+            markInboundControlAnswered(submission.approvalRequestId, claimGeneration)
+        }
+        return result
+    }
+
     /** Connection generation snapshot for callers that must capture it before a send. */
     fun currentConnectionGeneration(): Long = connectionGenerationProvider()
 
@@ -492,17 +556,32 @@ class AppServerTurnEngine(
         runId: String?,
     ): AppServerInboundFrame.AbortMessageResponse {
         val key = TurnRuntimeKey(agentId, conversationId)
-        // letta-mobile-qygvv.2: an idle loop status after this reads as Cancelled, not Completed.
-        leases.peek(key)?.boundaryGate?.noteAbortRequested()
         val scope = leases.peek(key)?.runtimeScope
             ?: AppServerRuntimeScope(agentId = agentId, conversationId = conversationId)
-        return client.abort(
+        return abort(scope, runId)
+    }
+
+    /**
+     * Aborts [runtime] with an explicit scope. letta-mobile-qygvv.6: once the server confirms
+     * the abort, this client's queued items for the runtime are removed and the queue resumed
+     * (see [AppServerQueueHygiene]) before this returns.
+     */
+    suspend fun abort(
+        runtime: AppServerRuntimeScope,
+        runId: String?,
+    ): AppServerInboundFrame.AbortMessageResponse {
+        // letta-mobile-qygvv.2: an idle loop status after this reads as Cancelled, not Completed.
+        leases.peek(TurnRuntimeKey(runtime.agentId, runtime.conversationId))?.boundaryGate?.noteAbortRequested()
+        queueHygiene.noteAbortRequested(runtime)
+        val response = client.abort(
             AppServerCommand.AbortMessage(
-                runtime = scope,
+                runtime = runtime,
                 requestId = requestIdFactory(),
                 runId = runId,
             ),
         )
+        queueHygiene.onAbortResponse(runtime, response)
+        return response
     }
 
     /**
@@ -511,13 +590,7 @@ class AppServerTurnEngine(
      */
     suspend fun abort(runId: String?): AppServerInboundFrame.AbortMessageResponse? {
         val scope = leases.snapshot().asReversed().firstNotNullOfOrNull { it.runtimeScope } ?: return null
-        return client.abort(
-            AppServerCommand.AbortMessage(
-                runtime = scope,
-                requestId = requestIdFactory(),
-                runId = runId,
-            ),
-        )
+        return abort(scope, runId)
     }
 
     /**
@@ -535,29 +608,15 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile folder-settings #2: changes the working directory for
-     * [agentId]/[conversationId] by re-issuing `runtime_start` with `cwd`
-     * set — the only client-facing mechanism the runtime supports for this
-     * (there is no dedicated `set_cwd` command upstream). Mirrors
-     * [ensureRuntime]'s command shape (same `clientInfo` / externalTools
-     * advertisement) so this doesn't clobber the connection's registered
-     * external tools with an empty list. Returns true on success.
+     * letta-mobile folder-settings #2 / letta-mobile-qygvv.7: changes the working
+     * directory for [agentId]/[conversationId] with `change_device_state{cwd}` and
+     * confirms it from the matching `update_device_status` (bounded wait, see
+     * [DeviceStateChanger]). Never re-issues `runtime_start`: that replays full
+     * state and re-registers external tools mid-turn. Returns false when the server
+     * does not confirm the new directory in time.
      */
-    suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean {
-        val response = client.runtimeStart(
-            AppServerCommand.RuntimeStart(
-                requestId = requestIdFactory(),
-                agentId = agentId,
-                conversationId = conversationId,
-                cwd = cwd,
-                clientInfo = clientInfo,
-                recoverApprovals = true,
-                forceDeviceStatus = true,
-                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
-            ),
-        )
-        return response.success
-    }
+    suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean =
+        deviceState.changeWorkingDirectory(AppServerRuntimeScope(agentId, conversationId), cwd)
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = channelFlow {
         val acquiredAtMs = currentTimeMs()
@@ -635,7 +694,7 @@ class AppServerTurnEngine(
                     Telemetry.event(
                         "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
                     )
-                    noteOwnerTerminal(RuntimeRunStatus.Failed, source = "idle_timeout", lease = leaseRef)
+                    noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "idle_timeout"), leaseRef)
                     send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
                 } catch (cancellation: CancellationException) {
                     releaseReason = "cancellation"
@@ -652,8 +711,13 @@ class AppServerTurnEngine(
                 inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
             }
             Telemetry.event("IrohTurn", "input.sent")
+            // letta-mobile-qygvv.1: only an input failure decides the release reason
+            // here. A plain join must NOT overwrite the reason the collector already
+            // recorded (watchdog_timeout / cancellation / stream_error), otherwise the
+            // release looks like a normal completion and the orphan-abort path in
+            // qygvv.3 never fires.
             joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
-                noteOwnerTerminal(RuntimeRunStatus.Failed, source = "input_rejected", lease = leaseRef)
+                noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "input_rejected"), leaseRef)
                 send(command.failedDraft(failureText))
             }?.let { releaseReason = it }
         } finally {
@@ -947,42 +1011,64 @@ class AppServerTurnEngine(
         }
     }
 
+    /**
+     * Gates [received] before it touches turn state: generation, a replayed approval this engine
+     * re-answers from cache (letta-mobile-qygvv.5), runtime scope and run id. Returns false when
+     * the frame is not this lease's to process.
+     */
+    private suspend fun admitFrame(received: AppServerReceivedFrame, context: TurnFrameContext): Boolean {
+        if (isConnectionGenerationSuperseded(context.lease)) {
+            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
+        }
+        if (received.isStaleGenerationForLease(context.lease)) return false
+        if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) {
+            return false
+        }
+        if (!received.matches(context.runtimeScope, context.lease)) {
+            completeScopeRejectedTurn(received, context)
+            return false
+        }
+        return context.lease.slot.runIdGate.accepts(received, context.lease.token)
+    }
+
     private suspend fun processReceivedFrame(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
     ) {
-        if (isConnectionGenerationSuperseded(context.lease)) {
-            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
-        }
-        if (received.isStaleGenerationForLease(context.lease)) return
-        if (!received.matches(context.runtimeScope, context.lease)) {
-            completeScopeRejectedTurn(received, context)
-            return
-        }
-        val slot = context.lease.slot
-        if (!slot.runIdGate.accepts(received, context.lease.token)) return
+        if (!admitFrame(received, context)) return
         context.idleWatchdog.markFrame()
+        queueHygiene.observeTurnFrame(received.frame)
         val queueRemoval = observeQueueProgress(received, context.lease)
-        // Review of PR #1661: a queued lease must not adopt the turn ahead of it.
+        // Review of PR #1661: a queued lease must not adopt the turn ahead of it. The gate runs
+        // first so it records the run ids seen while queued even for frames held below.
         if (context.queuedFrames.skip(received, context.lease.current?.runId)) return
+        // letta-mobile-qygvv.7: while queued, only update_queue concerns this lease.
+        if (context.lease.holdsWhileQueued(received)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
-        projectAtBoundary(received, context, budget, queueRemoval)
+        val projected = projectAtBoundary(received, context, budget)
+        // The update_queue passthrough draft still reaches viewers; only then
+        // settle a lease whose queued input the server dropped.
+        if (queueRemoval.cancelsLeaseOnceProjected(projected)) {
+            completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
+        }
     }
 
-    /** letta-mobile-qygvv.2: projects one accepted frame through the [TurnBoundaryGate] decision. */
+    /**
+     * letta-mobile-qygvv.2: projects one accepted frame through the [TurnBoundaryGate] decision.
+     * Returns false when the frame was dropped at the boundary or skipped as unprojectable.
+     */
     private suspend fun projectAtBoundary(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
-        queueRemoval: QueueRemovalDisposition?,
-    ) {
+    ): Boolean {
         val slot = context.lease.slot
         val boundary = slot.boundaryGate.decideOrDrop(
             TurnBoundaryInput(received, context.lease.current?.runId, approvals.hasOutstanding(slot.key)),
             context.runtimeScope,
-        ) ?: return
+        ) ?: return false
         // letta-mobile-gdvbf: the resilience boundary is EXACTLY this seam, and
         // deliberately no wider. Everything above has already touched turn
         // state (generation/scope gating, watchdog, external-tool dispatch,
@@ -990,16 +1076,12 @@ class AppServerTurnEngine(
         // (run-id promotion, draft processing). A failure there is not
         // equivalent to an unreadable frame — it may need terminal settlement —
         // so it must still propagate.
-        val drafts = projectOrSkip(received, context, budget) ?: return
+        val drafts = projectOrSkip(received, context, budget) ?: return false
         slot.runIdGate.promoteAtBoundary(boundary, drafts, context.lease.token)
         val frameSeq = received.eventSeqOrNull()
         boundary.withLoopIdleTerminal(drafts, context.command, context.lease.current?.runId)
             .forEach { draft -> context.draftProcessor.process(draft, frameSeq, boundary.isAuthoritative) }
-        // The update_queue passthrough draft above still reaches viewers; only then
-        // settle a lease whose queued input the server dropped.
-        if (queueRemoval == QueueRemovalDisposition.Cancelled) {
-            completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
-        }
+        return true
     }
 
     /**
@@ -1057,7 +1139,7 @@ class AppServerTurnEngine(
     private suspend fun completeAbruptTurn(context: TurnFrameContext, ending: AbruptTurnEnding): Nothing {
         ending.ownerTerminalSource?.let { source ->
             recordDequeued(context.lease, source)
-            noteOwnerTerminal(ending.status, source = source, lease = context.lease)
+            noteOwnerTerminal(OwnerTerminalNote(ending.status, source = source), context.lease)
         }
         val ledger = context.draftProcessor.ledger
         settleDanglingToolCalls(
@@ -1248,11 +1330,13 @@ class AppServerTurnEngine(
         if (received.frame.runtime?.conversationId != scope.conversationId) return null
         val status = received.lifecycleStatusFromTerminal() ?: return null
         noteOwnerTerminal(
-            status,
-            source = "authoritative_terminal_scope_mismatched",
-            seq = received.eventSeqOrNull(),
-            scopeMatched = false,
-            lease = lease,
+            OwnerTerminalNote(
+                status,
+                source = "authoritative_terminal_scope_mismatched",
+                seq = received.eventSeqOrNull(),
+                scopeMatched = false,
+            ),
+            lease,
         )
         return status
     }
@@ -1351,25 +1435,24 @@ class AppServerTurnEngine(
             "source" to approval.source,
         )
         // lgns8.22.4.1.4: capture the generation the approval is being ANSWERED ON
-        // before the send. Reading it back after client.input() would attribute the
+        // before the send. Reading it back after the send would attribute the
         // answer to whatever generation a mid-send disconnect installed, marking a
         // successor-generation recovery replay answered by a decision the server
         // may never have received.
         val claimGeneration = connectionGenerationProvider()
-        client.input(
-            AppServerCommand.Input(
+        // letta-mobile-qygvv.5: awaits input_accepted. A rejection means the gate
+        // is no longer pending (someone else resolved it), so the card stays
+        // suppressed either way; the result is recorded as telemetry.
+        submitApprovalResponse(
+            ApprovalSubmission(
                 runtime = scope,
-                payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = approval.requestId,
-                    decision = AppServerApprovalResponseDecision.Allow(
-                        message = "Approved by default mobile policy.",
-                    ),
+                approvalRequestId = approval.requestId,
+                decision = AppServerApprovalResponseDecision.Allow(
+                    message = "Approved by default mobile policy.",
                 ),
+                source = "auto_allow",
             ),
-        )
-        inboundControlRegistry.markAnswered(
-            InboundControlRequestRegistry.RequestRef(approval.requestId),
-            claimGeneration,
+            claimGeneration = claimGeneration,
         )
         return true
     }
@@ -1645,9 +1728,6 @@ class AppServerTurnEngine(
         val releaseReason: String? = null,
     )
 
-    private object TurnCompleted : TurnCompletedMarker()
-    private sealed class TurnCompletedMarker : Throwable()
-
     /**
      * fix(no-settle-on-clean-completion): true when [this] (or anything in its
      * `cause` chain) is [TurnCompletedMarker] — i.e. the exception is really
@@ -1661,48 +1741,18 @@ class AppServerTurnEngine(
     private fun Throwable.isCausedByCleanCompletion(): Boolean =
         generateSequence(this) { it.cause }.any { it is TurnCompletedMarker }
 
-    private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
-    private sealed class TurnIdleTimedOutMarker : Throwable()
-
     /**
      * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the last-seen terminal
      * lifecycle status on the active-turn owner (if one is set). Pure metadata
      * write — no control-flow, no lock interaction, no effect on emitted drafts.
-     *
-     * @param status terminal lifecycle status carried by the draft.
-     * @param source which collect-loop path observed this terminal (e.g.
-     *   "terminal_lifecycle", "post_tool_usage", "completed_settle",
-     *   "idle_timeout"). Descriptive only.
-     * @param seq event_seq of the terminal-bearing frame if known, else null.
-     * @param scopeMatched whether the terminal-bearing frame PASSED
-     *   matches(scope). Null when not applicable (e.g. synthesized terminals).
      */
-    private fun noteOwnerTerminal(
-        status: RuntimeRunStatus,
-        source: String? = null,
-        seq: Long? = null,
-        scopeMatched: Boolean? = null,
-        lease: LeaseRef,
-    ) {
+    private fun noteOwnerTerminal(note: OwnerTerminalNote, lease: LeaseRef) {
         if (lease.current == null) return
         val slot = lease.slot
         val current = slot.owner ?: return
-        slot.owner = current.copy(
-            lastTerminal = status.name,
-            lastTerminalSource = source ?: current.lastTerminalSource,
-            lastTerminalAtMs = currentTimeMs(),
-            lastTerminalSeq = seq ?: current.lastTerminalSeq,
-            lastTerminalScopeMatched = scopeMatched ?: current.lastTerminalScopeMatched,
-        )
+        slot.owner = current.withTerminal(note, currentTimeMs())
         slot.updateLease { held ->
-            if (held?.token != lease.token) held
-            else held.copy(
-                lastTerminal = status.name,
-                lastTerminalSource = source ?: held.lastTerminalSource,
-                lastTerminalAtMs = currentTimeMs(),
-                lastTerminalSeq = seq ?: held.lastTerminalSeq,
-                lastTerminalScopeMatched = scopeMatched ?: held.lastTerminalScopeMatched,
-            )
+            if (held?.token != lease.token) held else held.withTerminal(note, currentTimeMs())
         }
     }
 
@@ -1736,11 +1786,13 @@ class AppServerTurnEngine(
     private fun noteCompletedSettle(frameSeq: Long?, lease: LeaseRef) {
         lease.slot.boundaryGate.noteSettled(lease.current?.runId)
         noteOwnerTerminal(
-            RuntimeRunStatus.Completed,
-            source = "completed_settle",
-            seq = frameSeq,
-            scopeMatched = true,
-            lease = lease,
+            OwnerTerminalNote(
+                RuntimeRunStatus.Completed,
+                source = "completed_settle",
+                seq = frameSeq,
+                scopeMatched = true,
+            ),
+            lease,
         )
     }
 
@@ -1753,11 +1805,13 @@ class AppServerTurnEngine(
         lease.slot.boundaryGate.noteSettledTerminal(draft, lease.current?.runId)
         val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged ?: return
         noteOwnerTerminal(
-            lifecycle.status,
-            source = "terminal_lifecycle",
-            seq = frameSeq,
-            scopeMatched = true,
-            lease = lease,
+            OwnerTerminalNote(
+                lifecycle.status,
+                source = "terminal_lifecycle",
+                seq = frameSeq,
+                scopeMatched = true,
+            ),
+            lease,
         )
         if (lifecycle.status == RuntimeRunStatus.Failed ||
             lifecycle.status == RuntimeRunStatus.Cancelled
@@ -1873,3 +1927,11 @@ class AppServerTurnEngine(
         }
     }
 }
+
+/** Clean-completion signal thrown out of the frame loop (see isCausedByCleanCompletion). */
+private object TurnCompleted : TurnCompletedMarker()
+private sealed class TurnCompletedMarker : Throwable()
+
+/** Idle-watchdog signal: the turn saw no frame for the idle window. */
+private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
+private sealed class TurnIdleTimedOutMarker : Throwable()

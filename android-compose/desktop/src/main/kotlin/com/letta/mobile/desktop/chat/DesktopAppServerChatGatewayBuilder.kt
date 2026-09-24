@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -247,7 +248,7 @@ internal fun buildDesktopAppServerTurnEngine(
         turnContextPreflight = config.turnContextPreflight ?: AppServerContextWindowPreflight(client),
         eventRouter = router,
         externalToolRegistry = externalToolRegistry,
-    )
+    ).also { engine -> engine.answerApprovalReplaysFrom(router, scope) }
 }
 
 /**

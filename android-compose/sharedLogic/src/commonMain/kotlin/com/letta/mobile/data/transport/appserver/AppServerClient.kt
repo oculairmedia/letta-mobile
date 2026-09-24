@@ -71,6 +71,14 @@ interface AppServerClient {
 
     suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse
 
+    /** letta-mobile-qygvv.6: releases parked queue items. Requires `request_id` to correlate the response. */
+    suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse =
+        throw UnsupportedOperationException("resume_queue is not supported by this client")
+
+    /** letta-mobile-qygvv.6: removes one queued input by queue item id. */
+    suspend fun removeQueueItem(command: AppServerCommand.RemoveQueueItem): AppServerInboundFrame.RemoveQueueItemResponse =
+        throw UnsupportedOperationException("remove_queue_item is not supported by this client")
+
     suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse)
 
     // Runtime-native admin operations (lgns8.7). Defaults throw so existing
@@ -298,6 +306,18 @@ class DefaultAppServerClient(
             send = { transport.sendControl(command) },
         )
     }
+
+    override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse {
+        val requestId = requireNotNull(command.requestId) {
+            "resume_queue requires request_id when using response correlation."
+        }
+        return registry.request(requestId, { it as? AppServerInboundFrame.ResumeQueueResponse }) { transport.sendControl(command) }
+    }
+
+    override suspend fun removeQueueItem(
+        command: AppServerCommand.RemoveQueueItem,
+    ): AppServerInboundFrame.RemoveQueueItemResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.RemoveQueueItemResponse }) { transport.sendControl(command) }
 
     override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
         registry.request(
