@@ -1,9 +1,9 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
-import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -28,16 +28,15 @@ internal class ApprovalResponseSender(
     private val decisions: ApprovalDecisionCache,
     private val requestIdFactory: () -> String,
 ) {
-    suspend fun send(
-        runtime: AppServerRuntimeScope,
-        approvalRequestId: String,
-        decision: AppServerApprovalResponseDecision,
-        source: String,
-    ): ApprovalSubmitResult {
-        val cached = ApprovalDecisionCache.CachedDecision(runtime, approvalRequestId, decision)
+    suspend fun send(submission: ApprovalSubmission): ApprovalSubmitResult {
+        val cached = ApprovalDecisionCache.CachedDecision(
+            submission.runtime,
+            submission.approvalRequestId,
+            submission.decision,
+        )
         decisions.remember(cached)
         val result = deliver(cached)
-        record(cached, result, source)
+        record(cached, result, submission.source)
         return result
     }
 
@@ -145,6 +144,20 @@ fun AppServerTurnEngine.cachedApprovalDecisionFor(
     frame: AppServerInboundFrame.ControlRequest,
 ): ApprovalDecisionCache.CachedDecision? = approvalSender.cachedDecisionFor(frame)
 
+/**
+ * letta-mobile-qygvv.5: the captured user-input gate id for [toolCallId] is released once its
+ * answer went through; a rejected answer leaves the gate open for a retry.
+ */
+fun AppServerTurnEngine.releaseUserInputGateUnlessRejected(
+    result: ApprovalSubmitResult,
+    toolCallId: String?,
+    capturedRequestId: String?,
+) {
+    if (result is ApprovalSubmitResult.Rejected) return
+    if (toolCallId == null || capturedRequestId == null) return
+    clearUserInputApprovalId(toolCallId, capturedRequestId)
+}
+
 /** letta-mobile-qygvv.5: re-sends [cached] for a server replay of the same request (awaits `input_accepted`). */
 suspend fun AppServerTurnEngine.reanswerReplayedApproval(
     cached: ApprovalDecisionCache.CachedDecision,
@@ -173,6 +186,6 @@ internal suspend fun ApprovalResponseSender.sendAsTurnInput(
     response: AppServerInputPayload.ApprovalResponse,
 ): InputAcceptance.Failure? {
     val decision = response.decision ?: return null
-    val result = send(runtime, response.requestId, decision, source = "turn_input")
+    val result = send(ApprovalSubmission(runtime, response.requestId, decision, source = "turn_input"))
     return (result as? ApprovalSubmitResult.Rejected)?.let { InputAcceptance.Rejected(it.error) }
 }

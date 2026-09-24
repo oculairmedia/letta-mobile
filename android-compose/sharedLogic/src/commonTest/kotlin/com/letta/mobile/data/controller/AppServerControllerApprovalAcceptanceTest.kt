@@ -54,7 +54,7 @@ class AppServerControllerApprovalAcceptanceTest {
         val result = controller.submit(approve = true)
 
         assertEquals(ApprovalSubmitResult.Rejected(APPROVAL_NOT_PENDING_ERROR), result)
-        client.emit(frames.approvalControlRequest("approval-1"))
+        client.emit(frames.approvalControlRequest())
         runCurrent()
         assertEquals(1, client.approvalInputs().size, "a rejected decision is not re-sent on replay")
     }
@@ -74,12 +74,12 @@ class AppServerControllerApprovalAcceptanceTest {
         val drafts = mutableListOf<RuntimeEventDraft>()
         val turn = launch { controller.runTurn(command).collect { drafts += it } }
         runCurrent()
-        client.emit(frames.approvalControlRequest("approval-1"))
+        client.emit(frames.approvalControlRequest())
         runCurrent()
         assertEquals(1, drafts.approvalCards())
 
         assertEquals(ApprovalSubmitResult.Accepted, controller.submit(approve = false, reason = "not now"))
-        client.emit(frames.approvalControlRequest("approval-1"))
+        client.emit(frames.approvalControlRequest())
         runCurrent()
 
         val decisions = client.approvalInputs().map { it.approvalDecision() }
@@ -93,7 +93,7 @@ class AppServerControllerApprovalAcceptanceTest {
     fun replayWithNoActiveTurnIsReansweredFromCache() = withController { client, controller ->
         // The reconnect path replays pending approvals before any turn subscribes.
         assertEquals(ApprovalSubmitResult.Accepted, controller.submit(approve = true))
-        client.emit(frames.approvalControlRequest("approval-1"))
+        client.emit(frames.approvalControlRequest())
         runCurrent()
 
         assertEquals(2, client.approvalInputs().size)

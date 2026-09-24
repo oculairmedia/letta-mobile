@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerQueueRemoval
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -29,6 +30,22 @@ internal suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminalDraft(): Run
         val item = awaitItem()
         val status = item.runLifecycleStatus() ?: continue
         if (status in turnEngineTerminalStatuses) return item
+    }
+}
+
+/** One `update_queue` snapshot: client message ids still queued plus removal transitions. */
+internal data class QueueUpdateFixture(
+    val queued: List<String> = emptyList(),
+    val removed: List<AppServerQueueRemoval> = emptyList(),
+) {
+    companion object {
+        fun stillQueued(clientMessageId: String) = QueueUpdateFixture(queued = listOf(clientMessageId))
+
+        fun dequeued(clientMessageId: String) =
+            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "dequeued")))
+
+        fun cancelled(clientMessageId: String) =
+            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "cancelled")))
     }
 }
 

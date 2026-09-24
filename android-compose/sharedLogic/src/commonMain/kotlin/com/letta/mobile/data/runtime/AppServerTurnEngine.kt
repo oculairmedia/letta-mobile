@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
@@ -411,15 +412,12 @@ class AppServerTurnEngine(
      * capture-before-send rule as [markInboundControlAnswered].
      */
     suspend fun submitApprovalResponse(
-        runtime: AppServerRuntimeScope,
-        approvalRequestId: String,
-        decision: AppServerApprovalResponseDecision,
+        submission: ApprovalSubmission,
         claimGeneration: Long = connectionGenerationProvider(),
-        source: String = "submit",
     ): ApprovalSubmitResult {
-        val result = approvalSender.send(runtime, approvalRequestId, decision, source)
+        val result = approvalSender.send(submission)
         if (result !is ApprovalSubmitResult.Rejected) {
-            markInboundControlAnswered(approvalRequestId, claimGeneration)
+            markInboundControlAnswered(submission.approvalRequestId, claimGeneration)
         }
         return result
     }
@@ -1136,22 +1134,32 @@ class AppServerTurnEngine(
         }
     }
 
+    /**
+     * Gates [received] before it touches turn state: generation, a replayed approval this engine
+     * re-answers from cache (letta-mobile-qygvv.5), runtime scope and run id. Returns false when
+     * the frame is not this lease's to process.
+     */
+    private suspend fun admitFrame(received: AppServerReceivedFrame, context: TurnFrameContext): Boolean {
+        if (isConnectionGenerationSuperseded(context.lease)) {
+            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
+        }
+        if (received.isStaleGenerationForLease(context.lease)) return false
+        if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) {
+            return false
+        }
+        if (!received.matches(context.runtimeScope, context.lease)) {
+            completeScopeRejectedTurn(received, context)
+            return false
+        }
+        return context.lease.slot.runIdGate.accepts(received, context.lease.token)
+    }
+
     private suspend fun processReceivedFrame(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
     ) {
-        if (isConnectionGenerationSuperseded(context.lease)) {
-            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
-        }
-        if (received.isStaleGenerationForLease(context.lease)) return
-        if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) return
-        if (!received.matches(context.runtimeScope, context.lease)) {
-            completeScopeRejectedTurn(received, context)
-            return
-        }
-        val slot = context.lease.slot
-        if (!slot.runIdGate.accepts(received, context.lease.token)) return
+        if (!admitFrame(received, context)) return
         context.idleWatchdog.markFrame()
         val queueRemoval = observeQueueProgress(received, context.lease)
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
@@ -1551,13 +1559,15 @@ class AppServerTurnEngine(
         // is no longer pending (someone else resolved it), so the card stays
         // suppressed either way; the result is recorded as telemetry.
         submitApprovalResponse(
-            runtime = scope,
-            approvalRequestId = approval.requestId,
-            decision = AppServerApprovalResponseDecision.Allow(
-                message = "Approved by default mobile policy.",
+            ApprovalSubmission(
+                runtime = scope,
+                approvalRequestId = approval.requestId,
+                decision = AppServerApprovalResponseDecision.Allow(
+                    message = "Approved by default mobile policy.",
+                ),
+                source = "auto_allow",
             ),
             claimGeneration = claimGeneration,
-            source = "auto_allow",
         )
         return true
     }

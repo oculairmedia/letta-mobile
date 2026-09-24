@@ -1,5 +1,19 @@
 package com.letta.mobile.data.controller
 
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+
+/**
+ * letta-mobile-qygvv.5: one approval decision to send as an `approval_response` input, answering
+ * the pending `control_request` [approvalRequestId] on [runtime]. [source] tags telemetry.
+ */
+data class ApprovalSubmission(
+    val runtime: AppServerRuntimeScope,
+    val approvalRequestId: String,
+    val decision: AppServerApprovalResponseDecision,
+    val source: String = "submit",
+)
+
 /**
  * letta-mobile-qygvv.5: what the App Server said about one `approval_response` input.
  *

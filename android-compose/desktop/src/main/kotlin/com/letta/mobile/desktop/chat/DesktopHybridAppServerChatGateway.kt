@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.controller.AppServerApprovalDecisions
 import com.letta.mobile.data.controller.ApprovalRejectedException
+import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
@@ -173,7 +174,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
             // letta-mobile-qygvv.5: awaits input_accepted and caches the decision so
             // a server replay is re-answered. A rejection reaches the approval
             // coordinator's error path instead of vanishing.
-            val result = appServerEngine.submitApprovalResponse(scope, effectiveRequestId, decision)
+            val result = appServerEngine.submitApprovalResponse(ApprovalSubmission(scope, effectiveRequestId, decision))
             if (result is ApprovalSubmitResult.Rejected) throw ApprovalRejectedException(result.error)
         }
         submission.toolCallId?.let { toolCallId ->

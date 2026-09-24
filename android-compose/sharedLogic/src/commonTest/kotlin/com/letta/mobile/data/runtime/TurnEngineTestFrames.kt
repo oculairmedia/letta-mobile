@@ -5,7 +5,6 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
-import com.letta.mobile.data.transport.appserver.AppServerQueueRemoval
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -17,11 +16,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /*
- * Shared stream-frame, `input_accepted` and `update_queue` fixtures for App
- * Server turn-engine tests (letta-mobile-qygvv.1).
+ * Shared stream-frame, `input_accepted` and approval fixtures for App Server turn-engine tests
+ * (letta-mobile-qygvv.1, qygvv.5). The `update_queue` fixture lives beside the shared fake in
+ * TurnEngineTestStreamClient.kt.
  */
 
 internal const val TEST_INPUT_REQUEST_ID = "req-1"
+internal const val TEST_APPROVAL_REQUEST_ID = "approval-1"
 internal const val APPROVAL_NOT_PENDING_ERROR = "Approval request is no longer pending"
 
 /** What the fake App Server answers to an acknowledged `create_message`. */
@@ -37,22 +38,6 @@ internal data class InputAckFixture(
         val RejectedWithoutError = InputAckFixture(accepted = false)
 
         fun rejected(error: String) = InputAckFixture(accepted = false, error = error)
-    }
-}
-
-/** One `update_queue` snapshot: client message ids still queued plus removal transitions. */
-internal data class QueueUpdateFixture(
-    val queued: List<String> = emptyList(),
-    val removed: List<AppServerQueueRemoval> = emptyList(),
-) {
-    companion object {
-        fun stillQueued(clientMessageId: String) = QueueUpdateFixture(queued = listOf(clientMessageId))
-
-        fun dequeued(clientMessageId: String) =
-            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "dequeued")))
-
-        fun cancelled(clientMessageId: String) =
-            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "cancelled")))
     }
 }
 
@@ -97,9 +82,9 @@ internal class TurnEngineTestFrames(
         )
     }
 
-    /** A `can_use_tool` approval gate for [requestId] (letta-mobile-qygvv.5). */
-    fun approvalControlRequest(requestId: String) = AppServerInboundFrame.ControlRequest(
-        requestId = requestId,
+    /** The `can_use_tool` approval gate [TEST_APPROVAL_REQUEST_ID] (letta-mobile-qygvv.5). */
+    fun approvalControlRequest() = AppServerInboundFrame.ControlRequest(
+        requestId = TEST_APPROVAL_REQUEST_ID,
         request = buildJsonObject {
             put("subtype", "can_use_tool")
             put("tool_name", "searxng_web_search")

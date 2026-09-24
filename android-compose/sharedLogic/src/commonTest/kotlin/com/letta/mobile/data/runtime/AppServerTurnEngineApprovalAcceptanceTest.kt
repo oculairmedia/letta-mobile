@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
@@ -41,7 +42,7 @@ class AppServerTurnEngineApprovalAcceptanceTest {
         val approvalAck = CompletableDeferred<AppServerInboundFrame.InputAccepted>()
         val turn = startTurn(AppServerPermissionMode.Unrestricted) { approvalAckGate = approvalAck }
 
-        turn.client.emit(frames.approvalControlRequest("approval-1"))
+        turn.client.emit(frames.approvalControlRequest())
         runCurrent()
 
         val sent = turn.client.approvalInputs().single()
@@ -62,14 +63,14 @@ class AppServerTurnEngineApprovalAcceptanceTest {
         val client = TurnEngineTestAckingClient(frames, InputAckFixture.Started)
         val engine = engineFor(client, AppServerPermissionMode.Standard)
 
-        assertEquals(ApprovalSubmitResult.Accepted, engine.submitApprovalResponse(runtime, "approval-1", allow))
+        assertEquals(ApprovalSubmitResult.Accepted, engine.submitApprovalResponse(submission("approval-1", allow)))
 
         client.approvalAck = InputAckFixture.rejected(APPROVAL_NOT_PENDING_ERROR)
-        val rejected = engine.submitApprovalResponse(runtime, "approval-2", allow)
+        val rejected = engine.submitApprovalResponse(submission("approval-2", allow))
         assertEquals(ApprovalSubmitResult.Rejected(APPROVAL_NOT_PENDING_ERROR), rejected)
 
         client.supportsAck = false
-        val unacknowledged = engine.submitApprovalResponse(runtime, "approval-3", allow)
+        val unacknowledged = engine.submitApprovalResponse(submission("approval-3", allow))
         assertEquals(ApprovalSubmitResult.Unacknowledged("unsupported"), unacknowledged)
         assertEquals("approval-3", client.plainInputs.single().approvalRequestId())
     }
@@ -77,13 +78,13 @@ class AppServerTurnEngineApprovalAcceptanceTest {
     @Test
     fun replayedControlRequestIsReansweredWithCachedDecisionAndNoSecondCard() = runTest {
         val turn = startTurn(AppServerPermissionMode.Standard)
-        turn.client.emit(frames.approvalControlRequest("approval-1"))
+        turn.client.emit(frames.approvalControlRequest())
         runCurrent()
         assertEquals(1, turn.drafts.approvalCards())
 
-        val result = turn.engine.submitApprovalResponse(runtime, "approval-1", deny)
+        val result = turn.engine.submitApprovalResponse(submission("approval-1", deny))
         assertEquals(ApprovalSubmitResult.Accepted, result)
-        turn.client.emit(frames.approvalControlRequest("approval-1"))
+        turn.client.emit(frames.approvalControlRequest())
         runCurrent()
 
         val answers = turn.client.approvalInputs()
@@ -97,13 +98,13 @@ class AppServerTurnEngineApprovalAcceptanceTest {
     @Test
     fun rejectedDecisionIsNotReplayedFromCache() = runTest {
         val turn = startTurn(AppServerPermissionMode.Standard)
-        turn.client.emit(frames.approvalControlRequest("approval-1"))
+        turn.client.emit(frames.approvalControlRequest())
         runCurrent()
         turn.client.approvalAck = InputAckFixture.rejected(APPROVAL_NOT_PENDING_ERROR)
 
-        val result = turn.engine.submitApprovalResponse(runtime, "approval-1", allow)
+        val result = turn.engine.submitApprovalResponse(submission("approval-1", allow))
         assertIs<ApprovalSubmitResult.Rejected>(result)
-        turn.client.emit(frames.approvalControlRequest("approval-1"))
+        turn.client.emit(frames.approvalControlRequest())
         runCurrent()
 
         assertEquals(1, turn.client.approvalInputs().size, "a rejected decision is forgotten, not re-sent")
@@ -143,6 +144,9 @@ class AppServerTurnEngineApprovalAcceptanceTest {
         val frames = TurnEngineTestFrames(runtime)
         val allow = AppServerApprovalResponseDecision.Allow(message = "ok")
         val deny = AppServerApprovalResponseDecision.Deny(message = "not now")
+
+        fun submission(approvalRequestId: String, decision: AppServerApprovalResponseDecision) =
+            ApprovalSubmission(runtime, approvalRequestId, decision)
         val command = TurnCommand(
             backendId = BackendId("iroh-node-server"),
             runtimeId = RuntimeId("iroh-node:agent-1:conv-1"),

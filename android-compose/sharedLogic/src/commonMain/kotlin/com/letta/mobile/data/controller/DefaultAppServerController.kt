@@ -8,6 +8,7 @@ import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.reanswerReplayedApproval
+import com.letta.mobile.data.runtime.releaseUserInputGateUnlessRejected
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnContextPreflight
 import kotlin.time.Clock
@@ -485,16 +486,10 @@ class DefaultAppServerController(
         // the inbound control request (and the captured user-input gate id) open
         // and is returned so the caller can show the failure.
         val result = turnEngine.submitApprovalResponse(
-            runtime = runtime,
-            approvalRequestId = effectiveRequestId,
-            decision = decision,
+            ApprovalSubmission(runtime, effectiveRequestId, decision),
             claimGeneration = claimGeneration,
         )
-        if (result !is ApprovalSubmitResult.Rejected) {
-            if (toolCallId != null && capturedRequestId != null) {
-                turnEngine.clearUserInputApprovalId(toolCallId, capturedRequestId)
-            }
-        }
+        turnEngine.releaseUserInputGateUnlessRejected(result, toolCallId, capturedRequestId)
         return result
     }
 
