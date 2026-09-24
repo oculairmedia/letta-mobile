@@ -231,7 +231,7 @@ class IrohChannelTransportConcurrentConversationsTest {
             val terminalsForA = terminalsAfter.filter { it.turnId == turnIdA }
             assertEquals(1, terminalsForA.size, "the terminal must carry A's own turn id")
             assertEquals("completed", terminalsForA.single().status)
-            awaitTurnCleared(transport, CONV_A, "A's turn state must clear on its terminal")
+            awaitTurnOnAClears(transport)
             assertTrue(
                 transport.hasActiveChatTurn(CONV_B),
                 "A's terminal must settle A only — B's concurrent turn is untouched",
@@ -323,7 +323,7 @@ class IrohChannelTransportConcurrentConversationsTest {
             }
             val terminalA = frames.filterIsInstance<ServerFrame.TurnDone>().single { it.turnId == turnIdA }
             assertEquals("completed", terminalA.status, "A settles normally, not as a casualty of B's cancel")
-            awaitTurnCleared(transport, CONV_A, "A's turn state must clear on its terminal")
+            awaitTurnOnAClears(transport)
         } finally {
             collector.cancel()
             transport.disconnect()
@@ -418,11 +418,11 @@ class IrohChannelTransportConcurrentConversationsTest {
      * inactive turn means its terminal is already visible, not the other way round), so a test that
      * has just seen the TurnDone waits for the retirement instead of racing it.
      */
-    private suspend fun awaitTurnCleared(transport: IrohChannelTransport, conversationId: String, message: String) {
+    private suspend fun awaitTurnOnAClears(transport: IrohChannelTransport) {
         val cleared = withTimeoutOrNull(5.seconds) {
-            while (transport.hasActiveChatTurn(conversationId)) delay(10.milliseconds)
+            while (transport.hasActiveChatTurn(CONV_A)) delay(10.milliseconds)
             true
         }
-        assertTrue(cleared == true, message)
+        assertTrue(cleared == true, "A's turn state must clear on its terminal")
     }
 }
