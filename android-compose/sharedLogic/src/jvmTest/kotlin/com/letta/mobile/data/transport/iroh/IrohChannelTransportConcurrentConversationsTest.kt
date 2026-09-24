@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -230,7 +231,7 @@ class IrohChannelTransportConcurrentConversationsTest {
             val terminalsForA = terminalsAfter.filter { it.turnId == turnIdA }
             assertEquals(1, terminalsForA.size, "the terminal must carry A's own turn id")
             assertEquals("completed", terminalsForA.single().status)
-            assertFalse(transport.hasActiveChatTurn(CONV_A), "A's turn state must clear on its terminal")
+            awaitTurnCleared(transport, CONV_A, "A's turn state must clear on its terminal")
             assertTrue(
                 transport.hasActiveChatTurn(CONV_B),
                 "A's terminal must settle A only — B's concurrent turn is untouched",
@@ -322,7 +323,7 @@ class IrohChannelTransportConcurrentConversationsTest {
             }
             val terminalA = frames.filterIsInstance<ServerFrame.TurnDone>().single { it.turnId == turnIdA }
             assertEquals("completed", terminalA.status, "A settles normally, not as a casualty of B's cancel")
-            assertFalse(transport.hasActiveChatTurn(CONV_A))
+            awaitTurnCleared(transport, CONV_A, "A's turn state must clear on its terminal")
         } finally {
             collector.cancel()
             transport.disconnect()
@@ -410,5 +411,18 @@ class IrohChannelTransportConcurrentConversationsTest {
         const val CONV_A = "conv-a"
         const val CONV_B = "conv-b"
         const val CONV_C = "conv-c"
+    }
+
+    /**
+     * The terminal is published first and the turn retired just after (emitClaimedTerminal: an
+     * inactive turn means its terminal is already visible, not the other way round), so a test that
+     * has just seen the TurnDone waits for the retirement instead of racing it.
+     */
+    private suspend fun awaitTurnCleared(transport: IrohChannelTransport, conversationId: String, message: String) {
+        val cleared = withTimeoutOrNull(5.seconds) {
+            while (transport.hasActiveChatTurn(conversationId)) delay(10.milliseconds)
+            true
+        }
+        assertTrue(cleared == true, message)
     }
 }
