@@ -128,31 +128,32 @@ internal fun Modifier.touchNavigation(
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             fling.stop()
-            if (down.type != PointerType.Touch || !on || !canPan(down.position)) return@awaitEachGesture
-            var panning = false
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                val pressed = event.changes.filter { it.pressed }
-                if (pressed.isEmpty() && panning) {
-                    fling.release()
-                    return@awaitEachGesture
-                }
-                // Lifted without panning, or a second finger for DrawBox's pinch: no throw.
-                if (pressed.size != 1) return@awaitEachGesture
-                val change = pressed.first()
-                when {
-                    panning -> {
-                        pan(change.positionChange())
-                        fling.track(change.uptimeMillis, change.position)
-                    }
-                    (change.position - down.position).getDistance() > viewConfiguration.touchSlop -> {
-                        panning = true
-                        fling.begin(change.uptimeMillis, change.position)
-                        pan(change.position - down.position)
-                    }
-                }
-                if (panning) change.consume()
-            }
+            if (down.type == PointerType.Touch && on && canPan(down.position)) panWithOneFinger(down, fling) { pan(it) }
         }
+    }
+}
+
+/**
+ * Pans with the finger that went [down] once it moves past the slop, until it lifts (and throws the
+ * board on at its speed) or a second finger joins for DrawBox's pinch (no throw). A finger lifted
+ * without panning was a tap: nothing is taken.
+ */
+private suspend fun AwaitPointerEventScope.panWithOneFinger(down: PointerInputChange, fling: PanFling, pan: (Offset) -> Unit) {
+    var panning = false
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val pressed = event.changes.filter { it.pressed }
+        if (pressed.isEmpty() && panning) return fling.release(event.changes.first().uptimeMillis)
+        if (pressed.size != 1) return
+        val change = pressed.first()
+        if (panning) {
+            pan(change.positionChange())
+            fling.track(change.uptimeMillis, change.position)
+        } else if (movedPastSlop(change, down)) {
+            panning = true
+            fling.begin(change.uptimeMillis, change.position)
+            pan(change.position - down.position)
+        }
+        if (panning) change.consume()
     }
 }

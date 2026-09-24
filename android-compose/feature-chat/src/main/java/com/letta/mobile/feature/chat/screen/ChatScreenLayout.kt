@@ -80,6 +80,8 @@ internal data class ChatScreenLayoutParams(
     val floatingBannerMessage: String,
     val onFloatingBannerMessageChange: (String) -> Unit,
     val streamingRevealPulse: () -> Unit,
+    /** The composer's height each time it is measured, for whatever draws behind it. */
+    val onComposerMeasured: (Dp) -> Unit = {},
 )
 
 @Composable

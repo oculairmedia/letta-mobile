@@ -9,7 +9,6 @@ import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.relayTopicOf
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -119,16 +118,12 @@ abstract class AppModule {
 
         @Provides
         @Singleton
+        // Only device actions are this phone's to answer. canvas.* is the Iroh host's: it offers them
+        // on every runtime it serves, backed by the relay's log (letta-mobile-aknkw), and ignores
+        // any tools an app sends with runtime_start, so a copy here never reached a runtime.
         fun provideAndroidExternalToolRegistry(
             runner: DeviceActionCommandRunner,
-            canvasStore: CanvasDocumentStore,
-            canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
-        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(
-            buildList {
-                add(DeviceActionExternalTool(runner))
-                addAll(CanvasExternalTools.all(canvasStore, canvasSessions))
-            }
-        )
+        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(listOf(DeviceActionExternalTool(runner)))
 
         /** One registry per process here, but owned by the graph so it dies with it. */
         @Provides

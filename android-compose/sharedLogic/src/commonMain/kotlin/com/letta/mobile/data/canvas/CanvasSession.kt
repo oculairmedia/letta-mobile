@@ -183,9 +183,14 @@ class CanvasSession(
      * Applies a remote [CanvasOp], ignoring if already present in [opLog] (deduplication),
      * appends to [opLog], projects state, and updates persistence.
      */
-    suspend fun applyRemote(op: CanvasOp): CanvasDocument? = mutex.withLock {
+    suspend fun applyRemote(op: CanvasOp, vouchedActor: String? = null): CanvasDocument? = mutex.withLock {
         val current = currentDoc()
-        if (current.acl != null && !current.acl.canWrite(op.actorId)) {
+        if (!mayApplyRemote(current.acl, op, vouchedActor)) {
+            com.letta.mobile.util.Telemetry.event(
+                "CanvasSession", "remote.rejected",
+                "canvasId" to canvasId.value, "opId" to op.opId, "actorId" to op.actorId,
+                level = com.letta.mobile.util.Telemetry.Level.WARN,
+            )
             return null
         }
         if (opLog.has(canvasId, op.opId)) return null
@@ -194,6 +199,15 @@ class CanvasSession(
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         commitScene(newScene)
     }
+
+    /**
+     * Whether a remote [op] may land here: its actor may write under this app's copy of [acl], or
+     * the host vouches for it ([vouchedActor]). The host checks an agent against its own ACL before
+     * publishing; this app's copy may predate that agent (a canvas the agent made on the host, or
+     * one opened here without it), and rejecting it would drop every agent edit unseen.
+     */
+    private fun mayApplyRemote(acl: CanvasAcl?, op: CanvasOp, vouchedActor: String?): Boolean =
+        acl == null || vouchedActor == op.actorId || acl.canWrite(op.actorId)
 
     private fun updateLamport(op: CanvasOp) {
         if (op.lamport > lamportClock) {
@@ -270,27 +284,28 @@ class CanvasSession(
         style: CanvasTextStyle? = null,
         title: String? = null,
     ): CanvasDocument? {
-        val existing = documents().firstOrNull { it.id == documentId }
-        val unchanged = existing?.json == documentJson &&
-            (frame == null || frame == existing.frame) &&
-            (color == null || color == existing.color) &&
-            (style == null || style == existing.style) &&
-            (title == null || title.ifBlank { null } == existing.title)
-        if (unchanged) return null
-        return applyLocal(
-            CanvasOp.SetDocumentOp(
-                opId = CanvasOpDiffer.generateOpId("doc"),
-                actorId = actorId,
-                lamport = lamportClock + 1,
-                documentId = documentId,
-                documentJson = documentJson,
-                frame = frame,
-                color = color,
-                style = style,
-                title = title,
-            ),
+        val op = CanvasOp.SetDocumentOp(
+            opId = CanvasOpDiffer.generateOpId("doc"),
+            actorId = actorId,
+            lamport = lamportClock + 1,
+            documentId = documentId,
+            documentJson = documentJson,
+            frame = frame,
+            color = color,
+            style = style,
+            title = title,
         )
+        val existing = documents().firstOrNull { it.id == documentId }
+        return if (existing != null && existing.alreadyHas(op)) null else applyLocal(op)
     }
+
+    /** Whether writing [op] would leave this document as it is: the same text, and nothing [op] sets differs. */
+    private fun CanvasSceneDocument.alreadyHas(op: CanvasOp.SetDocumentOp): Boolean =
+        json == op.documentJson && keeps(op.frame, frame) && keeps(op.color, color) && keeps(op.style, style) &&
+            (op.title == null || op.title.ifBlank { null } == title)
+
+    /** A field [op] leaves out ([wanted] null) keeps what the document has. */
+    private fun <T> keeps(wanted: T?, current: T?): Boolean = wanted == null || wanted == current
 
     /** Renames a block document; an empty [title] clears it. A no-op for a document that is not there. */
     suspend fun retitleDocument(
@@ -499,7 +514,7 @@ class CanvasSession(
     fun startSync(scope: CoroutineScope): Job? {
         val transport = syncTransport ?: return null
         return scope.launch {
-            transport.deliverTo(canvasId) { remoteOp -> applyRemote(remoteOp) }
+            transport.deliverVouchedTo(canvasId) { remoteOp, vouchedActor -> applyRemote(remoteOp, vouchedActor) }
         }
     }
 

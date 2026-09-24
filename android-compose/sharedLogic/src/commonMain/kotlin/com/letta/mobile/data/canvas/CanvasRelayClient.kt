@@ -73,8 +73,34 @@ class CanvasRelayClient(
 
     private class AssetFetch {
         val result = CompletableDeferred<ByteArray?>()
-        var chunks: Array<ByteArray?>? = null
-        var received = 0
+        private var chunks: Array<ByteArray?>? = null
+        private var received = 0
+
+        /**
+         * Chunk [index] of [count], as the host sent it: the whole asset once every chunk is in, an
+         * empty array when the chunks do not make an asset, else null (more to come).
+         */
+        fun add(index: Int, count: Int, data: String): ByteArray? {
+            if (count !in 1..MAX_FETCH_CHUNKS || index !in 0 until count) return ByteArray(0)
+            val parts = chunks ?: arrayOfNulls<ByteArray>(count).also { chunks = it }
+            if (parts.size != count) return ByteArray(0)
+            if (parts[index] == null) {
+                parts[index] = runCatching { kotlin.io.encoding.Base64.decode(data) }.getOrNull() ?: return ByteArray(0)
+                received++
+            }
+            return if (received < count) null else join(parts)
+        }
+
+        /** One copy into an array of the final size; appending chunk by chunk copied quadratically. */
+        private fun join(parts: Array<ByteArray?>): ByteArray {
+            val whole = ByteArray(parts.sumOf { it!!.size })
+            var at = 0
+            for (part in parts) {
+                part!!.copyInto(whole, at)
+                at += part.size
+            }
+            return whole
+        }
     }
 
     private val localPresence = InMemoryCanvasPresenceTransport(presenceTtlMs, clock)
@@ -86,7 +112,7 @@ class CanvasRelayClient(
         healthFlows.getOrCreate(canvasId) { MutableStateFlow(CanvasSyncHealth.LocalOnly(NO_HOST)) }
 
     private inner class Canvas(val id: CanvasId, val topic: String) {
-        val appliers = mutableListOf<suspend (CanvasOp) -> Unit>()
+        val appliers = mutableListOf<suspend (CanvasOp, String?) -> Unit>()
         val health: MutableStateFlow<CanvasSyncHealth> = healthFlow(id)
 
         /**
@@ -149,11 +175,15 @@ class CanvasRelayClient(
     }
 
     override suspend fun deliverTo(canvasId: CanvasId, apply: suspend (CanvasOp) -> Unit) {
+        deliverVouchedTo(canvasId) { op, _ -> apply(op) }
+    }
+
+    override suspend fun deliverVouchedTo(canvasId: CanvasId, apply: suspend (op: CanvasOp, vouchedActor: String?) -> Unit) {
         val canvas = canvas(canvasId)
         lock.withLock { canvas.appliers += apply }
         try {
             coroutineScope {
-                launch { canvas.local.collect { apply(it) } }
+                launch { canvas.local.collect { apply(it, null) } }
                 val live = lock.withLock { current }
                 // A connection that fails here ends in [run]; this session keeps working locally.
                 if (live != null) runCatching { join(live, canvas.topic) }.onFailure { if (it is CancellationException) throw it }
@@ -212,58 +242,38 @@ class CanvasRelayClient(
         for (ref in CanvasAssetRefs.of(op)) {
             val claim = lock.withLock { current === live && live.assetsUp.add(ref) }
             if (!claim) continue
-            val bytes = store.get(ref)
-            if (bytes == null) {
-                // Not ours to send (another app's asset this app has not fetched): the host has it.
-                continue
+            // Not ours to send (another app's asset this app has not fetched): the host has it.
+            val bytes = store.get(ref) ?: continue
+            putAsset(live, topic, AssetRef(ref, store.mediaType(ref) ?: DEFAULT_MEDIA_TYPE, bytes.size.toLong()), bytes)
+        }
+    }
+
+    /** [bytes] up as [asset], chunk by chunk; if the connection fails part way, it is sent again next time. */
+    private suspend fun putAsset(live: Live, topic: String, asset: AssetRef, bytes: ByteArray) {
+        try {
+            forEachAssetChunk(bytes) { index, count, data ->
+                live.connection.send(CanvasRelayMessage.AssetPut(topic, asset, index, count, data))
             }
-            val asset = AssetRef(ref, store.mediaType(ref) ?: DEFAULT_MEDIA_TYPE, bytes.size.toLong())
-            val count = ((bytes.size + CanvasRelayHost.ASSET_CHUNK_BYTES - 1) / CanvasRelayHost.ASSET_CHUNK_BYTES).coerceAtLeast(1)
-            try {
-                for (index in 0 until count) {
-                    val from = index * CanvasRelayHost.ASSET_CHUNK_BYTES
-                    val to = minOf(bytes.size, from + CanvasRelayHost.ASSET_CHUNK_BYTES)
-                    live.connection.send(CanvasRelayMessage.AssetPut(topic, asset, index, count, kotlin.io.encoding.Base64.encode(bytes, from, to)))
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                lock.withLock { live.assetsUp -= ref }
-                throw e
-            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            lock.withLock { live.assetsUp -= asset.ref }
+            throw e
         }
     }
 
     private suspend fun assetData(message: CanvasRelayMessage.AssetData) {
         val store = assets ?: return
         val ref = message.asset.ref
-        val whole = lock.withLock {
-            val fetch = fetches[ref] ?: return
-            if (message.count !in 1..MAX_FETCH_CHUNKS || message.index !in 0 until message.count) return@withLock ByteArray(0)
-            val chunks = fetch.chunks ?: arrayOfNulls<ByteArray>(message.count).also { fetch.chunks = it }
-            if (chunks.size != message.count) return@withLock ByteArray(0)
-            if (chunks[message.index] == null) {
-                chunks[message.index] = runCatching { kotlin.io.encoding.Base64.decode(message.data) }.getOrNull() ?: return@withLock ByteArray(0)
-                fetch.received++
-            }
-            if (fetch.received < message.count) {
-                null
-            } else {
-                // One copy into an array of the final size; appending chunk by chunk copied quadratically.
-                val whole = ByteArray(chunks.sumOf { it!!.size })
-                var at = 0
-                for (part in chunks) {
-                    part!!.copyInto(whole, at)
-                    at += part.size
-                }
-                whole
-            }
-        } ?: return
-        // Kept, and handed over, only if the bytes are that asset.
-        val kept = whole.takeIf { it.isNotEmpty() }?.let { bytes ->
-            runCatching { store.put(message.asset.mediaType, bytes) }.getOrNull()?.takeIf { it.ref == ref }?.let { bytes }
-        }
-        finishFetch(ref, kept)
+        val whole = lock.withLock { fetches[ref]?.add(message.index, message.count, message.data) } ?: return
+        finishFetch(ref, verified(store, message.asset, whole))
+    }
+
+    /** [bytes], kept, when they are [asset]; null when they are not (or nothing arrived). */
+    private fun verified(store: AssetStore, asset: AssetRef, bytes: ByteArray): ByteArray? {
+        if (bytes.isEmpty()) return null
+        val kept = runCatching { store.put(asset.mediaType, bytes) }.getOrNull()
+        return bytes.takeIf { kept?.ref == asset.ref }
     }
 
     private suspend fun finishFetch(ref: String, bytes: ByteArray?) {
@@ -326,46 +336,13 @@ class CanvasRelayClient(
         if (lock.withLock { current !== live }) return false
         when (message) {
             is CanvasRelayMessage.Joined -> joined(live, message)
-            is CanvasRelayMessage.Op -> {
-                applyLocally(message.topic, message.op)
-                // Only after every session applied it: a crash before this replays it, never skips it.
-                delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
-                lock.withLock { canvasesOf(message.topic).forEach { it.hostCursor = maxOf(it.hostCursor, message.cursor) } }
-            }
-            is CanvasRelayMessage.CaughtUp -> {
-                delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
-                lock.withLock {
-                    live.caughtUp += message.topic
-                    canvasesOf(message.topic).forEach { it.hostCursor = maxOf(it.hostCursor, message.cursor) }
-                }
-                refresh(message.topic)
-            }
-            is CanvasRelayMessage.Ack -> {
-                val mine = lock.withLock { live.inFlight.remove(message.opId) }
-                if (mine) {
-                    delivery.acknowledge(message.topic, message.opId)
-                    // The host acks in log order, after every earlier op it fanned out to this app, so
-                    // the log is applied here up to this op too.
-                    delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
-                    lock.withLock { canvasesOf(message.topic).forEach { it.hostCursor = maxOf(it.hostCursor, message.cursor) } }
-                }
-                refresh(message.topic)
-            }
-            is CanvasRelayMessage.Rejected -> {
-                lock.withLock { live.inFlight -= message.opId }
-                delivery.reject(message.topic, message.opId, message.reason)
-                refresh(message.topic)
-            }
-            is CanvasRelayMessage.PresenceRelayed ->
-                lock.withLock { canvasesOf(message.topic).map { it.id } }.forEach { remotePresence.updatePresence(it, message.presence) }
-            is CanvasRelayMessage.PresenceGone -> {
-                val gone = CanvasPresence(message.peerId, "", "", 0f, 0f, isActive = false)
-                lock.withLock { canvasesOf(message.topic).map { it.id } }.forEach { remotePresence.updatePresence(it, gone) }
-            }
-            is CanvasRelayMessage.Refused -> {
-                lock.withLock { refusal = message.reason }
-                return false
-            }
+            is CanvasRelayMessage.Op -> op(live, message)
+            is CanvasRelayMessage.CaughtUp -> caughtUp(live, message)
+            is CanvasRelayMessage.Ack -> ack(live, message)
+            is CanvasRelayMessage.Rejected -> rejected(live, message)
+            is CanvasRelayMessage.PresenceRelayed -> relayedPresence(message.topic, message.presence)
+            is CanvasRelayMessage.PresenceGone ->
+                relayedPresence(message.topic, CanvasPresence(message.peerId, "", "", 0f, 0f, isActive = false))
             is CanvasRelayMessage.AssetStored -> lock.withLock { live.assetsUp += message.ref }
             is CanvasRelayMessage.AssetData -> assetData(message)
             is CanvasRelayMessage.AssetMissing -> finishFetch(message.ref, null)
@@ -375,13 +352,57 @@ class CanvasRelayClient(
                 "CanvasRelayClient", "asset.rejected", "ref" to message.ref, "reason" to message.reason,
                 level = com.letta.mobile.util.Telemetry.Level.WARN,
             )
+            is CanvasRelayMessage.Refused -> return refused(message.reason)
             // App-to-host messages coming this way: not a host speaking the protocol.
-            else -> {
-                lock.withLock { refusal = "the host sent ${message::class.simpleName}" }
-                return false
-            }
+            else -> return refused("the host sent ${message::class.simpleName}")
         }
         return true
+    }
+
+    private suspend fun op(live: Live, message: CanvasRelayMessage.Op) {
+        applyLocally(message.topic, message.op, vouchedActor(message))
+        // Only after every session applied it: a crash before this replays it, never skips it.
+        delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
+        raiseHostCursor(message.topic, message.cursor)
+    }
+
+    private suspend fun caughtUp(live: Live, message: CanvasRelayMessage.CaughtUp) {
+        delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
+        lock.withLock { live.caughtUp += message.topic }
+        raiseHostCursor(message.topic, message.cursor)
+        refresh(message.topic)
+    }
+
+    private suspend fun ack(live: Live, message: CanvasRelayMessage.Ack) {
+        val mine = lock.withLock { live.inFlight.remove(message.opId) }
+        if (mine) {
+            delivery.acknowledge(message.topic, message.opId)
+            // The host acks in log order, after every earlier op it fanned out to this app, so the
+            // log is applied here up to this op too.
+            delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
+            raiseHostCursor(message.topic, message.cursor)
+        }
+        refresh(message.topic)
+    }
+
+    private suspend fun rejected(live: Live, message: CanvasRelayMessage.Rejected) {
+        lock.withLock { live.inFlight -= message.opId }
+        delivery.reject(message.topic, message.opId, message.reason)
+        refresh(message.topic)
+    }
+
+    private suspend fun relayedPresence(topic: String, presence: CanvasPresence) {
+        lock.withLock { canvasesOf(topic).map { it.id } }.forEach { remotePresence.updatePresence(it, presence) }
+    }
+
+    /** The host turned this connection away: false, so the connection ends. */
+    private suspend fun refused(reason: String): Boolean {
+        lock.withLock { refusal = reason }
+        return false
+    }
+
+    private suspend fun raiseHostCursor(topic: String, cursor: Long) {
+        lock.withLock { canvasesOf(topic).forEach { it.hostCursor = maxOf(it.hostCursor, cursor) } }
     }
 
     private suspend fun joined(live: Live, message: CanvasRelayMessage.Joined) {
@@ -397,19 +418,24 @@ class CanvasRelayClient(
             delivery.enqueue(message.topic, localOps.values.sortedWith(CanvasOpOrder).map { it.opId })
             delivery.advanceCursor(live.connection.hostId, message.topic, 0L)
         }
-        for (opId in delivery.queued(message.topic)) {
+        if (sendQueued(live, message.topic, localOps)) refresh(message.topic)
+    }
+
+    /** Every op still queued for [topic], each after its assets; false if [live] was superseded meanwhile. */
+    private suspend fun sendQueued(live: Live, topic: String, localOps: Map<String, CanvasOp>): Boolean {
+        for (opId in delivery.queued(topic)) {
             val op = localOps[opId]
             if (op == null) {
                 // Queued but gone from the local log: nothing left to send.
-                delivery.reject(message.topic, opId, "not in the local op log")
+                delivery.reject(topic, opId, "not in the local op log")
                 continue
             }
             val send = lock.withLock { (current === live).also { if (it) live.inFlight += opId } }
-            if (!send) return
-            sendAssetsFor(live, message.topic, op)
-            live.connection.send(CanvasRelayMessage.Publish(message.topic, op))
+            if (!send) return false
+            sendAssetsFor(live, topic, op)
+            live.connection.send(CanvasRelayMessage.Publish(topic, op))
         }
-        refresh(message.topic)
+        return true
     }
 
     // ---- Local ----
@@ -423,10 +449,19 @@ class CanvasRelayClient(
     private fun canvasesOf(topic: String): List<Canvas> = canvases.values.filter { it.topic == topic }
 
     /** Every session of the canvases of [topic] in this app applies [op]; they skip ops they have. */
-    private suspend fun applyLocally(topic: String, op: CanvasOp) {
+    private suspend fun applyLocally(topic: String, op: CanvasOp, vouchedActor: String?) {
         val appliers = lock.withLock { canvasesOf(topic).flatMap { it.appliers.toList() } }
-        for (apply in appliers) apply(op)
+        for (apply in appliers) apply(op, vouchedActor)
     }
+
+    /**
+     * The actor the host vouches for on [message]: an agent's op that the host's own canvas tools
+     * published (origin `agent:<id>`, which only the host's backend uses; an app's origin is its
+     * authenticated node id) after checking the agent against the host's ACL. Null otherwise.
+     */
+    private fun vouchedActor(message: CanvasRelayMessage.Op): String? =
+        message.origin.removePrefix(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX)
+            .takeIf { message.origin.startsWith(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX) && it == message.op.actorId }
 
     private suspend fun refreshAll() {
         val topics = lock.withLock { canvases.values.map { it.topic }.toSet() }

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.fanout
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
@@ -22,6 +23,8 @@ import kotlinx.coroutines.launch
 class AppServerRuntimeEventRouter(
     private val inboundControlRegistry: InboundControlRequestRegistry = InboundControlRequestRegistry(),
     private val connectionGenerationProvider: () -> Long = { 0L },
+    /** letta-mobile-qygvv.5: decisions sent by this client, shared with the turn engine. */
+    private val approvalDecisionCache: ApprovalDecisionCache = ApprovalDecisionCache(),
     private val fanout: RuntimeEventFanout = RuntimeEventFanout(
         inboundControlRegistry = inboundControlRegistry,
         connectionGenerationProvider = connectionGenerationProvider,
@@ -31,6 +34,13 @@ class AppServerRuntimeEventRouter(
     private val attachLock = SynchronizedObject()
 
     fun inboundControlRegistry(): InboundControlRequestRegistry = inboundControlRegistry
+
+    fun approvalDecisionCache(): ApprovalDecisionCache = approvalDecisionCache
+
+    /** letta-mobile-qygvv.5: see [RuntimeEventFanout.bindApprovalReplayResponder]. */
+    fun bindApprovalReplayResponder(responder: (AppServerInboundFrame.ControlRequest) -> Boolean) {
+        fanout.bindApprovalReplayResponder(responder)
+    }
 
     /**
      * Attach a sole collector. No-op when an active collector is already running

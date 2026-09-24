@@ -55,6 +55,20 @@ class ExternalToolDispatcherTest {
         sent.assertIsErrorContaining("not handled")
     }
 
+    /** letta-mobile-aknkw: a tool learns the conversation as well as the agent, from the runtime scope. */
+    @Test
+    fun theToolIsToldTheWholeRuntimeScopeOfTheCall() = runTest {
+        var seen: com.letta.mobile.data.controller.extras.ExternalToolCaller? = null
+        val tool = object : ExternalTool by EchoTool({ ExternalToolResult.Success("ok") }) {
+            override suspend fun invoke(input: JsonObject, caller: com.letta.mobile.data.controller.extras.ExternalToolCaller): ExternalToolResult {
+                seen = caller
+                return ExternalToolResult.Success("ok")
+            }
+        }
+        dispatcher(RecordingClient(), registry = registryOf(tool)).answerRequest()
+        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller("agent-1", "conv-1"), seen)
+    }
+
     @Test
     fun answersWithTheToolResultWhenTheRegistryHandlesIt() = runTest {
         val client = RecordingClient()

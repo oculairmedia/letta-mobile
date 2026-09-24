@@ -32,7 +32,8 @@ class IrohCanvasRelay(
 ) {
     @Volatile
     private var hostId: String = ""
-    private val host = CanvasRelayHost(store, hostId = { hostId }, assets = assets)
+    /** The relay itself; the host's own canvas tools publish through it like any app (letta-mobile-aknkw). */
+    val host = CanvasRelayHost(store, hostId = { hostId }, assets = assets)
     private val reaper: Job = scope.launch {
         while (isActive) {
             delay(PRESENCE_REAP_MS)

@@ -456,6 +456,16 @@ class DrawBoxController(
     }
 
     /**
+     * The current drawing as JSON that stands on its own: every image carries its bytes, since a
+     * file or message it goes into has no asset store to resolve a ref against. The board's own
+     * saves go through [exportJson], which leaves them to the store.
+     */
+    fun exportStandaloneJson(): String = DrawingSerializer.serialize(
+        PayLoad(bgColor = _state.value.bgColor, elements = _state.value.elements),
+        inlineImageBytes = true,
+    )
+
+    /**
      * Export the current drawing as an SVG string.
      *
      * The exported string can be saved to a file and opened in any SVG viewer.

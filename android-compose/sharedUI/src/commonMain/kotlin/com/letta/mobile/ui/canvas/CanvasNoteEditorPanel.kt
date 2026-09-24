@@ -140,7 +140,7 @@ fun CanvasNoteEditorPanel(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    NoteIcon(Lucide.ArrowLeft, "Close note editor", onCard, onClick = onClose)
+                    NoteIcon(NoteButton(Lucide.ArrowLeft, "Close note editor"), onCard, onClick = onClose)
                 }
                 NoteTitleField(session, document, onCard, compact)
                 CanvasBlockEditor(
@@ -157,7 +157,7 @@ fun CanvasNoteEditorPanel(
                     modifier = Modifier.weight(1f).fillMaxWidth()
                         .padding(horizontal = if (compact) LettaDimens.Space.md else LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
                 )
-                NoteFootBar(session, document, toolbar, actions, onCard, background)
+                NoteFootBar(OpenNote(session, document, onCard, background), toolbar, actions)
             }
         }
     }
@@ -194,36 +194,38 @@ private fun NoteTitleField(session: CanvasSession, document: CanvasSceneDocument
     }
 }
 
+/** The note open in the editor, and the colours its bars are drawn in: [onCard] over [background]. */
+private data class OpenNote(
+    val session: CanvasSession,
+    val document: CanvasSceneDocument,
+    val onCard: Color,
+    val background: Color,
+)
+
 @Composable
-private fun NoteFootBar(
-    session: CanvasSession,
-    document: CanvasSceneDocument,
-    toolbar: NoteToolbar?,
-    actions: NoteEditorActions?,
-    onCard: Color,
-    background: Color,
-) {
-    var foot by remember(document.id) { mutableStateOf(NoteFoot.ICONS) }
-    Column(modifier = Modifier.fillMaxWidth().background(background)) {
-        if (foot == NoteFoot.COLOURS) NoteColourPanel(session, document, onCard)
+private fun NoteFootBar(note: OpenNote, toolbar: NoteToolbar?, actions: NoteEditorActions?) {
+    val onCard = note.onCard
+    var foot by remember(note.document.id) { mutableStateOf(NoteFoot.ICONS) }
+    Column(modifier = Modifier.fillMaxWidth().background(note.background)) {
+        if (foot == NoteFoot.COLOURS) NoteColourPanel(note.session, note.document, onCard)
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (foot == NoteFoot.FORMAT && toolbar != null) {
                 CanvasFormattingBar(toolbar = toolbar, modifier = Modifier.weight(1f))
-                NoteIcon(Lucide.X, "Close formatting", onCard) { foot = NoteFoot.ICONS }
+                NoteIcon(NoteButton(Lucide.X, "Close formatting"), onCard) { foot = NoteFoot.ICONS }
                 return@Row
             }
             NoteAddMenu(toolbar, onCard)
-            NoteIcon(Lucide.Palette, "Colours", onCard, selected = foot == NoteFoot.COLOURS) {
+            NoteIcon(NoteButton(Lucide.Palette, "Colours", selected = foot == NoteFoot.COLOURS), onCard) {
                 foot = if (foot == NoteFoot.COLOURS) NoteFoot.ICONS else NoteFoot.COLOURS
             }
-            NoteIcon(Lucide.ALargeSmall, "Text formatting", onCard, enabled = toolbar != null) { foot = NoteFoot.FORMAT }
+            NoteIcon(NoteButton(Lucide.ALargeSmall, "Text formatting", enabled = toolbar != null), onCard) { foot = NoteFoot.FORMAT }
             Spacer(modifier = Modifier.weight(1f))
             if (actions != null) {
-                NoteIcon(Lucide.Undo2, "Undo", onCard, enabled = actions.canUndo, onClick = actions.onUndo)
-                NoteIcon(Lucide.Redo2, "Redo", onCard, enabled = actions.canRedo, onClick = actions.onRedo)
+                NoteIcon(NoteButton(Lucide.Undo2, "Undo", enabled = actions.canUndo), onCard, onClick = actions.onUndo)
+                NoteIcon(NoteButton(Lucide.Redo2, "Redo", enabled = actions.canRedo), onCard, onClick = actions.onRedo)
                 NoteMoreMenu(actions, onCard)
             }
         }
@@ -236,7 +238,7 @@ private fun NoteAddMenu(toolbar: NoteToolbar?, onCard: Color) {
     var open by remember { mutableStateOf(false) }
     val todo = BlockButtons.firstOrNull { it.label == "To-do" }
     Box {
-        NoteIcon(Lucide.SquarePlus, "Add to note", onCard, enabled = toolbar != null && todo != null) { open = true }
+        NoteIcon(NoteButton(Lucide.SquarePlus, "Add to note", enabled = toolbar != null && todo != null), onCard) { open = true }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (toolbar != null && todo != null) {
                 MenuRow(Lucide.ListTodo, "Checkboxes") {
@@ -252,7 +254,7 @@ private fun NoteAddMenu(toolbar: NoteToolbar?, onCard: Color) {
 private fun NoteMoreMenu(actions: NoteEditorActions, onCard: Color) {
     var open by remember { mutableStateOf(false) }
     Box {
-        NoteIcon(Lucide.EllipsisVertical, "More", onCard) { open = true }
+        NoteIcon(NoteButton(Lucide.EllipsisVertical, "More"), onCard) { open = true }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             actions.onDuplicate?.let { duplicate ->
                 MenuRow(Lucide.Copy, "Make a copy") {
@@ -325,24 +327,26 @@ private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
     )
 }
 
+/** A button in the note's bars: what it shows and says, and whether it is on or available. */
+private data class NoteButton(
+    val icon: ImageVector,
+    val label: String,
+    val selected: Boolean = false,
+    val enabled: Boolean = true,
+)
+
 @Composable
-private fun NoteIcon(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    selected: Boolean = false,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
+private fun NoteIcon(button: NoteButton, tint: Color, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
-        enabled = enabled,
+        enabled = button.enabled,
         modifier = Modifier
             .size(LettaDimens.Orb.lg)
-            .then(if (selected) Modifier.clip(CircleShape).background(tint.copy(alpha = 0.12f)) else Modifier)
-            .semantics { contentDescription = label },
+            .then(if (button.selected) Modifier.clip(CircleShape).background(tint.copy(alpha = 0.12f)) else Modifier)
+            .semantics { contentDescription = button.label },
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = if (enabled) tint else tint.copy(alpha = 0.38f))
+        val shown = if (button.enabled) tint else tint.copy(alpha = 0.38f)
+        Icon(button.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = shown)
     }
 }
 

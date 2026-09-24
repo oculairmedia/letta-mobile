@@ -244,12 +244,7 @@ fun CanvasWorkspace(
                 // the parsed drawing is handed to the controller on it.
                 val (clean, parsed) = withContext(Dispatchers.Default) {
                     val stripped = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
-                    stripped to if (sessionJson.isBlank()) {
-                        null
-                    } else {
-                        runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(stripped) }.getOrNull()
-                            ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
-                    }
+                    stripped to if (sessionJson.isBlank()) null else CanvasImageAssets.parse(stripped, assets)
                 }
                 // Known even for an empty canvas, or the first note placed on it would read as
                 // an external change to the drawing and reload the board.
@@ -291,10 +286,8 @@ fun CanvasWorkspace(
                     )
                     val (result, parsedExternal) = withContext(Dispatchers.Default) {
                         val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params) ?: return@withContext null
-                        val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }?.let { json ->
-                            runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()
-                                ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
-                        }
+                        val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }
+                            ?.let { json -> CanvasImageAssets.parse(json, assets) }
                         evaluated to payload
                     } ?: return@collect
                     lastImportedRev = result.newImportedRev
@@ -414,6 +407,21 @@ fun CanvasWorkspace(
         }
     }
 
+    // An export stands on its own, so every image must go in whole: those still showing a preview
+    // get their bytes from the store or the host first, and an export that cannot have them all
+    // says so instead of writing previews in their place.
+    suspend fun exportStandalone(handler: (String) -> Unit) {
+        val completion = CanvasImageAssets.completeForExport(controller.state.value.elements, assets) { ref ->
+            session?.fetchAsset(ref)
+        }
+        completion.completed.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(it)) }
+        if (completion.missing > 0) {
+            statusMessage = "Export needs every image: ${completion.missing} not loaded yet"
+            return
+        }
+        handler(controller.exportStandaloneJson())
+    }
+
     // Collect export/error events from DrawBoxController
     LaunchedEffect(controller, session) {
         controller.events.collect { event ->
@@ -444,7 +452,6 @@ fun CanvasWorkspace(
                             history.record(CanvasHistory.Step.Drawing())
                         }
                     }
-                    onExportJson?.invoke(event.json)
                 }
                 is Event.SvgExported -> {
                     statusMessage = CanvasWorkspaceSupport.computeSvgExportStatus(event.svg)
@@ -600,7 +607,7 @@ fun CanvasWorkspace(
     }
 
     fun undoBoard() {
-        val drawingUnsaved = lastSavedElements != null && lastSavedElements != state.elements
+        val drawingUnsaved = lastSavedElements?.let { !CanvasWorkspaceSupport.sameDrawing(it, state.elements) } == true
         CanvasWorkspaceSupport.undoBoard(historyActionContext, drawingUnsaved, canUndo)
     }
 
@@ -867,6 +874,49 @@ fun CanvasWorkspace(
         openTextIn(next)
     }
 
+    // A new note at [frame], joined by an arrow to [from] on its [direction] side, the caret in it.
+    fun addJoinedNote(
+        from: androidx.compose.ui.geometry.Rect,
+        frame: CanvasDocumentFrame,
+        color: String?,
+        direction: QuickCreateDirection,
+    ) {
+        val s = session ?: return
+        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
+        coroutineScope.launch {
+            recordingDocuments("adding a note") {
+                runCatching { s.setDocument(id, "", frame = frame, color = color) }.onSuccess {
+                    val (start, end) = CanvasQuickCreate.connector(from, frame.toRect(), direction)
+                    if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
+                        // The session's documents, which already hold the note just added.
+                        CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
+                    }
+                    activeNoteId = id
+                    focusRequest.documentId = id
+                }
+            }
+        }
+    }
+
+    // A text at [world], joined by an arrow to [from], as one undo step, the caret in it.
+    fun addJoinedText(from: androidx.compose.ui.geometry.Rect, world: Offset, direction: QuickCreateDirection) {
+        val current = controller.state.value
+        val undoStepsBefore = current.history.size
+        val before = current.elements.mapTo(HashSet()) { it.id }
+        controller.insertText(
+            "", world, current.currentItemFontSize, current.currentItemFontFamilyKey,
+            current.currentItemTextAlignment, current.strokeColor,
+        )
+        val (start, _) = CanvasQuickCreate.connector(from, androidx.compose.ui.geometry.Rect(world, world), direction)
+        CanvasQuickCreate.addArrow(controller, start, world)
+        controller.onIntent(
+            io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
+        )
+        controller.state.value.elements
+            .firstOrNull { it.id !in before && it is io.ak1.drawbox.domain.model.Element.Text }
+            ?.let(::openTextIn)
+    }
+
     // Miro's quick create: an empty copy of the selected shape (or note) one gap away, joined to
     // it by an arrow, with the caret in it.
     fun quickCreate(direction: QuickCreateDirection) {
@@ -877,24 +927,9 @@ fun CanvasWorkspace(
             addJoinedShape(shape.bounds(), next, direction)
             return
         }
-        val s = session ?: return
         val note = activeNoteId?.let { id -> liveDocuments.firstOrNull { it.id == id } } ?: return
         val frame = note.frame ?: return
-        val nextFrame = CanvasQuickCreate.nextFrame(frame, direction)
-        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
-        coroutineScope.launch {
-            recordingDocuments("adding a note") {
-                runCatching { s.setDocument(id, "", frame = nextFrame, color = note.color) }.onSuccess {
-                    val (start, end) = CanvasQuickCreate.connector(frame.toRect(), nextFrame.toRect(), direction)
-                    if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
-                        // The session's documents, which already hold the note just added.
-                        CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
-                    }
-                    activeNoteId = id
-                    focusRequest.documentId = id
-                }
-            }
-        }
+        addJoinedNote(frame.toRect(), CanvasQuickCreate.nextFrame(frame, direction), note.color, direction)
     }
 
     // An arrow pulled out of a quick-create target and let go: what the menu there picked goes
@@ -908,39 +943,8 @@ fun CanvasWorkspace(
         val from = shape?.bounds() ?: note?.frame?.toRect() ?: return
         val direction = CanvasQuickCreate.directionToward(from, world)
         when (kind) {
-            QuickCreateKind.NOTE -> {
-                val s = session ?: return
-                val frame = newNoteFrame(world)
-                val id = "note-${Clock.System.now().toEpochMilliseconds()}"
-                coroutineScope.launch {
-                    recordingDocuments("adding a note") {
-                        runCatching { s.setDocument(id, "", frame = frame, color = note?.color ?: NoteColors.first().hex) }.onSuccess {
-                            val (start, end) = CanvasQuickCreate.connector(from, frame.toRect(), direction)
-                            if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
-                                CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
-                            }
-                            activeNoteId = id
-                            focusRequest.documentId = id
-                        }
-                    }
-                }
-            }
-            QuickCreateKind.TEXT -> {
-                val undoStepsBefore = current.history.size
-                val before = current.elements.mapTo(HashSet()) { it.id }
-                controller.insertText(
-                    "", world, current.currentItemFontSize, current.currentItemFontFamilyKey,
-                    current.currentItemTextAlignment, current.strokeColor,
-                )
-                val (start, _) = CanvasQuickCreate.connector(from, androidx.compose.ui.geometry.Rect(world, world), direction)
-                CanvasQuickCreate.addArrow(controller, start, world)
-                controller.onIntent(
-                    io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
-                )
-                controller.state.value.elements
-                    .firstOrNull { it.id !in before && it is io.ak1.drawbox.domain.model.Element.Text }
-                    ?.let(::openTextIn)
-            }
+            QuickCreateKind.NOTE -> addJoinedNote(from, newNoteFrame(world), note?.color ?: NoteColors.first().hex, direction)
+            QuickCreateKind.TEXT -> addJoinedText(from, world, direction)
             else -> {
                 val base = shape ?: CanvasQuickCreate.defaultShape(current.strokeColor, current.strokeWidth)
                 val next = CanvasQuickCreate.shapeAt(base, world, kind, current.elements.maxOfOrNull { it.zIndex } ?: 0)
@@ -1346,7 +1350,16 @@ fun CanvasWorkspace(
                         controller.importPath(CanvasSamples.dailyLoopJson)
                         statusMessage = "Imported Daily Loop sample"
                     },
-                    onExportJson = { controller.exportJson() },
+                    // A board saves on its own; an export is for somewhere else, so it carries its
+                    // images' bytes rather than refs nothing there can resolve.
+                    onExportJson = {
+                        val handler = onExportJson
+                        if (handler == null) {
+                            controller.exportJson()
+                        } else {
+                            coroutineScope.launch { exportStandalone(handler) }
+                        }
+                    },
                     onExportSvg = { controller.exportSvg() },
                     onClear = {
                         controller.reset()
@@ -1390,15 +1403,19 @@ fun CanvasWorkspace(
                 onRestore = { cp ->
                     val s = session ?: return@CanvasHistoryDialog
                     coroutineScope.launch {
-                        runCatching {
-                            s.restoreCheckpoint(cp.checkpointId)
-                        }.onSuccess { restored ->
+                        val outcome = runCatching { s.restoreCheckpoint(cp.checkpointId) }
+                        outcome.getOrNull()?.let { restored ->
                             lastExportedJson = restored.sceneJson
-                            controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
+                            // As on open: parsed off the main thread, its images given their bytes
+                            // from the store, since a checkpoint holds only their refs.
+                            val clean = CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson)
+                            val parsed = withContext(Dispatchers.Default) { CanvasImageAssets.parse(clean, assets) }
+                            if (parsed != null) controller.importPath(parsed) else controller.importPath(clean)
                             history.clear()
                             statusMessage = "Restored to revision ${cp.revision}"
                             showHistoryDialog = false
-                        }.onFailure { err ->
+                        }
+                        outcome.exceptionOrNull()?.let { err ->
                             statusMessage = "Restore failed: ${err.message}"
                         }
                     }
@@ -1476,13 +1493,15 @@ fun CanvasWorkspace(
             if (quickAnchor != null) {
                 CanvasQuickCreateTargets(
                     anchor = quickAnchor,
-                    onCreate = ::quickCreate,
+                    actions = QuickCreateActions(
+                        onCreate = ::quickCreate,
+                        onDrag = { quickDrag = it },
+                        // A pull that barely left the target was a fumbled press, not an arrow.
+                        onDrop = { drop -> if ((drop.to - drop.from).getDistance() > QUICK_PULL_MIN_PX) quickDrop = drop },
+                    ),
                     chromeRegions = chromeRegions,
                     modifier = Modifier.fillMaxSize(),
                     compact = compact,
-                    onDrag = { quickDrag = it },
-                    // A pull that barely left the target was a fumbled press, not an arrow.
-                    onDrop = { drop -> if ((drop.to - drop.from).getDistance() > QUICK_PULL_MIN_PX) quickDrop = drop },
                 )
             }
             // The arrow being pulled out, and while its menu is open, the arrow it will become.
@@ -1514,9 +1533,12 @@ fun CanvasWorkspace(
             // Typing into a shape on a phone: the keyboard takes the bottom half, so the tool bar
             // steps aside and the selection bar rides on the keyboard instead of over the shape,
             // the way Miro lays it out. The keyboard camera then keeps the shape above them both.
-            val typingOnPhone = compact && editingTextId != null && hasSelection
+            // A shape only: a standalone text keeps its usual bars, as the slim one has no
+            // Properties for it.
             val editable = state.elements.singleOrNull { it.id in state.selectedIds }
                 ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
+            val typingOnPhone = compact && editingTextId != null && hasSelection &&
+                editable is io.ak1.drawbox.domain.model.Element.Shape
             val selectionBar: @Composable (Modifier) -> Unit = { barModifier ->
                 CanvasSelectionBar(
                     state = controlsBarState,

@@ -60,6 +60,33 @@ class ProductionIrohToolRegistryWiringTest {
         )
     }
 
+    /**
+     * letta-mobile-aknkw: every runtime the host starts gets the host's canvas.* tools, whether or
+     * not --meridian-binary is set, since they need only the canvas relay the host runs.
+     */
+    @Test
+    fun theHostsCanvasToolsAreAdvertisedWithOrWithoutTheMessagingBinary() {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasRelayStore()
+        val canvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(
+            com.letta.mobile.data.canvas.HostCanvasBackend(
+                relay = com.letta.mobile.data.canvas.CanvasRelayHost(store, hostId = { "host" }),
+                store = store,
+                directory = com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory(),
+            ),
+        )
+        val canvasNames = com.letta.mobile.data.canvas.CanvasToolContract.all.map { it.name }.toSet()
+        for (binary in listOf("", "/usr/local/bin/meridian")) {
+            val registry = buildProductionExternalToolRegistryForTesting(
+                binary = binary,
+                identityDir = null,
+                addressStore = null,
+                hostTools = canvasTools,
+            )
+            val advertised = registry.advertisedToolsCommandGroups()!!.flatMap { group -> group.tools.map { it.name } }.toSet()
+            assertTrue(advertised.containsAll(canvasNames), "binary '$binary' advertised $advertised")
+        }
+    }
+
     @Test
     fun nonEmptyBinaryAdvertisesIrohToolAcrossAgents() {
         val registry = buildProductionExternalToolRegistryForTesting(

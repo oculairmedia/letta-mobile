@@ -48,6 +48,21 @@ object AmbientMotion {
      */
     val ABOVE_COMPOSER_BAND: AmbientBand = AmbientBand(top = 0.80f, peak = 0.90f)
 
+    /**
+     * [ABOVE_COMPOSER_BAND], moved up when the composer is taller than the tenth it assumes: a
+     * few lines of text, or a canvas the keyboard has shortened, put the composer's top above
+     * 0.80 and it would cover the whole band. [composerHeightFraction] is the composer's share of
+     * the canvas height (0 when unknown). The band keeps its height and never moves down.
+     */
+    fun bandAboveComposer(composerHeightFraction: Float): AmbientBand {
+        val band = ABOVE_COMPOSER_BAND
+        if (!composerHeightFraction.isFinite() || composerHeightFraction <= 0f) return band
+        val composerTop = (1f - composerHeightFraction).coerceIn(0f, 1f)
+        if (composerTop >= band.peak) return band
+        val height = band.peak - band.top
+        return AmbientBand(top = (composerTop - height).coerceAtLeast(0f), peak = composerTop)
+    }
+
     /** The legacy full breath cycle the speed multiplier is relative to. */
     const val BASE_PERIOD_MILLIS: Int = 6000
 

@@ -28,21 +28,59 @@ internal object CanvasImageAssets {
         return image.copy(assetRef = asset.ref, mediaType = mediaType, preview = image.preview ?: previewOf(image.bytes))
     }
 
+    /**
+     * Gives [image] its full bytes from the store, or its preview until the store has them. Bytes
+     * that are only the preview do not count as having them, so the full image replaces the
+     * preview as soon as it is here.
+     */
     fun hydrate(image: Element.Image, store: AssetStore): Element.Image {
         val ref = image.assetRef ?: return image
+        if (image.bytes.isNotEmpty() && !image.isShowingPreview) return image
+        val full = store.get(ref)
+        if (full != null) return image.copy(bytes = full)
         if (image.bytes.isNotEmpty()) return image
-        val bytes = store.get(ref) ?: image.preview ?: return image
-        return image.copy(bytes = bytes)
+        return image.preview?.let { image.copy(bytes = it) } ?: image
     }
 
     /** Keeps an image that came with its bytes in the store, when the bytes are really its asset's. */
     fun keep(image: Element.Image, store: AssetStore) {
         val ref = image.assetRef ?: return
-        if (image.bytes.isEmpty() || store.has(ref)) return
+        if (image.bytes.isEmpty() || image.isShowingPreview) return
+        // What the store holds, read back (and so checked against its hash), not merely present:
+        // a damaged file is repaired from intact bytes here, not left for later drawings to miss.
+        if (store.get(ref) != null) return
         // Bytes that do not hash to the ref they came with land under their own ref, which nothing
         // points at: harmless, and never served for [ref], since the store is content-addressed.
         runCatching { store.put(image.mediaType ?: sniffMediaType(image.bytes), image.bytes) }
     }
+
+    /**
+     * The images in [elements] that an export would write as only a ref and a preview, given their
+     * full bytes: from [store], else from [fetch] (the host). [ExportImages.missing] counts the ones
+     * neither has.
+     */
+    suspend fun completeForExport(
+        elements: List<Element>,
+        store: AssetStore?,
+        fetch: suspend (String) -> ByteArray?,
+    ): ExportImages {
+        val incomplete = elements.filterIsInstance<Element.Image>()
+            .filter { it.assetRef != null && (it.bytes.isEmpty() || it.isShowingPreview) }
+        val completed = incomplete.mapNotNull { image ->
+            val ref = image.assetRef ?: return@mapNotNull null
+            val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { store?.get(ref) } ?: fetch(ref)
+            bytes?.let { image.copy(bytes = it) }
+        }
+        return ExportImages(completed = completed, missing = incomplete.size - completed.size)
+    }
+
+    /** Images an export completed, and how many it could not. */
+    data class ExportImages(val completed: List<Element.Image>, val missing: Int)
+
+    /** Drawing [json] parsed and its images resolved against [store]; null when it does not parse. */
+    fun parse(json: String, store: AssetStore?): PayLoad? =
+        runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()
+            ?.let { drawing -> if (store != null) resolve(drawing, store) else drawing }
 
     /** [hydrate] and [keep] for every image in a parsed drawing. */
     fun resolve(payLoad: PayLoad, store: AssetStore): PayLoad {

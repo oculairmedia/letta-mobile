@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import kotlinx.serialization.json.JsonObject
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
+import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -45,6 +46,31 @@ class ApprovalAdminHandlersTest {
         assertEquals("agent-1", controller.submittedAgentId)
         assertEquals("approval-1", controller.submittedApprovalRequestId)
         assertEquals(true, controller.submittedApprove)
+    }
+
+    @Test
+    fun approvalSubmitRejectedByAppServerReturnsFailureWithServerError() = runTest {
+        installRecordingTransport()
+        val controller = RecordingController().apply {
+            submitResult = ApprovalSubmitResult.Rejected("Approval request is no longer pending")
+        }
+        val response = dispatchApproval(controller = controller, params = approvalParams())
+
+        assertFalse(response.getValue("success").jsonPrimitive.boolean)
+        val error = response.getValue("error").jsonPrimitive.content
+        assertTrue(error.contains("approval_rejected"), error)
+        assertTrue(error.contains("Approval request is no longer pending"), error)
+    }
+
+    @Test
+    fun approvalSubmitUnacknowledgedStillSucceeds() = runTest {
+        installRecordingTransport()
+        val controller = RecordingController().apply {
+            submitResult = ApprovalSubmitResult.Unacknowledged("ack_timeout")
+        }
+        val response = dispatchApproval(controller = controller, params = approvalParams())
+
+        assertTrue(response.getValue("success").jsonPrimitive.boolean)
     }
 
     @Test
@@ -133,6 +159,7 @@ class ApprovalAdminHandlersTest {
         var submittedApprove: Boolean? = null
         var submittedToolCallId: String? = null
         var submittedUpdatedInput: kotlinx.serialization.json.JsonObject? = null
+        var submitResult: ApprovalSubmitResult = ApprovalSubmitResult.Accepted
 
         override suspend fun startRuntime(
             agentId: AgentId,
@@ -175,12 +202,13 @@ class ApprovalAdminHandlersTest {
             reason: String?,
             toolCallId: String?,
             updatedInput: JsonObject?,
-        ) {
+        ): ApprovalSubmitResult {
             submittedAgentId = agentId.value
             submittedApprovalRequestId = approvalRequestId
             submittedApprove = approve
             submittedToolCallId = toolCallId
             submittedUpdatedInput = updatedInput
+            return submitResult
         }
     }
 }
