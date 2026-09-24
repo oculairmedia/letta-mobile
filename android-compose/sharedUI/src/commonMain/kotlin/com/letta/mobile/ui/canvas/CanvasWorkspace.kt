@@ -1467,28 +1467,13 @@ fun CanvasWorkspace(
                     }
                 }
             }
-            if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
-                val editable = state.elements.singleOrNull { it.id in state.selectedIds }
-                    ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
-                val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
-                AnchoredToSelection(
-                    anchor = CanvasWorkspaceSupport.barAnchor(
-                        BarAnchorParams(
-                            state = state,
-                            documents = anchorDocuments,
-                            selectedNoteIds = selectedNoteIds,
-                            activeNote = activeNote,
-                            groupOffset = groupOffset,
-                        ),
-                    ),
-                    // On a phone the title and actions pills fill the top row, so the bar stays
-                    // below them even when the host hides the title.
-                    topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
-                    startClearance = resolvedLayout.railClearance(),
-                    // Above the quick-create target, when there is one, not on it.
-                    gap = if (quickAnchor != null) 56.dp else 12.dp,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
+            // Typing into a shape on a phone: the keyboard takes the bottom half, so the tool bar
+            // steps aside and the selection bar rides on the keyboard instead of over the shape,
+            // the way Miro lays it out. The keyboard camera then keeps the shape above them both.
+            val typingOnPhone = compact && editingTextId != null && hasSelection
+            val editable = state.elements.singleOrNull { it.id in state.selectedIds }
+                ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
+            val selectionBar: @Composable (Modifier) -> Unit = { barModifier ->
                 CanvasSelectionBar(
                     state = controlsBarState,
                     properties = properties,
@@ -1510,8 +1495,30 @@ fun CanvasWorkspace(
                             val types = shapes.map { (it as io.ak1.drawbox.domain.model.Element.Shape).shapeType }.distinct()
                             ShapeReshapeActions(current = types.singleOrNull()) { type -> CanvasReshape.apply(controller, type) }
                         },
-                    modifier = Modifier.canvasChrome(chromeRegions),
+                    modifier = barModifier.canvasChrome(chromeRegions),
                 )
+            }
+            if (!typingOnPhone && (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null))) {
+                val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
+                AnchoredToSelection(
+                    anchor = CanvasWorkspaceSupport.barAnchor(
+                        BarAnchorParams(
+                            state = state,
+                            documents = anchorDocuments,
+                            selectedNoteIds = selectedNoteIds,
+                            activeNote = activeNote,
+                            groupOffset = groupOffset,
+                        ),
+                    ),
+                    // On a phone the title and actions pills fill the top row, so the bar stays
+                    // below them even when the host hides the title.
+                    topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
+                    startClearance = resolvedLayout.railClearance(),
+                    // Above the quick-create target, when there is one, not on it.
+                    gap = if (quickAnchor != null) 56.dp else 12.dp,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                selectionBar(Modifier)
                 }
             }
 
@@ -1575,12 +1582,13 @@ fun CanvasWorkspace(
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 val toolbar = noteToolbar
+                if (typingOnPhone) selectionBar(Modifier)
                 // An opened note carries its own formatting in its foot bar.
                 if (toolbar != null && activeNoteId != null && expandedNoteId == null) {
                     CanvasFormattingBar(toolbar = toolbar)
                 }
                 when (resolvedLayout) {
-                    CanvasLayout.COMPACT -> if (expanded == null) {
+                    CanvasLayout.COMPACT -> if (expanded == null && !typingOnPhone) {
                         CanvasCompactToolbar(
                             state = controlsBarState,
                             properties = properties,

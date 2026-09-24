@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.storage.AssetRef
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -87,6 +88,20 @@ sealed interface CanvasRelayMessage {
     @SerialName("presence")
     data class Presence(val topic: String, val presence: CanvasPresence) : CanvasRelayMessage
 
+    /**
+     * Chunk [index] of [count] of the bytes of [asset] (an image on the board, or any other large
+     * thing kept out of the ops), [data] base64. Sent before the op that refers to it, so the host
+     * has it for the other apps; answered by [AssetStored] once whole and verified, or already held.
+     */
+    @Serializable
+    @SerialName("asset_put")
+    data class AssetPut(val topic: String, val asset: AssetRef, val index: Int, val count: Int, val data: String) : CanvasRelayMessage
+
+    /** Asks for the bytes of [ref]; answered by [AssetData] chunks, or [AssetMissing]. */
+    @Serializable
+    @SerialName("asset_get")
+    data class AssetGet(val topic: String, val ref: String) : CanvasRelayMessage
+
     // ---- Host to app ----
 
     /** [topic] is canvas [canvasId] on host [hostId], whose log ends at [head]. */
@@ -126,6 +141,26 @@ sealed interface CanvasRelayMessage {
     @Serializable
     @SerialName("presence_gone")
     data class PresenceGone(val topic: String, val peerId: String) : CanvasRelayMessage
+
+    /** The host holds [ref], whole and verified: the app need not send it again. */
+    @Serializable
+    @SerialName("asset_stored")
+    data class AssetStored(val topic: String, val ref: String) : CanvasRelayMessage
+
+    /** Chunk [index] of [count] of [asset]'s bytes, [data] base64, answering [AssetGet]. */
+    @Serializable
+    @SerialName("asset_data")
+    data class AssetData(val topic: String, val asset: AssetRef, val index: Int, val count: Int, val data: String) : CanvasRelayMessage
+
+    /** The host does not have [ref] (and nobody is sending it). */
+    @Serializable
+    @SerialName("asset_missing")
+    data class AssetMissing(val topic: String, val ref: String) : CanvasRelayMessage
+
+    /** The host will not keep [ref] ([reason]: too large, bytes that are not that asset, ...). */
+    @Serializable
+    @SerialName("asset_rejected")
+    data class AssetRejected(val topic: String, val ref: String, val reason: String) : CanvasRelayMessage
 
     /** The host will not serve this connection ([reason]); it closes after this. */
     @Serializable

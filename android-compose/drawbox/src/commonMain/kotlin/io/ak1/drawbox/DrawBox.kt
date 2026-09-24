@@ -341,6 +341,9 @@ fun DrawBox(
     val latestOnIntent by rememberUpdatedState(onIntent)
     // A two-finger pan coasts on after the fingers lift, like the one-finger pan a host adds.
     val pinchFling = remember(scope) { PanFling(scope) { delta -> latestOnIntent(Intent.PanBy(delta)) } }
+    // A trackpad's two-finger scroll coasts on after the fingers stop, as it would in a browser; a
+    // mouse wheel's whole notches never do. Windows sends a trackpad no momentum of its own.
+    val wheelFling = remember(scope) { PanFling(scope) { delta -> latestOnIntent(Intent.PanBy(delta)) } }
     // Screen position of the latest press; see the drag handler. A plain holder, not state:
     // nothing draws from it, so writing it must not recompose.
     val press = remember { PressOrigin() }
@@ -503,7 +506,10 @@ fun DrawBox(
                     while (true) {
                         val event = awaitPointerEvent()
                         // Any new touch catches a coasting board.
-                        if (event.changes.any { it.pressed && !it.previousPressed }) pinchFling.stop()
+                        if (event.changes.any { it.pressed && !it.previousPressed }) {
+                            pinchFling.stop()
+                            wheelFling.stop()
+                        }
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.size >= 2) {
                             val p1 = pressed[0].position
@@ -543,12 +549,40 @@ fun DrawBox(
             // axes the device supplies. Trackpad two-finger scroll sends both
             // delta.x and delta.y; classic mouse wheels send only delta.y.
             .pointerInput(Unit) {
+                // The scroll burst in progress, as a pan (screen px) for the coast: where it has got
+                // to, whether it has been a trackpad's (fractional steps), and the coast waiting to
+                // start once the steps stop.
+                var burstPan = Offset.Zero
+                var burstIsTrackpad = false
+                var coastStart: kotlinx.coroutines.Job? = null
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.type != PointerEventType.Scroll) continue
                         val change = event.changes.firstOrNull() ?: continue
                         val delta = change.scrollDelta
+                        val plainPan = !event.keyboardModifiers.isCtrlPressed && !event.keyboardModifiers.isShiftPressed
+                        coastStart?.cancel()
+                        if (plainPan) {
+                            val step = Offset(-delta.x * 50f, -delta.y * 50f)
+                            if (coastStart == null) {
+                                wheelFling.begin(change.uptimeMillis, Offset.Zero)
+                                burstPan = Offset.Zero
+                                burstIsTrackpad = false
+                            }
+                            burstPan += step
+                            burstIsTrackpad = burstIsTrackpad || isTrackpadStep(delta)
+                            wheelFling.track(change.uptimeMillis, burstPan)
+                            val trackpad = burstIsTrackpad
+                            coastStart = scope.launch {
+                                kotlinx.coroutines.delay(WHEEL_COAST_IDLE_MS)
+                                coastStart = null
+                                if (trackpad) wheelFling.release() else wheelFling.stop()
+                            }
+                        } else {
+                            coastStart = null
+                            wheelFling.stop()
+                        }
                         when {
                             event.keyboardModifiers.isCtrlPressed -> {
                                 if (delta.y != 0f) {
@@ -558,8 +592,11 @@ fun DrawBox(
                             }
                             event.keyboardModifiers.isShiftPressed -> {
                                 // Map vertical wheel to horizontal pan for users
-                                // whose mouse has no horizontal axis.
-                                latestOnIntent(Intent.PanBy(Offset(-delta.y * 50f, 0f)))
+                                // whose mouse has no horizontal axis. A shift-wheel can
+                                // already arrive on x (the desktop touch shim sends its
+                                // horizontal pans that way), and then it must be read there.
+                                val sideways = if (delta.x != 0f) delta.x else delta.y
+                                latestOnIntent(Intent.PanBy(Offset(-sideways * 50f, 0f)))
                             }
                             else -> {
                                 latestOnIntent(Intent.PanBy(Offset(-delta.x * 50f, -delta.y * 50f)))
@@ -2334,3 +2371,15 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
 private class PressOrigin {
     var screen: Offset? = null
 }
+
+/**
+ * Whether a scroll step came from a trackpad (or a touch pan the desktop turned into scrolling)
+ * rather than a mouse wheel: a wheel moves in whole notches on one axis, a trackpad in fractions.
+ */
+internal fun isTrackpadStep(delta: Offset): Boolean {
+    fun fractional(v: Float) = v != 0f && kotlin.math.abs(v - kotlin.math.round(v)) > 1e-3f
+    return fractional(delta.x) || fractional(delta.y) || (delta.x != 0f && delta.y != 0f)
+}
+
+/** How long a trackpad's steps must pause before the board coasts on: the fingers have lifted. */
+private const val WHEEL_COAST_IDLE_MS = 60L
