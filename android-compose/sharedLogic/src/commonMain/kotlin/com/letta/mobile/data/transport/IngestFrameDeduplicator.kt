@@ -27,7 +27,7 @@ internal class IngestFrameDeduplicator(
     private val keySet = HashSet<String>()
     private var dropped = 0L
 
-    /** Duplicates suppressed at ingest since construction (or the last [reset]). */
+    /** Duplicates suppressed at ingest since construction. */
     val droppedCount: Long get() = synchronized(lock) { dropped }
 
     /** True when [event] repeats a frame already published inside the window. */
@@ -43,12 +43,6 @@ internal class IngestFrameDeduplicator(
             )
         }
         return duplicate
-    }
-
-    fun reset() = synchronized(lock) {
-        keys.clear()
-        keySet.clear()
-        dropped = 0L
     }
 
     private fun rememberLocked(key: String): Boolean {

@@ -1008,7 +1008,6 @@ class IrohChannelTransport(
             )
         }
         turnRegistry.clear()
-        framePublisher.resetIngestWindow()
         adminRpcExecutor.clear()
         subagentCorrelator.reset()
         lastEmittedSubagentRevision = 0L

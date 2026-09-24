@@ -78,9 +78,6 @@ internal class IrohFramePublisher(
         canonicalEvents.publish(event)
     }
 
-    /** Forget the ingest window, e.g. on an explicit disconnect. */
-    fun resetIngestWindow() = ingestDeduplicator.reset()
-
     companion object {
         const val DEFAULT_BUFFER_CAPACITY = 64
         const val DEFAULT_OVERFLOW_EVENT_CAPACITY = 64

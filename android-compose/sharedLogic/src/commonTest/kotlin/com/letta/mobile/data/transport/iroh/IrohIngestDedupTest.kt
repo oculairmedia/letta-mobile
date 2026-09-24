@@ -91,21 +91,6 @@ class IrohIngestDedupTest {
         job.cancelAndJoin()
     }
 
-    @Test
-    fun resetIngestWindowForgetsPublishedFrames() = runTest(UnconfinedTestDispatcher()) {
-        val publisher = IrohFramePublisher()
-        val received = mutableListOf<ServerFrame>()
-        val job = launch(start = CoroutineStart.UNDISPATCHED) { publisher.events.collect { received += it } }
-
-        publisher.publish(assistantFrame(content = "again"))
-        publisher.resetIngestWindow()
-        publisher.publish(assistantFrame(content = "again"))
-        runCurrent()
-
-        assertEquals(2, received.size)
-        job.cancelAndJoin()
-    }
-
     private fun assistantFrame(content: String) = ServerFrame.AssistantMessage(
         id = "cm-stream-dedup",
         ts = "2026-09-24T00:00:00Z",
