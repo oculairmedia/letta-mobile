@@ -35,6 +35,12 @@ internal enum class UnleasedApprovalOutcome {
 
     /** Another observer already claimed or answered it. */
     AlreadyClaimed,
+
+    /**
+     * No turn on this engine ever ran on the runtime key: another client owns it, and its own
+     * permission policy decides. Left pending, never auto-allowed.
+     */
+    NotOwned,
 }
 
 /**
@@ -45,7 +51,8 @@ internal enum class UnleasedApprovalOutcome {
  * used to sit in the fanout's pending buffer until the next turn subscribed. Meanwhile the server
  * turn was parked on it and the conversation queue behind it wedged.
  *
- * It now gets the policy the lease would have applied: under Unrestricted a non-interactive tool
+ * It now gets the policy the lease would have applied, but only for a runtime key this engine
+ * has run a turn on: under Unrestricted a non-interactive tool
  * is allowed at once. An interactive user-input tool (AskUserQuestion) is never auto-allowed; it
  * stays pending so the next viewer surfaces it. Claims go through [InboundControlRequestRegistry],
  * so a turn that subscribes later drops the already-answered request instead of answering twice.
@@ -55,6 +62,8 @@ internal class UnleasedApprovalAnswerer(
     private val inboundControlRegistry: InboundControlRequestRegistry,
     private val connectionGenerationProvider: () -> Long,
     private val leaseHeld: (TurnRuntimeKey) -> Boolean,
+    /** Whether this engine ran a turn on the key, i.e. the key's permission mode is ours to apply. */
+    private val runtimeOwned: (TurnRuntimeKey) -> Boolean,
     private val permissionModeFor: (TurnRuntimeKey) -> AppServerPermissionMode,
     private val runtimeScopeFor: (TurnRuntimeKey) -> AppServerRuntimeScope?,
 ) {
@@ -69,6 +78,13 @@ internal class UnleasedApprovalAnswerer(
         val toolName = request.request.string("tool_name")
         val mode = permissionModeFor(key)
         val details = ApprovalDetails(request, key, toolName, mode)
+        // Review of PR #1661: `client.events` carries every runtime on a shared App Server. For a
+        // key this engine never ran, the mode provider only returns the host DEFAULT (approve-all),
+        // which is not the owning client's policy, so auto-allowing would bypass that policy.
+        if (!runtimeOwned(key)) {
+            record("approval.unleasedNotOwned", details)
+            return UnleasedApprovalOutcome.NotOwned
+        }
         if (shouldStayPending(mode, toolName)) {
             record("approval.unleasedPending", details)
             return UnleasedApprovalOutcome.LeftPending

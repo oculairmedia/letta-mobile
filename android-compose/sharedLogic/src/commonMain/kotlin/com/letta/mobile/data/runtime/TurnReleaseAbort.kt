@@ -44,6 +44,8 @@ internal data class LeaseReleaseFacts(
     val leaseToken: Long,
     val releaseReason: String,
     val releaseCause: Throwable?,
+    /** The lease phase at release; a [TurnLeasePhase.Queued] lease has no server run of its own. */
+    val phase: TurnLeasePhase,
     val runId: String?,
     val lastTerminal: String?,
     val lastTerminalSource: String?,
@@ -69,8 +71,22 @@ internal class OrphanedTurnAborter(
     fun shouldAbort(facts: LeaseReleaseFacts): Boolean {
         if (facts.releaseReason !in ABORTING_REASONS) return false
         if (facts.generationSuperseded || facts.abortAlreadyRequested) return false
+        if (!namesOwnRun(facts)) return false
         if (facts.lastTerminal != null && facts.lastTerminalSource !in LOCAL_TERMINAL_SOURCES) return false
         return facts.releaseCause?.isTurnReleaseWithoutAbort() != true
+    }
+
+    /**
+     * Review of PR #1661: `abort_message` without a run id aborts WHATEVER run is active on the
+     * runtime, which may be another viewer's turn, and it also pauses the server queue.
+     *
+     *  - A lease still [TurnLeasePhase.Queued] has no run of its own: the active run belongs to
+     *    the turn ahead, so it is never aborted, with or without a run id.
+     *  - A cancellation that never saw this lease's run cannot name it, so it does not abort.
+     */
+    private fun namesOwnRun(facts: LeaseReleaseFacts): Boolean {
+        if (facts.phase == TurnLeasePhase.Queued) return false
+        return facts.runId != null || facts.releaseReason != CANCELLATION
     }
 
     /** Sends the abort when [shouldAbort]; never throws, bounded by [timeoutMs]. */
@@ -103,7 +119,8 @@ internal class OrphanedTurnAborter(
 
     companion object {
         const val ORPHAN_ABORT_TIMEOUT_MS: Long = 5_000L
-        private val ABORTING_REASONS = setOf("watchdog_timeout", "stream_error", "cancellation")
+        private const val CANCELLATION = "cancellation"
+        private val ABORTING_REASONS = setOf("watchdog_timeout", "stream_error", CANCELLATION)
 
         /** Terminals the engine synthesized itself; they are not evidence the server turn ended. */
         private val LOCAL_TERMINAL_SOURCES = setOf("idle_timeout", "input_rejected")

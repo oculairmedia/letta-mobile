@@ -154,14 +154,15 @@ internal enum class QueueRemovalDisposition {
  * the server queue.
  *
  * While queued the idle watchdog is paused — silence is expected until the turn
- * ahead finishes. The pause lifts on the first evidence the input started: a
- * `stream_delta` for the runtime or an `update_queue` removal with disposition
- * `dequeued` for [clientMessageId]. A `cancelled` removal means the input will
- * never run, and the engine settles the lease Cancelled.
+ * ahead finishes. The pause lifts on the only evidence that names THIS input: an
+ * `update_queue` removal with disposition `dequeued` for [clientMessageId]. A
+ * `stream_delta` is not evidence; it may belong to the turn ahead (see
+ * [QueuedLeaseFrameGate]). A `cancelled` removal means the input will never run,
+ * and the engine settles the lease Cancelled.
  *
- * Started evidence can race ahead of the ack (the collector processes frames while
- * the send coroutine is still resuming from `input_accepted`), so [markQueued] is
- * a no-op once the input is known to have started.
+ * The dequeue can race ahead of the ack (the collector processes frames while the
+ * send coroutine is still resuming from `input_accepted`), so [markQueued] is a
+ * no-op once the input is known to have started.
  */
 internal class QueuedInputTracker(val clientMessageId: String?) {
     private val state = atomic(PENDING)

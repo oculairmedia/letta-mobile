@@ -222,32 +222,75 @@ class AppServerTurnEngineOrphanedTurnTest {
     @Test
     fun unleasedApprovalIsAutoAllowedUnderUnrestricted() = runTest {
         val client = OrphanClient()
-        val engine = engine(client)
+        val engine = engine(client).also { it.ownRuntime() }
 
         val outcome = engine.answerUnleasedControlRequest(controlRequest("perm-1", "Bash"))
 
         assertEquals(UnleasedApprovalOutcome.AutoAllowed, outcome)
-        val response = assertIs<AppServerInputPayload.ApprovalResponse>(client.inputs.single().payload)
+        val response = assertIs<AppServerInputPayload.ApprovalResponse>(client.approvalResponses().single())
         assertEquals("perm-1", response.requestId)
         assertIs<AppServerApprovalResponseDecision.Allow>(response.decision)
     }
 
     @Test
+    fun unleasedApprovalForAnUnownedRuntimeIsNeverAutoAllowed() = runTest {
+        // Another client's runtime on the shared App Server: this engine never ran a turn on it, so
+        // the host default (approve-all) is not that client's policy.
+        val client = OrphanClient()
+        val engine = engine(client)
+
+        assertEquals(UnleasedApprovalOutcome.NotOwned, engine.answerUnleasedControlRequest(controlRequest("perm-1", "Bash")))
+        assertTrue(client.inputs.isEmpty())
+    }
+
+    @Test
     fun unleasedInteractiveApprovalStaysPending() = runTest {
         val client = OrphanClient()
-        val outcome = engine(client).answerUnleasedControlRequest(controlRequest("perm-1", "AskUserQuestion"))
+        val engine = engine(client).also { it.ownRuntime() }
+        val outcome = engine.answerUnleasedControlRequest(controlRequest("perm-1", "AskUserQuestion"))
 
         assertEquals(UnleasedApprovalOutcome.LeftPending, outcome)
-        assertTrue(client.inputs.isEmpty())
+        assertTrue(client.approvalResponses().isEmpty())
     }
 
     @Test
     fun unleasedApprovalStaysPendingOutsideUnrestricted() = runTest {
         val client = OrphanClient()
-        val engine = engine(client, mode = AppServerPermissionMode.Standard)
+        val engine = engine(client, mode = AppServerPermissionMode.Standard).also { it.ownRuntime() }
 
         assertEquals(UnleasedApprovalOutcome.LeftPending, engine.answerUnleasedControlRequest(controlRequest("perm-1", "Bash")))
-        assertTrue(client.inputs.isEmpty())
+        assertTrue(client.approvalResponses().isEmpty())
+    }
+
+    @Test
+    fun cancellingAQueuedLeaseNeverAbortsTheTurnAhead() = runTest {
+        val client = OrphanClient(ackDisposition = "queued")
+        val engine = engine(client)
+        val turn = backgroundScope.launch { runCatching { engine.runTurn(command).collect() } }
+        runCurrent()
+        // The turn ahead (another viewer's) streams while this input waits in the queue.
+        client.emit(delta("assistant_message", "run-ahead"))
+        runCurrent()
+
+        turn.cancel()
+        runCurrent()
+
+        assertTrue(client.aborts.isEmpty(), "a queued lease has no run of its own to abort")
+        assertFalse(engine.isBusy("agent-1", "conv-1"))
+    }
+
+    @Test
+    fun cancellationBeforeTheRunIsKnownDoesNotAbortBlind() = runTest {
+        val client = OrphanClient()
+        val engine = engine(client)
+        val turn = backgroundScope.launch { runCatching { engine.runTurn(command).collect() } }
+        runCurrent()
+
+        turn.cancel()
+        runCurrent()
+
+        assertTrue(client.aborts.isEmpty(), "an abort without a run id would abort whatever run is active")
+        assertFalse(engine.isBusy("agent-1", "conv-1"))
     }
 
     @Test
@@ -266,7 +309,7 @@ class AppServerTurnEngineOrphanedTurnTest {
         val client = OrphanClient()
         val registry = InboundControlRequestRegistry()
         val fanout = RuntimeEventFanout(inboundControlRegistry = registry)
-        val engine = engine(client, registry = registry)
+        val engine = engine(client, registry = registry).also { it.ownRuntime() }
         val frame = controlRequest("perm-1", "Bash")
         fanout.route(received(frame))
         assertEquals(1, fanout.pendingControlFrameCount(), "no subscriber yet: the fanout buffers it")
@@ -276,7 +319,7 @@ class AppServerTurnEngineOrphanedTurnTest {
         val (_, events) = fanout.subscribe(AgentId("agent-1"), ConversationId("conv-1"))
         assertEquals(0, fanout.pendingControlFrameCount())
         assertNull(withTimeoutOrNull(FANOUT_WAIT_MS) { events.first() }, "an answered approval must not reach the next turn")
-        assertEquals(1, client.inputs.size, "answered exactly once")
+        assertEquals(1, client.approvalResponses().size, "answered exactly once")
     }
 
     @Test
@@ -302,6 +345,13 @@ class AppServerTurnEngineOrphanedTurnTest {
         nowMs = { testScheduler.currentTime },
     )
 
+    /** Runs one turn to completion so the runtime key is this engine's own. */
+    private suspend fun AppServerTurnEngine.ownRuntime() {
+        runTurn(command.copy(input = TurnInput.UserMessage(localMessageId = AUTO_FINISH_ID, text = "hi"))).collect()
+    }
+
+    private fun OrphanClient.approvalResponses() = inputs.map { it.payload }.filterIsInstance<AppServerInputPayload.ApprovalResponse>()
+
     private fun List<RuntimeEventDraft>.lastStatus(): RuntimeRunStatus? =
         mapNotNull { (it.payload as? RuntimeEventPayload.RunLifecycleChanged)?.status }.lastOrNull()
 
@@ -312,6 +362,8 @@ class AppServerTurnEngineOrphanedTurnTest {
      */
     private class OrphanClient(
         private val syncLoopStatus: AppServerLoopStatus? = null,
+        /** When set, `create_message` is acknowledged with this disposition; null keeps the pre-ack path. */
+        private val ackDisposition: String? = null,
     ) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
         val aborts = mutableListOf<AppServerCommand.AbortMessage>()
@@ -334,6 +386,17 @@ class AppServerTurnEngineOrphanedTurnTest {
                 emit(delta("assistant_message", "run-9"))
                 emit(turnFinished("turn-9", "run-9"))
             }
+        }
+
+        override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
+            val disposition = ackDisposition ?: throw UnsupportedOperationException("no ack")
+            inputs += command
+            return AppServerInboundFrame.InputAccepted(
+                requestId = command.requestId.orEmpty(),
+                runtime = command.runtime,
+                accepted = true,
+                disposition = disposition,
+            )
         }
 
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse {

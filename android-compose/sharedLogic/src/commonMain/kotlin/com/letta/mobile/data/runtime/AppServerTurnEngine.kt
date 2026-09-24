@@ -30,6 +30,8 @@ import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.async
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -197,6 +199,7 @@ class AppServerTurnEngine(
         inboundControlRegistry = inboundControlRegistry,
         connectionGenerationProvider = connectionGenerationProvider,
         leaseHeld = { key -> leases.peek(key)?.lease != null },
+        runtimeOwned = { key -> leases.peek(key) != null },
         permissionModeFor = { key -> permissionModeProvider(unleasedCommandFor(key)) },
         runtimeScopeFor = { key -> leases.peek(key)?.runtimeScope },
     )
@@ -693,7 +696,16 @@ class AppServerTurnEngine(
                 }
             }
             collectorReady.await()
-            val inputFailure = sendTurnInput(command, scope, leaseRef, queuedInput) { draft -> send(draft) }
+            val ack = async {
+                sendTurnInput(command, scope, leaseRef, queuedInput) { draft -> send(draft) }
+            }
+            val inputFailure = select<String?> {
+                ack.onAwait { it }
+                collector.onJoin {
+                    ack.cancel()
+                    null
+                }
+            }
             Telemetry.event("IrohTurn", "input.sent")
             if (inputFailure != null) {
                 // letta-mobile-qygvv.1: the server will never run this input — fail
@@ -717,6 +729,7 @@ class AppServerTurnEngine(
                             leaseToken = leaseToken,
                             releaseReason = releaseReason,
                             releaseCause = releaseCause,
+                            phase = held.phase,
                             runId = held.runId?.takeIf { it.isNotBlank() },
                             lastTerminal = held.lastTerminal,
                             lastTerminalSource = held.lastTerminalSource,
@@ -968,7 +981,9 @@ class AppServerTurnEngine(
         val externalToolDispatchScope: CoroutineScope,
         val queuedInput: QueuedInputTracker,
         val emit: suspend (RuntimeEventDraft) -> Unit,
-    )
+    ) {
+        val queuedFrames = QueuedLeaseFrameGate(queuedInput)
+    }
 
 
     /**
@@ -1011,6 +1026,8 @@ class AppServerTurnEngine(
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
         val queueRemoval = observeQueueProgress(received, context)
+        // Review of PR #1661: a queued lease must not adopt the turn ahead of it.
+        if (context.queuedFrames.skip(received, context.lease.current?.runId)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val frameSeq = received.eventSeqOrNull()
@@ -1172,9 +1189,13 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-qygvv.1: tracks a queued input through `stream_delta` and
-     * `update_queue`. Returns the removal disposition for this lease's input when
-     * [received] carries one.
+     * letta-mobile-qygvv.1: tracks a queued input through `update_queue`. Returns the
+     * removal disposition for this lease's input when [received] carries one.
+     *
+     * Only the `dequeued` removal of THIS input's client message id ends the queued
+     * wait. A `stream_delta` is not start evidence: while this input is pending or
+     * queued it may belong to the turn ahead (review of PR #1661). Servers that
+     * answer `queued` (0.32+) also send `update_queue.removed`.
      */
     private fun observeQueueProgress(
         received: AppServerReceivedFrame,
@@ -1182,23 +1203,25 @@ class AppServerTurnEngine(
     ): QueueRemovalDisposition? {
         val frame = received.frame
         val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(context.queuedInput::removalIn)
-        val startedBy = when {
-            frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
-            removal == QueueRemovalDisposition.Dequeued -> "update_queue"
-            else -> null
+        if (removal == QueueRemovalDisposition.Dequeued && context.queuedInput.markStarted()) {
+            leaveQueued(context.lease, "update_queue")
         }
-        if (startedBy != null && context.queuedInput.markStarted()) leaveQueued(context.lease, startedBy)
         return removal
     }
 
     private fun leaveQueued(lease: LeaseRef, source: String) {
+        var left = false
         lease.slot.updateLease { cur ->
             if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Queued) {
-                cur.copy(phase = TurnLeasePhase.Streaming)
+                left = true
+                // Every run-bearing frame was skipped while queued, so a run id promoted
+                // here came from the turn ahead (frames that raced the queued ack).
+                cur.copy(phase = TurnLeasePhase.Streaming, runId = null)
             } else {
                 cur
             }
         }
+        if (left) lease.slot.updateOwner { owner -> owner?.copy(runId = null) }
         Telemetry.event(
             "AppServerTurnEngine", "turn.dequeued",
             "key" to lease.key.toString(),

@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
+import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
 import com.letta.mobile.data.transport.appserver.AppServerQueueRemoval
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRequestFailedException
@@ -115,7 +116,7 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun queuedInputPausesWatchdogUntilFirstStreamFrame() = runTest {
+    fun queuedInputPausesWatchdogUntilDequeued() = runTest {
         val client = AckingClient(ack(accepted = true, disposition = "queued"))
         val engine = engineFor(client)
         val drafts = mutableListOf<RuntimeEventDraft>()
@@ -131,8 +132,15 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertTrue(engine.isBusy("agent-1", "conv-1"), "watchdog must be paused while queued")
         assertEquals(RuntimeRunStatus.Running, drafts.lastLifecycle()?.status)
 
-        // The turn starts: the watchdog is armed again and trips on fresh silence.
-        client.emit(streamDelta("assistant_message"))
+        // A stream frame of the turn ahead is not this input starting: still paused.
+        client.emit(streamDelta("assistant_message", runId = "run-ahead"))
+        runCurrent()
+        advanceTimeBy(IDLE_TIMEOUT_MS * 5)
+        runCurrent()
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "the turn ahead must not end the queued wait")
+
+        // This input is dequeued: the watchdog is armed again and trips on fresh silence.
+        client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
         runCurrent()
         advanceTimeBy(IDLE_TIMEOUT_MS + 1)
         advanceUntilIdle()
@@ -249,7 +257,7 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun startEvidenceBeforeQueuedAckKeepsWatchdogArmed() = runTest {
+    fun dequeueBeforeQueuedAckKeepsWatchdogArmed() = runTest {
         val gate = CompletableDeferred<AppServerInboundFrame.InputAccepted>()
         val client = AckingClient(ack(accepted = true, disposition = "queued")).apply { ackGate = gate }
         val engine = engineFor(client)
@@ -257,8 +265,8 @@ class AppServerTurnEngineInputAcceptanceTest {
         val turn = launch { engine.runTurn(command).collect { drafts += it } }
         runCurrent()
 
-        // The collector sees the turn start before the send coroutine resumes on the ack.
-        client.emit(streamDelta("assistant_message"))
+        // The collector sees this input dequeued before the send coroutine resumes on the ack.
+        client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
         runCurrent()
         gate.complete(ack(accepted = true, disposition = "queued"))
         runCurrent()
@@ -268,6 +276,91 @@ class AppServerTurnEngineInputAcceptanceTest {
         advanceUntilIdle()
         turn.join()
         assertEquals(RuntimeRunStatus.Failed, drafts.lastLifecycle()?.status)
+    }
+
+    @Test
+    fun queuedLeaseDoesNotAdoptTheTurnAhead() = runTest {
+        val client = AckingClient(ack(accepted = true, disposition = "queued"))
+        val engine = engineFor(client)
+        val drafts = mutableListOf<RuntimeEventDraft>()
+        val turn = launch { engine.runTurn(command).collect { drafts += it } }
+        runCurrent()
+
+        // The turn ahead streams, stops, finishes and the loop goes idle while this input waits.
+        client.emit(streamDelta("assistant_message", runId = "run-ahead"))
+        client.emit(streamDelta("stop_reason", runId = "run-ahead"))
+        client.emit(turnFinished("turn-ahead", "run-ahead"))
+        client.emit(loopStatus("WAITING_ON_INPUT"))
+        runCurrent()
+        advanceTimeBy(IDLE_TIMEOUT_MS / 2)
+        runCurrent()
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "the turn ahead's terminal must not complete this lease")
+        assertEquals(RuntimeRunStatus.Running, drafts.lastLifecycle()?.status)
+        assertTrue(drafts.none { it.runId?.value == "run-ahead" }, "the turn ahead's run must not be adopted")
+
+        client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
+        // A late turn_finished for the run ahead after the dequeue still belongs to that run.
+        client.emit(turnFinished("turn-ahead-late", "run-ahead"))
+        runCurrent()
+        assertTrue(engine.isBusy("agent-1", "conv-1"))
+
+        client.emit(streamDelta("assistant_message", runId = "run-own"))
+        client.emit(turnFinished("turn-own", "run-own"))
+        advanceUntilIdle()
+        turn.join()
+
+        val last = drafts.lastLifecycle()
+        assertEquals(RuntimeRunStatus.Completed, last?.status)
+        assertTrue(drafts.none { it.runId?.value == "run-ahead" }, "no draft of the run ahead reaches this lease")
+        assertFalse(engine.isBusy("agent-1", "conv-1"))
+    }
+
+    @Test
+    fun turnAheadFramesBeforeTheQueuedAckAreNotAdopted() = runTest {
+        val gate = CompletableDeferred<AppServerInboundFrame.InputAccepted>()
+        val client = AckingClient(ack(accepted = true, disposition = "queued")).apply { ackGate = gate }
+        val engine = engineFor(client)
+        val drafts = mutableListOf<RuntimeEventDraft>()
+        val turn = launch { engine.runTurn(command).collect { drafts += it } }
+        runCurrent()
+
+        // The turn ahead is still streaming when this input is sent; its delta beats the ack.
+        client.emit(streamDelta("assistant_message", runId = "run-ahead"))
+        runCurrent()
+        gate.complete(ack(accepted = true, disposition = "queued"))
+        runCurrent()
+        assertTrue(INPUT_QUEUED_REASON in drafts.lifecycleReasons(), "the input is queued, not started")
+
+        client.emit(turnFinished("turn-ahead", "run-ahead"))
+        runCurrent()
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "the turn ahead's turn_finished must not complete this lease")
+
+        client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
+        client.emit(streamDelta("assistant_message", runId = "run-own"))
+        client.emit(turnFinished("turn-own", "run-own"))
+        advanceUntilIdle()
+        turn.join()
+        assertEquals(RuntimeRunStatus.Completed, drafts.lastLifecycle()?.status)
+    }
+
+    @Test
+    fun acceptanceWaitEndsWhenTheTurnCompletes() = runTest {
+        // The ack never arrives (a lost input_accepted): the turn's own terminal must still end it.
+        val client = AckingClient(ack(accepted = true)).apply { ackGate = CompletableDeferred() }
+        val engine = engineFor(client)
+        val drafts = mutableListOf<RuntimeEventDraft>()
+        val turn = launch { engine.runTurn(command).collect { drafts += it } }
+        runCurrent()
+
+        client.emit(streamDelta("assistant_message"))
+        client.emit(turnFinished("turn-1", "run-1"))
+        runCurrent()
+        advanceTimeBy(IDLE_TIMEOUT_MS / 2)
+        runCurrent()
+
+        assertTrue(turn.isCompleted, "a completed collector must not wait on the acceptance request")
+        assertEquals(RuntimeRunStatus.Completed, drafts.lastLifecycle()?.status)
+        assertFalse(engine.isBusy("agent-1", "conv-1"))
     }
 
     @Test
@@ -317,7 +410,7 @@ class AppServerTurnEngineInputAcceptanceTest {
 
         private var seq = 0L
 
-        fun streamDelta(messageType: String): AppServerInboundFrame.StreamDelta {
+        fun streamDelta(messageType: String, runId: String = "run-1"): AppServerInboundFrame.StreamDelta {
             seq += 1
             return AppServerInboundFrame.StreamDelta(
                 runtime = runtime,
@@ -326,8 +419,32 @@ class AppServerTurnEngineInputAcceptanceTest {
                 idempotencyKey = "evt-$messageType-$seq",
                 delta = buildJsonObject {
                     put("message_type", messageType)
-                    put("run_id", "run-1")
+                    put("run_id", runId)
                 },
+            )
+        }
+
+        fun turnFinished(turnId: String, runId: String): AppServerInboundFrame.TurnFinished {
+            seq += 1
+            return AppServerInboundFrame.TurnFinished(
+                runtime = runtime,
+                eventSeq = seq,
+                emittedAt = "2026-09-24T00:00:00Z",
+                idempotencyKey = "turn_finished:$turnId",
+                turnId = turnId,
+                stopReason = "end_turn",
+                runId = runId,
+            )
+        }
+
+        fun loopStatus(status: String): AppServerInboundFrame.UpdateLoopStatus {
+            seq += 1
+            return AppServerInboundFrame.UpdateLoopStatus(
+                runtime = runtime,
+                eventSeq = seq,
+                emittedAt = "2026-09-24T00:00:00Z",
+                idempotencyKey = "loop-$seq",
+                loopStatus = AppServerLoopStatus(status = status),
             )
         }
 
@@ -397,6 +514,8 @@ class AppServerTurnEngineInputAcceptanceTest {
                     put("delta", frame.delta)
                 }
                 if (frame is AppServerInboundFrame.UpdateQueue) put("idempotency_key", frame.idempotencyKey)
+                if (frame is AppServerInboundFrame.TurnFinished) put("idempotency_key", frame.idempotencyKey)
+                if (frame is AppServerInboundFrame.UpdateLoopStatus) put("idempotency_key", frame.idempotencyKey)
             }
             (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
                 AppServerReceivedFrame(channel = AppServerChannel.Stream, frame = frame, raw = raw),

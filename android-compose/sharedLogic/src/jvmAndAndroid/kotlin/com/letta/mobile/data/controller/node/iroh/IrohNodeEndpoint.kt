@@ -87,8 +87,11 @@ class IrohNodeEndpoint(
      * letta-mobile-qygvv.3: ONE node-owned home for every connection's live turns, a child of
      * the endpoint scope and of no connection, so a peer dropping mid-turn detaches its turn
      * instead of cancelling the server turn under it.
+     *
+     * One host per endpoint generation: [start] creates it and [shutdown] stops its turns, so
+     * detached turns never outlive the endpoint and a restarted endpoint gets a live host.
      */
-    private val turnHost = NodeTurnHost.childOf(scope)
+    private var turnHost: NodeTurnHost? = null
 
     /**
      * Delivers device-wide `agent_updated` frames to every live connection allowed to read agents
@@ -218,6 +221,8 @@ class IrohNodeEndpoint(
     fun start(controller: AppServerController) {
         val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
         require(acceptJob == null) { "IrohNodeEndpoint already started" }
+        val host = NodeTurnHost.childOf(scope)
+        turnHost = host
 
         acceptJob = scope.launch(irohExceptionHandler) {
             while (isActive) {
@@ -244,7 +249,7 @@ class IrohNodeEndpoint(
                     // client handshake (peer died mid-connect) can never block
                     // the accept loop for other clients — the exact wedge that
                     // made every subsequent dial time out.
-                    launch { serveIncoming(incoming, controller) }
+                    launch { serveIncoming(incoming, controller, host) }
                 } catch (_: TimeoutCancellationException) {
                     continue
                 } catch (e: CancellationException) {
@@ -260,7 +265,7 @@ class IrohNodeEndpoint(
     }
 
     /** Handshake and serve one accepted connection; failures are logged, never thrown into the accept loop. */
-    private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController) {
+    private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController, turnHost: NodeTurnHost) {
         try {
             val accepting = incoming.accept()
             val peerAlpn = accepting.alpn()
@@ -336,6 +341,8 @@ class IrohNodeEndpoint(
     suspend fun shutdown() {
         acceptJob?.cancel()
         acceptJob = null
+        turnHost?.shutdown()
+        turnHost = null
 
         endpoint?.let {
             runCatching { it.shutdown() }
