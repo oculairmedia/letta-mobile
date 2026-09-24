@@ -1,5 +1,4 @@
 package com.letta.mobile.data.runtime
-
 import kotlinx.coroutines.Job
 
 /**
@@ -53,3 +52,28 @@ enum class TurnLeasePhase {
     Retiring,
     Terminal,
 }
+
+/**
+ * A slot plus the token and queued input tracker of the lease this turn owns inside it.
+ */
+internal class LeaseRef(
+    val slot: TurnLeaseSlot,
+    val token: Long,
+    val queuedInput: QueuedInputTracker,
+) {
+    val key: TurnRuntimeKey get() = slot.key
+    /** The slot still holds OUR lease (not a successor's). */
+    val current: TurnLease? get() = slot.lease?.takeIf { it.token == token }
+}
+
+internal fun TurnLease.toInitialOwner(): AppServerTurnEngine.ActiveTurnOwner = AppServerTurnEngine.ActiveTurnOwner(
+    runId = null,
+    runtimeId = runtimeId,
+    agentId = agentId,
+    conversationId = conversationId,
+    acquiredAtMs = acquiredAtMs,
+    lastTerminal = null,
+    processRole = processRole,
+    settleDeadlineMs = settleDeadlineMs,
+    watchdogDeadlineMs = watchdogDeadlineMs,
+)
