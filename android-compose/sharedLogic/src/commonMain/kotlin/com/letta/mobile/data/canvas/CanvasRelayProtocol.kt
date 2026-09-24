@@ -24,6 +24,12 @@ object CanvasRelayProtocol {
     const val VERSION: Int = 1
 
     /** The topic of conversation [conversationId]: every app opening it shares one canvas. */
+    /**
+     * The origin the host stamps on ops its own canvas tools publish for an agent. No app has it: an
+     * app's origin is the node id its connection authenticated as.
+     */
+    const val AGENT_ORIGIN_PREFIX = "agent:"
+
     fun conversationTopic(conversationId: String): String = "conversation:$conversationId"
 
     /** The topic of a canvas that belongs to no conversation, shared by its id. */
