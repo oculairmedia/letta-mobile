@@ -1009,6 +1009,7 @@ class AppServerTurnEngine(
         }
         val slot = context.lease.slot
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
+        if (!slot.bindRunAndAccept(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
         val queueRemoval = observeQueueProgress(received, context)
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
@@ -1339,6 +1340,7 @@ class AppServerTurnEngine(
         // prior ids are superseded and must not complete/mutate this lease.
         slot.runIdGate.beginLease(lease.token)
         slot.boundaryGate.beginLease(lease.token)
+        slot.runBinding.beginLease(lease.token, queuedInput.clientMessageId)
         val (fanoutSubscriberId, inboundEvents) = inboundSource.subscribe(scope)
         val frameContext = TurnFrameContext(
             runtimeScope = scope,
@@ -1416,6 +1418,7 @@ class AppServerTurnEngine(
         // Superseded run IDs must not complete the active lease via the
         // same-conversation mismatch fallback (exact-scope path already gates
         // through runIdGate.accepts).
+        if (!lease.slot.bindRunAndAccept(received, lease.token)) return null
         if (!lease.slot.runIdGate.accepts(received, lease.token)) return null
         noteOwnerScopeDecision(
             scopeMatched = false,
