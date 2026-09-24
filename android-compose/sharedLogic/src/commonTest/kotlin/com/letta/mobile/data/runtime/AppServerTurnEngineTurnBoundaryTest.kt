@@ -159,6 +159,37 @@ class AppServerTurnEngineTurnBoundaryTest {
         }
     }
 
+    @Test
+    fun settledRunDraftDoesNotPromoteRunOrCompleteNextLeaseOnIdle() = runTest {
+        val client = BoundaryClient()
+        val engine = engine(client)
+        engine.runTurn(command).test {
+            awaitStarted()
+            client.emit(delta("assistant_message", "run-1"))
+            client.emit(turnFinished("turn-1", "run-1"))
+            assertEquals(RuntimeRunStatus.Completed, awaitTerminal().status())
+            awaitComplete()
+        }
+        engine.runTurn(command.copy(input = TurnInput.UserMessage(localMessageId = "local-2", text = "again"))).test {
+            awaitStarted()
+            // Lingering draft from old settled run-1 projects into the stream...
+            client.emit(delta("assistant_message", "run-1"))
+            val lingeringDraft = awaitItem()
+            assertEquals("run-1", lingeringDraft.runId?.value)
+            // ...but an idle loop status right after must not complete this lease because run-1 draft is not evidence for this lease.
+            client.emit(loopStatus("WAITING_ON_INPUT"))
+            advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
+            expectNoEvents()
+            // Valid new-run frames proceed and are not dropped as superseded_run.
+            client.emit(delta("assistant_message", "run-2"))
+            client.emit(turnFinished("turn-2", "run-2"))
+            val terminal = awaitTerminal()
+            assertEquals(RuntimeRunStatus.Completed, terminal.status())
+            assertEquals("run-2", terminal.runId?.value)
+            awaitComplete()
+        }
+    }
+
     private fun TestScope.engine(client: BoundaryClient) = AppServerTurnEngine(
         client = client,
         turnIdleTimeoutMs = 600_000,

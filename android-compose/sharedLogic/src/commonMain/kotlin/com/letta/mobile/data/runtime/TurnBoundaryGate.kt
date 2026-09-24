@@ -2,23 +2,36 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerStopReason
 import com.letta.mobile.runtime.RuntimeRunStatus
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /** What the engine does with one inbound frame at the turn boundary (letta-mobile-qygvv.2). */
 internal sealed interface TurnBoundaryDecision {
+    val isAuthoritative: Boolean get() = false
+    val allowsRunPromotion: Boolean get() = true
+
     /** Project the frame as usual; a terminal it carries goes through the settle path. */
     data object Project : TurnBoundaryDecision
 
+    /** Project a non-terminal frame from a settled run: do not treat as evidence, do not promote run ID. */
+    data object ProjectSettledRunDraft : TurnBoundaryDecision {
+        override val allowsRunPromotion: Boolean get() = false
+    }
+
     /** Project the frame; a terminal lifecycle it carries is authoritative and completes the turn now. */
-    data object ProjectAuthoritative : TurnBoundaryDecision
+    data object ProjectAuthoritative : TurnBoundaryDecision {
+        override val isAuthoritative: Boolean get() = true
+    }
 
     /** Skip the frame: it closes a turn this runtime key has already settled. */
     data class Drop(val reason: String) : TurnBoundaryDecision
 
     /** The server's loop went idle after this turn produced evidence: complete with [status]. */
-    data class LoopIdle(val status: RuntimeRunStatus) : TurnBoundaryDecision
+    data class LoopIdle(val status: RuntimeRunStatus) : TurnBoundaryDecision {
+        override val isAuthoritative: Boolean get() = true
+    }
 }
 
 /**
@@ -76,10 +89,12 @@ internal class TurnBoundaryGate {
 
     private fun decideStreamDelta(received: AppServerReceivedFrame): TurnBoundaryDecision {
         val runId = received.frameRunIdOrNull()
-        val lateTerminal = runId != null &&
-            runId in settledRunIds &&
-            received.lifecycleStatusFromTerminal() != null
-        if (lateTerminal) return TurnBoundaryDecision.Drop("terminal_delta_for_settled_run")
+        if (runId != null && runId in settledRunIds) {
+            if (received.lifecycleStatusFromTerminal() != null) {
+                return TurnBoundaryDecision.Drop("terminal_delta_for_settled_run")
+            }
+            return TurnBoundaryDecision.ProjectSettledRunDraft
+        }
         evidenceSeen = true
         return TurnBoundaryDecision.Project
     }
@@ -89,14 +104,18 @@ internal class TurnBoundaryGate {
         leaseRunId: String?,
     ): TurnBoundaryDecision {
         if (frame.turnId in finishedTurnIds) return TurnBoundaryDecision.Drop("duplicate_turn_id")
+        val terminal = AppServerStopReason.isTerminal(frame.stopReason)
         val runId = frame.runId?.takeIf { it.isNotBlank() }
-        if (runId != null && runId in settledRunIds) {
-            finishedTurnIds.add(frame.turnId)
-            return TurnBoundaryDecision.Drop("run_already_settled")
+        if (runId != null) {
+            if (runId in settledRunIds) {
+                if (terminal) finishedTurnIds.add(frame.turnId)
+                return TurnBoundaryDecision.Drop("run_already_settled")
+            }
+            if (leaseRunId != null && runId != leaseRunId) {
+                return TurnBoundaryDecision.Drop("superseded_run")
+            }
         }
-        if (runId != null && leaseRunId != null && runId != leaseRunId) {
-            return TurnBoundaryDecision.Drop("superseded_run")
-        }
+        if (!terminal) return TurnBoundaryDecision.Project
         finishedTurnIds.add(frame.turnId)
         return TurnBoundaryDecision.ProjectAuthoritative
     }
@@ -105,9 +124,9 @@ internal class TurnBoundaryGate {
         frame: AppServerInboundFrame.UpdateLoopStatus,
         approvalOutstanding: Boolean,
     ): TurnBoundaryDecision {
-        val idle = frame.loopStatus.status == LOOP_WAITING_ON_INPUT &&
-            frame.loopStatus.activeRunIds.isEmpty()
-        if (!idle || !evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
+        if (!evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
+        if (frame.loopStatus.status != LOOP_WAITING_ON_INPUT) return TurnBoundaryDecision.Project
+        if (frame.loopStatus.activeRunIds.isNotEmpty()) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }

@@ -1145,10 +1145,12 @@ class AppServerTurnEngine(
         // equivalent to an unreadable frame — it may need terminal settlement —
         // so it must still propagate.
         val drafts = projectOrSkip(received, context, budget) ?: return
-        drafts.firstOrNull { it.runId != null }?.runId?.value?.let { runId ->
-            slot.runIdGate.promote(runId, context.lease.token)
+        if (boundary.allowsRunPromotion) {
+            drafts.firstOrNull { it.runId != null }?.runId?.value?.let { runId ->
+                slot.runIdGate.promote(runId, context.lease.token)
+            }
         }
-        val authoritative = boundary != TurnBoundaryDecision.Project
+        val authoritative = boundary.isAuthoritative
         drafts.forEach { draft -> context.draftProcessor.process(draft, frameSeq, authoritative) }
         if (boundary is TurnBoundaryDecision.LoopIdle) {
             context.draftProcessor.process(context.loopIdleTerminal(boundary.status), frameSeq, authoritative = true)

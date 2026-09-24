@@ -41,8 +41,9 @@ class TurnBoundaryGateTest {
         gate.beginLease(2)
         assertIs<TurnBoundaryDecision.Drop>(gate.decide(turnFinished("turn-1", "run-1"), null, false))
         assertIs<TurnBoundaryDecision.Drop>(gate.decide(delta("stop_reason", "run-1", stopReason = "end_turn"), null, false))
-        // Non-terminal frames of that run still project.
-        assertEquals(TurnBoundaryDecision.Project, gate.decide(delta("assistant_message", "run-1"), null, false))
+        // Non-terminal frames of that run project as settled-run drafts and do not count as evidence.
+        assertEquals(TurnBoundaryDecision.ProjectSettledRunDraft, gate.decide(delta("assistant_message", "run-1"), null, false))
+        assertEquals(TurnBoundaryDecision.Project, gate.decide(loopStatus("WAITING_ON_INPUT"), null, false))
     }
 
     @Test
@@ -84,17 +85,49 @@ class TurnBoundaryGateTest {
         assertEquals(RuntimeRunStatus.Completed, idle.status)
     }
 
+    @Test
+    fun nonTerminalTurnFinishedProjectsWithoutConsumingTurnId() {
+        assertEquals(
+            TurnBoundaryDecision.Project,
+            gate.decide(turnFinished("turn-1", "run-1", stopReason = "requires_approval"), "run-1", false),
+        )
+        // Terminal for the same turnId completes authoritatively and records the turnId for subsequent deduplication.
+        assertEquals(
+            TurnBoundaryDecision.ProjectAuthoritative,
+            gate.decide(turnFinished("turn-1", "run-1", stopReason = "end_turn"), "run-1", false),
+        )
+        val duplicate = assertIs<TurnBoundaryDecision.Drop>(
+            gate.decide(turnFinished("turn-1", "run-1", stopReason = "end_turn"), "run-1", false),
+        )
+        assertEquals("duplicate_turn_id", duplicate.reason)
+    }
+
+    @Test
+    fun nonTerminalTurnFinishedForSettledRunDoesNotRecordTurnId() {
+        gate.noteSettled("run-1")
+        gate.beginLease(2)
+        val decision = assertIs<TurnBoundaryDecision.Drop>(
+            gate.decide(turnFinished("turn-1", "run-1", stopReason = "requires_approval"), null, false),
+        )
+        assertEquals("run_already_settled", decision.reason)
+        // Since turn-1 was non-terminal, its turnId was not added to finishedTurnIds.
+        assertEquals(
+            TurnBoundaryDecision.ProjectAuthoritative,
+            gate.decide(turnFinished("turn-1", "run-2", stopReason = "end_turn"), "run-2", false),
+        )
+    }
+
     private fun received(frame: AppServerInboundFrame) =
         AppServerReceivedFrame(channel = AppServerChannel.Stream, frame = frame, raw = buildJsonObject { put("type", frame.type ?: "") })
 
-    private fun turnFinished(turnId: String, runId: String?) = received(
+    private fun turnFinished(turnId: String, runId: String?, stopReason: String = "end_turn") = received(
         AppServerInboundFrame.TurnFinished(
             runtime = runtime,
             eventSeq = 5,
             emittedAt = "2026-09-24T00:00:00Z",
             idempotencyKey = "turn_finished:$turnId",
             turnId = turnId,
-            stopReason = "end_turn",
+            stopReason = stopReason,
             runId = runId,
         ),
     )
