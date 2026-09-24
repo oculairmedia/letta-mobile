@@ -125,7 +125,7 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "queued input must be visible")
 
         // An earlier turn's turn_finished arriving while queued must be ignored and not complete this turn.
-        turn.client.emitTurnFinished(turnId = "prev-turn-1", runId = "prev-run-1")
+        turn.client.emitTurnFinished(TestRun("prev-run-1"), turn = 0)
         runCurrent()
         assertTrue(turn.isBusy, "turn must remain active when earlier turn finishes")
         assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
@@ -133,7 +133,7 @@ class AppServerTurnEngineInputAcceptanceTest {
         // Dequeue, then our own turn streams and completes normally.
         turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
         turn.client.emitStreamDelta("assistant_message")
-        turn.client.emitTurnFinished(turnId = "turn-1", runId = "run-1")
+        turn.client.emitTurnFinished(TestRun("run-1"), turn = 1)
         finish(turn)
 
         assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)

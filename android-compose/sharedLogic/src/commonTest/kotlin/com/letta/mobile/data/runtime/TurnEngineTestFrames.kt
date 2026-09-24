@@ -96,17 +96,10 @@ internal class TurnEngineTestFrames(
         )
     }
 
-    fun turnFinished(turnId: String, runId: String?): AppServerInboundFrame.TurnFinished {
+    /** [run]'s `turn_finished` for turn number [turn], sequenced after the frames already built. */
+    fun turnFinished(run: TestRun, turn: Int): AppServerInboundFrame.TurnFinished {
         seq += 1
-        return AppServerInboundFrame.TurnFinished(
-            runtime = runtime,
-            eventSeq = seq,
-            emittedAt = FIXTURE_EMITTED_AT,
-            idempotencyKey = "finished-$seq",
-            turnId = turnId,
-            stopReason = "end_turn",
-            runId = runId,
-        )
+        return run.turnFinished(turn).copy(eventSeq = seq)
     }
 
     private companion object {
@@ -167,7 +160,7 @@ internal class TurnEngineTestAckingClient(
 
     fun emitUpdateQueue(update: QueueUpdateFixture) = emit(frames.updateQueue(update))
 
-    fun emitTurnFinished(turnId: String, runId: String?) = emit(frames.turnFinished(turnId, runId))
+    fun emitTurnFinished(run: TestRun, turn: Int) = emit(frames.turnFinished(run, turn))
 
     private fun emit(frame: AppServerInboundFrame) {
         (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(

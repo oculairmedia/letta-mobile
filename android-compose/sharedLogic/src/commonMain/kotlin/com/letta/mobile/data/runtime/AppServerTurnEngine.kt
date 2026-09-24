@@ -1108,13 +1108,13 @@ class AppServerTurnEngine(
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
         val queueRemoval = observeQueueProgress(received, context.lease)
-        if (context.lease.queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue) return
+        if (context.lease.holdsWhileQueued(received)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val projected = projectAtBoundary(received, context, budget)
         // The update_queue passthrough draft above still reaches viewers; only then
         // settle a lease whose queued input the server dropped.
-        if (projected && queueRemoval == QueueRemovalDisposition.Cancelled) {
+        if (queueRemoval.cancelsLeaseOnceProjected(projected)) {
             completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
         }
     }

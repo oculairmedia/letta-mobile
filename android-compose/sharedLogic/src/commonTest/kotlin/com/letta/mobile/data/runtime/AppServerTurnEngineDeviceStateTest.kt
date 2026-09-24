@@ -18,8 +18,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * letta-mobile-qygvv.7: working-directory changes go through `change_device_state`
@@ -30,7 +28,7 @@ class AppServerTurnEngineDeviceStateTest {
 
     @Test
     fun setWorkingDirectorySendsChangeDeviceStateAndConfirmsFromDeviceStatus() = runTest {
-        val client = DeviceStateClient { command -> deviceStatusFrame(command.runtime, cwd = command.payload.cwd) }
+        val client = DeviceStateClient { command -> DeviceStatusFixture.inDirectory(command.payload.cwd).frame(command.runtime) }
         val engine = AppServerTurnEngine(client = client)
 
         assertTrue(engine.setWorkingDirectory("agent-1", "conv-1", "/work/project/"))
@@ -46,7 +44,7 @@ class AppServerTurnEngineDeviceStateTest {
     fun setWorkingDirectoryReturnsFalseWhenServerKeepsTheOldDirectory() = runTest {
         // A rejected (missing) directory is answered with a snapshot that still carries
         // the old cwd; that must not confirm, and the wait stays bounded.
-        val client = DeviceStateClient { command -> deviceStatusFrame(command.runtime, cwd = "/old") }
+        val client = DeviceStateClient { command -> DeviceStatusFixture.inDirectory("/old").frame(command.runtime) }
         val engine = AppServerTurnEngine(client = client)
 
         assertFalse(engine.setWorkingDirectory("agent-1", "conv-1", "/gone"))
@@ -69,9 +67,8 @@ class AppServerTurnEngineDeviceStateTest {
 
     @Test
     fun setWorkingDirectoryIgnoresDeviceStatusForAnotherConversation() = runTest {
-        val client = DeviceStateClient { command ->
-            deviceStatusFrame(AppServerRuntimeScope("agent-1", "conv-other"), cwd = command.payload.cwd)
-        }
+        val otherConversation = AppServerRuntimeScope("agent-1", "conv-other")
+        val client = DeviceStateClient { command -> DeviceStatusFixture.inDirectory(command.payload.cwd).frame(otherConversation) }
         val engine = AppServerTurnEngine(client = client)
 
         assertFalse(engine.setWorkingDirectory("agent-1", "conv-1", "/work"))
@@ -90,13 +87,12 @@ class AppServerTurnEngineDeviceStateTest {
 
     @Test
     fun deviceStatusSnapshotReadsKnownFieldsAndToleratesUnknownOnes() {
-        val frame = deviceStatusFrame(runtime, cwd = "/w", mode = "acceptEdits", extra = true)
-        val snapshot = frame.snapshot
+        val snapshot = DeviceStatusFixture(cwd = "/w", modeWire = "acceptEdits", withUnknownField = true).frame(runtime).snapshot
         assertEquals("/w", snapshot.currentWorkingDirectory)
         assertEquals(AppServerPermissionMode.AcceptEdits, snapshot.currentPermissionMode)
-        assertEquals(7L, snapshot.cwdRevision)
+        assertEquals(DEVICE_STATUS_TEST_CWD_REVISION, snapshot.cwdRevision)
 
-        val unknownMode = deviceStatusFrame(runtime, cwd = null, mode = "someFutureMode").snapshot
+        val unknownMode = DeviceStatusFixture(modeWire = "someFutureMode").frame(runtime).snapshot
         assertNull(unknownMode.currentWorkingDirectory)
         assertNull(unknownMode.currentPermissionMode)
     }
@@ -108,25 +104,6 @@ class AppServerTurnEngineDeviceStateTest {
         assertEquals("C:\\dev", normalizeWorkingDirectory("C:\\dev\\"))
     }
 }
-
-private fun deviceStatusFrame(
-    runtime: AppServerRuntimeScope,
-    cwd: String?,
-    mode: String? = null,
-    extra: Boolean = false,
-): AppServerInboundFrame.UpdateDeviceStatus =
-    AppServerInboundFrame.UpdateDeviceStatus(
-        runtime = runtime,
-        eventSeq = 1,
-        emittedAt = "2026-09-24T00:00:00Z",
-        idempotencyKey = "device-1",
-        deviceStatus = buildJsonObject {
-            if (cwd != null) put("current_working_directory", cwd)
-            if (mode != null) put("current_permission_mode", mode)
-            put("cwd_revision", 7)
-            if (extra) put("some_future_field", "tolerated")
-        },
-    )
 
 /**
  * Answers each `change_device_state` with the frame [reply] builds (or nothing), emitted on

@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.DeviceStateChanger
+import com.letta.mobile.data.runtime.DeviceStatusFixture
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -11,7 +12,6 @@ import com.letta.mobile.data.transport.appserver.AppServerCreatedRuntimeEntities
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
@@ -619,17 +619,7 @@ private class FakeAppServerClient(
         changeDeviceStateCommands += command
         val mode = command.payload.mode ?: return
         if (!confirmModeChanges) return
-        emit(
-            AppServerInboundFrame.UpdateDeviceStatus(
-                runtime = command.runtime,
-                eventSeq = 1,
-                emittedAt = "2026-09-24T00:00:00Z",
-                idempotencyKey = "device-1",
-                deviceStatus = buildJsonObject {
-                    put("current_permission_mode", AppServerProtocol.json.encodeToJsonElement(AppServerPermissionMode.serializer(), mode))
-                },
-            ),
-        )
+        emit(DeviceStatusFixture.inMode(mode).frame(command.runtime))
     }
 
     override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse {

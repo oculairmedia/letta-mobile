@@ -292,6 +292,17 @@ internal fun recordDequeued(lease: LeaseRef, source: String) {
     )
 }
 
+/**
+ * letta-mobile-qygvv.7: while this lease's input is queued, frames on the scope belong to the turn
+ * ahead; only `update_queue` concerns it.
+ */
+internal fun LeaseRef.holdsWhileQueued(received: AppServerReceivedFrame): Boolean =
+    queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue
+
+/** The server dropped this lease's queued input and its `update_queue` frame already reached viewers. */
+internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boolean): Boolean =
+    projected && this == QueueRemovalDisposition.Cancelled
+
 internal fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
