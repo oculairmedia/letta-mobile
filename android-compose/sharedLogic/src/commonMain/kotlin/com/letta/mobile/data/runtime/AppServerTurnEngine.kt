@@ -4,7 +4,9 @@ import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -154,7 +156,16 @@ class AppServerTurnEngine(
      * elapsed time — the documented flake source.
      */
     private val nowMs: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    /**
+     * letta-mobile-qygvv.5: approval decisions this client sent, keyed by
+     * (agent, conversation, request_id). Shared with the controller router when
+     * present so a replayed `control_request` is re-answered, not dropped.
+     */
+    private val approvalDecisionCache: ApprovalDecisionCache =
+        eventRouter?.approvalDecisionCache() ?: ApprovalDecisionCache(),
 ) : TurnEngine {
+    internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
+
     /**
      * letta-mobile-8xxzv: owner-token leases KEYED BY {agentId, conversationId}.
      *
@@ -400,6 +411,27 @@ class AppServerTurnEngine(
             InboundControlRequestRegistry.RequestRef(requestId),
             claimGeneration,
         )
+    }
+
+    /**
+     * letta-mobile-qygvv.5: send one approval decision with a `request_id` and wait
+     * for `input_accepted`. The inbound control request is marked answered unless
+     * the server REJECTED the decision (e.g. "Approval request is no longer
+     * pending"), which the caller must surface. [claimGeneration] follows the same
+     * capture-before-send rule as [markInboundControlAnswered].
+     */
+    suspend fun submitApprovalResponse(
+        runtime: AppServerRuntimeScope,
+        approvalRequestId: String,
+        decision: AppServerApprovalResponseDecision,
+        claimGeneration: Long = connectionGenerationProvider(),
+        source: String = "submit",
+    ): ApprovalSubmitResult {
+        val result = approvalSender.send(runtime, approvalRequestId, decision, source)
+        if (result !is ApprovalSubmitResult.Rejected) {
+            markInboundControlAnswered(approvalRequestId, claimGeneration)
+        }
+        return result
     }
 
     /** Connection generation snapshot for callers that must capture it before a send. */
@@ -1141,6 +1173,7 @@ class AppServerTurnEngine(
             completeSupersededTurn(context)
         }
         if (received.isStaleGenerationForLease(context.lease)) return
+        if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) return
         if (!received.matches(context.runtimeScope, context.lease)) {
             completeScopeRejectedTurn(received, context)
             return
@@ -1262,9 +1295,9 @@ class AppServerTurnEngine(
 
     /**
      * letta-mobile-qygvv.1: sends the turn's input. A `create_message` carries a
-     * `request_id` and waits for `input_accepted`; approval responses stay
-     * fire-and-forget. Returns the failure reason when the input will never run,
-     * else null. A queued input moves the lease to [TurnLeasePhase.Queued] and
+     * `request_id` and waits for `input_accepted`; so do approval responses
+     * (letta-mobile-qygvv.5, via [ApprovalResponseSender]). Returns the failure
+     * reason when the input will never run, else null. A queued input moves the lease to [TurnLeasePhase.Queued] and
      * emits a visible Running lifecycle so the UI does not look hung.
      */
     private suspend fun sendTurnInput(
@@ -1275,6 +1308,14 @@ class AppServerTurnEngine(
         emit: suspend (RuntimeEventDraft) -> Unit,
     ): String? {
         val input = command.toInputCommand(scope)
+        val approvalResponse = input.payload as? AppServerInputPayload.ApprovalResponse
+        val approvalDecision = approvalResponse?.decision
+        if (approvalResponse != null && approvalDecision != null) {
+            // letta-mobile-qygvv.5: approval responses await input_accepted too; a
+            // rejected decision fails the turn instead of parking it.
+            val result = approvalSender.send(scope, approvalResponse.requestId, approvalDecision, source = "turn_input")
+            return (result as? ApprovalSubmitResult.Rejected)?.error
+        }
         if (command.input !is TurnInput.UserMessage) {
             client.input(input)
             return null
@@ -1677,25 +1718,22 @@ class AppServerTurnEngine(
             "source" to approval.source,
         )
         // lgns8.22.4.1.4: capture the generation the approval is being ANSWERED ON
-        // before the send. Reading it back after client.input() would attribute the
+        // before the send. Reading it back after the send would attribute the
         // answer to whatever generation a mid-send disconnect installed, marking a
         // successor-generation recovery replay answered by a decision the server
         // may never have received.
         val claimGeneration = connectionGenerationProvider()
-        client.input(
-            AppServerCommand.Input(
-                runtime = scope,
-                payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = approval.requestId,
-                    decision = AppServerApprovalResponseDecision.Allow(
-                        message = "Approved by default mobile policy.",
-                    ),
-                ),
+        // letta-mobile-qygvv.5: awaits input_accepted. A rejection means the gate
+        // is no longer pending (someone else resolved it), so the card stays
+        // suppressed either way; the result is recorded as telemetry.
+        submitApprovalResponse(
+            runtime = scope,
+            approvalRequestId = approval.requestId,
+            decision = AppServerApprovalResponseDecision.Allow(
+                message = "Approved by default mobile policy.",
             ),
-        )
-        inboundControlRegistry.markAnswered(
-            InboundControlRequestRegistry.RequestRef(approval.requestId),
-            claimGeneration,
+            claimGeneration = claimGeneration,
+            source = "auto_allow",
         )
         return true
     }

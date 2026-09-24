@@ -209,27 +209,34 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun approvalResponseInputStaysFireAndForget() = runTest {
+    fun approvalResponseInputAwaitsAcceptance() = runTest {
+        // letta-mobile-qygvv.5: approval responses carry a request_id and await the ack too.
         val client = AckingClient(ack(accepted = true))
         val engine = engineFor(client)
-        val approvalCommand = command.copy(
-            input = TurnInput.ToolApprovalResponse(
-                ToolApprovalDecision(
-                    approvalId = ToolApprovalId("approval-1"),
-                    callId = ToolCallId("call-1"),
-                    decision = ToolApprovalDecisionValue.Approved,
-                    scope = ToolApprovalScope.Once,
-                ),
-            ),
-        )
         val turn = launch { engine.runTurn(approvalCommand).collect { } }
         runCurrent()
 
-        assertTrue(client.acknowledgedInputs.isEmpty())
-        val sent = client.plainInputs.single()
-        assertNull(sent.requestId)
-        assertTrue(sent.payload is AppServerInputPayload.ApprovalResponse)
+        assertTrue(client.plainInputs.isEmpty())
+        val sent = client.acknowledgedInputs.single()
+        assertEquals("req-1", sent.requestId)
+        assertEquals("approval-1", (sent.payload as AppServerInputPayload.ApprovalResponse).requestId)
         turn.cancel()
+    }
+
+    @Test
+    fun rejectedApprovalResponseInputFailsFastWithServerError() = runTest {
+        val client = AckingClient(ack(accepted = false, error = "Approval request is no longer pending"))
+        val engine = engineFor(client)
+        val drafts = mutableListOf<RuntimeEventDraft>()
+        val turn = launch { engine.runTurn(approvalCommand).collect { drafts += it } }
+        runCurrent()
+        turn.join()
+
+        val last = drafts.lastLifecycle()
+        assertEquals(RuntimeRunStatus.Failed, last?.status)
+        assertEquals("Approval request is no longer pending", last?.reason)
+        assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS, "a rejected decision must not wait for the watchdog")
+        assertFalse(engine.isBusy("agent-1", "conv-1"))
     }
 
     @Test
@@ -304,6 +311,17 @@ class AppServerTurnEngineInputAcceptanceTest {
             agentId = AgentId("agent-1"),
             conversationId = ConversationId("conv-1"),
             input = TurnInput.UserMessage(localMessageId = "local-1", text = "hey"),
+        )
+
+        val approvalCommand = command.copy(
+            input = TurnInput.ToolApprovalResponse(
+                ToolApprovalDecision(
+                    approvalId = ToolApprovalId("approval-1"),
+                    callId = ToolCallId("call-1"),
+                    decision = ToolApprovalDecisionValue.Approved,
+                    scope = ToolApprovalScope.Once,
+                ),
+            ),
         )
 
         fun ack(accepted: Boolean, disposition: String? = null, error: String? = null) =

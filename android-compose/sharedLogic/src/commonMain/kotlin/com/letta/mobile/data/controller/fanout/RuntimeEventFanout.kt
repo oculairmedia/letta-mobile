@@ -66,6 +66,20 @@ class RuntimeEventFanout(
      */
     private val connectionGenerationProvider: () -> Long = { 0L },
 ) {
+    private val approvalReplayResponder = atomic<((AppServerInboundFrame.ControlRequest) -> Boolean)?>(null)
+
+    /**
+     * letta-mobile-qygvv.5: [responder] is offered every `control_request` before
+     * registration. It returns true when this client already answered the request
+     * (the frame is a server replay, so the answer was lost) and it has re-sent the
+     * cached decision; the frame is then consumed instead of being dropped as an
+     * Answered duplicate (which wedged the turn) or surfaced as a second card.
+     * Must not block: the responder launches the re-send.
+     */
+    fun bindApprovalReplayResponder(responder: (AppServerInboundFrame.ControlRequest) -> Boolean) {
+        approvalReplayResponder.value = responder
+    }
+
     /**
      * Per-subscriber channels. Buffering starts at [subscribe], not at collect,
      * so frames cannot be lost in the subscribe→collect handoff window. There is
@@ -159,6 +173,8 @@ class RuntimeEventFanout(
      * [inboundControlRegistry] then deliver once (duplicate request_ids drop).
      */
     suspend fun route(received: AppServerReceivedFrame) {
+        val control = received.frame as? AppServerInboundFrame.ControlRequest
+        if (control != null && approvalReplayResponder.value?.invoke(control) == true) return
         val plan = synchronized(stateLock) { planRoute(received) }
         val delivered = deliverToChannels(plan.channels, received)
         plan.markDispatchedIfNeeded(delivered)

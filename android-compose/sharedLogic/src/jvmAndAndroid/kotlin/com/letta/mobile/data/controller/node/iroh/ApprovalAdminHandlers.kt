@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.serialization.json.JsonElement
@@ -84,7 +85,21 @@ object ApprovalAdminHandlers {
                 toolCallId = toolCallIds.firstOrNull(),
                 updatedInput = updatedInput,
             )
-        }.onSuccess {
+        }.onSuccess { result ->
+            // letta-mobile-qygvv.5: the server refused the decision (e.g. the gate is
+            // no longer pending). Fail the RPC so the phone shows it instead of silence.
+            if (result is ApprovalSubmitResult.Rejected) {
+                AdminRouteTelemetry.selected(
+                    AdminRouteTelemetry.Selection(
+                        method = "approval.submit",
+                        owner = "controller_native",
+                        route = "controller_native",
+                        outcome = "rejected",
+                        reason = result.error,
+                    ),
+                )
+                adminError("approval_rejected: ${result.error}")
+            }
             AdminRouteTelemetry.selected(
                 AdminRouteTelemetry.Selection(
                     method = "approval.submit",
@@ -93,7 +108,10 @@ object ApprovalAdminHandlers {
                     outcome = "success",
                 ),
             )
-            return buildJsonObject { put("status", if (approve) "approved" else "denied") }
+            return buildJsonObject {
+                put("status", if (approve) "approved" else "denied")
+                put("acknowledged", result == ApprovalSubmitResult.Accepted)
+            }
         }.onFailure { error ->
             if (error is kotlinx.coroutines.CancellationException) throw error
             AdminRouteTelemetry.selected(

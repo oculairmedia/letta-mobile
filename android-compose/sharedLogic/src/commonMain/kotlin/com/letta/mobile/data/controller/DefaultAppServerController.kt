@@ -2,16 +2,17 @@ package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.reanswerReplayedApproval
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnContextPreflight
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -85,11 +86,15 @@ class DefaultAppServerController(
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
+    /** letta-mobile-qygvv.5: decisions sent, shared by the router and the turn engine. */
+    private val approvalDecisionCache = ApprovalDecisionCache()
     private val eventRouter = AppServerRuntimeEventRouter(
         connectionGenerationProvider = { connectionGeneration.value },
+        approvalDecisionCache = approvalDecisionCache,
     )
 
     init {
+        eventRouter.bindApprovalReplayResponder(::onApprovalReplay)
         eventRouter.attach(controllerScope, client.events)
         attachUnleasedExternalToolAnswerer()
     }
@@ -120,6 +125,18 @@ class DefaultAppServerController(
                 launch { turnEngine.answerUnleasedExternalToolCall(request) }
             }
         }
+    }
+
+    /**
+     * letta-mobile-qygvv.5: a `control_request` for a request this client already
+     * answered is a server replay — the server still considers it pending, so our
+     * answer was lost. Re-send the SAME cached decision (awaiting input_accepted)
+     * instead of dropping the replay or showing a second approval card.
+     */
+    private fun onApprovalReplay(frame: AppServerInboundFrame.ControlRequest): Boolean {
+        val cached = approvalDecisionCache.lookup(frame) ?: return false
+        controllerScope.launch { turnEngine.reanswerReplayedApproval(cached) }
+        return true
     }
 
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
@@ -156,6 +173,7 @@ class DefaultAppServerController(
             },
             connectionGenerationProvider = { connectionGeneration.value },
             inboundControlRegistry = eventRouter.inboundControlRegistry(),
+            approvalDecisionCache = approvalDecisionCache,
             onRuntimeInvalidated = {
                 runtimeMutex.withLock { runtimeCache.clear() }
             },
@@ -423,7 +441,7 @@ class DefaultAppServerController(
         reason: String?,
         toolCallId: String?,
         updatedInput: kotlinx.serialization.json.JsonObject?,
-    ) {
+    ): ApprovalSubmitResult {
         val runtime = runtimeMutex.withLock {
             val conversationValue = conversationId?.value
             runtimeCache.entries.firstOrNull { (key, _) ->
@@ -459,19 +477,19 @@ class DefaultAppServerController(
         // mark a successor-generation recovery replay Answered, dropping the replay
         // even though the server may never have received the decision.
         val claimGeneration = connectionGeneration.value
-        client.input(
-            AppServerCommand.Input(
-                runtime = runtime,
-                payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = effectiveRequestId,
-                    decision = decision,
-                ),
-            ),
+        // letta-mobile-qygvv.5: awaits input_accepted. A rejected decision leaves
+        // the inbound control request (and the captured user-input gate id) open
+        // and is returned so the caller can show the failure.
+        val result = turnEngine.submitApprovalResponse(
+            runtime = runtime,
+            approvalRequestId = effectiveRequestId,
+            decision = decision,
+            claimGeneration = claimGeneration,
         )
-        turnEngine.markInboundControlAnswered(effectiveRequestId, claimGeneration)
-        if (toolCallId != null && capturedRequestId != null) {
+        if (result !is ApprovalSubmitResult.Rejected && toolCallId != null && capturedRequestId != null) {
             turnEngine.clearUserInputApprovalId(toolCallId, capturedRequestId)
         }
+        return result
     }
 
     override suspend fun sync(
