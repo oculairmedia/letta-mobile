@@ -35,6 +35,8 @@ class CanvasViewModel @Inject constructor(
     val syncTransport: CanvasSyncTransport,
     val presenceTransport: CanvasPresenceTransport,
     private val opLog: CanvasOpLog,
+    /** The app's canvas assets, shared with the relay (see AppModule.provideCanvasAssetStore). */
+    val assets: com.letta.mobile.data.storage.AssetStore,
 ) : ViewModel() {
     private val _session = MutableStateFlow<CanvasSession?>(null)
     val session: StateFlow<CanvasSession?> = _session.asStateFlow()
@@ -83,14 +85,10 @@ fun CanvasScreen(
     val session by viewModel.session.collectAsStateWithLifecycle()
     val activeSession = session
     if (activeSession != null) {
-        val context = androidx.compose.ui.platform.LocalContext.current
-        val assets = androidx.compose.runtime.remember(context) {
-            com.letta.mobile.data.storage.FileAssetStore(java.io.File(context.filesDir, "canvas-assets"))
-        }
         CanvasWorkspace(
             session = activeSession,
             presenceTransport = viewModel.presenceTransport,
-            assets = assets,
+            assets = viewModel.assets,
             onNavigateBack = onNavigateBack,
             onShareToChat = onShareToChat,
         )

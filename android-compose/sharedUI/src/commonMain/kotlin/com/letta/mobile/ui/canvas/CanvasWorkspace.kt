@@ -383,6 +383,37 @@ fun CanvasWorkspace(
         }
     }
 
+    // An image another app put on the board arrives as its ref and a preview; its full bytes are
+    // fetched from the host in the background and swapped in, outside undo, as they land. A ref
+    // the host did not have is asked for again a little later, not on every recomposition.
+    val fetchingAssets = remember(session) { mutableSetOf<String>() }
+    var assetRetry by remember(session) { mutableStateOf(0) }
+    LaunchedEffect(state.elements, assets, session, initialLoadDone, assetRetry) {
+        val store = assets ?: return@LaunchedEffect
+        val s = session ?: return@LaunchedEffect
+        if (!initialLoadDone) return@LaunchedEffect
+        val refs = state.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
+            .mapNotNull { it.assetRef }.distinct().filter { it !in fetchingAssets }
+        if (refs.isEmpty()) return@LaunchedEffect
+        val missing = withContext(Dispatchers.Default) { refs.filter { !store.has(it) } }
+        for (ref in missing) {
+            fetchingAssets += ref
+            coroutineScope.launch {
+                val bytes = s.fetchAsset(ref)
+                if (bytes == null) {
+                    delay(ASSET_RETRY_MS)
+                    fetchingAssets -= ref
+                    assetRetry++
+                    return@launch
+                }
+                controller.state.value.elements
+                    .filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
+                    .filter { it.assetRef == ref && !it.bytes.contentEquals(bytes) }
+                    .forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(it.copy(bytes = bytes))) }
+            }
+        }
+    }
+
     // Collect export/error events from DrawBoxController
     LaunchedEffect(controller, session) {
         controller.events.collect { event ->
@@ -1645,6 +1676,8 @@ fun CanvasWorkspace(
 
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
+/** How long before asking the host again for an asset it did not have yet. */
+private const val ASSET_RETRY_MS = 10_000L
 
 /** Which image, as stored: an image whose bytes change (replaced in place) is stored again. */
 private fun storedKey(image: io.ak1.drawbox.domain.model.Element.Image): String =

@@ -1,6 +1,11 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.storage.AssetRef
+import com.letta.mobile.data.storage.AssetRefs
+import com.letta.mobile.data.storage.AssetStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
@@ -48,6 +53,12 @@ class CanvasRelayClient(
     private val topicOf: suspend (CanvasId) -> String,
     private val presenceTtlMs: Long = CanvasRelayHost.PRESENCE_TTL_MS,
     private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    /**
+     * This app's assets (the same store its boards keep images in). Before an op that refers to an
+     * asset goes up, the asset goes up; an asset another app put on the board is fetched into it.
+     */
+    private val assets: AssetStore? = null,
+    private val assetFetchTimeoutMs: Long = ASSET_FETCH_TIMEOUT_MS,
 ) : CanvasSyncTransport, CanvasPresenceTransport {
 
     private val lock = Mutex()
@@ -56,6 +67,15 @@ class CanvasRelayClient(
     private var generation = 0L
     private var hostExpected = false
     private var refusal: String? = null
+
+    /** Assets being fetched from the host, by ref (under [lock]); one fetch however many ask. */
+    private val fetches = mutableMapOf<String, AssetFetch>()
+
+    private class AssetFetch {
+        val result = CompletableDeferred<ByteArray?>()
+        var chunks: Array<ByteArray?>? = null
+        var received = 0
+    }
 
     private val localPresence = InMemoryCanvasPresenceTransport(presenceTtlMs, clock)
     private val remotePresence = InMemoryCanvasPresenceTransport(presenceTtlMs, clock)
@@ -83,6 +103,9 @@ class CanvasRelayClient(
         val joinSent = mutableSetOf<String>()
         val caughtUp = mutableSetOf<String>()
         val inFlight = mutableSetOf<String>()
+
+        /** Assets sent to (or already held by) the host on this connection. */
+        val assetsUp = mutableSetOf<String>()
     }
 
     /** What this app knows of a canvas on its host, for settle comparisons and diagnostics. */
@@ -109,6 +132,7 @@ class CanvasRelayClient(
         val live = lock.withLock { current?.takeIf { canvas.topic in it.joinSent }?.also { it.inFlight += op.opId } }
         if (live != null) {
             try {
+                sendAssetsFor(live, canvas.topic, op)
                 live.connection.send(CanvasRelayMessage.Publish(canvas.topic, op))
             } catch (e: CancellationException) {
                 throw e
@@ -150,6 +174,102 @@ class CanvasRelayClient(
         return RelayView(live?.connection?.hostId, canvas.topic, canvas.canonicalId, canvas.hostCursor, delivery.queued(canvas.topic).size)
     }
 
+    // ---- Assets ----
+
+    /**
+     * Asset [ref]'s bytes: this app's own copy, or else the host's, fetched over the current
+     * connection, verified and kept. Null when neither has it, there is no connection, or it does
+     * not arrive in time.
+     */
+    override suspend fun fetchAsset(canvasId: CanvasId, ref: String): ByteArray? {
+        val store = assets ?: return null
+        if (!AssetRefs.isValid(ref)) return null
+        store.get(ref)?.let { return it }
+        val canvas = canvas(canvasId)
+        var ask: Live? = null
+        val fetch = lock.withLock {
+            val live = current?.takeIf { canvas.topic in it.joinSent } ?: return null
+            fetches[ref] ?: AssetFetch().also {
+                fetches[ref] = it
+                ask = live
+            }
+        }
+        ask?.let { live ->
+            runCatching { live.connection.send(CanvasRelayMessage.AssetGet(canvas.topic, ref)) }
+                .onFailure { if (it is CancellationException) throw it else finishFetch(ref, null) }
+        }
+        return withTimeoutOrNull(assetFetchTimeoutMs) { fetch.result.await() }
+            ?: run {
+                // Timed out: the next ask starts afresh rather than waiting on this one.
+                lock.withLock { if (fetches[ref] === fetch) fetches.remove(ref) }
+                null
+            }
+    }
+
+    /** Before [op] goes up, every asset it refers to that this app holds and the host may not. */
+    private suspend fun sendAssetsFor(live: Live, topic: String, op: CanvasOp) {
+        val store = assets ?: return
+        for (ref in CanvasAssetRefs.of(op)) {
+            val claim = lock.withLock { current === live && live.assetsUp.add(ref) }
+            if (!claim) continue
+            val bytes = store.get(ref)
+            if (bytes == null) {
+                // Not ours to send (another app's asset this app has not fetched): the host has it.
+                continue
+            }
+            val asset = AssetRef(ref, store.mediaType(ref) ?: DEFAULT_MEDIA_TYPE, bytes.size.toLong())
+            val count = ((bytes.size + CanvasRelayHost.ASSET_CHUNK_BYTES - 1) / CanvasRelayHost.ASSET_CHUNK_BYTES).coerceAtLeast(1)
+            try {
+                for (index in 0 until count) {
+                    val from = index * CanvasRelayHost.ASSET_CHUNK_BYTES
+                    val to = minOf(bytes.size, from + CanvasRelayHost.ASSET_CHUNK_BYTES)
+                    live.connection.send(CanvasRelayMessage.AssetPut(topic, asset, index, count, kotlin.io.encoding.Base64.encode(bytes, from, to)))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                lock.withLock { live.assetsUp -= ref }
+                throw e
+            }
+        }
+    }
+
+    private suspend fun assetData(message: CanvasRelayMessage.AssetData) {
+        val store = assets ?: return
+        val ref = message.asset.ref
+        val whole = lock.withLock {
+            val fetch = fetches[ref] ?: return
+            if (message.count !in 1..MAX_FETCH_CHUNKS || message.index !in 0 until message.count) return@withLock ByteArray(0)
+            val chunks = fetch.chunks ?: arrayOfNulls<ByteArray>(message.count).also { fetch.chunks = it }
+            if (chunks.size != message.count) return@withLock ByteArray(0)
+            if (chunks[message.index] == null) {
+                chunks[message.index] = runCatching { kotlin.io.encoding.Base64.decode(message.data) }.getOrNull() ?: return@withLock ByteArray(0)
+                fetch.received++
+            }
+            if (fetch.received < message.count) {
+                null
+            } else {
+                // One copy into an array of the final size; appending chunk by chunk copied quadratically.
+                val whole = ByteArray(chunks.sumOf { it!!.size })
+                var at = 0
+                for (part in chunks) {
+                    part!!.copyInto(whole, at)
+                    at += part.size
+                }
+                whole
+            }
+        } ?: return
+        // Kept, and handed over, only if the bytes are that asset.
+        val kept = whole.takeIf { it.isNotEmpty() }?.let { bytes ->
+            runCatching { store.put(message.asset.mediaType, bytes) }.getOrNull()?.takeIf { it.ref == ref }?.let { bytes }
+        }
+        finishFetch(ref, kept)
+    }
+
+    private suspend fun finishFetch(ref: String, bytes: ByteArray?) {
+        lock.withLock { fetches.remove(ref) }?.result?.complete(bytes)
+    }
+
     // ---- CanvasPresenceTransport ----
 
     override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
@@ -186,6 +306,9 @@ class CanvasRelayClient(
             }
         } finally {
             lock.withLock { if (current === live) current = null }
+            // Fetches asked on this connection will not be answered on it.
+            val pending = lock.withLock { fetches.values.toList().also { fetches.clear() } }
+            pending.forEach { it.result.complete(null) }
             refreshAll()
         }
     }
@@ -243,10 +366,15 @@ class CanvasRelayClient(
                 lock.withLock { refusal = message.reason }
                 return false
             }
-            // Replies about assets (w3nb2.3): this client does not ask for them yet, but a host that
-            // sends one is speaking the protocol, not breaking it.
-            is CanvasRelayMessage.AssetStored, is CanvasRelayMessage.AssetData,
-            is CanvasRelayMessage.AssetMissing, is CanvasRelayMessage.AssetRejected -> Unit
+            is CanvasRelayMessage.AssetStored -> lock.withLock { live.assetsUp += message.ref }
+            is CanvasRelayMessage.AssetData -> assetData(message)
+            is CanvasRelayMessage.AssetMissing -> finishFetch(message.ref, null)
+            // The host will not keep it (too large, say); the op that refers to it still goes up, and
+            // other apps draw its preview.
+            is CanvasRelayMessage.AssetRejected -> com.letta.mobile.util.Telemetry.event(
+                "CanvasRelayClient", "asset.rejected", "ref" to message.ref, "reason" to message.reason,
+                level = com.letta.mobile.util.Telemetry.Level.WARN,
+            )
             // App-to-host messages coming this way: not a host speaking the protocol.
             else -> {
                 lock.withLock { refusal = "the host sent ${message::class.simpleName}" }
@@ -278,6 +406,7 @@ class CanvasRelayClient(
             }
             val send = lock.withLock { (current === live).also { if (it) live.inFlight += opId } }
             if (!send) return
+            sendAssetsFor(live, message.topic, op)
             live.connection.send(CanvasRelayMessage.Publish(message.topic, op))
         }
         refresh(message.topic)
@@ -322,5 +451,9 @@ class CanvasRelayClient(
 
     private companion object {
         const val NO_HOST = "Not connected to an Iroh host; this canvas stays on this device"
+        const val ASSET_FETCH_TIMEOUT_MS = 60_000L
+        const val DEFAULT_MEDIA_TYPE = "application/octet-stream"
+        /** Chunks an asset may arrive in: the host's largest asset at its chunk size, and some. */
+        val MAX_FETCH_CHUNKS = (CanvasRelayHost.MAX_ASSET_BYTES / CanvasRelayHost.ASSET_CHUNK_BYTES).toInt() + 1
     }
 }

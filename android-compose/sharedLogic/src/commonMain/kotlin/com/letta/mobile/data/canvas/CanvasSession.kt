@@ -394,6 +394,9 @@ class CanvasSession(
         )
     }
 
+    /** Asset [ref]'s bytes from wherever this canvas is shared (see [CanvasSyncTransport.fetchAsset]). */
+    suspend fun fetchAsset(ref: String): ByteArray? = syncTransport?.fetchAsset(canvasId, ref)
+
     /** The board's background pattern as of the current scene; null when none was set. */
     fun backgroundPattern(): CanvasBackgroundPattern? = CanvasOpProjector.backgroundPatternOf(sceneJsonOrEmpty())
 
