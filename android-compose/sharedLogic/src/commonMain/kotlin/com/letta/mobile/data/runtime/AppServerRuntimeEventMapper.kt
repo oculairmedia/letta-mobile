@@ -97,9 +97,9 @@ open class AppServerRuntimeEventMapper {
 
     private fun AppServerInboundFrame.AbortMessageResponse.toAbortDraft(command: TurnCommand): List<RuntimeEventDraft> =
         if (success && aborted) {
-            listOf(command.lifecycle(RuntimeRunStatus.Cancelled, reason = null))
+            listOf(command.runLifecycleDraft(RuntimeRunStatus.Cancelled, reason = null))
         } else if (!success) {
-            listOf(command.lifecycle(RuntimeRunStatus.Failed, reason = error ?: "App Server abort failed"))
+            listOf(command.runLifecycleDraft(RuntimeRunStatus.Failed, reason = error ?: "App Server abort failed"))
         } else {
             emptyList()
         }
@@ -151,42 +151,28 @@ open class AppServerRuntimeEventMapper {
             ?: return unprojectableDelta(command, raw)
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
+        val ref = StreamDeltaRef(frameId = idempotencyKey, runId = runId, delta = deltaObject, raw = raw)
         return when (messageType) {
             "stop_reason" -> {
-                val stopDraft = command.draft(
-                    runId = runId,
-                    source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RemoteStreamFrame(
-                        frameId = idempotencyKey,
-                        messageId = deltaObject.string("id"),
-                        messageType = messageType,
-                        body = raw.toString(),
-                    ),
-                )
+                val stopDraft = command.remoteStreamFrame(ref)
                 val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
                 val lifecycleDraft = when (AppServerStopReason.boundaryOf(stopReason)) {
                     AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
-                    AppServerTurnBoundary.Cancelled -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
-                    AppServerTurnBoundary.Failed -> command.lifecycle(
+                    AppServerTurnBoundary.Cancelled -> command.runLifecycleDraft(RuntimeRunStatus.Cancelled, runId = runId)
+                    AppServerTurnBoundary.Failed -> command.runLifecycleDraft(
                         RuntimeRunStatus.Failed,
                         runId = runId,
                         reason = deltaObject.errorMessage("App Server turn stopped with ${stopReason ?: "error"}"),
                     )
-                    AppServerTurnBoundary.Completed -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
+                    AppServerTurnBoundary.Completed -> command.runLifecycleDraft(RuntimeRunStatus.Completed, runId = runId)
                 }
                 listOfNotNull(stopDraft, lifecycleDraft)
             }
             "loop_error",
             "error_message",
-            -> if (deltaObject.isNonTerminalError()) {
-                // letta-mobile-qygvv.2: `is_terminal: false` (0.32 LoopErrorMessage) is a notice
-                // the loop recovers from, not a turn end.
-                listOf(command.remoteFrame(idempotencyKey, runId, messageType, deltaObject.string("id"), raw))
-            } else {
-                listOf(command.lifecycle(RuntimeRunStatus.Failed, runId = runId, reason = deltaObject.errorMessage()))
-            }
+            -> listOf(command.errorDeltaDraft(ref, failureReason = deltaObject.errorMessage()))
             "client_tool_start" -> listOf(
-                command.draft(
+                command.turnDraft(
                     runId = runId,
                     source = RuntimeEventSource.LocalRuntime,
                     payload = RuntimeEventPayload.ToolCallObserved(
@@ -197,7 +183,7 @@ open class AppServerRuntimeEventMapper {
                 ),
             )
             "client_tool_end" -> listOf(
-                command.draft(
+                command.turnDraft(
                     runId = runId,
                     source = RuntimeEventSource.LocalRuntime,
                     payload = RuntimeEventPayload.ToolReturnObserved(
@@ -211,68 +197,20 @@ open class AppServerRuntimeEventMapper {
                     ),
                 ),
             )
-            else -> listOf(
-                command.draft(
-                    runId = runId,
-                    source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RemoteStreamFrame(
-                        frameId = idempotencyKey,
-                        messageId = deltaObject.string("id"),
-                        messageType = messageType,
-                        body = raw.toString(),
-                    ),
-                ),
-            )
+            else -> listOf(command.remoteStreamFrame(ref))
         }
     }
-
-    /**
-     * letta-mobile-qygvv.2: `turn_finished` is the server's authoritative end of a turn. Its stop
-     * reason is read exactly like the delta's; `requires_approval` and unknown reasons stay open.
-     */
-    private fun AppServerInboundFrame.TurnFinished.toTerminalDraft(command: TurnCommand): RuntimeEventDraft? {
-        val finishedRunId = runId?.takeIf { it.isNotBlank() }?.let(::RunId)
-        return when (AppServerStopReason.boundaryOf(stopReason)) {
-            AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
-            AppServerTurnBoundary.Cancelled ->
-                command.lifecycle(RuntimeRunStatus.Cancelled, runId = finishedRunId, reason = error)
-            AppServerTurnBoundary.Failed -> command.lifecycle(
-                RuntimeRunStatus.Failed,
-                runId = finishedRunId,
-                reason = error ?: "App Server turn stopped with $stopReason",
-            )
-            AppServerTurnBoundary.Completed -> command.lifecycle(RuntimeRunStatus.Completed, runId = finishedRunId)
-        }
-    }
-
-    private fun TurnCommand.remoteFrame(
-        frameId: String,
-        runId: RunId?,
-        messageType: String?,
-        messageId: String?,
-        raw: JsonObject,
-    ): RuntimeEventDraft =
-        draft(
-            runId = runId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RemoteStreamFrame(
-                frameId = frameId,
-                messageId = messageId,
-                messageType = messageType,
-                body = raw.toString(),
-            ),
-        )
 
     private fun AppServerInboundFrame.UpdateLoopStatus.toLoopStatusDraft(command: TurnCommand): List<RuntimeEventDraft> =
         if (loopStatus.activeRunIds.isNotEmpty()) {
-            listOf(command.lifecycle(RuntimeRunStatus.Running, runId = RunId(loopStatus.activeRunIds.first())))
+            listOf(command.runLifecycleDraft(RuntimeRunStatus.Running, runId = RunId(loopStatus.activeRunIds.first())))
         } else {
             emptyList()
         }
 
     private fun AppServerInboundFrame.ExternalToolCallRequest.toToolCallDraft(command: TurnCommand): List<RuntimeEventDraft> =
         listOf(
-            command.draft(
+            command.turnDraft(
                 source = RuntimeEventSource.LocalRuntime,
                 payload = RuntimeEventPayload.ToolCallObserved(
                     toolCallId = ToolCallId(toolCallId),
@@ -292,7 +230,7 @@ open class AppServerRuntimeEventMapper {
         val toolCallId = request.string("tool_call_id") ?: requestId
         val toolName = request.string("tool_name") ?: "tool"
         return listOf(
-            command.draft(
+            command.turnDraft(
                 source = RuntimeEventSource.LocalRuntime,
                 payload = RuntimeEventPayload.ApprovalRequested(
                     ToolApprovalRequest(
@@ -308,42 +246,13 @@ open class AppServerRuntimeEventMapper {
     }
 
     private fun AppServerReceivedFrame.toExternalTransportDraft(command: TurnCommand): RuntimeEventDraft =
-        command.draft(
+        command.turnDraft(
             source = RuntimeEventSource.ExternalTransport,
             payload = RuntimeEventPayload.ExternalTransportFrame(
                 frameId = raw.string("idempotency_key") ?: frame.requestId ?: frame.type ?: "app-server-frame",
                 transportMessageId = frame.requestId,
                 body = raw.toString(),
             ),
-        )
-
-    private fun TurnCommand.lifecycle(
-        status: RuntimeRunStatus,
-        runId: RunId? = null,
-        reason: String? = null,
-    ): RuntimeEventDraft =
-        draft(
-            runId = runId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(
-                status = status,
-                reason = reason,
-            ),
-        )
-
-    private fun TurnCommand.draft(
-        runId: RunId? = null,
-        source: RuntimeEventSource,
-        payload: RuntimeEventPayload,
-    ): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            runId = runId,
-            source = source,
-            payload = payload,
         )
 
     /**
@@ -360,9 +269,6 @@ open class AppServerRuntimeEventMapper {
         (this[key] as? JsonPrimitive)?.contentOrNull
 
     private fun JsonObject.objectOrNull(key: String): JsonObject? = this[key] as? JsonObject
-
-    /** Only an explicit `is_terminal: false` downgrades an error; absent means terminal (pre-0.32). */
-    private fun JsonObject.isNonTerminalError(): Boolean = string("is_terminal") == "false"
 
     private fun JsonObject.errorMessage(fallback: String = "App Server turn failed"): String =
         string("message")

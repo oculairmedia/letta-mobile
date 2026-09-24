@@ -1030,8 +1030,21 @@ class AppServerTurnEngine(
         if (context.queuedFrames.skip(received, context.lease.current?.runId)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
-        val frameSeq = received.eventSeqOrNull()
-        val boundary = decideBoundary(received, context) ?: return
+        projectAtBoundary(received, context, budget, queueRemoval)
+    }
+
+    /** letta-mobile-qygvv.2: projects one accepted frame through the [TurnBoundaryGate] decision. */
+    private suspend fun projectAtBoundary(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+        budget: FrameProjectionErrorBudget,
+        queueRemoval: QueueRemovalDisposition?,
+    ) {
+        val slot = context.lease.slot
+        val boundary = slot.boundaryGate.decideOrDrop(
+            TurnBoundaryInput(received, context.lease.current?.runId, approvals.hasOutstanding(slot.key)),
+            context.runtimeScope,
+        ) ?: return
         // letta-mobile-gdvbf: the resilience boundary is EXACTLY this seam, and
         // deliberately no wider. Everything above has already touched turn
         // state (generation/scope gating, watchdog, external-tool dispatch,
@@ -1040,51 +1053,13 @@ class AppServerTurnEngine(
         // equivalent to an unreadable frame — it may need terminal settlement —
         // so it must still propagate.
         val drafts = projectOrSkip(received, context, budget) ?: return
-        drafts.firstOrNull { it.runId != null }?.runId?.value?.let { runId ->
-            slot.runIdGate.promote(runId, context.lease.token)
-        }
-        val authoritative = boundary != TurnBoundaryDecision.Project
-        drafts.forEach { draft -> context.draftProcessor.process(draft, frameSeq, authoritative) }
-        if (boundary is TurnBoundaryDecision.LoopIdle) {
-            context.draftProcessor.process(context.loopIdleTerminal(boundary.status), frameSeq, authoritative = true)
-        }
+        slot.runIdGate.promoteAtBoundary(boundary, drafts, context.lease.token)
+        val frameSeq = received.eventSeqOrNull()
+        boundary.withLoopIdleTerminal(drafts, context.command, context.lease.current?.runId)
+            .forEach { draft -> context.draftProcessor.process(draft, frameSeq, boundary.isAuthoritative) }
         // The update_queue passthrough draft above still reaches viewers; only then
         // settle a lease whose queued input the server dropped.
         if (queueRemoval == QueueRemovalDisposition.Cancelled) completeQueueCancelledTurn(context)
-    }
-
-    /**
-     * letta-mobile-qygvv.2: `turn_finished` and an idle loop status after evidence are the
-     * server's own turn boundaries. Returns null when the frame closes a turn this key already
-     * settled (a duplicate `turn_id`, a superseded or settled run) and must be skipped.
-     */
-    private fun decideBoundary(
-        received: AppServerReceivedFrame,
-        context: TurnFrameContext,
-    ): TurnBoundaryDecision? {
-        val slot = context.lease.slot
-        val decision = slot.boundaryGate.decide(
-            received = received,
-            leaseRunId = context.lease.current?.runId,
-            approvalOutstanding = approvals.hasOutstanding(slot.key),
-        )
-        if (decision !is TurnBoundaryDecision.Drop) return decision
-        Telemetry.event(
-            "AppServerTurnEngine", "terminal.boundary_dropped",
-            "frameType" to (received.frame.type ?: "<unknown>"),
-            "reason" to decision.reason,
-            "conversationId" to context.runtimeScope.conversationId,
-            "eventSeq" to received.eventSeqOrNull(),
-        )
-        return null
-    }
-
-    private fun TurnFrameContext.loopIdleTerminal(status: RuntimeRunStatus): RuntimeEventDraft {
-        val runId = lease.current?.runId?.takeIf { it.isNotBlank() }?.let(::RunId)
-        return when (status) {
-            RuntimeRunStatus.Cancelled -> command.cancelledDraft("App Server loop idle after abort").copy(runId = runId)
-            else -> command.completedDraft(runId)
-        }
     }
 
     /**
@@ -1326,18 +1301,8 @@ class AppServerTurnEngine(
                 completedDraft = { runId -> command.completedDraft(runId) },
                 recordTerminal = { draft, frameSeq ->
                     recordTerminalLifecycle(draft, command, frameSeq, lease)
-                    slot.boundaryGate.noteSettled(draft.runId?.value ?: lease.current?.runId)
                 },
-                noteCompleted = { frameSeq ->
-                    slot.boundaryGate.noteSettled(lease.current?.runId)
-                    noteOwnerTerminal(
-                        RuntimeRunStatus.Completed,
-                        source = "completed_settle",
-                        seq = frameSeq,
-                        scopeMatched = true,
-                        lease = lease,
-                    )
-                },
+                noteCompleted = { frameSeq -> noteCompletedSettle(frameSeq, lease) },
                 complete = { throw TurnCompleted },
                 settleDelayMs = terminalSettleQuietMs,
             ),
@@ -1741,15 +1706,7 @@ class AppServerTurnEngine(
         )
 
     private fun TurnCommand.completedDraft(runId: RunId?): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            runId = runId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
-        )
+        runLifecycleDraft(RuntimeRunStatus.Completed, runId = runId)
 
     private fun TurnCommand.failedDraft(reason: String): RuntimeEventDraft =
         RuntimeEventDraft(
@@ -1762,14 +1719,7 @@ class AppServerTurnEngine(
         )
 
     private fun TurnCommand.cancelledDraft(reason: String): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason = reason),
-        )
+        runLifecycleDraft(RuntimeRunStatus.Cancelled, reason = reason)
 
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
@@ -1852,17 +1802,6 @@ class AppServerTurnEngine(
             ),
         )
     }
-
-    private fun AppServerReceivedFrame.eventSeqOrNull(): Long? =
-        when (val f = frame) {
-            is AppServerInboundFrame.StreamDelta -> f.eventSeq
-            is AppServerInboundFrame.UpdateLoopStatus -> f.eventSeq
-            is AppServerInboundFrame.TurnFinished -> f.eventSeq
-            is AppServerInboundFrame.UpdateDeviceStatus -> f.eventSeq
-            is AppServerInboundFrame.UpdateQueue -> f.eventSeq
-            is AppServerInboundFrame.UpdateSubagentState -> f.eventSeq
-            else -> null
-        }
 
     /**
      * letta-mobile-oqfbj: extract tool_call_id from a RemoteStreamFrame body.
@@ -2085,12 +2024,25 @@ class AppServerTurnEngine(
      * letta-mobile-kyqdt / o0atv: telemetry for a matched terminal lifecycle draft.
      * Kept out of [collectTurnWithIdleWatchdog] to avoid Complex Method regressions.
      */
+    /** The settle window closed on a completed turn: its run is settled (letta-mobile-qygvv.2). */
+    private fun noteCompletedSettle(frameSeq: Long?, lease: LeaseRef) {
+        lease.slot.boundaryGate.noteSettled(lease.current?.runId)
+        noteOwnerTerminal(
+            RuntimeRunStatus.Completed,
+            source = "completed_settle",
+            seq = frameSeq,
+            scopeMatched = true,
+            lease = lease,
+        )
+    }
+
     private fun recordTerminalLifecycle(
         draft: RuntimeEventDraft,
         command: TurnCommand,
         frameSeq: Long?,
         lease: LeaseRef,
     ) {
+        lease.slot.boundaryGate.noteSettledTerminal(draft, lease.current?.runId)
         val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged ?: return
         noteOwnerTerminal(
             lifecycle.status,
