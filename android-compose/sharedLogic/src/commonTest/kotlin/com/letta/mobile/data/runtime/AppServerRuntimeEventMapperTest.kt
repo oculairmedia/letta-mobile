@@ -313,8 +313,84 @@ class AppServerRuntimeEventMapperTest {
             turnId = "turn-1",
             stopReason = "end_turn",
         )
-        assertIs<RuntimeEventPayload.ExternalTransportFrame>(mapper.map(command, received(finished)).single().payload)
+        val drafts = mapper.map(command, received(finished))
+        assertIs<RuntimeEventPayload.ExternalTransportFrame>(drafts[0].payload)
+        assertEquals(RuntimeRunStatus.Completed, assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts[1].payload).status)
     }
+
+    @Test
+    fun turnFinishedCarriesTheAuthoritativeTerminal() {
+        val cancelled = mapper.map(command, received(turnFinished("cancelled", runId = "run-7")))
+        val cancel = assertIs<RuntimeEventPayload.RunLifecycleChanged>(cancelled[1].payload)
+        assertEquals(RuntimeRunStatus.Cancelled, cancel.status)
+        assertEquals("run-7", cancelled[1].runId?.value)
+
+        val failed = mapper.map(command, received(turnFinished("llm_api_error", error = "provider down")))
+        val failure = assertIs<RuntimeEventPayload.RunLifecycleChanged>(failed[1].payload)
+        assertEquals(RuntimeRunStatus.Failed, failure.status)
+        assertEquals("provider down", failure.reason)
+    }
+
+    @Test
+    fun turnFinishedOnApprovalOrUnknownReasonStaysOpen() {
+        listOf("requires_approval", "tool_use").forEach { reason ->
+            val drafts = mapper.map(command, received(turnFinished(reason)))
+            assertIs<RuntimeEventPayload.ExternalTransportFrame>(drafts.single().payload)
+        }
+    }
+
+    @Test
+    fun nonTerminalLoopErrorIsANoticeNotATurnEnd() {
+        val drafts = mapper.map(
+            command,
+            received(
+                streamDelta(
+                    messageType = "loop_error",
+                    body = buildJsonObject {
+                        put("message_type", "loop_error")
+                        put("message", "retrying provider")
+                        put("is_terminal", false)
+                    },
+                ),
+            ),
+        )
+        val notice = assertIs<RuntimeEventPayload.RemoteStreamFrame>(drafts.single().payload)
+        assertEquals("loop_error", notice.messageType)
+    }
+
+    @Test
+    fun loopErrorWithoutIsTerminalStillFailsTheTurn() {
+        listOf(null, true).forEach { terminal ->
+            val drafts = mapper.map(
+                command,
+                received(
+                    streamDelta(
+                        messageType = "loop_error",
+                        body = buildJsonObject {
+                            put("message_type", "loop_error")
+                            put("message", "boom")
+                            terminal?.let { put("is_terminal", it) }
+                        },
+                    ),
+                ),
+            )
+            val failure = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts.single().payload)
+            assertEquals(RuntimeRunStatus.Failed, failure.status)
+            assertEquals("boom", failure.reason)
+        }
+    }
+
+    private fun turnFinished(reason: String, runId: String? = null, error: String? = null) =
+        AppServerInboundFrame.TurnFinished(
+            runtime = runtime,
+            eventSeq = 9,
+            emittedAt = "2026-09-15T00:00:00Z",
+            idempotencyKey = "turn_finished:9",
+            turnId = "turn-1",
+            stopReason = reason,
+            runId = runId,
+            error = error,
+        )
 
     private fun stopWith(reason: String) = streamDelta(
         messageType = "stop_reason",
