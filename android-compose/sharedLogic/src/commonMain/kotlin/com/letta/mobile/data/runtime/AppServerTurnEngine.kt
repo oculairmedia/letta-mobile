@@ -4,7 +4,10 @@ import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.ApprovalSubmission
+import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -157,7 +160,16 @@ class AppServerTurnEngine(
      * `turn_finished`. Null keeps only the abort-response trigger.
      */
     private val queueHygieneScope: CoroutineScope? = null,
+    /**
+     * letta-mobile-qygvv.5: approval decisions this client sent, keyed by
+     * (agent, conversation, request_id). Shared with the controller router when
+     * present so a replayed `control_request` is re-answered, not dropped.
+     */
+    private val approvalDecisionCache: ApprovalDecisionCache =
+        eventRouter?.approvalDecisionCache() ?: ApprovalDecisionCache(),
 ) : TurnEngine {
+    internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
+
     /**
      * letta-mobile-8xxzv: owner-token leases KEYED BY {agentId, conversationId}.
      *
@@ -170,6 +182,7 @@ class AppServerTurnEngine(
     private val leases = TurnLeaseRegistry()
     private val leaseTokenSeq = atomic(0L)
     private val inboundSource = TurnInboundSource(client, eventRouter)
+    private val deviceState = DeviceStateChanger(client, inboundSource)
 
     /**
      * lgns8.22.5: the FULL external-tool invocation lifecycle — claim, generation
@@ -200,6 +213,7 @@ class AppServerTurnEngine(
     private val inputSender = TurnInputSender(
         client,
         requestIdFactory,
+        approvalSender,
         externalToolRegistry,
         noteSentInput = queueHygiene::noteSentInput,
     )
@@ -424,6 +438,24 @@ class AppServerTurnEngine(
         )
     }
 
+    /**
+     * letta-mobile-qygvv.5: send one approval decision with a `request_id` and wait
+     * for `input_accepted`. The inbound control request is marked answered unless
+     * the server REJECTED the decision (e.g. "Approval request is no longer
+     * pending"), which the caller must surface. [claimGeneration] follows the same
+     * capture-before-send rule as [markInboundControlAnswered].
+     */
+    suspend fun submitApprovalResponse(
+        submission: ApprovalSubmission,
+        claimGeneration: Long = connectionGenerationProvider(),
+    ): ApprovalSubmitResult {
+        val result = approvalSender.send(submission)
+        if (result !is ApprovalSubmitResult.Rejected) {
+            markInboundControlAnswered(submission.approvalRequestId, claimGeneration)
+        }
+        return result
+    }
+
     /** Connection generation snapshot for callers that must capture it before a send. */
     fun currentConnectionGeneration(): Long = connectionGenerationProvider()
 
@@ -547,29 +579,15 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile folder-settings #2: changes the working directory for
-     * [agentId]/[conversationId] by re-issuing `runtime_start` with `cwd`
-     * set — the only client-facing mechanism the runtime supports for this
-     * (there is no dedicated `set_cwd` command upstream). Mirrors
-     * [ensureRuntime]'s command shape (same `clientInfo` / externalTools
-     * advertisement) so this doesn't clobber the connection's registered
-     * external tools with an empty list. Returns true on success.
+     * letta-mobile folder-settings #2 / letta-mobile-qygvv.7: changes the working
+     * directory for [agentId]/[conversationId] with `change_device_state{cwd}` and
+     * confirms it from the matching `update_device_status` (bounded wait, see
+     * [DeviceStateChanger]). Never re-issues `runtime_start`: that replays full
+     * state and re-registers external tools mid-turn. Returns false when the server
+     * does not confirm the new directory in time.
      */
-    suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean {
-        val response = client.runtimeStart(
-            AppServerCommand.RuntimeStart(
-                requestId = requestIdFactory(),
-                agentId = agentId,
-                conversationId = conversationId,
-                cwd = cwd,
-                clientInfo = clientInfo,
-                recoverApprovals = true,
-                forceDeviceStatus = true,
-                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
-            ),
-        )
-        return response.success
-    }
+    suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean =
+        deviceState.changeWorkingDirectory(AppServerRuntimeScope(agentId, conversationId), cwd)
 
     /**
      * letta-mobile-c4igq.3 / lgns8.22.2: causal liveness recovery.
@@ -870,10 +888,15 @@ class AppServerTurnEngine(
             collectorReady.await()
             val inputFailure = inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
             Telemetry.event("IrohTurn", "input.sent")
-            releaseReason = joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
+            // letta-mobile-qygvv.1: only an input failure decides the release reason
+            // here. A plain join must NOT overwrite the reason the collector already
+            // recorded (watchdog_timeout / cancellation / stream_error), otherwise the
+            // release looks like a normal completion and the orphan-abort path in
+            // qygvv.3 never fires.
+            joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
                 noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "input_rejected"), leaseRef)
                 send(command.failedDraft(failureText))
-            }
+            }?.let { releaseReason = it }
         } finally {
             withContext(NonCancellable) {
                 collector?.cancelAndJoin()
@@ -1145,30 +1168,42 @@ class AppServerTurnEngine(
         }
     }
 
+    /**
+     * Gates [received] before it touches turn state: generation, a replayed approval this engine
+     * re-answers from cache (letta-mobile-qygvv.5), runtime scope and run id. Returns false when
+     * the frame is not this lease's to process.
+     */
+    private suspend fun admitFrame(received: AppServerReceivedFrame, context: TurnFrameContext): Boolean {
+        if (isConnectionGenerationSuperseded(context.lease)) {
+            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
+        }
+        if (received.isStaleGenerationForLease(context.lease)) return false
+        if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) {
+            return false
+        }
+        if (!received.matches(context.runtimeScope, context.lease)) {
+            completeScopeRejectedTurn(received, context)
+            return false
+        }
+        return context.lease.slot.runIdGate.accepts(received, context.lease.token)
+    }
+
     private suspend fun processReceivedFrame(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
     ) {
-        if (isConnectionGenerationSuperseded(context.lease)) {
-            completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
-        }
-        if (received.isStaleGenerationForLease(context.lease)) return
-        if (!received.matches(context.runtimeScope, context.lease)) {
-            completeScopeRejectedTurn(received, context)
-            return
-        }
-        val slot = context.lease.slot
-        if (!slot.runIdGate.accepts(received, context.lease.token)) return
+        if (!admitFrame(received, context)) return
         context.idleWatchdog.markFrame()
         queueHygiene.observeTurnFrame(received.frame)
         val queueRemoval = observeQueueProgress(received, context.lease)
+        if (context.lease.holdsWhileQueued(received)) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val projected = projectAtBoundary(received, context, budget)
         // The update_queue passthrough draft still reaches viewers; only then
         // settle a lease whose queued input the server dropped.
-        if (projected && queueRemoval == QueueRemovalDisposition.Cancelled) {
+        if (queueRemoval.cancelsLeaseOnceProjected(projected)) {
             completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
         }
     }
@@ -1553,25 +1588,24 @@ class AppServerTurnEngine(
             "source" to approval.source,
         )
         // lgns8.22.4.1.4: capture the generation the approval is being ANSWERED ON
-        // before the send. Reading it back after client.input() would attribute the
+        // before the send. Reading it back after the send would attribute the
         // answer to whatever generation a mid-send disconnect installed, marking a
         // successor-generation recovery replay answered by a decision the server
         // may never have received.
         val claimGeneration = connectionGenerationProvider()
-        client.input(
-            AppServerCommand.Input(
+        // letta-mobile-qygvv.5: awaits input_accepted. A rejection means the gate
+        // is no longer pending (someone else resolved it), so the card stays
+        // suppressed either way; the result is recorded as telemetry.
+        submitApprovalResponse(
+            ApprovalSubmission(
                 runtime = scope,
-                payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = approval.requestId,
-                    decision = AppServerApprovalResponseDecision.Allow(
-                        message = "Approved by default mobile policy.",
-                    ),
+                approvalRequestId = approval.requestId,
+                decision = AppServerApprovalResponseDecision.Allow(
+                    message = "Approved by default mobile policy.",
                 ),
+                source = "auto_allow",
             ),
-        )
-        inboundControlRegistry.markAnswered(
-            InboundControlRequestRegistry.RequestRef(approval.requestId),
-            claimGeneration,
+            claimGeneration = claimGeneration,
         )
         return true
     }

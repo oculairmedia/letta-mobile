@@ -126,6 +126,11 @@ interface AppServerController {
         runId: String? = null,
     ): AppServerInboundFrame.AbortMessageResponse
 
+    /**
+     * Sends one approval decision and waits for the App Server's `input_accepted`
+     * (letta-mobile-qygvv.5). [ApprovalSubmitResult.Rejected] carries the server's
+     * reason (e.g. "Approval request is no longer pending") and must be surfaced.
+     */
     suspend fun submitApproval(
         agentId: AgentId,
         conversationId: ConversationId? = null,
@@ -140,7 +145,7 @@ interface AppServerController {
         // being re-decoded from the `reason` sentinel here. When present and
         // approving, the tool call is closed via `Allow(updated_input=…)`.
         updatedInput: kotlinx.serialization.json.JsonObject? = null,
-    ) {
+    ): ApprovalSubmitResult {
         error("submitApproval is not supported by this controller")
     }
 

@@ -103,12 +103,40 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertTrue(turn.isBusy, "watchdog must be paused while queued")
         assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
 
-        // The turn starts: the watchdog is armed again and trips on fresh silence.
+        // A stream frame from the earlier turn must not unpause the watchdog while queued.
         turn.client.emitStreamDelta("assistant_message")
+        runCurrent()
+        advanceTimeBy(IDLE_TIMEOUT_MS * 5)
+        runCurrent()
+        assertTrue(turn.isBusy, "stream frame from earlier turn must not trip watchdog while queued")
+
+        // Once dequeued, fresh silence trips the armed watchdog.
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
         runCurrent()
         idleOut(turn)
 
         assertEquals(RuntimeRunStatus.Failed, turn.drafts.lastLifecycle()?.status)
+        assertFalse(turn.isBusy)
+    }
+
+    @Test
+    fun earlierTurnFinishedArrivingWhileQueuedDoesNotCompleteTurn() = runTest {
+        val turn = startTurn(InputAckFixture.Queued)
+        assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "queued input must be visible")
+
+        // An earlier turn's turn_finished arriving while queued must be ignored and not complete this turn.
+        turn.client.emitTurnFinished(TestRun("prev-run-1"), turn = 0)
+        runCurrent()
+        assertTrue(turn.isBusy, "turn must remain active when earlier turn finishes")
+        assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
+
+        // Dequeue, then our own turn streams and completes normally.
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        turn.client.emitStreamDelta("assistant_message")
+        turn.client.emitTurnFinished(TestRun("run-1"), turn = 1)
+        finish(turn)
+
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
         assertFalse(turn.isBusy)
     }
 
@@ -163,14 +191,27 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun approvalResponseInputStaysFireAndForget() = runTest {
+    fun approvalResponseInputAwaitsAcceptance() = runTest {
+        // letta-mobile-qygvv.5: approval responses carry a request_id and await the ack too.
         val turn = startTurn(InputAckFixture.NoDisposition, approvalCommand)
 
-        assertTrue(turn.client.acknowledgedInputs.isEmpty())
-        val sent = turn.client.plainInputs.single()
-        assertNull(sent.requestId)
-        assertTrue(sent.payload is AppServerInputPayload.ApprovalResponse)
+        assertTrue(turn.client.plainInputs.isEmpty())
+        val sent = turn.client.acknowledgedInputs.single()
+        assertEquals(TEST_INPUT_REQUEST_ID, sent.requestId)
+        assertEquals("approval-1", (sent.payload as AppServerInputPayload.ApprovalResponse).requestId)
         turn.job.cancel()
+    }
+
+    @Test
+    fun rejectedApprovalResponseInputFailsFastWithServerError() = runTest {
+        val turn = startTurn(InputAckFixture.rejected(APPROVAL_NOT_PENDING_ERROR), approvalCommand)
+        turn.job.join()
+
+        val last = turn.drafts.lastLifecycle()
+        assertEquals(RuntimeRunStatus.Failed, last?.status)
+        assertEquals(APPROVAL_NOT_PENDING_ERROR, last?.reason)
+        assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS, "a rejected decision must not wait for the watchdog")
+        assertFalse(turn.isBusy)
     }
 
     @Test

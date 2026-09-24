@@ -292,15 +292,28 @@ internal fun recordDequeued(lease: LeaseRef, source: String) {
     )
 }
 
+/**
+ * letta-mobile-qygvv.7: while this lease's input is queued, frames on the scope belong to the turn
+ * ahead; only `update_queue` concerns it.
+ */
+internal fun LeaseRef.holdsWhileQueued(received: AppServerReceivedFrame): Boolean =
+    queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue
+
+/** The server dropped this lease's queued input and its `update_queue` frame already reached viewers. */
+internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boolean): Boolean =
+    projected && this == QueueRemovalDisposition.Cancelled
+
 internal fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
 ): QueueRemovalDisposition? {
     val frame = received.frame
     val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
+    // While queued, frames on this scope belong to the turn ahead; only the
+    // dequeue transition for OUR client_message_id proves our input started.
     val startedBy = when {
-        frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
         removal == QueueRemovalDisposition.Dequeued -> "update_queue"
+        frame is AppServerInboundFrame.StreamDelta && !lease.queuedInput.isQueued -> "stream_delta"
         else -> null
     }
     if (startedBy != null && lease.queuedInput.markStarted()) {
@@ -312,6 +325,7 @@ internal fun observeQueueProgress(
 internal class TurnInputSender(
     private val client: AppServerClient,
     private val requestIdFactory: () -> String,
+    private val approvalSender: ApprovalResponseSender,
     private val externalToolRegistry: ExternalToolRegistry? = null,
     /** letta-mobile-qygvv.6: records a user input before it is sent, so its queue item is recognised. */
     private val noteSentInput: (TurnRuntimeKey, String?, TurnCommand) -> Unit = { _, _, _ -> },
@@ -323,6 +337,9 @@ internal class TurnInputSender(
         emit: suspend (RuntimeEventDraft) -> Unit,
     ): InputAcceptance.Failure? {
         val input = command.toInputCommand(scope, externalToolRegistry)
+        // letta-mobile-qygvv.5: approval responses await input_accepted too; a
+        // rejected decision fails the turn instead of parking it.
+        input.approvalResponseOrNull()?.let { return approvalSender.sendAsTurnInput(scope, it) }
         if (command.input !is TurnInput.UserMessage) {
             client.input(input)
             return null
@@ -388,7 +405,7 @@ internal suspend fun joinCollectorOrHandleFailure(
     collector: Job,
     inputFailure: InputAcceptance.Failure?,
     onFailure: suspend (String) -> Unit,
-): String {
+): String? {
     if (inputFailure != null) {
         // letta-mobile-qygvv.1: the server will never run this input — fail
         // now instead of waiting out the idle watchdog.
@@ -396,8 +413,10 @@ internal suspend fun joinCollectorOrHandleFailure(
         onFailure(inputFailure.failureReason)
         return "input_rejected"
     }
+    // A normal join decides nothing: the collector's own catch blocks already
+    // recorded why it ended, and that reason must survive (see the engine).
     collector.join()
-    return "normal_completion"
+    return null
 }
 
 /**
