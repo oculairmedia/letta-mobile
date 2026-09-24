@@ -63,7 +63,10 @@ class PanFling(private val scope: CoroutineScope, private val onPan: (Offset) ->
         const val MIN_SPEED = 400f
         /** A wild flick still lands somewhere near. */
         const val MAX_SPEED = 8000f
-        /** Higher stops sooner; tuned to feel like a list's fling. */
-        const val FRICTION = 1.6f
+        /**
+         * Higher stops sooner. 1.6 stopped a throw within a hand's width, which read as drag, not
+         * glide; a board should coast like a thrown map, well past where the finger let go.
+         */
+        const val FRICTION = 0.6f
     }
 }

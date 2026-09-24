@@ -350,15 +350,28 @@ fun CanvasWorkspace(
     }
 
     // Images placed on this board, and those of boards made before it kept images as assets, are
-    // moved into the asset store: their bytes stored once under their hash, the image given the
-    // ref and a preview. Updated in place, outside undo: nothing the person did changed.
+    // moved into the asset store: their bytes stored once under their hash.
+    //
+    // The image itself is given its ref (and a preview) only once drawings stop carrying image
+    // bytes (DrawingSerializer.inlineImageBytes off, w3nb2.3c), when every app reads refs. Before
+    // then, rewriting it fought any older app on the board: that app's drawing drops fields it does
+    // not know, so its next save sent every image back without them, this board adopted them again,
+    // and the two traded the same images forever. So until then the store is only filled, which
+    // needs no one else's agreement. Each image is stored once, not on every change to the board.
+    val storedImages = remember(session) { mutableSetOf<String>() }
     LaunchedEffect(state.elements, assets, initialLoadDone) {
         val store = assets ?: return@LaunchedEffect
         if (!initialLoadDone) return@LaunchedEffect
+        val writeRefs = !io.ak1.drawbox.domain.model.DrawingSerializer.inlineImageBytes
         val pending = state.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
             .filter { it.assetRef == null && it.bytes.isNotEmpty() }
+            .filter { writeRefs || storedKey(it) !in storedImages }
         if (pending.isEmpty()) return@LaunchedEffect
         val adopted = withContext(Dispatchers.Default) { pending.map { CanvasImageAssets.adopt(it, store) } }
+        if (!writeRefs) {
+            pending.forEach { storedImages += storedKey(it) }
+            return@LaunchedEffect
+        }
         val now = controller.state.value.elements.associateBy { it.id }
         adopted.forEach { image ->
             val current = now[image.id] as? io.ak1.drawbox.domain.model.Element.Image ?: return@forEach
@@ -1498,28 +1511,13 @@ fun CanvasWorkspace(
                     }
                 }
             }
-            if (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null)) {
-                val editable = state.elements.singleOrNull { it.id in state.selectedIds }
-                    ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
-                val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
-                AnchoredToSelection(
-                    anchor = CanvasWorkspaceSupport.barAnchor(
-                        BarAnchorParams(
-                            state = state,
-                            documents = anchorDocuments,
-                            selectedNoteIds = selectedNoteIds,
-                            activeNote = activeNote,
-                            groupOffset = groupOffset,
-                        ),
-                    ),
-                    // On a phone the title and actions pills fill the top row, so the bar stays
-                    // below them even when the host hides the title.
-                    topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
-                    startClearance = resolvedLayout.railClearance(),
-                    // Above the quick-create target, when there is one, not on it.
-                    gap = if (quickAnchor != null) 56.dp else 12.dp,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
+            // Typing into a shape on a phone: the keyboard takes the bottom half, so the tool bar
+            // steps aside and the selection bar rides on the keyboard instead of over the shape,
+            // the way Miro lays it out. The keyboard camera then keeps the shape above them both.
+            val typingOnPhone = compact && editingTextId != null && hasSelection
+            val editable = state.elements.singleOrNull { it.id in state.selectedIds }
+                ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
+            val selectionBar: @Composable (Modifier) -> Unit = { barModifier ->
                 CanvasSelectionBar(
                     state = controlsBarState,
                     properties = properties,
@@ -1541,8 +1539,30 @@ fun CanvasWorkspace(
                             val types = shapes.map { (it as io.ak1.drawbox.domain.model.Element.Shape).shapeType }.distinct()
                             ShapeReshapeActions(current = types.singleOrNull()) { type -> CanvasReshape.apply(controller, type) }
                         },
-                    modifier = Modifier.canvasChrome(chromeRegions),
+                    modifier = barModifier.canvasChrome(chromeRegions),
                 )
+            }
+            if (!typingOnPhone && (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null))) {
+                val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
+                AnchoredToSelection(
+                    anchor = CanvasWorkspaceSupport.barAnchor(
+                        BarAnchorParams(
+                            state = state,
+                            documents = anchorDocuments,
+                            selectedNoteIds = selectedNoteIds,
+                            activeNote = activeNote,
+                            groupOffset = groupOffset,
+                        ),
+                    ),
+                    // On a phone the title and actions pills fill the top row, so the bar stays
+                    // below them even when the host hides the title.
+                    topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
+                    startClearance = resolvedLayout.railClearance(),
+                    // Above the quick-create target, when there is one, not on it.
+                    gap = if (quickAnchor != null) 56.dp else 12.dp,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                selectionBar(Modifier)
                 }
             }
 
@@ -1606,12 +1626,13 @@ fun CanvasWorkspace(
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 val toolbar = noteToolbar
+                if (typingOnPhone) selectionBar(Modifier)
                 // An opened note carries its own formatting in its foot bar.
                 if (toolbar != null && activeNoteId != null && expandedNoteId == null) {
                     CanvasFormattingBar(toolbar = toolbar)
                 }
                 when (resolvedLayout) {
-                    CanvasLayout.COMPACT -> if (expanded == null) {
+                    CanvasLayout.COMPACT -> if (expanded == null && !typingOnPhone) {
                         CanvasCompactToolbar(
                             state = controlsBarState,
                             properties = properties,
@@ -1657,6 +1678,10 @@ private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
 /** How long before asking the host again for an asset it did not have yet. */
 private const val ASSET_RETRY_MS = 10_000L
+
+/** Which image, as stored: an image whose bytes change (replaced in place) is stored again. */
+private fun storedKey(image: io.ak1.drawbox.domain.model.Element.Image): String =
+    "${image.id}:${image.bytes.size}:${image.bytes.contentHashCode()}"
 /** How far (board px) an arrow must be pulled out of a quick-create target to count as one. */
 private const val QUICK_PULL_MIN_PX = 24f
 private const val QUICK_ARROW_HEAD_PX = 14f

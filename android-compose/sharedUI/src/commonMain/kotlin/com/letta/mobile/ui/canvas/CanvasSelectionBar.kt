@@ -1,6 +1,10 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
+import com.composables.icons.lucide.EllipsisVertical
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +99,25 @@ fun CanvasSelectionBar(
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // A phone keeps the bar to what is reached for while working on a shape - its kind and
+            // its text size - and puts the rest behind one menu. Colour and style are the tool
+            // bar's properties control, a thumb away at the foot; a second copy here was clutter.
+            if (LocalCanvasCompact.current && note == null && hasSelection) {
+                PhoneSelectionButtons(
+                    PhoneSelectionActions(
+                        properties = properties,
+                        dispatchProperty = dispatchProperty,
+                        onBringToFront = onBringToFront,
+                        onSendToBack = onSendToBack,
+                        onDelete = onDelete,
+                        onDuplicate = onDuplicate,
+                        onEditText = onEditText,
+                        shapeText = shapeText,
+                        reshape = reshape,
+                    ),
+                )
+                return@Row
+            }
             CanvasPropertyControl(
                 state = state,
                 properties = properties,
@@ -137,6 +160,88 @@ fun CanvasSelectionBar(
                 onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate selection", onClick = it) }
                 BarButton(Lucide.Trash2, "Delete selection", onClick = onDelete)
             }
+        }
+    }
+}
+
+/** Everything the phone's selection bar can do, for [PhoneSelectionButtons]. */
+private class PhoneSelectionActions(
+    val properties: CanvasProperties,
+    val dispatchProperty: (CanvasPropertyIntent) -> Unit,
+    val onBringToFront: () -> Unit,
+    val onSendToBack: () -> Unit,
+    val onDelete: () -> Unit,
+    val onDuplicate: (() -> Unit)?,
+    val onEditText: (() -> Unit)?,
+    val shapeText: ShapeTextActions?,
+    val reshape: ShapeReshapeActions?,
+)
+
+/** The phone's bar: the shape's kind, its text a step smaller or larger, and the rest behind "More". */
+@Composable
+private fun PhoneSelectionButtons(actions: PhoneSelectionActions) {
+    actions.reshape?.let { ShapeTypeButton(it) }
+    val text = actions.shapeText
+    if (text != null || actions.properties.showFontSize) {
+        val size = text?.fontSize ?: actions.properties.fontSize
+        val setSize: (Float) -> Unit = text?.onFontSize ?: { actions.dispatchProperty(CanvasPropertyIntent.SetFontSize(it)) }
+        BarButton(Lucide.AArrowDown, "Smaller text") { setSize(steppedFontSize(size, up = false)) }
+        BarButton(Lucide.AArrowUp, "Larger text") { setSize(steppedFontSize(size, up = true)) }
+    }
+    var open by remember { mutableStateOf(false) }
+    Box {
+        BarButton(Lucide.EllipsisVertical, "More shape actions") { open = true }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            fun item(icon: ImageVector, label: String, onClick: () -> Unit) = @Composable {
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+                    onClick = {
+                        open = false
+                        onClick()
+                    },
+                )
+            }
+            actions.onEditText?.let { item(Lucide.TextCursorInput, "Edit text", it)() }
+            if (text != null) {
+                DropdownMenuItem(
+                    text = { TextColourSwatches(text) },
+                    onClick = {},
+                )
+                val (icon, next) = when (text.alignment) {
+                    io.ak1.drawbox.domain.model.TextAlignment.LEFT -> Lucide.AlignLeft to io.ak1.drawbox.domain.model.TextAlignment.CENTER
+                    io.ak1.drawbox.domain.model.TextAlignment.CENTER -> Lucide.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT
+                    io.ak1.drawbox.domain.model.TextAlignment.RIGHT -> Lucide.AlignRight to io.ak1.drawbox.domain.model.TextAlignment.LEFT
+                }
+                item(icon, "Text alignment") { text.onAlignment(next) }()
+            }
+            item(Lucide.BringToFront, "Bring to front", actions.onBringToFront)()
+            item(Lucide.SendToBack, "Send to back", actions.onSendToBack)()
+            actions.onDuplicate?.let { item(Lucide.Copy, "Duplicate", it)() }
+            item(Lucide.Trash2, "Delete", actions.onDelete)()
+        }
+    }
+}
+
+/** The text colour, as a row of swatches inside the phone bar's menu. */
+@Composable
+private fun TextColourSwatches(text: ShapeTextActions) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+        StrokePalette.forEach { swatch ->
+            val selected = swatch.color.toHex() == text.color.toHex()
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(swatch.color)
+                    .border(
+                        if (selected) 3.dp else 1.dp,
+                        MaterialTheme.colorScheme.outline,
+                        androidx.compose.foundation.shape.CircleShape,
+                    )
+                    .clickable { text.onColor(swatch.color) }
+                    .semantics { contentDescription = "Text colour ${swatch.name}" },
+            )
         }
     }
 }
