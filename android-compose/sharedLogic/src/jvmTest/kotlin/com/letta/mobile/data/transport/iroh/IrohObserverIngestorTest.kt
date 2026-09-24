@@ -139,9 +139,14 @@ class IrohObserverIngestorTest {
             delta = """{"message_type": "stop_reason", "stop_reason": "end_turn"}""",
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(terminalDelta, 1L))
-        assertEquals(1, emittedFrames.size)
-        assertTrue(emittedFrames[0] is ServerFrame.TurnDone)
-        assertEquals("completed", (emittedFrames[0] as ServerFrame.TurnDone).status)
+        // The turn's ending (stop reason) is published ahead of the terminal so
+        // the coordinator records it before the turn retires.
+        assertEquals(2, emittedFrames.size, "got ${emittedFrames.map { it::class.simpleName }}")
+        val stop = assertIs<ServerFrame.StopReason>(emittedFrames[0])
+        assertEquals("end_turn", stop.stopReason)
+        assertEquals("turn-1", stop.turnId)
+        assertTrue(emittedFrames[1] is ServerFrame.TurnDone)
+        assertEquals("completed", (emittedFrames[1] as ServerFrame.TurnDone).status)
         assertTrue(activeTurn.hasTerminal)
     }
 

@@ -468,6 +468,52 @@ class ChatSendCoordinatorCleanupTest {
         assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
     }
 
+    // The observer fallback can claim the terminal before the engine's own settle
+    // flushes: the engine's stop/usage tail then lands on an already-retired turn.
+    // It must still reach the timeline projection (so the run folds with its stop
+    // reason and usage) without re-opening or re-settling the retired turn.
+    @Test
+    fun retiredTurnStopAndUsageTailIsForwardedToRuntimeEvents() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val recorded = mutableListOf<Pair<WsTimelineEvent, String?>>()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+            recordRuntimeEvent = { event, conversationId -> recorded += event to conversationId },
+        )
+
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
+        advanceUntilIdle()
+        val visualCompletionsAtRetire = ui.visualCompletions
+        assertFalse(ui.isStreaming())
+
+        val stop = WsTimelineEvent.StopReason(turnId = "turn-1", runId = "run-1", stopReason = "end_turn")
+        val usage = WsTimelineEvent.UsageStatistics(
+            turnId = "turn-1",
+            runId = "run-1",
+            promptTokens = 10L,
+            completionTokens = 5L,
+            totalTokens = 15L,
+            cachedInputTokens = 0L,
+            reasoningTokens = 0L,
+        )
+        coordinator.handleEvent(stop)
+        coordinator.handleEvent(usage)
+        advanceUntilIdle()
+
+        assertTrue(recorded.contains(stop to "conv-1"), "retired-turn stop reason reaches the runtime events; got $recorded")
+        assertTrue(recorded.contains(usage to "conv-1"), "retired-turn usage reaches the runtime events; got $recorded")
+        // The retired turn is not re-opened or re-settled.
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        assertEquals(visualCompletionsAtRetire, ui.visualCompletions)
+        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+    }
+
     @Test
     fun postSendReconcileSkipsWhenLiveIngestArrivesAfterSend() = runTest(UnconfinedTestDispatcher()) {
         ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(10L)

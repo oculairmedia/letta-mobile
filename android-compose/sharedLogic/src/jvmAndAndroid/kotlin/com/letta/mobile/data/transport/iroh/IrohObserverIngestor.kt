@@ -293,19 +293,31 @@ internal class IrohObserverIngestor(
                 ),
             )
         }
-        val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
-        if (terminal is ServerFrame.TurnDone) {
-            val publication = IrohTerminalPublication(
-                turn = localTurn,
-                status = IrohTerminalStatus(terminal.status),
-                source = IrohTerminalSource.Observer,
-            )
-            if (turnRegistry.claimTerminal(publication)) {
-                withContext(NonCancellable) {
-                    emitBoth(terminal)
-                    turnRegistry.retireClaimed(publication)
-                }
-            }
+        claimObserverTerminal(localTurn, projectedFrames)
+    }
+
+    /**
+     * The observer won the engine-owned terminal race (the controller completes
+     * on the idle loop status and its fanned-out stop_reason lands before the
+     * local engine's settle fires). Publish the frames that carry the turn's
+     * ending — stop reason / usage — ahead of the TurnDone, or the coordinator
+     * retires the turn with an empty stop reason and drops the engine's own
+     * late tail. Assistant/reasoning deltas stay engine-owned and are never
+     * re-emitted here.
+     */
+    private suspend fun claimObserverTerminal(localTurn: IrohActiveTurn, projectedFrames: List<ServerFrame>) {
+        val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone } as? ServerFrame.TurnDone ?: return
+        val publication = IrohTerminalPublication(
+            turn = localTurn,
+            status = IrohTerminalStatus(terminal.status),
+            source = IrohTerminalSource.Observer,
+        )
+        if (!turnRegistry.claimTerminal(publication)) return
+        val endingFrames = projectedFrames.filter { it is ServerFrame.StopReason || it is ServerFrame.UsageStatistics }
+        withContext(NonCancellable) {
+            endingFrames.forEach { emitBoth(it) }
+            emitBoth(terminal)
+            turnRegistry.retireClaimed(publication)
         }
     }
 
