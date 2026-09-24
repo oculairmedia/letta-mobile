@@ -74,11 +74,11 @@ internal class TestApp(
     private var running: Job? = null
     private var syncing: Job? = null
 
-    suspend fun open(conversationId: String): TestApp = apply {
+    suspend fun open(conversationId: String, agentId: String? = null): TestApp = apply {
         session = CanvasSession.getOrCreateForConversation(
             documents,
             conversationId,
-            CanvasConversationOptions(opLog = opLog, syncTransport = client),
+            CanvasConversationOptions(agentId = agentId, opLog = opLog, syncTransport = client),
         )
         syncing = session.startSync(scope)
     }
