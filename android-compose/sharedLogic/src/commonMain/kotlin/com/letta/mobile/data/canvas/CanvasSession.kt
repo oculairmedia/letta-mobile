@@ -185,11 +185,7 @@ class CanvasSession(
      */
     suspend fun applyRemote(op: CanvasOp, vouchedActor: String? = null): CanvasDocument? = mutex.withLock {
         val current = currentDoc()
-        // The host vouches for an agent whose op it checked against its own ACL before publishing;
-        // this app's copy of the ACL may predate that agent (a canvas the agent made on the host,
-        // or one opened here without it), and rejecting it would drop every agent edit unseen.
-        val vouched = vouchedActor != null && vouchedActor == op.actorId
-        if (current.acl != null && !vouched && !current.acl.canWrite(op.actorId)) {
+        if (!mayApplyRemote(current.acl, op, vouchedActor)) {
             com.letta.mobile.util.Telemetry.event(
                 "CanvasSession", "remote.rejected",
                 "canvasId" to canvasId.value, "opId" to op.opId, "actorId" to op.actorId,
@@ -203,6 +199,15 @@ class CanvasSession(
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         commitScene(newScene)
     }
+
+    /**
+     * Whether a remote [op] may land here: its actor may write under this app's copy of [acl], or
+     * the host vouches for it ([vouchedActor]). The host checks an agent against its own ACL before
+     * publishing; this app's copy may predate that agent (a canvas the agent made on the host, or
+     * one opened here without it), and rejecting it would drop every agent edit unseen.
+     */
+    private fun mayApplyRemote(acl: CanvasAcl?, op: CanvasOp, vouchedActor: String?): Boolean =
+        acl == null || vouchedActor == op.actorId || acl.canWrite(op.actorId)
 
     private fun updateLamport(op: CanvasOp) {
         if (op.lamport > lamportClock) {
