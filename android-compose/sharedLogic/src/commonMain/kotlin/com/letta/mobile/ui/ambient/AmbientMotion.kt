@@ -31,7 +31,23 @@ data class AmbientMotionSpec(
     val isTransient: Boolean get() = bloomEnvelope != settledEnvelope
 }
 
+/** Where the glow sits: it fades in from [top] and is strongest at [peak], as fractions of canvas height. */
+data class AmbientBand(val top: Float, val peak: Float)
+
 object AmbientMotion {
+    /**
+     * A desktop pane: the glow creeps up from the pane's bottom EDGE - light leaking in from
+     * below, not a band parked at mid-window - so it starts low and peaks at the edge itself.
+     */
+    val PANE_EDGE_BAND: AmbientBand = AmbientBand(top = 0.90f, peak = 0.995f)
+
+    /**
+     * A phone: the composer is opaque and docked flush to the screen's bottom edge, covering
+     * about its bottom tenth, so the edge band would draw entirely behind it. The band rises
+     * above the composer instead, into the messages.
+     */
+    val ABOVE_COMPOSER_BAND: AmbientBand = AmbientBand(top = 0.80f, peak = 0.90f)
+
     /** The legacy full breath cycle the speed multiplier is relative to. */
     const val BASE_PERIOD_MILLIS: Int = 6000
 

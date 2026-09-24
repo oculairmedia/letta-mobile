@@ -118,6 +118,26 @@ class DrawBoxControllerTest {
     }
 
     @Test
+    fun aDrawingChangedElsewhereKeepsThisBoardsCameraToolAndSelection() {
+        val controller = newController()
+        listOf("a", "b").forEach { controller.onIntent(Intent.AddElement(square(it))) }
+        controller.onIntent(Intent.SetMode(io.ak1.drawbox.domain.model.Mode.SELECT))
+        controller.panBy(androidx.compose.ui.geometry.Offset(-420f, 260f))
+        controller.zoomBy(2f, androidx.compose.ui.geometry.Offset.Zero)
+        controller.selectIds(setOf("a", "b"))
+        val camera = controller.state.value.viewport
+        val json = io.ak1.drawbox.domain.model.DrawingSerializer.serialize(
+            io.ak1.drawbox.domain.model.PayLoad(bgColor = Color.White, elements = listOf(square("a"), square("c"))),
+        )
+        controller.importExternal(json)
+        val state = controller.state.value
+        assertEquals(listOf("a", "c"), state.elements.map { it.id })
+        assertEquals(camera, state.viewport)
+        assertEquals(io.ak1.drawbox.domain.model.Mode.SELECT, state.mode)
+        assertEquals(setOf("a"), state.selectedIds)
+    }
+
+    @Test
     fun saveBitmapStillCapturesRightAfterAnIntent() {
         val controller = newController()
         var captured = 0
@@ -136,5 +156,30 @@ class DrawBoxControllerTest {
         controller.onIntent(Intent.MergeUndoSteps(2))
         controller.onIntent(Intent.Undo)
         assertEquals(listOf("a"), controller.state.value.elements.map { it.id })
+    }
+
+    @Test
+    fun anAdditiveTapTogglesAnElementInAndOutOfTheSelection() {
+        val controller = newController()
+        controller.onIntent(Intent.AddElement(square("a")))
+        controller.onIntent(
+            Intent.AddElement(
+                square("b").copy(points = listOf(androidx.compose.ui.geometry.Offset(50f, 50f), androidx.compose.ui.geometry.Offset(60f, 60f))),
+            ),
+        )
+        val a = square("a").points.first()
+        controller.selectIds(setOf("b"))
+        controller.onIntent(Intent.SelectAt(a + androidx.compose.ui.geometry.Offset(1f, 1f), 4f, additive = true))
+        assertTrue("a" in controller.state.value.selectedIds && "b" in controller.state.value.selectedIds)
+        controller.onIntent(Intent.SelectAt(a + androidx.compose.ui.geometry.Offset(1f, 1f), 4f, additive = true))
+        assertEquals(setOf("b"), controller.state.value.selectedIds)
+    }
+
+    @Test
+    fun aWheelNotchIsNotATrackpadStepButFractionsAndTwoAxesAre() {
+        assertTrue(!io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(0f, 1f)), "a wheel notch does not coast")
+        assertTrue(!io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(0f, -3f)))
+        assertTrue(io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(0f, 0.37f)))
+        assertTrue(io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(1f, 1f)), "two axes at once is a trackpad")
     }
 }

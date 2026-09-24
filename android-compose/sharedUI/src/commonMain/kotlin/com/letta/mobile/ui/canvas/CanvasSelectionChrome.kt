@@ -9,8 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -18,6 +16,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
 import io.ak1.drawbox.SelectionChromeStyle
+import io.ak1.drawbox.drawSelectionFrame
+import androidx.compose.ui.geometry.Rect
 import io.ak1.drawbox.domain.model.ResizeHandle
 
 /**
@@ -33,7 +33,19 @@ import io.ak1.drawbox.domain.model.ResizeHandle
  * in the corner: two selection systems on one board.
  */
 @Composable
-internal fun canvasSelectionStyle(): SelectionChromeStyle = SelectionChromeStyle(
+internal fun canvasSelectionStyle(): SelectionChromeStyle = if (LocalCanvasCompact.current) {
+    // A phone: handles a fingertip can find and grab (a 48dp target), and a rotation handle far
+    // enough out that reaching for it does not grab a corner.
+    SelectionChromeStyle(
+        padding = LettaDimens.Space.sm,
+        handleSize = TOUCH_HANDLE,
+        cornerRadius = 0.dp,
+        strokeWidth = LettaDimens.Stroke.hairline,
+        accent = MaterialTheme.colorScheme.primary,
+        hitRadius = TOUCH_HIT_RADIUS,
+        rotationOffset = TOUCH_ROTATION_OFFSET,
+    )
+} else SelectionChromeStyle(
     padding = LettaDimens.Space.xs,
     handleSize = LettaDimens.Space.sm,
     // Square, not rounded: DrawBox's chrome is a plain rectangle, and a rounded note outline beside
@@ -71,36 +83,29 @@ internal fun CanvasSelectionChrome(
     onResize: ((ResizeHandle, Offset) -> Unit)? = null,
     onResizeEnd: (() -> Unit)? = null,
 ) {
-    val handleFill = MaterialTheme.colorScheme.surface
+    // The card is drawn in the board's zoom, so every chrome size is divided by it: the outline,
+    // handles and grab areas stay one size on screen, as a shape's do.
     val safeScale = if (scale <= 0f) 1f else scale
-    val half = style.handleSize / 2
-    val boxWidth = contentWidth + style.chromeInset() * 2
-    val boxHeight = contentHeight + style.chromeInset() * 2
+    val half = style.handleSize / 2 / safeScale
+    val inset = style.chromeInset() / safeScale
+    val boxWidth = contentWidth + inset * 2
+    val boxHeight = contentHeight + inset * 2
+    val grab = style.hitRadius / safeScale
 
     Box(
         modifier = modifier
             .size(width = boxWidth, height = boxHeight)
             .semantics { contentDescription = "Selection chrome" }
             .drawBehind {
+                // The very chrome DrawBox draws round a selected shape; see drawSelectionFrame.
                 val halfPx = half.toPx()
-                val stroke = (style.strokeWidth.toPx() / safeScale).coerceAtLeast(MIN_STROKE_PX / safeScale)
-                val handlePx = style.handleSize.toPx()
-                drawRect(
-                    color = style.accent,
-                    topLeft = Offset(halfPx, halfPx),
-                    size = Size(size.width - halfPx * 2, size.height - halfPx * 2),
-                    style = Stroke(width = stroke),
+                drawSelectionFrame(
+                    box = Rect(halfPx, halfPx, size.width - halfPx, size.height - halfPx),
+                    handleRadius = halfPx,
+                    strokeWidth = (style.strokeWidth.toPx() / safeScale).coerceAtLeast(MIN_STROKE_PX / safeScale),
+                    cornerRadius = style.cornerRadius.toPx() / safeScale,
+                    accent = style.accent,
                 )
-                handleCentresPx(size, halfPx).forEach { centre ->
-                    val corner = Offset(centre.x - handlePx / 2f, centre.y - handlePx / 2f)
-                    drawRect(color = handleFill, topLeft = corner, size = Size(handlePx, handlePx))
-                    drawRect(
-                        color = style.accent,
-                        topLeft = corner,
-                        size = Size(handlePx, handlePx),
-                        style = Stroke(width = stroke),
-                    )
-                }
             },
     ) {
         if (onResize != null) {
@@ -118,8 +123,8 @@ internal fun CanvasSelectionChrome(
                 }
                 Box(
                     modifier = Modifier
-                        .offset(x = centreX - style.handleSize, y = centreY - style.handleSize)
-                        .size(style.handleSize * 2)
+                        .offset(x = centreX - grab, y = centreY - grab)
+                        .size(grab * 2)
                         .semantics { contentDescription = "Resize ${handle.name}" }
                         .pointerInput(handle, onResize, onResizeEnd) {
                             detectDragGestures(
@@ -152,19 +157,9 @@ private val HANDLE_GRID = listOf(
     ResizeHandle.BottomRight to (2 to 2),
 )
 
-private fun handleCentresPx(boxSize: Size, halfPx: Float): List<Offset> {
-    val left = halfPx
-    val top = halfPx
-    val right = boxSize.width - halfPx
-    val bottom = boxSize.height - halfPx
-    val midX = (left + right) / 2f
-    val midY = (top + bottom) / 2f
-    return listOf(
-        Offset(left, top), Offset(midX, top), Offset(right, top),
-        Offset(left, midY), Offset(right, midY),
-        Offset(left, bottom), Offset(midX, bottom), Offset(right, bottom),
-    )
-}
-
 /** Below this the outline stops being visible at all on a zoomed-out board. */
 private const val MIN_STROKE_PX = 1f
+
+private val TOUCH_HANDLE = 16.dp
+private val TOUCH_HIT_RADIUS = 24.dp
+private val TOUCH_ROTATION_OFFSET = 44.dp

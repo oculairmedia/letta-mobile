@@ -154,6 +154,12 @@ data class ElementDto(
      * round-trips as a single artifact.
      */
     val imageData: String? = null,
+    /** The image's content-addressed asset, when its bytes are kept out of the drawing. */
+    val imageRef: String? = null,
+    /** The media type recorded with [imageRef]. */
+    val imageMediaType: String? = null,
+    /** A small inline thumbnail (base64) to draw until the asset is resolved. */
+    val imagePreview: String? = null,
     /** Source image's intrinsic pixel width. Only set for Image elements. */
     val intrinsicWidth: Float? = null,
     /** Source image's intrinsic pixel height. Only set for Image elements. */
@@ -210,7 +216,12 @@ fun Element.toDto(): ElementDto = when (this) {
         rotation = rotation.takeIf { it != 0f },
         createdAt = createdAt.takeIf { it != 0L },
         modifiedAt = modifiedAt.takeIf { it != 0L },
-        imageData = Base64.encode(bytes),
+        // Inline while every reader still needs the bytes in the drawing; once assets are served,
+        // an image with a ref carries only the ref (see DrawingSerializer.inlineImageBytes).
+        imageData = if (assetRef == null || DrawingSerializer.inlineImageBytes) Base64.encode(bytes) else null,
+        imageRef = assetRef,
+        imageMediaType = mediaType,
+        imagePreview = preview?.let { Base64.encode(it) },
         intrinsicWidth = intrinsicSize.width,
         intrinsicHeight = intrinsicSize.height,
         opacity = opacity.takeIf { it != 1f },
@@ -287,6 +298,9 @@ fun ElementDto.toElement(): Element = when (type) {
     "Image" -> Element.Image(
         id = id,
         bytes = imageData?.let { Base64.decode(it) } ?: ByteArray(0),
+        assetRef = imageRef,
+        mediaType = imageMediaType,
+        preview = imagePreview?.let { runCatching { Base64.decode(it) }.getOrNull() },
         intrinsicSize = Size(
             intrinsicWidth ?: 0f,
             intrinsicHeight ?: 0f,
@@ -413,6 +427,12 @@ data class SerializableElement(
     val samples: List<String>? = null,
     val strokeEnabled: Boolean? = null,
     val imageData: String? = null,
+    /** The image's content-addressed asset, when its bytes are kept out of the drawing. */
+    val imageRef: String? = null,
+    /** The media type recorded with [imageRef]. */
+    val imageMediaType: String? = null,
+    /** A small inline thumbnail (base64) to draw until the asset is resolved. */
+    val imagePreview: String? = null,
     val intrinsicWidth: Float? = null,
     val intrinsicHeight: Float? = null,
     val opacity: Float? = null,
@@ -432,6 +452,14 @@ data class SerializableDrawing(
 )
 
 object DrawingSerializer {
+    /**
+     * Whether an image that has an asset ref still writes its bytes inline. Off (letta-mobile-w3nb2.3c):
+     * every app now resolves refs and fetches assets from the host, so a drawing carries an image's
+     * ref and preview only, never its bytes. An image without a ref (a host with no asset store)
+     * still writes them. Turn it back on only if apps that cannot read refs must share a board.
+     */
+    var inlineImageBytes: Boolean = false
+
     // Tolerate fields written by a newer schema instead of failing the whole import.
     private val json = Json {
         prettyPrint = true
@@ -464,6 +492,9 @@ object DrawingSerializer {
                     samples = element.samples,
                     strokeEnabled = element.strokeEnabled,
                     imageData = element.imageData,
+                    imageRef = element.imageRef,
+                    imageMediaType = element.imageMediaType,
+                    imagePreview = element.imagePreview,
                     intrinsicWidth = element.intrinsicWidth,
                     intrinsicHeight = element.intrinsicHeight,
                     opacity = element.opacity,
@@ -506,6 +537,9 @@ object DrawingSerializer {
                     samples = element.samples,
                     strokeEnabled = element.strokeEnabled,
                     imageData = element.imageData,
+                    imageRef = element.imageRef,
+                    imageMediaType = element.imageMediaType,
+                    imagePreview = element.imagePreview,
                     intrinsicWidth = element.intrinsicWidth,
                     intrinsicHeight = element.intrinsicHeight,
                     opacity = element.opacity,

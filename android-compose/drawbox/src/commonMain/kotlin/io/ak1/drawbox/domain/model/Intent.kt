@@ -249,7 +249,11 @@ sealed class Intent {
      * Pick the topmost element at [offset] and make it the sole selection. If no
      * element is hit, clears selection. Tolerance is in canvas pixels.
      */
-    data class SelectAt(val offset: Offset, val tolerance: Float = 8f) : Intent()
+    /**
+     * Select the topmost element under [offset]. [additive] toggles it in or out of the selection
+     * instead of replacing it (a phone's multi-selection); a miss clears the selection either way.
+     */
+    data class SelectAt(val offset: Offset, val tolerance: Float = 8f, val additive: Boolean = false) : Intent()
 
     /**
      * Make exactly the elements with these [ids] the selection (ids with no element are ignored).

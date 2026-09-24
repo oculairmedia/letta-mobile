@@ -396,14 +396,20 @@ internal class DesktopTouchPanVelocity(
 
     /**
      * The velocity to coast on: the dominant axis only, so a near-vertical
-     * swipe does not drift sideways on release because of pan jitter.
+     * swipe does not drift sideways on release because of pan jitter - unless
+     * the swipe was really diagonal ([DIAGONAL_PAN_RATIO]), as a canvas is
+     * thrown, when it keeps both. A list ignores the axis it does not scroll.
      */
-    fun dominant(): TouchScrollDelta =
-        if (abs(velocityX) > abs(velocityY)) {
+    fun dominant(): TouchScrollDelta {
+        val major = maxOf(abs(velocityX), abs(velocityY))
+        val minor = minOf(abs(velocityX), abs(velocityY))
+        if (major > 0f && minor / major >= DIAGONAL_PAN_RATIO) return TouchScrollDelta(dx = velocityX, dy = velocityY)
+        return if (abs(velocityX) > abs(velocityY)) {
             TouchScrollDelta(dx = velocityX, dy = 0f)
         } else {
             TouchScrollDelta(dx = 0f, dy = velocityY)
         }
+    }
 }
 
 /**
@@ -418,6 +424,9 @@ internal data class TouchPanSample(
 
 /** Beyond this a "swipe" is sensor noise, not a gesture worth coasting on. */
 internal const val MAX_PAN_VELOCITY_PX_PER_MS = 6f
+
+/** A swipe whose lesser axis is at least this share of the greater one is diagonal (~31 degrees off); real sideways jitter measures up to ~0.4. */
+internal const val DIAGONAL_PAN_RATIO = 0.6f
 
 /** Weight of the newest sample in the velocity average; the rest is history. */
 internal const val PAN_VELOCITY_SMOOTHING = 0.35f

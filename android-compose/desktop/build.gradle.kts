@@ -102,6 +102,14 @@ fun computeDesktopPackageVersion() = providers.provider {
         },
     )
 
+// Compile against the versions the app runs with. :drawbox (and Nucleus) bring Compose 1.11.1 and
+// Skia 0.150 onto the runtime classpath only, while this module's own Compose is 1.10, so it
+// compiled against Skia 0.144 and crashed at run time: Skia's Matrix33 became a value class in
+// 0.150, and RuntimeShaderBuilder.makeShader(Matrix33) no longer exists (letta-mobile-o40hp).
+mapOf("compileClasspath" to "runtimeClasspath", "testCompileClasspath" to "testRuntimeClasspath").forEach { (compile, runtime) ->
+    configurations.named(compile) { shouldResolveConsistentlyWith(configurations.getByName(runtime)) }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)

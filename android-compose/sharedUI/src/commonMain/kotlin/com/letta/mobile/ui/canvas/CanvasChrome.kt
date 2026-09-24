@@ -335,8 +335,44 @@ internal val BoardBackgrounds: List<NamedColor> = listOf(
     NamedColor(Color(0xFF0B0F17), "midnight"),
 )
 
+/** True inside [CanvasHeaderBar]: the pills there are parts of the one bar, not bars of their own. */
+internal val LocalInHeaderBar = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/**
+ * The board's header: one bar across the top holding the title, the sync status and the actions,
+ * rather than three islands. The pills composed inside it drop their own surfaces.
+ */
+@Composable
+internal fun CanvasHeaderBar(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        shadowElevation = LettaDimens.Space.xs,
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalInHeaderBar provides true) {
+            Row(
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                content = content,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ChromePill(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    if (LocalInHeaderBar.current) {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+            content = { content() },
+        )
+        return
+    }
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(LettaDimens.Radius.md),

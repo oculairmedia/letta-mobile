@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import io.ak1.drawbox.presentation.PanFling
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -216,7 +217,10 @@ fun DrawBox(
      * showing, so the two do not double-paint.
      */
     hiddenTextElementIds: Set<String> = emptySet(),
+    /** Taps in the select tool toggle elements in and out of the selection instead of replacing it. */
+    additiveTaps: Boolean = false,
 ) {
+    val additiveTapsNow by rememberUpdatedState(additiveTaps)
     // Two-layer split:
     //   - finalizedLayer: cached display list of "static" elements (everything not
     //     currently being mutated). Re-recorded only when the static set OR the
@@ -311,8 +315,8 @@ fun DrawBox(
         state.bgPattern?.toTiledBrush(density, layoutDirection)
     }
 
-    val handleHitPx = with(density) { 16.dp.toPx() }
-    val rotationOffsetPx = with(density) { 28.dp.toPx() }
+    val handleHitPx = with(density) { selectionStyle.hitRadius.toPx() }
+    val rotationOffsetPx = with(density) { selectionStyle.rotationOffset.toPx() }
     val pickTolerancePx = with(density) { 12.dp.toPx() }
     // Screen-space metrics for the selection chrome. Kept in px here (resolved
     // once per density change) and scaled by inverseScale at draw time so the
@@ -335,6 +339,11 @@ fun DrawBox(
     // What gestures act on: the host's live state when it provides one, else the composed one.
     fun stateNow(): State = liveStateRef.value?.invoke() ?: composedState.value
     val latestOnIntent by rememberUpdatedState(onIntent)
+    // A two-finger pan coasts on after the fingers lift, like the one-finger pan a host adds.
+    val pinchFling = remember(scope) { PanFling(scope) { delta -> latestOnIntent(Intent.PanBy(delta)) } }
+    // A trackpad's two-finger scroll coasts on after the fingers stop, as it would in a browser; a
+    // mouse wheel's whole notches never do. Windows sends a trackpad no momentum of its own.
+    val wheelFling = remember(scope) { PanFling(scope) { delta -> latestOnIntent(Intent.PanBy(delta)) } }
     // Screen position of the latest press; see the drag handler. A plain holder, not state:
     // nothing draws from it, so writing it must not recompose.
     val press = remember { PressOrigin() }
@@ -496,6 +505,11 @@ fun DrawBox(
                     var multi = false
                     while (true) {
                         val event = awaitPointerEvent()
+                        // Any new touch catches a coasting board.
+                        if (event.changes.any { it.pressed && !it.previousPressed }) {
+                            pinchFling.stop()
+                            wheelFling.stop()
+                        }
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.size >= 2) {
                             val p1 = pressed[0].position
@@ -506,6 +520,7 @@ fun DrawBox(
                                 multi = true
                                 prevDistance = d
                                 prevCentroid = centroid
+                                pinchFling.begin(pressed[0].uptimeMillis, centroid)
                                 // Cancel any in-progress marquee on the other handler.
                                 if (stateNow().marqueeRect != null) {
                                     latestOnIntent(Intent.SetMarqueeRect(null))
@@ -515,12 +530,15 @@ fun DrawBox(
                                     latestOnIntent(Intent.ZoomBy(d / prevDistance, centroid))
                                 }
                                 latestOnIntent(Intent.PanBy(centroid - prevCentroid))
+                                pinchFling.track(pressed[0].uptimeMillis, centroid)
                                 prevDistance = d
                                 prevCentroid = centroid
                             }
                             event.changes.forEach { it.consume() }
                         } else if (multi) {
                             multi = false
+                            // The pinch ended (fingers rarely lift together): throw at its last speed.
+                            pinchFling.release()
                             event.changes.forEach { it.consume() }
                         }
                     }
@@ -531,12 +549,40 @@ fun DrawBox(
             // axes the device supplies. Trackpad two-finger scroll sends both
             // delta.x and delta.y; classic mouse wheels send only delta.y.
             .pointerInput(Unit) {
+                // The scroll burst in progress, as a pan (screen px) for the coast: where it has got
+                // to, whether it has been a trackpad's (fractional steps), and the coast waiting to
+                // start once the steps stop.
+                var burstPan = Offset.Zero
+                var burstIsTrackpad = false
+                var coastStart: kotlinx.coroutines.Job? = null
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.type != PointerEventType.Scroll) continue
                         val change = event.changes.firstOrNull() ?: continue
                         val delta = change.scrollDelta
+                        val plainPan = !event.keyboardModifiers.isCtrlPressed && !event.keyboardModifiers.isShiftPressed
+                        coastStart?.cancel()
+                        if (plainPan) {
+                            val step = Offset(-delta.x * 50f, -delta.y * 50f)
+                            if (coastStart == null) {
+                                wheelFling.begin(change.uptimeMillis, Offset.Zero)
+                                burstPan = Offset.Zero
+                                burstIsTrackpad = false
+                            }
+                            burstPan += step
+                            burstIsTrackpad = burstIsTrackpad || isTrackpadStep(delta)
+                            wheelFling.track(change.uptimeMillis, burstPan)
+                            val trackpad = burstIsTrackpad
+                            coastStart = scope.launch {
+                                kotlinx.coroutines.delay(WHEEL_COAST_IDLE_MS)
+                                coastStart = null
+                                if (trackpad) wheelFling.release() else wheelFling.stop()
+                            }
+                        } else {
+                            coastStart = null
+                            wheelFling.stop()
+                        }
                         when {
                             event.keyboardModifiers.isCtrlPressed -> {
                                 if (delta.y != 0f) {
@@ -546,8 +592,11 @@ fun DrawBox(
                             }
                             event.keyboardModifiers.isShiftPressed -> {
                                 // Map vertical wheel to horizontal pan for users
-                                // whose mouse has no horizontal axis.
-                                latestOnIntent(Intent.PanBy(Offset(-delta.y * 50f, 0f)))
+                                // whose mouse has no horizontal axis. A shift-wheel can
+                                // already arrive on x (the desktop touch shim sends its
+                                // horizontal pans that way), and then it must be read there.
+                                val sideways = if (delta.x != 0f) delta.x else delta.y
+                                latestOnIntent(Intent.PanBy(Offset(-sideways * 50f, 0f)))
                             }
                             else -> {
                                 latestOnIntent(Intent.PanBy(Offset(-delta.x * 50f, -delta.y * 50f)))
@@ -576,7 +625,7 @@ fun DrawBox(
                         val world = s.viewport.screenToWorld(screenPos)
                         val tol = pickTolerancePx / s.viewport.scale
                         when (s.effectiveMode) {
-                            Mode.SELECT -> latestOnIntent(Intent.SelectAt(world, tol))
+                            Mode.SELECT -> latestOnIntent(Intent.SelectAt(world, tol, additive = additiveTapsNow))
                             Mode.PEN -> {
                                 latestOnIntent(Intent.InsertNewPath(world))
                                 latestOnIntent(Intent.UpdateLatestPath(world))
@@ -1275,6 +1324,10 @@ data class SelectionChromeStyle(
     val cornerRadius: Dp = 8.dp,
     val strokeWidth: Dp = 1.5.dp,
     val accent: Color = Color(0xFF2196F3),
+    /** How near a handle a press still grabs it; a finger needs more than a mouse. */
+    val hitRadius: Dp = 16.dp,
+    /** How far above the box the rotation handle floats. */
+    val rotationOffset: Dp = 28.dp,
 ) {
     companion object {
         val Default = SelectionChromeStyle()
@@ -1374,17 +1427,40 @@ private fun DrawScope.drawSelectionForElement(
         right = bounds.right + pad,
         bottom = bounds.bottom + pad,
     )
-    val strokeWorld = metrics.strokeWidthPx * inverseScale
-    val cornerWorld = metrics.cornerRadiusPx * inverseScale
-    val handleRadius = metrics.handleSizePx * 0.5f * inverseScale
-    val edgeRadius = handleRadius * 0.8f
-    val rotHandle = rotationHandleLocal(box, rotationOffsetWorld)
+    drawSelectionFrame(
+        box = box,
+        handleRadius = metrics.handleSizePx * 0.5f * inverseScale,
+        strokeWidth = metrics.strokeWidthPx * inverseScale,
+        cornerRadius = metrics.cornerRadiusPx * inverseScale,
+        accent = metrics.accent,
+        rotationHandle = rotationHandleLocal(box, rotationOffsetWorld),
+    )
+}
 
+/**
+ * The selection chrome every selected thing on a board wears, in this scope's units: the [box]
+ * outline, a hollow rounded-square handle on each corner and a slightly smaller one on each edge
+ * midpoint, and, when there is one, the [rotationHandle] joined to the top edge. The outline is
+ * cut away under every handle so it never shows through one.
+ *
+ * Public so a host drawing chrome for its own elements (a board's note cards, say) draws the very
+ * same thing rather than a look-alike: pass sizes already divided by the zoom to keep them one
+ * size on screen, as DrawBox does.
+ */
+fun DrawScope.drawSelectionFrame(
+    box: Rect,
+    handleRadius: Float,
+    strokeWidth: Float,
+    cornerRadius: Float,
+    accent: Color,
+    rotationHandle: Offset? = null,
+) {
+    val edgeRadius = handleRadius * EDGE_HANDLE_RATIO
     // Every handle as (center, radius): full-size rounded squares on the corners
     // (both-axis resize), slightly smaller on the edge midpoints (single-axis),
     // plus the rotation handle floated above the box.
     val handles = buildList {
-        add(rotHandle to handleRadius)
+        rotationHandle?.let { add(it to handleRadius) }
         resizeHandlesLocal(box).forEach { (handle, p) ->
             add(p to if (handle.isCorner()) handleRadius else edgeRadius)
         }
@@ -1396,7 +1472,7 @@ private fun DrawScope.drawSelectionForElement(
         addRect(
             Rect(
                 left = box.left - handleRadius,
-                top = rotHandle.y - handleRadius,
+                top = (rotationHandle?.y ?: box.top) - handleRadius,
                 right = box.right + handleRadius,
                 bottom = box.bottom + handleRadius,
             ),
@@ -1412,25 +1488,24 @@ private fun DrawScope.drawSelectionForElement(
         fillType = PathFillType.EvenOdd
     }
     clipPath(mask) {
-        // Rounded bounding box.
         drawRoundRect(
-            color = metrics.accent,
+            color = accent,
             topLeft = box.topLeft,
             size = Size(box.width, box.height),
-            cornerRadius = CornerRadius(cornerWorld, cornerWorld),
-            style = Stroke(width = strokeWorld),
+            cornerRadius = CornerRadius(cornerRadius, cornerRadius),
+            style = Stroke(width = strokeWidth),
         )
         // Rotation connector: short line from the box up to the rotation handle.
-        drawLine(
-            color = metrics.accent,
-            start = Offset(box.center.x, box.top),
-            end = rotHandle,
-            strokeWidth = strokeWorld,
-        )
+        rotationHandle?.let { handle ->
+            drawLine(color = accent, start = Offset(box.center.x, box.top), end = handle, strokeWidth = strokeWidth)
+        }
     }
     // Handles drawn on top, unclipped, so their outlines stay whole.
-    handles.forEach { (c, r) -> drawSquareHandle(c, r, strokeWorld, metrics.accent) }
+    handles.forEach { (c, r) -> drawSquareHandle(c, r, strokeWidth, accent) }
 }
+
+/** An edge-midpoint handle's size against a corner's: it resizes one axis, so it reads as lesser. */
+const val EDGE_HANDLE_RATIO: Float = 0.8f
 
 /**
  * A single handle: a hollow rounded-corner square outlined in the accent color.
@@ -2296,3 +2371,15 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
 private class PressOrigin {
     var screen: Offset? = null
 }
+
+/**
+ * Whether a scroll step came from a trackpad (or a touch pan the desktop turned into scrolling)
+ * rather than a mouse wheel: a wheel moves in whole notches on one axis, a trackpad in fractions.
+ */
+internal fun isTrackpadStep(delta: Offset): Boolean {
+    fun fractional(v: Float) = v != 0f && kotlin.math.abs(v - kotlin.math.round(v)) > 1e-3f
+    return fractional(delta.x) || fractional(delta.y) || (delta.x != 0f && delta.y != 0f)
+}
+
+/** How long a trackpad's steps must pause before the board coasts on: the fingers have lifted. */
+private const val WHEEL_COAST_IDLE_MS = 60L

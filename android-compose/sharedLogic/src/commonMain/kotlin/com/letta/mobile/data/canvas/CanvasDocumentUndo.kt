@@ -90,7 +90,8 @@ object CanvasDocumentUndo {
         previous.json != change.documentJson ||
             (change.frame != null && change.frame != previous.frame) ||
             (change.color != null && change.color != previous.color) ||
-            (change.style != null && change.style != previous.style)
+            (change.style != null && change.style != previous.style) ||
+            (change.title != null && change.title.ifBlank { null } != previous.title)
 
     private fun removeFor(change: CanvasOp.SetDocumentOp): CanvasOp.RemoveDocumentOp =
         CanvasOp.RemoveDocumentOp(
@@ -158,5 +159,7 @@ object CanvasDocumentUndo {
         frame = document.frame,
         color = document.color,
         style = document.style,
+        // Null would keep the title the change gave it; empty clears it back to none.
+        title = document.title.orEmpty(),
     )
 }
