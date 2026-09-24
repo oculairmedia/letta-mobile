@@ -189,7 +189,19 @@ data class ElementDto(
     val textColor: String? = null,
 )
 
-fun Element.toDto(): ElementDto = when (this) {
+/**
+ * The image's bytes as written into the drawing, or null. Inline while every reader still needs the
+ * bytes in the drawing; once assets are served, an image with a ref carries only the ref (see
+ * DrawingSerializer.inlineImageBytes). Bytes that are only its preview, shown until the full asset
+ * arrives, are never written as the image: they would stand in for it wherever the drawing went.
+ */
+private fun Element.Image.inlineImageData(inlineImageBytes: Boolean): String? = when {
+    assetRef == null -> Base64.encode(bytes)
+    !inlineImageBytes || bytes.isEmpty() || isShowingPreview -> null
+    else -> Base64.encode(bytes)
+}
+
+fun Element.toDto(inlineImageBytes: Boolean = DrawingSerializer.inlineImageBytes): ElementDto = when (this) {
     is Element.Path -> ElementDto(
         id = id,
         type = "Path",
@@ -216,9 +228,7 @@ fun Element.toDto(): ElementDto = when (this) {
         rotation = rotation.takeIf { it != 0f },
         createdAt = createdAt.takeIf { it != 0L },
         modifiedAt = modifiedAt.takeIf { it != 0L },
-        // Inline while every reader still needs the bytes in the drawing; once assets are served,
-        // an image with a ref carries only the ref (see DrawingSerializer.inlineImageBytes).
-        imageData = if (assetRef == null || DrawingSerializer.inlineImageBytes) Base64.encode(bytes) else null,
+        imageData = inlineImageData(inlineImageBytes),
         imageRef = assetRef,
         imageMediaType = mediaType,
         imagePreview = preview?.let { Base64.encode(it) },
@@ -395,9 +405,9 @@ data class DrawingExportDto(
     val elements: List<ElementDto>,
 )
 
-fun PayLoad.toDto(): DrawingExportDto = DrawingExportDto(
+fun PayLoad.toDto(inlineImageBytes: Boolean = DrawingSerializer.inlineImageBytes): DrawingExportDto = DrawingExportDto(
     bgColor = bgColor.toHexString(),
-    elements = elements.map { it.toDto() },
+    elements = elements.map { it.toDto(inlineImageBytes) },
 )
 
 fun DrawingExportDto.toPayLoad(): PayLoad = PayLoad(
@@ -466,8 +476,13 @@ object DrawingSerializer {
         ignoreUnknownKeys = true
     }
 
-    fun serialize(payLoad: PayLoad): String {
-        val dto = payLoad.toDto()
+    /**
+     * [payLoad] as drawing JSON. [inlineImageBytes] per call: a drawing kept beside an asset store
+     * leaves an image's bytes to the store, but one that leaves the app on its own (an export)
+     * must carry them, as nothing it reaches can resolve a ref.
+     */
+    fun serialize(payLoad: PayLoad, inlineImageBytes: Boolean = this.inlineImageBytes): String {
+        val dto = payLoad.toDto(inlineImageBytes)
         val serializableDrawing = SerializableDrawing(
             bgColor = dto.bgColor,
             elements = dto.elements.map { element ->

@@ -568,11 +568,30 @@ internal object CanvasWorkspaceSupport {
         }
     }
 
+    /**
+     * Whether a save is a step to undo. An image given its asset ref, or its full bytes in place of
+     * its preview, is the board keeping its books, not something anyone did: undoing it would only
+     * strip the ref (to be adopted again) or put the preview back.
+     */
     fun shouldRecordDrawingStep(
         elementsBefore: List<Element>?,
         elementsNow: List<Element>,
         isApplyingHistory: Boolean,
-    ): Boolean = !isApplyingHistory && elementsBefore != null && elementsBefore != elementsNow
+    ): Boolean = !isApplyingHistory && elementsBefore != null && !sameDrawing(elementsBefore, elementsNow)
+
+    /**
+     * Whether [a] and [b] are the same drawing as far as anyone did anything: equal, or differing
+     * only in images' asset bookkeeping. What decides an undo step decides which undo applies too.
+     */
+    fun sameDrawing(a: List<Element>, b: List<Element>): Boolean =
+        a == b || a.map(::withoutAssetBookkeeping) == b.map(::withoutAssetBookkeeping)
+
+    private fun withoutAssetBookkeeping(element: Element): Element =
+        if (element is Element.Image) {
+            element.copy(bytes = ByteArray(0), assetRef = null, mediaType = null, preview = null)
+        } else {
+            element
+        }
 
     fun deleteFocused(params: DeleteFocusedParams): Boolean {
         if (params.selectedNoteIds.isNotEmpty() && params.hasSession) {
