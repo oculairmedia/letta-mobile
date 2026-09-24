@@ -144,85 +144,99 @@ class CanvasRelayHost(
 
         private suspend fun putAsset(message: CanvasRelayMessage.AssetPut) {
             val ref = message.asset.ref
-            val rejected = when {
-                assets == null -> "this host keeps no assets"
-                !state.withLock { message.topic in joined } -> "not joined"
-                !AssetRefs.isValid(ref) -> "not an asset ref"
-                message.asset.byteSize !in 0..maxAssetBytes -> "larger than this host keeps"
-                message.count !in 1..maxChunks() || message.index !in 0 until message.count -> "not a chunk of it"
-                else -> null
-            }
-            if (rejected != null) return deliver(CanvasRelayMessage.AssetRejected(message.topic, ref, rejected))
-            val store = assets ?: return
-            if (store.has(ref)) {
-                // Already here: said once, at the first chunk; the rest of the upload is ignored.
-                state.withLock { uploads.remove(ref) }
-                if (message.index == 0) deliver(CanvasRelayMessage.AssetStored(message.topic, ref))
-                return
-            }
+            val store = assets ?: return deliver(CanvasRelayMessage.AssetRejected(message.topic, ref, "this host keeps no assets"))
+            refusalOf(message)?.let { return deliver(CanvasRelayMessage.AssetRejected(message.topic, ref, it)) }
+            if (store.has(ref)) return alreadyHeld(message)
             val chunk = runCatching { kotlin.io.encoding.Base64.decode(message.data) }.getOrNull()
                 ?: return deliver(CanvasRelayMessage.AssetRejected(message.topic, ref, "chunk is not base64"))
             registry.withLock { arriving.getOrPut(ref) { this } }
-            val outcome = state.withLock {
-                // A few at a time per app: each is held in memory until whole.
-                if (ref !in uploads && uploads.size >= MAX_UPLOADS_PER_APP) {
-                    Upload.Outcome.Invalid("too many assets arriving at once")
-                } else {
-                    uploads.getOrPut(ref) { Upload(message.asset, message.count) }.add(message.index, chunk, maxAssetBytes)
-                }
-            }
-            when (outcome) {
+            when (val outcome = collect(message, chunk)) {
                 is Upload.Outcome.Partial -> Unit
-                is Upload.Outcome.Invalid -> {
-                    state.withLock { uploads.remove(ref) }
-                    deliver(CanvasRelayMessage.AssetRejected(message.topic, ref, outcome.reason))
-                    arrived(ref, null, null)
-                }
-                is Upload.Outcome.Complete -> {
-                    state.withLock { uploads.remove(ref) }
-                    // Kept only if the bytes really are the asset they claim: a store is content
-                    // addressed, and an app must not get another asset served under this ref.
-                    val stored = runCatching { store.put(message.asset.mediaType, outcome.bytes) }.getOrNull()
-                    if (stored?.ref != ref) {
-                        deliver(CanvasRelayMessage.AssetRejected(message.topic, ref, "bytes are not that asset"))
-                        arrived(ref, null, null)
-                    } else {
-                        deliver(CanvasRelayMessage.AssetStored(message.topic, ref))
-                        arrived(ref, stored, outcome.bytes)
-                    }
-                }
+                is Upload.Outcome.Invalid -> abandon(message, outcome.reason)
+                is Upload.Outcome.Complete -> keep(store, message, outcome.bytes)
+            }
+        }
+
+        /** Why this host will not take [message] as a chunk of its asset, or null when it will. */
+        private suspend fun refusalOf(message: CanvasRelayMessage.AssetPut): String? = when {
+            !isJoined(message.topic) -> "not joined"
+            !AssetRefs.isValid(message.asset.ref) -> "not an asset ref"
+            message.asset.byteSize !in 0..maxAssetBytes -> "larger than this host keeps"
+            !isChunkOf(message) -> "not a chunk of it"
+            else -> null
+        }
+
+        private fun isChunkOf(message: CanvasRelayMessage.AssetPut): Boolean =
+            message.count in 1..maxChunks() && message.index in 0 until message.count
+
+        private suspend fun isJoined(topic: String): Boolean = state.withLock { topic in joined }
+
+        /** Already here: said once, at the first chunk; the rest of the upload is ignored. */
+        private suspend fun alreadyHeld(message: CanvasRelayMessage.AssetPut) {
+            state.withLock { uploads.remove(message.asset.ref) }
+            if (message.index == 0) deliver(CanvasRelayMessage.AssetStored(message.topic, message.asset.ref))
+        }
+
+        /** [chunk] added to its upload; a few at a time per app, since each is held in memory until whole. */
+        private suspend fun collect(message: CanvasRelayMessage.AssetPut, chunk: ByteArray): Upload.Outcome = state.withLock {
+            val ref = message.asset.ref
+            if (ref !in uploads && uploads.size >= MAX_UPLOADS_PER_APP) {
+                Upload.Outcome.Invalid("too many assets arriving at once")
+            } else {
+                uploads.getOrPut(ref) { Upload(message.asset, message.count) }.add(message.index, chunk, maxAssetBytes)
+            }
+        }
+
+        private suspend fun abandon(message: CanvasRelayMessage.AssetPut, reason: String) {
+            state.withLock { uploads.remove(message.asset.ref) }
+            deliver(CanvasRelayMessage.AssetRejected(message.topic, message.asset.ref, reason))
+            arrived(message.asset.ref, null, null)
+        }
+
+        /**
+         * The whole upload, kept only if the bytes really are the asset they claim: a store is content
+         * addressed, and an app must not get another asset served under this ref.
+         */
+        private suspend fun keep(store: AssetStore, message: CanvasRelayMessage.AssetPut, bytes: ByteArray) {
+            val ref = message.asset.ref
+            state.withLock { uploads.remove(ref) }
+            val stored = runCatching { store.put(message.asset.mediaType, bytes) }.getOrNull()
+            if (stored?.ref != ref) {
+                deliver(CanvasRelayMessage.AssetRejected(message.topic, ref, "bytes are not that asset"))
+                arrived(ref, null, null)
+            } else {
+                deliver(CanvasRelayMessage.AssetStored(message.topic, ref))
+                arrived(ref, stored, bytes)
             }
         }
 
         private suspend fun getAsset(message: CanvasRelayMessage.AssetGet) {
             val store = assets
-            if (store == null || !AssetRefs.isValid(message.ref) || !state.withLock { message.topic in joined }) {
-                return deliver(CanvasRelayMessage.AssetMissing(message.topic, message.ref))
-            }
+            if (store == null || !canServe(message)) return deliver(CanvasRelayMessage.AssetMissing(message.topic, message.ref))
             val bytes = store.get(message.ref)
             if (bytes != null) {
                 val asset = AssetRef(message.ref, store.mediaType(message.ref) ?: DEFAULT_MEDIA_TYPE, bytes.size.toLong())
                 return sendAsset(message.topic, asset, bytes)
             }
-            val parked = registry.withLock {
-                if (message.ref in arriving) {
-                    waiting.getOrPut(message.ref) { mutableListOf() } += this to message.topic
-                    true
-                } else {
-                    false
-                }
+            if (!parkUntilArrived(message)) deliver(CanvasRelayMessage.AssetMissing(message.topic, message.ref))
+        }
+
+        private suspend fun canServe(message: CanvasRelayMessage.AssetGet): Boolean =
+            AssetRefs.isValid(message.ref) && isJoined(message.topic)
+
+        /** Waits for an asset some app is still sending; false when none is. */
+        private suspend fun parkUntilArrived(message: CanvasRelayMessage.AssetGet): Boolean = registry.withLock {
+            if (message.ref in arriving) {
+                waiting.getOrPut(message.ref) { mutableListOf() } += this to message.topic
+                true
+            } else {
+                false
             }
-            if (!parked) deliver(CanvasRelayMessage.AssetMissing(message.topic, message.ref))
         }
 
         /** [bytes] to this app in chunks, each well inside a frame. */
         internal suspend fun sendAsset(topic: String, asset: AssetRef, bytes: ByteArray) {
-            val count = ((bytes.size + ASSET_CHUNK_BYTES - 1) / ASSET_CHUNK_BYTES).coerceAtLeast(1)
-            for (index in 0 until count) {
-                val from = index * ASSET_CHUNK_BYTES
-                val to = minOf(bytes.size, from + ASSET_CHUNK_BYTES)
-                deliver(CanvasRelayMessage.AssetData(topic, asset, index, count, kotlin.io.encoding.Base64.encode(bytes, from, to)))
-            }
+            forEachAssetChunk(bytes) { index, count, data -> deliver(CanvasRelayMessage.AssetData(topic, asset, index, count, data)) }
         }
 
         private suspend fun relayPresence(message: CanvasRelayMessage.Presence) {
@@ -327,14 +341,24 @@ class CanvasRelayHost(
 
         fun add(index: Int, chunk: ByteArray, limit: Long): Outcome {
             if (index >= count) return Outcome.Invalid("not a chunk of it")
-            if (chunks[index] == null) {
-                chunks[index] = chunk
-                received++
-                size += chunk.size
+            record(index, chunk)
+            return when {
+                size > asset.byteSize || size > limit -> Outcome.Invalid("larger than it said")
+                received < count -> Outcome.Partial
+                size != asset.byteSize -> Outcome.Invalid("not the size it said")
+                else -> assemble()
             }
-            if (size > asset.byteSize || size > limit) return Outcome.Invalid("larger than it said")
-            if (received < count) return Outcome.Partial
-            if (size != asset.byteSize) return Outcome.Invalid("not the size it said")
+        }
+
+        /** A chunk seen again (an app resending) is counted once. */
+        private fun record(index: Int, chunk: ByteArray) {
+            if (chunks[index] != null) return
+            chunks[index] = chunk
+            received++
+            size += chunk.size
+        }
+
+        private fun assemble(): Outcome {
             val whole = ByteArray(size.toInt())
             var at = 0
             for (part in chunks) {
@@ -357,5 +381,19 @@ class CanvasRelayHost(
 
         private const val DEFAULT_MEDIA_TYPE = "application/octet-stream"
         private const val MAX_UPLOADS_PER_APP = 4
+    }
+}
+
+/**
+ * [bytes] as the chunks an asset travels in, host to app or app to host: [action] gets each chunk's
+ * index, the count and its base64 data, [CanvasRelayHost.ASSET_CHUNK_BYTES] raw bytes at most, so
+ * every chunk sits well inside a relay frame. An empty asset is one empty chunk.
+ */
+internal inline fun forEachAssetChunk(bytes: ByteArray, action: (index: Int, count: Int, data: String) -> Unit) {
+    val size = CanvasRelayHost.ASSET_CHUNK_BYTES
+    val count = ((bytes.size + size - 1) / size).coerceAtLeast(1)
+    for (index in 0 until count) {
+        val from = index * size
+        action(index, count, kotlin.io.encoding.Base64.encode(bytes, from, minOf(bytes.size, from + size)))
     }
 }

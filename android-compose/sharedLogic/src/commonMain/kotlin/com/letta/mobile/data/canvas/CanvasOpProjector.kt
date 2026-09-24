@@ -461,33 +461,45 @@ object CanvasOpProjector {
     ): String {
         val parsed = parseScene(sceneJson)
         val entries = documentEntries(parsed).toMutableList()
-        val index = entries.indexOfFirst { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull() == input.documentId }
+        val index = entries.indexOfFirst { documentIdOf(it) == input.documentId }
         if (index >= 0 && !wins(input.provenance, documentProvenance(entries[index]))) return sceneJson
         val existing = entries.getOrNull(index)?.takeIf { !isRemovedDocument(it) }
-        val keptFrame = input.frame ?: existing?.let(::documentFrame)
-        val keptColor = input.color ?: existing?.let(::documentColor)
-        val keptStyle = input.style ?: existing?.let(::documentStyle)
-        // An empty title clears it; null keeps what the document had.
-        val keptTitle = (input.title ?: existing?.let(::documentTitle))?.takeIf { it.isNotBlank() }
-        val entry = buildJsonObject {
-            put("id", JsonPrimitive(input.documentId))
-            if (input.json != null) put(DOC_JSON, JsonPrimitive(input.json)) else put(DOC_REMOVED, JsonPrimitive(true))
-            if (input.json != null && keptFrame != null) put(DOC_FRAME, frameJson(keptFrame))
-            if (input.json != null && keptColor != null) put(DOC_COLOR, JsonPrimitive(keptColor))
-            if (input.json != null && keptStyle != null) put(DOC_STYLE, styleJson(keptStyle))
-            if (input.json != null && keptTitle != null) put(DOC_TITLE, JsonPrimitive(keptTitle))
-            put(LAMPORT, JsonPrimitive(input.provenance.lamport))
-            put(ACTOR, JsonPrimitive(input.provenance.actorId))
-            put(OP_ID, JsonPrimitive(input.provenance.opId))
-        }
+        val entry = documentEntry(input, existing)
         if (index >= 0) entries[index] = entry else entries.add(entry)
-        entries.sortBy { runCatching { it["id"]?.jsonPrimitive?.content }.getOrNull().orEmpty() }
+        entries.sortBy { documentIdOf(it).orEmpty() }
         return canonicalScene(
             buildMap {
                 parsed.forEach { (key, value) -> if (key != DOCUMENTS) put(key, value) }
                 put(DOCUMENTS, JsonArray(entries))
             },
         )
+    }
+
+    private fun documentIdOf(entry: JsonObject): String? = runCatching { entry["id"]?.jsonPrimitive?.content }.getOrNull()
+
+    /**
+     * The entry [input] leaves for its document: its text (or a removal), what it sets or [existing]
+     * already had, and its provenance.
+     */
+    private fun documentEntry(input: DocumentWriteInput, existing: JsonObject?): JsonObject = buildJsonObject {
+        put("id", JsonPrimitive(input.documentId))
+        if (input.json == null) {
+            put(DOC_REMOVED, JsonPrimitive(true))
+        } else {
+            put(DOC_JSON, JsonPrimitive(input.json))
+            keptFields(input, existing).forEach { (key, value) -> put(key, value) }
+        }
+        put(LAMPORT, JsonPrimitive(input.provenance.lamport))
+        put(ACTOR, JsonPrimitive(input.provenance.actorId))
+        put(OP_ID, JsonPrimitive(input.provenance.opId))
+    }
+
+    /** A write without a frame, colour, style or title keeps [existing]'s; an empty title clears it. */
+    private fun keptFields(input: DocumentWriteInput, existing: JsonObject?): Map<String, JsonElement> = buildMap {
+        (input.frame ?: existing?.let(::documentFrame))?.let { put(DOC_FRAME, frameJson(it)) }
+        (input.color ?: existing?.let(::documentColor))?.let { put(DOC_COLOR, JsonPrimitive(it)) }
+        (input.style ?: existing?.let(::documentStyle))?.let { put(DOC_STYLE, styleJson(it)) }
+        (input.title ?: existing?.let(::documentTitle))?.takeIf { it.isNotBlank() }?.let { put(DOC_TITLE, JsonPrimitive(it)) }
     }
 
     private fun upsertDocumentWithLww(sceneJson: String, op: CanvasOp.SetDocumentOp): String =

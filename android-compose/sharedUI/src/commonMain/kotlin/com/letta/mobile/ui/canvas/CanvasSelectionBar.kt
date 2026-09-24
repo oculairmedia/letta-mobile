@@ -99,23 +99,22 @@ fun CanvasSelectionBar(
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val actions = SelectionActions(
+                properties = properties,
+                dispatchProperty = dispatchProperty,
+                onBringToFront = onBringToFront,
+                onSendToBack = onSendToBack,
+                onDelete = onDelete,
+                onDuplicate = onDuplicate,
+                onEditText = onEditText,
+                shapeText = shapeText,
+                reshape = reshape,
+            )
             // A phone keeps the bar to what is reached for while working on a shape - its kind and
             // its text size - and puts the rest behind one menu. Colour and style are the tool
             // bar's properties control, a thumb away at the foot; a second copy here was clutter.
             if (LocalCanvasCompact.current && note == null && hasSelection) {
-                PhoneSelectionButtons(
-                    PhoneSelectionActions(
-                        properties = properties,
-                        dispatchProperty = dispatchProperty,
-                        onBringToFront = onBringToFront,
-                        onSendToBack = onSendToBack,
-                        onDelete = onDelete,
-                        onDuplicate = onDuplicate,
-                        onEditText = onEditText,
-                        shapeText = shapeText,
-                        reshape = reshape,
-                    ),
-                )
+                PhoneSelectionButtons(actions)
                 return@Row
             }
             CanvasPropertyControl(
@@ -127,45 +126,58 @@ fun CanvasSelectionBar(
                 shapeText = shapeText,
                 modifier = Modifier.size(BAR_BUTTON),
             )
-            if (note != null) {
-                Divider()
-                BarButton(Lucide.Maximize2, "Open note large", onClick = note.onOpen)
-                onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
-                BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
-            } else if (hasSelection) {
-                reshape?.let { ShapeTypeButton(it) }
-                onEditText?.let {
-                    Divider()
-                    BarButton(Lucide.TextCursorInput, "Edit text", onClick = it)
-                }
-                // Text is sized from the bar it is selected on, not from a panel behind a swatch:
-                // it is the one property you reach for over and over, and a step up or a step down
-                // is the whole of what that needs.
-                // A shape's text, right on the bar the way Miro puts it: colour, a step smaller or
-                // larger, and alignment. The panel's Text tab has the rest (font, exact sizes).
-                shapeText?.let { text -> ShapeTextButtons(text) }
-                if (properties.showFontSize && shapeText == null) {
-                    Divider()
-                    BarButton(Lucide.AArrowDown, "Smaller text") {
-                        dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(properties.fontSize, up = false)))
-                    }
-                    BarButton(Lucide.AArrowUp, "Larger text") {
-                        dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(properties.fontSize, up = true)))
-                    }
-                }
-                Divider()
-                BarButton(Lucide.BringToFront, "Bring to front", onClick = onBringToFront)
-                BarButton(Lucide.SendToBack, "Send to back", onClick = onSendToBack)
-                Divider()
-                onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate selection", onClick = it) }
-                BarButton(Lucide.Trash2, "Delete selection", onClick = onDelete)
+            when {
+                note != null -> NoteSelectionButtons(note, onDuplicate)
+                hasSelection -> ShapeSelectionButtons(actions)
             }
         }
     }
 }
 
-/** Everything the phone's selection bar can do, for [PhoneSelectionButtons]. */
-private class PhoneSelectionActions(
+@Composable
+private fun NoteSelectionButtons(note: NoteBarActions, onDuplicate: (() -> Unit)?) {
+    Divider()
+    BarButton(Lucide.Maximize2, "Open note large", onClick = note.onOpen)
+    onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate note", onClick = it) }
+    BarButton(Lucide.Trash2, "Delete note", onClick = note.onDelete)
+}
+
+/** The desktop's bar for selected shapes: kind, text, stacking, and duplicate or delete. */
+@Composable
+private fun ShapeSelectionButtons(actions: SelectionActions) {
+    actions.reshape?.let { ShapeTypeButton(it) }
+    actions.onEditText?.let {
+        Divider()
+        BarButton(Lucide.TextCursorInput, "Edit text", onClick = it)
+    }
+    // A shape's text, right on the bar the way Miro puts it: colour, a step smaller or larger, and
+    // alignment. The panel's Text tab has the rest (font, exact sizes).
+    actions.shapeText?.let { text -> ShapeTextButtons(text) }
+    // Other text is sized from the bar it is selected on, not from a panel behind a swatch: it is
+    // the one property you reach for over and over, and a step up or down is all that needs.
+    if (actions.properties.showFontSize && actions.shapeText == null) TextStepButtons(actions)
+    Divider()
+    BarButton(Lucide.BringToFront, "Bring to front", onClick = actions.onBringToFront)
+    BarButton(Lucide.SendToBack, "Send to back", onClick = actions.onSendToBack)
+    Divider()
+    actions.onDuplicate?.let { BarButton(Lucide.Copy, "Duplicate selection", onClick = it) }
+    BarButton(Lucide.Trash2, "Delete selection", onClick = actions.onDelete)
+}
+
+@Composable
+private fun TextStepButtons(actions: SelectionActions) {
+    val size = actions.properties.fontSize
+    Divider()
+    BarButton(Lucide.AArrowDown, "Smaller text") {
+        actions.dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(size, up = false)))
+    }
+    BarButton(Lucide.AArrowUp, "Larger text") {
+        actions.dispatchProperty(CanvasPropertyIntent.SetFontSize(steppedFontSize(size, up = true)))
+    }
+}
+
+/** Everything a selection bar can do with the selected shapes, on a phone or not. */
+private class SelectionActions(
     val properties: CanvasProperties,
     val dispatchProperty: (CanvasPropertyIntent) -> Unit,
     val onBringToFront: () -> Unit,
@@ -179,7 +191,7 @@ private class PhoneSelectionActions(
 
 /** The phone's bar: the shape's kind, its text a step smaller or larger, and the rest behind "More". */
 @Composable
-private fun PhoneSelectionButtons(actions: PhoneSelectionActions) {
+private fun PhoneSelectionButtons(actions: SelectionActions) {
     actions.reshape?.let { ShapeTypeButton(it) }
     val text = actions.shapeText
     if (text != null || actions.properties.showFontSize) {
