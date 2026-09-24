@@ -270,27 +270,28 @@ class CanvasSession(
         style: CanvasTextStyle? = null,
         title: String? = null,
     ): CanvasDocument? {
-        val existing = documents().firstOrNull { it.id == documentId }
-        val unchanged = existing?.json == documentJson &&
-            (frame == null || frame == existing.frame) &&
-            (color == null || color == existing.color) &&
-            (style == null || style == existing.style) &&
-            (title == null || title.ifBlank { null } == existing.title)
-        if (unchanged) return null
-        return applyLocal(
-            CanvasOp.SetDocumentOp(
-                opId = CanvasOpDiffer.generateOpId("doc"),
-                actorId = actorId,
-                lamport = lamportClock + 1,
-                documentId = documentId,
-                documentJson = documentJson,
-                frame = frame,
-                color = color,
-                style = style,
-                title = title,
-            ),
+        val op = CanvasOp.SetDocumentOp(
+            opId = CanvasOpDiffer.generateOpId("doc"),
+            actorId = actorId,
+            lamport = lamportClock + 1,
+            documentId = documentId,
+            documentJson = documentJson,
+            frame = frame,
+            color = color,
+            style = style,
+            title = title,
         )
+        val existing = documents().firstOrNull { it.id == documentId }
+        return if (existing != null && existing.alreadyHas(op)) null else applyLocal(op)
     }
+
+    /** Whether writing [op] would leave this document as it is: the same text, and nothing [op] sets differs. */
+    private fun CanvasSceneDocument.alreadyHas(op: CanvasOp.SetDocumentOp): Boolean =
+        json == op.documentJson && keeps(op.frame, frame) && keeps(op.color, color) && keeps(op.style, style) &&
+            (op.title == null || op.title.ifBlank { null } == title)
+
+    /** A field [op] leaves out ([wanted] null) keeps what the document has. */
+    private fun <T> keeps(wanted: T?, current: T?): Boolean = wanted == null || wanted == current
 
     /** Renames a block document; an empty [title] clears it. A no-op for a document that is not there. */
     suspend fun retitleDocument(

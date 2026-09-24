@@ -61,68 +61,27 @@ internal data class QuickCreateDrag(val direction: QuickCreateDirection, val fro
 @Composable
 internal fun CanvasQuickCreateTargets(
     anchor: Rect,
-    onCreate: (QuickCreateDirection) -> Unit,
+    actions: QuickCreateActions,
     modifier: Modifier = Modifier,
     chromeRegions: CanvasChromeRegions? = null,
     compact: Boolean = false,
-    onDrag: (QuickCreateDrag?) -> Unit = {},
-    onDrop: (QuickCreateDrag) -> Unit = {},
 ) {
-    val target = if (compact) TOUCH_TARGET else TARGET
-    val icon = if (compact) TOUCH_ICON else ICON
     val gapPx = with(LocalDensity.current) { (if (compact) TOUCH_OFFSET else OFFSET).toPx() }
-    fun centreOf(direction: QuickCreateDirection): Offset = when (direction) {
-        QuickCreateDirection.UP -> Offset(anchor.center.x, anchor.top - gapPx)
-        QuickCreateDirection.RIGHT -> Offset(anchor.right + gapPx, anchor.center.y)
-        QuickCreateDirection.DOWN -> Offset(anchor.center.x, anchor.bottom + gapPx)
-        QuickCreateDirection.LEFT -> Offset(anchor.left - gapPx, anchor.center.y)
-    }
+    fun centreOf(direction: QuickCreateDirection): Offset = CanvasQuickCreate.targetCentre(anchor, direction, gapPx)
     // The drag outlives recompositions (the anchor moves as the board pans), so it reads these fresh.
     val centre by rememberUpdatedState(::centreOf)
-    val dragged by rememberUpdatedState(onDrag)
-    val dropped by rememberUpdatedState(onDrop)
+    val latest by rememberUpdatedState(actions)
     Layout(
         modifier = modifier,
         content = {
             QuickCreateDirection.entries.forEach { direction ->
-                Surface(
-                    onClick = { onCreate(direction) },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier
-                        .size(target)
-                        .canvasChrome(chromeRegions)
-                        .semantics { contentDescription = "Add ${direction.label}" }
-                        .pointerInput(direction) {
-                            var drag: QuickCreateDrag? = null
-                            detectDragGestures(
-                                onDragStart = { local ->
-                                    val from = centre(direction)
-                                    drag = QuickCreateDrag(direction, from, from - Offset(size.width / 2f, size.height / 2f) + local)
-                                    dragged(drag)
-                                },
-                                onDragEnd = {
-                                    drag?.let(dropped)
-                                    drag = null
-                                    dragged(null)
-                                },
-                                onDragCancel = {
-                                    drag = null
-                                    dragged(null)
-                                },
-                            ) { change, amount ->
-                                change.consume()
-                                drag = drag?.let { it.copy(to = it.to + amount) }
-                                dragged(drag)
-                            }
-                        },
-                ) {
-                    Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
-                        Icon(direction.icon, contentDescription = null, modifier = Modifier.size(icon))
-                    }
-                }
+                QuickCreateTarget(
+                    direction = direction,
+                    compact = compact,
+                    chromeRegions = chromeRegions,
+                    onClick = { latest.onCreate(direction) },
+                    pull = Modifier.pullArrow(direction, { centre(direction) }, { latest }),
+                )
             }
         },
     ) { measurables, constraints ->
@@ -136,16 +95,93 @@ internal fun CanvasQuickCreateTargets(
     }
 }
 
+/** What the quick-create targets do: a tap makes one ([onCreate]); a pull shows and drops an arrow. */
+internal data class QuickCreateActions(
+    val onCreate: (QuickCreateDirection) -> Unit,
+    val onDrag: (QuickCreateDrag?) -> Unit = {},
+    val onDrop: (QuickCreateDrag) -> Unit = {},
+)
+
+/** One round target; on a phone ([compact]) big enough to hit with a finger. */
+@Composable
+private fun QuickCreateTarget(
+    direction: QuickCreateDirection,
+    compact: Boolean,
+    chromeRegions: CanvasChromeRegions?,
+    onClick: () -> Unit,
+    pull: Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        shadowElevation = 2.dp,
+        modifier = Modifier
+            .size(if (compact) TOUCH_TARGET else TARGET)
+            .canvasChrome(chromeRegions)
+            .semantics { contentDescription = "Add ${direction.label}" }
+            .then(pull),
+    ) {
+        Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Icon(direction.icon, contentDescription = null, modifier = Modifier.size(if (compact) TOUCH_ICON else ICON))
+        }
+    }
+}
+
+/**
+ * An arrow pulled out of the target for [direction]: it starts at the target's centre ([from], read
+ * fresh as the board pans) and follows the pointer, reported to [actions] as it moves and where it
+ * is let go.
+ */
+private fun Modifier.pullArrow(
+    direction: QuickCreateDirection,
+    from: () -> Offset,
+    actions: () -> QuickCreateActions,
+): Modifier = pointerInput(direction) {
+    var drag: QuickCreateDrag? = null
+    fun report(next: QuickCreateDrag?) {
+        drag = next
+        actions().onDrag(next)
+    }
+    detectDragGestures(
+        onDragStart = { local ->
+            val start = from()
+            report(QuickCreateDrag(direction, start, start - Offset(size.width / 2f, size.height / 2f) + local))
+        },
+        onDragEnd = {
+            drag?.let { actions().onDrop(it) }
+            report(null)
+        },
+        onDragCancel = { report(null) },
+    ) { change, amount ->
+        change.consume()
+        report(drag?.let { it.copy(to = it.to + amount) })
+    }
+}
+
 /** Where quick-created elements go and how they are joined. */
 internal object CanvasQuickCreate {
     /** Space, in board units, between an element and the one quick-created beside it. */
     const val GAP = 80f
 
+    /** Where the target for [direction] sits: [gapPx] beyond [anchor]'s edge, clear of the handles. */
+    fun targetCentre(anchor: Rect, direction: QuickCreateDirection, gapPx: Float): Offset = when (direction) {
+        QuickCreateDirection.UP -> Offset(anchor.center.x, anchor.top - gapPx)
+        QuickCreateDirection.RIGHT -> Offset(anchor.right + gapPx, anchor.center.y)
+        QuickCreateDirection.DOWN -> Offset(anchor.center.x, anchor.bottom + gapPx)
+        QuickCreateDirection.LEFT -> Offset(anchor.left - gapPx, anchor.center.y)
+    }
+
     /** An empty copy of [shape] one gap beyond it towards [direction], above everything else. */
-    @OptIn(ExperimentalTime::class)
     fun nextShape(shape: Element.Shape, direction: QuickCreateDirection, topZ: Int): Element.Shape {
         val b = shape.bounds()
-        val delta = Offset(direction.dx * (b.width + GAP), direction.dy * (b.height + GAP))
+        return freshCopy(shape, Offset(direction.dx * (b.width + GAP), direction.dy * (b.height + GAP)), topZ)
+    }
+
+    /** [shape] moved by [delta] as a new, empty, unbound element above everything else. */
+    @OptIn(ExperimentalTime::class)
+    private fun freshCopy(shape: Element.Shape, delta: Offset, topZ: Int): Element.Shape {
         val now = Clock.System.now().toEpochMilliseconds()
         return (shape.translate(delta) as Element.Shape).copy(
             id = "${shape.id}-next-$now",
@@ -175,10 +211,12 @@ internal object CanvasQuickCreate {
     /** Which side of [from] faces [point]: the one along the axis it is furthest out on. */
     fun directionToward(from: Rect, point: Offset): QuickCreateDirection {
         val d = point - from.center
-        return if (kotlin.math.abs(d.x) >= kotlin.math.abs(d.y)) {
-            if (d.x >= 0f) QuickCreateDirection.RIGHT else QuickCreateDirection.LEFT
-        } else {
-            if (d.y >= 0f) QuickCreateDirection.DOWN else QuickCreateDirection.UP
+        val sideways = kotlin.math.abs(d.x) >= kotlin.math.abs(d.y)
+        return when {
+            sideways && d.x >= 0f -> QuickCreateDirection.RIGHT
+            sideways -> QuickCreateDirection.LEFT
+            d.y >= 0f -> QuickCreateDirection.DOWN
+            else -> QuickCreateDirection.UP
         }
     }
 
@@ -186,18 +224,8 @@ internal object CanvasQuickCreate {
      * An empty shape of [kind] centred on [centre], sized and styled like [base], above everything
      * else: what goes where an arrow pulled out of a target is let go.
      */
-    @OptIn(ExperimentalTime::class)
     fun shapeAt(base: Element.Shape, centre: Offset, kind: QuickCreateKind, topZ: Int): Element.Shape {
-        val now = Clock.System.now().toEpochMilliseconds()
-        val moved = (base.translate(centre - base.bounds().center) as Element.Shape).copy(
-            id = "${base.id}-next-$now",
-            text = "",
-            startBinding = null,
-            endBinding = null,
-            zIndex = topZ + 1,
-            createdAt = now,
-            modifiedAt = now,
-        )
+        val moved = freshCopy(base, centre - base.bounds().center, topZ)
         val b = moved.bounds()
         return when (kind) {
             QuickCreateKind.RECTANGLE -> CanvasReshape.reshaped(moved, ShapeType.RECTANGLE).copy(cornerRadius = 0f)
