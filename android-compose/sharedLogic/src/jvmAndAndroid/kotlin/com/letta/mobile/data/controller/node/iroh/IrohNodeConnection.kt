@@ -14,6 +14,7 @@ import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
@@ -114,6 +115,11 @@ class IrohNodeConnection(
      * mid-turn, replayed on redial re-send (P3, q71yi). Injectable for tests.
      */
     private val parkedTerminals: ParkedTerminalStore = SHARED_PARKED_TERMINALS,
+    /**
+     * letta-mobile-qygvv.3: node-owned home of this connection's turns. A turn outlives its
+     * initiator's connection (it is detached, not cancelled), so it must not be a child of it.
+     */
+    private val turnHost: NodeTurnHost = NodeTurnHost.SHARED,
 ) {
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
     // base — replaces the shared mutable companion var that raced across
@@ -133,14 +139,7 @@ class IrohNodeConnection(
 
     /** Whether this peer has authenticated; side protocols from the same peer are gated on it. */
     val isAuthenticated: Boolean get() = authenticated.get()
-    
-    /**
-     * Mid-turn redial fix: thread-local storage for tracking the active turn's
-     * clientMessageId and frames. Set at the start of handleInput, cleared when
-     * the turn completes or fails. Used by writeStreamDelta to track frames for
-     * parking if the stream dies mid-turn.
-     */
-    private val activeTurnTracking = ThreadLocal<ActiveTurnTracking?>()
+
 
     /**
      * Transport capabilities advertised by the peer in its auth frame.
@@ -801,18 +800,24 @@ class IrohNodeConnection(
         }
     }
 
-    /** Builds one turn fanout with connection-owned observer ordering and initiator parking. */
+    /**
+     * Builds one turn fanout with initiator parking. The initiator's writes stay on this
+     * connection's queue; observer writes use the node-owned queue so a detached turn
+     * (letta-mobile-qygvv.3) still reaches the remaining viewers.
+     */
     private fun createTurnFanout(
         input: AppServerCommand.Input,
         streamSend: SendStream,
+        tracker: TurnFrameTracker?,
     ) = ConversationTurnFanout(
         conversationId = input.runtime.conversationId,
         runtime = input.runtime,
         viewersFor = { conversationId -> connectionRegistry?.viewersFor(conversationId) ?: emptySet() },
         initiatorViewer = ensureSelfViewer(streamSend),
-        trackInitiatorFrame = { deltaJson -> activeTurnTracking.get()?.tracker?.track(deltaJson) },
+        trackInitiatorFrame = { deltaJson -> tracker?.track(deltaJson) },
         unregisterViewer = { conversationId, viewer -> connectionRegistry?.unregister(conversationId, viewer) },
-        observerWrites = observerWrites,
+        observerWrites = turnHost.observerWrites,
+        initiatorWrites = observerWrites,
     )
 
     private suspend fun handleInput(
@@ -877,57 +882,68 @@ class IrohNodeConnection(
                 contentPartsJson = contentParts?.toString(),
             ),
         )
-        // Mid-turn redial fix: set thread-local tracking so the INITIATOR-ONLY
-        // parking hook can record frames for parking if the stream dies mid-turn.
+        // Mid-turn redial fix: the INITIATOR-ONLY parking record for this turn.
+        val tracker = clientMsgId?.let { TurnFrameTracker() }
+        val fanout = createTurnFanout(input, streamSend, tracker)
+        // eaczz.5: live user-echo fanout. Before the assistant stream, emit a
+        // snapshot `user_message` delta so OBSERVERS see the sender's prompt
+        // immediately, in order, ahead of the reply (today they only get it on
+        // a later message.list reconcile — so the reply could appear first).
+        // The initiator does NOT double-render: the echo carries the sender's
+        // otid (== clientMsgId), which the reducer collapses against the
+        // initiator's own optimistic Local row (idempotent snapshot, never
+        // appended twice). No-op when there is no client_message_id (nothing
+        // to key optimistic dedup on) — the fanout is best-effort regardless.
         if (clientMsgId != null) {
-            activeTurnTracking.set(ActiveTurnTracking(clientMessageId = clientMsgId))
-        }
-        val fanout = createTurnFanout(input, streamSend)
-        try {
-            // eaczz.5: live user-echo fanout. Before the assistant stream, emit a
-            // snapshot `user_message` delta so OBSERVERS see the sender's prompt
-            // immediately, in order, ahead of the reply (today they only get it on
-            // a later message.list reconcile — so the reply could appear first).
-            // The initiator does NOT double-render: the echo carries the sender's
-            // otid (== clientMsgId), which the reducer collapses against the
-            // initiator's own optimistic Local row (idempotent snapshot, never
-            // appended twice). No-op when there is no client_message_id (nothing
-            // to key optimistic dedup on) — the fanout is best-effort regardless.
-            if (clientMsgId != null) {
-                runCatching {
-                    fanout.broadcastUserEcho(
-                        clientMessageId = clientMsgId,
-                        text = text,
-                        contentParts = contentParts,
-                    )
-                }
-            }
             runCatching {
-                controller.runTurn(command).collect { draft ->
-                    val payload = draft.payload
-                    if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) {
-                        Telemetry.event(
-                            "IrohNode", "stream.terminal_duplicate_skipped",
-                            "remoteEndpointId" to remoteEndpointId,
-                            "agentId" to input.runtime.agentId,
-                            "conversationId" to input.runtime.conversationId,
-                        )
-                        return@collect
-                    }
-                    // Before a failure/cancel terminal, close any dangling tool_calls
-                    // so the client never renders a tool_call without a return.
-                    if (fanout.isFailureOrCancelLifecycle(payload)) {
-                        fanout.flushOpenToolCalls()
-                    }
-                    fanout.onDraft(payload)
-                }
-            }.onFailure { error ->
-                handleInputFailure(error, fanout, clientMsgId, input, parkedTerminals)
+                fanout.broadcastUserEcho(
+                    clientMessageId = clientMsgId,
+                    text = text,
+                    contentParts = contentParts,
+                )
             }
-        } finally {
-            // Clear thread-local tracking when the turn completes or fails
-            activeTurnTracking.remove()
         }
+        // letta-mobile-qygvv.3: the collector runs on the node-owned host. If this
+        // connection closes first, the turn is detached, not cancelled: the server
+        // turn keeps its approvals, external tools and other viewers, and its tail
+        // is parked for this initiator's redial.
+        turnHost.run(
+            NodeTurn(
+                conversationId = input.runtime.conversationId,
+                clientMessageId = clientMsgId,
+                fanout = fanout,
+                tracker = tracker ?: TurnFrameTracker(),
+                parkedTerminals = parkedTerminals,
+            ) {
+                runCatching {
+                    controller.runTurn(command).collect { draft -> deliverTurnDraft(fanout, input, draft.payload) }
+                }.onFailure { error ->
+                    handleInputFailure(error, fanout, clientMsgId, input, tracker)
+                }
+            },
+        )
+    }
+
+    private suspend fun deliverTurnDraft(
+        fanout: ConversationTurnFanout,
+        input: AppServerCommand.Input,
+        payload: RuntimeEventPayload,
+    ) {
+        if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) {
+            Telemetry.event(
+                "IrohNode", "stream.terminal_duplicate_skipped",
+                "remoteEndpointId" to remoteEndpointId,
+                "agentId" to input.runtime.agentId,
+                "conversationId" to input.runtime.conversationId,
+            )
+            return
+        }
+        // Before a failure/cancel terminal, close any dangling tool_calls
+        // so the client never renders a tool_call without a return.
+        if (fanout.isFailureOrCancelLifecycle(payload)) {
+            fanout.flushOpenToolCalls()
+        }
+        fanout.onDraft(payload)
     }
 
     private suspend fun handleInputFailure(
@@ -935,7 +951,7 @@ class IrohNodeConnection(
         fanout: ConversationTurnFanout,
         clientMsgId: String?,
         input: AppServerCommand.Input,
-        parkedTerminals: ParkedTerminalStore,
+        tracker: TurnFrameTracker?,
     ) {
         val errorText = error.message ?: error.toString()
         if (isTurnAlreadyActiveMessage(errorText)) {
@@ -949,7 +965,7 @@ class IrohNodeConnection(
             }
         }.isSuccess
         if (!wroteTerminal) {
-            parkInterruptedTerminal(error, fanout, clientMsgId, input, parkedTerminals)
+            parkInterruptedTerminal(error, fanout, clientMsgId, input, tracker)
         }
         if (error is CancellationException) throw error
     }
@@ -982,7 +998,7 @@ class IrohNodeConnection(
         fanout: ConversationTurnFanout,
         clientMsgId: String?,
         input: AppServerCommand.Input,
-        parkedTerminals: ParkedTerminalStore,
+        tracker: TurnFrameTracker?,
     ) {
         Telemetry.event(
             "IrohNode", "stream.closed_before_terminal",
@@ -992,21 +1008,14 @@ class IrohNodeConnection(
             level = Telemetry.Level.WARN,
         )
         if (clientMsgId == null || fanout.anyTerminalWritten) return
-        val tracking = activeTurnTracking.get()
-        tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
+        tracker?.parkFrames(parkedTerminals, clientMsgId, NodeTurnHost.INTERRUPTED_TERMINAL)
         Telemetry.event(
             "IrohNode", "stream.frames_parked",
             "remoteEndpointId" to remoteEndpointId,
             "clientMessageId" to clientMsgId,
             "conversationId" to input.runtime.conversationId,
-            "frameCount" to (tracking?.tracker?.frameCount() ?: 0),
+            "frameCount" to (tracker?.frameCount() ?: 0),
         )
-    }
-
-    private fun interruptedTerminalDelta(): JsonObject = buildJsonObject {
-        put("message_type", "error_message")
-        put("message", "connection interrupted before the turn completed")
-        put("status", "cancelled")
     }
 
     private fun extractTextFromContentParts(parts: JsonArray?): String? =
@@ -1054,8 +1063,6 @@ class IrohNodeConnection(
         streamWriteMutex.withLock {
             IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
         }
-        // Mid-turn redial fix: track the delta JSON for parking if stream dies
-        activeTurnTracking.get()?.tracker?.track(delta.toString())
     }
 
 

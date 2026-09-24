@@ -55,6 +55,9 @@ internal class TurnBoundaryGate {
     /** An `abort_message` was sent for this key: a later idle loop status reads as Cancelled. */
     fun noteAbortRequested(): Unit = synchronized(lock) { abortRequested = true }
 
+    /** Whether an abort was already requested for the current lease (letta-mobile-qygvv.3). */
+    fun isAbortRequested(): Boolean = synchronized(lock) { abortRequested }
+
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
     fun noteSettled(runId: String?): Unit = synchronized(lock) {
         runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)

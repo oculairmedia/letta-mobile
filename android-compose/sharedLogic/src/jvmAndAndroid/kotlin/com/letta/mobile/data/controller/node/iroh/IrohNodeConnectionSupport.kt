@@ -156,25 +156,17 @@ internal class TurnFrameTracker(
         }
     }
 
-    /** Park all tracked frames + a synthetic terminal into the store. */
-    fun parkFrames(store: ParkedTerminalStore, key: String, terminalDelta: String) {
-        // Park all tracked frames
+    /**
+     * Park all tracked frames, plus [terminalDelta] when the tracked frames carry no terminal of
+     * their own (null when the real terminal was already tracked).
+     */
+    fun parkFrames(store: ParkedTerminalStore, key: String, terminalDelta: String?) {
         frames.forEach { store.park(key, it) }
-        // Park the terminal
-        store.park(key, terminalDelta)
+        terminalDelta?.let { store.park(key, it) }
     }
 
     fun frameCount(): Int = frames.size
 }
-
-/**
- * Thread-local state for tracking an active turn's frames during streaming.
- * Used by IrohNodeConnection to park frames if the SendStream dies mid-turn.
- */
-internal data class ActiveTurnTracking(
-    val clientMessageId: String,
-    val tracker: TurnFrameTracker = TurnFrameTracker(),
-)
 
 /**
  * eaczz.3: per-connection conversation-viewer subscription with the Option A

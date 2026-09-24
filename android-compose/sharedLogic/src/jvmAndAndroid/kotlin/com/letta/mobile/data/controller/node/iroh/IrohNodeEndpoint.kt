@@ -84,6 +84,13 @@ class IrohNodeEndpoint(
     private val connectionRegistry = ConnectionRegistry()
 
     /**
+     * letta-mobile-qygvv.3: ONE node-owned home for every connection's live turns, a child of
+     * the endpoint scope and of no connection, so a peer dropping mid-turn detaches its turn
+     * instead of cancelling the server turn under it.
+     */
+    private val turnHost = NodeTurnHost.childOf(scope)
+
+    /**
      * Delivers device-wide `agent_updated` frames to every live connection allowed to read agents
      * ([IrohPeerCapabilities.CHAT_READ], the `agent.list` capability), on its stream channel.
      */
@@ -279,6 +286,7 @@ class IrohNodeEndpoint(
                 pairingService = pairingService,
                 remoteEndpointId = remoteId,
                 connectionRegistry = connectionRegistry,
+                turnHost = turnHost,
             )
             val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
                 java.util.concurrent.ConcurrentHashMap.newKeySet()
