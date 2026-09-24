@@ -20,6 +20,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -83,6 +84,7 @@ class DefaultAppServerController(
         RuntimePermissionDefaults.DEFAULT_MODE
     },
 ) : AppServerController {
+    @Suppress("NoDetachedCoroutineLifecycle")
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
@@ -311,6 +313,8 @@ class DefaultAppServerController(
                     externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
                 ),
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
@@ -486,8 +490,10 @@ class DefaultAppServerController(
             decision = decision,
             claimGeneration = claimGeneration,
         )
-        if (result !is ApprovalSubmitResult.Rejected && toolCallId != null && capturedRequestId != null) {
-            turnEngine.clearUserInputApprovalId(toolCallId, capturedRequestId)
+        if (result !is ApprovalSubmitResult.Rejected) {
+            if (toolCallId != null && capturedRequestId != null) {
+                turnEngine.clearUserInputApprovalId(toolCallId, capturedRequestId)
+            }
         }
         return result
     }
@@ -506,6 +512,8 @@ class DefaultAppServerController(
                     forceDeviceStatus = forceDeviceStatus,
                 ),
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to sync runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
@@ -523,6 +531,8 @@ class DefaultAppServerController(
                     runId = runId,
                 ),
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }

@@ -53,3 +53,10 @@ enum class TurnLeasePhase {
     Retiring,
     Terminal,
 }
+
+/** A slot plus the token of the lease this turn owns inside it. */
+internal class LeaseRef(val slot: TurnLeaseSlot, val token: Long) {
+    val key: TurnRuntimeKey get() = slot.key
+    /** The slot still holds OUR lease (not a successor's). */
+    val current: TurnLease? get() = slot.lease?.takeIf { it.token == token }
+}

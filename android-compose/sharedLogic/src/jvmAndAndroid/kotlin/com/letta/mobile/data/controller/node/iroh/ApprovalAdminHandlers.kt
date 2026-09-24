@@ -86,32 +86,7 @@ object ApprovalAdminHandlers {
                 updatedInput = updatedInput,
             )
         }.onSuccess { result ->
-            // letta-mobile-qygvv.5: the server refused the decision (e.g. the gate is
-            // no longer pending). Fail the RPC so the phone shows it instead of silence.
-            if (result is ApprovalSubmitResult.Rejected) {
-                AdminRouteTelemetry.selected(
-                    AdminRouteTelemetry.Selection(
-                        method = "approval.submit",
-                        owner = "controller_native",
-                        route = "controller_native",
-                        outcome = "rejected",
-                        reason = result.error,
-                    ),
-                )
-                adminError("approval_rejected: ${result.error}")
-            }
-            AdminRouteTelemetry.selected(
-                AdminRouteTelemetry.Selection(
-                    method = "approval.submit",
-                    owner = "controller_native",
-                    route = "controller_native",
-                    outcome = "success",
-                ),
-            )
-            return buildJsonObject {
-                put("status", if (approve) "approved" else "denied")
-                put("acknowledged", result == ApprovalSubmitResult.Accepted)
-            }
+            return handleApprovalSubmitResult(result, approve)
         }.onFailure { error ->
             if (error is kotlinx.coroutines.CancellationException) throw error
             AdminRouteTelemetry.selected(
@@ -126,5 +101,37 @@ object ApprovalAdminHandlers {
             adminError("app_server_error: approval.submit failed")
         }
         error("unreachable")
+    }
+
+    private fun handleApprovalSubmitResult(
+        result: ApprovalSubmitResult,
+        approve: Boolean,
+    ): kotlinx.serialization.json.JsonObject {
+        // letta-mobile-qygvv.5: the server refused the decision (e.g. the gate is
+        // no longer pending). Fail the RPC so the phone shows it instead of silence.
+        if (result is ApprovalSubmitResult.Rejected) {
+            AdminRouteTelemetry.selected(
+                AdminRouteTelemetry.Selection(
+                    method = "approval.submit",
+                    owner = "controller_native",
+                    route = "controller_native",
+                    outcome = "rejected",
+                    reason = result.error,
+                ),
+            )
+            adminError("approval_rejected: ${result.error}")
+        }
+        AdminRouteTelemetry.selected(
+            AdminRouteTelemetry.Selection(
+                method = "approval.submit",
+                owner = "controller_native",
+                route = "controller_native",
+                outcome = "success",
+            ),
+        )
+        return buildJsonObject {
+            put("status", if (approve) "approved" else "denied")
+            put("acknowledged", result == ApprovalSubmitResult.Accepted)
+        }
     }
 }

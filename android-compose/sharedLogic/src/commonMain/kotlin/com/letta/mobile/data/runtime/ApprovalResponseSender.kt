@@ -131,7 +131,10 @@ internal fun ApprovalResponseSender.reanswerCachedReplay(
 ): Boolean {
     val control = frame as? AppServerInboundFrame.ControlRequest ?: return false
     val scope = control.runtime
-    if (scope != null && (scope.agentId != runtime.agentId || scope.conversationId != runtime.conversationId)) return false
+    if (scope != null) {
+        if (scope.agentId != runtime.agentId) return false
+        if (scope.conversationId != runtime.conversationId) return false
+    }
     val cached = cachedDecisionFor(control) ?: return false
     launchScope.launch { reanswer(cached) }
     return true

@@ -203,13 +203,6 @@ class AppServerTurnEngine(
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
 
-    /** A slot plus the token of the lease this turn owns inside it. */
-    private class LeaseRef(val slot: TurnLeaseSlot, val token: Long) {
-        val key: TurnRuntimeKey get() = slot.key
-        /** The slot still holds OUR lease (not a successor's). */
-        val current: TurnLease? get() = slot.lease?.takeIf { it.token == token }
-    }
-
     /**
      * lgns8.22.4: cancel the active turn immediately when its connection generation
      * is superseded. Must not wait for another inbound frame — a turn parked at a
@@ -1164,28 +1157,40 @@ class AppServerTurnEngine(
         }
     }
 
+    private suspend fun preflightFrame(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+    ): Boolean {
+        if (isConnectionGenerationSuperseded(context.lease)) {
+            completeSupersededTurn(context)
+        }
+        if (received.isStaleGenerationForLease(context.lease)) return false
+        if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) return false
+        if (!received.matches(context.runtimeScope, context.lease)) {
+            completeScopeRejectedTurn(received, context)
+            return false
+        }
+        return context.lease.slot.runIdGate.accepts(received, context.lease.token)
+    }
+
     private suspend fun processReceivedFrame(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
     ) {
-        if (isConnectionGenerationSuperseded(context.lease)) {
-            completeSupersededTurn(context)
-        }
-        if (received.isStaleGenerationForLease(context.lease)) return
-        if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) return
-        if (!received.matches(context.runtimeScope, context.lease)) {
-            completeScopeRejectedTurn(received, context)
-            return
-        }
+        if (!preflightFrame(received, context)) return
         val slot = context.lease.slot
-        if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
-        val queueRemoval = observeQueueProgress(received, context)
+        val queueRemoval = context.queuedInput.observeQueueProgress(received, context.lease)
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val frameSeq = received.eventSeqOrNull()
-        val boundary = decideBoundary(received, context) ?: return
+        val boundary = slot.boundaryGate.decideBoundary(
+            received = received,
+            leaseRunId = context.lease.current?.runId,
+            conversationId = context.runtimeScope.conversationId,
+            hasOutstandingApproval = approvals.hasOutstanding(slot.key),
+        ) ?: return
         // letta-mobile-gdvbf: the resilience boundary is EXACTLY this seam, and
         // deliberately no wider. Everything above has already touched turn
         // state (generation/scope gating, watchdog, external-tool dispatch,
@@ -1200,45 +1205,15 @@ class AppServerTurnEngine(
         val authoritative = boundary != TurnBoundaryDecision.Project
         drafts.forEach { draft -> context.draftProcessor.process(draft, frameSeq, authoritative) }
         if (boundary is TurnBoundaryDecision.LoopIdle) {
-            context.draftProcessor.process(context.loopIdleTerminal(boundary.status), frameSeq, authoritative = true)
+            context.draftProcessor.process(
+                context.command.loopIdleTerminal(boundary.status, context.lease.current?.runId),
+                frameSeq,
+                authoritative = true,
+            )
         }
         // The update_queue passthrough draft above still reaches viewers; only then
         // settle a lease whose queued input the server dropped.
         if (queueRemoval == QueueRemovalDisposition.Cancelled) completeQueueCancelledTurn(context)
-    }
-
-    /**
-     * letta-mobile-qygvv.2: `turn_finished` and an idle loop status after evidence are the
-     * server's own turn boundaries. Returns null when the frame closes a turn this key already
-     * settled (a duplicate `turn_id`, a superseded or settled run) and must be skipped.
-     */
-    private fun decideBoundary(
-        received: AppServerReceivedFrame,
-        context: TurnFrameContext,
-    ): TurnBoundaryDecision? {
-        val slot = context.lease.slot
-        val decision = slot.boundaryGate.decide(
-            received = received,
-            leaseRunId = context.lease.current?.runId,
-            approvalOutstanding = approvals.hasOutstanding(slot.key),
-        )
-        if (decision !is TurnBoundaryDecision.Drop) return decision
-        Telemetry.event(
-            "AppServerTurnEngine", "terminal.boundary_dropped",
-            "frameType" to (received.frame.type ?: "<unknown>"),
-            "reason" to decision.reason,
-            "conversationId" to context.runtimeScope.conversationId,
-            "eventSeq" to received.eventSeqOrNull(),
-        )
-        return null
-    }
-
-    private fun TurnFrameContext.loopIdleTerminal(status: RuntimeRunStatus): RuntimeEventDraft {
-        val runId = lease.current?.runId?.takeIf { it.isNotBlank() }?.let(::RunId)
-        return when (status) {
-            RuntimeRunStatus.Cancelled -> command.cancelledDraft("App Server loop idle after abort").copy(runId = runId)
-            else -> command.completedDraft(runId)
-        }
     }
 
     /**
@@ -1322,68 +1297,8 @@ class AppServerTurnEngine(
         }
         val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
         val failure = acceptance.recordAndFailureReason(command.conversationId.value)
-        if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, queuedInput, emit)
+        if (acceptance == InputAcceptance.Queued) queuedInput.enterQueued(command, lease, emit)
         return failure
-    }
-
-    private suspend fun enterQueued(
-        command: TurnCommand,
-        lease: LeaseRef,
-        queuedInput: QueuedInputTracker,
-        emit: suspend (RuntimeEventDraft) -> Unit,
-    ) {
-        // Started evidence may already have been processed by the collector.
-        if (!queuedInput.markQueued()) return
-        lease.slot.updateLease { cur ->
-            if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Streaming) {
-                cur.copy(phase = TurnLeasePhase.Queued)
-            } else {
-                cur
-            }
-        }
-        Telemetry.event(
-            "AppServerTurnEngine", "turn.queued",
-            "key" to lease.key.toString(),
-            "leaseToken" to lease.token,
-            "clientMessageId" to (queuedInput.clientMessageId ?: "<none>"),
-        )
-        emit(command.queuedInputDraft())
-    }
-
-    /**
-     * letta-mobile-qygvv.1: tracks a queued input through `stream_delta` and
-     * `update_queue`. Returns the removal disposition for this lease's input when
-     * [received] carries one.
-     */
-    private fun observeQueueProgress(
-        received: AppServerReceivedFrame,
-        context: TurnFrameContext,
-    ): QueueRemovalDisposition? {
-        val frame = received.frame
-        val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(context.queuedInput::removalIn)
-        val startedBy = when {
-            frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
-            removal == QueueRemovalDisposition.Dequeued -> "update_queue"
-            else -> null
-        }
-        if (startedBy != null && context.queuedInput.markStarted()) leaveQueued(context.lease, startedBy)
-        return removal
-    }
-
-    private fun leaveQueued(lease: LeaseRef, source: String) {
-        lease.slot.updateLease { cur ->
-            if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Queued) {
-                cur.copy(phase = TurnLeasePhase.Streaming)
-            } else {
-                cur
-            }
-        }
-        Telemetry.event(
-            "AppServerTurnEngine", "turn.dequeued",
-            "key" to lease.key.toString(),
-            "leaseToken" to lease.token,
-            "source" to source,
-        )
     }
 
     /** The server dropped this lease's queued input (`update_queue` removal `cancelled`). */
@@ -1883,47 +1798,6 @@ class AppServerTurnEngine(
             .sorted()
     }
 
-    private fun TurnCommand.startedDraft(): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started),
-        )
-
-    private fun TurnCommand.completedDraft(runId: RunId?): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            runId = runId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
-        )
-
-    private fun TurnCommand.failedDraft(reason: String): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Failed, reason = reason),
-        )
-
-    private fun TurnCommand.cancelledDraft(reason: String): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason = reason),
-        )
-
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
         leaseRef: LeaseRef,
@@ -2005,17 +1879,6 @@ class AppServerTurnEngine(
             ),
         )
     }
-
-    private fun AppServerReceivedFrame.eventSeqOrNull(): Long? =
-        when (val f = frame) {
-            is AppServerInboundFrame.StreamDelta -> f.eventSeq
-            is AppServerInboundFrame.UpdateLoopStatus -> f.eventSeq
-            is AppServerInboundFrame.TurnFinished -> f.eventSeq
-            is AppServerInboundFrame.UpdateDeviceStatus -> f.eventSeq
-            is AppServerInboundFrame.UpdateQueue -> f.eventSeq
-            is AppServerInboundFrame.UpdateSubagentState -> f.eventSeq
-            else -> null
-        }
 
     /**
      * letta-mobile-oqfbj: extract tool_call_id from a RemoteStreamFrame body.

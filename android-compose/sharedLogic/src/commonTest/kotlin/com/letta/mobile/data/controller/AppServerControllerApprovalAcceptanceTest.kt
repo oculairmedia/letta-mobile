@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.FakeAppServerTestClient
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -180,24 +181,13 @@ class AppServerControllerApprovalAcceptanceTest {
         )
     }
 
-    private class AckingControllerClient : AppServerClient {
-        override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
+    private class AckingControllerClient : FakeAppServerTestClient() {
         val acknowledgedInputs = mutableListOf<AppServerCommand.Input>()
         val plainInputs = mutableListOf<AppServerCommand.Input>()
         var supportsAck = true
         var approvalAccepted = true
 
         fun approvalInputs() = acknowledgedInputs.filter { it.payload is AppServerInputPayload.ApprovalResponse }
-
-        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) =
-            AppServerInboundFrame.RuntimeStartResponse(
-                requestId = command.requestId,
-                success = true,
-                runtime = AppServerRuntimeScope(
-                    agentId = requireNotNull(command.agentId),
-                    conversationId = requireNotNull(command.conversationId),
-                ),
-            )
 
         override suspend fun input(command: AppServerCommand.Input) {
             plainInputs += command
@@ -215,27 +205,6 @@ class AppServerControllerApprovalAcceptanceTest {
                 accepted = accepted,
                 disposition = if (accepted) "started" else null,
                 error = if (accepted) null else "Approval request is no longer pending",
-            )
-        }
-
-        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("sync unused")
-
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("abort unused")
-
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            error("adminRpc unused")
-
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
-
-        fun emit(frame: AppServerInboundFrame) {
-            (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    frame = frame,
-                    raw = buildJsonObject { put("type", frame.type ?: "unknown") },
-                ),
             )
         }
     }

@@ -182,33 +182,13 @@ class AppServerTurnEngineTurnBoundaryTest {
     private fun RuntimeEventDraft.status(): RuntimeRunStatus? =
         (payload as? RuntimeEventPayload.RunLifecycleChanged)?.status
 
-    private class BoundaryClient : AppServerClient {
+    private class BoundaryClient : FakeAppServerTestClient() {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 32)
-
-        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
-            AppServerInboundFrame.RuntimeStartResponse(
-                requestId = command.requestId,
-                success = true,
-                runtime = AppServerRuntimeScope(
-                    agentId = requireNotNull(command.agentId),
-                    conversationId = requireNotNull(command.conversationId),
-                ),
-            )
-
-        override suspend fun input(command: AppServerCommand.Input) = Unit
-
-        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("sync unused")
-
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("abort unused")
 
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
             AppServerInboundFrame.AdminRpcResponse(requestId = command.requestId, success = true, result = null)
 
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
-
-        fun emit(frame: AppServerInboundFrame) {
+        override fun emit(frame: AppServerInboundFrame) {
             (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
                 AppServerReceivedFrame(
                     channel = AppServerChannel.Stream,

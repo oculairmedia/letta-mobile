@@ -31,6 +31,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -74,20 +75,43 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertFalse(engine.isBusy("agent-1", "conv-1"))
     }
 
-    @Test
-    fun rejectedInputFailsFastWithServerErrorAndReleasesLease() = runTest {
-        val client = AckingClient(ack(accepted = false, error = "Runtime is no longer active"))
+    private class RunningTestTurn(
+        val turn: Job,
+        val drafts: MutableList<RuntimeEventDraft>,
+        val engine: AppServerTurnEngine,
+    )
+
+    private fun TestScope.startTurn(client: AckingClient, cmd: TurnCommand = command): RunningTestTurn {
         val engine = engineFor(client)
         val drafts = mutableListOf<RuntimeEventDraft>()
-        val turn = launch { engine.runTurn(command).collect { drafts += it } }
+        val turn = launch { engine.runTurn(cmd).collect { drafts += it } }
         runCurrent()
-        turn.join()
+        return RunningTestTurn(turn, drafts, engine)
+    }
 
-        val last = drafts.lastLifecycle()
+    private suspend fun TestScope.assertRejectedInputFails(
+        cmd: TurnCommand,
+        error: String,
+        assertionNote: String,
+    ) {
+        val client = AckingClient(ack(accepted = false, error = error))
+        val running = startTurn(client, cmd)
+        running.turn.join()
+
+        val last = running.drafts.lastLifecycle()
         assertEquals(RuntimeRunStatus.Failed, last?.status)
-        assertEquals("Runtime is no longer active", last?.reason)
-        assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS, "a rejected input must not wait for the watchdog")
-        assertFalse(engine.isBusy("agent-1", "conv-1"))
+        assertEquals(error, last?.reason)
+        assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS, assertionNote)
+        assertFalse(running.engine.isBusy("agent-1", "conv-1"))
+    }
+
+    @Test
+    fun rejectedInputFailsFastWithServerErrorAndReleasesLease() = runTest {
+        assertRejectedInputFails(
+            command,
+            "Runtime is no longer active",
+            "a rejected input must not wait for the watchdog",
+        )
     }
 
     @Test
@@ -117,95 +141,83 @@ class AppServerTurnEngineInputAcceptanceTest {
     @Test
     fun queuedInputPausesWatchdogUntilFirstStreamFrame() = runTest {
         val client = AckingClient(ack(accepted = true, disposition = "queued"))
-        val engine = engineFor(client)
-        val drafts = mutableListOf<RuntimeEventDraft>()
-        val turn = launch { engine.runTurn(command).collect { drafts += it } }
-        runCurrent()
+        val running = startTurn(client)
 
-        assertTrue(INPUT_QUEUED_REASON in drafts.lifecycleReasons(), "queued input must be visible")
-        assertEquals(RuntimeRunStatus.Running, drafts.lastLifecycle()?.status)
+        assertTrue(INPUT_QUEUED_REASON in running.drafts.lifecycleReasons(), "queued input must be visible")
+        assertEquals(RuntimeRunStatus.Running, running.drafts.lastLifecycle()?.status)
 
         // Far past the idle window with no frames: a queued turn must stay alive.
         advanceTimeBy(IDLE_TIMEOUT_MS * 5)
         runCurrent()
-        assertTrue(engine.isBusy("agent-1", "conv-1"), "watchdog must be paused while queued")
-        assertEquals(RuntimeRunStatus.Running, drafts.lastLifecycle()?.status)
+        assertTrue(running.engine.isBusy("agent-1", "conv-1"), "watchdog must be paused while queued")
+        assertEquals(RuntimeRunStatus.Running, running.drafts.lastLifecycle()?.status)
 
         // The turn starts: the watchdog is armed again and trips on fresh silence.
         client.emit(streamDelta("assistant_message"))
         runCurrent()
         advanceTimeBy(IDLE_TIMEOUT_MS + 1)
         advanceUntilIdle()
-        turn.join()
+        running.turn.join()
 
-        assertEquals(RuntimeRunStatus.Failed, drafts.lastLifecycle()?.status)
-        assertFalse(engine.isBusy("agent-1", "conv-1"))
+        assertEquals(RuntimeRunStatus.Failed, running.drafts.lastLifecycle()?.status)
+        assertFalse(running.engine.isBusy("agent-1", "conv-1"))
     }
 
     @Test
     fun queuedInputThenStreamCompletesNormally() = runTest {
         val client = AckingClient(ack(accepted = true, disposition = "queued"))
-        val engine = engineFor(client)
-        val drafts = mutableListOf<RuntimeEventDraft>()
-        val turn = launch { engine.runTurn(command).collect { drafts += it } }
-        runCurrent()
+        val running = startTurn(client)
 
         client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
         client.emit(streamDelta("assistant_message"))
         client.emit(streamDelta("stop_reason"))
         advanceUntilIdle()
-        turn.join()
+        running.turn.join()
 
-        assertEquals(RuntimeRunStatus.Completed, drafts.lastLifecycle()?.status)
-        assertFalse(engine.isBusy("agent-1", "conv-1"))
+        assertEquals(RuntimeRunStatus.Completed, running.drafts.lastLifecycle()?.status)
+        assertFalse(running.engine.isBusy("agent-1", "conv-1"))
     }
 
     @Test
     fun dequeuedRemovalResumesWatchdog() = runTest {
         val client = AckingClient(ack(accepted = true, disposition = "queued"))
-        val engine = engineFor(client)
-        val drafts = mutableListOf<RuntimeEventDraft>()
-        val turn = launch { engine.runTurn(command).collect { drafts += it } }
-        runCurrent()
+        val running = startTurn(client)
 
         client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
         runCurrent()
         advanceTimeBy(IDLE_TIMEOUT_MS + 1)
         advanceUntilIdle()
-        turn.join()
+        running.turn.join()
 
-        assertEquals(RuntimeRunStatus.Failed, drafts.lastLifecycle()?.status)
+        assertEquals(RuntimeRunStatus.Failed, running.drafts.lastLifecycle()?.status)
     }
 
     @Test
     fun updateQueueCancelledRemovalSettlesQueuedLeaseCancelled() = runTest {
         val client = AckingClient(ack(accepted = true, disposition = "queued"))
-        val engine = engineFor(client)
-        val drafts = mutableListOf<RuntimeEventDraft>()
-        val turn = launch { engine.runTurn(command).collect { drafts += it } }
-        runCurrent()
+        val running = startTurn(client)
 
         // Still queued: the snapshot lists this input and nothing was removed.
         client.emit(updateQueue(queued = listOf("local-1")))
         runCurrent()
-        assertTrue(engine.isBusy("agent-1", "conv-1"))
+        assertTrue(running.engine.isBusy("agent-1", "conv-1"))
 
         // Another input's removal must not touch this lease.
         client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("someone-else", "cancelled"))))
         runCurrent()
-        assertTrue(engine.isBusy("agent-1", "conv-1"))
+        assertTrue(running.engine.isBusy("agent-1", "conv-1"))
 
         client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "cancelled"))))
         advanceUntilIdle()
-        turn.join()
+        running.turn.join()
 
-        val passthrough = drafts.count { it.payload is RuntimeEventPayload.ExternalTransportFrame }
+        val passthrough = running.drafts.count { it.payload is RuntimeEventPayload.ExternalTransportFrame }
         assertEquals(3, passthrough, "update_queue frames still reach viewers")
-        val last = drafts.lastLifecycle()
+        val last = running.drafts.lastLifecycle()
         assertEquals(RuntimeRunStatus.Cancelled, last?.status)
         assertEquals(QUEUED_INPUT_CANCELLED_REASON, last?.reason)
         assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS)
-        assertFalse(engine.isBusy("agent-1", "conv-1"))
+        assertFalse(running.engine.isBusy("agent-1", "conv-1"))
     }
 
     @Test
@@ -225,18 +237,11 @@ class AppServerTurnEngineInputAcceptanceTest {
 
     @Test
     fun rejectedApprovalResponseInputFailsFastWithServerError() = runTest {
-        val client = AckingClient(ack(accepted = false, error = "Approval request is no longer pending"))
-        val engine = engineFor(client)
-        val drafts = mutableListOf<RuntimeEventDraft>()
-        val turn = launch { engine.runTurn(approvalCommand).collect { drafts += it } }
-        runCurrent()
-        turn.join()
-
-        val last = drafts.lastLifecycle()
-        assertEquals(RuntimeRunStatus.Failed, last?.status)
-        assertEquals("Approval request is no longer pending", last?.reason)
-        assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS, "a rejected decision must not wait for the watchdog")
-        assertFalse(engine.isBusy("agent-1", "conv-1"))
+        assertRejectedInputFails(
+            approvalCommand,
+            "Approval request is no longer pending",
+            "a rejected decision must not wait for the watchdog",
+        )
     }
 
     @Test
@@ -365,23 +370,12 @@ class AppServerTurnEngineInputAcceptanceTest {
         }
     }
 
-    private class AckingClient(private val response: AppServerInboundFrame.InputAccepted) : AppServerClient {
-        override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
+    private class AckingClient(private val response: AppServerInboundFrame.InputAccepted) : FakeAppServerTestClient() {
         val acknowledgedInputs = mutableListOf<AppServerCommand.Input>()
         val plainInputs = mutableListOf<AppServerCommand.Input>()
         var supportsAck = true
         var ackFailure: Throwable? = null
         var ackGate: CompletableDeferred<AppServerInboundFrame.InputAccepted>? = null
-
-        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) =
-            AppServerInboundFrame.RuntimeStartResponse(
-                requestId = command.requestId,
-                success = true,
-                runtime = AppServerRuntimeScope(
-                    agentId = requireNotNull(command.agentId),
-                    conversationId = requireNotNull(command.conversationId),
-                ),
-            )
 
         override suspend fun input(command: AppServerCommand.Input) {
             plainInputs += command
@@ -396,18 +390,7 @@ class AppServerTurnEngineInputAcceptanceTest {
             return ackGate?.await() ?: response
         }
 
-        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("sync unused")
-
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("abort unused")
-
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            error("adminRpc unused")
-
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
-
-        fun emit(frame: AppServerInboundFrame) {
+        override fun emit(frame: AppServerInboundFrame) {
             val raw: JsonObject = buildJsonObject {
                 put("type", frame.type ?: "unknown")
                 if (frame is AppServerInboundFrame.StreamDelta) {

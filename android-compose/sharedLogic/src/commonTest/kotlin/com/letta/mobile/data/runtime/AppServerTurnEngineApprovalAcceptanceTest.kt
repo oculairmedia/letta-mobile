@@ -174,8 +174,7 @@ class AppServerTurnEngineApprovalAcceptanceTest {
         )
     }
 
-    private class ApprovalAckClient : AppServerClient {
-        override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
+    private class ApprovalAckClient : FakeAppServerTestClient() {
         val acknowledgedInputs = mutableListOf<AppServerCommand.Input>()
         val plainInputs = mutableListOf<AppServerCommand.Input>()
         var supportsAck = true
@@ -192,16 +191,6 @@ class AppServerTurnEngineApprovalAcceptanceTest {
             error = if (accepted) null else "Approval request is no longer pending",
         )
 
-        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) =
-            AppServerInboundFrame.RuntimeStartResponse(
-                requestId = command.requestId,
-                success = true,
-                runtime = AppServerRuntimeScope(
-                    agentId = requireNotNull(command.agentId),
-                    conversationId = requireNotNull(command.conversationId),
-                ),
-            )
-
         override suspend fun input(command: AppServerCommand.Input) {
             plainInputs += command
         }
@@ -217,27 +206,6 @@ class AppServerTurnEngineApprovalAcceptanceTest {
                 return gate.await()
             }
             return ackFor(command, accepted = approvalAccepted)
-        }
-
-        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("sync unused")
-
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("abort unused")
-
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            error("adminRpc unused")
-
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
-
-        fun emit(frame: AppServerInboundFrame) {
-            (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    frame = frame,
-                    raw = buildJsonObject { put("type", frame.type ?: "unknown") },
-                ),
-            )
         }
     }
 }

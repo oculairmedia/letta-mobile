@@ -3,8 +3,10 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRequestFailedException
 import com.letta.mobile.data.transport.appserver.AppServerRequestTimeoutException
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
@@ -140,6 +142,47 @@ internal fun TurnCommand.queuedInputDraft(): RuntimeEventDraft =
         payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Running, reason = INPUT_QUEUED_REASON),
     )
 
+internal fun TurnCommand.startedDraft(): RuntimeEventDraft =
+    RuntimeEventDraft(
+        backendId = backendId,
+        runtimeId = runtimeId,
+        agentId = agentId,
+        conversationId = conversationId,
+        source = RuntimeEventSource.LocalRuntime,
+        payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started),
+    )
+
+internal fun TurnCommand.completedDraft(runId: RunId?): RuntimeEventDraft =
+    RuntimeEventDraft(
+        backendId = backendId,
+        runtimeId = runtimeId,
+        agentId = agentId,
+        conversationId = conversationId,
+        runId = runId,
+        source = RuntimeEventSource.LocalRuntime,
+        payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
+    )
+
+internal fun TurnCommand.failedDraft(reason: String): RuntimeEventDraft =
+    RuntimeEventDraft(
+        backendId = backendId,
+        runtimeId = runtimeId,
+        agentId = agentId,
+        conversationId = conversationId,
+        source = RuntimeEventSource.LocalRuntime,
+        payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Failed, reason = reason),
+    )
+
+internal fun TurnCommand.cancelledDraft(reason: String): RuntimeEventDraft =
+    RuntimeEventDraft(
+        backendId = backendId,
+        runtimeId = runtimeId,
+        agentId = agentId,
+        conversationId = conversationId,
+        source = RuntimeEventSource.LocalRuntime,
+        payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason = reason),
+    )
+
 /** Upstream `QueueRemovalTransition.disposition`. */
 internal enum class QueueRemovalDisposition {
     /** Taken off the queue to START a turn. */
@@ -196,4 +239,57 @@ internal class QueuedInputTracker(val clientMessageId: String?) {
         const val QUEUED = 1
         const val STARTED = 2
     }
+}
+
+internal suspend fun QueuedInputTracker.enterQueued(
+    command: TurnCommand,
+    lease: LeaseRef,
+    emit: suspend (RuntimeEventDraft) -> Unit,
+) {
+    if (!markQueued()) return
+    lease.slot.updateLease { cur ->
+        if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Streaming) {
+            cur.copy(phase = TurnLeasePhase.Queued)
+        } else {
+            cur
+        }
+    }
+    Telemetry.event(
+        "AppServerTurnEngine", "turn.queued",
+        "key" to lease.key.toString(),
+        "leaseToken" to lease.token,
+        "clientMessageId" to (clientMessageId ?: "<none>"),
+    )
+    emit(command.queuedInputDraft())
+}
+
+internal fun leaveQueued(lease: LeaseRef, source: String) {
+    lease.slot.updateLease { cur ->
+        if (cur?.token == lease.token && cur.phase == TurnLeasePhase.Queued) {
+            cur.copy(phase = TurnLeasePhase.Streaming)
+        } else {
+            cur
+        }
+    }
+    Telemetry.event(
+        "AppServerTurnEngine", "turn.dequeued",
+        "key" to lease.key.toString(),
+        "leaseToken" to lease.token,
+        "source" to source,
+    )
+}
+
+internal fun QueuedInputTracker.observeQueueProgress(
+    received: AppServerReceivedFrame,
+    lease: LeaseRef,
+): QueueRemovalDisposition? {
+    val frame = received.frame
+    val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(::removalIn)
+    val startedBy = when {
+        frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
+        removal == QueueRemovalDisposition.Dequeued -> "update_queue"
+        else -> null
+    }
+    if (startedBy != null && markStarted()) leaveQueued(lease, startedBy)
+    return removal
 }

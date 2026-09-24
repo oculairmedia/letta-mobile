@@ -178,13 +178,7 @@ open class AppServerRuntimeEventMapper {
             }
             "loop_error",
             "error_message",
-            -> if (deltaObject.isNonTerminalError()) {
-                // letta-mobile-qygvv.2: `is_terminal: false` (0.32 LoopErrorMessage) is a notice
-                // the loop recovers from, not a turn end.
-                listOf(command.remoteFrame(idempotencyKey, runId, messageType, deltaObject.string("id"), raw))
-            } else {
-                listOf(command.lifecycle(RuntimeRunStatus.Failed, runId = runId, reason = deltaObject.errorMessage()))
-            }
+            -> toErrorDeltaDraft(command, runId, deltaObject, raw)
             "client_tool_start" -> listOf(
                 command.draft(
                     runId = runId,
@@ -245,11 +239,24 @@ open class AppServerRuntimeEventMapper {
         }
     }
 
+    private fun AppServerInboundFrame.StreamDelta.toErrorDeltaDraft(
+        command: TurnCommand,
+        runId: RunId?,
+        deltaObject: JsonObject,
+        raw: JsonObject,
+    ): List<RuntimeEventDraft> =
+        if (deltaObject.isNonTerminalError()) {
+            // letta-mobile-qygvv.2: `is_terminal: false` (0.32 LoopErrorMessage) is a notice
+            // the loop recovers from, not a turn end.
+            listOf(command.remoteFrame(idempotencyKey, runId, deltaObject, raw))
+        } else {
+            listOf(command.lifecycle(RuntimeRunStatus.Failed, runId = runId, reason = deltaObject.errorMessage()))
+        }
+
     private fun TurnCommand.remoteFrame(
         frameId: String,
         runId: RunId?,
-        messageType: String?,
-        messageId: String?,
+        deltaObject: JsonObject,
         raw: JsonObject,
     ): RuntimeEventDraft =
         draft(
@@ -257,8 +264,8 @@ open class AppServerRuntimeEventMapper {
             source = RuntimeEventSource.LocalRuntime,
             payload = RuntimeEventPayload.RemoteStreamFrame(
                 frameId = frameId,
-                messageId = messageId,
-                messageType = messageType,
+                messageId = deltaObject.string("id"),
+                messageType = deltaObject.string("message_type"),
                 body = raw.toString(),
             ),
         )
