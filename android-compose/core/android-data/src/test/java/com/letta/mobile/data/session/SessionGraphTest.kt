@@ -8,7 +8,7 @@ import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
@@ -76,7 +76,11 @@ class SessionGraphTest {
         assertEquals("https://backend-a.example.test", graph.backendDescriptor.label)
         assertTrue(graph.backendDescriptor.capabilities.supportsMemFs)
         assertTrue(graph.backendDescriptor.capabilities.supportsApprovals)
-        assertTrue(graph.channelTransport is ChannelTransport)
+        assertTrue(graph.channelTransport is NoOpChannelTransport)
+        // g70jb.3: REST configs used to get an unconnected shim ChannelTransport
+        // (Idle). Nothing on the REST path calls connect(), so the NoOp must
+        // stay Idle too — never Disconnected, which chat would render as loss.
+        assertEquals(ChannelTransportState.Idle, graph.channelTransport.state.value)
     }
 
     @Test

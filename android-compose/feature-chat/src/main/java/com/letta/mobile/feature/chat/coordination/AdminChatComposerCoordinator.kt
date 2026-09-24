@@ -331,7 +331,6 @@ internal class AdminChatComposerCoordinator(
     private fun cancelTransportLabel(context: ChatSendContext): String = when {
         context.isLocalRuntime -> "localRuntime"
         context.backendKind == BackendKind.IROH -> "iroh"
-        context.backendKind == BackendKind.SHIM_WS -> "shim"
         else -> "appServer"
     }
 

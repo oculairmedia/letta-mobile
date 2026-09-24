@@ -79,7 +79,6 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
             activeConfig = activeConfig,
             localRuntimeBackend = localRuntimeBackend,
             settingsRepository = settingsRepository,
-            capturedCursorStore = cursors,
         )
         return assembler.assemble(
             SessionGraphAssembleRequest(

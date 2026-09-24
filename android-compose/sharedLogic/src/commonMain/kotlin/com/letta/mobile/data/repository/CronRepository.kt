@@ -42,8 +42,8 @@ fun defaultCronScope(): CoroutineScope =
  *  - `iroh://` config -> `IrohChannelTransport`, which bridges each of these
  *    calls onto the native `cron.*` admin_rpc methods. No shim frame is ever
  *    emitted.
- *  - shim config      -> `ChannelTransport`, which emits the legacy
- *    `cron_list` / `cron_add` / `cron_delete` shim WS frames.
+ *  - any other config -> `NoOpChannelTransport`, whose cron calls throw
+ *    (the legacy shim WebSocket transport was deleted in g70jb.3).
  *
  * Platform-neutral (commonMain) so Android and Desktop share one impl
  * (Phase 4c).
