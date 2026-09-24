@@ -67,7 +67,10 @@ mod platform {
     }
 
     pub struct Bridge {
-        manager: Manager,
+        /// The window the manager claims Ink on, kept so a broken manager can be rebuilt.
+        hwnd: NonZeroIsize,
+        /// None only between tearing a broken manager down and a rebuild that did not succeed.
+        manager: Option<Manager>,
         /// The last position seen, so Down and Up — which carry no coordinates of their own —
         /// can be reported where the pen actually was.
         last_position: [f32; 2],
@@ -76,27 +79,43 @@ mod platform {
 
     impl Bridge {
         pub fn new(hwnd: isize) -> Option<Self> {
-            let handle = NonZeroIsize::new(hwnd)?;
-            let window = AwtWindow(handle);
-            // Defaults, exactly as the standalone probe uses them. The probe receives this
-            // tablet; the app did not, so the bridge stops differing from the thing that works.
-            // Mouse emulation stays on: the JVM side can tell an emulated tool from a real one by
-            // its lack of pressure, and turning it off was one of two differences between us and
-            // a working reference.
-            let builder = Builder::default();
-            // SAFETY: see AwtWindow.
-            let manager = unsafe { builder.build_raw(window) }.ok()?;
+            let hwnd = NonZeroIsize::new(hwnd)?;
+            let manager = build(hwnd)?;
             Some(Self {
-                manager,
+                hwnd,
+                manager: Some(manager),
                 last_position: [0.0, 0.0],
                 last_pressure: NO_PRESSURE,
             })
         }
 
+        /// Throws the manager away and builds a new one on the same window, after it panicked.
+        ///
+        /// octotablet 0.1 can panic inside `pump` while it holds its shared frame's lock (seen
+        /// live: "removal index (is 5) should be < len (is 4)" as it drops tablets Windows
+        /// removed). That lock is then poisoned, and every later pump quietly gets no events:
+        /// the pen was dead for the rest of the session, and touch stopped with it. Dropping the
+        /// manager disables its RealTimeStylus and removes its plugin, so the new one starts
+        /// from nothing, as at launch. Returns where the pen last was, to report it lifted.
+        pub fn rebuild(&mut self) -> [f32; 2] {
+            if let Some(broken) = self.manager.take() {
+                // Its drop glue may trip over the same bad state; that must not stop the rebuild.
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || drop(broken)));
+            }
+            self.manager = build(self.hwnd);
+            self.last_pressure = NO_PRESSURE;
+            self.last_position
+        }
+
         /// Everything that has happened since the last call, flattened.
         pub fn drain(&mut self) -> Vec<f32> {
             let mut out = Vec::new();
-            let events = match self.manager.pump() {
+            let Some(manager) = self.manager.as_mut() else {
+                // A rebuild that failed is tried again, once a frame, rather than given up on.
+                self.manager = build(self.hwnd);
+                return out;
+            };
+            let events = match manager.pump() {
                 Ok(events) => events,
                 Err(_) => return out,
             };
@@ -137,6 +156,15 @@ mod platform {
         }
     }
 
+    /// A manager on [hwnd], with the defaults the standalone probe uses. The probe receives this
+    /// tablet; the app did not, so the bridge stops differing from the thing that works. Mouse
+    /// emulation stays on: the JVM side can tell an emulated tool from a real one by its lack of
+    /// pressure, and turning it off was one of two differences between us and a working reference.
+    fn build(hwnd: NonZeroIsize) -> Option<Manager> {
+        // SAFETY: see AwtWindow.
+        unsafe { Builder::default().build_raw(AwtWindow(hwnd)) }.ok()
+    }
+
     /// One event in the flattened layout the Kotlin side reads: kind, x, y, pressure, tool.
     fn encode_event(kind: f32, position: [f32; 2], pressure: f32, tool: f32) -> [f32; STRIDE] {
         [kind, position[0], position[1], pressure, tool]
@@ -160,6 +188,10 @@ mod platform {
 
         pub fn drain(&mut self) -> Vec<f32> {
             Vec::new()
+        }
+
+        pub fn rebuild(&mut self) -> [f32; 2] {
+            [0.0, 0.0]
         }
     }
 }
@@ -202,12 +234,20 @@ pub extern "system" fn Java_com_letta_mobile_desktop_input_TabletBridge_nativePo
     // A panic must not cross back into the JVM. This is an `extern "system"` function, so an
     // unwind through it is undefined and Rust aborts the process instead - the whole app dies
     // with a bare NTSTATUS and no stack worth reading. A tablet that misbehaves for one frame
-    // should cost that frame, not the session, so a panic here becomes "no events".
+    // should cost that frame, not the session, so a panic here becomes "no events" - and a new
+    // manager, since the old one is left broken (see Bridge::rebuild). The pen is reported lifted:
+    // whatever Up that frame held is gone, and a stroke left open would keep drawing.
     let events = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.drain())) {
         Ok(events) => events,
         Err(_) => {
-            eprintln!("TABLET: the native bridge panicked while draining; dropping this frame");
-            return empty;
+            eprintln!("TABLET: the native bridge panicked while draining; rebuilding it");
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.rebuild())) {
+                Ok(at) => [KIND_UP, at[0], at[1], NO_PRESSURE, TOOL_UNKNOWN, KIND_OUT, at[0], at[1], NO_PRESSURE, TOOL_UNKNOWN].to_vec(),
+                Err(_) => {
+                    eprintln!("TABLET: rebuilding the native bridge panicked too; trying again next frame");
+                    return empty;
+                }
+            }
         }
     };
     match env.new_float_array(events.len() as i32) {
