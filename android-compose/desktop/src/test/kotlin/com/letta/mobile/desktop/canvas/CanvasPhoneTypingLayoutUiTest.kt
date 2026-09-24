@@ -2,7 +2,9 @@
 
 package com.letta.mobile.desktop.canvas
 
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -18,6 +20,7 @@ import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /** Typing into a new shape on a phone: one slim bar rides on the keyboard, the tool bar steps aside. */
 class CanvasPhoneTypingLayoutUiTest {
@@ -43,6 +46,10 @@ class CanvasPhoneTypingLayoutUiTest {
         onNodeWithContentDescription("Change shape").assertExists()
         onNodeWithContentDescription("Smaller text").assertExists()
         onNodeWithContentDescription("Larger text").assertExists()
+        // And it is at the foot, where the keyboard will be, not over the shape mid-board.
+        val board = onRoot().getBoundsInRoot()
+        val bar = onNodeWithContentDescription("Change shape").getBoundsInRoot()
+        assertTrue(bar.top.value > board.bottom.value * 0.75f, "the bar is at ${bar.top} on a board ${board.bottom} tall")
         // Colour and style are the tool bar's; the phone bar does not carry a second copy.
         onNodeWithContentDescription("Properties").assertDoesNotExist()
 

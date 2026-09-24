@@ -1514,9 +1514,12 @@ fun CanvasWorkspace(
             // Typing into a shape on a phone: the keyboard takes the bottom half, so the tool bar
             // steps aside and the selection bar rides on the keyboard instead of over the shape,
             // the way Miro lays it out. The keyboard camera then keeps the shape above them both.
-            val typingOnPhone = compact && editingTextId != null && hasSelection
+            // A shape only: a standalone text keeps its usual bars, as the slim one has no
+            // Properties for it.
             val editable = state.elements.singleOrNull { it.id in state.selectedIds }
                 ?.takeIf { CanvasWorkspaceSupport.holdsText(it) }
+            val typingOnPhone = compact && editingTextId != null && hasSelection &&
+                editable is io.ak1.drawbox.domain.model.Element.Shape
             val selectionBar: @Composable (Modifier) -> Unit = { barModifier ->
                 CanvasSelectionBar(
                     state = controlsBarState,

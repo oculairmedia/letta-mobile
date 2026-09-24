@@ -173,4 +173,16 @@ class AmbientMotionTest {
                 assertEquals(0, AmbientMotion.holdMillis(status), "$status is not held")
             }
     }
+
+    @Test
+    fun thePhoneBandStaysAboveATallComposer() {
+        val usual = AmbientMotion.ABOVE_COMPOSER_BAND
+        assertEquals(usual, AmbientMotion.bandAboveComposer(0f), "unmeasured")
+        assertEquals(usual, AmbientMotion.bandAboveComposer(0.08f), "a composer inside its tenth")
+
+        val tall = AmbientMotion.bandAboveComposer(0.30f)
+        assertEquals(0.70f, tall.peak, 1e-4f)
+        assertEquals(usual.peak - usual.top, tall.peak - tall.top, 1e-4f)
+        assertTrue(AmbientMotion.bandAboveComposer(0.99f).top >= 0f)
+    }
 }
