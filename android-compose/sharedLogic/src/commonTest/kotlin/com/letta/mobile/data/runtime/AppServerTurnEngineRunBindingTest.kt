@@ -143,62 +143,15 @@ class AppServerTurnEngineRunBindingTest {
         assertEquals(RuntimeRunStatus.Started, started.status)
     }
 
-    /** Skips observable frames up to the first terminal lifecycle draft, which it returns. */
-    private suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminal(): RuntimeEventDraft {
-        while (true) {
-            val item = awaitItem()
-            val status = item.status() ?: continue
-            if (status in terminalStatuses) return item
-        }
-    }
+    private typealias BindingClient = TurnEngineTestStreamClient
 
-    private fun RuntimeEventDraft.status(): RuntimeRunStatus? =
-        (payload as? RuntimeEventPayload.RunLifecycleChanged)?.status
+    private suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminal(): RuntimeEventDraft = awaitTerminalDraft()
 
-    private class BindingClient : AppServerClient {
-        override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 32)
-
-        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
-            AppServerInboundFrame.RuntimeStartResponse(
-                requestId = command.requestId,
-                success = true,
-                runtime = AppServerRuntimeScope(
-                    agentId = requireNotNull(command.agentId),
-                    conversationId = requireNotNull(command.conversationId),
-                ),
-            )
-
-        override suspend fun input(command: AppServerCommand.Input) = Unit
-
-        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("sync unused")
-
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("abort unused")
-
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            AppServerInboundFrame.AdminRpcResponse(requestId = command.requestId, success = true, result = null)
-
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
-
-        fun emit(frame: AppServerInboundFrame) {
-            (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    frame = frame,
-                    raw = buildJsonObject {
-                        put("type", frame.type ?: "unknown")
-                        put("idempotency_key", "evt-${frame.type}")
-                        if (frame is AppServerInboundFrame.StreamDelta) put("delta", frame.delta)
-                    },
-                ),
-            )
-        }
-    }
+    private fun RuntimeEventDraft.status(): RuntimeRunStatus? = runLifecycleStatus()
 
     private companion object {
         const val SETTLE_WINDOW_PASSED_MS = 5_000L
-        val terminalStatuses = setOf(RuntimeRunStatus.Completed, RuntimeRunStatus.Failed, RuntimeRunStatus.Cancelled)
+        val terminalStatuses = turnEngineTerminalStatuses
         val runtime = AppServerRuntimeScope("agent-1", "conv-1")
 
         fun commandFor(localMessageId: String) = TurnCommand(

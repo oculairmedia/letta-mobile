@@ -20,6 +20,7 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -83,6 +84,7 @@ class DefaultAppServerController(
         RuntimePermissionDefaults.DEFAULT_MODE
     },
 ) : AppServerController {
+    @Suppress("NoDetachedCoroutineLifecycle") // Controller lifecycle: scope is owned and cancelled in close().
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
@@ -312,6 +314,7 @@ class DefaultAppServerController(
                 ),
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
                 message = "Failed to start runtime: ${e.message}",
@@ -507,6 +510,7 @@ class DefaultAppServerController(
                 ),
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw AppServerControllerException("Failed to sync runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
     }
@@ -524,6 +528,7 @@ class DefaultAppServerController(
                 ),
             )
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
     }

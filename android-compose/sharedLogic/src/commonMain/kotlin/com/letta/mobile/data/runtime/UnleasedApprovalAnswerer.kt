@@ -69,11 +69,22 @@ internal class UnleasedApprovalAnswerer(
         val toolName = request.request.string("tool_name")
         val mode = permissionModeFor(key)
         if (mode != AppServerPermissionMode.Unrestricted || RuntimeUserInputTools.requiresUserInput(toolName)) {
-            record("approval.unleasedPending", request, key, toolName, mode)
+            record("approval.unleasedPending", request, toolName, mode)
             return UnleasedApprovalOutcome.LeftPending
         }
         val generation = connectionGeneration ?: connectionGenerationProvider()
         if (!claim(request, key, generation)) return UnleasedApprovalOutcome.AlreadyClaimed
+        sendAutoAllow(request, key, runtime, generation)
+        record("approval.unleasedAutoAllow", request, toolName, mode)
+        return UnleasedApprovalOutcome.AutoAllowed
+    }
+
+    private suspend fun sendAutoAllow(
+        request: AppServerInboundFrame.ControlRequest,
+        key: TurnRuntimeKey,
+        runtime: AppServerRuntimeScope,
+        generation: Long,
+    ) {
         val ref = InboundControlRequestRegistry.RequestRef(request.requestId)
         try {
             client.input(
@@ -93,8 +104,6 @@ internal class UnleasedApprovalAnswerer(
             throw error
         }
         inboundControlRegistry.markAnswered(ref, generation)
-        record("approval.unleasedAutoAllow", request, key, toolName, mode)
-        return UnleasedApprovalOutcome.AutoAllowed
     }
 
     private fun claim(
@@ -121,14 +130,14 @@ internal class UnleasedApprovalAnswerer(
     private fun record(
         event: String,
         request: AppServerInboundFrame.ControlRequest,
-        key: TurnRuntimeKey,
         toolName: String?,
         mode: AppServerPermissionMode,
     ) {
+        val runtimeKey = request.runtime?.let { "${it.agentId}/${it.conversationId}" }.orEmpty()
         Telemetry.event(
             "AppServerTurnEngine", event,
             "requestId" to request.requestId,
-            "key" to key.toString(),
+            "key" to runtimeKey,
             "tool" to (toolName ?: ""),
             "permissionMode" to mode.name,
             level = Telemetry.Level.WARN,

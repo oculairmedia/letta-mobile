@@ -59,9 +59,10 @@ internal class TurnBoundaryGate {
     fun isAbortRequested(): Boolean = synchronized(lock) { abortRequested }
 
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
-    fun noteSettled(runId: String?): Unit = synchronized(lock) {
-        runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
-        Unit
+    fun noteSettled(runId: String?) {
+        synchronized(lock) {
+            runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
+        }
     }
 
     fun decide(
@@ -97,12 +98,15 @@ internal class TurnBoundaryGate {
             finishedTurnIds.add(frame.turnId)
             return TurnBoundaryDecision.Drop("run_already_settled")
         }
-        if (runId != null && leaseRunId != null && runId != leaseRunId) {
+        if (isSupersededRun(runId, leaseRunId)) {
             return TurnBoundaryDecision.Drop("superseded_run")
         }
         finishedTurnIds.add(frame.turnId)
         return TurnBoundaryDecision.ProjectAuthoritative
     }
+
+    private fun isSupersededRun(runId: String?, leaseRunId: String?): Boolean =
+        runId != null && leaseRunId != null && runId != leaseRunId
 
     private fun decideLoopStatus(
         frame: AppServerInboundFrame.UpdateLoopStatus,
@@ -110,10 +114,13 @@ internal class TurnBoundaryGate {
     ): TurnBoundaryDecision {
         val idle = frame.loopStatus.status == LOOP_WAITING_ON_INPUT &&
             frame.loopStatus.activeRunIds.isEmpty()
-        if (!idle || !evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
+        if (!canSettleIdleLoop(idle, approvalOutstanding)) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }
+
+    private fun canSettleIdleLoop(idle: Boolean, approvalOutstanding: Boolean): Boolean =
+        idle && evidenceSeen && !approvalOutstanding
 
     /** Insertion-ordered, bounded set: the oldest id is evicted once [capacity] is exceeded. */
     private class RecentIds(private val capacity: Int) {

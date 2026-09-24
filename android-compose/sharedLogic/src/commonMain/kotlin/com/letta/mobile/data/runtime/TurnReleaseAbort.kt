@@ -74,6 +74,7 @@ internal class OrphanedTurnAborter(
     }
 
     /** Sends the abort when [shouldAbort]; never throws, bounded by [timeoutMs]. */
+    @Suppress("CancellationMustPropagate") // Runs in the lease's NonCancellable release path: nothing may escape it.
     suspend fun abortIfOrphaned(facts: LeaseReleaseFacts) {
         if (!shouldAbort(facts)) return
         // A late terminal for the aborted run must not end the next turn on this key.

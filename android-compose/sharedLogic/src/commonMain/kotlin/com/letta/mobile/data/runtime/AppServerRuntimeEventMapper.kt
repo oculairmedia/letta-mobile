@@ -152,36 +152,13 @@ open class AppServerRuntimeEventMapper {
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
         return when (messageType) {
-            "stop_reason" -> {
-                val stopDraft = command.draft(
-                    runId = runId,
-                    source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RemoteStreamFrame(
-                        frameId = idempotencyKey,
-                        messageId = deltaObject.string("id"),
-                        messageType = messageType,
-                        body = raw.toString(),
-                    ),
-                )
-                val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
-                val lifecycleDraft = when (AppServerStopReason.boundaryOf(stopReason)) {
-                    AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
-                    AppServerTurnBoundary.Cancelled -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
-                    AppServerTurnBoundary.Failed -> command.lifecycle(
-                        RuntimeRunStatus.Failed,
-                        runId = runId,
-                        reason = deltaObject.errorMessage("App Server turn stopped with ${stopReason ?: "error"}"),
-                    )
-                    AppServerTurnBoundary.Completed -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
-                }
-                listOfNotNull(stopDraft, lifecycleDraft)
-            }
+            "stop_reason" -> toStopReasonDraft(command, deltaObject, raw)
             "loop_error",
             "error_message",
             -> if (deltaObject.isNonTerminalError()) {
                 // letta-mobile-qygvv.2: `is_terminal: false` (0.32 LoopErrorMessage) is a notice
                 // the loop recovers from, not a turn end.
-                listOf(command.remoteFrame(idempotencyKey, runId, messageType, deltaObject.string("id"), raw))
+                listOf(command.remoteFrame(idempotencyKey, runId, deltaObject, raw))
             } else {
                 listOf(command.lifecycle(RuntimeRunStatus.Failed, runId = runId, reason = deltaObject.errorMessage()))
             }
@@ -245,11 +222,40 @@ open class AppServerRuntimeEventMapper {
         }
     }
 
+    private fun AppServerInboundFrame.StreamDelta.toStopReasonDraft(
+        command: TurnCommand,
+        deltaObject: JsonObject,
+        raw: JsonObject,
+    ): List<RuntimeEventDraft> {
+        val runId = deltaObject.string("run_id")?.let(::RunId)
+        val stopDraft = command.draft(
+            runId = runId,
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.RemoteStreamFrame(
+                frameId = idempotencyKey,
+                messageId = deltaObject.string("id"),
+                messageType = "stop_reason",
+                body = raw.toString(),
+            ),
+        )
+        val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
+        val lifecycleDraft = when (AppServerStopReason.boundaryOf(stopReason)) {
+            AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
+            AppServerTurnBoundary.Cancelled -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
+            AppServerTurnBoundary.Failed -> command.lifecycle(
+                RuntimeRunStatus.Failed,
+                runId = runId,
+                reason = deltaObject.errorMessage("App Server turn stopped with ${stopReason ?: "error"}"),
+            )
+            AppServerTurnBoundary.Completed -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
+        }
+        return listOfNotNull(stopDraft, lifecycleDraft)
+    }
+
     private fun TurnCommand.remoteFrame(
         frameId: String,
         runId: RunId?,
-        messageType: String?,
-        messageId: String?,
+        deltaObject: JsonObject,
         raw: JsonObject,
     ): RuntimeEventDraft =
         draft(
@@ -257,8 +263,8 @@ open class AppServerRuntimeEventMapper {
             source = RuntimeEventSource.LocalRuntime,
             payload = RuntimeEventPayload.RemoteStreamFrame(
                 frameId = frameId,
-                messageId = messageId,
-                messageType = messageType,
+                messageId = deltaObject.string("id"),
+                messageType = deltaObject.string("message_type"),
                 body = raw.toString(),
             ),
         )

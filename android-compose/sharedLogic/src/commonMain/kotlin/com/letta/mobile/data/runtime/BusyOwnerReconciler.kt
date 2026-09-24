@@ -140,21 +140,8 @@ internal class BusyOwnerReconciler(
         // its collector too), so retire whatever lease still carries the probed token. If the
         // owner ended on its own meanwhile, the slot is free for the caller to retry.
         val owner = retireLease(slot, probed.token) ?: return slot.lease?.token != probed.token
-        // Cancel and join the owning structured scope before admitting a successor. The cause
-        // tells the owner's release path there is no server turn left to abort.
-        owner.ownerJob?.let { job ->
-            job.cancel(DeadOwnerReleasedCancellation())
-            runCatching { job.join() }
-        }
-        // The owner's finally may already have cleared the retiring lease via token match.
-        slot.updateLease { cur -> if (cur?.token == owner.token) null else cur }
-        slot.updateOwner { telemetry ->
-            val same = telemetry != null &&
-                telemetry.runtimeId == owner.runtimeId &&
-                telemetry.conversationId == owner.conversationId &&
-                telemetry.acquiredAtMs == owner.acquiredAtMs
-            if (same) null else telemetry
-        }
+        cancelOwnerJob(owner)
+        clearSlotOwner(slot, owner)
         // SENSING (b, letta-mobile-8xxzv): this lease ended via the reconciler, NOT via a
         // terminal frame. Scoped to ONE key so it also proves it never reaches across runtimes.
         Telemetry.event(
@@ -168,6 +155,27 @@ internal class BusyOwnerReconciler(
             level = Telemetry.Level.WARN,
         )
         return slot.lease?.token != owner.token
+    }
+
+    private suspend fun cancelOwnerJob(owner: TurnLease) {
+        // Cancel and join the owning structured scope before admitting a successor. The cause
+        // tells the owner's release path there is no server turn left to abort.
+        owner.ownerJob?.let { job ->
+            job.cancel(DeadOwnerReleasedCancellation())
+            runCatching { job.join() }
+        }
+    }
+
+    private fun clearSlotOwner(slot: TurnLeaseSlot, owner: TurnLease) {
+        // The owner's finally may already have cleared the retiring lease via token match.
+        slot.updateLease { cur -> if (cur?.token == owner.token) null else cur }
+        slot.updateOwner { telemetry ->
+            val same = telemetry != null &&
+                telemetry.runtimeId == owner.runtimeId &&
+                telemetry.conversationId == owner.conversationId &&
+                telemetry.acquiredAtMs == owner.acquiredAtMs
+            if (same) null else telemetry
+        }
     }
 
     /** Moves the live lease with [token] to Retiring; null when no such live lease remains. */
