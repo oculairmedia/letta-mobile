@@ -112,7 +112,7 @@ class CanvasRelayClient(
         healthFlows.getOrCreate(canvasId) { MutableStateFlow(CanvasSyncHealth.LocalOnly(NO_HOST)) }
 
     private inner class Canvas(val id: CanvasId, val topic: String) {
-        val appliers = mutableListOf<suspend (CanvasOp) -> Unit>()
+        val appliers = mutableListOf<suspend (CanvasOp, String?) -> Unit>()
         val health: MutableStateFlow<CanvasSyncHealth> = healthFlow(id)
 
         /**
@@ -175,11 +175,15 @@ class CanvasRelayClient(
     }
 
     override suspend fun deliverTo(canvasId: CanvasId, apply: suspend (CanvasOp) -> Unit) {
+        deliverVouchedTo(canvasId) { op, _ -> apply(op) }
+    }
+
+    override suspend fun deliverVouchedTo(canvasId: CanvasId, apply: suspend (op: CanvasOp, vouchedActor: String?) -> Unit) {
         val canvas = canvas(canvasId)
         lock.withLock { canvas.appliers += apply }
         try {
             coroutineScope {
-                launch { canvas.local.collect { apply(it) } }
+                launch { canvas.local.collect { apply(it, null) } }
                 val live = lock.withLock { current }
                 // A connection that fails here ends in [run]; this session keeps working locally.
                 if (live != null) runCatching { join(live, canvas.topic) }.onFailure { if (it is CancellationException) throw it }
@@ -356,7 +360,7 @@ class CanvasRelayClient(
     }
 
     private suspend fun op(live: Live, message: CanvasRelayMessage.Op) {
-        applyLocally(message.topic, message.op)
+        applyLocally(message.topic, message.op, vouchedActor(message))
         // Only after every session applied it: a crash before this replays it, never skips it.
         delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
         raiseHostCursor(message.topic, message.cursor)
@@ -445,10 +449,19 @@ class CanvasRelayClient(
     private fun canvasesOf(topic: String): List<Canvas> = canvases.values.filter { it.topic == topic }
 
     /** Every session of the canvases of [topic] in this app applies [op]; they skip ops they have. */
-    private suspend fun applyLocally(topic: String, op: CanvasOp) {
+    private suspend fun applyLocally(topic: String, op: CanvasOp, vouchedActor: String?) {
         val appliers = lock.withLock { canvasesOf(topic).flatMap { it.appliers.toList() } }
-        for (apply in appliers) apply(op)
+        for (apply in appliers) apply(op, vouchedActor)
     }
+
+    /**
+     * The actor the host vouches for on [message]: an agent's op that the host's own canvas tools
+     * published (origin `agent:<id>`, which only the host's backend uses; an app's origin is its
+     * authenticated node id) after checking the agent against the host's ACL. Null otherwise.
+     */
+    private fun vouchedActor(message: CanvasRelayMessage.Op): String? =
+        message.origin.removePrefix(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX)
+            .takeIf { message.origin.startsWith(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX) && it == message.op.actorId }
 
     private suspend fun refreshAll() {
         val topics = lock.withLock { canvases.values.map { it.topic }.toSet() }

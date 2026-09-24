@@ -463,6 +463,8 @@ class AppServerTurnEngine(
         runId: String?,
     ): AppServerInboundFrame.AbortMessageResponse {
         val key = TurnRuntimeKey(agentId, conversationId)
+        // letta-mobile-qygvv.2: an idle loop status after this reads as Cancelled, not Completed.
+        leases.peek(key)?.boundaryGate?.noteAbortRequested()
         val scope = leases.peek(key)?.runtimeScope
             ?: AppServerRuntimeScope(agentId = agentId, conversationId = conversationId)
         return client.abort(
@@ -1126,7 +1128,28 @@ class AppServerTurnEngine(
         val queueRemoval = observeQueueProgress(received, context.lease)
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
-        val frameSeq = received.eventSeqOrNull()
+        val projected = projectAtBoundary(received, context, budget)
+        // The update_queue passthrough draft above still reaches viewers; only then
+        // settle a lease whose queued input the server dropped.
+        if (projected && queueRemoval == QueueRemovalDisposition.Cancelled) {
+            completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
+        }
+    }
+
+    /**
+     * letta-mobile-qygvv.2: projects one accepted frame through the [TurnBoundaryGate] decision.
+     * Returns false when the frame was dropped at the boundary or could not be projected.
+     */
+    private suspend fun projectAtBoundary(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+        budget: FrameProjectionErrorBudget,
+    ): Boolean {
+        val slot = context.lease.slot
+        val boundary = slot.boundaryGate.decideOrDrop(
+            TurnBoundaryInput(received, context.lease.current?.runId, approvals.hasOutstanding(slot.key)),
+            context.runtimeScope,
+        ) ?: return false
         // letta-mobile-gdvbf: the resilience boundary is EXACTLY this seam, and
         // deliberately no wider. Everything above has already touched turn
         // state (generation/scope gating, watchdog, external-tool dispatch,
@@ -1134,13 +1157,12 @@ class AppServerTurnEngine(
         // (run-id promotion, draft processing). A failure there is not
         // equivalent to an unreadable frame — it may need terminal settlement —
         // so it must still propagate.
-        val drafts = projectOrSkip(received, context, budget) ?: return
-        context.draftProcessor.promoteAndProcess(drafts, frameSeq, slot, context.lease.token)
-        // The update_queue passthrough draft above still reaches viewers; only then
-        // settle a lease whose queued input the server dropped.
-        if (queueRemoval == QueueRemovalDisposition.Cancelled) {
-            completeAbruptTurn(context, AbruptTurnEnding.QueuedInputCancelled)
-        }
+        val drafts = projectOrSkip(received, context, budget) ?: return false
+        slot.runIdGate.promoteAtBoundary(boundary, drafts, context.lease.token)
+        val frameSeq = received.eventSeqOrNull()
+        boundary.withLoopIdleTerminal(drafts, context.command, context.lease.current?.runId)
+            .forEach { draft -> context.draftProcessor.process(draft, frameSeq, boundary.isAuthoritative) }
+        return true
     }
 
     /**
@@ -1268,15 +1290,7 @@ class AppServerTurnEngine(
                 recordTerminal = { draft, frameSeq ->
                     recordTerminalLifecycle(draft, command, frameSeq, lease)
                 },
-                noteCompleted = { frameSeq ->
-                    noteOwnerTerminal(
-                        RuntimeRunStatus.Completed,
-                        source = "completed_settle",
-                        seq = frameSeq,
-                        scopeMatched = true,
-                        lease = lease,
-                    )
-                },
+                noteCompleted = { frameSeq -> noteCompletedSettle(frameSeq, lease) },
                 complete = { throw TurnCompleted },
                 settleDelayMs = terminalSettleQuietMs,
             ),
@@ -1300,6 +1314,7 @@ class AppServerTurnEngine(
         // lgns8.22.4: when the server reassigns run id mid-turn (tool continuation),
         // prior ids are superseded and must not complete/mutate this lease.
         slot.runIdGate.beginLease(lease.token)
+        slot.boundaryGate.beginLease(lease.token)
         val (fanoutSubscriberId, inboundEvents) = inboundSource.subscribe(scope)
         val frameContext = TurnFrameContext(
             runtimeScope = scope,
@@ -1659,16 +1674,6 @@ class AppServerTurnEngine(
         )
     }
 
-    private fun AppServerReceivedFrame.eventSeqOrNull(): Long? =
-        when (val f = frame) {
-            is AppServerInboundFrame.StreamDelta -> f.eventSeq
-            is AppServerInboundFrame.UpdateLoopStatus -> f.eventSeq
-            is AppServerInboundFrame.UpdateDeviceStatus -> f.eventSeq
-            is AppServerInboundFrame.UpdateQueue -> f.eventSeq
-            is AppServerInboundFrame.UpdateSubagentState -> f.eventSeq
-            else -> null
-        }
-
     /**
      * letta-mobile-oqfbj: extract tool_call_id from a RemoteStreamFrame body.
      * Handles tool_call_message, approval_request_message, and tool_return_message frames.
@@ -1890,12 +1895,25 @@ class AppServerTurnEngine(
      * letta-mobile-kyqdt / o0atv: telemetry for a matched terminal lifecycle draft.
      * Kept out of [collectTurnWithIdleWatchdog] to avoid Complex Method regressions.
      */
+    /** The settle window closed on a completed turn: its run is settled (letta-mobile-qygvv.2). */
+    private fun noteCompletedSettle(frameSeq: Long?, lease: LeaseRef) {
+        lease.slot.boundaryGate.noteSettled(lease.current?.runId)
+        noteOwnerTerminal(
+            RuntimeRunStatus.Completed,
+            source = "completed_settle",
+            seq = frameSeq,
+            scopeMatched = true,
+            lease = lease,
+        )
+    }
+
     private fun recordTerminalLifecycle(
         draft: RuntimeEventDraft,
         command: TurnCommand,
         frameSeq: Long?,
         lease: LeaseRef,
     ) {
+        lease.slot.boundaryGate.noteSettledTerminal(draft, lease.current?.runId)
         val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged ?: return
         noteOwnerTerminal(
             lifecycle.status,

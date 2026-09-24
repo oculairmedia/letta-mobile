@@ -97,7 +97,7 @@ class HostCanvasBackend(
             return HostCanvasPublish.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
         val replies = Channel<CanvasRelayMessage>(Channel.UNLIMITED)
-        val link = relay.connect("agent:${caller.agentId}") { replies.send(it) }
+        val link = relay.connect(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX + caller.agentId) { replies.send(it) }
         try {
             link.receive(CanvasRelayMessage.Join(entry.topic, entry.canvasId, afterCursor = store.head(entry.topic)))
             var lamport = scene(entry).lamport
