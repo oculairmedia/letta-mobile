@@ -21,6 +21,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -84,6 +85,7 @@ class DefaultAppServerController(
         RuntimePermissionDefaults.DEFAULT_MODE
     },
 ) : AppServerController {
+    @Suppress("NoDetachedCoroutineLifecycle")
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
@@ -216,15 +218,46 @@ class DefaultAppServerController(
         mode: AppServerPermissionMode?,
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
-    ): CanonicalRuntime = runtimeMutex.withLock {
-        startRuntimeLocked(
-            agentId = agentId,
-            conversationId = conversationId,
-            cwd = cwd,
-            mode = mode,
-            recoverApprovals = recoverApprovals,
-            forceDeviceStatus = forceDeviceStatus,
-        )
+    ): CanonicalRuntime {
+        val key = RuntimeKey(agentId.value, conversationId.value)
+        val modeChangeCandidate = runtimeMutex.withLock {
+            val cached = runtimeCache[key]
+            if (cached != null) {
+                val effectiveMode = mode ?: runtimePermissionModes[key] ?: defaultPermissionMode()
+                if (runtimePermissionModes[key] == effectiveMode) {
+                    return cached
+                }
+                ModeChangeCandidate(cached, effectiveMode, connectionGeneration.value)
+            } else {
+                null
+            }
+        }
+
+        if (modeChangeCandidate != null) {
+            val (cached, effectiveMode, generation) = modeChangeCandidate
+            val confirmed = deviceState.changePermissionMode(cached.scope, effectiveMode)
+            runtimeMutex.withLock {
+                if (connectionGeneration.value == generation && runtimeCache[key] === cached) {
+                    if (confirmed) {
+                        runtimePermissionModes[key] = effectiveMode
+                        return cached
+                    }
+                    runtimeCache.remove(key)
+                    turnEngine.invalidateRuntime(notifyHost = false)
+                }
+            }
+        }
+
+        return runtimeMutex.withLock {
+            startRuntimeLocked(
+                agentId = agentId,
+                conversationId = conversationId,
+                cwd = cwd,
+                mode = mode,
+                recoverApprovals = recoverApprovals,
+                forceDeviceStatus = forceDeviceStatus,
+            )
+        }
     }
 
     private suspend fun startRuntimeLocked(
@@ -240,7 +273,14 @@ class DefaultAppServerController(
         // (ReconnectCoordinator calls startRuntime without mode). Only the fully
         // absent case falls back to the cold-start default (letta-mobile-h5t1g).
         val effectiveMode = mode ?: runtimePermissionModes[key] ?: defaultPermissionMode()
-        evictCachedRuntimeIfModeMismatch(key, effectiveMode)?.let { return it }
+        val cached = runtimeCache[key]
+        if (cached != null) {
+            if (runtimePermissionModes[key] == effectiveMode) {
+                return cached
+            }
+            runtimeCache.remove(key)
+            turnEngine.invalidateRuntime(notifyHost = false)
+        }
         runtimePermissionModes[key] = effectiveMode
         val response = startRuntimeRemote(
             key = key,
@@ -252,31 +292,6 @@ class DefaultAppServerController(
             forceDeviceStatus = forceDeviceStatus,
         )
         return cacheStartedRuntime(key, agentId, conversationId, cwd, response)
-    }
-
-    /**
-     * Returns a matching cached runtime, or null when a fresh start is required.
-     *
-     * letta-mobile-qygvv.7: a permission-mode change on a cached runtime is applied
-     * in place with `change_device_state{mode}` and confirmed from the scope's
-     * `update_device_status`; the runtime is NOT restarted (runtime_start replays
-     * state and re-registers external tools). Only when the server does not confirm
-     * the new mode is the runtime evicted, so the next start re-attaches with the
-     * requested mode rather than leaving a cached runtime in an unknown mode.
-     */
-    private suspend fun evictCachedRuntimeIfModeMismatch(
-        key: RuntimeKey,
-        effectiveMode: AppServerPermissionMode,
-    ): CanonicalRuntime? {
-        val cached = runtimeCache[key] ?: return null
-        if (runtimePermissionModes[key] == effectiveMode) return cached
-        if (deviceState.changePermissionMode(cached.scope, effectiveMode)) {
-            runtimePermissionModes[key] = effectiveMode
-            return cached
-        }
-        runtimeCache.remove(key)
-        turnEngine.invalidateRuntime(notifyHost = false)
-        return null
     }
 
     private suspend fun startRuntimeRemote(
@@ -308,6 +323,8 @@ class DefaultAppServerController(
                     externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
                 ),
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
@@ -503,6 +520,8 @@ class DefaultAppServerController(
                     forceDeviceStatus = forceDeviceStatus,
                 ),
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to sync runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
@@ -520,6 +539,8 @@ class DefaultAppServerController(
                     runId = runId,
                 ),
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
@@ -529,6 +550,12 @@ class DefaultAppServerController(
      * Internal key for runtime cache.
      */
     private data class RuntimeKey(val agentId: String, val conversationId: String)
+
+    private data class ModeChangeCandidate(
+        val cached: CanonicalRuntime,
+        val effectiveMode: AppServerPermissionMode,
+        val generation: Long,
+    )
 
     /** Tear down the inbound router collector and controller scope (tests / shutdown). */
     override fun close() {

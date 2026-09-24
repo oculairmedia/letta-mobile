@@ -74,8 +74,10 @@ internal class DeviceStateChanger(
                         .first(confirms)
                 }
                 try {
-                    client.changeDeviceState(AppServerCommand.ChangeDeviceState(scope, payload))
-                    withTimeout(timeoutMs.milliseconds) { confirmation.await() }
+                    withTimeout(timeoutMs.milliseconds) {
+                        client.changeDeviceState(AppServerCommand.ChangeDeviceState(scope, payload))
+                        confirmation.await()
+                    }
                     true
                 } finally {
                     confirmation.cancel()

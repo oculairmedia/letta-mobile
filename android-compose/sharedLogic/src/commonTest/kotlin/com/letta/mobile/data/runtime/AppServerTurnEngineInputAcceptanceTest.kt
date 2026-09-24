@@ -131,14 +131,48 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertTrue(engine.isBusy("agent-1", "conv-1"), "watchdog must be paused while queued")
         assertEquals(RuntimeRunStatus.Running, drafts.lastLifecycle()?.status)
 
-        // The turn starts: the watchdog is armed again and trips on fresh silence.
+        // A stream frame from the earlier turn must not unpause the watchdog while queued.
         client.emit(streamDelta("assistant_message"))
+        runCurrent()
+        advanceTimeBy(IDLE_TIMEOUT_MS * 5)
+        runCurrent()
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "stream frame from earlier turn must not trip watchdog while queued")
+
+        // Once dequeued, fresh silence trips the armed watchdog.
+        client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
         runCurrent()
         advanceTimeBy(IDLE_TIMEOUT_MS + 1)
         advanceUntilIdle()
         turn.join()
 
         assertEquals(RuntimeRunStatus.Failed, drafts.lastLifecycle()?.status)
+        assertFalse(engine.isBusy("agent-1", "conv-1"))
+    }
+
+    @Test
+    fun earlierTurnFinishedArrivingWhileQueuedDoesNotCompleteTurn() = runTest {
+        val client = AckingClient(ack(accepted = true, disposition = "queued"))
+        val engine = engineFor(client)
+        val drafts = mutableListOf<RuntimeEventDraft>()
+        val turn = launch { engine.runTurn(command).collect { drafts += it } }
+        runCurrent()
+
+        assertTrue(INPUT_QUEUED_REASON in drafts.lifecycleReasons(), "queued input must be visible")
+
+        // An earlier turn's turn_finished arriving while queued must be ignored and not complete this turn.
+        client.emit(turnFinished(turnId = "prev-turn-1", runId = "prev-run-1"))
+        runCurrent()
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "turn must remain active when earlier turn finishes")
+        assertEquals(RuntimeRunStatus.Running, drafts.lastLifecycle()?.status)
+
+        // Dequeue, then our own turn streams and completes normally.
+        client.emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "dequeued"))))
+        client.emit(streamDelta("assistant_message"))
+        client.emit(turnFinished(turnId = "turn-1", runId = "run-1"))
+        advanceUntilIdle()
+        turn.join()
+
+        assertEquals(RuntimeRunStatus.Completed, drafts.lastLifecycle()?.status)
         assertFalse(engine.isBusy("agent-1", "conv-1"))
     }
 
@@ -343,6 +377,23 @@ class AppServerTurnEngineInputAcceptanceTest {
                 idempotencyKey = "queue-$seq",
                 queue = queued.map { id -> buildJsonObject { put("client_message_id", id) } },
                 removed = removed,
+            )
+        }
+
+        fun turnFinished(
+            turnId: String = "turn-prev",
+            runId: String? = "run-prev",
+            stopReason: String = "end_turn",
+        ): AppServerInboundFrame.TurnFinished {
+            seq += 1
+            return AppServerInboundFrame.TurnFinished(
+                runtime = runtime,
+                eventSeq = seq,
+                emittedAt = "2026-09-24T00:00:00Z",
+                idempotencyKey = "finished-$seq",
+                turnId = turnId,
+                stopReason = stopReason,
+                runId = runId,
             )
         }
     }

@@ -1136,6 +1136,7 @@ class AppServerTurnEngine(
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
         val queueRemoval = observeQueueProgress(received, context)
+        if (context.queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue) return
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
         val frameSeq = received.eventSeqOrNull()
@@ -1307,9 +1308,11 @@ class AppServerTurnEngine(
     ): QueueRemovalDisposition? {
         val frame = received.frame
         val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(context.queuedInput::removalIn)
+        // While queued, frames on this scope belong to the turn ahead; only the
+        // dequeue transition for OUR client_message_id proves our input started.
         val startedBy = when {
-            frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
             removal == QueueRemovalDisposition.Dequeued -> "update_queue"
+            frame is AppServerInboundFrame.StreamDelta && !context.queuedInput.isQueued -> "stream_delta"
             else -> null
         }
         if (startedBy != null && context.queuedInput.markStarted()) leaveQueued(context.lease, startedBy)

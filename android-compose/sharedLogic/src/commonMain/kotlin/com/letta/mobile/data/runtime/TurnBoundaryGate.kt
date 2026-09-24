@@ -58,7 +58,6 @@ internal class TurnBoundaryGate {
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
     fun noteSettled(runId: String?): Unit = synchronized(lock) {
         runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
-        Unit
     }
 
     fun decide(
@@ -94,8 +93,8 @@ internal class TurnBoundaryGate {
             finishedTurnIds.add(frame.turnId)
             return TurnBoundaryDecision.Drop("run_already_settled")
         }
-        if (runId != null && leaseRunId != null && runId != leaseRunId) {
-            return TurnBoundaryDecision.Drop("superseded_run")
+        if (runId != null && leaseRunId != null) {
+            if (runId != leaseRunId) return TurnBoundaryDecision.Drop("superseded_run")
         }
         finishedTurnIds.add(frame.turnId)
         return TurnBoundaryDecision.ProjectAuthoritative
@@ -107,7 +106,8 @@ internal class TurnBoundaryGate {
     ): TurnBoundaryDecision {
         val idle = frame.loopStatus.status == LOOP_WAITING_ON_INPUT &&
             frame.loopStatus.activeRunIds.isEmpty()
-        if (!idle || !evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
+        if (!idle) return TurnBoundaryDecision.Project
+        if (!evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }
