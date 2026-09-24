@@ -254,8 +254,9 @@ class ShimOffParityGateTest {
             reason: String?,
             toolCallId: String?,
             updatedInput: JsonObject?,
-        ) {
+        ): com.letta.mobile.data.controller.ApprovalSubmitResult {
             submittedApprovalRequestId = approvalRequestId
+            return com.letta.mobile.data.controller.ApprovalSubmitResult.Accepted
         }
     }
 

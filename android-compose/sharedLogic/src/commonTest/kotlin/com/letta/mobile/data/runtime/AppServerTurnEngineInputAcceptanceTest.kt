@@ -191,14 +191,27 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun approvalResponseInputStaysFireAndForget() = runTest {
+    fun approvalResponseInputAwaitsAcceptance() = runTest {
+        // letta-mobile-qygvv.5: approval responses carry a request_id and await the ack too.
         val turn = startTurn(InputAckFixture.NoDisposition, approvalCommand)
 
-        assertTrue(turn.client.acknowledgedInputs.isEmpty())
-        val sent = turn.client.plainInputs.single()
-        assertNull(sent.requestId)
-        assertTrue(sent.payload is AppServerInputPayload.ApprovalResponse)
+        assertTrue(turn.client.plainInputs.isEmpty())
+        val sent = turn.client.acknowledgedInputs.single()
+        assertEquals(TEST_INPUT_REQUEST_ID, sent.requestId)
+        assertEquals("approval-1", (sent.payload as AppServerInputPayload.ApprovalResponse).requestId)
         turn.job.cancel()
+    }
+
+    @Test
+    fun rejectedApprovalResponseInputFailsFastWithServerError() = runTest {
+        val turn = startTurn(InputAckFixture.rejected(APPROVAL_NOT_PENDING_ERROR), approvalCommand)
+        turn.job.join()
+
+        val last = turn.drafts.lastLifecycle()
+        assertEquals(RuntimeRunStatus.Failed, last?.status)
+        assertEquals(APPROVAL_NOT_PENDING_ERROR, last?.reason)
+        assertTrue(testScheduler.currentTime < IDLE_TIMEOUT_MS, "a rejected decision must not wait for the watchdog")
+        assertFalse(turn.isBusy)
     }
 
     @Test

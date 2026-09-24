@@ -325,6 +325,7 @@ internal fun observeQueueProgress(
 internal class TurnInputSender(
     private val client: AppServerClient,
     private val requestIdFactory: () -> String,
+    private val approvalSender: ApprovalResponseSender,
     private val externalToolRegistry: ExternalToolRegistry? = null,
 ) {
     suspend fun sendInput(
@@ -334,6 +335,9 @@ internal class TurnInputSender(
         emit: suspend (RuntimeEventDraft) -> Unit,
     ): InputAcceptance.Failure? {
         val input = command.toInputCommand(scope, externalToolRegistry)
+        // letta-mobile-qygvv.5: approval responses await input_accepted too; a
+        // rejected decision fails the turn instead of parking it.
+        input.approvalResponseOrNull()?.let { return approvalSender.sendAsTurnInput(scope, it) }
         if (command.input !is TurnInput.UserMessage) {
             client.input(input)
             return null

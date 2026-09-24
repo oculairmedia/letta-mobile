@@ -1,27 +1,29 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerChannel
-import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerQueueRemoval
+import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /*
- * Shared stream-frame, `input_accepted` and `update_queue` fixtures for App
- * Server turn-engine tests (letta-mobile-qygvv.1).
+ * Shared stream-frame, `input_accepted` and approval fixtures for App Server turn-engine tests
+ * (letta-mobile-qygvv.1, qygvv.5). The `update_queue` fixture lives beside the shared fake in
+ * TurnEngineTestStreamClient.kt.
  */
 
 internal const val TEST_INPUT_REQUEST_ID = "req-1"
+internal const val TEST_APPROVAL_REQUEST_ID = "approval-1"
+internal const val APPROVAL_NOT_PENDING_ERROR = "Approval request is no longer pending"
 
 /** What the fake App Server answers to an acknowledged `create_message`. */
 internal data class InputAckFixture(
@@ -36,22 +38,6 @@ internal data class InputAckFixture(
         val RejectedWithoutError = InputAckFixture(accepted = false)
 
         fun rejected(error: String) = InputAckFixture(accepted = false, error = error)
-    }
-}
-
-/** One `update_queue` snapshot: client message ids still queued plus removal transitions. */
-internal data class QueueUpdateFixture(
-    val queued: List<String> = emptyList(),
-    val removed: List<AppServerQueueRemoval> = emptyList(),
-) {
-    companion object {
-        fun stillQueued(clientMessageId: String) = QueueUpdateFixture(queued = listOf(clientMessageId))
-
-        fun dequeued(clientMessageId: String) =
-            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "dequeued")))
-
-        fun cancelled(clientMessageId: String) =
-            QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "cancelled")))
     }
 }
 
@@ -96,6 +82,19 @@ internal class TurnEngineTestFrames(
         )
     }
 
+    /** The `can_use_tool` approval gate [TEST_APPROVAL_REQUEST_ID] (letta-mobile-qygvv.5). */
+    fun approvalControlRequest() = AppServerInboundFrame.ControlRequest(
+        requestId = TEST_APPROVAL_REQUEST_ID,
+        request = buildJsonObject {
+            put("subtype", "can_use_tool")
+            put("tool_name", "searxng_web_search")
+            put("tool_call_id", "tool-call-1")
+            put("input", buildJsonObject { put("query", "iroh") })
+        },
+        agentId = runtime.agentId,
+        conversationId = runtime.conversationId,
+    )
+
     /** [run]'s `turn_finished` for turn number [turn], sequenced after the frames already built. */
     fun turnFinished(run: TestRun, turn: Int): AppServerInboundFrame.TurnFinished {
         seq += 1
@@ -108,29 +107,25 @@ internal class TurnEngineTestFrames(
 }
 
 /**
- * Fake App Server that acknowledges `create_message` with [ack], records what was
- * sent acknowledged vs fire-and-forget, and replays emitted frames on the stream channel.
+ * Fake App Server that acknowledges inputs with [ack] (approval responses with [approvalAck] when
+ * set), records what was sent acknowledged vs fire-and-forget, and replays emitted frames on the
+ * stream channel.
  */
 internal class TurnEngineTestAckingClient(
     private val frames: TurnEngineTestFrames,
     private val ack: InputAckFixture,
-) : AppServerClient {
-    override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
+) : TurnEngineTestStreamClient() {
     val acknowledgedInputs = mutableListOf<AppServerCommand.Input>()
     val plainInputs = mutableListOf<AppServerCommand.Input>()
     var supportsAck = true
     var ackFailure: Throwable? = null
     var ackGate: CompletableDeferred<AppServerInboundFrame.InputAccepted>? = null
+    var approvalAck: InputAckFixture? = null
 
-    override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) =
-        AppServerInboundFrame.RuntimeStartResponse(
-            requestId = command.requestId,
-            success = true,
-            runtime = AppServerRuntimeScope(
-                agentId = requireNotNull(command.agentId),
-                conversationId = requireNotNull(command.conversationId),
-            ),
-        )
+    /** Holds the NEXT approval response's ack until completed (letta-mobile-qygvv.5). */
+    var approvalAckGate: CompletableDeferred<AppServerInboundFrame.InputAccepted>? = null
+
+    fun approvalInputs() = acknowledgedInputs.filter { it.isApprovalResponse() }
 
     override suspend fun input(command: AppServerCommand.Input) {
         plainInputs += command
@@ -142,19 +137,14 @@ internal class TurnEngineTestAckingClient(
         if (!supportsAck) throw UnsupportedOperationException("no ack")
         acknowledgedInputs += command
         ackFailure?.let { throw it }
+        if (command.isApprovalResponse()) return awaitApprovalAck()
         return ackGate?.await() ?: frames.inputAccepted(ack)
     }
 
-    override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-        error("sync unused")
-
-    override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-        error("abort unused")
-
-    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-        error("adminRpc unused")
-
-    override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
+    private suspend fun awaitApprovalAck(): AppServerInboundFrame.InputAccepted {
+        val gate = approvalAckGate.also { approvalAckGate = null }
+        return gate?.await() ?: frames.inputAccepted(approvalAck ?: ack)
+    }
 
     fun emitStreamDelta(messageType: String) = emit(frames.streamDelta(messageType))
 
@@ -162,12 +152,14 @@ internal class TurnEngineTestAckingClient(
 
     fun emitTurnFinished(run: TestRun, turn: Int) = emit(frames.turnFinished(run, turn))
 
-    private fun emit(frame: AppServerInboundFrame) {
+    override fun emit(frame: AppServerInboundFrame) {
         (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
             AppServerReceivedFrame(channel = AppServerChannel.Stream, frame = frame, raw = frame.rawJson()),
         )
     }
 }
+
+private fun AppServerCommand.Input.isApprovalResponse(): Boolean = payload is AppServerInputPayload.ApprovalResponse
 
 private fun AppServerInboundFrame.rawJson(): JsonObject = buildJsonObject {
     put("type", type ?: "unknown")
@@ -188,3 +180,11 @@ internal fun List<RuntimeEventDraft>.lastLifecycle(): RuntimeEventPayload.RunLif
     lifecycles().lastOrNull()
 
 internal fun List<RuntimeEventDraft>.lifecycleReasons(): List<String> = lifecycles().mapNotNull { it.reason }
+
+internal fun List<RuntimeEventDraft>.approvalCards(): Int = count { it.payload is RuntimeEventPayload.ApprovalRequested }
+
+internal fun AppServerCommand.Input.approvalRequestId(): String? =
+    (payload as? AppServerInputPayload.ApprovalResponse)?.requestId
+
+internal fun AppServerCommand.Input.approvalDecision(): AppServerApprovalResponseDecision? =
+    (payload as? AppServerInputPayload.ApprovalResponse)?.decision
