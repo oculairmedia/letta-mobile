@@ -402,28 +402,7 @@ class AppServerServeIrohCommand : CliktCommand(
 
             println("[iroh-app-server] Starting Iroh endpoint...")
             
-            // Canvases: every app connected here shares them through this host.
-            val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) }
-                ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "topics")
-            val canvasAssets = canvasAssetsDir?.let { java.nio.file.Path.of(it) }
-                ?: java.nio.file.Path.of(System.getProperty("user.home") ?: ".", ".letta", "canvas-relay", "assets")
-            val canvasStore = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps)
-            val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
-                scope = scope,
-                store = canvasStore,
-                assets = com.letta.mobile.data.storage.FileAssetStore(canvasAssets.toFile()),
-            )
-            // The agents this host serves get the canvas.* tools, answered here from the relay's log
-            // (letta-mobile-aknkw): they work on every runtime the host starts, app connected or not.
-            val canvasDirectory = canvasOps.resolveSibling("host-canvases.json")
-            hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(
-                com.letta.mobile.data.canvas.HostCanvasBackend(
-                    relay = canvasRelay.host,
-                    store = canvasStore,
-                    directory = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory),
-                ),
-            )
-            println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
+            val canvasRelay = startCanvasRelay(scope)
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
@@ -731,7 +710,35 @@ class AppServerServeIrohCommand : CliktCommand(
             hostTools = hostCanvasTools,
         )
 
-    /** The host's canvas.* tools, built with the canvas relay in [run] before the controller is. */
+    /**
+     * The canvas relay every app connected here shares boards through, and the canvas.* tools the
+     * agents this host serves get, answered from the relay's log (letta-mobile-aknkw): they work on
+     * every runtime the host starts, app connected or not. Called in [run] before the controller is
+     * built, so its registry carries the tools.
+     */
+    private fun startCanvasRelay(scope: CoroutineScope): com.letta.mobile.data.transport.iroh.IrohCanvasRelay {
+        val home = System.getProperty("user.home") ?: "."
+        val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "topics")
+        val canvasAssets = canvasAssetsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "assets")
+        val canvasStore = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps)
+        val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
+            scope = scope,
+            store = canvasStore,
+            assets = com.letta.mobile.data.storage.FileAssetStore(canvasAssets.toFile()),
+        )
+        val canvasDirectory = canvasOps.resolveSibling("host-canvases.json")
+        hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(
+            com.letta.mobile.data.canvas.HostCanvasBackend(
+                relay = canvasRelay.host,
+                store = canvasStore,
+                directory = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory),
+            ),
+        )
+        println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
+        return canvasRelay
+    }
+
+    /** The host's canvas.* tools, set by [startCanvasRelay]. */
     private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()
 
     /**

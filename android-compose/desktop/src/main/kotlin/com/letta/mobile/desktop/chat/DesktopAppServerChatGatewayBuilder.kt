@@ -110,11 +110,7 @@ class DesktopAppServerChatGatewayBuilder(
             val turnEngine = buildDesktopAppServerTurnEngine(
                 client = client,
                 scope = controllerScope,
-                // On Iroh the host answers canvas.* for every runtime it serves (letta-mobile-aknkw);
-                // the desktop offers its own only against an App Server it reaches directly.
-                externalToolRegistry = ExternalToolRegistry.hostTools(
-                    if (isIroh) emptyList() else CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions),
-                ),
+                externalToolRegistry = desktopCanvasToolRegistry(isIroh, canvasSessions),
                 config = DesktopAppServerEngineConfig(
                     eventRouter = router,
                     turnContextPreflight = if (isIroh) {
@@ -221,6 +217,17 @@ class DesktopAppServerChatGatewayBuilder(
 internal data class DesktopAppServerEngineConfig(
     val eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
     val turnContextPreflight: TurnContextPreflight? = null,
+)
+
+/**
+ * The desktop's own canvas.* tools, for an App Server it reaches directly. On Iroh the host answers
+ * canvas.* for every runtime it serves (letta-mobile-aknkw), so the desktop offers none there.
+ */
+internal fun desktopCanvasToolRegistry(
+    isIroh: Boolean,
+    canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
+): ExternalToolRegistry = ExternalToolRegistry.hostTools(
+    if (isIroh) emptyList() else CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions),
 )
 
 internal fun buildDesktopAppServerTurnEngine(
