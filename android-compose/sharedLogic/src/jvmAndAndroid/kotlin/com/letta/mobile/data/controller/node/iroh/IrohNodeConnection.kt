@@ -140,7 +140,6 @@ class IrohNodeConnection(
     /** Whether this peer has authenticated; side protocols from the same peer are gated on it. */
     val isAuthenticated: Boolean get() = authenticated.get()
 
-
     /**
      * Transport capabilities advertised by the peer in its auth frame.
      * Empty until the peer authenticates with a `capabilities` array; frames
@@ -894,15 +893,7 @@ class IrohNodeConnection(
         // initiator's own optimistic Local row (idempotent snapshot, never
         // appended twice). No-op when there is no client_message_id (nothing
         // to key optimistic dedup on) — the fanout is best-effort regardless.
-        if (clientMsgId != null) {
-            runCatching {
-                fanout.broadcastUserEcho(
-                    clientMessageId = clientMsgId,
-                    text = text,
-                    contentParts = contentParts,
-                )
-            }
-        }
+        if (clientMsgId != null) runCatching { fanout.broadcastUserEcho(clientMsgId, text, contentParts) }
         // letta-mobile-qygvv.3: the collector runs on the node-owned host. If this
         // connection closes first, the turn is detached, not cancelled: the server
         // turn keeps its approvals, external tools and other viewers, and its tail

@@ -35,6 +35,12 @@ internal enum class UnleasedApprovalOutcome {
 
     /** Another observer already claimed or answered it. */
     AlreadyClaimed,
+
+    /**
+     * No turn on this engine ever ran on the runtime key: another client owns it, and its own
+     * permission policy decides. Left pending, never auto-allowed.
+     */
+    NotOwned,
 }
 
 /**
@@ -45,7 +51,8 @@ internal enum class UnleasedApprovalOutcome {
  * used to sit in the fanout's pending buffer until the next turn subscribed. Meanwhile the server
  * turn was parked on it and the conversation queue behind it wedged.
  *
- * It now gets the policy the lease would have applied: under Unrestricted a non-interactive tool
+ * It now gets the policy the lease would have applied, but only for a runtime key this engine
+ * has run a turn on: under Unrestricted a non-interactive tool
  * is allowed at once. An interactive user-input tool (AskUserQuestion) is never auto-allowed; it
  * stays pending so the next viewer surfaces it. Claims go through [InboundControlRequestRegistry],
  * so a turn that subscribes later drops the already-answered request instead of answering twice.
@@ -55,6 +62,8 @@ internal class UnleasedApprovalAnswerer(
     private val inboundControlRegistry: InboundControlRequestRegistry,
     private val connectionGenerationProvider: () -> Long,
     private val leaseHeld: (TurnRuntimeKey) -> Boolean,
+    /** Whether this engine ran a turn on the key, i.e. the key's permission mode is ours to apply. */
+    private val runtimeOwned: (TurnRuntimeKey) -> Boolean,
     private val permissionModeFor: (TurnRuntimeKey) -> AppServerPermissionMode,
     private val runtimeScopeFor: (TurnRuntimeKey) -> AppServerRuntimeScope?,
 ) {
@@ -67,31 +76,57 @@ internal class UnleasedApprovalAnswerer(
         if (leaseHeld(key)) return UnleasedApprovalOutcome.Deferred
         if (request.request.string("subtype") != CAN_USE_TOOL) return UnleasedApprovalOutcome.NotApproval
         val toolName = request.request.string("tool_name")
-        val mode = permissionModeFor(key)
-        if (mode != AppServerPermissionMode.Unrestricted || RuntimeUserInputTools.requiresUserInput(toolName)) {
-            record("approval.unleasedPending", request, toolName, mode)
+        val details = ApprovalDetails(request, key, toolName, permissionModeFor(key))
+        return withheldOutcome(details) ?: autoAllow(details, runtime, connectionGeneration)
+    }
+
+    /** Why [details] must not be auto-allowed here, or null when the key's policy allows it. */
+    private fun withheldOutcome(details: ApprovalDetails): UnleasedApprovalOutcome? {
+        // Review of PR #1661: `client.events` carries every runtime on a shared App Server. For a
+        // key this engine never ran, the mode provider only returns the host DEFAULT (approve-all),
+        // which is not the owning client's policy, so auto-allowing would bypass that policy.
+        if (!runtimeOwned(details.key)) {
+            record("approval.unleasedNotOwned", details)
+            return UnleasedApprovalOutcome.NotOwned
+        }
+        if (shouldStayPending(details.mode, details.toolName)) {
+            record("approval.unleasedPending", details)
             return UnleasedApprovalOutcome.LeftPending
         }
+        return null
+    }
+
+    private suspend fun autoAllow(
+        details: ApprovalDetails,
+        runtime: AppServerRuntimeScope,
+        connectionGeneration: Long?,
+    ): UnleasedApprovalOutcome {
         val generation = connectionGeneration ?: connectionGenerationProvider()
-        if (!claim(request, key, generation)) return UnleasedApprovalOutcome.AlreadyClaimed
-        sendAutoAllow(request, key, runtime, generation)
-        record("approval.unleasedAutoAllow", request, toolName, mode)
+        if (!claim(details.request, details.key, generation)) return UnleasedApprovalOutcome.AlreadyClaimed
+        val ref = InboundControlRequestRegistry.RequestRef(details.request.requestId)
+        val targetRuntime = runtimeScopeFor(details.key) ?: runtime
+        sendAutoAllow(details.request.requestId, targetRuntime, ref, generation)
+        record("approval.unleasedAutoAllow", details)
         return UnleasedApprovalOutcome.AutoAllowed
     }
 
+    private fun shouldStayPending(mode: AppServerPermissionMode, toolName: String?): Boolean {
+        if (mode != AppServerPermissionMode.Unrestricted) return true
+        return RuntimeUserInputTools.requiresUserInput(toolName)
+    }
+
     private suspend fun sendAutoAllow(
-        request: AppServerInboundFrame.ControlRequest,
-        key: TurnRuntimeKey,
-        runtime: AppServerRuntimeScope,
+        requestId: String,
+        targetRuntime: AppServerRuntimeScope,
+        ref: InboundControlRequestRegistry.RequestRef,
         generation: Long,
     ) {
-        val ref = InboundControlRequestRegistry.RequestRef(request.requestId)
         try {
             client.input(
                 AppServerCommand.Input(
-                    runtime = runtimeScopeFor(key) ?: runtime,
+                    runtime = targetRuntime,
                     payload = AppServerInputPayload.ApprovalResponse(
-                        requestId = request.requestId,
+                        requestId = requestId,
                         decision = AppServerApprovalResponseDecision.Allow(
                             message = "Approved by default mobile policy.",
                         ),
@@ -129,20 +164,24 @@ internal class UnleasedApprovalAnswerer(
 
     private fun record(
         event: String,
-        request: AppServerInboundFrame.ControlRequest,
-        toolName: String?,
-        mode: AppServerPermissionMode,
+        details: ApprovalDetails,
     ) {
-        val runtimeKey = request.runtime?.let { "${it.agentId}/${it.conversationId}" }.orEmpty()
         Telemetry.event(
             "AppServerTurnEngine", event,
-            "requestId" to request.requestId,
-            "key" to runtimeKey,
-            "tool" to (toolName ?: ""),
-            "permissionMode" to mode.name,
+            "requestId" to details.request.requestId,
+            "key" to details.key.toString(),
+            "tool" to (details.toolName ?: ""),
+            "permissionMode" to details.mode.name,
             level = Telemetry.Level.WARN,
         )
     }
+
+    private data class ApprovalDetails(
+        val request: AppServerInboundFrame.ControlRequest,
+        val key: TurnRuntimeKey,
+        val toolName: String?,
+        val mode: AppServerPermissionMode,
+    )
 
     private fun kotlinx.serialization.json.JsonObject.string(key: String): String? =
         (this[key] as? JsonPrimitive)?.contentOrNull

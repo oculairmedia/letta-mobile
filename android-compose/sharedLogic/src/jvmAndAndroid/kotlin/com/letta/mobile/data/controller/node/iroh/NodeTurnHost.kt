@@ -101,7 +101,7 @@ class NodeTurnHost internal constructor(
         }
 
         /** A host whose turns are children of [parent] (the endpoint's scope) but of no connection. */
-        @Suppress("NoDetachedCoroutineLifecycle") // Turns are tied to parent endpoint scope.
+        @Suppress("NoDetachedCoroutineLifecycle") // Node-owned scope tied to parent endpoint lifecycle.
         fun childOf(parent: CoroutineScope): NodeTurnHost = NodeTurnHost(
             CoroutineScope(
                 parent.coroutineContext + SupervisorJob(parent.coroutineContext[Job]) + handler,
@@ -109,7 +109,7 @@ class NodeTurnHost internal constructor(
         )
 
         /** Process-scoped fallback for constructions without an endpoint (legacy/tests). */
-        @Suppress("NoDetachedCoroutineLifecycle") // Process-scoped fallback for tests/endpoint-less construction.
+        @Suppress("NoDetachedCoroutineLifecycle") // Fallback shared scope for endpointless tests.
         internal val SHARED: NodeTurnHost by lazy {
             NodeTurnHost(CoroutineScope(SupervisorJob() + Dispatchers.Default + handler))
         }

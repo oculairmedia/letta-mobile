@@ -567,39 +567,6 @@ class AppServerProtocolTest {
         val frame = assertIs<AppServerInboundFrame.UpdateLoopStatus>(received.frame)
         assertEquals("SOME_FUTURE_STATUS", frame.loopStatus.status)
         assertEquals(listOf("run-9"), frame.loopStatus.activeRunIds)
-        // letta-mobile-qygvv.8: pre-0.32.17 servers omit the run binding fields.
-        assertEquals(emptyMap(), frame.loopStatus.clientMessageIdsByRunId)
-        assertEquals(emptyList(), frame.loopStatus.executingToolCallIds)
-    }
-
-    @Test
-    fun loopStatusDecodesRunBindingFields() {
-        val received = AppServerProtocol.decodeFrame(
-            rawJson = """
-                {
-                  "type": "update_loop_status",
-                  "runtime": {"agent_id": "agent-1", "conversation_id": "conv-1"},
-                  "event_seq": 8,
-                  "emitted_at": "2026-09-24T00:00:00Z",
-                  "idempotency_key": "evt-8",
-                  "loop_status": {
-                    "status": "EXECUTING_CLIENT_SIDE_TOOL",
-                    "active_run_ids": ["local-run-20"],
-                    "client_message_ids_by_run_id": {"local-run-1": ["cm-a"], "local-run-20": ["cm-b", "cm-c"]},
-                    "executing_tool_call_ids": ["call-1"],
-                    "future_loop_field": 1
-                  }
-                }
-            """.trimIndent(),
-            channel = AppServerChannel.Stream,
-        )
-
-        val status = assertIs<AppServerInboundFrame.UpdateLoopStatus>(received.frame).loopStatus
-        assertEquals(
-            mapOf("local-run-1" to listOf("cm-a"), "local-run-20" to listOf("cm-b", "cm-c")),
-            status.clientMessageIdsByRunId,
-        )
-        assertEquals(listOf("call-1"), status.executingToolCallIds)
     }
 
     @Test

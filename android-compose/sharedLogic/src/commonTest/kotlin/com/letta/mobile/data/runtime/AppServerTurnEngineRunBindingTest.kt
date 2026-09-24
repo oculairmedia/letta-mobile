@@ -3,13 +3,6 @@ package com.letta.mobile.data.runtime
 import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.transport.appserver.AppServerChannel
-import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -22,13 +15,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * letta-mobile-qygvv.8: with App Server 0.32.17's `client_message_ids_by_run_id`, a lease binds to
@@ -39,100 +28,102 @@ import kotlinx.serialization.json.put
 class AppServerTurnEngineRunBindingTest {
     @Test
     fun earlierTurnCompletingLateDoesNotCompleteTheNextTurn() = runTest {
-        val client = BindingClient()
+        val client = TurnEngineTestStreamClient()
         val engine = engine(client)
-        engine.runTurn(commandFor("local-1")).test {
+        engine.runTurn(TestInput.Local1.command()).test {
             awaitStarted()
-            client.emit(loopStatus("PROCESSING_API_RESPONSE", mapOf("run-1" to listOf("local-1"))))
-            client.emit(delta("assistant_message", "run-1"))
-            client.emit(turnFinished("turn-1", "run-1"))
-            assertEquals("run-1", awaitTerminal().runId?.value)
+            client.emit(TestLoopState.ProcessingApiResponse.bound(listOf(run1), run1 to TestInput.Local1))
+            client.emit(run1.assistantDelta())
+            client.emit(run1.turnFinished(1))
+            assertEquals(run1.id, awaitTerminalDraft().runId?.value)
             awaitComplete()
         }
-        engine.runTurn(commandFor("local-2")).test {
+        engine.runTurn(TestInput.Local2.command()).test {
             awaitStarted()
             // A turn from another client on this conversation was queued ahead of ours and runs first.
-            val mapping = mapOf(
-                "run-1" to listOf("local-1"),
-                "run-5" to listOf("other-device-1"),
-                "run-6" to listOf("local-2"),
-            )
             // The foreign run is the active one: its Running status must not reach this lease either.
-            client.emit(loopStatus("PROCESSING_API_RESPONSE", mapping, activeRunIds = listOf("run-5")))
-            client.emit(delta("assistant_message", "run-5"))
-            client.emit(delta("stop_reason", "run-5", stopReason = "end_turn"))
-            client.emit(turnFinished("turn-5", "run-5"))
-            client.emit(delta("stop_reason", "run-1", stopReason = "end_turn"))
-            client.emit(turnFinished("turn-1-replay", "run-1"))
+            client.emit(
+                TestLoopState.ProcessingApiResponse.bound(
+                    listOf(run5),
+                    run1 to TestInput.Local1,
+                    run5 to TestInput.OtherDevice,
+                    run6 to TestInput.Local2,
+                ),
+            )
+            client.emit(run5.assistantDelta())
+            client.emit(run5.stopDelta())
+            client.emit(run5.turnFinished(5))
+            client.emit(run1.stopDelta())
+            client.emit(run1.turnFinished(REPLAYED_TURN))
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
-            client.emit(delta("assistant_message", "run-6"))
-            client.emit(turnFinished("turn-6", "run-6"))
-            val terminal = awaitTerminal()
-            assertEquals(RuntimeRunStatus.Completed, terminal.status())
-            assertEquals("run-6", terminal.runId?.value)
+            client.emit(run6.assistantDelta())
+            client.emit(run6.turnFinished(6))
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
+            assertEquals(run6.id, terminal.runId?.value)
             awaitComplete()
         }
     }
 
     @Test
     fun foreignRunPromotedBeforeTheMappingCannotFinishTheLease() = runTest {
-        val client = BindingClient()
-        engine(client).runTurn(commandFor("local-2")).test {
+        val client = TurnEngineTestStreamClient()
+        engine(client).runTurn(TestInput.Local2.command()).test {
             awaitStarted()
             // The earlier run streams before any mapping arrives, so legacy promotion adopts it.
-            client.emit(delta("assistant_message", "run-1"))
+            client.emit(run1.assistantDelta())
             awaitItem()
             client.emit(
-                loopStatus(
-                    "PROCESSING_API_RESPONSE",
-                    mapOf("run-1" to listOf("local-1"), "run-2" to listOf("local-2")),
-                    activeRunIds = listOf("run-1"),
+                TestLoopState.ProcessingApiResponse.bound(
+                    listOf(run1),
+                    run1 to TestInput.Local1,
+                    run2 to TestInput.Local2,
                 ),
             )
-            client.emit(turnFinished("turn-1", "run-1"))
+            client.emit(run1.turnFinished(1))
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
-            client.emit(delta("assistant_message", "run-2"))
-            client.emit(turnFinished("turn-2", "run-2"))
-            assertEquals("run-2", awaitTerminal().runId?.value)
+            client.emit(run2.assistantDelta())
+            client.emit(run2.turnFinished(2))
+            assertEquals(run2.id, awaitTerminalDraft().runId?.value)
             awaitComplete()
         }
     }
 
     @Test
     fun runPromotedFromMapping() = runTest {
-        val client = BindingClient()
-        engine(client).runTurn(commandFor("local-1")).test {
+        val client = TurnEngineTestStreamClient()
+        engine(client).runTurn(TestInput.Local1.command()).test {
             awaitStarted()
             // No active run and no run-bearing delta: only the mapping can name this lease's run.
-            client.emit(loopStatus("PROCESSING_API_RESPONSE", mapOf("run-7" to listOf("local-1")), activeRunIds = emptyList()))
-            client.emit(delta("assistant_message", runId = null))
-            client.emit(loopStatus("WAITING_ON_INPUT", mapOf("run-7" to listOf("local-1")), activeRunIds = emptyList()))
-            val terminal = awaitTerminal()
-            assertEquals(RuntimeRunStatus.Completed, terminal.status())
-            assertEquals("run-7", terminal.runId?.value)
+            client.emit(TestLoopState.ProcessingApiResponse.bound(emptyList(), run7 to TestInput.Local1))
+            client.emit(TestRun(null).assistantDelta())
+            client.emit(TestLoopState.WaitingOnInput.bound(emptyList(), run7 to TestInput.Local1))
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
+            assertEquals(run7.id, terminal.runId?.value)
             awaitComplete()
         }
     }
 
     @Test
     fun mappingAbsentKeepsLegacyBehaviour() = runTest {
-        val client = BindingClient()
-        engine(client).runTurn(commandFor("local-2")).test {
+        val client = TurnEngineTestStreamClient()
+        engine(client).runTurn(TestInput.Local2.command()).test {
             awaitStarted()
             // An older server sends no mapping: any run on the scope still drives the lease.
-            client.emit(loopStatus("PROCESSING_API_RESPONSE", emptyMap()))
-            client.emit(delta("assistant_message", "run-1"))
-            client.emit(turnFinished("turn-1", "run-1"))
-            val terminal = awaitTerminal()
-            assertEquals(RuntimeRunStatus.Completed, terminal.status())
-            assertEquals("run-1", terminal.runId?.value)
+            client.emit(TestLoopState.ProcessingApiResponse.frame())
+            client.emit(run1.assistantDelta())
+            client.emit(run1.turnFinished(1))
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
+            assertEquals(run1.id, terminal.runId?.value)
             awaitComplete()
         }
     }
 
-    private fun TestScope.engine(client: BindingClient) = AppServerTurnEngine(
+    private fun TestScope.engine(client: TurnEngineTestStreamClient) = AppServerTurnEngine(
         client = client,
         turnIdleTimeoutMs = 600_000,
         nowMs = { testScheduler.currentTime },
@@ -143,61 +134,36 @@ class AppServerTurnEngineRunBindingTest {
         assertEquals(RuntimeRunStatus.Started, started.status)
     }
 
-    private typealias BindingClient = TurnEngineTestStreamClient
+    /** The `client_message_id`s a turn sends; the server maps each run to the one it consumed. */
+    private enum class TestInput(val clientMessageId: String) {
+        Local1("local-1"),
+        Local2("local-2"),
+        OtherDevice("other-device-1"),
+        ;
 
-    private suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminal(): RuntimeEventDraft = awaitTerminalDraft()
-
-    private fun RuntimeEventDraft.status(): RuntimeRunStatus? = runLifecycleStatus()
-
-    private companion object {
-        const val SETTLE_WINDOW_PASSED_MS = 5_000L
-        val terminalStatuses = turnEngineTerminalStatuses
-        val runtime = AppServerRuntimeScope("agent-1", "conv-1")
-
-        fun commandFor(localMessageId: String) = TurnCommand(
+        fun command() = TurnCommand(
             backendId = BackendId("backend-1"),
             runtimeId = RuntimeId("runtime-1"),
             agentId = AgentId("agent-1"),
             conversationId = ConversationId("conv-1"),
-            input = TurnInput.UserMessage(localMessageId = localMessageId, text = "hello"),
+            input = TurnInput.UserMessage(localMessageId = clientMessageId, text = "hello"),
         )
+    }
 
-        fun delta(messageType: String, runId: String?, stopReason: String? = null) = AppServerInboundFrame.StreamDelta(
-            runtime = runtime,
-            eventSeq = 1,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "delta-$messageType-$runId",
-            delta = buildJsonObject {
-                put("message_type", messageType)
-                runId?.let { put("run_id", it) }
-                stopReason?.let { put("stop_reason", it) }
-            },
-        )
+    /** This loop state with [activeRuns] running and each run mapped to the input it consumed. */
+    private fun TestLoopState.bound(activeRuns: List<TestRun>, vararg consumed: Pair<TestRun, TestInput>) =
+        frame(activeRuns).let { status ->
+            val mapping = consumed.associate { (run, input) -> requireNotNull(run.id) to listOf(input.clientMessageId) }
+            status.copy(loopStatus = status.loopStatus.copy(clientMessageIdsByRunId = mapping))
+        }
 
-        fun turnFinished(turnId: String, runId: String) = AppServerInboundFrame.TurnFinished(
-            runtime = runtime,
-            eventSeq = 2,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "turn_finished:$turnId",
-            turnId = turnId,
-            stopReason = "end_turn",
-            runId = runId,
-        )
-
-        fun loopStatus(
-            status: String,
-            clientMessageIdsByRunId: Map<String, List<String>>,
-            activeRunIds: List<String> = clientMessageIdsByRunId.keys.toList(),
-        ) = AppServerInboundFrame.UpdateLoopStatus(
-            runtime = runtime,
-            eventSeq = 3,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "loop:$status",
-            loopStatus = AppServerLoopStatus(
-                status = status,
-                activeRunIds = activeRunIds,
-                clientMessageIdsByRunId = clientMessageIdsByRunId,
-            ),
-        )
+    private companion object {
+        const val SETTLE_WINDOW_PASSED_MS = 5_000L
+        const val REPLAYED_TURN = 11
+        val run1 = TestRun("run-1")
+        val run2 = TestRun("run-2")
+        val run5 = TestRun("run-5")
+        val run6 = TestRun("run-6")
+        val run7 = TestRun("run-7")
     }
 }

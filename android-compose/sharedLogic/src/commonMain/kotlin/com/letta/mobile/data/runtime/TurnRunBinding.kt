@@ -102,11 +102,14 @@ internal fun AppServerReceivedFrame.boundRunIdOrNull(): String? = when (val f = 
 /**
  * letta-mobile-qygvv.8: the engine's per-frame binding step for this slot's lease [leaseToken].
  * Promotes a run the server just bound to this lease's `client_message_id` (`turn.run_bound`) and
- * returns false for a frame whose run belongs to a different `client_message_id`
- * (`frame.foreign_run_dropped`): it must neither mutate nor complete this lease. The fanout still
- * delivers that frame to viewers; only this lease's collector skips it.
+ * classifies [received]'s run. A [RunOwnership.Foreign] frame belongs to a different
+ * `client_message_id` (`frame.foreign_run_dropped`): it must neither mutate nor complete this
+ * lease. The fanout still delivers that frame to viewers; only this lease's collector skips it.
+ *
+ * This answers "is this run mine"; [QueuedLeaseFrameGate] answers "am I still queued" for the
+ * frames the binding cannot place ([RunOwnership.Unknown]).
  */
-internal fun TurnLeaseSlot.bindRunAndAccept(received: AppServerReceivedFrame, leaseToken: Long): Boolean {
+internal fun TurnLeaseSlot.bindRun(received: AppServerReceivedFrame, leaseToken: Long): RunOwnership {
     runBinding.observe(received.frame).lastOrNull()?.let { runId ->
         runIdGate.promote(runId, leaseToken)
         Telemetry.event(
@@ -115,12 +118,14 @@ internal fun TurnLeaseSlot.bindRunAndAccept(received: AppServerReceivedFrame, le
             "conversationId" to key.conversationId,
         )
     }
-    if (runBinding.ownershipOf(received) != RunOwnership.Foreign) return true
-    Telemetry.event(
-        "AppServerTurnEngine", "frame.foreign_run_dropped",
-        "runId" to (received.boundRunIdOrNull() ?: "<none>"),
-        "frameType" to (received.frame.type ?: "<unknown>"),
-        "conversationId" to key.conversationId,
-    )
-    return false
+    val ownership = runBinding.ownershipOf(received)
+    if (ownership == RunOwnership.Foreign) {
+        Telemetry.event(
+            "AppServerTurnEngine", "frame.foreign_run_dropped",
+            "runId" to (received.boundRunIdOrNull() ?: "<none>"),
+            "frameType" to (received.frame.type ?: "<unknown>"),
+            "conversationId" to key.conversationId,
+        )
+    }
+    return ownership
 }

@@ -3,13 +3,6 @@ package com.letta.mobile.data.runtime
 import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.transport.appserver.AppServerChannel
-import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -23,13 +16,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * letta-mobile-qygvv.2: `turn_finished` and an idle `update_loop_status` after evidence are the
@@ -39,14 +28,14 @@ import kotlinx.serialization.json.put
 class AppServerTurnEngineTurnBoundaryTest {
     @Test
     fun turnFinishedCompletesWithoutTheSettleDelay() = runTest {
-        val client = BoundaryClient()
+        val client = TurnEngineTestStreamClient()
         engine(client).runTurn(command).test {
             awaitStarted()
-            client.emit(delta("assistant_message", "run-1"))
-            client.emit(delta("stop_reason", "run-1", stopReason = "end_turn"))
-            client.emit(turnFinished("turn-1", "run-1"))
-            val terminal = awaitTerminal()
-            assertEquals(RuntimeRunStatus.Completed, terminal.status())
+            client.emit(run1.assistantDelta())
+            client.emit(run1.stopDelta())
+            client.emit(run1.turnFinished(1))
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
             assertEquals("run-1", terminal.runId?.value)
             awaitComplete()
         }
@@ -58,26 +47,26 @@ class AppServerTurnEngineTurnBoundaryTest {
 
     @Test
     fun turnFinishedThenLateStopDeltaDoesNotDoubleTerminal() = runTest {
-        val client = BoundaryClient()
+        val client = TurnEngineTestStreamClient()
         val engine = engine(client)
         engine.runTurn(command).test {
             awaitStarted()
-            client.emit(delta("assistant_message", "run-1"))
-            client.emit(turnFinished("turn-1", "run-1"))
-            assertEquals(RuntimeRunStatus.Completed, awaitTerminal().status())
+            client.emit(run1.assistantDelta())
+            client.emit(run1.turnFinished(1))
+            assertEquals(RuntimeRunStatus.Completed, awaitTerminalDraft().runLifecycleStatus())
             awaitComplete()
         }
-        engine.runTurn(command.copy(input = TurnInput.UserMessage(localMessageId = "local-2", text = "again"))).test {
+        engine.runTurn(secondCommand).test {
             awaitStarted()
             // The first turn's late stop delta and a replayed turn_finished must not end this turn.
-            client.emit(delta("stop_reason", "run-1", stopReason = "end_turn"))
-            client.emit(turnFinished("turn-1", "run-1"))
+            client.emit(run1.stopDelta())
+            client.emit(run1.turnFinished(1))
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
-            client.emit(delta("assistant_message", "run-2"))
-            client.emit(turnFinished("turn-2", "run-2"))
-            val terminal = awaitTerminal()
-            assertEquals(RuntimeRunStatus.Completed, terminal.status())
+            client.emit(run2.assistantDelta())
+            client.emit(run2.turnFinished(2))
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
             assertEquals("run-2", terminal.runId?.value)
             awaitComplete()
         }
@@ -85,12 +74,12 @@ class AppServerTurnEngineTurnBoundaryTest {
 
     @Test
     fun stopDeltaStillSettlesTheTurnWithoutTurnFinished() = runTest {
-        val client = BoundaryClient()
+        val client = TurnEngineTestStreamClient()
         engine(client).runTurn(command).test {
             awaitStarted()
-            client.emit(delta("stop_reason", "run-1", stopReason = "end_turn"))
-            val terminal = awaitTerminal()
-            assertEquals(RuntimeRunStatus.Completed, terminal.status())
+            client.emit(run1.stopDelta())
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
             awaitComplete()
         }
         assertTrue(testScheduler.currentTime >= AppServerTurnEngine.DEFAULT_TERMINAL_SETTLE_QUIET_MS)
@@ -98,13 +87,13 @@ class AppServerTurnEngineTurnBoundaryTest {
 
     @Test
     fun idleLoopStatusAfterEvidenceCompletesTheTurn() = runTest {
-        val client = BoundaryClient()
+        val client = TurnEngineTestStreamClient()
         engine(client).runTurn(command).test {
             awaitStarted()
-            client.emit(delta("assistant_message", "run-1"))
-            client.emit(loopStatus("WAITING_ON_INPUT"))
-            val terminal = awaitTerminal()
-            assertEquals(RuntimeRunStatus.Completed, terminal.status())
+            client.emit(run1.assistantDelta())
+            client.emit(TestLoopState.WaitingOnInput.frame())
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
             assertEquals("run-1", terminal.runId?.value)
             awaitComplete()
         }
@@ -113,25 +102,25 @@ class AppServerTurnEngineTurnBoundaryTest {
 
     @Test
     fun idleLoopStatusBeforeEvidenceDoesNotCompleteTheTurn() = runTest {
-        val client = BoundaryClient()
+        val client = TurnEngineTestStreamClient()
         engine(client).runTurn(command).test {
             awaitStarted()
-            client.emit(loopStatus("WAITING_ON_INPUT"))
+            client.emit(TestLoopState.WaitingOnInput.frame())
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
-            client.emit(delta("stop_reason", "run-1", stopReason = "end_turn"))
-            assertEquals(RuntimeRunStatus.Completed, awaitTerminal().status())
+            client.emit(run1.stopDelta())
+            assertEquals(RuntimeRunStatus.Completed, awaitTerminalDraft().runLifecycleStatus())
             awaitComplete()
         }
     }
 
     @Test
     fun waitingOnApprovalLoopStatusDoesNotCompleteTheTurn() = runTest {
-        val client = BoundaryClient()
+        val client = TurnEngineTestStreamClient()
         engine(client).runTurn(command).test {
             awaitStarted()
-            client.emit(delta("stop_reason", "run-1", stopReason = "requires_approval"))
-            client.emit(loopStatus("WAITING_ON_APPROVAL"))
+            client.emit(run1.stopDelta(TestStopReason.RequiresApproval))
+            client.emit(TestLoopState.WaitingOnApproval.frame())
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -140,26 +129,52 @@ class AppServerTurnEngineTurnBoundaryTest {
 
     @Test
     fun nonTerminalLoopErrorDoesNotEndTheTurn() = runTest {
-        val client = BoundaryClient()
+        val client = TurnEngineTestStreamClient()
         engine(client).runTurn(command).test {
             awaitStarted()
-            client.emit(
-                delta("loop_error", "run-1") {
-                    put("message", "retrying provider")
-                    put("is_terminal", false)
-                },
-            )
+            client.emit(run1.loopErrorDelta(terminal = false))
             val notice = assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
             assertEquals("loop_error", notice.messageType)
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
-            client.emit(turnFinished("turn-1", "run-1"))
-            assertEquals(RuntimeRunStatus.Completed, awaitTerminal().status())
+            client.emit(run1.turnFinished(1))
+            assertEquals(RuntimeRunStatus.Completed, awaitTerminalDraft().runLifecycleStatus())
             awaitComplete()
         }
     }
 
-    private fun TestScope.engine(client: BoundaryClient) = AppServerTurnEngine(
+    @Test
+    fun settledRunDraftDoesNotPromoteRunOrCompleteNextLeaseOnIdle() = runTest {
+        val client = TurnEngineTestStreamClient()
+        val engine = engine(client)
+        engine.runTurn(command).test {
+            awaitStarted()
+            client.emit(run1.assistantDelta())
+            client.emit(run1.turnFinished(1))
+            assertEquals(RuntimeRunStatus.Completed, awaitTerminalDraft().runLifecycleStatus())
+            awaitComplete()
+        }
+        engine.runTurn(secondCommand).test {
+            awaitStarted()
+            // Lingering draft from old settled run-1 projects into the stream...
+            client.emit(run1.assistantDelta())
+            val lingeringDraft = awaitItem()
+            assertEquals("run-1", lingeringDraft.runId?.value)
+            // ...but an idle loop status right after must not complete this lease because run-1 draft is not evidence for this lease.
+            client.emit(TestLoopState.WaitingOnInput.frame())
+            advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
+            expectNoEvents()
+            // Valid new-run frames proceed and are not dropped as superseded_run.
+            client.emit(run2.assistantDelta())
+            client.emit(run2.turnFinished(2))
+            val terminal = awaitTerminalDraft()
+            assertEquals(RuntimeRunStatus.Completed, terminal.runLifecycleStatus())
+            assertEquals("run-2", terminal.runId?.value)
+            awaitComplete()
+        }
+    }
+
+    private fun TestScope.engine(client: TurnEngineTestStreamClient) = AppServerTurnEngine(
         client = client,
         turnIdleTimeoutMs = 600_000,
         nowMs = { testScheduler.currentTime },
@@ -170,16 +185,10 @@ class AppServerTurnEngineTurnBoundaryTest {
         assertEquals(RuntimeRunStatus.Started, started.status)
     }
 
-    private typealias BoundaryClient = TurnEngineTestStreamClient
-
-    private suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminal(): RuntimeEventDraft = awaitTerminalDraft()
-
-    private fun RuntimeEventDraft.status(): RuntimeRunStatus? = runLifecycleStatus()
-
     private companion object {
         const val SETTLE_WINDOW_PASSED_MS = 5_000L
-        val terminalStatuses = turnEngineTerminalStatuses
-        val runtime = AppServerRuntimeScope("agent-1", "conv-1")
+        val run1 = TestRun("run-1")
+        val run2 = TestRun("run-2")
         val command = TurnCommand(
             backendId = BackendId("backend-1"),
             runtimeId = RuntimeId("runtime-1"),
@@ -187,41 +196,6 @@ class AppServerTurnEngineTurnBoundaryTest {
             conversationId = ConversationId("conv-1"),
             input = TurnInput.UserMessage(localMessageId = "local-1", text = "hello"),
         )
-
-        fun delta(
-            messageType: String,
-            runId: String,
-            stopReason: String? = null,
-            extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {},
-        ) = AppServerInboundFrame.StreamDelta(
-            runtime = runtime,
-            eventSeq = 1,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "delta-$messageType-$runId",
-            delta = buildJsonObject {
-                put("message_type", messageType)
-                put("run_id", runId)
-                stopReason?.let { put("stop_reason", it) }
-                extra()
-            },
-        )
-
-        fun turnFinished(turnId: String, runId: String) = AppServerInboundFrame.TurnFinished(
-            runtime = runtime,
-            eventSeq = 2,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "turn_finished:$turnId",
-            turnId = turnId,
-            stopReason = "end_turn",
-            runId = runId,
-        )
-
-        fun loopStatus(status: String) = AppServerInboundFrame.UpdateLoopStatus(
-            runtime = runtime,
-            eventSeq = 3,
-            emittedAt = "2026-09-24T00:00:00Z",
-            idempotencyKey = "loop:$status",
-            loopStatus = AppServerLoopStatus(status = status),
-        )
+        val secondCommand = command.copy(input = TurnInput.UserMessage(localMessageId = "local-2", text = "again"))
     }
 }
