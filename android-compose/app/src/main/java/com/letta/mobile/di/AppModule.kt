@@ -83,8 +83,6 @@ import com.letta.mobile.data.timeline.MessageApiTimelineTransport
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-import com.letta.mobile.data.transport.DataStoreRunCursorStore
-import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
@@ -315,11 +313,6 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindChannelTransport(impl: SessionScopedChannelTransport): IChannelTransport
-
-    // letta-mobile-2rkdj — persisted run cursor map for reconnect resume.
-    @Binds
-    @Singleton
-    abstract fun bindRunCursorStore(impl: DataStoreRunCursorStore): RunCursorStore
 
     @Binds
     @Singleton

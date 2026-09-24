@@ -85,11 +85,6 @@ class AppServerProductionEngineConnectTest {
     }
 
     @Test
-    fun desktopWsChannelTransportClientCompletesARealFrameExchange() {
-        assertRealConnectSucceeds(desktopWsChannelTransportClient())
-    }
-
-    @Test
     fun appServerCliProbeClientCompletesARealFrameExchange() {
         assertRealConnectSucceeds(appServerCliProbeClient())
     }
@@ -186,7 +181,6 @@ class AppServerProductionEngineConnectTest {
         "iroh-wrapper-cli live controller" to ::irohWrapperLiveControllerClient,
         "iroh-wrapper-cli stub controller" to ::irohWrapperStubControllerClient,
         "desktop createDesktopLettaHttpClient" to ::desktopLettaHttpClient,
-        "desktop DesktopWsChannelTransport.defaultWsClient" to ::desktopWsChannelTransportClient,
         "appserver-cli restart-replay probe" to ::appServerCliProbeClient,
     )
 
@@ -229,15 +223,6 @@ class AppServerProductionEngineConnectTest {
             requestTimeoutMillis = 60_000
             socketTimeoutMillis = 60_000
         }
-    }
-
-    /**
-     * SOURCE: `desktop/src/main/kotlin/com/letta/mobile/desktop/data/
-     * DesktopWsChannelTransport.kt` — `defaultWsClient` (trust manager omitted,
-     * see above).
-     */
-    private fun desktopWsChannelTransportClient(): HttpClient = HttpClient(ClientCIO) {
-        install(ClientWebSockets) { applyAppServerFrameLimits() }
     }
 
     /**

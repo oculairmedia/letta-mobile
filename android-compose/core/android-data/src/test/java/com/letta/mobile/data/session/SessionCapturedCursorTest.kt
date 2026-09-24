@@ -64,12 +64,6 @@ class SessionCapturedCursorTest {
                 val store = checkNotNull(graph.conversationCursorStore)
                 assertEquals(graph.backendDescriptor.backendId.value, store.backendId)
                 assertEquals(8L, store.getCursor("same"))
-                val coordinatorField = graph.channelTransport.javaClass
-                    .getDeclaredField("cursorCoordinator").apply { isAccessible = true }
-                val coordinator = coordinatorField.get(graph.channelTransport)
-                val storeField = coordinator.javaClass
-                    .getDeclaredField("conversationCursorStore").apply { isAccessible = true }
-                assertSame(store, storeField.get(coordinator))
             }
         } finally {
             graphs.forEach { it.close() }
@@ -89,11 +83,6 @@ class SessionCapturedCursorTest {
             val first = factory.create()
             val cursors = checkNotNull(first.conversationCursorStore)
             assertEquals(first.backendDescriptor.backendId.value, cursors.backendId)
-            // Verify the transport's actual replay coordinator, not a second test-only adapter.
-            val coordinatorField = first.channelTransport.javaClass.getDeclaredField("cursorCoordinator").apply { isAccessible = true }
-            val coordinator = coordinatorField.get(first.channelTransport)
-            val storeField = coordinator.javaClass.getDeclaredField("conversationCursorStore").apply { isAccessible = true }
-            assertSame(cursors, storeField.get(coordinator))
             cursors.recordFrame("same", 8)
             assertTrue(cursors.replaceExpiredWatermark("same", 8, 2))
             first.close()
@@ -108,42 +97,6 @@ class SessionCapturedCursorTest {
                 second.close()
                 second.scope.coroutineContext[Job]!!.join()
             }
-        } finally { db.close() }
-    }
-
-    @Test fun capturedExpiryRetainsExpectedWatermarkForCommitSpanningReplacement() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val db = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
-        try {
-            val factory = createTestDefaultSessionRepositoryGraphFactory {
-                appContext = context
-                cursorFactory = BackendConversationCursorFactory(db)
-            }
-            val graph = factory.create()
-            val cursors = checkNotNull(graph.conversationCursorStore)
-            cursors.recordFrame("same", 100)
-            val coordinatorField = graph.channelTransport.javaClass.getDeclaredField("cursorCoordinator").apply { isAccessible = true }
-            val coordinator = coordinatorField.get(graph.channelTransport) as com.letta.mobile.data.transport.CursorResumeCoordinator
-            val runStoreField = coordinator.javaClass.getDeclaredField("cursorStore").apply { isAccessible = true }
-            val runStore = runStoreField.get(coordinator) as com.letta.mobile.data.transport.RunCursorStore
-            runStore.record("same", "run-1", 10L)
-            coordinator.registerResumedRun("run-1", "same")
-            coordinator.clearExpiredCursor(
-                com.letta.mobile.data.transport.ServerFrame.Error(
-                    id = "err",
-                    ts = "ts",
-                    code = "cursor_expired",
-                    conversationId = "same",
-                    runId = "run-1",
-                    afterSeq = 100L,
-                ),
-            ) { "SimpleState" }
-            kotlinx.coroutines.yield()
-            assertEquals(100L, cursors.getCursor("same"))
-            assertTrue(cursors.replaceExpiredWatermark("same", 100, 7))
-            assertEquals(7L, cursors.getCursor("same"))
-            graph.close()
-            graph.scope.coroutineContext[Job]!!.join()
         } finally { db.close() }
     }
 }

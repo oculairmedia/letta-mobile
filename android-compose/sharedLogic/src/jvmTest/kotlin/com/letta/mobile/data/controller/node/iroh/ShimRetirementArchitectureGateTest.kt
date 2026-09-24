@@ -189,16 +189,10 @@ class ShimRetirementArchitectureGateTest {
 
         /**
          * The only production files allowed to name the legacy shim mobile
-         * channel. Each is either the shim transport itself (reachable only for
-         * an explicitly shim-configured backend) or documentation on the
-         * abstraction that transport implements.
+         * channel: documentation on the wire-shape contracts. The shim transport
+         * itself was deleted in g70jb.3.
          */
         val SHIM_MOBILE_WS_ALLOWED = setOf(
-            // The Android shim WS transport + its own doc comment.
-            "android-compose/core/android-data/src/main/java/com/letta/mobile/data/transport/WebSocketConnection.kt",
-            "android-compose/core/android-data/src/main/java/com/letta/mobile/data/transport/ChannelTransport.kt",
-            // The desktop shim WS transport.
-            "android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopWsChannelTransport.kt",
             // Wire-shape contracts / renderer docs that describe the protocol.
             "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/MobileWsFrames.kt",
             "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/render/ChatUiModels.kt",

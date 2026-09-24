@@ -5,8 +5,11 @@ using a device. It is tracked by `letta-mobile-q9t4t`.
 
 The CLI now has two useful modes:
 
-- `connect` / `send` / `capture` / `record` / `replay` / `dump-timeline` exercise the
-  admin-shim mobile WebSocket and the same reducer/writer paths used by the app.
+- `replay` / `dump-timeline` / `record-cursor-state` fold recorded JSONL fixtures
+  and REST history through the same reducer/writer paths used by the app. (The
+  admin-shim WebSocket commands `connect`, `send`, `capture`, `record`,
+  `disconnect`, and `reconnect` were removed with the shim WS pathway; existing
+  JSONL recordings still replay, but new ones can no longer be recorded here.)
 - `rest` exposes generic authenticated JSON access to any Letta REST endpoint,
   which is the foundation for the broader device-free admin/provisioning CLI.
 - Typed resource command groups wrap the app's main REST-backed admin surfaces
@@ -38,22 +41,20 @@ No args prints the short command list.
 
 ## Shared options
 
-Most admin-shim commands accept:
+Most REST-backed commands accept:
 
 | env / flag | what |
 | --- | --- |
-| `LETTA_BASE_URL` / `--base-url` | Letta/admin-shim base URL, default `https://letta.oculair.ca` |
+| `LETTA_BASE_URL` / `--base-url` | Letta base URL, default `https://letta.oculair.ca` |
 | `LETTA_TOKEN` / `--token` | Bearer token; falls back to the selected CLI profile |
 | `LETTA_PROFILE` / `--profile` | CLI profile name; defaults to the active profile |
-| `--device-id` | Device id advertised to the shim, default `letta-mobile-cli` |
-| `--client-version` | Client version advertised to the shim, default `letta-mobile-cli` |
 
 Conversation and agent commands also use:
 
 | env / flag | what |
 | --- | --- |
-| `LETTA_AGENT_ID` / `--agent` | Agent id for send/record |
-| `LETTA_CONVERSATION_ID` / `--conversation` | Conversation id for send/dump/replay/record |
+| `LETTA_AGENT_ID` / `--agent` | Default agent id for agent-scoped commands |
+| `LETTA_CONVERSATION_ID` / `--conversation` | Conversation id for dump-timeline/replay |
 
 ## Profiles
 
@@ -70,47 +71,10 @@ configuration for CLI runs.
 .\gradlew.bat :cli:run -PcliArgs="profile import --file cli-profiles.json"
 ```
 
-Profile defaults are used by `send`, `dump-timeline`, `replay`, `capture`,
-`record`, `reconnect`, `stream`, `rest`, and the typed resource command groups
-when explicit flags/env vars are omitted.
+Profile defaults are used by `dump-timeline`, `replay`, `stream`, `rest`, and
+the typed resource command groups when explicit flags/env vars are omitted.
 
 ## Commands
-
-### `connect`
-
-Open the admin-shim mobile WebSocket, print incoming frame summaries, wait for
-the welcome state, then optionally hold the connection open. Use
-`--conversation`, `--run-id`, and `--resume-cursor` to seed the same
-`RunCursorStore` path the app uses; after welcome, `ChannelTransport` dispatches
-the production resume `subscribe(run_id, cursor)` frame.
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="connect --hold-ms 10000"
-.\gradlew.bat :cli:run -PcliArgs="connect --conversation conv_x --run-id run_x --resume-cursor 42 --hold-ms 10000"
-```
-
-The output includes the `canonical_live_transport` advertised by the welcome
-frame so transport exclusivity can be checked from scripts.
-
-### `send`
-
-Send a user message through admin-shim WS and fold the resulting frames through
-`WsChatBridge`, `ChannelTransport`, and the headless timeline store.
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="send `"hello`" --agent agt_x --conversation conv_x --wait-for-stable --dump-timeline"
-```
-
-Attach inline images with `--image` / `-i`. Values may be local image paths or
-`data:image/*;base64,...` URLs; the CLI sends them as Letta `content_parts`, not
-as text placeholders.
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="send `"describe this`" --image .\screenshot.png --agent agt_x --conversation conv_x"
-```
-
-If `--conversation` is omitted, the CLI creates one for the supplied agent via
-REST before sending.
 
 ### `dump-timeline`
 
@@ -121,53 +85,13 @@ emit stable JSON suitable for diffing.
 .\gradlew.bat :cli:run -PcliArgs="dump-timeline --conversation conv_x --limit 200"
 ```
 
-### `record`
+### `record-cursor-state`
 
-Capture raw admin-shim mobile WS frames as replay-compatible JSONL.
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="record --conversation conv_x --out recordings\conv_x.jsonl"
-```
-
-To record shim replay frames for an existing run, add `--run-id` and optional
-`--cursor`:
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="record --run-id run_x --cursor 42 --out recordings\run_x.jsonl"
-```
-
-To record a send flow, include the message and required agent/conversation:
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="record --agent agt_x --conversation conv_x --message `"hello`" --out recordings\send.jsonl"
-```
-
-`record --message` accepts the same repeatable `--image` / `-i` option as
-`send`, and records the outbound `content_parts` frame for replay.
-
-Snapshot the highest observed cursor state from a capture/recording with:
+Snapshot the highest observed cursor state from an existing JSONL recording:
 
 ```powershell
 .\gradlew.bat :cli:run -PcliArgs="record-cursor-state --recording recordings\resume.jsonl"
 ```
-
-### `capture`
-
-Capture a replay fixture from the same admin-shim mobile WS path, with an
-initial REST hydrate snapshot and local cursor observations included as metadata
-events. WS entries remain replay-compatible; `replay` hydrates `rest_messages`
-entries and ignores cursor metadata unless an assertion consumes frame seq data.
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="capture --shim https://letta.oculair.ca --conversation conv_x --output recordings\conv_x.jsonl --timeout-ms 30000"
-.\gradlew.bat :cli:run -PcliArgs="capture --conversation conv_x --agent agt_x --message `"repro prompt`" --output recordings\send.jsonl"
-.\gradlew.bat :cli:run -PcliArgs="capture --conversation conv_x --run-id run_x --cursor 42 --output recordings\resume.jsonl"
-```
-
-Use `--skip-rest-snapshot` for a WS-only fixture, and `--rest-limit` to cap the
-initial hydrate snapshot. `--from-phone` / `--adb` are reserved for a future
-device diagnostic channel; the current supported capture path is shim WS plus
-REST snapshot.
 
 ### `replay`
 
@@ -287,20 +211,10 @@ Interactive commands:
 - `save-fixture <path>`: write consumed and injected frames as replayable JSONL.
 - `reset`, `exit`.
 
-### `disconnect` and `reconnect`
-
-`disconnect` verifies that the CLI can connect and close cleanly with `bye`.
-`reconnect` exercises a connect/disconnect/connect cycle, with optional run
-cursor seeding:
-
-```powershell
-.\gradlew.bat :cli:run -PcliArgs="reconnect --conversation conv_x --run-id run_x --cursor 42"
-```
-
 ### `rest`
 
-Call arbitrary Letta REST endpoints with the same base URL/token flags as the
-admin-shim commands. This is the escape hatch for app/server functionality that
+Call arbitrary Letta REST endpoints with the shared base URL/token/profile
+flags. This is the escape hatch for app/server functionality that
 does not yet have a typed CLI wrapper.
 
 ```powershell
@@ -485,8 +399,8 @@ server that requires bearer auth.
 
 ## Fixture workflow
 
-1. Capture a suspect flow with `capture` (REST snapshot + WS) or `record`
-   (WS-only).
+1. Start from an existing JSONL recording (the shim-WS `capture`/`record`
+   commands are gone; see above).
 2. Reproduce locally with `replay --dump-timeline`.
 3. Minimize noisy fixtures with `replay --bisect-frame --bisect-out`.
 4. Add the JSONL under `android-compose/core/src/test/resources/replay`.

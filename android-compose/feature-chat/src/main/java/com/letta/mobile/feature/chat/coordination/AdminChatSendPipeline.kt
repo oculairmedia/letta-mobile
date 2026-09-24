@@ -12,7 +12,6 @@ import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.send.IrohChatSendStrategy
 import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
-import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -102,10 +101,6 @@ internal class AdminChatSendPipeline(
         )
     }
 
-    val wsChatSendStrategy: WsChatSendStrategy by lazy {
-        WsChatSendStrategy(wsChatSendCoordinator)
-    }
-
     val localRuntimeChatSendCoordinator: LocalRuntimeChatSendCoordinator by lazy {
         LocalRuntimeChatSendCoordinator(
             scope = scope,
@@ -125,11 +120,9 @@ internal class AdminChatSendPipeline(
     }
 
     /**
-     * lgns8.10.4.1: Iroh's own send route. Shares [wsChatSendCoordinator] with
-     * [wsChatSendStrategy] because that coordinator is transport-neutral — it
-     * drives whichever `IChannelTransport` the session graph bound. The types
-     * are distinct so the routing decision (and its telemetry) can never
-     * silently send an Iroh backend down the shim route.
+     * lgns8.10.4.1: Iroh's own send route, driving [wsChatSendCoordinator]
+     * (transport-neutral: it talks to whichever `IChannelTransport` the session
+     * graph bound).
      */
     val irohChatSendStrategy: IrohChatSendStrategy by lazy {
         IrohChatSendStrategy(wsChatSendCoordinator)
@@ -138,7 +131,6 @@ internal class AdminChatSendPipeline(
     val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
             timelineStrategy = timelineChatSendStrategy,
-            wsStrategy = wsChatSendStrategy,
             localStrategy = localRuntimeChatSendStrategy,
             irohStrategy = irohChatSendStrategy,
         )
