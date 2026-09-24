@@ -315,13 +315,16 @@ fun DrawBox(
         state.bgPattern?.toTiledBrush(density, layoutDirection)
     }
 
-    val handleHitPx = with(density) { selectionStyle.hitRadius.toPx() }
-    val rotationOffsetPx = with(density) { selectionStyle.rotationOffset.toPx() }
-    val pickTolerancePx = with(density) { 12.dp.toPx() }
+    // Read through state: the gesture handlers below live as long as the board, and the style
+    // changes under them (a window resized between phone and desktop layouts moves the handles),
+    // so a captured value would hit-test the chrome where it used to be drawn.
+    val handleHitPx by rememberUpdatedState(with(density) { selectionStyle.hitRadius.toPx() })
+    val rotationOffsetPx by rememberUpdatedState(with(density) { selectionStyle.rotationOffset.toPx() })
+    val pickTolerancePx by rememberUpdatedState(with(density) { 12.dp.toPx() })
     // Screen-space metrics for the selection chrome. Kept in px here (resolved
     // once per density change) and scaled by inverseScale at draw time so the
     // box, handles, and padding stay a constant on-screen size at any zoom.
-    val chromeMetrics = with(density) {
+    val chromeMetrics by rememberUpdatedState(with(density) {
         SelectionChromeMetrics(
             handleSizePx = selectionStyle.handleSize.toPx(),
             paddingPx = selectionStyle.padding.toPx(),
@@ -329,7 +332,7 @@ fun DrawBox(
             strokeWidthPx = selectionStyle.strokeWidth.toPx(),
             accent = selectionStyle.accent,
         )
-    }
+    })
 
     // The pointerInput coroutines are long-lived; reading state/onIntent through
     // rememberUpdatedState lets gesture callbacks see the current value without
@@ -503,6 +506,8 @@ fun DrawBox(
                     var prevDistance = 0f
                     var prevCentroid = Offset.Zero
                     var multi = false
+                    // A pinch ended with a finger still down: the throw waits for that finger.
+                    var awaitingLastLift = false
                     while (true) {
                         val event = awaitPointerEvent()
                         // Any new touch catches a coasting board.
@@ -518,6 +523,7 @@ fun DrawBox(
                             val centroid = Offset((p1.x + p2.x) * 0.5f, (p1.y + p2.y) * 0.5f)
                             if (!multi) {
                                 multi = true
+                                awaitingLastLift = false
                                 prevDistance = d
                                 prevCentroid = centroid
                                 pinchFling.begin(pressed[0].uptimeMillis, centroid)
@@ -537,9 +543,14 @@ fun DrawBox(
                             event.changes.forEach { it.consume() }
                         } else if (multi) {
                             multi = false
-                            // The pinch ended (fingers rarely lift together): throw at its last speed.
-                            pinchFling.release()
+                            // The pinch ended. Fingers rarely lift together, and the board must not
+                            // coast out from under one still holding it: the throw waits for the
+                            // last lift, and is dropped if that finger held still meanwhile.
+                            if (pressed.isEmpty()) pinchFling.release(event.changes.first().uptimeMillis) else awaitingLastLift = true
                             event.changes.forEach { it.consume() }
+                        } else if (awaitingLastLift && pressed.isEmpty()) {
+                            awaitingLastLift = false
+                            pinchFling.release(event.changes.first().uptimeMillis)
                         }
                     }
                 }
@@ -550,11 +561,10 @@ fun DrawBox(
             // delta.x and delta.y; classic mouse wheels send only delta.y.
             .pointerInput(Unit) {
                 // The scroll burst in progress, as a pan (screen px) for the coast: where it has got
-                // to, whether it has been a trackpad's (fractional steps), and the coast waiting to
-                // start once the steps stop.
+                // to, and whether it has been a trackpad's (fractional steps). The coast waiting to
+                // start once the steps stop is the fling's own, so a press cancels it with the rest.
                 var burstPan = Offset.Zero
                 var burstIsTrackpad = false
-                var coastStart: kotlinx.coroutines.Job? = null
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -562,10 +572,9 @@ fun DrawBox(
                         val change = event.changes.firstOrNull() ?: continue
                         val delta = change.scrollDelta
                         val plainPan = !event.keyboardModifiers.isCtrlPressed && !event.keyboardModifiers.isShiftPressed
-                        coastStart?.cancel()
                         if (plainPan) {
                             val step = Offset(-delta.x * 50f, -delta.y * 50f)
-                            if (coastStart == null) {
+                            if (!wheelFling.awaitingIdle) {
                                 wheelFling.begin(change.uptimeMillis, Offset.Zero)
                                 burstPan = Offset.Zero
                                 burstIsTrackpad = false
@@ -573,14 +582,8 @@ fun DrawBox(
                             burstPan += step
                             burstIsTrackpad = burstIsTrackpad || isTrackpadStep(delta)
                             wheelFling.track(change.uptimeMillis, burstPan)
-                            val trackpad = burstIsTrackpad
-                            coastStart = scope.launch {
-                                kotlinx.coroutines.delay(WHEEL_COAST_IDLE_MS)
-                                coastStart = null
-                                if (trackpad) wheelFling.release() else wheelFling.stop()
-                            }
+                            wheelFling.releaseWhenIdle(WHEEL_COAST_IDLE_MS, coast = burstIsTrackpad)
                         } else {
-                            coastStart = null
                             wheelFling.stop()
                         }
                         when {

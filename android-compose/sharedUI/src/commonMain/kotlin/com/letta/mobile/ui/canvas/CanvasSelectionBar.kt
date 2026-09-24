@@ -223,25 +223,38 @@ private fun PhoneSelectionButtons(actions: PhoneSelectionActions) {
     }
 }
 
-/** The text colour, as a row of swatches inside the phone bar's menu. */
+/**
+ * The text colour, as a row of swatches inside the phone bar's menu. Each is a finger's 48dp
+ * target around a 24dp dot: small dots with their own undersized targets overlapped, so a tap
+ * between two could pick either. The row scrolls when the palette outgrows the menu.
+ */
 @Composable
 private fun TextColourSwatches(text: ShapeTextActions) {
-    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         StrokePalette.forEach { swatch ->
             val selected = swatch.color.toHex() == text.color.toHex()
             Box(
                 modifier = Modifier
-                    .size(24.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(swatch.color)
-                    .border(
-                        if (selected) 3.dp else 1.dp,
-                        MaterialTheme.colorScheme.outline,
-                        androidx.compose.foundation.shape.CircleShape,
-                    )
+                    .size(48.dp)
                     .clickable { text.onColor(swatch.color) }
                     .semantics { contentDescription = "Text colour ${swatch.name}" },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(swatch.color)
+                        .border(
+                            if (selected) 3.dp else 1.dp,
+                            MaterialTheme.colorScheme.outline,
+                            androidx.compose.foundation.shape.CircleShape,
+                        ),
+                )
+            }
         }
     }
 }
