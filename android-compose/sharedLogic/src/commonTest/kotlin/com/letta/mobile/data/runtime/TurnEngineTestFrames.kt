@@ -118,6 +118,27 @@ internal class TurnEngineTestFrames(
         conversationId = runtime.conversationId,
     )
 
+    /** An `approval_request_message` stream delta for `tool-call-1` (letta-mobile-qygvv.13). */
+    fun approvalRequestMessage(toolName: String): AppServerInboundFrame.StreamDelta {
+        seq += 1
+        return AppServerInboundFrame.StreamDelta(
+            runtime = runtime,
+            eventSeq = seq,
+            emittedAt = FIXTURE_EMITTED_AT,
+            idempotencyKey = "evt-approval-$seq",
+            delta = buildJsonObject {
+                put("message_type", "approval_request_message")
+                put("id", "letta-msg-$seq")
+                put("run_id", runId)
+                put("tool_call", buildJsonObject {
+                    put("tool_call_id", "tool-call-1")
+                    put("name", toolName)
+                    put("arguments", "{}")
+                })
+            },
+        )
+    }
+
     /** [run]'s `turn_finished` for turn number [turn], sequenced after the frames already built. */
     fun turnFinished(run: TestRun, turn: Int): AppServerInboundFrame.TurnFinished {
         seq += 1

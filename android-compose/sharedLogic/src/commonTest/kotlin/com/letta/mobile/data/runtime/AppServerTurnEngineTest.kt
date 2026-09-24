@@ -592,11 +592,12 @@ class AppServerTurnEngineTest {
             )
             runCurrent()
 
-            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
-            assertEquals(runtime, approvalInput.runtime)
-            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
-            assertEquals("approval-1", approval.requestId)
-            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            // letta-mobile-qygvv.13: the server already approved the tool under
+            // Unrestricted; the delta is informational, so no approval_response is sent.
+            assertTrue(
+                client.sentCommands.none { (it as? AppServerCommand.Input)?.payload is AppServerInputPayload.ApprovalResponse },
+                "no redundant approval_response for an unrestricted approval_request_message",
+            )
             // Approval card suppressed; tool-call announcement surfaces so the
             // Skill tool chip renders live (toolchip-live fix).
             val toolCall = assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
