@@ -20,11 +20,18 @@ import kotlinx.coroutines.launch
 class PanFling(private val scope: CoroutineScope, private val onPan: (Offset) -> Unit) {
     private val tracker = VelocityTracker()
     private var job: Job? = null
+    private var idleWait: Job? = null
+    private var lastSampleMillis = 0L
 
-    /** Stops a coasting board where it is. */
+    /** Whether a [releaseWhenIdle] is waiting: the drag it belongs to is still going on. */
+    val awaitingIdle: Boolean get() = idleWait?.isActive == true
+
+    /** Stops a coasting board where it is, and any coast waiting to start. */
     fun stop() {
         job?.cancel()
         job = null
+        idleWait?.cancel()
+        idleWait = null
     }
 
     /** A drag of the board begins at [position] (screen px) at [timeMillis]. */
@@ -32,15 +39,38 @@ class PanFling(private val scope: CoroutineScope, private val onPan: (Offset) ->
         stop()
         tracker.resetTracking()
         tracker.addPosition(timeMillis, position)
+        lastSampleMillis = timeMillis
     }
 
     /** The finger dragging the board is at [position] at [timeMillis]. */
     fun track(timeMillis: Long, position: Offset) {
         tracker.addPosition(timeMillis, position)
+        lastSampleMillis = timeMillis
     }
 
-    /** The finger lifted: the board coasts on when it was moving fast enough to mean it. */
-    fun release() {
+    /**
+     * The drag has no lift of its own (a scroll burst): it is over once no step has come for
+     * [idleMillis], and then it coasts if [coast], else simply ends. Each call restarts the wait.
+     */
+    fun releaseWhenIdle(idleMillis: Long, coast: Boolean) {
+        idleWait?.cancel()
+        idleWait = scope.launch {
+            kotlinx.coroutines.delay(idleMillis)
+            idleWait = null
+            if (coast) release() else tracker.resetTracking()
+        }
+    }
+
+    /**
+     * The finger lifted, at [liftMillis] when known: the board coasts on when it was moving fast
+     * enough to mean it. A finger that stopped before it lifted threw nothing, however fast it
+     * had been going: the velocity is measured at its last move, not at the lift.
+     */
+    fun release(liftMillis: Long? = null) {
+        if (liftMillis != null && liftMillis - lastSampleMillis > STOPPED_MS) {
+            tracker.resetTracking()
+            return
+        }
         val measured = tracker.calculateVelocity()
         tracker.resetTracking()
         var velocity = Offset(measured.x, measured.y)
@@ -59,6 +89,8 @@ class PanFling(private val scope: CoroutineScope, private val onPan: (Offset) ->
     }
 
     private companion object {
+        /** A finger still this long before it lifts has stopped (as Android's own trackers assume). */
+        const val STOPPED_MS = 40L
         /** Below this (px/s) a lift is a stop, not a throw. */
         const val MIN_SPEED = 400f
         /** A wild flick still lands somewhere near. */
