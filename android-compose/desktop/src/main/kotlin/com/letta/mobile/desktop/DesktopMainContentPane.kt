@@ -111,15 +111,10 @@ internal fun DesktopMainContentPane(
             // header above it only pushed the board down.
             showHeader = false,
         ) {
-            val assets = androidx.compose.runtime.remember {
-                com.letta.mobile.data.storage.FileAssetStore(
-                    com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore.defaultRootDirectory().resolve("assets").toFile(),
-                )
-            }
             CanvasWorkspace(
                 session = inputs.activeCanvasSession,
                 presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
-                assets = assets,
+                assets = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.assets,
                 onNavigateBack = actions.onCloseCanvas,
                 onShareToChat = actions.onShareCanvasToChat,
                 modifier = Modifier.fillMaxSize(),
