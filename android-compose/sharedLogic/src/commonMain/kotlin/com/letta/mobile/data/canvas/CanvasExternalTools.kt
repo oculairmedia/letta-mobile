@@ -6,14 +6,9 @@ import com.letta.mobile.data.controller.extras.HostExternalTool
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
 
 private val canvasJson = Json {
     ignoreUnknownKeys = true
@@ -239,15 +234,6 @@ private inline fun BaseCanvasTool.runWithContext(
     }.getOrElse { ExternalToolResult.Error("$failurePrefix: ${it.message}") }
 }
 
-private fun singleCanvasIdSchema(): JsonObject = buildJsonObject {
-    put("type", "object")
-    putJsonObject("properties") {
-        putJsonObject("canvas_id") { put("type", "string") }
-    }
-    put("required", buildJsonArray { add(JsonPrimitive("canvas_id")) })
-    put("additionalProperties", false)
-}
-
 /**
  * Tool: canvas.create
  * Creates a new canvas document or resolves an existing conversation canvas.
@@ -257,16 +243,8 @@ class CanvasCreateTool(
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : BaseCanvasTool(store, sessions) {
     override val name: String = NAME
-    override val description: String =
-        "Create a new canvas document. Returns the created canvas_id."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("title") { put("type", "string") }
-            putJsonObject("conversation_id") { put("type", "string") }
-        }
-        put("additionalProperties", false)
-    }
+    override val description: String = CanvasToolContract.create.description
+    override val inputSchema: JsonObject = CanvasToolContract.create.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to create canvas") { context ->
@@ -274,7 +252,7 @@ class CanvasCreateTool(
         }
 
     companion object {
-        const val NAME = "canvas.create"
+        const val NAME = CanvasToolContract.CREATE
     }
 }
 
@@ -287,9 +265,8 @@ class CanvasGetSceneTool(
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : BaseCanvasTool(store, sessions) {
     override val name: String = NAME
-    override val description: String =
-        "Get the current DrawBox scene JSON and revision for a canvas."
-    override val inputSchema: JsonObject = singleCanvasIdSchema()
+    override val description: String = CanvasToolContract.getScene.description
+    override val inputSchema: JsonObject = CanvasToolContract.getScene.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to get scene") { context ->
@@ -307,7 +284,7 @@ class CanvasGetSceneTool(
         }
 
     companion object {
-        const val NAME = "canvas.get_scene"
+        const val NAME = CanvasToolContract.GET_SCENE
     }
 }
 
@@ -320,20 +297,8 @@ class CanvasReplaceSceneTool(
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : BaseCanvasTool(store, sessions) {
     override val name: String = NAME
-    override val description: String =
-        "Replace the DrawBox scene JSON for a canvas, incrementing its revision."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("canvas_id") { put("type", "string") }
-            putJsonObject("scene_json") { put("type", "string") }
-        }
-        put("required", buildJsonArray {
-            add(JsonPrimitive("canvas_id"))
-            add(JsonPrimitive("scene_json"))
-        })
-        put("additionalProperties", false)
-    }
+    override val description: String = CanvasToolContract.replaceScene.description
+    override val inputSchema: JsonObject = CanvasToolContract.replaceScene.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to replace scene") { context ->
@@ -341,7 +306,7 @@ class CanvasReplaceSceneTool(
         }
 
     companion object {
-        const val NAME = "canvas.replace_scene"
+        const val NAME = CanvasToolContract.REPLACE_SCENE
     }
 }
 
@@ -354,24 +319,8 @@ class CanvasApplyOpsTool(
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : BaseCanvasTool(store, sessions) {
     override val name: String = NAME
-    override val description: String =
-        "Apply a sequence of Canvas operations to the canvas. Besides element ops, " +
-            "set_document {document_id, document_json, frame?, color?, style?} places a block-document note on the board " +
-            "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
-            "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}) and " +
-            "remove_document {document_id} takes it off."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("canvas_id") { put("type", "string") }
-            putJsonObject("ops") { put("type", "array") }
-        }
-        put("required", buildJsonArray {
-            add(JsonPrimitive("canvas_id"))
-            add(JsonPrimitive("ops"))
-        })
-        put("additionalProperties", false)
-    }
+    override val description: String = CanvasToolContract.applyOps.description
+    override val inputSchema: JsonObject = CanvasToolContract.applyOps.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to apply ops") { context ->
@@ -379,7 +328,7 @@ class CanvasApplyOpsTool(
         }
 
     companion object {
-        const val NAME = "canvas.apply_ops"
+        const val NAME = CanvasToolContract.APPLY_OPS
     }
 }
 
@@ -392,16 +341,15 @@ class CanvasExportSvgTool(
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : BaseCanvasTool(store, sessions) {
     override val name: String = NAME
-    override val description: String =
-        "Export the SVG representation of a canvas."
-    override val inputSchema: JsonObject = singleCanvasIdSchema()
+    override val description: String = CanvasToolContract.exportSvg.description
+    override val inputSchema: JsonObject = CanvasToolContract.exportSvg.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to export SVG") { context ->
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
                 is CanvasLookupResult.Found -> {
-                    val svgContent = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\"></svg>"
+                    val svgContent = CanvasToolContract.PLACEHOLDER_SVG
                     ExternalToolResult.Success(
                         canvasJson.encodeToString(CanvasExportSvgResult(svg = svgContent))
                     )
@@ -410,7 +358,7 @@ class CanvasExportSvgTool(
         }
 
     companion object {
-        const val NAME = "canvas.export_svg"
+        const val NAME = CanvasToolContract.EXPORT_SVG
     }
 }
 
@@ -423,15 +371,8 @@ class CanvasListTool(
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
 ) : BaseCanvasTool(store, sessions) {
     override val name: String = NAME
-    override val description: String =
-        "List canvas IDs for a conversation, or every canvas the calling agent owns."
-    override val inputSchema: JsonObject = buildJsonObject {
-        put("type", "object")
-        putJsonObject("properties") {
-            putJsonObject("conversation_id") { put("type", "string") }
-        }
-        put("additionalProperties", false)
-    }
+    override val description: String = CanvasToolContract.list.description
+    override val inputSchema: JsonObject = CanvasToolContract.list.inputSchema
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to list canvases") { context ->
@@ -440,7 +381,7 @@ class CanvasListTool(
         }
 
     companion object {
-        const val NAME = "canvas.list"
+        const val NAME = CanvasToolContract.LIST
     }
 }
 
