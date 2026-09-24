@@ -175,4 +175,27 @@ class CanvasImageAssetsTest {
         val moved = adopted.copy(points = listOf(Offset(10f, 10f), Offset(410f, 310f)))
         assertTrue(CanvasWorkspaceSupport.shouldRecordDrawingStep(listOf(adopted), listOf(moved), isApplyingHistory = false))
     }
+
+    @Test
+    fun anExportCompletesPreviewOnlyImagesAndCountsTheOnesItCannot() = kotlinx.coroutines.test.runTest {
+        val bytes = photo()
+        val adopted = CanvasImageAssets.adopt(image(bytes, id = "here"), InMemoryAssetStore())
+        val fromHost = adopted.copy(id = "fetched", bytes = adopted.preview!!)
+        val lost = adopted.copy(id = "lost", assetRef = "sha256:" + "0".repeat(64), bytes = ByteArray(0))
+        val stored = InMemoryAssetStore()
+        val completion = CanvasImageAssets.completeForExport(listOf(fromHost, lost), stored) { ref ->
+            if (ref == adopted.assetRef) bytes else null
+        }
+        assertEquals(listOf("fetched"), completion.completed.map { it.id })
+        assertContentEquals(bytes, completion.completed.single().bytes)
+        assertEquals(1, completion.missing, "the image nobody has is counted, not exported as a preview")
+    }
+
+    @Test
+    fun theUndoChoiceComparesDrawingsTheWayTheUndoStepDoes() {
+        val plain = image(photo())
+        val adopted = CanvasImageAssets.adopt(plain, InMemoryAssetStore())
+        assertTrue(CanvasWorkspaceSupport.sameDrawing(listOf(plain), listOf(adopted)))
+        assertTrue(!CanvasWorkspaceSupport.sameDrawing(listOf(plain), listOf(plain.copy(opacity = 0.5f))))
+    }
 }

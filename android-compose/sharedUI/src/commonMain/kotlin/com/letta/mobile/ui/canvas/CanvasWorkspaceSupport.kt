@@ -577,8 +577,14 @@ internal object CanvasWorkspaceSupport {
         elementsBefore: List<Element>?,
         elementsNow: List<Element>,
         isApplyingHistory: Boolean,
-    ): Boolean = !isApplyingHistory && elementsBefore != null && elementsBefore != elementsNow &&
-        elementsBefore.map(::withoutAssetBookkeeping) != elementsNow.map(::withoutAssetBookkeeping)
+    ): Boolean = !isApplyingHistory && elementsBefore != null && !sameDrawing(elementsBefore, elementsNow)
+
+    /**
+     * Whether [a] and [b] are the same drawing as far as anyone did anything: equal, or differing
+     * only in images' asset bookkeeping. What decides an undo step decides which undo applies too.
+     */
+    fun sameDrawing(a: List<Element>, b: List<Element>): Boolean =
+        a == b || a.map(::withoutAssetBookkeeping) == b.map(::withoutAssetBookkeeping)
 
     private fun withoutAssetBookkeeping(element: Element): Element =
         if (element is Element.Image) {

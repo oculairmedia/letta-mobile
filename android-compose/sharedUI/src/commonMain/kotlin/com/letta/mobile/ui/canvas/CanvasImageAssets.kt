@@ -54,6 +54,29 @@ internal object CanvasImageAssets {
         runCatching { store.put(image.mediaType ?: sniffMediaType(image.bytes), image.bytes) }
     }
 
+    /**
+     * The images in [elements] that an export would write as only a ref and a preview, given their
+     * full bytes: from [store], else from [fetch] (the host). [ExportImages.missing] counts the ones
+     * neither has.
+     */
+    suspend fun completeForExport(
+        elements: List<Element>,
+        store: AssetStore?,
+        fetch: suspend (String) -> ByteArray?,
+    ): ExportImages {
+        val incomplete = elements.filterIsInstance<Element.Image>()
+            .filter { it.assetRef != null && (it.bytes.isEmpty() || it.isShowingPreview) }
+        val completed = incomplete.mapNotNull { image ->
+            val ref = image.assetRef ?: return@mapNotNull null
+            val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { store?.get(ref) } ?: fetch(ref)
+            bytes?.let { image.copy(bytes = it) }
+        }
+        return ExportImages(completed = completed, missing = incomplete.size - completed.size)
+    }
+
+    /** Images an export completed, and how many it could not. */
+    data class ExportImages(val completed: List<Element.Image>, val missing: Int)
+
     /** Drawing [json] parsed and its images resolved against [store]; null when it does not parse. */
     fun parse(json: String, store: AssetStore?): PayLoad? =
         runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()

@@ -407,6 +407,21 @@ fun CanvasWorkspace(
         }
     }
 
+    // An export stands on its own, so every image must go in whole: those still showing a preview
+    // get their bytes from the store or the host first, and an export that cannot have them all
+    // says so instead of writing previews in their place.
+    suspend fun exportStandalone(handler: (String) -> Unit) {
+        val completion = CanvasImageAssets.completeForExport(controller.state.value.elements, assets) { ref ->
+            session?.fetchAsset(ref)
+        }
+        completion.completed.forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(it)) }
+        if (completion.missing > 0) {
+            statusMessage = "Export needs every image: ${completion.missing} not loaded yet"
+            return
+        }
+        handler(controller.exportStandaloneJson())
+    }
+
     // Collect export/error events from DrawBoxController
     LaunchedEffect(controller, session) {
         controller.events.collect { event ->
@@ -592,7 +607,7 @@ fun CanvasWorkspace(
     }
 
     fun undoBoard() {
-        val drawingUnsaved = lastSavedElements != null && lastSavedElements != state.elements
+        val drawingUnsaved = lastSavedElements?.let { !CanvasWorkspaceSupport.sameDrawing(it, state.elements) } == true
         CanvasWorkspaceSupport.undoBoard(historyActionContext, drawingUnsaved, canUndo)
     }
 
@@ -1342,7 +1357,11 @@ fun CanvasWorkspace(
                     // images' bytes rather than refs nothing there can resolve.
                     onExportJson = {
                         val handler = onExportJson
-                        if (handler != null) handler(controller.exportStandaloneJson()) else controller.exportJson()
+                        if (handler == null) {
+                            controller.exportJson()
+                        } else {
+                            coroutineScope.launch { exportStandalone(handler) }
+                        }
                     },
                     onExportSvg = { controller.exportSvg() },
                     onClear = {
