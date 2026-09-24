@@ -487,7 +487,19 @@ class DrawBoxController(
      */
     fun importPath(jsonString: String) {
         try {
-            val payLoad = DrawingSerializer.deserialize(jsonString)
+            importPath(DrawingSerializer.deserialize(jsonString))
+        } catch (e: Exception) {
+            // Handle deserialization error
+            _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))
+        }
+    }
+
+    /**
+     * [importPath] for a drawing already parsed, so a host can parse a large one off the main
+     * thread (parsing is the expensive part) and hand over only the result.
+     */
+    fun importPath(payLoad: PayLoad) {
+        run {
             // The host's settings, read before reset() replaces them with defaults.
             val before = _state.value
             reset()
@@ -500,9 +512,6 @@ class DrawBoxController(
                 bgPattern = before.bgPattern,
                 selectInsideHollowShapes = before.selectInsideHollowShapes,
             ).also { it.invokeBitmap = before.invokeBitmap }
-        } catch (e: Exception) {
-            // Handle deserialization error
-            _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))
         }
     }
 
@@ -514,7 +523,15 @@ class DrawBoxController(
      */
     fun importExternal(jsonString: String) {
         try {
-            val payLoad = DrawingSerializer.deserialize(jsonString)
+            importExternal(DrawingSerializer.deserialize(jsonString))
+        } catch (e: Exception) {
+            _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))
+        }
+    }
+
+    /** [importExternal] for a drawing already parsed (off the main thread, by the host). */
+    fun importExternal(payLoad: PayLoad) {
+        run {
             val ids = payLoad.elements.mapTo(HashSet()) { it.id }
             val before = _state.value
             _state.value = before.copy(
@@ -524,8 +541,6 @@ class DrawBoxController(
                 history = emptyList(),
                 future = emptyList(),
             ).also { it.invokeBitmap = before.invokeBitmap }
-        } catch (e: Exception) {
-            _events.tryEmit(Event.Error("Failed to import drawing: ${e.message}"))
         }
     }
 }

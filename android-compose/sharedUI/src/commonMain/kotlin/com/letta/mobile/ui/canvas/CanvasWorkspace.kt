@@ -230,14 +230,34 @@ fun CanvasWorkspace(
             sessionRegistry?.register(session)
             val syncJob = session.startSync(this)
             try {
+                val openStarted = kotlin.time.TimeSource.Monotonic.markNow()
                 session.load()
                 val sessionJson = session.sceneJsonOrEmpty()
                 var lastImportedRev = session.document.value?.revision ?: 0L
+                // Parsing the scene is the heaviest thing opening a board does, and a board with
+                // pictures on it is megabytes of JSON: it is parsed off the main thread, and only
+                // the parsed drawing is handed to the controller on it.
+                val (clean, parsed) = withContext(Dispatchers.Default) {
+                    val stripped = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
+                    stripped to if (sessionJson.isBlank()) {
+                        null
+                    } else {
+                        runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(stripped) }.getOrNull()
+                    }
+                }
                 // Known even for an empty canvas, or the first note placed on it would read as
                 // an external change to the drawing and reload the board.
-                lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
+                lastDrawing = clean
                 if (sessionJson.isNotBlank()) {
-                    controller.importPath(lastDrawing!!)
+                    // A scene that does not parse still goes through the text path, which reports it.
+                    if (parsed != null) controller.importPath(parsed) else controller.importPath(clean)
+                    com.letta.mobile.util.Telemetry.event(
+                        "CanvasPerformance", "open.loaded",
+                        "canvasId" to session.canvasId.value,
+                        "sceneChars" to sessionJson.length,
+                        "elements" to controller.state.value.elements.size,
+                        durationMs = openStarted.elapsedNow().inWholeMilliseconds,
+                    )
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
                 }
@@ -252,20 +272,40 @@ fun CanvasWorkspace(
 
                 // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
                 // Conflict: agent replace wins; toast/status.
+                // Each revision is compared and parsed off the main thread too. While one is being
+                // parsed the collector is suspended, and the document flow keeps only the newest
+                // revision, so a catch-up burst of many revisions lands as one import.
                 session.document.collect { doc ->
-                    val result = CanvasWorkspaceSupport.evaluateExternalDocSync(
-                        ExternalSyncParams(
-                            doc = doc,
-                            lastImportedRev = lastImportedRev,
-                            lastExportedJson = lastExportedJson,
-                            lastDrawing = lastDrawing,
-                        ),
-                    ) ?: return@collect
+                    val importStarted = kotlin.time.TimeSource.Monotonic.markNow()
+                    val params = ExternalSyncParams(
+                        doc = doc,
+                        lastImportedRev = lastImportedRev,
+                        lastExportedJson = lastExportedJson,
+                        lastDrawing = lastDrawing,
+                    )
+                    val (result, parsedExternal) = withContext(Dispatchers.Default) {
+                        val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params) ?: return@withContext null
+                        val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }?.let { json ->
+                            runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()
+                        }
+                        evaluated to payload
+                    } ?: return@collect
                     lastImportedRev = result.newImportedRev
                     importedRevision = result.newImportedRev
                     if (result.shouldImport && result.cleanJson != null) {
                         // A change from another app must not move this one's camera or tool.
-                        controller.importExternal(result.cleanJson)
+                        if (parsedExternal != null) {
+                            controller.importExternal(parsedExternal)
+                        } else {
+                            controller.importExternal(result.cleanJson)
+                        }
+                        com.letta.mobile.util.Telemetry.event(
+                            "CanvasPerformance", "sync.imported",
+                            "revision" to doc?.revision,
+                            "sceneChars" to result.cleanJson.length,
+                            durationMs = importStarted.elapsedNow().inWholeMilliseconds,
+                            level = com.letta.mobile.util.Telemetry.Level.DEBUG,
+                        )
                         // Nor put a caret in text placed there: it is known before the caret
                         // effect sees it, or text placed on a desktop opened a phone's keyboard.
                         knownTextIds = CanvasTextElements.ids(controller.state.value.elements)
