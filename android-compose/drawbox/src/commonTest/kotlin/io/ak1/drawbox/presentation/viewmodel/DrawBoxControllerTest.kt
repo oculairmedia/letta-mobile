@@ -174,4 +174,12 @@ class DrawBoxControllerTest {
         controller.onIntent(Intent.SelectAt(a + androidx.compose.ui.geometry.Offset(1f, 1f), 4f, additive = true))
         assertEquals(setOf("b"), controller.state.value.selectedIds)
     }
+
+    @Test
+    fun aWheelNotchIsNotATrackpadStepButFractionsAndTwoAxesAre() {
+        assertTrue(!io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(0f, 1f)), "a wheel notch does not coast")
+        assertTrue(!io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(0f, -3f)))
+        assertTrue(io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(0f, 0.37f)))
+        assertTrue(io.ak1.drawbox.isTrackpadStep(androidx.compose.ui.geometry.Offset(1f, 1f)), "two axes at once is a trackpad")
+    }
 }
