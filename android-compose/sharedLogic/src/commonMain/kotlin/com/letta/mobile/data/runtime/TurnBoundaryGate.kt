@@ -2,28 +2,44 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.runtime.RunId
-import com.letta.mobile.runtime.RuntimeEventDraft
+import com.letta.mobile.data.transport.appserver.AppServerStopReason
 import com.letta.mobile.runtime.RuntimeRunStatus
-import com.letta.mobile.runtime.TurnCommand
-import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /** What the engine does with one inbound frame at the turn boundary (letta-mobile-qygvv.2). */
 internal sealed interface TurnBoundaryDecision {
+    val isAuthoritative: Boolean get() = false
+    val allowsRunPromotion: Boolean get() = true
+
     /** Project the frame as usual; a terminal it carries goes through the settle path. */
     data object Project : TurnBoundaryDecision
 
+    /** Project a non-terminal frame from a settled run: do not treat as evidence, do not promote run ID. */
+    data object ProjectSettledRunDraft : TurnBoundaryDecision {
+        override val allowsRunPromotion: Boolean get() = false
+    }
+
     /** Project the frame; a terminal lifecycle it carries is authoritative and completes the turn now. */
-    data object ProjectAuthoritative : TurnBoundaryDecision
+    data object ProjectAuthoritative : TurnBoundaryDecision {
+        override val isAuthoritative: Boolean get() = true
+    }
 
     /** Skip the frame: it closes a turn this runtime key has already settled. */
     data class Drop(val reason: String) : TurnBoundaryDecision
 
     /** The server's loop went idle after this turn produced evidence: complete with [status]. */
-    data class LoopIdle(val status: RuntimeRunStatus) : TurnBoundaryDecision
+    data class LoopIdle(val status: RuntimeRunStatus) : TurnBoundaryDecision {
+        override val isAuthoritative: Boolean get() = true
+    }
 }
+
+/** One inbound frame plus the lease facts the boundary decision reads (letta-mobile-qygvv.2). */
+internal data class TurnBoundaryInput(
+    val received: AppServerReceivedFrame,
+    val leaseRunId: String?,
+    val approvalOutstanding: Boolean,
+)
 
 /**
  * letta-mobile-qygvv.2: authoritative turn boundaries for ONE runtime key, mirroring the reference
@@ -62,57 +78,59 @@ internal class TurnBoundaryGate {
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
     fun noteSettled(runId: String?): Unit = synchronized(lock) {
         runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
+        Unit
     }
 
-    fun decide(
-        received: AppServerReceivedFrame,
-        leaseRunId: String?,
-        approvalOutstanding: Boolean,
-    ): TurnBoundaryDecision = synchronized(lock) {
-        when (val frame = received.frame) {
-            is AppServerInboundFrame.StreamDelta -> decideStreamDelta(received)
-            is AppServerInboundFrame.TurnFinished -> decideTurnFinished(frame, leaseRunId)
-            is AppServerInboundFrame.UpdateLoopStatus -> decideLoopStatus(frame, approvalOutstanding)
+    fun decide(input: TurnBoundaryInput): TurnBoundaryDecision = synchronized(lock) {
+        when (val frame = input.received.frame) {
+            is AppServerInboundFrame.StreamDelta -> decideStreamDelta(input.received)
+            is AppServerInboundFrame.TurnFinished -> decideTurnFinished(frame, input)
+            is AppServerInboundFrame.UpdateLoopStatus -> decideLoopStatus(frame, input)
             else -> TurnBoundaryDecision.Project
         }
     }
 
     private fun decideStreamDelta(received: AppServerReceivedFrame): TurnBoundaryDecision {
         val runId = received.frameRunIdOrNull()
-        val lateTerminal = runId != null &&
-            runId in settledRunIds &&
-            received.lifecycleStatusFromTerminal() != null
-        if (lateTerminal) return TurnBoundaryDecision.Drop("terminal_delta_for_settled_run")
+        if (runId != null && runId in settledRunIds) {
+            if (received.lifecycleStatusFromTerminal() != null) {
+                return TurnBoundaryDecision.Drop("terminal_delta_for_settled_run")
+            }
+            return TurnBoundaryDecision.ProjectSettledRunDraft
+        }
         evidenceSeen = true
         return TurnBoundaryDecision.Project
     }
 
     private fun decideTurnFinished(
         frame: AppServerInboundFrame.TurnFinished,
-        leaseRunId: String?,
+        input: TurnBoundaryInput,
     ): TurnBoundaryDecision {
+        val leaseRunId = input.leaseRunId
         if (frame.turnId in finishedTurnIds) return TurnBoundaryDecision.Drop("duplicate_turn_id")
+        val terminal = AppServerStopReason.isTerminal(frame.stopReason)
         val runId = frame.runId?.takeIf { it.isNotBlank() }
-        if (runId != null && runId in settledRunIds) {
-            finishedTurnIds.add(frame.turnId)
-            return TurnBoundaryDecision.Drop("run_already_settled")
+        if (runId != null) {
+            if (runId in settledRunIds) {
+                if (terminal) finishedTurnIds.add(frame.turnId)
+                return TurnBoundaryDecision.Drop("run_already_settled")
+            }
+            if (leaseRunId != null && runId != leaseRunId) {
+                return TurnBoundaryDecision.Drop("superseded_run")
+            }
         }
-        if (runId != null && leaseRunId != null) {
-            if (runId != leaseRunId) return TurnBoundaryDecision.Drop("superseded_run")
-        }
+        if (!terminal) return TurnBoundaryDecision.Project
         finishedTurnIds.add(frame.turnId)
         return TurnBoundaryDecision.ProjectAuthoritative
     }
 
     private fun decideLoopStatus(
         frame: AppServerInboundFrame.UpdateLoopStatus,
-        approvalOutstanding: Boolean,
+        input: TurnBoundaryInput,
     ): TurnBoundaryDecision {
-        val idle = frame.loopStatus.status == LOOP_WAITING_ON_INPUT &&
-            frame.loopStatus.activeRunIds.isEmpty()
-        if (!idle) return TurnBoundaryDecision.Project
-        if (!evidenceSeen) return TurnBoundaryDecision.Project
-        if (approvalOutstanding) return TurnBoundaryDecision.Project
+        if (!evidenceSeen || input.approvalOutstanding) return TurnBoundaryDecision.Project
+        if (frame.loopStatus.status != LOOP_WAITING_ON_INPUT) return TurnBoundaryDecision.Project
+        if (frame.loopStatus.activeRunIds.isNotEmpty()) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }
@@ -133,51 +151,5 @@ internal class TurnBoundaryGate {
     companion object {
         const val LOOP_WAITING_ON_INPUT: String = "WAITING_ON_INPUT"
         private const val RECENT_CAPACITY = 32
-    }
-}
-
-internal fun AppServerReceivedFrame.eventSeqOrNull(): Long? =
-    when (val f = frame) {
-        is AppServerInboundFrame.StreamDelta -> f.eventSeq
-        is AppServerInboundFrame.UpdateLoopStatus -> f.eventSeq
-        is AppServerInboundFrame.TurnFinished -> f.eventSeq
-        is AppServerInboundFrame.UpdateDeviceStatus -> f.eventSeq
-        is AppServerInboundFrame.UpdateQueue -> f.eventSeq
-        is AppServerInboundFrame.UpdateSubagentState -> f.eventSeq
-        else -> null
-    }
-
-/**
- * letta-mobile-qygvv.2: `turn_finished` and an idle loop status after evidence are the
- * server's own turn boundaries. Returns null when the frame closes a turn this key already
- * settled (a duplicate `turn_id`, a superseded or settled run) and must be skipped.
- */
-internal fun TurnBoundaryGate.decideBoundary(
-    received: AppServerReceivedFrame,
-    leaseRunId: String?,
-    conversationId: String,
-    hasOutstandingApproval: Boolean,
-): TurnBoundaryDecision? {
-    val decision = decide(
-        received = received,
-        leaseRunId = leaseRunId,
-        approvalOutstanding = hasOutstandingApproval,
-    )
-    if (decision !is TurnBoundaryDecision.Drop) return decision
-    Telemetry.event(
-        "AppServerTurnEngine", "terminal.boundary_dropped",
-        "frameType" to (received.frame.type ?: "<unknown>"),
-        "reason" to decision.reason,
-        "conversationId" to conversationId,
-        "eventSeq" to received.eventSeqOrNull(),
-    )
-    return null
-}
-
-internal fun TurnCommand.loopIdleTerminal(status: RuntimeRunStatus, leaseRunId: String?): RuntimeEventDraft {
-    val runId = leaseRunId?.takeIf { it.isNotBlank() }?.let(::RunId)
-    return when (status) {
-        RuntimeRunStatus.Cancelled -> cancelledDraft("App Server loop idle after abort").copy(runId = runId)
-        else -> completedDraft(runId)
     }
 }
