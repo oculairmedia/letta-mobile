@@ -56,9 +56,10 @@ internal class TurnBoundaryGate {
     fun noteAbortRequested(): Unit = synchronized(lock) { abortRequested = true }
 
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
-    fun noteSettled(runId: String?): Unit = synchronized(lock) {
-        runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
-        Unit
+    fun noteSettled(runId: String?) {
+        synchronized(lock) {
+            runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
+        }
     }
 
     fun decide(
@@ -94,8 +95,8 @@ internal class TurnBoundaryGate {
             finishedTurnIds.add(frame.turnId)
             return TurnBoundaryDecision.Drop("run_already_settled")
         }
-        if (runId != null && leaseRunId != null && runId != leaseRunId) {
-            return TurnBoundaryDecision.Drop("superseded_run")
+        if (runId != null && leaseRunId != null) {
+            if (runId != leaseRunId) return TurnBoundaryDecision.Drop("superseded_run")
         }
         finishedTurnIds.add(frame.turnId)
         return TurnBoundaryDecision.ProjectAuthoritative
@@ -105,9 +106,11 @@ internal class TurnBoundaryGate {
         frame: AppServerInboundFrame.UpdateLoopStatus,
         approvalOutstanding: Boolean,
     ): TurnBoundaryDecision {
-        val idle = frame.loopStatus.status == LOOP_WAITING_ON_INPUT &&
-            frame.loopStatus.activeRunIds.isEmpty()
-        if (!idle || !evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
+        val isWaitingOnInput = frame.loopStatus.status == LOOP_WAITING_ON_INPUT
+        val noActiveRuns = frame.loopStatus.activeRunIds.isEmpty()
+        if (!isWaitingOnInput || !noActiveRuns) return TurnBoundaryDecision.Project
+        if (!evidenceSeen) return TurnBoundaryDecision.Project
+        if (approvalOutstanding) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }

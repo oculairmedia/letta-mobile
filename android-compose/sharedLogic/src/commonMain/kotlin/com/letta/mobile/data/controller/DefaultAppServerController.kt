@@ -22,6 +22,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -85,6 +86,7 @@ class DefaultAppServerController(
         RuntimePermissionDefaults.DEFAULT_MODE
     },
 ) : AppServerController {
+    @Suppress("NoDetachedCoroutineLifecycle")
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
@@ -315,6 +317,8 @@ class DefaultAppServerController(
                     externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
                 ),
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
@@ -510,6 +514,8 @@ class DefaultAppServerController(
                     forceDeviceStatus = forceDeviceStatus,
                 ),
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to sync runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
@@ -523,6 +529,8 @@ class DefaultAppServerController(
             // letta-mobile-qygvv.6: through the engine so a confirmed abort also cleans up this
             // client's parked queue items and resumes the queue.
             turnEngine.abort(runtime, runId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
