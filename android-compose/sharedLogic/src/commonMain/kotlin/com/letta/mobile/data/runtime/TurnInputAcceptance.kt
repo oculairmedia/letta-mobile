@@ -385,7 +385,7 @@ internal suspend fun joinCollectorOrHandleFailure(
     collector: Job,
     inputFailure: InputAcceptance.Failure?,
     onFailure: suspend (String) -> Unit,
-): String {
+): String? {
     if (inputFailure != null) {
         // letta-mobile-qygvv.1: the server will never run this input — fail
         // now instead of waiting out the idle watchdog.
@@ -393,8 +393,10 @@ internal suspend fun joinCollectorOrHandleFailure(
         onFailure(inputFailure.failureReason)
         return "input_rejected"
     }
+    // A normal join decides nothing: the collector's own catch blocks already
+    // recorded why it ended, and that reason must survive (see the engine).
     collector.join()
-    return "normal_completion"
+    return null
 }
 
 /**

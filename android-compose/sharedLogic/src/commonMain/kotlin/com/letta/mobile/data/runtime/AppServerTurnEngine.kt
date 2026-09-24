@@ -827,10 +827,15 @@ class AppServerTurnEngine(
             collectorReady.await()
             val inputFailure = inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
             Telemetry.event("IrohTurn", "input.sent")
-            releaseReason = joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
+            // letta-mobile-qygvv.1: only an input failure decides the release reason
+            // here. A plain join must NOT overwrite the reason the collector already
+            // recorded (watchdog_timeout / cancellation / stream_error), otherwise the
+            // release looks like a normal completion and the orphan-abort path in
+            // qygvv.3 never fires.
+            joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
                 noteOwnerTerminal(RuntimeRunStatus.Failed, source = "input_rejected", lease = leaseRef)
                 send(command.failedDraft(failureText))
-            }
+            }?.let { releaseReason = it }
         } finally {
             withContext(NonCancellable) {
                 collector?.cancelAndJoin()
