@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -69,6 +70,29 @@ class AppServerClientTest {
         val ack = accepted.await()
         assertEquals(true, ack.accepted)
         assertEquals(true, ack.queued)
+    }
+
+    // letta-mobile-qygvv.6
+    @Test
+    fun clientCorrelatesQueueResponsesByRequestId() = runTest {
+        val transport = FakeAppServerTransport()
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
+
+        val removal = backgroundScope.async {
+            client.removeQueueItem(AppServerCommand.RemoveQueueItem("remove-1", runtime, "q-1"))
+        }
+        val resume = backgroundScope.async { client.resumeQueue(AppServerCommand.ResumeQueue(runtime, "resume-1")) }
+        runCurrent()
+
+        assertIs<AppServerCommand.RemoveQueueItem>(transport.sentControlCommands[0])
+        assertIs<AppServerCommand.ResumeQueue>(transport.sentControlCommands[1])
+        transport.emitControl(AppServerInboundFrame.ResumeQueueResponse("resume-1", runtime, resumed = 1, success = true))
+        transport.emitControl(AppServerInboundFrame.RemoveQueueItemResponse("other", success = false, itemId = "q-9"))
+        transport.emitControl(AppServerInboundFrame.RemoveQueueItemResponse("remove-1", success = true, itemId = "q-1"))
+
+        assertEquals("q-1", removal.await().itemId)
+        assertTrue(removal.await().success)
+        assertEquals(1, resume.await().resumed)
     }
 
     @Test

@@ -41,6 +41,23 @@ internal data class InputAckFixture(
     }
 }
 
+/** One server queue item (letta-mobile-qygvv.6): its item id, owning client message id, and pause state. */
+internal data class QueueItemFixture(
+    val id: String,
+    val clientMessageId: String,
+    val paused: Boolean = false,
+) {
+    fun toJson(): JsonObject = buildJsonObject {
+        put("id", id)
+        put("client_message_id", clientMessageId)
+        put("kind", "message")
+        put("source", "user")
+        put("content", "queued text")
+        put("enqueued_at", FIXTURE_EMITTED_AT)
+        if (paused) put("paused", true)
+    }
+}
+
 /** Builds sequenced stream-channel frames for one runtime. */
 internal class TurnEngineTestFrames(
     private val runtime: AppServerRuntimeScope,
@@ -77,7 +94,8 @@ internal class TurnEngineTestFrames(
             eventSeq = seq,
             emittedAt = FIXTURE_EMITTED_AT,
             idempotencyKey = "queue-$seq",
-            queue = update.queued.map { id -> buildJsonObject { put("client_message_id", id) } },
+            queue = update.queued.map { id -> buildJsonObject { put("client_message_id", id) } } +
+                update.items.map(QueueItemFixture::toJson),
             removed = update.removed,
         )
     }
@@ -100,11 +118,9 @@ internal class TurnEngineTestFrames(
         seq += 1
         return run.turnFinished(turn).copy(eventSeq = seq)
     }
-
-    private companion object {
-        const val FIXTURE_EMITTED_AT = "2026-09-24T00:00:00Z"
-    }
 }
+
+private const val FIXTURE_EMITTED_AT = "2026-09-24T00:00:00Z"
 
 /**
  * Fake App Server that acknowledges inputs with [ack] (approval responses with [approvalAck] when
@@ -153,11 +169,13 @@ internal class TurnEngineTestAckingClient(
     fun emitTurnFinished(run: TestRun, turn: Int) = emit(frames.turnFinished(run, turn))
 
     override fun emit(frame: AppServerInboundFrame) {
-        (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
-            AppServerReceivedFrame(channel = AppServerChannel.Stream, frame = frame, raw = frame.rawJson()),
-        )
+        (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(frame.onStreamChannel())
     }
 }
+
+/** [this] as the stream channel delivers it. */
+internal fun AppServerInboundFrame.onStreamChannel(): AppServerReceivedFrame =
+    AppServerReceivedFrame(channel = AppServerChannel.Stream, frame = this, raw = rawJson())
 
 private fun AppServerCommand.Input.isApprovalResponse(): Boolean = payload is AppServerInputPayload.ApprovalResponse
 

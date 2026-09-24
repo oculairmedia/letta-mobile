@@ -33,10 +33,14 @@ internal suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminalDraft(): Run
     }
 }
 
-/** One `update_queue` snapshot: client message ids still queued plus removal transitions. */
+/**
+ * One `update_queue` snapshot: client message ids still queued, full queue [items], and
+ * removal transitions.
+ */
 internal data class QueueUpdateFixture(
     val queued: List<String> = emptyList(),
     val removed: List<AppServerQueueRemoval> = emptyList(),
+    val items: List<QueueItemFixture> = emptyList(),
 ) {
     companion object {
         fun stillQueued(clientMessageId: String) = QueueUpdateFixture(queued = listOf(clientMessageId))
@@ -46,6 +50,8 @@ internal data class QueueUpdateFixture(
 
         fun cancelled(clientMessageId: String) =
             QueueUpdateFixture(removed = listOf(AppServerQueueRemoval(clientMessageId, "cancelled")))
+
+        fun of(vararg items: QueueItemFixture) = QueueUpdateFixture(items = items.toList())
     }
 }
 

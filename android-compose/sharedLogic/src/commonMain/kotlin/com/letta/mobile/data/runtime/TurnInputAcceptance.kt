@@ -327,6 +327,8 @@ internal class TurnInputSender(
     private val requestIdFactory: () -> String,
     private val approvalSender: ApprovalResponseSender,
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    /** letta-mobile-qygvv.6: records a user input before it is sent, so its queue item is recognised. */
+    private val noteSentInput: (TurnRuntimeKey, String?, TurnCommand) -> Unit = { _, _, _ -> },
 ) {
     suspend fun sendInput(
         command: TurnCommand,
@@ -342,6 +344,7 @@ internal class TurnInputSender(
             client.input(input)
             return null
         }
+        noteSentInput(lease.key, lease.queuedInput.clientMessageId, command)
         val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
         val failure = acceptance.recordAndFailure(command.conversationId)
         if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, emit)
