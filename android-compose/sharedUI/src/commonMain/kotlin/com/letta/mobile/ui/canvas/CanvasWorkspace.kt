@@ -869,12 +869,12 @@ fun CanvasWorkspace(
 
     // A new note at [frame], joined by an arrow to [from] on its [direction] side, the caret in it.
     fun addJoinedNote(
-        s: CanvasSession,
         from: androidx.compose.ui.geometry.Rect,
         frame: CanvasDocumentFrame,
         color: String?,
         direction: QuickCreateDirection,
     ) {
+        val s = session ?: return
         val id = "note-${Clock.System.now().toEpochMilliseconds()}"
         coroutineScope.launch {
             recordingDocuments("adding a note") {
@@ -920,10 +920,9 @@ fun CanvasWorkspace(
             addJoinedShape(shape.bounds(), next, direction)
             return
         }
-        val s = session ?: return
         val note = activeNoteId?.let { id -> liveDocuments.firstOrNull { it.id == id } } ?: return
         val frame = note.frame ?: return
-        addJoinedNote(s, frame.toRect(), CanvasQuickCreate.nextFrame(frame, direction), note.color, direction)
+        addJoinedNote(frame.toRect(), CanvasQuickCreate.nextFrame(frame, direction), note.color, direction)
     }
 
     // An arrow pulled out of a quick-create target and let go: what the menu there picked goes
@@ -937,9 +936,7 @@ fun CanvasWorkspace(
         val from = shape?.bounds() ?: note?.frame?.toRect() ?: return
         val direction = CanvasQuickCreate.directionToward(from, world)
         when (kind) {
-            QuickCreateKind.NOTE -> session?.let { s ->
-                addJoinedNote(s, from, newNoteFrame(world), note?.color ?: NoteColors.first().hex, direction)
-            }
+            QuickCreateKind.NOTE -> addJoinedNote(from, newNoteFrame(world), note?.color ?: NoteColors.first().hex, direction)
             QuickCreateKind.TEXT -> addJoinedText(from, world, direction)
             else -> {
                 val base = shape ?: CanvasQuickCreate.defaultShape(current.strokeColor, current.strokeWidth)
