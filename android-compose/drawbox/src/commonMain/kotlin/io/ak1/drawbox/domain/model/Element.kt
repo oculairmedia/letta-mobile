@@ -175,6 +175,13 @@ sealed class Element {
         /** A small inline thumbnail, drawn while the full image is being resolved. */
         val preview: ByteArray? = null,
     ) : Element() {
+        /**
+         * Whether what it draws is only its [preview]: the full asset has not reached this device
+         * yet. Such bytes are never taken, saved or stored as the image itself.
+         */
+        val isShowingPreview: Boolean
+            get() = preview != null && bytes.isNotEmpty() && bytes.contentEquals(preview)
+
         // ByteArray defaults to reference equality, which would make two
         // identical-bytes copies of the same image compare unequal. Override
         // so undo/redo snapshots that re-decode the same payload behave

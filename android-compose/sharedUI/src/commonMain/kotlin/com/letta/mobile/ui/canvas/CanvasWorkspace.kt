@@ -244,12 +244,7 @@ fun CanvasWorkspace(
                 // the parsed drawing is handed to the controller on it.
                 val (clean, parsed) = withContext(Dispatchers.Default) {
                     val stripped = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
-                    stripped to if (sessionJson.isBlank()) {
-                        null
-                    } else {
-                        runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(stripped) }.getOrNull()
-                            ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
-                    }
+                    stripped to if (sessionJson.isBlank()) null else CanvasImageAssets.parse(stripped, assets)
                 }
                 // Known even for an empty canvas, or the first note placed on it would read as
                 // an external change to the drawing and reload the board.
@@ -291,10 +286,8 @@ fun CanvasWorkspace(
                     )
                     val (result, parsedExternal) = withContext(Dispatchers.Default) {
                         val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params) ?: return@withContext null
-                        val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }?.let { json ->
-                            runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()
-                                ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
-                        }
+                        val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }
+                            ?.let { json -> CanvasImageAssets.parse(json, assets) }
                         evaluated to payload
                     } ?: return@collect
                     lastImportedRev = result.newImportedRev
@@ -444,7 +437,6 @@ fun CanvasWorkspace(
                             history.record(CanvasHistory.Step.Drawing())
                         }
                     }
-                    onExportJson?.invoke(event.json)
                 }
                 is Event.SvgExported -> {
                     statusMessage = CanvasWorkspaceSupport.computeSvgExportStatus(event.svg)
@@ -1346,7 +1338,12 @@ fun CanvasWorkspace(
                         controller.importPath(CanvasSamples.dailyLoopJson)
                         statusMessage = "Imported Daily Loop sample"
                     },
-                    onExportJson = { controller.exportJson() },
+                    // A board saves on its own; an export is for somewhere else, so it carries its
+                    // images' bytes rather than refs nothing there can resolve.
+                    onExportJson = {
+                        val handler = onExportJson
+                        if (handler != null) handler(controller.exportStandaloneJson()) else controller.exportJson()
+                    },
                     onExportSvg = { controller.exportSvg() },
                     onClear = {
                         controller.reset()
@@ -1390,15 +1387,19 @@ fun CanvasWorkspace(
                 onRestore = { cp ->
                     val s = session ?: return@CanvasHistoryDialog
                     coroutineScope.launch {
-                        runCatching {
-                            s.restoreCheckpoint(cp.checkpointId)
-                        }.onSuccess { restored ->
+                        val outcome = runCatching { s.restoreCheckpoint(cp.checkpointId) }
+                        outcome.getOrNull()?.let { restored ->
                             lastExportedJson = restored.sceneJson
-                            controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson))
+                            // As on open: parsed off the main thread, its images given their bytes
+                            // from the store, since a checkpoint holds only their refs.
+                            val clean = CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson)
+                            val parsed = withContext(Dispatchers.Default) { CanvasImageAssets.parse(clean, assets) }
+                            if (parsed != null) controller.importPath(parsed) else controller.importPath(clean)
                             history.clear()
                             statusMessage = "Restored to revision ${cp.revision}"
                             showHistoryDialog = false
-                        }.onFailure { err ->
+                        }
+                        outcome.exceptionOrNull()?.let { err ->
                             statusMessage = "Restore failed: ${err.message}"
                         }
                     }

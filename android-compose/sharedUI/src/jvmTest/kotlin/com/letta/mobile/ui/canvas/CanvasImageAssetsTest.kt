@@ -113,4 +113,66 @@ class CanvasImageAssetsTest {
         assertEquals("image/jpeg", CanvasImageAssets.sniffMediaType(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0)))
         assertEquals("application/octet-stream", CanvasImageAssets.sniffMediaType(byteArrayOf(1, 2, 3)))
     }
+
+    /** A file the store lists but whose bytes no longer match their hash, as a damaged disk leaves it. */
+    private class DamagedStore(private val inner: InMemoryAssetStore = InMemoryAssetStore()) : com.letta.mobile.data.storage.AssetStore by inner {
+        val damaged = mutableSetOf<String>()
+        override fun get(ref: String): ByteArray? = if (ref in damaged) null else inner.get(ref)
+        override fun put(mediaType: String, bytes: ByteArray): com.letta.mobile.data.storage.AssetRef =
+            inner.put(mediaType, bytes).also { damaged -= it.ref }
+    }
+
+    @Test
+    fun thePreviewShownWhileTheAssetIsAwayGivesWayToTheFullImage() {
+        val bytes = photo()
+        val adopted = CanvasImageAssets.adopt(image(bytes), InMemoryAssetStore())
+        val onAnotherDevice = InMemoryAssetStore()
+        val showingPreview = CanvasImageAssets.hydrate(adopted.copy(bytes = ByteArray(0)), onAnotherDevice)
+        assertTrue(showingPreview.isShowingPreview, "the preview, until the asset is here")
+
+        onAnotherDevice.put("image/png", bytes)
+        val full = CanvasImageAssets.hydrate(showingPreview, onAnotherDevice)
+        assertContentEquals(bytes, full.bytes)
+        assertTrue(!full.isShowingPreview)
+    }
+
+    @Test
+    fun aPreviewIsNeverWrittenAsTheImageItself() {
+        DrawingSerializer.inlineImageBytes = true
+        val adopted = CanvasImageAssets.adopt(image(photo()), InMemoryAssetStore())
+        val showingPreview = adopted.copy(bytes = adopted.preview!!)
+        val json = DrawingSerializer.serialize(PayLoad(bgColor = Color.White, elements = listOf(showingPreview)))
+        assertTrue("\"imageData\"" !in json, "the preview went out as the image")
+    }
+
+    @Test
+    fun aStandaloneExportCarriesTheImageBytes() {
+        val bytes = photo()
+        val adopted = CanvasImageAssets.adopt(image(bytes), InMemoryAssetStore())
+        val payLoad = PayLoad(bgColor = Color.White, elements = listOf(adopted))
+        assertTrue("\"imageData\"" !in DrawingSerializer.serialize(payLoad), "a board's own save leaves them to the store")
+        val exported = DrawingSerializer.deserialize(DrawingSerializer.serialize(payLoad, inlineImageBytes = true))
+        assertContentEquals(bytes, exported.elements.filterIsInstance<Element.Image>().single().bytes)
+    }
+
+    @Test
+    fun intactBytesRepairADamagedStoredAsset() {
+        val bytes = photo()
+        val store = DamagedStore()
+        val adopted = CanvasImageAssets.adopt(image(bytes), store)
+        store.damaged += adopted.assetRef!!
+        assertTrue(store.has(adopted.assetRef!!) && store.get(adopted.assetRef!!) == null)
+
+        CanvasImageAssets.keep(adopted, store)
+        assertContentEquals(bytes, store.get(adopted.assetRef!!))
+    }
+
+    @Test
+    fun keepingAnImagesAssetBooksIsNotAStepToUndo() {
+        val plain = image(photo())
+        val adopted = CanvasImageAssets.adopt(plain, InMemoryAssetStore())
+        assertTrue(!CanvasWorkspaceSupport.shouldRecordDrawingStep(listOf(plain), listOf(adopted), isApplyingHistory = false))
+        val moved = adopted.copy(points = listOf(Offset(10f, 10f), Offset(410f, 310f)))
+        assertTrue(CanvasWorkspaceSupport.shouldRecordDrawingStep(listOf(adopted), listOf(moved), isApplyingHistory = false))
+    }
 }
