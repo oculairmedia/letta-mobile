@@ -32,8 +32,13 @@ internal suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitTerminalDraft(): Run
     }
 }
 
-internal class TurnEngineTestStreamClient : AppServerClient {
-    override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 32)
+/**
+ * The one shared fake App Server for turn-engine tests: starts any runtime, swallows sends and
+ * replays [emit]ted frames on the stream channel. Tests that need acknowledgement extend it
+ * ([TurnEngineTestAckingClient]).
+ */
+internal open class TurnEngineTestStreamClient : AppServerClient {
+    override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
 
     override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
         AppServerInboundFrame.RuntimeStartResponse(
@@ -58,7 +63,7 @@ internal class TurnEngineTestStreamClient : AppServerClient {
 
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
-    fun emit(frame: AppServerInboundFrame) {
+    open fun emit(frame: AppServerInboundFrame) {
         (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
             AppServerReceivedFrame(
                 channel = AppServerChannel.Stream,

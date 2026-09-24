@@ -209,4 +209,3 @@ private fun RuntimeEventDraft.isStopReasonFrame(): Boolean = when (val event = p
     is RuntimeEventPayload.ExternalTransportFrame -> frameMessageType(event.body) == "stop_reason"
     else -> false
 }
-

@@ -162,3 +162,17 @@ fun AppServerTurnEngine.answerApprovalReplaysFrom(router: AppServerRuntimeEventR
         cached != null
     }
 }
+
+/** letta-mobile-qygvv.5: the approval decision [this] input carries, when it is an `approval_response`. */
+internal fun AppServerCommand.Input.approvalResponseOrNull(): AppServerInputPayload.ApprovalResponse? =
+    (payload as? AppServerInputPayload.ApprovalResponse)?.takeIf { it.decision != null }
+
+/** Sends a `TurnInput.ToolApprovalResponse`: only a rejected decision fails the turn. */
+internal suspend fun ApprovalResponseSender.sendAsTurnInput(
+    runtime: AppServerRuntimeScope,
+    response: AppServerInputPayload.ApprovalResponse,
+): InputAcceptance.Failure? {
+    val decision = response.decision ?: return null
+    val result = send(runtime, response.requestId, decision, source = "turn_input")
+    return (result as? ApprovalSubmitResult.Rejected)?.let { InputAcceptance.Rejected(it.error) }
+}
