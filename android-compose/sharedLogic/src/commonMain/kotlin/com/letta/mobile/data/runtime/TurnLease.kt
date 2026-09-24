@@ -29,14 +29,26 @@ data class TurnLease(
     val watchdogDeadlineMs: Long? = null,
     val releaseReason: String? = null,
 ) {
-    /** Preparing/Starting are locally alive even when the provider has no run yet. */
+    /**
+     * Preparing/Starting are locally alive even when the provider has no run yet.
+     * Queued is too: the server acknowledged the input into its queue, so an idle
+     * run list is expected and is not evidence the owner died.
+     */
     val isLocallyAliveWithoutRun: Boolean
-        get() = phase == TurnLeasePhase.Preparing || phase == TurnLeasePhase.Starting
+        get() = phase == TurnLeasePhase.Preparing ||
+            phase == TurnLeasePhase.Starting ||
+            phase == TurnLeasePhase.Queued
 }
 
 enum class TurnLeasePhase {
     Preparing,
     Starting,
+    /**
+     * letta-mobile-qygvv.1: `input_accepted{disposition: queued}` — the input waits
+     * behind an active turn or pending approval. The idle watchdog is paused until
+     * the first stream frame (or `update_queue` dequeue) shows the turn started.
+     */
+    Queued,
     Streaming,
     Retiring,
     Terminal,
