@@ -453,11 +453,12 @@ data class SerializableDrawing(
 
 object DrawingSerializer {
     /**
-     * Whether an image that has an asset ref still writes its bytes inline. On while any reader of
-     * a drawing may lack the asset (another device before the host serves assets, an older app);
-     * turned off once they can all resolve refs, which is when drawings stop carrying image bytes.
+     * Whether an image that has an asset ref still writes its bytes inline. Off (letta-mobile-w3nb2.3c):
+     * every app now resolves refs and fetches assets from the host, so a drawing carries an image's
+     * ref and preview only, never its bytes. An image without a ref (a host with no asset store)
+     * still writes them. Turn it back on only if apps that cannot read refs must share a board.
      */
-    var inlineImageBytes: Boolean = true
+    var inlineImageBytes: Boolean = false
 
     // Tolerate fields written by a newer schema instead of failing the whole import.
     private val json = Json {

@@ -23,8 +23,8 @@ import kotlin.test.assertTrue
 /** A board's images live in the asset store; the drawing refers to them (letta-mobile-w3nb2.2). */
 class CanvasImageAssetsTest {
     @AfterTest
-    fun inlineAgain() {
-        DrawingSerializer.inlineImageBytes = true
+    fun backToTheDefault() {
+        DrawingSerializer.inlineImageBytes = false
     }
 
     private fun photo(width: Int = 800, height: Int = 600): ByteArray {
@@ -83,6 +83,7 @@ class CanvasImageAssetsTest {
         val adopted = CanvasImageAssets.adopt(image(photo()), store)
         val drawing = PayLoad(bgColor = Color.White, elements = listOf(adopted))
 
+        DrawingSerializer.inlineImageBytes = true
         val inline = DrawingSerializer.serialize(drawing)
         assertTrue(inline.contains(adopted.assetRef!!))
         assertTrue(inline.contains("\"imageData\""), "still inline while readers may lack the asset")

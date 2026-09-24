@@ -42,8 +42,8 @@ class CanvasImageAssetsUiTest {
     }
 
     @AfterTest
-    fun inlineAgain() {
-        DrawingSerializer.inlineImageBytes = true
+    fun backToTheDefault() {
+        DrawingSerializer.inlineImageBytes = false
     }
 
     private fun png(): ByteArray {
@@ -72,6 +72,7 @@ class CanvasImageAssetsUiTest {
      */
     @Test
     fun whileBytesTravelInlineAnImageIsStoredButNotRewritten() = runComposeUiTest {
+        DrawingSerializer.inlineImageBytes = true
         val bytes = png()
         val relay = Capturing()
         val session = runBlocking {
@@ -95,7 +96,6 @@ class CanvasImageAssetsUiTest {
 
     @Test
     fun onceBytesStopTravellingInlineTheImageGetsItsRef() = runComposeUiTest {
-        DrawingSerializer.inlineImageBytes = false
         val bytes = png()
         val session = runBlocking {
             CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = boardWithAnInlineImage(bytes)))
@@ -110,5 +110,6 @@ class CanvasImageAssetsUiTest {
         assertContentEquals(bytes, assets.get(adopted()!!), "the store has the picture under its ref")
         mainClock.advanceTimeBy(3_000)
         waitUntil(timeoutMillis = 5000) { session.sceneJsonOrEmpty().contains(adopted()!!) }
+        assertTrue(!session.sceneJsonOrEmpty().contains("\"imageData\""), "the board's scene carries the ref, not the bytes")
     }
 }
