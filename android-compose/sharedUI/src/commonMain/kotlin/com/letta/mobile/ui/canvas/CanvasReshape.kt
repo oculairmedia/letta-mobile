@@ -28,16 +28,22 @@ internal object CanvasReshape {
      */
     @OptIn(ExperimentalTime::class)
     fun reshaped(shape: Element.Shape, type: ShapeType): Element.Shape {
-        if (shape.shapeType == type || type !in Types || shape.shapeType !in Types) return shape
-        val b = shape.bounds()
-        val points = if (type == ShapeType.CIRCLE) {
+        if (!canBecome(shape, type)) return shape
+        return shape.copy(shapeType = type, points = pointsFor(shape.bounds(), type), modifiedAt = Clock.System.now().toEpochMilliseconds())
+    }
+
+    /** Whether [shape] is a closed shape that is not already a [type], and [type] is one it can take. */
+    private fun canBecome(shape: Element.Shape, type: ShapeType): Boolean =
+        shape.shapeType != type && canReshape(shape) && type in Types
+
+    /** The points that make a [type] of bounds [b]. */
+    private fun pointsFor(b: androidx.compose.ui.geometry.Rect, type: ShapeType): List<Offset> =
+        if (type == ShapeType.CIRCLE) {
             val r = min(b.width, b.height) / 2f
             listOf(Offset(b.center.x - r, b.center.y), Offset(b.center.x + r, b.center.y))
         } else {
             listOf(b.topLeft, b.bottomRight)
         }
-        return shape.copy(shapeType = type, points = points, modifiedAt = Clock.System.now().toEpochMilliseconds())
-    }
 
     /** Reshapes every selected closed shape to [type] as one undo step. */
     fun apply(controller: DrawBoxController, type: ShapeType) {

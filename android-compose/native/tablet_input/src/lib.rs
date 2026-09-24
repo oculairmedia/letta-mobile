@@ -231,34 +231,47 @@ pub extern "system" fn Java_com_letta_mobile_desktop_input_TabletBridge_nativePo
     // SAFETY: the handle is one we returned from nativeOpen and the JVM side does not use it
     // after nativeClose.
     let bridge = unsafe { &mut *(handle as *mut Bridge) };
-    // A panic must not cross back into the JVM. This is an `extern "system"` function, so an
-    // unwind through it is undefined and Rust aborts the process instead - the whole app dies
-    // with a bare NTSTATUS and no stack worth reading. A tablet that misbehaves for one frame
-    // should cost that frame, not the session, so a panic here becomes "no events" - and a new
-    // manager, since the old one is left broken (see Bridge::rebuild). The pen is reported lifted:
-    // whatever Up that frame held is gone, and a stroke left open would keep drawing.
-    let events = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.drain())) {
-        Ok(events) => events,
-        Err(_) => {
-            eprintln!("TABLET: the native bridge panicked while draining; rebuilding it");
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.rebuild())) {
-                Ok(at) => [KIND_UP, at[0], at[1], NO_PRESSURE, TOOL_UNKNOWN, KIND_OUT, at[0], at[1], NO_PRESSURE, TOOL_UNKNOWN].to_vec(),
-                Err(_) => {
-                    eprintln!("TABLET: rebuilding the native bridge panicked too; trying again next frame");
-                    return empty;
-                }
-            }
-        }
-    };
-    match env.new_float_array(events.len() as i32) {
-        Ok(array) => {
-            if env.set_float_array_region(&array, 0, &events).is_err() {
-                return empty;
-            }
-            array.into_raw()
-        }
-        Err(_) => empty,
+    match drain_or_recover(bridge) {
+        Some(events) => to_java(&env, &events).unwrap_or(empty),
+        None => empty,
     }
+}
+
+/// Everything since the last poll, or what a panic leaves behind.
+///
+/// A panic must not cross back into the JVM. The poll is an `extern "system"` function, so an
+/// unwind through it is undefined and Rust aborts the process instead - the whole app dies with a
+/// bare NTSTATUS and no stack worth reading. A tablet that misbehaves for one frame should cost that
+/// frame, not the session, so a panic here becomes a new manager, since the old one is left broken
+/// (see Bridge::rebuild), and the pen reported lifted: whatever Up that frame held is gone, and a
+/// stroke left open would keep drawing. None when even the rebuild panicked; the next frame tries again.
+fn drain_or_recover(bridge: &mut Bridge) -> Option<Vec<f32>> {
+    if let Ok(events) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.drain())) {
+        return Some(events);
+    }
+    eprintln!("TABLET: the native bridge panicked while draining; rebuilding it");
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| bridge.rebuild())) {
+        Ok(at) => Some(lifted_at(at)),
+        Err(_) => {
+            eprintln!("TABLET: rebuilding the native bridge panicked too; trying again next frame");
+            None
+        }
+    }
+}
+
+/// An Up then an Out at [at]: the pen lifted and left, wherever it was last seen.
+fn lifted_at(at: [f32; 2]) -> Vec<f32> {
+    let mut out = Vec::with_capacity(2 * STRIDE);
+    out.extend_from_slice(&[KIND_UP, at[0], at[1], NO_PRESSURE, TOOL_UNKNOWN]);
+    out.extend_from_slice(&[KIND_OUT, at[0], at[1], NO_PRESSURE, TOOL_UNKNOWN]);
+    out
+}
+
+/// [events] as a Java float array, or None when the JVM could not take it.
+fn to_java(env: &JNIEnv, events: &[f32]) -> Option<jfloatArray> {
+    let array = env.new_float_array(events.len() as i32).ok()?;
+    env.set_float_array_region(&array, 0, events).ok()?;
+    Some(array.into_raw())
 }
 
 /// Closes the bridge. Safe to call twice; the JVM side zeroes its handle.

@@ -874,6 +874,49 @@ fun CanvasWorkspace(
         openTextIn(next)
     }
 
+    // A new note at [frame], joined by an arrow to [from] on its [direction] side, the caret in it.
+    fun addJoinedNote(
+        from: androidx.compose.ui.geometry.Rect,
+        frame: CanvasDocumentFrame,
+        color: String?,
+        direction: QuickCreateDirection,
+    ) {
+        val s = session ?: return
+        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
+        coroutineScope.launch {
+            recordingDocuments("adding a note") {
+                runCatching { s.setDocument(id, "", frame = frame, color = color) }.onSuccess {
+                    val (start, end) = CanvasQuickCreate.connector(from, frame.toRect(), direction)
+                    if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
+                        // The session's documents, which already hold the note just added.
+                        CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
+                    }
+                    activeNoteId = id
+                    focusRequest.documentId = id
+                }
+            }
+        }
+    }
+
+    // A text at [world], joined by an arrow to [from], as one undo step, the caret in it.
+    fun addJoinedText(from: androidx.compose.ui.geometry.Rect, world: Offset, direction: QuickCreateDirection) {
+        val current = controller.state.value
+        val undoStepsBefore = current.history.size
+        val before = current.elements.mapTo(HashSet()) { it.id }
+        controller.insertText(
+            "", world, current.currentItemFontSize, current.currentItemFontFamilyKey,
+            current.currentItemTextAlignment, current.strokeColor,
+        )
+        val (start, _) = CanvasQuickCreate.connector(from, androidx.compose.ui.geometry.Rect(world, world), direction)
+        CanvasQuickCreate.addArrow(controller, start, world)
+        controller.onIntent(
+            io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
+        )
+        controller.state.value.elements
+            .firstOrNull { it.id !in before && it is io.ak1.drawbox.domain.model.Element.Text }
+            ?.let(::openTextIn)
+    }
+
     // Miro's quick create: an empty copy of the selected shape (or note) one gap away, joined to
     // it by an arrow, with the caret in it.
     fun quickCreate(direction: QuickCreateDirection) {
@@ -884,24 +927,9 @@ fun CanvasWorkspace(
             addJoinedShape(shape.bounds(), next, direction)
             return
         }
-        val s = session ?: return
         val note = activeNoteId?.let { id -> liveDocuments.firstOrNull { it.id == id } } ?: return
         val frame = note.frame ?: return
-        val nextFrame = CanvasQuickCreate.nextFrame(frame, direction)
-        val id = "note-${Clock.System.now().toEpochMilliseconds()}"
-        coroutineScope.launch {
-            recordingDocuments("adding a note") {
-                runCatching { s.setDocument(id, "", frame = nextFrame, color = note.color) }.onSuccess {
-                    val (start, end) = CanvasQuickCreate.connector(frame.toRect(), nextFrame.toRect(), direction)
-                    if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
-                        // The session's documents, which already hold the note just added.
-                        CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
-                    }
-                    activeNoteId = id
-                    focusRequest.documentId = id
-                }
-            }
-        }
+        addJoinedNote(frame.toRect(), CanvasQuickCreate.nextFrame(frame, direction), note.color, direction)
     }
 
     // An arrow pulled out of a quick-create target and let go: what the menu there picked goes
@@ -915,39 +943,8 @@ fun CanvasWorkspace(
         val from = shape?.bounds() ?: note?.frame?.toRect() ?: return
         val direction = CanvasQuickCreate.directionToward(from, world)
         when (kind) {
-            QuickCreateKind.NOTE -> {
-                val s = session ?: return
-                val frame = newNoteFrame(world)
-                val id = "note-${Clock.System.now().toEpochMilliseconds()}"
-                coroutineScope.launch {
-                    recordingDocuments("adding a note") {
-                        runCatching { s.setDocument(id, "", frame = frame, color = note?.color ?: NoteColors.first().hex) }.onSuccess {
-                            val (start, end) = CanvasQuickCreate.connector(from, frame.toRect(), direction)
-                            if (CanvasQuickCreate.addArrow(controller, start, end) != null) {
-                                CanvasWorkspaceSupport.snapLatestConnector(controller, s, s.documents(), coroutineScope)
-                            }
-                            activeNoteId = id
-                            focusRequest.documentId = id
-                        }
-                    }
-                }
-            }
-            QuickCreateKind.TEXT -> {
-                val undoStepsBefore = current.history.size
-                val before = current.elements.mapTo(HashSet()) { it.id }
-                controller.insertText(
-                    "", world, current.currentItemFontSize, current.currentItemFontFamilyKey,
-                    current.currentItemTextAlignment, current.strokeColor,
-                )
-                val (start, _) = CanvasQuickCreate.connector(from, androidx.compose.ui.geometry.Rect(world, world), direction)
-                CanvasQuickCreate.addArrow(controller, start, world)
-                controller.onIntent(
-                    io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
-                )
-                controller.state.value.elements
-                    .firstOrNull { it.id !in before && it is io.ak1.drawbox.domain.model.Element.Text }
-                    ?.let(::openTextIn)
-            }
+            QuickCreateKind.NOTE -> addJoinedNote(from, newNoteFrame(world), note?.color ?: NoteColors.first().hex, direction)
+            QuickCreateKind.TEXT -> addJoinedText(from, world, direction)
             else -> {
                 val base = shape ?: CanvasQuickCreate.defaultShape(current.strokeColor, current.strokeWidth)
                 val next = CanvasQuickCreate.shapeAt(base, world, kind, current.elements.maxOfOrNull { it.zIndex } ?: 0)
@@ -1496,13 +1493,15 @@ fun CanvasWorkspace(
             if (quickAnchor != null) {
                 CanvasQuickCreateTargets(
                     anchor = quickAnchor,
-                    onCreate = ::quickCreate,
+                    actions = QuickCreateActions(
+                        onCreate = ::quickCreate,
+                        onDrag = { quickDrag = it },
+                        // A pull that barely left the target was a fumbled press, not an arrow.
+                        onDrop = { drop -> if ((drop.to - drop.from).getDistance() > QUICK_PULL_MIN_PX) quickDrop = drop },
+                    ),
                     chromeRegions = chromeRegions,
                     modifier = Modifier.fillMaxSize(),
                     compact = compact,
-                    onDrag = { quickDrag = it },
-                    // A pull that barely left the target was a fumbled press, not an arrow.
-                    onDrop = { drop -> if ((drop.to - drop.from).getDistance() > QUICK_PULL_MIN_PX) quickDrop = drop },
                 )
             }
             // The arrow being pulled out, and while its menu is open, the arrow it will become.

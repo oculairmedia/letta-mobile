@@ -188,34 +188,14 @@ sealed class Element {
         // correctly. Keep id out of equality so element-level identity is
         // already determined by id elsewhere; here we want structural
         // equality for diffing.
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other !is Image) return false
-            if (id != other.id) return false
-            if (intrinsicSize != other.intrinsicSize) return false
-            if (points != other.points) return false
-            if (opacity != other.opacity) return false
-            if (zIndex != other.zIndex) return false
-            if (rotation != other.rotation) return false
-            if (createdAt != other.createdAt) return false
-            if (modifiedAt != other.modifiedAt) return false
-            if (assetRef != other.assetRef) return false
-            return bytes.contentEquals(other.bytes)
-        }
+        override fun equals(other: Any?): Boolean =
+            this === other || (other is Image && structure() == other.structure() && bytes.contentEquals(other.bytes))
 
-        override fun hashCode(): Int {
-            var result = id.hashCode()
-            result = 31 * result + intrinsicSize.hashCode()
-            result = 31 * result + points.hashCode()
-            result = 31 * result + opacity.hashCode()
-            result = 31 * result + zIndex
-            result = 31 * result + rotation.hashCode()
-            result = 31 * result + createdAt.hashCode()
-            result = 31 * result + modifiedAt.hashCode()
-            result = 31 * result + (assetRef?.hashCode() ?: 0)
-            result = 31 * result + bytes.size
-            return result
-        }
+        override fun hashCode(): Int = 31 * structure().hashCode() + bytes.size
+
+        /** Everything equality compares but the bytes, which are compared by content. */
+        private fun structure(): List<Any?> =
+            listOf(id, intrinsicSize, points, opacity, zIndex, rotation, createdAt, modifiedAt, assetRef)
     }
 
     /**
