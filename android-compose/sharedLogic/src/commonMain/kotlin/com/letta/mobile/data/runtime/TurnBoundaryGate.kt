@@ -38,8 +38,8 @@ internal sealed interface TurnBoundaryDecision {
  */
 internal class TurnBoundaryGate {
     private val lock = SynchronizedObject()
-    private val finishedTurnIds = RecentIds(RECENT_CAPACITY)
-    private val settledRunIds = RecentIds(RECENT_CAPACITY)
+    private val finishedTurnIds = RecentIds<String>(RECENT_CAPACITY)
+    private val settledRunIds = RecentIds<String>(RECENT_CAPACITY)
     private var leaseToken: Long? = null
     private var evidenceSeen = false
     private var abortRequested = false
@@ -59,9 +59,12 @@ internal class TurnBoundaryGate {
     fun isAbortRequested(): Boolean = synchronized(lock) { abortRequested }
 
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
-    fun noteSettled(runId: String?): Unit = synchronized(lock) {
-        runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
-        Unit
+    fun noteSettled(runId: String?) {
+        if (!runId.isNullOrBlank()) {
+            synchronized(lock) {
+                settledRunIds.add(runId)
+            }
+        }
     }
 
     fun decide(
@@ -110,18 +113,20 @@ internal class TurnBoundaryGate {
     ): TurnBoundaryDecision {
         val idle = frame.loopStatus.status == LOOP_WAITING_ON_INPUT &&
             frame.loopStatus.activeRunIds.isEmpty()
-        if (!idle || !evidenceSeen || approvalOutstanding) return TurnBoundaryDecision.Project
+        if (!idle) return TurnBoundaryDecision.Project
+        if (!evidenceSeen) return TurnBoundaryDecision.Project
+        if (approvalOutstanding) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }
 
     /** Insertion-ordered, bounded set: the oldest id is evicted once [capacity] is exceeded. */
-    private class RecentIds(private val capacity: Int) {
-        private val ids = LinkedHashSet<String>()
+    private class RecentIds<T>(private val capacity: Int) {
+        private val ids = LinkedHashSet<T>()
 
-        operator fun contains(id: String): Boolean = id in ids
+        operator fun contains(id: T): Boolean = id in ids
 
-        fun add(id: String) {
+        fun add(id: T) {
             ids.remove(id)
             ids.add(id)
             if (ids.size > capacity) ids.remove(ids.first())
