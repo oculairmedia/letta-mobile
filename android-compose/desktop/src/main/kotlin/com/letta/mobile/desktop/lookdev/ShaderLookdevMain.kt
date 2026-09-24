@@ -215,10 +215,11 @@ private fun LookdevRoot() {
     val state = remember { LookdevState() }
 
     // Recompile on every source change; keep the last good effect on errors.
-    var builder by remember { mutableStateOf<RuntimeShaderBuilder?>(null) }
+    var builder by remember { mutableStateOf<CompiledShader?>(null) }
     LaunchedEffect(state.source) {
-        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(state.source)) }
-            .onSuccess { builder = it; state.compileError = null }
+        val source = state.source
+        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(source)) }
+            .onSuccess { builder = CompiledShader(it, source); state.compileError = null }
             .onFailure { state.compileError = it.message }
     }
 
@@ -386,7 +387,7 @@ private fun ControlsColumn(state: LookdevState) {
 @Composable
 private fun PreviewPane(
     state: LookdevState,
-    builder: () -> RuntimeShaderBuilder?,
+    builder: () -> CompiledShader?,
     phase: () -> Float,
 ) {
     val paint = remember { SkiaPaint() }
@@ -401,26 +402,27 @@ private fun PreviewPane(
         // Painting the shader last made the lookdev overstate text tinting, so
         // opacity picked here would have read differently in the shipped chat.
         Canvas(Modifier.fillMaxSize()) {
-            val active = builder() ?: return@Canvas
+            val compiled = builder() ?: return@Canvas
+            val active = compiled.builder
             active.uniform("uSize", size.width, size.height)
             active.uniform("uTime", phase())
             active.uniform("uAgitation", state.agitation)
             active.uniform("uEnvelope", state.envelope)
-            if (state.source.contains("uniform float uPalettePull")) {
+            if (compiled.declares("uPalettePull")) {
                 active.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
             }
-            if (state.source.contains("uniform float uBandTop")) {
+            if (compiled.declares("uBandTop") && compiled.declares("uBandPeak")) {
                 active.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
                 active.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)
             }
-            if (state.source.contains("uniform float uStreamEnergy")) {
+            if (compiled.declares("uStreamEnergy")) {
                 active.uniform("uStreamEnergy", 0f)
             }
             active.uniform("uColor", state.tint.red, state.tint.green, state.tint.blue, state.alpha)
-            if (state.source.contains("uniform float uInvert")) {
+            if (compiled.declares("uInvert")) {
                 active.uniform("uInvert", state.invert)
             }
-            if (state.source.contains("uniform float uScale")) {
+            if (compiled.declares("uScale")) {
                 active.uniform("uScale", state.scale)
             }
             val frameShader = active.makeShader(null)
@@ -460,3 +462,12 @@ private fun LabeledSlider(
 }
 
 private const val BaseRate = (2 * PI).toFloat() * 1000f / AmbientMotion.BASE_PERIOD_MILLIS
+
+/**
+ * A compiled effect with the source it was compiled from. Uniforms are bound against that source,
+ * not the editor's: after a failed edit the preview keeps the last good effect, and binding a
+ * uniform only the newer text declares aborts the preview.
+ */
+private class CompiledShader(val builder: RuntimeShaderBuilder, private val source: String) {
+    fun declares(uniform: String): Boolean = source.contains("uniform float $uniform")
+}

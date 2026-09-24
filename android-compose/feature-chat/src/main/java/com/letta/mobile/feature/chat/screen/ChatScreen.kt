@@ -95,9 +95,12 @@ internal fun ChatScreen(
         // shader canvas and the ChatScreenLayout to keyboard height so
         // the shader shrinks with the keyboard. The Column inside still
         // receives `bottomInsetDp` for navbar-clearance.
+        // The composer's height, as the layout measures it, so the glow can stay above it.
+        var composerHeight by remember { mutableStateOf(androidx.compose.ui.unit.Dp.Unspecified) }
         AmbientShaderAgentBackground(
             agentStatus = ambient.status,
             streamActivityPulse = streamActivityPulse,
+            composerHeight = { composerHeight },
             modifier = modifier
                 .fillMaxSize()
                 .imePadding()
@@ -124,6 +127,7 @@ internal fun ChatScreen(
                         floatingBannerMessage = floatingBannerMessage,
                         onFloatingBannerMessageChange = { floatingBannerMessage = it },
                         streamingRevealPulse = streamingRevealPulse,
+                        onComposerMeasured = { composerHeight = it },
                     ),
                 )
                 }

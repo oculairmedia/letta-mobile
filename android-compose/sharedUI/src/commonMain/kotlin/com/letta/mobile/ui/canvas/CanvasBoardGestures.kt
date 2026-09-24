@@ -134,7 +134,7 @@ internal fun Modifier.touchNavigation(
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val pressed = event.changes.filter { it.pressed }
                 if (pressed.isEmpty() && panning) {
-                    fling.release()
+                    fling.release(event.changes.first().uptimeMillis)
                     return@awaitEachGesture
                 }
                 // Lifted without panning, or a second finger for DrawBox's pinch: no throw.
