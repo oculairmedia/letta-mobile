@@ -71,6 +71,8 @@ internal class AppServerQueueHygiene(
     private val requestIdFactory: () -> String,
     private val scope: CoroutineScope? = null,
     private val maxTrackedInputs: Int = DEFAULT_MAX_TRACKED_INPUTS,
+    /** True when a host router feeds every inbound frame through [observe]. */
+    private val routed: Boolean = false,
 ) {
     private class SentInput(val key: TurnRuntimeKey, val command: TurnCommand)
 
@@ -121,6 +123,14 @@ internal class AppServerQueueHygiene(
             response.success -> takePendingAbort(key)
             else -> Unit
         }
+    }
+
+    /**
+     * A frame a turn's own loop collected. Ignored when [routed]: the host's router already feeds
+     * every inbound frame through [observe].
+     */
+    fun observeTurnFrame(frame: AppServerInboundFrame) {
+        if (!routed) observe(frame)
     }
 
     private fun observeQueue(frame: AppServerInboundFrame.UpdateQueue) {

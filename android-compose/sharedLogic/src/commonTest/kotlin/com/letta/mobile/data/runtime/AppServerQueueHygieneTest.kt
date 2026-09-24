@@ -1,11 +1,9 @@
 package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerQueueRemoval
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
@@ -29,9 +27,6 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * letta-mobile-qygvv.6: after a confirmed abort the client removes its own parked queue items,
@@ -51,7 +46,7 @@ class AppServerQueueHygieneTest {
         runCurrent()
         assertTrue(INPUT_QUEUED_REASON in drafts.lifecycleReasons(), "the input is queued behind another turn")
 
-        client.emit(updateQueue(item("q-1", "local-1"), item("q-2", "other-client-msg")))
+        client.emit(queueOf(ownItem, otherItem))
         runCurrent()
         engine.abort("agent-1", "conv-1", runId = null)
         advanceUntilIdle()
@@ -71,15 +66,15 @@ class AppServerQueueHygieneTest {
     fun pausedFlagIsSurfacedPerRuntime() = runTest {
         val hygiene = AppServerQueueHygiene(QueueClient(abortResponse(aborted = true)), { "req" })
 
-        hygiene.observe(updateQueue(item("q-1", "local-1", paused = true)))
+        hygiene.observe(queueOf(ownPausedItem))
         val snapshot = hygiene.snapshots.value.getValue(key)
         assertTrue(snapshot.paused)
         assertEquals(listOf("q-1"), snapshot.items.map { it.id })
 
-        hygiene.observe(updateQueue(item("q-1", "local-1")))
+        hygiene.observe(queueOf(ownItem))
         assertFalse(hygiene.snapshots.value.getValue(key).paused)
 
-        hygiene.observe(updateQueue())
+        hygiene.observe(queueOf())
         assertNull(hygiene.snapshots.value[key], "an empty queue drops the runtime's entry")
     }
 
@@ -100,11 +95,11 @@ class AppServerQueueHygieneTest {
         val client = QueueClient(abortResponse(aborted = false))
         val hygiene = AppServerQueueHygiene(client, { "req" }, scope = backgroundScope)
         hygiene.noteSentInput(key, "local-1", command)
-        hygiene.observe(updateQueue(item("q-1", "local-1")))
+        hygiene.observe(queueOf(ownItem))
 
         hygiene.noteAbortRequested(runtime)
         hygiene.onAbortResponse(runtime, abortResponse(aborted = false))
-        hygiene.observe(turnFinished("cancelled"))
+        hygiene.observe(TestRun(null).turnFinished(turn = 1, reason = TestStopReason.Cancelled))
         runCurrent() // the settle runs in backgroundScope, which advanceUntilIdle skips
 
         assertTrue(client.calls.isEmpty(), "aborted=false means nothing was parked, and clears the pending abort")
@@ -115,14 +110,14 @@ class AppServerQueueHygieneTest {
         val client = QueueClient(abortResponse(aborted = true))
         val hygiene = AppServerQueueHygiene(client, { "req" }, scope = backgroundScope)
         hygiene.noteSentInput(key, "local-1", command)
-        hygiene.observe(updateQueue(item("q-1", "local-1", paused = true), item("q-2", "cm-q-2", paused = true)))
+        hygiene.observe(queueOf(ownPausedItem, otherPausedItem))
 
         hygiene.noteAbortRequested(runtime)
-        hygiene.observe(turnFinished("end_turn"))
+        hygiene.observe(TestRun(null).turnFinished(turn = 2))
         runCurrent() // the settle runs in backgroundScope, which advanceUntilIdle skips
         assertTrue(client.calls.isEmpty(), "only a cancelled turn_finished settles an abort")
 
-        hygiene.observe(turnFinished("cancelled"))
+        hygiene.observe(TestRun(null).turnFinished(turn = 1, reason = TestStopReason.Cancelled))
         runCurrent() // the settle runs in backgroundScope, which advanceUntilIdle skips
         assertEquals(listOf("remove_queue_item:q-1", "resume_queue"), client.calls)
 
@@ -139,7 +134,7 @@ class AppServerQueueHygieneTest {
         val cancelled = mutableListOf<CancelledQueuedInput>()
         backgroundScope.launch { hygiene.cancelledInputs.collect { cancelled += it } }
         hygiene.noteSentInput(key, "local-1", command)
-        hygiene.observe(updateQueue(item("q-1", "local-1", paused = true)))
+        hygiene.observe(queueOf(ownPausedItem))
 
         hygiene.noteAbortRequested(runtime)
         hygiene.onAbortResponse(runtime, abortResponse(aborted = true))
@@ -154,7 +149,7 @@ class AppServerQueueHygieneTest {
         val client = QueueClient(abortResponse(aborted = true), supportsQueueCommands = false)
         val hygiene = AppServerQueueHygiene(client, { "req" })
         hygiene.noteSentInput(key, "local-1", command)
-        hygiene.observe(updateQueue(item("q-1", "local-1")))
+        hygiene.observe(queueOf(ownItem))
 
         hygiene.noteAbortRequested(runtime)
         hygiene.onAbortResponse(runtime, abortResponse(aborted = true))
@@ -170,13 +165,6 @@ class AppServerQueueHygieneTest {
         nowMs = { testScheduler.currentTime },
     )
 
-    private fun List<RuntimeEventDraft>.lifecycles() =
-        mapNotNull { it.payload as? RuntimeEventPayload.RunLifecycleChanged }
-
-    private fun List<RuntimeEventDraft>.lastLifecycle() = lifecycles().lastOrNull()
-
-    private fun List<RuntimeEventDraft>.lifecycleReasons() = lifecycles().mapNotNull { it.reason }
-
     private companion object {
         val runtime = AppServerRuntimeScope("agent-1", "conv-1")
         val key = TurnRuntimeKey("agent-1", "conv-1")
@@ -188,44 +176,16 @@ class AppServerQueueHygieneTest {
             input = TurnInput.UserMessage(localMessageId = "local-1", text = "hey"),
         )
 
-        private var seq = 0L
+        val frames = TurnEngineTestFrames(runtime)
+        val ownItem = QueueItemFixture("q-1", "local-1")
+        val ownPausedItem = ownItem.copy(paused = true)
+        val otherItem = QueueItemFixture("q-2", "other-client-msg")
+        val otherPausedItem = otherItem.copy(paused = true)
+
+        fun queueOf(vararg items: QueueItemFixture) = frames.updateQueue(QueueUpdateFixture.of(*items))
 
         fun abortResponse(aborted: Boolean) =
             AppServerInboundFrame.AbortMessageResponse(requestId = "req-1", runtime = runtime, aborted = aborted, success = true)
-
-        fun item(id: String, clientMessageId: String, paused: Boolean = false): JsonObject = buildJsonObject {
-            put("id", id)
-            put("client_message_id", clientMessageId)
-            put("kind", "message")
-            put("source", "user")
-            put("content", "queued text")
-            put("enqueued_at", "2026-09-24T00:00:00Z")
-            if (paused) put("paused", true)
-        }
-
-        fun updateQueue(vararg queue: JsonObject, removed: List<AppServerQueueRemoval> = emptyList()): AppServerInboundFrame.UpdateQueue {
-            seq += 1
-            return AppServerInboundFrame.UpdateQueue(
-                runtime = runtime,
-                eventSeq = seq,
-                emittedAt = "2026-09-24T00:00:00Z",
-                idempotencyKey = "queue-$seq",
-                queue = queue.toList(),
-                removed = removed,
-            )
-        }
-
-        fun turnFinished(stopReason: String): AppServerInboundFrame.TurnFinished {
-            seq += 1
-            return AppServerInboundFrame.TurnFinished(
-                runtime = runtime,
-                eventSeq = seq,
-                emittedAt = "2026-09-24T00:00:00Z",
-                idempotencyKey = "turn-finished-$seq",
-                turnId = "turn-$seq",
-                stopReason = stopReason,
-            )
-        }
     }
 
     /** Stands in for the App Server: input is queued, and a removal emits the `cancelled` transition. */
@@ -268,7 +228,7 @@ class AppServerQueueHygieneTest {
             calls += "remove_queue_item:${command.itemId}"
             if (!supportsQueueCommands) throw UnsupportedOperationException("no queue commands")
             if (removeSucceeds) {
-                emit(updateQueue(removed = listOf(AppServerQueueRemoval("local-1", "cancelled"))))
+                emit(frames.updateQueue(QueueUpdateFixture.cancelled("local-1")))
             }
             return AppServerInboundFrame.RemoveQueueItemResponse(command.requestId, success = removeSucceeds, itemId = command.itemId)
         }
@@ -293,13 +253,7 @@ class AppServerQueueHygieneTest {
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
         fun emit(frame: AppServerInboundFrame) {
-            val raw: JsonObject = buildJsonObject {
-                put("type", frame.type ?: "unknown")
-                if (frame is AppServerInboundFrame.UpdateQueue) put("idempotency_key", frame.idempotencyKey)
-            }
-            (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
-                AppServerReceivedFrame(channel = AppServerChannel.Stream, frame = frame, raw = raw),
-            )
+            (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(frame.onStreamChannel())
         }
     }
 }

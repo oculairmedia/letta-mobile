@@ -191,8 +191,18 @@ class AppServerTurnEngine(
      * for why claim/generation ownership stays in [InboundControlRequestRegistry].
      */
     private val approvals = ApprovalRegistry()
-    private val queueHygiene = AppServerQueueHygiene(client, requestIdFactory, queueHygieneScope)
-    private val inputSender = TurnInputSender(client, requestIdFactory, externalToolRegistry, queueHygiene::noteSentInput)
+    private val queueHygiene = AppServerQueueHygiene(
+        client,
+        requestIdFactory,
+        queueHygieneScope,
+        routed = eventRouter != null,
+    )
+    private val inputSender = TurnInputSender(
+        client,
+        requestIdFactory,
+        externalToolRegistry,
+        noteSentInput = queueHygiene::noteSentInput,
+    )
 
     /** letta-mobile-qygvv.6: latest `update_queue` snapshot per runtime (items + paused). */
     val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>> get() = queueHygiene.snapshots
@@ -207,6 +217,7 @@ class AppServerTurnEngine(
      */
     fun observeQueueFrame(frame: AppServerInboundFrame) = queueHygiene.observe(frame)
 
+    /** Without an [eventRouter] the engine feeds [queueHygiene] the frames its turns collect. */
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
 
@@ -846,7 +857,7 @@ class AppServerTurnEngine(
                     Telemetry.event(
                         "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
                     )
-                    noteOwnerTerminal(RuntimeRunStatus.Failed, source = "idle_timeout", lease = leaseRef)
+                    noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "idle_timeout"), leaseRef)
                     send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
                 } catch (cancellation: CancellationException) {
                     releaseReason = "cancellation"
@@ -860,7 +871,7 @@ class AppServerTurnEngine(
             val inputFailure = inputSender.sendInput(command, scope, leaseRef) { draft -> send(draft) }
             Telemetry.event("IrohTurn", "input.sent")
             releaseReason = joinCollectorOrHandleFailure(collector, inputFailure) { failureText ->
-                noteOwnerTerminal(RuntimeRunStatus.Failed, source = "input_rejected", lease = leaseRef)
+                noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "input_rejected"), leaseRef)
                 send(command.failedDraft(failureText))
             }
         } finally {
@@ -1150,7 +1161,7 @@ class AppServerTurnEngine(
         val slot = context.lease.slot
         if (!slot.runIdGate.accepts(received, context.lease.token)) return
         context.idleWatchdog.markFrame()
-        if (eventRouter == null) queueHygiene.observe(received.frame)
+        queueHygiene.observeTurnFrame(received.frame)
         val queueRemoval = observeQueueProgress(received, context.lease)
         answerExternalToolCallIfPresent(received, context.lease, context.externalToolDispatchScope)
         if (suppressChildFrame(received)) return
@@ -1246,7 +1257,7 @@ class AppServerTurnEngine(
     private suspend fun completeAbruptTurn(context: TurnFrameContext, ending: AbruptTurnEnding): Nothing {
         ending.ownerTerminalSource?.let { source ->
             recordDequeued(context.lease, source)
-            noteOwnerTerminal(ending.status, source = source, lease = context.lease)
+            noteOwnerTerminal(OwnerTerminalNote(ending.status, source = source), context.lease)
         }
         val ledger = context.draftProcessor.ledger
         settleDanglingToolCalls(
@@ -1437,11 +1448,13 @@ class AppServerTurnEngine(
         if (received.frame.runtime?.conversationId != scope.conversationId) return null
         val status = received.lifecycleStatusFromTerminal() ?: return null
         noteOwnerTerminal(
-            status,
-            source = "authoritative_terminal_scope_mismatched",
-            seq = received.eventSeqOrNull(),
-            scopeMatched = false,
-            lease = lease,
+            OwnerTerminalNote(
+                status,
+                source = "authoritative_terminal_scope_mismatched",
+                seq = received.eventSeqOrNull(),
+                scopeMatched = false,
+            ),
+            lease,
         )
         return status
     }
@@ -1834,9 +1847,6 @@ class AppServerTurnEngine(
         val releaseReason: String? = null,
     )
 
-    private object TurnCompleted : TurnCompletedMarker()
-    private sealed class TurnCompletedMarker : Throwable()
-
     /**
      * fix(no-settle-on-clean-completion): true when [this] (or anything in its
      * `cause` chain) is [TurnCompletedMarker] — i.e. the exception is really
@@ -1850,48 +1860,18 @@ class AppServerTurnEngine(
     private fun Throwable.isCausedByCleanCompletion(): Boolean =
         generateSequence(this) { it.cause }.any { it is TurnCompletedMarker }
 
-    private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
-    private sealed class TurnIdleTimedOutMarker : Throwable()
-
     /**
      * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the last-seen terminal
      * lifecycle status on the active-turn owner (if one is set). Pure metadata
      * write — no control-flow, no lock interaction, no effect on emitted drafts.
-     *
-     * @param status terminal lifecycle status carried by the draft.
-     * @param source which collect-loop path observed this terminal (e.g.
-     *   "terminal_lifecycle", "post_tool_usage", "completed_settle",
-     *   "idle_timeout"). Descriptive only.
-     * @param seq event_seq of the terminal-bearing frame if known, else null.
-     * @param scopeMatched whether the terminal-bearing frame PASSED
-     *   matches(scope). Null when not applicable (e.g. synthesized terminals).
      */
-    private fun noteOwnerTerminal(
-        status: RuntimeRunStatus,
-        source: String? = null,
-        seq: Long? = null,
-        scopeMatched: Boolean? = null,
-        lease: LeaseRef,
-    ) {
+    private fun noteOwnerTerminal(note: OwnerTerminalNote, lease: LeaseRef) {
         if (lease.current == null) return
         val slot = lease.slot
         val current = slot.owner ?: return
-        slot.owner = current.copy(
-            lastTerminal = status.name,
-            lastTerminalSource = source ?: current.lastTerminalSource,
-            lastTerminalAtMs = currentTimeMs(),
-            lastTerminalSeq = seq ?: current.lastTerminalSeq,
-            lastTerminalScopeMatched = scopeMatched ?: current.lastTerminalScopeMatched,
-        )
+        slot.owner = current.withTerminal(note, currentTimeMs())
         slot.updateLease { held ->
-            if (held?.token != lease.token) held
-            else held.copy(
-                lastTerminal = status.name,
-                lastTerminalSource = source ?: held.lastTerminalSource,
-                lastTerminalAtMs = currentTimeMs(),
-                lastTerminalSeq = seq ?: held.lastTerminalSeq,
-                lastTerminalScopeMatched = scopeMatched ?: held.lastTerminalScopeMatched,
-            )
+            if (held?.token != lease.token) held else held.withTerminal(note, currentTimeMs())
         }
     }
 
@@ -1925,11 +1905,13 @@ class AppServerTurnEngine(
     private fun noteCompletedSettle(frameSeq: Long?, lease: LeaseRef) {
         lease.slot.boundaryGate.noteSettled(lease.current?.runId)
         noteOwnerTerminal(
-            RuntimeRunStatus.Completed,
-            source = "completed_settle",
-            seq = frameSeq,
-            scopeMatched = true,
-            lease = lease,
+            OwnerTerminalNote(
+                RuntimeRunStatus.Completed,
+                source = "completed_settle",
+                seq = frameSeq,
+                scopeMatched = true,
+            ),
+            lease,
         )
     }
 
@@ -1942,11 +1924,13 @@ class AppServerTurnEngine(
         lease.slot.boundaryGate.noteSettledTerminal(draft, lease.current?.runId)
         val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged ?: return
         noteOwnerTerminal(
-            lifecycle.status,
-            source = "terminal_lifecycle",
-            seq = frameSeq,
-            scopeMatched = true,
-            lease = lease,
+            OwnerTerminalNote(
+                lifecycle.status,
+                source = "terminal_lifecycle",
+                seq = frameSeq,
+                scopeMatched = true,
+            ),
+            lease,
         )
         if (lifecycle.status == RuntimeRunStatus.Failed ||
             lifecycle.status == RuntimeRunStatus.Cancelled
@@ -2066,3 +2050,11 @@ class AppServerTurnEngine(
         }
     }
 }
+
+/** Clean-completion signal thrown out of the frame loop (see isCausedByCleanCompletion). */
+private object TurnCompleted : TurnCompletedMarker()
+private sealed class TurnCompletedMarker : Throwable()
+
+/** Idle-watchdog signal: the turn saw no frame for the idle window. */
+private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
+private sealed class TurnIdleTimedOutMarker : Throwable()
