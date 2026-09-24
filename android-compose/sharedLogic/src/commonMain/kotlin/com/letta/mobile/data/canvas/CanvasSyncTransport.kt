@@ -28,6 +28,13 @@ interface CanvasSyncTransport {
     suspend fun deliverTo(canvasId: CanvasId, apply: suspend (CanvasOp) -> Unit) {
         subscribe(canvasId).collect { apply(it) }
     }
+
+    /**
+     * The bytes of asset [ref] (an image on [canvasId], or any other large thing kept out of the
+     * ops), fetched from wherever this transport shares the canvas; null when it cannot get them.
+     * A transport that never leaves the process has nowhere to fetch from.
+     */
+    suspend fun fetchAsset(canvasId: CanvasId, ref: String): ByteArray? = null
 }
 
 private val LOCAL_PROCESS_ONLY = LocalOnlyCanvasSyncHealth("Not connected to a host; this canvas stays on this device")

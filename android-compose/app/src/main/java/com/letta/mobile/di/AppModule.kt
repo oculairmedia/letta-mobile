@@ -141,16 +141,30 @@ abstract class AppModule {
          * SessionChannelTransportFactory). Edits are queued durably in the app's files until the
          * host acknowledges them; without a host every canvas reports itself local-only.
          */
+        /**
+         * Where the app's canvases keep their images (and any other large things put on a board),
+         * by their hash. One store for the boards and the relay, so an image placed on a board is
+         * the one sent to the host, and one fetched from the host is the one the board draws.
+         */
+        @Provides
+        @Singleton
+        fun provideCanvasAssetStore(
+            @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
+        ): com.letta.mobile.data.storage.AssetStore =
+            com.letta.mobile.data.storage.FileAssetStore(java.io.File(context.filesDir, "canvas-assets"))
+
         @Provides
         @Singleton
         fun provideCanvasRelayClient(
             @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
             opLog: com.letta.mobile.data.canvas.CanvasOpLog,
             documents: com.letta.mobile.data.canvas.CanvasDocumentStore,
+            assets: com.letta.mobile.data.storage.AssetStore,
         ): com.letta.mobile.data.canvas.CanvasRelayClient = com.letta.mobile.data.canvas.CanvasRelayClient(
             opLog = opLog,
             delivery = com.letta.mobile.data.canvas.FileCanvasDeliveryStore(java.io.File(context.filesDir, "canvas-delivery.json")),
             topicOf = { id -> documents.relayTopicOf(id) },
+            assets = assets,
         )
 
         @Provides

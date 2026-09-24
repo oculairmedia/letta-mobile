@@ -100,6 +100,11 @@ fun CanvasWorkspace(
     sessionRegistry: CanvasSessionRegistry? = null,
     initialJson: String? = null,
     presenceTransport: CanvasPresenceTransport? = null,
+    /**
+     * Where this board keeps its images (and later other large things) instead of only inside the
+     * drawing; see [CanvasImageAssets]. Null keeps them inline only, as a session-less preview does.
+     */
+    assets: com.letta.mobile.data.storage.AssetStore? = null,
     currentPeerId: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
@@ -230,14 +235,35 @@ fun CanvasWorkspace(
             sessionRegistry?.register(session)
             val syncJob = session.startSync(this)
             try {
+                val openStarted = kotlin.time.TimeSource.Monotonic.markNow()
                 session.load()
                 val sessionJson = session.sceneJsonOrEmpty()
                 var lastImportedRev = session.document.value?.revision ?: 0L
+                // Parsing the scene is the heaviest thing opening a board does, and a board with
+                // pictures on it is megabytes of JSON: it is parsed off the main thread, and only
+                // the parsed drawing is handed to the controller on it.
+                val (clean, parsed) = withContext(Dispatchers.Default) {
+                    val stripped = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
+                    stripped to if (sessionJson.isBlank()) {
+                        null
+                    } else {
+                        runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(stripped) }.getOrNull()
+                            ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
+                    }
+                }
                 // Known even for an empty canvas, or the first note placed on it would read as
                 // an external change to the drawing and reload the board.
-                lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
+                lastDrawing = clean
                 if (sessionJson.isNotBlank()) {
-                    controller.importPath(lastDrawing!!)
+                    // A scene that does not parse still goes through the text path, which reports it.
+                    if (parsed != null) controller.importPath(parsed) else controller.importPath(clean)
+                    com.letta.mobile.util.Telemetry.event(
+                        "CanvasPerformance", "open.loaded",
+                        "canvasId" to session.canvasId.value,
+                        "sceneChars" to sessionJson.length,
+                        "elements" to controller.state.value.elements.size,
+                        durationMs = openStarted.elapsedNow().inWholeMilliseconds,
+                    )
                     lastExportedJson = sessionJson
                     statusMessage = "Loaded from session (rev ${session.document.value?.revision ?: 1})"
                 }
@@ -252,20 +278,41 @@ fun CanvasWorkspace(
 
                 // Card I2.3: Session observes revision bump -> controller.importPath if JSON changed externally.
                 // Conflict: agent replace wins; toast/status.
+                // Each revision is compared and parsed off the main thread too. While one is being
+                // parsed the collector is suspended, and the document flow keeps only the newest
+                // revision, so a catch-up burst of many revisions lands as one import.
                 session.document.collect { doc ->
-                    val result = CanvasWorkspaceSupport.evaluateExternalDocSync(
-                        ExternalSyncParams(
-                            doc = doc,
-                            lastImportedRev = lastImportedRev,
-                            lastExportedJson = lastExportedJson,
-                            lastDrawing = lastDrawing,
-                        ),
-                    ) ?: return@collect
+                    val importStarted = kotlin.time.TimeSource.Monotonic.markNow()
+                    val params = ExternalSyncParams(
+                        doc = doc,
+                        lastImportedRev = lastImportedRev,
+                        lastExportedJson = lastExportedJson,
+                        lastDrawing = lastDrawing,
+                    )
+                    val (result, parsedExternal) = withContext(Dispatchers.Default) {
+                        val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params) ?: return@withContext null
+                        val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }?.let { json ->
+                            runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()
+                                ?.let { drawing -> if (assets != null) CanvasImageAssets.resolve(drawing, assets) else drawing }
+                        }
+                        evaluated to payload
+                    } ?: return@collect
                     lastImportedRev = result.newImportedRev
                     importedRevision = result.newImportedRev
                     if (result.shouldImport && result.cleanJson != null) {
                         // A change from another app must not move this one's camera or tool.
-                        controller.importExternal(result.cleanJson)
+                        if (parsedExternal != null) {
+                            controller.importExternal(parsedExternal)
+                        } else {
+                            controller.importExternal(result.cleanJson)
+                        }
+                        com.letta.mobile.util.Telemetry.event(
+                            "CanvasPerformance", "sync.imported",
+                            "revision" to doc?.revision,
+                            "sceneChars" to result.cleanJson.length,
+                            durationMs = importStarted.elapsedNow().inWholeMilliseconds,
+                            level = com.letta.mobile.util.Telemetry.Level.DEBUG,
+                        )
                         // Nor put a caret in text placed there: it is known before the caret
                         // effect sees it, or text placed on a desktop opened a phone's keyboard.
                         knownTextIds = CanvasTextElements.ids(controller.state.value.elements)
@@ -300,6 +347,58 @@ fun CanvasWorkspace(
         delay(500)
         isAutosaving = true
         controller.exportJson()
+    }
+
+    // Images placed on this board, and those of boards made before it kept images as assets, are
+    // moved into the asset store: their bytes stored once under their hash, the image given the
+    // ref and a preview. Updated in place, outside undo: nothing the person did changed.
+    LaunchedEffect(state.elements, assets, initialLoadDone) {
+        val store = assets ?: return@LaunchedEffect
+        if (!initialLoadDone) return@LaunchedEffect
+        val pending = state.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
+            .filter { it.assetRef == null && it.bytes.isNotEmpty() }
+        if (pending.isEmpty()) return@LaunchedEffect
+        val adopted = withContext(Dispatchers.Default) { pending.map { CanvasImageAssets.adopt(it, store) } }
+        val now = controller.state.value.elements.associateBy { it.id }
+        adopted.forEach { image ->
+            val current = now[image.id] as? io.ak1.drawbox.domain.model.Element.Image ?: return@forEach
+            // Only if it is still the image that was adopted: moved or replaced meanwhile, it is
+            // adopted again on the next pass rather than overwritten with a stale copy.
+            if (image.assetRef != null && current.assetRef == null && current == image.copy(assetRef = null, mediaType = null, preview = current.preview)) {
+                controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(image))
+            }
+        }
+    }
+
+    // An image another app put on the board arrives as its ref and a preview; its full bytes are
+    // fetched from the host in the background and swapped in, outside undo, as they land. A ref
+    // the host did not have is asked for again a little later, not on every recomposition.
+    val fetchingAssets = remember(session) { mutableSetOf<String>() }
+    var assetRetry by remember(session) { mutableStateOf(0) }
+    LaunchedEffect(state.elements, assets, session, initialLoadDone, assetRetry) {
+        val store = assets ?: return@LaunchedEffect
+        val s = session ?: return@LaunchedEffect
+        if (!initialLoadDone) return@LaunchedEffect
+        val refs = state.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
+            .mapNotNull { it.assetRef }.distinct().filter { it !in fetchingAssets }
+        if (refs.isEmpty()) return@LaunchedEffect
+        val missing = withContext(Dispatchers.Default) { refs.filter { !store.has(it) } }
+        for (ref in missing) {
+            fetchingAssets += ref
+            coroutineScope.launch {
+                val bytes = s.fetchAsset(ref)
+                if (bytes == null) {
+                    delay(ASSET_RETRY_MS)
+                    fetchingAssets -= ref
+                    assetRetry++
+                    return@launch
+                }
+                controller.state.value.elements
+                    .filterIsInstance<io.ak1.drawbox.domain.model.Element.Image>()
+                    .filter { it.assetRef == ref && !it.bytes.contentEquals(bytes) }
+                    .forEach { controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(it.copy(bytes = bytes))) }
+            }
+        }
     }
 
     // Collect export/error events from DrawBoxController
@@ -1564,6 +1663,8 @@ fun CanvasWorkspace(
 
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
+/** How long before asking the host again for an asset it did not have yet. */
+private const val ASSET_RETRY_MS = 10_000L
 /** How far (board px) an arrow must be pulled out of a quick-create target to count as one. */
 private const val QUICK_PULL_MIN_PX = 24f
 private const val QUICK_ARROW_HEAD_PX = 14f

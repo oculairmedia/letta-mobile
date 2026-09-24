@@ -25,12 +25,22 @@ object DesktopCanvasHostSync {
 
     private val documents = DesktopCanvasDocumentStore()
 
+    /**
+     * Where the desktop's canvases keep their images (and any other large things put on a board),
+     * in `~/.letta/canvas/assets`. One store for the boards and the relay: the image a board places
+     * is the one sent to the host, and one fetched from the host is the one the board draws.
+     */
+    val assets: com.letta.mobile.data.storage.AssetStore = com.letta.mobile.data.storage.FileAssetStore(
+        DesktopCanvasDocumentStore.defaultRootDirectory().resolve("assets").toFile(),
+    )
+
     val relay: CanvasRelayClient = CanvasRelayClient(
         opLog = opLog,
         delivery = FileCanvasDeliveryStore(
             DesktopCanvasDocumentStore.defaultRootDirectory().resolve("delivery.json").toFile(),
         ),
         topicOf = { documents.relayTopicOf(it) },
+        assets = assets,
     )
 
     @Suppress("NoDetachedCoroutineLifecycle") // Lives as long as the desktop process, like the op log.

@@ -66,8 +66,9 @@ internal class TestApp(
     val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
     val delivery: InMemoryCanvasDeliveryStore = InMemoryCanvasDeliveryStore(),
     val documents: CanvasDocumentStore = InMemoryCanvasDocumentStore(),
+    val assets: com.letta.mobile.data.storage.AssetStore? = null,
 ) {
-    val client = CanvasRelayClient(opLog, delivery, topicOf = { documents.relayTopicOf(it) })
+    val client = CanvasRelayClient(opLog, delivery, topicOf = { documents.relayTopicOf(it) }, assets = assets)
     lateinit var session: CanvasSession
     var connection: TestConnection? = null
     private var running: Job? = null
