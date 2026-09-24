@@ -75,8 +75,10 @@ open class AppServerRuntimeEventMapper {
             // Acknowledges an input that carried request_id; correlated by the registry.
             is AppServerInboundFrame.InputAccepted,
             -> emptyList()
-            // Decoded as Unknown before 0.32 typing; kept on the same observable path.
-            is AppServerInboundFrame.TurnFinished -> listOf(received.toExternalTransportDraft(command))
+            // Decoded as Unknown before 0.32 typing; kept on the same observable path, plus the
+            // authoritative lifecycle terminal it carries (letta-mobile-qygvv.2).
+            is AppServerInboundFrame.TurnFinished ->
+                listOfNotNull(received.toExternalTransportDraft(command), frame.toTerminalDraft(command))
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)
             is AppServerInboundFrame.UpdateLoopStatus -> frame.toLoopStatusDraft(command)
@@ -176,7 +178,13 @@ open class AppServerRuntimeEventMapper {
             }
             "loop_error",
             "error_message",
-            -> listOf(command.lifecycle(RuntimeRunStatus.Failed, runId = runId, reason = deltaObject.errorMessage()))
+            -> if (deltaObject.isNonTerminalError()) {
+                // letta-mobile-qygvv.2: `is_terminal: false` (0.32 LoopErrorMessage) is a notice
+                // the loop recovers from, not a turn end.
+                listOf(command.remoteFrame(idempotencyKey, runId, messageType, deltaObject.string("id"), raw))
+            } else {
+                listOf(command.lifecycle(RuntimeRunStatus.Failed, runId = runId, reason = deltaObject.errorMessage()))
+            }
             "client_tool_start" -> listOf(
                 command.draft(
                     runId = runId,
@@ -217,6 +225,43 @@ open class AppServerRuntimeEventMapper {
             )
         }
     }
+
+    /**
+     * letta-mobile-qygvv.2: `turn_finished` is the server's authoritative end of a turn. Its stop
+     * reason is read exactly like the delta's; `requires_approval` and unknown reasons stay open.
+     */
+    private fun AppServerInboundFrame.TurnFinished.toTerminalDraft(command: TurnCommand): RuntimeEventDraft? {
+        val finishedRunId = runId?.takeIf { it.isNotBlank() }?.let(::RunId)
+        return when (AppServerStopReason.boundaryOf(stopReason)) {
+            AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
+            AppServerTurnBoundary.Cancelled ->
+                command.lifecycle(RuntimeRunStatus.Cancelled, runId = finishedRunId, reason = error)
+            AppServerTurnBoundary.Failed -> command.lifecycle(
+                RuntimeRunStatus.Failed,
+                runId = finishedRunId,
+                reason = error ?: "App Server turn stopped with $stopReason",
+            )
+            AppServerTurnBoundary.Completed -> command.lifecycle(RuntimeRunStatus.Completed, runId = finishedRunId)
+        }
+    }
+
+    private fun TurnCommand.remoteFrame(
+        frameId: String,
+        runId: RunId?,
+        messageType: String?,
+        messageId: String?,
+        raw: JsonObject,
+    ): RuntimeEventDraft =
+        draft(
+            runId = runId,
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.RemoteStreamFrame(
+                frameId = frameId,
+                messageId = messageId,
+                messageType = messageType,
+                body = raw.toString(),
+            ),
+        )
 
     private fun AppServerInboundFrame.UpdateLoopStatus.toLoopStatusDraft(command: TurnCommand): List<RuntimeEventDraft> =
         if (loopStatus.activeRunIds.isNotEmpty()) {
@@ -315,6 +360,9 @@ open class AppServerRuntimeEventMapper {
         (this[key] as? JsonPrimitive)?.contentOrNull
 
     private fun JsonObject.objectOrNull(key: String): JsonObject? = this[key] as? JsonObject
+
+    /** Only an explicit `is_terminal: false` downgrades an error; absent means terminal (pre-0.32). */
+    private fun JsonObject.isNonTerminalError(): Boolean = string("is_terminal") == "false"
 
     private fun JsonObject.errorMessage(fallback: String = "App Server turn failed"): String =
         string("message")
