@@ -292,15 +292,28 @@ internal fun recordDequeued(lease: LeaseRef, source: String) {
     )
 }
 
+/**
+ * letta-mobile-qygvv.7: while this lease's input is queued, frames on the scope belong to the turn
+ * ahead; only `update_queue` concerns it.
+ */
+internal fun LeaseRef.holdsWhileQueued(received: AppServerReceivedFrame): Boolean =
+    queuedInput.isQueued && received.frame !is AppServerInboundFrame.UpdateQueue
+
+/** The server dropped this lease's queued input and its `update_queue` frame already reached viewers. */
+internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boolean): Boolean =
+    projected && this == QueueRemovalDisposition.Cancelled
+
 internal fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
 ): QueueRemovalDisposition? {
     val frame = received.frame
     val removal = (frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
+    // While queued, frames on this scope belong to the turn ahead; only the
+    // dequeue transition for OUR client_message_id proves our input started.
     val startedBy = when {
-        frame is AppServerInboundFrame.StreamDelta -> "stream_delta"
         removal == QueueRemovalDisposition.Dequeued -> "update_queue"
+        frame is AppServerInboundFrame.StreamDelta && !lease.queuedInput.isQueued -> "stream_delta"
         else -> null
     }
     if (startedBy != null && lease.queuedInput.markStarted()) {

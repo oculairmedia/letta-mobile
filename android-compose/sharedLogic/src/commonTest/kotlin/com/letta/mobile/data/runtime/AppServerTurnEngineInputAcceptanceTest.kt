@@ -103,12 +103,40 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertTrue(turn.isBusy, "watchdog must be paused while queued")
         assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
 
-        // The turn starts: the watchdog is armed again and trips on fresh silence.
+        // A stream frame from the earlier turn must not unpause the watchdog while queued.
         turn.client.emitStreamDelta("assistant_message")
+        runCurrent()
+        advanceTimeBy(IDLE_TIMEOUT_MS * 5)
+        runCurrent()
+        assertTrue(turn.isBusy, "stream frame from earlier turn must not trip watchdog while queued")
+
+        // Once dequeued, fresh silence trips the armed watchdog.
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
         runCurrent()
         idleOut(turn)
 
         assertEquals(RuntimeRunStatus.Failed, turn.drafts.lastLifecycle()?.status)
+        assertFalse(turn.isBusy)
+    }
+
+    @Test
+    fun earlierTurnFinishedArrivingWhileQueuedDoesNotCompleteTurn() = runTest {
+        val turn = startTurn(InputAckFixture.Queued)
+        assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "queued input must be visible")
+
+        // An earlier turn's turn_finished arriving while queued must be ignored and not complete this turn.
+        turn.client.emitTurnFinished(TestRun("prev-run-1"), turn = 0)
+        runCurrent()
+        assertTrue(turn.isBusy, "turn must remain active when earlier turn finishes")
+        assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
+
+        // Dequeue, then our own turn streams and completes normally.
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        turn.client.emitStreamDelta("assistant_message")
+        turn.client.emitTurnFinished(TestRun("run-1"), turn = 1)
+        finish(turn)
+
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
         assertFalse(turn.isBusy)
     }
 
