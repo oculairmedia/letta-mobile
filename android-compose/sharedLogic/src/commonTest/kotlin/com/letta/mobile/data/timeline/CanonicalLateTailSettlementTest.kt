@@ -27,8 +27,11 @@ class CanonicalLateTailSettlementTest {
     private val sentAt = timelineNow().toString()
     private val otid = "cm-android-7e148aa8"
 
-    private fun reply(content: String) = AssistantMessage(
-        id = "ui-msg-9173252", contentRaw = JsonPrimitive(content), date = sentAt, runId = "local-run-50",
+    /** One streamed fragment of the reply ui-msg-9173252 (run local-run-50). */
+    private enum class ReplyFragment(val text: String) { First("Hel"), Second("lo"), Tail(" there") }
+
+    private fun reply(fragment: ReplyFragment) = AssistantMessage(
+        id = "ui-msg-9173252", contentRaw = JsonPrimitive(fragment.text), date = sentAt, runId = "local-run-50",
     )
 
     // The 0.32.17 message list: seq_id and run_id null, no otid on the assistant row, the user
@@ -65,14 +68,14 @@ class CanonicalLateTailSettlementTest {
             agent, conversation,
             UserMessage(id = "cm-user-$otid", contentRaw = JsonPrimitive("hi"), date = sentAt, otid = otid),
         )
-        external.ingestExternalTransportMessage(agent, conversation, reply("Hel"))
-        external.ingestExternalTransportMessage(agent, conversation, reply("lo"))
+        external.ingestExternalTransportMessage(agent, conversation, reply(ReplyFragment.First))
+        external.ingestExternalTransportMessage(agent, conversation, reply(ReplyFragment.Second))
         // stop_reason, usage and RunLifecycleChanged(Completed) travel the runtime batcher, not the
         // timeline writer; the coordinator's finishActiveTurn then ends the timeline turn.
         external.turnEnded(agent, conversation, clean = true)
         external.clearExternalTransportActive(agent, conversation)
         // The tail the transport emitted behind turn_finished.
-        external.ingestExternalTransportMessage(agent, conversation, reply(" there"))
+        external.ingestExternalTransportMessage(agent, conversation, reply(ReplyFragment.Tail))
     }
 
     @Test
@@ -204,26 +207,13 @@ class CanonicalLateTailSettlementTest {
     }
 }
 
-/** Serves the same recent page to every reconcile. */
-private class StaticPageTransport(private val records: () -> List<TimelineRemoteRecord>) : TimelineTransport {
+/** Serves the same recent page to every reconcile; every other route is unused. */
+private class StaticPageTransport(
+    private val records: () -> List<TimelineRemoteRecord>,
+) : TimelineTransport by EmptyTimelineTransport {
     override suspend fun listConversationMessagePage(
         request: TimelineRemotePageRequest,
         progress: TimelinePageProgress?,
     ): TimelineRemotePageResult =
         TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, records(), null, false, 0)
-
-    override suspend fun sendConversationMessage(
-        conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest,
-    ): kotlinx.coroutines.flow.Flow<LettaMessage> = error("unexpected send")
-
-    override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
-        error("unexpected stream")
-
-    override suspend fun listConversationMessages(
-        conversationId: String, limit: Int?, after: String?, order: String?,
-    ): List<LettaMessage> = error("legacy hydration")
-
-    override suspend fun listAgentMessages(
-        agentId: String, limit: Int?, order: String?, conversationId: String?,
-    ): List<LettaMessage> = error("legacy hydration")
 }

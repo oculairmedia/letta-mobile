@@ -231,22 +231,6 @@ data class TimelineLivePublication(
         return false
     }
 
-    /**
-     * True when [message] belongs to this settled turn: it names a row the turn already streamed,
-     * or the run that produced it. Only a settled publication can have a tail; a frame of a
-     * different run (an agent replying again without a turn start) is never claimed.
-     */
-    fun claimsLateTail(message: com.letta.mobile.data.model.LettaMessage): Boolean {
-        if (settlementRevision == null) return false
-        val runId = message.runId?.takeIf { it.isNotBlank() }
-        val otid = message.otid?.takeIf { it.isNotBlank() }
-        return block.events.any { event ->
-            event.serverId == message.id ||
-                (otid != null && event.otid == otid) ||
-                (runId != null && event.runId == runId)
-        }
-    }
-
     /** Overlay stays resident, draining individual events as they become resident in settled rows. */
     fun overlayEvents(presented: Map<TimelineMessageId, Long>): List<TimelineEvent.Confirmed> {
         if (isSettled(presented)) return emptyList()

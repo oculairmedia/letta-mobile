@@ -1132,7 +1132,7 @@ class ChatSendCoordinator(
         val retiredTail = isRetiredTurnTail(event, conversationId)
         timelineRepository.ingestExternalTransportMessage(
             agentId, conversationId, event.message,
-            source = if (retiredTail) TimelineIngestSources.RETIRED_TURN_TAIL else "coordinator",
+            source = TimelineIngestSources.coordinator(retiredTail),
         )
         if (retiredTail) {
             // A reply's last deltas can reach us after its terminal (Iroh emits them behind

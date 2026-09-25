@@ -112,4 +112,7 @@ object TimelineIngestSources {
      * terminal. A canonical writer folds it into that turn and never opens a new turn for it.
      */
     const val RETIRED_TURN_TAIL = "coordinator.retiredTurnTail"
+
+    /** The send coordinator's source for a delta, naming a finished turn's tail as such. */
+    fun coordinator(retiredTail: Boolean): String = if (retiredTail) RETIRED_TURN_TAIL else "coordinator"
 }

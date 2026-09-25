@@ -13,6 +13,22 @@ internal fun TimelineReducerState.reduceLive(message: LettaMessage, agentId: Str
 internal fun LettaMessage.returnedCallId(): String? =
     (this as? ToolReturnMessage)?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
 
+/**
+ * True when [message] belongs to this settled turn: it names a row the turn already streamed,
+ * or the run that produced it. Only a settled publication can have a tail; a frame of a
+ * different run (an agent replying again without a turn start) is never claimed.
+ */
+internal fun TimelineLivePublication.claimsLateTail(message: LettaMessage): Boolean {
+    if (settlementRevision == null) return false
+    return block.events.any { it.namesSameMessageAs(message) }
+}
+
+private fun TimelineEvent.Confirmed.namesSameMessageAs(message: LettaMessage): Boolean {
+    if (serverId == message.id) return true
+    if (!message.otid.isNullOrBlank() && otid == message.otid) return true
+    return !message.runId.isNullOrBlank() && runId == message.runId
+}
+
 /** Removes the first element matching [predicate]; true when there was one. */
 internal inline fun <T> MutableList<T>.removeFirstMatching(predicate: (T) -> Boolean): Boolean {
     val index = indexOfFirst(predicate)

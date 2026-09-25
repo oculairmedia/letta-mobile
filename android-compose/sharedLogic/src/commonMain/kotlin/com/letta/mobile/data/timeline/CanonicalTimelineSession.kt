@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.sync.withLock
 
@@ -144,13 +145,13 @@ class CanonicalTimelineCoordinator(
      */
     suspend fun ingestExternal(
         owner: Owner,
-        message: com.letta.mobile.data.model.LettaMessage,
+        message: LettaMessage,
         retiredTail: Boolean = false,
     ): Boolean = mutex.withLock { ingestExternalLocked(owner, message, retiredTail) }
 
     private suspend fun ingestExternalLocked(
         owner: Owner,
-        message: com.letta.mobile.data.model.LettaMessage,
+        message: LettaMessage,
         retiredTail: Boolean,
     ): Boolean {
         if (owners[owner.selection.scope] !== owner) return false
@@ -176,7 +177,7 @@ class CanonicalTimelineCoordinator(
      */
     private suspend fun absorbsSettledTail(
         owner: Owner,
-        message: com.letta.mobile.data.model.LettaMessage,
+        message: LettaMessage,
         retiredTail: Boolean,
     ): Boolean {
         if (!retiredTail && owner.settledTurn()?.claimsLateTail(message) != true) return false

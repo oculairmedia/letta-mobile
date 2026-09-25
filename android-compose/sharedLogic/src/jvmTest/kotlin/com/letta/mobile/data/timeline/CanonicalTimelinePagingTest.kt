@@ -185,9 +185,13 @@ class CanonicalTimelinePagingTest {
         val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val decodes = AtomicInteger()
         val projections = AtomicInteger()
+        // The durable revision current when the presenter last decoded: it names the ledger
+        // generation that reload rendered.
+        val decodedAtRevision = java.util.concurrent.atomic.AtomicLong(-1)
         val adapter = TimelineSettledProjectionAdapter(
             decode = { record ->
                 decodes.incrementAndGet()
+                decodedAtRevision.set(owner.session.publication.value.durableRevision)
                 DefaultTimelineSettledProjectionAdapter.decode(record).also {
                     // A second raw decode outside this adapter must fail too, not evade the counter.
                     record.body.fill(0)
@@ -203,6 +207,16 @@ class CanonicalTimelinePagingTest {
         try {
             ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
             presenter.awaitRows(1) { "calls=${transport.calls} ledgerRows=${store.rows.size}" }
+            presenter.awaitIdle()
+            // The newest and older walks fetch independently, so the second walk's commit can bump
+            // the durable revision after the first page is on screen, and its reload decodes again.
+            // Counting before that reload raced it (CI on #1672: 1, then 2 after the delay). Wait
+            // until history is exhausted and the last decode rendered the ledger's final revision;
+            // nothing can invalidate the source after that.
+            awaitCondition({ "presenter never rendered the final ledger: calls=${transport.calls}" }) {
+                !store.current.hasMore &&
+                    decodedAtRevision.get() == owner.session.publication.value.durableRevision
+            }
             presenter.awaitIdle()
 
             // Paging can emit a second generation after the first page lands (revision

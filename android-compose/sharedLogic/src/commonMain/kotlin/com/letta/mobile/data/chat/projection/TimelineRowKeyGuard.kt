@@ -21,7 +21,11 @@ object TimelineRowKeyGuard {
         var duplicates: MutableMap<Int, String>? = null
         keys.forEachIndexed { index, key ->
             if (key == null) return@forEachIndexed
-            val first = seen.putIfAbsent(key, index) ?: return@forEachIndexed
+            val first = seen[key]
+            if (first == null) {
+                seen[key] = index
+                return@forEachIndexed
+            }
             Telemetry.event(
                 "Timeline", "timeline.duplicateKeyDropped",
                 "key" to key,
