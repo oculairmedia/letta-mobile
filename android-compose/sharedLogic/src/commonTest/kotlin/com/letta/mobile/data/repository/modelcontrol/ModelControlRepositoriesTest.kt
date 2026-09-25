@@ -57,7 +57,7 @@ class ModelControlRepositoriesTest {
     fun disconnectPassesTheAlias() = runTest {
         val invoker = RecordingInvoker { _, _ -> ModelControlFixtures.mutation(modelsMayHaveChanged = true) }
 
-        ProviderConnectionRepository(invoker).disconnect("lmstudio", "lc-lmstudio")
+        ProviderConnectionRepository(invoker).disconnect(ProviderDisconnectTarget(ConnectableProviderId("lmstudio"), "lc-lmstudio"))
 
         val (method, params) = invoker.calls.single()
         assertEquals("provider.disconnect", method)
@@ -72,10 +72,10 @@ class ModelControlRepositoriesTest {
         val models = repo.refresh()
 
         assertEquals(JsonPrimitive(true), invoker.calls.single().second["include_hidden"])
-        assertEquals(listOf("openai/gpt-sol", "lmstudio/minimax-m3"), models.map { it.handle })
-        assertEquals(listOf("openai/gpt-sol"), repo.exposedModels.map { it.handle })
-        assertEquals(listOf("none", "high"), repo.reasoningEffortsFor("openai/gpt-sol"))
-        assertEquals(emptyList(), repo.reasoningEffortsFor("lmstudio/minimax-m3"))
+        assertEquals(listOf("openai/gpt-sol", "lmstudio/minimax-m3"), models.map { it.handle.value })
+        assertEquals(listOf("openai/gpt-sol"), repo.exposedModels.map { it.handle.value })
+        assertEquals(listOf("none", "high"), repo.reasoningEffortsFor(ModelHandle("openai/gpt-sol")))
+        assertEquals(emptyList(), repo.reasoningEffortsFor(ModelHandle("lmstudio/minimax-m3")))
     }
 
     @Test
@@ -88,12 +88,12 @@ class ModelControlRepositoriesTest {
         val repo = ModelCatalogRepository(invoker)
         repo.refresh()
 
-        repo.setExposed("lmstudio/minimax-m3", true)
+        repo.setExposed(ExposureChange(ModelHandle("lmstudio/minimax-m3"), true))
         assertTrue(repo.models.value.all { it.exposed })
 
         failWrites = true
-        assertFailsWith<ModelControlException> { repo.setExposed("openai/gpt-sol", false) }
-        assertTrue(repo.models.value.first { it.handle == "openai/gpt-sol" }.exposed)
+        assertFailsWith<ModelControlException> { repo.setExposed(ExposureChange(ModelHandle("openai/gpt-sol"), false)) }
+        assertTrue(repo.models.value.first { it.handle.value == "openai/gpt-sol" }.exposed)
     }
 
     @Test
@@ -102,9 +102,10 @@ class ModelControlRepositoriesTest {
         val repo = ConversationModelRepository(invoker)
         val target = ConversationModelTarget("agent-1", "conv-1")
 
-        repo.updateModel(target, "openai/gpt-sol")
+        val sol = ModelHandle("openai/gpt-sol")
+        repo.updateModel(target, sol)
         repo.updateModel(target, null, ReasoningEffortChoice.ProviderDefault)
-        repo.updateModel(target, "openai/gpt-sol", ReasoningEffortChoice.Named("high"))
+        repo.updateModel(target, sol, ReasoningEffortChoice.Named("high"))
 
         val params = invoker.calls.map { it.second }
         assertFalse("reasoning_effort" in params[0])

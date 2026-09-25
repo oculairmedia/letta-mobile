@@ -62,7 +62,7 @@ class ProviderAdminController(
         _state.update { it.copy(pendingDisconnect = null) }
         run(failure = "Couldn't disconnect ${provider.displayName}") {
             val alias = provider.connections.singleOrNull()?.providerName
-            val result = repository.disconnect(provider.id, alias)
+            val result = repository.disconnect(ProviderDisconnectTarget(ConnectableProviderId(provider.id), alias))
             _state.update { it.copy(providers = result.providers, message = "${provider.displayName} disconnected") }
         }
     }
@@ -93,11 +93,11 @@ data class ModelExposureState(
     val query: String = "",
 ) {
     private val matching: List<CatalogModel>
-        get() = models.filter { query.isBlank() || it.handle.contains(query.trim(), ignoreCase = true) }
+        get() = models.filter { query.isBlank() || it.handle.value.contains(query.trim(), ignoreCase = true) }
 
-    val exposed: List<CatalogModel> get() = matching.filter { it.exposed }.sortedBy { it.handle }
+    val exposed: List<CatalogModel> get() = matching.filter { it.exposed }.sortedBy { it.handle.value }
 
-    val hidden: List<CatalogModel> get() = matching.filterNot { it.exposed }.sortedBy { it.handle }
+    val hidden: List<CatalogModel> get() = matching.filterNot { it.exposed }.sortedBy { it.handle.value }
 }
 
 /** Platform-neutral presenter for per-model exposure toggles (letta-mobile-w4q4p). */
@@ -122,10 +122,10 @@ class ModelExposureController(
 
     fun setQuery(query: String) = _state.update { it.copy(query = query) }
 
-    fun setExposed(handle: String, exposed: Boolean) {
+    fun setExposed(change: ExposureChange) {
         scope.launch {
-            val failure = runCatching { repository.setExposed(handle, exposed) }.exceptionOrNull()
-            failure?.let { e -> _state.update { it.copy(error = "Couldn't update $handle: ${e.message}") } }
+            val failure = runCatching { repository.setExposed(change) }.exceptionOrNull()
+            failure?.let { e -> _state.update { it.copy(error = "Couldn't update ${change.handle}: ${e.message}") } }
         }
     }
 }

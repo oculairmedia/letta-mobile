@@ -25,12 +25,6 @@ import com.letta.mobile.ui.modelcontrol.ProviderConnectionPane
 import com.letta.mobile.ui.modelcontrol.ProviderFormActions
 import com.letta.mobile.ui.modelcontrol.ProviderPaneActions
 
-/** Admin RPC over whichever channel transport the desktop currently holds. */
-@Composable
-internal fun rememberModelControlRpc(
-    transport: androidx.compose.runtime.State<com.letta.mobile.data.transport.api.IChannelTransport?>,
-): AdminRpcInvoker = remember(transport) { AdminRpcInvoker.overTransport { transport.value } }
-
 /**
  * Providers & Models (letta-mobile-w4q4p): the desktop binding of the shared
  * provider-management and model-exposure panes. Repositories and presenters
@@ -79,7 +73,9 @@ private fun ModelsTab(rpc: AdminRpcInvoker) {
     val state by controller.state.collectAsState()
     ModelExposurePane(
         state = state,
-        onQueryChange = controller::setQuery,
-        onExposedChange = controller::setExposed,
+        actions = com.letta.mobile.ui.modelcontrol.ModelExposureActions(
+            onQueryChange = controller::setQuery,
+            onExposedChange = controller::setExposed,
+        ),
     )
 }

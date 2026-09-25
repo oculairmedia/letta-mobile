@@ -658,7 +658,9 @@ private fun ModelExposureTab(controller: com.letta.mobile.data.repository.modelc
     val state by controller.state.collectAsStateWithLifecycle()
     com.letta.mobile.ui.modelcontrol.ModelExposurePane(
         state = state,
-        onQueryChange = controller::setQuery,
-        onExposedChange = controller::setExposed,
+        actions = com.letta.mobile.ui.modelcontrol.ModelExposureActions(
+            onQueryChange = controller::setQuery,
+            onExposedChange = controller::setExposed,
+        ),
     )
 }

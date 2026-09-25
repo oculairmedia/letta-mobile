@@ -48,6 +48,7 @@ internal data class ModelPickerRowSpec(
     val isActive: Boolean,
     val enabled: Boolean,
     val efforts: List<String> = emptyList(),
+    val subtitle: String = "",
 )
 
 /** One model in the picker: name, tier, subtitle, reasoning chips, and the active check. */
@@ -76,7 +77,7 @@ internal fun ModelPickerRow(
                 ModelTitleLine(model)
                 Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                 Text(
-                    text = buildModelSubtitle(model),
+                    text = spec.subtitle,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -121,17 +122,4 @@ private fun ActiveModelCheck() {
         modifier = Modifier.padding(start = LettaDimens.Space.sm).size(LettaIconSizing.Toolbar),
         tint = MaterialTheme.colorScheme.primary,
     )
-}
-
-/**
- * Builds the subtitle line for a model picker item: context window
- * size and provider name when available.
- */
-private fun buildModelSubtitle(model: LlmModel): String {
-    val parts = mutableListOf<String>()
-    model.contextWindow?.takeIf { it > 0 }?.let {
-        parts.add("${it / 1000}K context")
-    }
-    model.providerName?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
-    return parts.joinToString(" · ")
 }

@@ -24,10 +24,10 @@ class ProviderConnectionRepository(private val rpc: AdminRpcInvoker) {
     suspend fun connect(request: ProviderConnectRequest): ProviderMutationResult =
         apply(rpc.invoke(ModelControlWire.PROVIDER_CONNECT, ModelControlWire.connectParams(request)))
 
-    suspend fun disconnect(providerId: String, providerName: String? = null): ProviderMutationResult {
+    suspend fun disconnect(target: ProviderDisconnectTarget): ProviderMutationResult {
         val params = buildJsonObject {
-            put("provider_id", providerId)
-            providerName?.let { put("provider_name", it) }
+            put("provider_id", target.providerId.value)
+            target.providerName?.let { put("provider_name", it) }
         }
         return apply(rpc.invoke(ModelControlWire.PROVIDER_DISCONNECT, params))
     }
@@ -56,11 +56,11 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
     }
 
     /** Optimistic: flips the row first and restores it if the wrapper rejects the change. */
-    suspend fun setExposed(handle: String, exposed: Boolean) {
+    suspend fun setExposed(change: ExposureChange) {
         val before = _models.value
-        _models.update { rows -> rows.map { if (it.handle == handle) it.copy(exposed = exposed) else it } }
+        _models.update { rows -> rows.map { if (it.handle == change.handle) it.copy(exposed = change.exposed) else it } }
         try {
-            rpc.invoke(ModelControlWire.MODEL_EXPOSURE_SET, exposureParams(handle, exposed))
+            rpc.invoke(ModelControlWire.MODEL_EXPOSURE_SET, exposureParams(change))
         } catch (e: Exception) {
             _models.value = before
             throw e
@@ -68,12 +68,12 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
     }
 
     /** Reasoning variants upstream advertises for [handle]; empty when none. */
-    fun reasoningEffortsFor(handle: String?): List<String> =
+    fun reasoningEffortsFor(handle: ModelHandle?): List<String> =
         handle?.let { h -> _models.value.firstOrNull { it.handle == h }?.reasoningEfforts }.orEmpty()
 
-    private fun exposureParams(handle: String, exposed: Boolean): JsonObject = buildJsonObject {
-        put("handle", handle)
-        put("exposed", JsonPrimitive(exposed))
+    private fun exposureParams(change: ExposureChange): JsonObject = buildJsonObject {
+        put("handle", change.handle.value)
+        put("exposed", JsonPrimitive(change.exposed))
     }
 }
 
@@ -81,7 +81,7 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
 class ConversationModelRepository(private val rpc: AdminRpcInvoker) {
     suspend fun updateModel(
         target: ConversationModelTarget,
-        modelHandle: String?,
+        modelHandle: ModelHandle?,
         effort: ReasoningEffortChoice = ReasoningEffortChoice.Unchanged,
     ): ConversationModelUpdate {
         require(modelHandle != null || effort != ReasoningEffortChoice.Unchanged) { "nothing to update" }

@@ -9,6 +9,8 @@ data class DesktopBootstrapState(
     val config: LettaConfig,
     val sessionGraphId: Long,
     val featureReadiness: List<DesktopFeatureReadiness>,
+    /** letta-mobile-w4q4p: admin RPC to the connected host for Providers & Models. */
+    val modelControlRpc: com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker? = null,
 )
 
 data class DesktopFeatureReadiness(
@@ -70,6 +72,7 @@ fun defaultDesktopBootstrapState(
     config: LettaConfig = defaultDesktopLettaConfig(),
 ) = DesktopBootstrapState(
     config = config,
+    modelControlRpc = dataBindings.modelControlRpc,
     sessionGraphId = dataBindings.sessionGraphProvider.current.id,
     featureReadiness = listOf(
         DesktopFeatureReadiness(

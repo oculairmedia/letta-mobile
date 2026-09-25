@@ -11,6 +11,7 @@ import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.activeBackendIsIroh
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
+import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -46,20 +47,20 @@ internal class AdminChatModelCoordinator(
         }
     }
 
-    fun reasoningEffortsFor(handle: String?): List<String> = modelControl?.reasoningEffortsFor(handle).orEmpty()
+    fun reasoningEffortsFor(handle: ModelHandle?): List<String> = modelControl?.reasoningEffortsFor(handle).orEmpty()
 
     /**
      * On an Iroh host with an open conversation the pick goes through
      * `model.update` for THIS conversation (with the chosen reasoning effort);
      * otherwise it keeps updating the agent as before.
      */
-    fun updateActiveAgentModel(handle: String, effort: EffortSelection = EffortSelection.Keep) {
+    fun updateActiveAgentModel(pick: ModelPick) {
         val target = conversationModelTarget()
         val control = modelControl
         if (target != null && control != null) {
-            switchConversationModel(control, target, PickedModel(handle.trim(), effort))
+            switchConversationModel(control, target, pick)
         } else {
-            updateAgentModel(handle)
+            updateAgentModel(pick)
         }
     }
 
@@ -69,10 +70,10 @@ internal class AdminChatModelCoordinator(
         return ConversationModelTarget(agentId.value, conversation)
     }
 
-    private fun switchConversationModel(control: ChatModelControl, target: ConversationModelTarget, pick: PickedModel) {
+    private fun switchConversationModel(control: ChatModelControl, target: ConversationModelTarget, pick: ModelPick) {
         scope.launch {
             try {
-                control.switchConversationModel(target, pick.handle, pick.effort)
+                control.switchConversationModel(target, pick)
                 runCatching { agentRepository.refreshAgents() }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -82,13 +83,13 @@ internal class AdminChatModelCoordinator(
         }
     }
 
-    private fun updateAgentModel(handle: String) {
+    private fun updateAgentModel(pick: ModelPick) {
         scope.launch {
             try {
                 val config = settingsRepository.activeConfig.firstOrNull()
                 agentRepository.updateAgent(
                     agentId,
-                    modelSwitchUpdateParams(handle, config, activeAgent.value),
+                    modelSwitchUpdateParams(pick.handle.value, config, activeAgent.value),
                 )
                 refreshModels()
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -116,8 +117,6 @@ internal class AdminChatModelCoordinator(
         )
     }
 }
-
-private data class PickedModel(val handle: String, val effort: EffortSelection)
 
 private data class LocalModelSelection(
     val isSelected: Boolean,

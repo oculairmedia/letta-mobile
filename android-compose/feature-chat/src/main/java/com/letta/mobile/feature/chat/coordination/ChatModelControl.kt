@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelRepository
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
+import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import javax.inject.Inject
 
@@ -19,13 +20,15 @@ class ChatModelControl @Inject constructor(
         catalog.refresh()
     }
 
-    fun reasoningEffortsFor(handle: String?): List<String> = catalog.reasoningEffortsFor(handle)
+    fun reasoningEffortsFor(handle: ModelHandle?): List<String> = catalog.reasoningEffortsFor(handle)
 
-    /** [effort] null = provider default; absent choice = leave the effort alone. */
-    suspend fun switchConversationModel(target: ConversationModelTarget, handle: String, effort: EffortSelection) {
-        conversationModels.updateModel(target, handle, effort.toChoice())
+    suspend fun switchConversationModel(target: ConversationModelTarget, pick: ModelPick) {
+        conversationModels.updateModel(target, pick.handle, pick.effort.toChoice())
     }
 }
+
+/** A picker selection: the model plus what to do with its reasoning effort. */
+data class ModelPick(val handle: ModelHandle, val effort: EffortSelection = EffortSelection.Keep)
 
 /** What the picker asked for: just a model, or a model plus an effort (null = provider default). */
 sealed interface EffortSelection {

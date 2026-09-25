@@ -875,6 +875,7 @@ internal fun ModelPickerSheet(
                                     isActive = model == activeModel,
                                     enabled = !isDismissingForAction,
                                     efforts = reasoning.effortsFor(handle),
+                                    subtitle = buildModelSubtitle(model),
                                 ),
                                 onSelect = { selectThenDismiss { onModelSelected(handle) } },
                                 onEffortSelected = { effort -> selectThenDismiss { reasoning.onEffortSelected(handle, effort) } },
@@ -887,6 +888,19 @@ internal fun ModelPickerSheet(
             Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         }
     }
+}
+
+/**
+ * Builds the subtitle line for a model picker item: context window
+ * size and provider name when available.
+ */
+private fun buildModelSubtitle(model: LlmModel): String {
+    val parts = mutableListOf<String>()
+    model.contextWindow?.takeIf { it > 0 }?.let {
+        parts.add("${it / 1000}K context")
+    }
+    model.providerName?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
+    return parts.joinToString(" · ")
 }
 
 internal data class DrawerNavigationCallbacks(

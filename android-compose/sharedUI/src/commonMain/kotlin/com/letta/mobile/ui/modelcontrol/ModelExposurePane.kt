@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.repository.modelcontrol.CatalogModel
+import com.letta.mobile.data.repository.modelcontrol.ExposureChange
 import com.letta.mobile.data.repository.modelcontrol.ModelExposureState
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaSectionLabel
@@ -34,11 +35,16 @@ private const val HIDDEN_ALPHA = 0.5f
  * Exposed models first; hidden ones greyed under "Hidden". Shared by the
  * Android Model Browser and the desktop Models pane.
  */
+/** Callbacks of [ModelExposurePane]; bound to a ModelExposureController by each host. */
+data class ModelExposureActions(
+    val onQueryChange: (String) -> Unit,
+    val onExposedChange: (ExposureChange) -> Unit,
+)
+
 @Composable
 fun ModelExposurePane(
     state: ModelExposureState,
-    onQueryChange: (String) -> Unit,
-    onExposedChange: (handle: String, exposed: Boolean) -> Unit,
+    actions: ModelExposureActions,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize().testTag(ModelExposureTags.PANE)) {
@@ -46,23 +52,23 @@ fun ModelExposurePane(
         ModelControlNotice(error = state.error, message = null)
         OutlinedTextField(
             value = state.query,
-            onValueChange = onQueryChange,
+            onValueChange = actions.onQueryChange,
             label = { Text("Filter models") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg),
         )
         LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.lg)) {
             item { LettaSectionLabel("Shown in pickers (${state.exposed.size})") }
-            items(state.exposed, key = { "e-${it.handle}" }) { ExposureRow(it, onExposedChange) }
+            items(state.exposed, key = { "e-${it.handle}" }) { ExposureRow(it, actions.onExposedChange) }
             item { LettaSectionLabel("Hidden (${state.hidden.size})") }
             if (state.hidden.isEmpty()) item { LettaEmptyHint("No hidden models") }
-            items(state.hidden, key = { "h-${it.handle}" }) { ExposureRow(it, onExposedChange) }
+            items(state.hidden, key = { "h-${it.handle}" }) { ExposureRow(it, actions.onExposedChange) }
         }
     }
 }
 
 @Composable
-private fun ExposureRow(model: CatalogModel, onExposedChange: (String, Boolean) -> Unit) {
+private fun ExposureRow(model: CatalogModel, onExposedChange: (ExposureChange) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -74,14 +80,14 @@ private fun ExposureRow(model: CatalogModel, onExposedChange: (String, Boolean) 
         Column(modifier = Modifier.weight(1f)) {
             Text(model.model.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                model.handle,
+                model.handle.value,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Switch(checked = model.exposed, onCheckedChange = { onExposedChange(model.handle, it) })
+        Switch(checked = model.exposed, onCheckedChange = { onExposedChange(ExposureChange(model.handle, it)) })
     }
 }
 

@@ -71,10 +71,10 @@ class ModelControlControllersTest {
         val controller = ModelExposureController(backgroundScope, ModelCatalogRepository(invoker))
 
         controller.refresh()
-        assertEquals(listOf("openai/gpt-sol"), controller.state.value.exposed.map { it.handle })
-        assertEquals(listOf("lmstudio/minimax-m3"), controller.state.value.hidden.map { it.handle })
+        assertEquals(listOf("openai/gpt-sol"), controller.state.value.exposed.map { it.handle.value })
+        assertEquals(listOf("lmstudio/minimax-m3"), controller.state.value.hidden.map { it.handle.value })
 
-        controller.setExposed("lmstudio/minimax-m3", true)
+        controller.setExposed(ExposureChange(ModelHandle("lmstudio/minimax-m3"), true))
         assertTrue(controller.state.value.hidden.isEmpty())
     }
 }

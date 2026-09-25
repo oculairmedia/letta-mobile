@@ -55,11 +55,11 @@ internal object ModelControlWire {
         put("fields", JsonObject(request.fields.mapValues { JsonPrimitive(it.value) }))
     }
 
-    fun updateParams(target: ConversationModelTarget, handle: String?, effort: ReasoningEffortChoice): JsonObject =
+    fun updateParams(target: ConversationModelTarget, handle: ModelHandle?, effort: ReasoningEffortChoice): JsonObject =
         buildJsonObject {
             put("agent_id", target.agentId)
             put("conversation_id", target.conversationId)
-            handle?.let { put("model_handle", it) }
+            handle?.let { put("model_handle", it.value) }
             when (effort) {
                 ReasoningEffortChoice.Unchanged -> Unit
                 ReasoningEffortChoice.ProviderDefault -> put("reasoning_effort", JsonNull)

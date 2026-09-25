@@ -121,8 +121,6 @@ internal data class DestinationContentInputs(
     val nucleus: DesktopNucleusState,
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
-    /** letta-mobile-w4q4p: admin RPC to the connected host for Providers & Models. */
-    val modelControlRpc: com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker? = null,
 )
 
 internal data class DestinationNucleusActions(
@@ -210,7 +208,7 @@ internal fun DestinationContent(
             actions = actions.schedules,
             modifier = modifier,
         )
-        DesktopDestination.Providers -> inputs.modelControlRpc?.let { rpc ->
+        DesktopDestination.Providers -> inputs.state.modelControlRpc?.let { rpc ->
             ProvidersDestinationContent(rpc = rpc, modifier = modifier)
         }
         DesktopDestination.Channels -> ChannelsDestinationContent(

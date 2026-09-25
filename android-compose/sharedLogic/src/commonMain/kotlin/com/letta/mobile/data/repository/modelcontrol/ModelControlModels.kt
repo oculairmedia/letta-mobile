@@ -8,6 +8,24 @@ import com.letta.mobile.data.model.LlmModel
  * admin RPC by [ModelControlWire]; platform-neutral.
  */
 
+/** A model's selection handle (e.g. `openai/gpt-sol`); the key of exposure decisions. */
+@kotlin.jvm.JvmInline
+value class ModelHandle(val value: String) {
+    override fun toString(): String = value
+}
+
+/** A connectable provider row id from `provider.list` (e.g. `openai-compatible`). */
+@kotlin.jvm.JvmInline
+value class ConnectableProviderId(val value: String) {
+    override fun toString(): String = value
+}
+
+/** Which provider (and, for multi-alias rows, which connected alias) to disconnect. */
+data class ProviderDisconnectTarget(val providerId: ConnectableProviderId, val providerName: String? = null)
+
+/** One exposure decision for `model.exposure.set`. */
+data class ExposureChange(val handle: ModelHandle, val exposed: Boolean)
+
 /** One input of a provider connect form (`ConnectProviderField`). */
 data class ProviderField(
     val key: String,
@@ -66,7 +84,7 @@ data class CatalogModel(
     val reasoningEfforts: List<String>,
 ) {
     /** Exposure is keyed by the selection handle the wrapper projected. */
-    val handle: String get() = model.handle ?: model.id
+    val handle: ModelHandle get() = ModelHandle(model.handle ?: model.id)
 }
 
 /** What `model.update` should do with the reasoning effort. */

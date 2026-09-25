@@ -586,9 +586,15 @@ internal class AdminChatViewModel @Inject constructor(
         handle: String,
         effort: com.letta.mobile.feature.chat.coordination.EffortSelection =
             com.letta.mobile.feature.chat.coordination.EffortSelection.Keep,
-    ) = modelCoordinator.updateActiveAgentModel(handle, effort)
+    ) = modelCoordinator.updateActiveAgentModel(
+        com.letta.mobile.feature.chat.coordination.ModelPick(
+            com.letta.mobile.data.repository.modelcontrol.ModelHandle(handle.trim()),
+            effort,
+        ),
+    )
 
-    fun reasoningEffortsFor(handle: String?): List<String> = modelCoordinator.reasoningEffortsFor(handle)
+    fun reasoningEffortsFor(handle: String?): List<String> =
+        modelCoordinator.reasoningEffortsFor(handle?.let { com.letta.mobile.data.repository.modelcontrol.ModelHandle(it) })
 
     fun refreshAvailableAgents() {
         viewModelScope.launch {
