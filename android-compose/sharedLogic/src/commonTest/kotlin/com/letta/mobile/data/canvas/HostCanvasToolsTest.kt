@@ -38,7 +38,12 @@ class HostCanvasToolsTest {
 
     private fun addText(elementId: String, text: String) = CanvasOp.AddElementOp(
         opId = "model-chosen", actorId = "someone-else", lamport = 1L, elementId = elementId,
-        elementJson = """{"id":"$elementId","type":"Text","text":"$text"}""",
+        elementJson = buildJsonObject {
+            put("id", elementId)
+            put("type", "Text")
+            put("text", text)
+            put("textTopLeft", "10.0,10.0")
+        }.toString(),
     )
 
     private fun ops(vararg op: CanvasOp) = buildJsonObject {
@@ -146,7 +151,10 @@ class HostCanvasToolsTest {
     @Test
     fun missingParametersAreNamed() = runTest {
         val host = Host()
-        assertTrue("canvas_id" in host.call(CanvasToolContract.GET_SCENE, input(), "agent-1", "conv-1").error())
+        assertTrue(
+            "canvas_id" in host.call(CanvasToolContract.GET_SCENE, input(), "agent-1", conversation = null).error(),
+            "outside a conversation there is no canvas to default to",
+        )
         assertTrue(
             "scene_json" in host.call(CanvasToolContract.REPLACE_SCENE, input("canvas_id" to "x"), "agent-1", "conv-1").error(),
         )

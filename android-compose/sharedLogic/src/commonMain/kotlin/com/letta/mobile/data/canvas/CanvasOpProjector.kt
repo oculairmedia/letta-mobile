@@ -616,11 +616,24 @@ object CanvasOpProjector {
     }
 
     private fun cleanElementsArray(elements: JsonArray): List<JsonObject> = elements.mapNotNull { elem ->
-        val elemObj = runCatching { elem.jsonObject }.getOrNull() ?: return@mapNotNull null
+        val elemObj = runCatching { elem.jsonObject }.getOrNull() ?: return@mapNotNull null.also { reportDropped(elem) }
         buildJsonObject {
             elemObj.forEach { (k, v) -> if (!k.startsWith("_")) put(k, v) }
         }
     }
+
+    /** An element that is not even an object never reaches DrawBox; say so rather than lose it quietly. */
+    private fun reportDropped(element: JsonElement) {
+        com.letta.mobile.util.Telemetry.event(
+            "Canvas", "scene.elementDropped",
+            "elementId" to null,
+            "type" to null,
+            "reason" to "not a JSON object: ${element.toString().take(DROPPED_PREVIEW_CHARS)}",
+            level = com.letta.mobile.util.Telemetry.Level.WARN,
+        )
+    }
+
+    private const val DROPPED_PREVIEW_CHARS = 80
 
     private fun cleanSceneRoot(parsed: JsonObject, cleanedElements: List<JsonObject>): JsonObject = buildJsonObject {
         parsed.forEach { (k, v) -> if (k != "elements" && !k.startsWith("_")) put(k, v) }
