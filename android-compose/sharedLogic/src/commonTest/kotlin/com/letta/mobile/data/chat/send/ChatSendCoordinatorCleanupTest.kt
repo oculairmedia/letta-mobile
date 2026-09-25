@@ -180,6 +180,38 @@ class ChatSendCoordinatorCleanupTest {
         assertTrue(timeline.clearedActiveConversations.isEmpty())
     }
 
+    // letta-mobile-qygvv.16: the transport ends a turn its lost session carried with a
+    // connection_lost error and a failed terminal. The coordinator must retire the turn on it.
+    @Test
+    fun sessionLossTerminalAfterTransientDisconnectClearsPresence() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val recorded = mutableListOf<WsTimelineEvent>()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(sendResults = mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+            recordRuntimeEvent = { event, _ -> recorded += event },
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 0, reason = "connection lost", willReconnect = true))
+        assertTrue(ui.isStreaming(), "a transient disconnect alone keeps the turn")
+        val kind = TurnFailureNotices.CONNECTION_LOST_KIND
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(kind, TurnFailureNotices.messageFor(kind), "conv-1", "turn-1", "run-1"),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+        advanceUntilIdle()
+
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        assertEquals(1, recorded.count { it is WsTimelineEvent.TurnDone })
+        assertEquals(TurnFailureNotices.messageFor(kind), ui.currentError())
+    }
+
     @Test
     fun terminalDisconnectWithActiveTurnCleansActiveRunTurnAndObservedAssistantRuns() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()

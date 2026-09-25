@@ -40,6 +40,18 @@ class IrohActiveTurn(request: IrohTurnRequest) {
 
     fun tryClaimTerminal(source: IrohTerminalSource): Boolean =
         terminalClaimed.compareAndSet(expect = null, update = source)
+
+    private val sessionLost = atomic(false)
+
+    /**
+     * letta-mobile-qygvv.16: the session this turn ran on is gone. Its run may still be going on
+     * the server, so once retired the run stays open to the observer instead of being fenced.
+     */
+    val cutOffBySessionLoss: Boolean get() = sessionLost.value
+
+    fun markCutOffBySessionLoss() {
+        sessionLost.value = true
+    }
 }
 
 sealed interface IrohTryStartResult {
@@ -196,7 +208,9 @@ class IrohTurnRegistry {
             interruptedTurns.remove(conversationId.value)
         }
         frameOwnership.remove(conversationId.value)
-        rememberRetiredRun(IrohRunId(turn.runId))
+        // letta-mobile-qygvv.16: a run cut off by session loss may still be running on the
+        // server; after the redial the observer re-attaches to it instead of dropping its frames.
+        if (!turn.cutOffBySessionLoss) rememberRetiredRun(IrohRunId(turn.runId))
         activeTurns.remove(conversationId.value, turn)
         turn.terminalReached.complete(publication.status)
     }

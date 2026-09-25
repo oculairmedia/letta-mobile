@@ -1251,7 +1251,8 @@ class AppServerTurnEngine(
         try {
             collectorReady.complete(Unit)
             val projectionErrors = FrameProjectionErrorBudget()
-            inboundEvents.collect { received ->
+            // letta-mobile-qygvv.16: a lost session never delivers a server terminal; end the turn.
+            SessionLossCutOff(draftProcessor, command, lease).endOnDetach(inboundEvents).collect { received ->
                 processReceivedFrame(received, frameContext, projectionErrors)
             }
         } catch (idle: TurnIdleTimedOutMarker) {
