@@ -52,63 +52,91 @@ internal fun TimelinePageProjectionInput.project(adapter: TimelineSettledProject
  * Groups renderable residents before Paging creates rows. Per-record projection is still retained
  * on every source record for deferred bodies and settlement provenance; only the first record in a
  * render block owns the combined item and the remaining records are dropped from presentation.
+ *
+ * A single-message run is claimed too: its page-built item carries the turn latency the run
+ * disclosure needs, which a per-record projection cannot see (letta-mobile-qygvv.20).
  */
 internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
     prepared: List<TimelineSettledRecord>,
 ): List<TimelineSettledRecord> {
-    val renderable = prepared.mapIndexedNotNull { index, record ->
-        val presentation = record.preparedPresentation as? TimelineSettledPresentation.Render
-            ?: return@mapIndexedNotNull null
-        val message = timelineEventToUiMessage(presentation.event, context.ownAgentId)
-            ?: return@mapIndexedNotNull null
-        IndexedRenderedRecord(index, record, presentation, message)
-    }
+    val renderable = renderableRecords(prepared)
     if (renderable.size < 2) return prepared
-
     val grouped = buildChatRenderModel(
-        messages = renderable.map { it.message },
+        messages = renderable.map { it.message }.withPromptOwnedRunIds(),
         mode = ChatDisplayMode.Interactive,
         activeAgentId = context.scope.agentId,
     ).renderItems
-    if (grouped.size == renderable.size) return prepared
-
     val output = prepared.toMutableList()
-    grouped.forEach { item ->
-        if (item !is ChatRenderItem.RunBlock || item.messages.size < 2) return@forEach
-        if (!envelope.containsComplete(item.runId)) return@forEach
-        val members = item.messages.map { it.first.id }.toSet()
-        val sources = renderable.filter { it.message.id in members }
-        if (sources.size != item.messages.size) return@forEach
-        val sourceIndexes = sources.map { it.index }.sorted()
-        // Skill instruction envelopes are hidden model context, not human turn boundaries.
-        // Returns are folded into their canonical owners before projection; do not infer
-        // ownership for arbitrary hidden rows (including orphan returns).
-        if (sourceIndexes.zipWithNext().any { (left, right) ->
-                (left + 1 until right).any { index ->
-                    records[index].event?.isSyntheticSkillEnvelope() != true
-                }
-            }) return@forEach
-        val owner = sources.minBy { it.index }
-        output[owner.index] = owner.record.copy(
-            preparedPresentation = TimelineSettledPresentation.Render(
-                event = owner.presentation.event,
-                item = item,
-                residentEvents = sources.map { source ->
-                    TimelineResidentEvent(
-                        identity = source.record.key.identity,
-                        revision = source.record.revision,
-                        otid = source.presentation.event.otid,
-                        serverId = source.presentation.event.serverId,
-                    )
-                },
-            ),
-        )
-        sources.drop(1).forEach { source ->
-            output[source.index] = source.record.copy(preparedPresentation = TimelineSettledPresentation.Drop)
-        }
-    }
+    grouped.mapNotNull { it.runClaim() }
+        .filter { envelope.containsComplete(it.runId) }
+        .forEach { claim -> claimRun(output, claim, renderable) }
     return output
 }
+
+private fun TimelinePageProjectionInput.renderableRecords(
+    prepared: List<TimelineSettledRecord>,
+): List<IndexedRenderedRecord> = prepared.mapIndexedNotNull { index, record ->
+    val presentation = record.preparedPresentation as? TimelineSettledPresentation.Render
+        ?: return@mapIndexedNotNull null
+    val message = timelineEventToUiMessage(presentation.event, context.ownAgentId)
+        ?: return@mapIndexedNotNull null
+    IndexedRenderedRecord(index, record, presentation, message)
+}
+
+/** A page-built run and the message ids it owns, in chat order. */
+private data class RunClaim(val item: ChatRenderItem, val runId: String, val memberIds: List<String>)
+
+private fun ChatRenderItem.runClaim(): RunClaim? = when (this) {
+    is ChatRenderItem.RunBlock -> RunClaim(this, runId, messages.map { it.first.id })
+        .takeIf { messages.size >= 2 }
+    // Settled as the one-message block the per-record projection would have built, now carrying the
+    // page-built message (its turn latency) under the run's key.
+    is ChatRenderItem.Single -> stableRunId?.let { runId ->
+        RunClaim(ChatRenderItem.RunBlock(runId, listOf(message to groupPosition), stableKey = key), runId, listOf(message.id))
+    }
+}
+
+private fun TimelinePageProjectionInput.claimRun(
+    output: MutableList<TimelineSettledRecord>,
+    claim: RunClaim,
+    renderable: List<IndexedRenderedRecord>,
+) {
+    val members = claim.memberIds.toSet()
+    val sources = renderable.filter { it.message.id in members }
+    if (sources.size != claim.memberIds.size || spansVisibleGap(sources)) return
+    val owner = sources.minBy { it.index }
+    output[owner.index] = owner.record.copy(
+        preparedPresentation = TimelineSettledPresentation.Render(
+            event = owner.presentation.event,
+            item = claim.item,
+            residentEvents = sources.map { it.residentEvent() },
+        ),
+    )
+    sources.filter { it !== owner }.forEach { source ->
+        output[source.index] = source.record.copy(preparedPresentation = TimelineSettledPresentation.Drop)
+    }
+}
+
+/**
+ * Skill instruction envelopes are hidden model context, not human turn boundaries. Returns are
+ * folded into their canonical owners before projection; do not infer ownership for arbitrary
+ * hidden rows (including orphan returns). A run's own stop_reason and usage frames close a step, not
+ * the turn.
+ */
+private fun TimelinePageProjectionInput.spansVisibleGap(sources: List<IndexedRenderedRecord>): Boolean =
+    sources.map { it.index }.sorted().zipWithNext().any { (left, right) ->
+        (left + 1 until right).any { index -> !records[index].isRunInterior() }
+    }
+
+private fun TimelineProjectionRecord.isRunInterior(): Boolean =
+    event?.isSyntheticSkillEnvelope() == true || isRunMetadata()
+
+private fun IndexedRenderedRecord.residentEvent() = TimelineResidentEvent(
+    identity = record.key.identity,
+    revision = record.revision,
+    otid = presentation.event.otid,
+    serverId = presentation.event.serverId,
+)
 
 private fun TimelineRunEnvelope.containsComplete(runId: String): Boolean =
     older != TimelineRunBoundary.Continues(runId) && newer != TimelineRunBoundary.Continues(runId)

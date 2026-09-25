@@ -45,7 +45,7 @@ class TimelineExactCanonicalWriter(
             } ?: 0, record.identity,
         )
         val bytes = TimelineSnapshotCodec.json.encodeToString(com.letta.mobile.data.model.LettaMessage.serializer(), record.message).encodeToByteArray()
-        transaction.put(TimelineStoredRecord(key, "application/vnd.letta.message+json;version=1", bytes))
+        transaction.put(TimelineStoredRecord(key, TIMELINE_OPAQUE_MESSAGE_CONTENT_TYPE, bytes))
         return true
     }
 

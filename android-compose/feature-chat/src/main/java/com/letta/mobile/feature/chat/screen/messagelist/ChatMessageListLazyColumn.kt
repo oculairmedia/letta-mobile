@@ -178,101 +178,75 @@ internal fun ChatMessageListRenderItem(
 
 @Composable
 private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyParams) {
-    when (val renderItem = params.renderItem) {
-        is ChatRenderItem.Single -> ChatMessageListRenderSingleItem(
-            params = ChatMessageListRenderSingleItemParams(
-                renderItem = renderItem,
-                context = params.context,
-                chatDimens = params.chatDimens,
-                isStreamingRenderItem = params.isStreamingRenderItem,
-                showTimestamp = params.showTimestamp,
-            ),
-        )
-        is ChatRenderItem.RunBlock -> ChatMessageListRenderRunBlockItem(
-            params = ChatMessageListRenderRunBlockItemParams(
-                renderItem = renderItem,
-                context = params.context,
-                chatDimens = params.chatDimens,
-                chatShapes = params.chatShapes,
-                isStreamingRenderItem = params.isStreamingRenderItem,
-                showTimestamp = params.showTimestamp,
-            ),
-        )
-    }
-}
-
-@Composable
-private fun ChatMessageListRenderSingleItem(params: ChatMessageListRenderSingleItemParams) {
-    val renderItem = params.renderItem
-    val context = params.context
-    val msg = renderItem.message
-    val stableKey = renderItem.stableRunKey
-    if (stableKey != null) {
-        val runId = renderItem.stableRunId ?: stableKey.removePrefix("run-")
-        RunBlock(
-            messages = listOf(msg),
-            collapsed = runId in context.itemState.collapsedRunIds,
-            onToggleCollapsed = {
-                context.callbacks.onToggleRunCollapsed(runId)
-            },
-            modifier = Modifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
-            isStreaming = params.isStreamingRenderItem,
-            activeApprovalRequestId = context.itemState.activeApprovalRequestId,
-            onApprovalDecision = context.callbacks.onSubmitApproval,
-            chatMode = context.chatMode,
-            showCompletedDisclosure = params.showTimestamp,
-            onOpenToolRunDetails = context.callbacks.onOpenToolRunDetails,
-        ) { message, position, rowModifier ->
-            RenderChatMessageRow(
-                params = RenderChatMessageRowParams(
-                    message = message,
-                    position = position,
-                    context = context,
-                    isStreamingRenderItem = params.isStreamingRenderItem,
-                    showTimestamp = params.showTimestamp,
-                ),
-                modifier = rowModifier,
-            )
-        }
+    // The live and settled copies of one run can differ in shape - a lone reply holding its run's
+    // key live, a grouped block once settled. Rendering every run from this single call site lets
+    // Compose update the RunBlock across that swap instead of disposing it and composing a new one,
+    // which is what made the run disclosure snap (letta-mobile-qygvv.20).
+    val run = params.runParams()
+    if (run != null) {
+        ChatMessageListRenderRunItem(run)
         return
     }
+    val single = params.renderItem as? ChatRenderItem.Single ?: return
     RenderChatMessageRow(
         params = RenderChatMessageRowParams(
-            message = msg,
-            position = renderItem.groupPosition,
-            context = context,
+            message = single.message,
+            position = single.groupPosition,
+            context = params.context,
             isStreamingRenderItem = params.isStreamingRenderItem,
             showTimestamp = params.showTimestamp,
         ),
     )
 }
 
+private fun ChatMessageListRenderItemBodyParams.runParams(): ChatMessageListRenderRunParams? =
+    when (val item = renderItem) {
+        is ChatRenderItem.RunBlock -> ChatMessageListRenderRunParams(
+            runId = item.runId,
+            messages = item.messages.map { it.first },
+            topPadding = if (item.messages.all { !it.first.toolCalls.isNullOrEmpty() }) {
+                chatDimens.groupedMessageSpacing
+            } else {
+                chatDimens.ungroupedMessageSpacing
+            },
+            highlighted = item.containsMessageId(context.highlightedMessageId.orEmpty()),
+            body = this,
+        )
+        is ChatRenderItem.Single -> item.stableRunKey?.let { key ->
+            ChatMessageListRenderRunParams(
+                runId = item.stableRunId ?: key.removePrefix("run-"),
+                messages = listOf(item.message),
+                topPadding = chatDimens.ungroupedMessageSpacing,
+                highlighted = false,
+                body = this,
+            )
+        }
+    }
+
 @Composable
-private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBlockItemParams) {
-    val renderItem = params.renderItem
-    val context = params.context
-    val isHighlighted = renderItem.containsMessageId(context.highlightedMessageId.orEmpty())
-    val highlightModifier = if (isHighlighted) {
+private fun ChatMessageListRenderRunItem(params: ChatMessageListRenderRunParams) {
+    val body = params.body
+    val context = body.context
+    val highlightModifier = if (params.highlighted) {
         Modifier.background(
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-            RoundedCornerShape(params.chatShapes.bubbleRadius),
+            RoundedCornerShape(body.chatShapes.bubbleRadius),
         )
     } else {
         Modifier
     }
     RunBlock(
-        messages = renderItem.messages.map { it.first },
-        collapsed = renderItem.runId in context.itemState.collapsedRunIds,
+        messages = params.messages,
+        collapsed = params.runId in context.itemState.collapsedRunIds,
         onToggleCollapsed = {
-            context.callbacks.onToggleRunCollapsed(renderItem.runId)
+            context.callbacks.onToggleRunCollapsed(params.runId)
         },
-        modifier = highlightModifier.padding(top = if (renderItem.messages.all { !it.first.toolCalls.isNullOrEmpty() })
-            params.chatDimens.groupedMessageSpacing else params.chatDimens.ungroupedMessageSpacing),
-        isStreaming = params.isStreamingRenderItem,
+        modifier = highlightModifier.padding(top = params.topPadding),
+        isStreaming = body.isStreamingRenderItem,
         activeApprovalRequestId = context.itemState.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,
         chatMode = context.chatMode,
-        showCompletedDisclosure = params.showTimestamp,
+        showCompletedDisclosure = body.showTimestamp,
         onOpenToolRunDetails = context.callbacks.onOpenToolRunDetails,
     ) { message, position, rowModifier ->
         RenderChatMessageRow(
@@ -280,8 +254,8 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
                 message = message,
                 position = position,
                 context = context,
-                isStreamingRenderItem = params.isStreamingRenderItem,
-                showTimestamp = params.showTimestamp && message.id == renderItem.messages.last().first.id,
+                isStreamingRenderItem = body.isStreamingRenderItem,
+                showTimestamp = body.showTimestamp && message.id == params.messages.last().id,
             ),
             modifier = rowModifier,
         )
