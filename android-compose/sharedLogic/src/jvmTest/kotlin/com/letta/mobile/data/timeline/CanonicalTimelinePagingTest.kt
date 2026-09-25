@@ -1,31 +1,23 @@
 package com.letta.mobile.data.timeline
 
 import androidx.paging.LoadState
-import androidx.paging.PagingDataEvent
-import androidx.paging.PagingDataPresenter
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 /**
  * Drives a real [androidx.paging.Pager] end to end: empty ledger, mediator fetches history, the
@@ -288,8 +280,7 @@ class CanonicalTimelinePagingTest {
                 before,
             )
             presentation.onResidentRows(settledRows)
-            awaitCondition({ "live overlay did not drain" }) { owner.session.live.value == null }
-            assertEquals(emptyList(), presentation.live.value)
+            awaitLiveDrained(owner, presentation)
             val after = presenter.snapshot().items.map { it.item.key to renderSignature(it.item) }
             assertEquals(
                 listOf(
@@ -336,6 +327,7 @@ class CanonicalTimelinePagingTest {
         )
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(streamedMsg)))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        val liveKey = awaitLiveKey(presentation)
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
         val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
         val emittedGenerations = AtomicInteger(0)
@@ -350,7 +342,8 @@ class CanonicalTimelinePagingTest {
             presenter.awaitIdle()
             val initialRow = presenter.snapshot().items.single()
             assertEquals(TimelineMessageId(canonicalId), initialRow.identity)
-            assertEquals("segment-$streamedId", initialRow.item.key)
+            // The settled row takes over the live row's slot (letta-mobile-sibr8).
+            assertEquals(liveKey, initialRow.item.key)
 
             // Acknowledge settlement: this clears owner.session.live
             presentation.onResidentRows(listOf(initialRow))
@@ -367,7 +360,7 @@ class CanonicalTimelinePagingTest {
             // Post-settlement paging generation must retain the streamed key rather than reverting to canonical identity
             val postSettlementRow = presenter.snapshot().items.single()
             assertEquals(TimelineMessageId(canonicalId), postSettlementRow.identity)
-            assertEquals("segment-$streamedId", postSettlementRow.item.key)
+            assertEquals(liveKey, postSettlementRow.item.key)
             presentation.close()
         } finally {
             ui.cancel()
@@ -407,6 +400,7 @@ class CanonicalTimelinePagingTest {
         // The overlay holds the reply under the stream's (and ledger's) id, short of its tail.
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(reply.copy(contentRaw = JsonPrimitive("Hello")))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        val liveKey = awaitLiveKey(presentation)
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
         assertEquals(emptyMap(), owner.session.live.value?.aliases, "an exact id match needs no alias")
         val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
@@ -416,7 +410,8 @@ class CanonicalTimelinePagingTest {
             presenter.awaitIdle()
             val keys = presenter.snapshot().items.map { it.identity.value to it.item.key }
             assertEquals(
-                listOf("ui-msg-9173264" to "segment-ui-msg-9173264", "ui-msg-9173262" to "segment-ui-msg-9173262"),
+                // The true row takes the live reply's slot; the earlier turn's row keeps its own.
+                listOf("ui-msg-9173264" to liveKey, "ui-msg-9173262" to "segment-ui-msg-9173262"),
                 keys,
             )
             presentation.close()
@@ -425,38 +420,8 @@ class CanonicalTimelinePagingTest {
         }
     }
 
-    private class RecordingPresenter<T : Any> : PagingDataPresenter<T>(Dispatchers.Default, null) {
-        override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) = Unit
-
-        suspend fun awaitIdle() {
-            val idle = withTimeoutOrNull(5_000) {
-                loadStateFlow.first { states ->
-                    states != null && states.refresh is LoadState.NotLoading &&
-                        states.prepend is LoadState.NotLoading && states.append is LoadState.NotLoading
-                }
-            }
-            if (idle == null) fail("Paging did not settle: ${loadStateFlow.value}")
-        }
-
-        /**
-         * Waits for the row count, and names what the pipeline had done when it did not arrive.
-         * Polls the condition rather than waiting on [onPagesUpdatedFlow]: that flow has no replay,
-         * so a page update that landed before this call subscribed would never be observed and the
-         * wait would time out with the rows already present (CI, 2026-09-24).
-         */
-        suspend fun awaitRows(expected: Int, detail: () -> String) {
-            val settled = withTimeoutOrNull(10_000) {
-                while (size != expected) delay(10)
-                true
-            }
-            if (settled == null) {
-                fail("presenter never reached $expected rows: size=$size loadState=${loadStateFlow.value} ${detail()}")
-            }
-        }
-    }
-
     /** One page of assistant replies, newest first, with no older history behind it. */
-    private class PageTransport(private val records: Int) : TimelineTransport {
+    private class PageTransport(private val records: Int) : TimelineTransport by unexpectedTimelineTransport() {
         // The newest and older walks fetch independently; a plain ++ can lose a concurrent call.
         private val callCount = AtomicInteger()
         val calls: Int get() = callCount.get()
@@ -477,31 +442,34 @@ class CanonicalTimelinePagingTest {
             }
             return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, page, null, false, 0)
         }
-        override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = error("No send")
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = error("No stream")
-        override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> = error("No legacy hydration")
-        override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = error("No legacy hydration")
     }
 
 
     companion object {
         private val scope = TimelineScope("backend", "conversation", "agent")
 
+        /**
+         * The fence releases, then the presentation re-projects its live list on its own dispatcher;
+         * reading that list in the same instant as the release raced the hop (CI, #1673).
+         */
+        private suspend fun awaitLiveDrained(
+            owner: CanonicalTimelineCoordinator.Owner,
+            presentation: CanonicalTimelinePresentation,
+        ) = awaitCondition({ "live still ${presentation.live.value}" }) {
+            owner.session.live.value == null && presentation.live.value.isEmpty()
+        }
+
+        /** The key the single live row renders under before the turn settles. */
+        private suspend fun awaitLiveKey(presentation: CanonicalTimelinePresentation): String {
+            awaitCondition({ "live row never projected" }) { presentation.live.value.size == 1 }
+            return presentation.live.value.single().key
+        }
+
         private fun renderSignature(item: com.letta.mobile.data.chat.projection.ChatRenderItem): String = when (item) {
             is com.letta.mobile.data.chat.projection.ChatRenderItem.Single ->
                 "${if (item.message.isReasoning) "reasoning" else item.message.role}:${item.message.content}"
             is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock ->
                 "run:${item.runId}:${item.messages.joinToString("|") { it.first.content }}"
-        }
-
-
-        /** Real-time wait for async pipeline work that has no flow to observe. */
-        private suspend fun awaitCondition(detail: () -> String, condition: () -> Boolean) {
-            val met = withTimeoutOrNull(10_000) {
-                while (!condition()) delay(10)
-                true
-            }
-            if (met == null) fail("condition never held: ${detail()}")
         }
     }
 }

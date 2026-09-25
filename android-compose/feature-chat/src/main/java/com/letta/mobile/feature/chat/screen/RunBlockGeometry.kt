@@ -12,9 +12,10 @@ import androidx.compose.ui.unit.Dp
  * bottom of the newest row, directly above the composer. Measuring the pull-up out of the reported
  * height keeps the same drawn position and gives that space back.
  */
-internal fun Modifier.pullUp(distance: Dp): Modifier = layout { measurable, constraints ->
+internal fun Modifier.pullUp(distance: () -> Dp): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    val shift = distance.roundToPx().coerceAtMost(placeable.height)
+    // Read during layout so an animated distance re-lays out without recomposing.
+    val shift = distance().roundToPx().coerceIn(0, placeable.height)
     layout(placeable.width, placeable.height - shift) {
         placeable.place(0, -shift)
     }

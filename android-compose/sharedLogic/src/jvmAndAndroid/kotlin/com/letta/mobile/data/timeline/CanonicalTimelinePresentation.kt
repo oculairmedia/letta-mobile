@@ -44,6 +44,7 @@ class CanonicalTimelinePresentation private constructor(
     private val residentOtids = MutableStateFlow<Set<String>>(emptySet())
     private val residentServerIds = MutableStateFlow<Set<String>>(emptySet())
     private val streamedKeyAliases = ConcurrentHashMap<TimelineMessageId, String>()
+    private val adoptions = SettledLiveAdoptions()
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
     init {
@@ -233,6 +234,23 @@ class CanonicalTimelinePresentation private constructor(
         else -> this
     }
 
+    /**
+     * A settled row takes over the live row it replaces - key, run id, turn latency - so the final
+     * live render and the settled render of one turn are identical. Rows that replace no live row
+     * keep a run's own key or a segment key.
+     */
+    private fun ChatRenderItem.withSettledKey(
+        identity: TimelineMessageId,
+        residents: List<TimelineResidentEvent>,
+    ): ChatRenderItem {
+        val adopted = adoptions.adopted(this, residents, ::liveSnapshot)
+        if (adopted != null) return adopted
+        return if (isRunItem) this else withKeyOverride(replacementKey(identity))
+    }
+
+    private fun liveSnapshot(): Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>> =
+        mutableLive.value to owner.session.live.value?.aliases.orEmpty()
+
     /** Preserve the LazyColumn slot while an aliased streamed row becomes its canonical ledger row. */
     private fun replacementKey(identity: TimelineMessageId): String {
         streamedKeyAliases[identity]?.let { return it }
@@ -248,16 +266,19 @@ class CanonicalTimelinePresentation private constructor(
     }
 
     private fun project(record: TimelineSettledRecord, presentation: TimelineSettledPresentation): Row = when (presentation) {
-        is TimelineSettledPresentation.Render -> Row(
-            record.key.identity,
-            record.revision,
-            presentation.item.settledToolCalls().withKeyOverride(replacementKey(record.key.identity)),
-            otid = presentation.event.otid,
-            serverId = presentation.event.serverId,
-            residentEvents = presentation.residentEvents.ifEmpty {
+        is TimelineSettledPresentation.Render -> {
+            val residents = presentation.residentEvents.ifEmpty {
                 listOf(TimelineResidentEvent(record.key.identity, record.revision, presentation.event.otid, presentation.event.serverId))
-            },
-        )
+            }
+            Row(
+                record.key.identity,
+                record.revision,
+                presentation.item.settledToolCalls().withSettledKey(record.key.identity, residents),
+                otid = presentation.event.otid,
+                serverId = presentation.event.serverId,
+                residentEvents = residents,
+            )
+        }
         is TimelineSettledPresentation.Defer -> Row(
             record.key.identity,
             record.revision,

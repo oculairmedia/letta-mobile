@@ -134,7 +134,7 @@ private fun backfillUnambiguousAssistantRun(
     }
 }
 
-private fun syntheticHydratedToolRunId(segment: List<UiMessage>): String? {
+internal fun syntheticHydratedToolRunId(segment: List<UiMessage>): String? {
     val assistantMessages = segment.filter { it.role == "assistant" }
     if (assistantMessages.size < 2 || assistantMessages.none { !it.toolCalls.isNullOrEmpty() }) return null
     if (assistantMessages.any { !it.runId.isNullOrBlank() }) return null
