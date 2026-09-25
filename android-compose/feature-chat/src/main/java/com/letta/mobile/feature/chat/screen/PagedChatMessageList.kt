@@ -39,6 +39,7 @@ import androidx.paging.LoadStates
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import com.letta.mobile.ui.mascot.MascotLoading
@@ -50,10 +51,12 @@ internal fun followNewestEdge(wasScrolling: Boolean, atNewestEdge: Boolean, prep
 internal fun shouldRepositionAfterPagerRefresh(refresh: LoadState): Boolean =
     refresh is LoadState.Loading
 
-internal fun displayedLiveRows(live: List<ChatRenderItem>, residentSettled: List<ChatRenderItem>): List<ChatRenderItem> {
-    val settledKeys = residentSettled.mapTo(mutableSetOf()) { it.key }
-    return live.filterNot { it.key in settledKeys }
-}
+/**
+ * Composition-time view for targeting and opening state. The lazy list itself re-derives this at
+ * measure from the snapshot it keys by ([TimelineRowAssembly]), since a page can land in between.
+ */
+internal fun displayedLiveRows(live: List<ChatRenderItem>, residentSettled: List<ChatRenderItem>): List<ChatRenderItem> =
+    TimelineRowAssembly.displayedLive(live, residentSettled.map { it.key })
 
 /** Additive S1 diagnostics: composition commits and layout passes, not GPU-presented frames. */
 internal sealed interface TimelineOpeningObservation {
