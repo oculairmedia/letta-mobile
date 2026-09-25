@@ -31,6 +31,7 @@ import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
+import com.letta.mobile.data.chat.projection.TimelineRowKeyGuard
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.screen.PagedTimelineEffects.timelinePinchZoom
@@ -153,13 +154,21 @@ internal object PagedTimelineLazyLayout {
 
     private fun LazyListScope.timelineRowItems(params: PagedTimelineLazyListParams) {
         val settledKey = params.pages.itemKey { it.key }
+        val liveCount = params.displayedLive.size
+        // A repeated key would throw inside LazyColumn measurement; the guard turns it into one
+        // empty row instead. itemSnapshotList is what itemKey reads, so both agree on every index.
+        val duplicates = TimelineRowKeyGuard.duplicateRows(
+            params.displayedLive.map { it.key } + params.pages.itemSnapshotList.map { it?.key },
+        ) { index -> if (index < liveCount) "live" else "settled" }
         items(
-            count = params.displayedLive.size + params.pages.itemCount,
+            count = liveCount + params.pages.itemCount,
             key = { index ->
-                params.displayedLive.getOrNull(index)?.key
-                    ?: settledKey(index - params.displayedLive.size)
+                duplicates[index]
+                    ?: params.displayedLive.getOrNull(index)?.key
+                    ?: settledKey(index - liveCount)
             },
         ) { index ->
+            if (index in duplicates) return@items
             TimelineRowItem(index, params)
         }
     }

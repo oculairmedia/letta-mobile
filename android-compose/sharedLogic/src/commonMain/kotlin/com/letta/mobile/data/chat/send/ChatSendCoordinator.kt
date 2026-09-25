@@ -14,6 +14,7 @@ import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.api.TimelineIngestSources
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -1040,6 +1041,17 @@ class ChatSendCoordinator(
         }
     }
 
+    /** A delta naming a turn this conversation has already finished is that turn's tail. */
+    private fun isRetiredTurnTail(event: WsTimelineEvent.MessageDelta, conversationId: String): Boolean {
+        val state = peekState(conversationId) ?: return false
+        val turnId = event.turnId?.takeIf { it.isNotBlank() }
+        if (turnId != null) return isRetiredTurn(state, turnId)
+        // A frame without a turn id still names its run; a settled run that is not the live one
+        // is a finished turn's tail too.
+        val runId = event.message.runId?.takeIf { it.isNotBlank() } ?: return false
+        return runId != state.runId && runId in state.settledRunIds
+    }
+
     /**
      * Prefer the state the otid bound, then the state that owns this turn, then whatever the
      * frame's conversation resolves to. The frame's own id is the last thing to trust: it is the
@@ -1121,7 +1133,23 @@ class ChatSendCoordinator(
             frameConversationId = event.conversationId,
             isReplay = event.isReplay,
         )
-        timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
+        val retiredTail = isRetiredTurnTail(event, conversationId)
+        timelineRepository.ingestExternalTransportMessage(
+            agentId, conversationId, event.message,
+            source = TimelineIngestSources.coordinator(retiredTail),
+        )
+        if (retiredTail) {
+            // A reply's last deltas can reach us after its terminal (Iroh emits them behind
+            // turn_finished). The timeline folds them into the finished turn, but the turn is over:
+            // latching typing here re-lit Thinking/Stop run with no terminal left to clear them.
+            Telemetry.event(
+                "AdminChatVM", "ws.event.retiredTurnTailDelta",
+                "turnId" to event.turnId,
+                "messageType" to event.message.messageType,
+                "conversationId" to conversationId,
+            )
+            return
+        }
         if (!event.isReplay) {
             postSendReconciler.recordLiveIngest(conversationId)
             // Finding 1: a background conversation's delta must not latch

@@ -97,6 +97,9 @@ class IrohChannelTransport(
     // expire young-in-flight protection without waiting the production 45s window.
     private val livenessCongestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
     livenessMaxDetectionMs: Long = IrohLivenessProbe.MAX_DETECTION_MS,
+    // How long an engine-owned turn's own terminal has before the observer's copy stands in.
+    // Overridable so real-time tests of the fallback need not wait the production window.
+    private val observerTerminalGraceMs: Long = IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
@@ -359,6 +362,7 @@ class IrohChannelTransport(
             emitBoth = ::emitBoth,
             adminRpc = { method, path, body -> adminRpc(method, path, body) },
             recordFrameOwnership = ::recordFrameOwnership,
+            observerTerminalGraceMs = observerTerminalGraceMs,
         )
     }
 

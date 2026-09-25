@@ -102,8 +102,9 @@ class CanonicalTimelinePresentation private constructor(
         }
     }.cachedIn(scope)
 
-    // Bounded by pending storage: pruned to the records still awaiting their durable echo.
-    private val echoedOtids = mutableSetOf<String>()
+    // Bounded by pending storage: pruned to the records still awaiting their durable echo. Each
+    // otid remembers the turn whose overlay echoed it.
+    private val echoedOtids = mutableMapOf<String, TimelineLiveFence>()
 
     private val mutableLive = MutableStateFlow<List<ChatRenderItem>>(emptyList())
 
@@ -129,8 +130,16 @@ class CanonicalTimelinePresentation private constructor(
         // Only the sync path's durable echo clears pending storage, and the publication is dropped
         // the moment settlement is acknowledged. Remember the otids this turn echoed so the local
         // bubble cannot reappear in the gap between the overlay draining and that write landing.
-        publication?.block?.events?.forEach { if (it.otid.isNotBlank()) echoedOtids += it.otid }
-        echoedOtids.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
+        //
+        // An otid is remembered only while the turn that echoed it is still the resident one. Once
+        // a different turn's overlay replaces it with the echo still not durable (its repair never
+        // committed), the overlay's copy of the prompt is gone; hiding the local bubble as well
+        // made the user's prompt vanish from the timeline.
+        publication?.let { current ->
+            echoedOtids.values.removeAll { it !== current.fence }
+            current.block.events.forEach { if (it.otid.isNotBlank()) echoedOtids[it.otid] = current.fence }
+        }
+        echoedOtids.keys.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
         val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in settledOtids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
         val activeMessages = events.mapNotNull { event ->
