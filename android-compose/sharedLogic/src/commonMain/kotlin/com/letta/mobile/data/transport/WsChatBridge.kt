@@ -3,6 +3,8 @@ package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
@@ -101,6 +103,12 @@ class WsChatBridge(
             },
     )
 
+    /**
+     * letta-mobile-ztuog: agent-keyed views of [events]. Chat coordinators subscribe here, never
+     * to [events] directly, so a frame reaches only the coordinator of the agent it belongs to.
+     */
+    val agentScopes: AgentEventScopes = AgentEventScopes(events)
+
     /** A2UI frame stream, kept separate from text/tool timeline events. */
     val a2uiEvents: Flow<A2uiFrameEvent> = transport.events.mapNotNull { frame ->
         (frame as? ServerFrame.A2ui)?.toA2uiEvent()
@@ -137,6 +145,7 @@ class WsChatBridge(
         } else {
             buildContentParts(text, attachments).toJsonArray()
         }
+        agentScopes.learnSend(AgentId(agentId), ConversationId(conversationId))
         return transport.send(
             agentId = agentId,
             conversationId = conversationId,

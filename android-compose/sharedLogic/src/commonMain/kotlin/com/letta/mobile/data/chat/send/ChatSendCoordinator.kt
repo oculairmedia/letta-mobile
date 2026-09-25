@@ -125,10 +125,16 @@ class ChatSendCoordinator(
     )
     private val runtimeEventBatcher = RuntimeEventBatcher(scope, recordRuntimeEvents)
 
+    /** letta-mobile-ztuog: this chat's agent-keyed subscription; hosts select it when it is on screen. */
+    val eventSubscription = ChatSendEventSubscription(
+        scope = scope,
+        attachment = wsChatBridge.agentScopes.attachment(AgentId(agentId)) {
+            snapshotStates().any { it.isTracking && !it.reachedTerminal } || queuedSends.state.value.values.any { !it.isEmpty }
+        },
+        handle = { event -> handleEvent(event) },
+    )
+
     init {
-        scope.launch {
-            wsChatBridge.events.collect { event -> handleEvent(event) }
-        }
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
                 contained("RedialWhileTurnActive") { handleRedialWhileTurnActive(event) }
@@ -597,6 +603,9 @@ class ChatSendCoordinator(
         // synchronous call site so a later switch cannot rebind it. agentId is
         // already a construction-time constant and needs no capture.
         val targetConversationId = activeConversationId()
+        // letta-mobile-ztuog: only the chat on screen sends, so a send claims the selection
+        // (and so attaches) before its turn's first frame can arrive.
+        eventSubscription.claimForSend()
         return scope.launch {
             sendInternal(text, attachments, targetConversationId)
         }
@@ -809,34 +818,8 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleEventLocked(event: WsTimelineEvent) {
-        // letta-mobile-sfex6: strict agent scoping. wsChatBridge.events is a
-        // GLOBAL flow — every per-(agentId,conversationId) coordinator collects
-        // it, so a frame for one agent reaches every coordinator. When two
-        // agents share the bare conversation id "default" (main + a subagent),
-        // a foreign agent's TurnStarted would otherwise open a turn entry in THIS
-        // coordinator and its deltas would ingest into our timeline — the
-        // cross-conversation leak. Drop any event that carries an explicit
-        // agentId not matching ours BEFORE it can mutate any turn entry.
-        // (MessageDelta/StopReason/etc. carry no agentId; they are scoped
-        // transitively because a conversation entry only ever gains a turn id
-        // from a TurnStarted that passed this gate.)
-        val eventAgentId: String? = when (event) {
-            is WsTimelineEvent.TurnStarted -> event.agentId
-            is WsTimelineEvent.AgentUpdated -> event.agentId
-            // Message frames name their run's agent too; a foreign agent's delta must not
-            // reach turn resolution at all (cross-agent timeline bleed, 2026-09-14).
-            is WsTimelineEvent.MessageDelta -> event.agentId
-            else -> null
-        }
-        if (eventAgentId != null && eventAgentId != agentId) {
-            Telemetry.event(
-                "AdminChatVM", "ws.event.foreignAgentDropped",
-                "eventType" to (event::class.simpleName ?: ""),
-                "eventAgentId" to eventAgentId,
-                "boundAgentId" to agentId,
-            )
-            return
-        }
+        // letta-mobile-sfex6: strict agent scoping, kept as a defensive gate (see isForeignTo).
+        if (event.isForeignTo(agentId)) return
         Telemetry.event(
             "IrohTrace", "coordinator.event",
             "type" to (event::class.simpleName ?: ""),
