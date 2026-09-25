@@ -195,6 +195,8 @@ class SessionGraphAssembler @Inject constructor(
                 localConversationSource = localConversationSource,
                 settingsRepository = request.settingsRepository,
                 irohConversationListSource = irohConversationListSource,
+                // letta-mobile-lks7m: conversations started on another device arrive as pushes.
+                transport = request.channelTransport,
             ),
             conversation = ConversationRepository(
                 conversationApi = conversationApi,

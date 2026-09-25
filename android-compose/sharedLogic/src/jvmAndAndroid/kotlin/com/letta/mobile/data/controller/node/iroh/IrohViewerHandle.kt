@@ -55,9 +55,12 @@ internal class IrohViewerHandle(
     private val frameParts: () -> Boolean,
     private val maxFrameBytes: Int,
     private val agentEventsGate: () -> Boolean = { false },
+    private val conversationEventsGate: () -> Boolean = { false },
 ) : ViewerHandle {
 
     override fun receivesAgentEvents(): Boolean = agentEventsGate()
+
+    override fun receivesConversationEvents(): Boolean = conversationEventsGate()
 
     /**
      * Re-wrap an already-cumulated + cm-stream-tagged assistant/tool/terminal

@@ -361,6 +361,34 @@ class NativeAdminHandlersTest {
     }
 
     @Test
+    fun conversationWritesNotifyConnectedClientsAndFailedWritesDoNot() = runTest {
+        val frames = mutableListOf<String>()
+        val notifier = ConversationChangeNotifier(backgroundScope, windowMs = 10).also { it.attach { frame -> frames += frame } }
+        val client = FakeNativeClient()
+        val r = AdminRpcRouter().also {
+            ConversationAdminHandlers.register(it, NativeReadTiers(nativeClient = client, conversationChanges = notifier))
+        }
+
+        resultOf(dispatchJson(r, "conversation.create", buildJsonObject { put("agent_id", "agent-1") }))
+        resultOf(dispatchJson(r, "conversation.update", buildJsonObject { put("conversation_id", "conv-1"); put("summary", "S") }))
+        resultOf(dispatchJson(r, "conversation.archive", buildJsonObject { put("conversation_id", "conv-2") }))
+        resultOf(dispatchJson(r, "conversation.restore", buildJsonObject { put("conversation_id", "conv-3") }))
+        client.failNative = true
+        dispatchJson(r, "conversation.update", buildJsonObject { put("conversation_id", "conv-4"); put("summary", "S") })
+        testScheduler.advanceTimeBy(20)
+        testScheduler.runCurrent()
+
+        val reasons = frames.map { Json.parseToJsonElement(it).jsonObject }
+            .associate { it.getValue("conversation_id").jsonPrimitive.content to it.getValue("reason").jsonPrimitive.content }
+        assertEquals(
+            mapOf("conv-new" to "created", "conv-1" to "updated", "conv-2" to "archived", "conv-3" to "restored"),
+            reasons,
+        )
+        val created = frames.map { Json.parseToJsonElement(it).jsonObject }.single { it.getValue("reason").jsonPrimitive.content == "created" }
+        assertEquals("agent-1", created.getValue("agent_id").jsonPrimitive.content, "the owner comes from the request when the response omits it")
+    }
+
+    @Test
     fun anUnsuccessfulUpdateResponseTellsNoClientToRefetch() = runTest {
         val frames = mutableListOf<String>()
         val notifier = AgentChangeNotifier(backgroundScope, windowMs = 10).also { it.attach { frame -> frames += frame } }

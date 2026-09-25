@@ -4,6 +4,8 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ChatConnectionState
+import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
@@ -19,7 +21,9 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.observeConversationUpdates
 import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.withCatalogModelRouting
@@ -35,6 +39,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -74,6 +79,12 @@ class DesktopChatController(
     ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
         RealDesktopTimelineLoop.create(gateway, conversation, loopScope, timelinePersistence)
     },
+    /**
+     * letta-mobile-lks7m: the transport carrying Meridian's `conversation_updated` pushes. When set,
+     * a conversation another client creates or changes lands in the list without a restart. Null
+     * (HTTP / demo backends) keeps the list to startup, reconnect and this window's own writes.
+     */
+    private val conversationChanges: IChannelTransport? = null,
 ) {
     private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)
     private val _state = MutableStateFlow(initialState)
@@ -434,6 +445,10 @@ class DesktopChatController(
     private var selectJob: Job? = null
     private var sendJob: Job? = null
     private var createConversationJob: Job? = null
+    private var conversationPushJob: Job? = null
+
+    // Conflated: pushes landing while a refresh runs collapse into one follow-up refresh.
+    private val rosterRefreshRequests = Channel<Unit>(Channel.CONFLATED)
     private var started = false
     private var closed = false
 
@@ -447,6 +462,7 @@ class DesktopChatController(
         if (started || closed) return
         started = true
         loadJob = scope.launch { connectAndLoad() }
+        conversationChanges?.let(::observeConversationPushes)
     }
 
     fun retryConnection() {
@@ -474,6 +490,7 @@ class DesktopChatController(
         if (closed) return
         closed = true
         presenceJob.cancel()
+        conversationPushJob?.cancel()
         runPhases.close()
         connectionWatcher.stop()
         loadJob?.cancel()
@@ -1067,6 +1084,19 @@ class DesktopChatController(
 
     private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
         val nextGateway = gateway ?: return
+        val summaries = loadConversationSummaries(nextGateway)
+        if (closed) return
+        val loadedRuntime = ChatSessionReducer.conversationsLoaded(
+            state = _state.value.runtimeState,
+            conversations = summaries,
+        )
+        _state.update { it.withRuntimeState(loadedRuntime) }
+        val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
+            ?: summaries.firstOrNull()?.id
+        selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+    }
+
+    private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         // An empty map here silently degrades every conversation label to its
@@ -1080,18 +1110,57 @@ class DesktopChatController(
                 )
             }
             .getOrDefault(emptyMap())
-        val summaries = conversations.toChatConversationSummaries(agentNamesById)
+        return conversations.toChatConversationSummaries(agentNamesById)
             .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
+    }
+
+    /**
+     * letta-mobile-lks7m: every `conversation_updated` push asks for a roster re-read; one worker
+     * serves them in order, so a burst of pushes costs at most one read in flight plus one queued.
+     */
+    private fun observeConversationPushes(transport: IChannelTransport) {
+        conversationPushJob = scope.launch {
+            launch {
+                for (request in rosterRefreshRequests) {
+                    try {
+                        refreshConversationRoster()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (t: Throwable) {
+                        // The next push or reconnect re-reads the roster; a failed refresh only waits for it.
+                        Telemetry.error(TELEMETRY_TAG, "roster.refreshFailed", t)
+                    }
+                }
+            }
+            observeConversationUpdates(transport) { frame ->
+                Telemetry.event(TELEMETRY_TAG, "roster.pushReceived", "reason" to frame.reason)
+                rosterRefreshRequests.trySend(Unit)
+            }
+        }
+    }
+
+    /**
+     * Re-reads the roster WITHOUT reloading the session: the list is merged through
+     * [ChatSessionReducer.conversationRosterRefreshed], so the selection, its timeline loop and the
+     * composer draft are untouched. Only an empty session (nothing selected yet) takes the full load
+     * path, because then there is no selection to preserve and the first conversation should open.
+     */
+    private suspend fun refreshConversationRoster() {
         if (closed) return
-        val loadedRuntime = ChatSessionReducer.conversationsLoaded(
-            state = _state.value.runtimeState,
-            conversations = summaries,
-        )
-        _state.update { it.withRuntimeState(loadedRuntime) }
-        val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
-            ?: summaries.firstOrNull()?.id
-        selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+        val nextGateway = gateway ?: return
+        val runtime = _state.value.runtimeState
+        if (!runtime.isRemoteBacked || runtime.connectionState !in ROSTER_REFRESHABLE_STATES) return
+        if (runtime.selectedConversationId == null) {
+            reloadConversationsAndSelect(preferConversationId = null)
+            return
+        }
+        val deleting = _deletingConversationIds.value
+        val summaries = loadConversationSummaries(nextGateway).filterNot { it.id in deleting }
+        if (closed || gateway !== nextGateway) return
+        _state.update { current ->
+            current.withRuntimeState(ChatSessionReducer.conversationRosterRefreshed(current.runtimeState, summaries))
+        }
     }
 
     /**
@@ -1287,6 +1356,14 @@ class DesktopChatController(
 private const val NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS = 5_000L
 
 private const val TELEMETRY_TAG = "DesktopChat"
+
+/** Connection states in which the session is settled enough to merge a re-read roster into. */
+private val ROSTER_REFRESHABLE_STATES = setOf(
+    ChatConnectionState.Live,
+    ChatConnectionState.NoConversations,
+    ChatConnectionState.Sending,
+    ChatConnectionState.SendFailed,
+)
 
 /** letta-mobile-lgns8.19: shown when a send is attempted while a stop is pending. */
 internal const val STOPPING_SEND_BLOCKED_MESSAGE =

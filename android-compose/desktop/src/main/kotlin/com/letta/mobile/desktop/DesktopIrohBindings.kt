@@ -274,6 +274,8 @@ private fun buildDesktopChatController(
         persistArchivedConversationIds = { ids ->
             persistArchivedConversationIds(bindings.secureSettingsStore, ids)
         },
+        // Conversations created or changed on another device arrive as Meridian pushes.
+        conversationChanges = bindings.irohTransport,
     )
 }
 

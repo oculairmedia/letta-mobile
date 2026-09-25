@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.paging.ConversationPagingSource
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
+import com.letta.mobile.data.transport.api.IChannelTransport
 import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ open class AllConversationsRepository(
     localConversationSource: LocalRuntimeConversationSource? = null,
     settingsRepository: ISettingsRepository? = null,
     irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+    transport: IChannelTransport? = null,
 ) : CachedAllConversationsRepository(
     remote = conversationApi,
     localCache = conversationDao?.let { dao -> { RoomAllConversationsLocalCache(dao.get()) } },
@@ -42,6 +44,7 @@ open class AllConversationsRepository(
     localConversationSource = localConversationSource,
     settingsRepository = settingsRepository,
     irohConversationListSource = irohConversationListSource,
+    transport = transport,
 ) {
     /** Hilt-friendly constructor — uses [defaultAllConversationsScope]. */
     @Inject

@@ -6,6 +6,8 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
+import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
@@ -15,6 +17,7 @@ import com.letta.mobile.testutil.armedConversationApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -51,6 +54,59 @@ class AllConversationsRepositoryTest {
         assertEquals(1, fakeApi.calls.count { it == "listConversations" })
         assertEquals(listOf("1"), repository.conversations.value.map { it.id.value })
     }
+
+    // letta-mobile-lks7m: a conversation another device creates arrives as a Meridian push.
+    @Test
+    fun `conversation_updated push refreshes a loaded list`() = runTest {
+        val transport = FakeChannelTransport()
+        val pushed = AllConversationsRepository(fakeApi, repositoryScope = backgroundScope, transport = transport)
+        fakeApi.conversations.add(TestData.conversation(id = "1"))
+        pushed.refresh()
+        runCurrent()
+
+        fakeApi.conversations.add(TestData.conversation(id = "from-phone"))
+        transport.events.emit(conversationPush("from-phone"))
+        runCurrent()
+
+        assertTrue(pushed.conversations.value.any { it.id.value == "from-phone" })
+    }
+
+    @Test
+    fun `conversation_updated push before the list ever loaded fetches nothing`() = runTest {
+        val transport = FakeChannelTransport()
+        AllConversationsRepository(fakeApi, repositoryScope = backgroundScope, transport = transport)
+        runCurrent()
+
+        transport.events.emit(conversationPush("from-phone"))
+        runCurrent()
+
+        assertEquals(0, fakeApi.calls.count { it == "listConversations" })
+    }
+
+    @Test
+    fun `reconnect re-reads a loaded list since pushes sent while offline are lost`() = runTest {
+        val transport = FakeChannelTransport()
+        val pushed = AllConversationsRepository(fakeApi, repositoryScope = backgroundScope, transport = transport)
+        runCurrent()
+        pushed.refresh()
+        val callsAfterLoad = fakeApi.calls.count { it == "listConversations" }
+
+        transport.state.value = ChannelTransportState.Disconnected(code = 1006, reason = "blip")
+        runCurrent()
+        fakeApi.conversations.add(TestData.conversation(id = "while-offline"))
+        transport.state.value = ChannelTransportState.Connected(serverId = "srv", sessionId = "sess2", deviceId = "dev")
+        runCurrent()
+
+        assertEquals(callsAfterLoad + 1, fakeApi.calls.count { it == "listConversations" })
+        assertTrue(pushed.conversations.value.any { it.id.value == "while-offline" })
+    }
+
+    private fun conversationPush(conversationId: String) = ServerFrame.ConversationUpdated(
+        id = "conversation-updated-$conversationId",
+        ts = "2026-09-25T21:00:00Z",
+        conversationId = conversationId,
+        reason = "created",
+    )
 
     // letta-mobile-ajtu2: local-runtime mode routes refreshes to the
     // on-device letta.js store instead of the remote API, inside the

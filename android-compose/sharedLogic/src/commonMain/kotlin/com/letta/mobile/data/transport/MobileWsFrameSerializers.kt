@@ -54,6 +54,7 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "crons_updated" -> ServerFrame.CronsUpdated.serializer()
             "goals_updated" -> ServerFrame.GoalsUpdated.serializer()
             "agent_updated" -> ServerFrame.AgentUpdated.serializer()
+            "conversation_updated" -> ServerFrame.ConversationUpdated.serializer()
             "subagent_list_response" -> ServerFrame.SubagentListResponse.serializer()
             "subagent_todos_response" -> ServerFrame.SubagentTodosResponse.serializer()
             "subagents_updated" -> ServerFrame.SubagentsUpdated.serializer()
