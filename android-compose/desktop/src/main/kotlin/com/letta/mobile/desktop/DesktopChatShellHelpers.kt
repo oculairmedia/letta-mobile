@@ -363,6 +363,7 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
     add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
     add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
     add(ComposerCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
+    add(ComposerCommand("providers", "Open providers & models") { onNavigate(DesktopDestination.Providers) })
     add(ComposerCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
     params.agentSlashCommands.forEach { cmd ->
         add(

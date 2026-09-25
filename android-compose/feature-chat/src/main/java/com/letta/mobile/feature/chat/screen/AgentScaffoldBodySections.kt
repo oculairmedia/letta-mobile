@@ -274,15 +274,27 @@ internal fun AgentScaffoldSheets(state: AgentScaffoldRuntimeState) {
     }
 
     if (sheetVisibility.showModelPicker) {
-        ModelPickerSheet(
-            models = state.availableModels,
-            currentModel = state.activeAgentModel,
-            onDismiss = { sheetVisibility.onShowModelPickerChange(false) },
-            onModelSelected = { handle ->
-                params.viewModel.updateActiveAgentModel(handle)
+        val reasoning = ModelPickerReasoning(
+            effortsFor = params.viewModel::reasoningEffortsFor,
+            onEffortSelected = { handle, effort ->
+                params.viewModel.updateActiveAgentModel(
+                    handle,
+                    com.letta.mobile.feature.chat.coordination.EffortSelection.Set(effort),
+                )
                 sheetVisibility.onShowModelPickerChange(false)
             },
-            onRefresh = params.viewModel::refreshModels,
         )
+        androidx.compose.runtime.CompositionLocalProvider(LocalModelPickerReasoning provides reasoning) {
+            ModelPickerSheet(
+                models = state.availableModels,
+                currentModel = state.activeAgentModel,
+                onDismiss = { sheetVisibility.onShowModelPickerChange(false) },
+                onModelSelected = { handle ->
+                    params.viewModel.updateActiveAgentModel(handle)
+                    sheetVisibility.onShowModelPickerChange(false)
+                },
+                onRefresh = params.viewModel::refreshModels,
+            )
+        }
     }
 }

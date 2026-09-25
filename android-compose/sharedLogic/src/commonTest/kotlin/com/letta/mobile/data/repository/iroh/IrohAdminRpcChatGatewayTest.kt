@@ -33,6 +33,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -160,6 +162,21 @@ class IrohAdminRpcChatGatewayTest {
 
         val failure = collected.await().exceptionOrNull()
         assertTrue(failure is TimelineTransportHttpException, "expected transport failure, got $failure")
+    }
+
+    @Test
+    fun setConversationModelRoutesModelUpdateForTheConversationsAgent() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        gateway.setConversationModel("conv-1", "lmstudio/minimax-m3")
+
+        val update = transport.rpcCalls.single { it.method == "model.update" }
+        val body = Json.parseToJsonElement(update.body!!).jsonObject
+        assertEquals("agent-1", body["agent_id"]?.jsonPrimitive?.content)
+        assertEquals("conv-1", body["conversation_id"]?.jsonPrimitive?.content)
+        assertEquals("lmstudio/minimax-m3", body["model_handle"]?.jsonPrimitive?.content)
     }
 
     @Test

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
@@ -170,6 +171,7 @@ private val DesktopDestination.icon: ImageVector
         DesktopDestination.Memory -> Icons.Outlined.Memory
         DesktopDestination.Schedules -> Icons.Outlined.Schedule
         DesktopDestination.Channels -> Icons.Outlined.Hub
+        DesktopDestination.Providers -> Icons.Outlined.Tune
         DesktopDestination.Conversations -> Icons.Outlined.Forum
         DesktopDestination.Settings -> Icons.Outlined.Settings
     }
@@ -199,6 +201,9 @@ internal fun DestinationContent(
             actions = actions.schedules,
             modifier = modifier,
         )
+        DesktopDestination.Providers -> inputs.state.modelControlRpc?.let { rpc ->
+            ProvidersDestinationContent(rpc = rpc, modifier = modifier)
+        }
         DesktopDestination.Channels -> ChannelsDestinationContent(
             channelLibraryState = inputs.channelLibraryState,
             onChannelsRefresh = actions.onChannelsRefresh,

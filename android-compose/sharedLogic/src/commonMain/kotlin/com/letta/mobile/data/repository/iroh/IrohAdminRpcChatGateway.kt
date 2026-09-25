@@ -339,8 +339,16 @@ class IrohAdminRpcChatGateway(
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
+    /** letta-mobile-w4q4p: the wrapper's `model.update` (App Server `update_model`) for this conversation. */
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation {
-        throw UnsupportedOperationException("Per-conversation model override is not available over iroh:// yet")
+        val agentId = agentIdFor(ConversationId(conversationId))
+        val body = buildJsonObject {
+            put("agent_id", agentId.value)
+            put("conversation_id", conversationId)
+            put("model_handle", model)
+        }.toString()
+        rpc(AdminRpcCall.of(method = AdminRpcMethod("model.update"), path = AdminRpcPath(""), body = AdminRpcBody(body)))
+        return getConversation(conversationId)
     }
 
     override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {

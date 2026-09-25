@@ -305,6 +305,8 @@ data class DesktopDataBindings(
     val sessionGraphFactory: DesktopSessionGraphFactory,
     val sessionGraphProvider: DesktopSessionGraphProvider,
     val chatSessionGraphFactory: DesktopChatSessionGraphFactory,
+    /** letta-mobile-w4q4p: provider/model admin RPC over the current channel transport. */
+    val modelControlRpc: com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker? = null,
 )
 
 fun createDefaultDesktopDataBindings(
@@ -329,5 +331,6 @@ fun createDefaultDesktopDataBindings(
             configProvider = configProvider,
             repositoryGraphFactory = graphFactory,
         ),
+        modelControlRpc = com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker.overTransport(channelTransportProvider),
     )
 }
