@@ -11,6 +11,12 @@ data class MemoryPageState(
     val view: MemoryGraphView = MemoryGraphView(),
     val layout: MemoryGraphLayout = MemoryGraphLayout(),
     val selection: MemoryNodeSelection? = null,
+    /** An agent is selected and the backend exposes committed block writes. */
+    val canCreateBlock: Boolean = false,
+    /** The open "New block" sheet, if any. */
+    val creation: MemoryBlockDraft? = null,
+    /** The pending delete confirmation, if any. */
+    val deletion: MemoryBlockDeletion? = null,
 ) {
     val selectedNodeId: String? get() = selection?.detail?.nodeId
 }
@@ -54,12 +60,16 @@ data class MemoryNodeSelection(
     val canEdit: Boolean
         get() = writable && !detail.readOnly && detail.blockRef != null && content is MemoryNodeContent.Loaded
 
+    /** A writable, non-read-only block that is not mid-save. */
+    val canDelete: Boolean
+        get() = writable && !detail.readOnly && detail.blockRef != null && editor?.isSaving != true
+
     val canSave: Boolean
         get() = editor != null && !editor.isSaving && editor.isDirty && !editor.exceeds(detail.limit)
 }
 
 /** Everything the page can ask for. The controller implements it; UI calls it. */
-interface MemoryPageActions {
+interface MemoryPageActions : MemoryBlockLifecycleActions {
     fun refresh()
     fun selectAgent(agentId: String)
     fun toggleKind(kind: MemoryGraphNodeKind)

@@ -47,7 +47,7 @@ fun MemoryPage(
 ) {
     val reducedMotion = options.reducedMotion
     Column(modifier.fillMaxSize()) {
-        MemoryPageChrome(state.parity, actions, options.showTitle)
+        MemoryPageChrome(state.parity, actions, MemoryChromeOptions(options.showTitle, state.canCreateBlock))
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val layout = MemoryPageLayout(state, actions, reducedMotion)
             if (maxWidth >= LettaDimens.Pane.wideBreakpoint) {
@@ -57,6 +57,7 @@ fun MemoryPage(
             }
         }
     }
+    MemoryBlockDialogs(state.creation, state.deletion, actions)
 }
 
 /**

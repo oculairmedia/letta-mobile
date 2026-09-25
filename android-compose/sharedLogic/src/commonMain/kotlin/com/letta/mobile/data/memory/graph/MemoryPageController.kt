@@ -26,14 +26,24 @@ import kotlinx.coroutines.withContext
  * filtered graph with a deterministic layout, tracks the selected node's card,
  * and runs the load → edit → committed-save flow through [MemoryBlockContentPort].
  */
-class MemoryPageController(
+class MemoryPageController private constructor(
     private val source: MemoryParitySource,
     private val blocks: MemoryBlockContentPort,
     private val scope: CoroutineScope,
-    private val layoutDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    private val editErrorMessage: (Throwable) -> String = ::memoryEditErrorMessage,
-) : MemoryPageActions, AutoCloseable {
-    private val stateFlow = MutableStateFlow(MemoryPageState())
+    private val layoutDispatcher: CoroutineDispatcher,
+    private val editErrorMessage: (Throwable) -> String,
+    private val stateFlow: MutableStateFlow<MemoryPageState>,
+) : MemoryPageActions,
+    MemoryBlockLifecycleActions by MemoryBlockLifecycle(stateFlow, blocks, scope, source::reload, editErrorMessage),
+    AutoCloseable {
+    constructor(
+        source: MemoryParitySource,
+        blocks: MemoryBlockContentPort,
+        scope: CoroutineScope,
+        layoutDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        editErrorMessage: (Throwable) -> String = ::memoryEditErrorMessage,
+    ) : this(source, blocks, scope, layoutDispatcher, editErrorMessage, MutableStateFlow(MemoryPageState()))
+
     val state: StateFlow<MemoryPageState> = stateFlow.asStateFlow()
     private val disabledKinds = MutableStateFlow<Set<MemoryGraphNodeKind>>(emptySet())
     private var projectionJob: Job? = null
@@ -151,6 +161,7 @@ class MemoryPageController(
                 view = view,
                 layout = layout,
                 selection = state.selection?.let { reconcile(it, parity, view) },
+                canCreateBlock = parity.memory.selectedAgentId != null && canWrite(),
             )
         }
     }
@@ -202,7 +213,7 @@ class MemoryPageController(
     }
 }
 
-private suspend fun <T> attempt(block: suspend () -> T): Result<T> =
+internal suspend fun <T> attempt(block: suspend () -> T): Result<T> =
     try {
         Result.success(block())
     } catch (cancelled: CancellationException) {

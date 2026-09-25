@@ -383,6 +383,33 @@ class IrohAdminRpcAgentDirectory(
         params,
     )
 
+    /**
+     * bfooy.5: agent + label block create (`block.create_agent`). The node writes
+     * a NEW `memory/system/<label>.md` through `write_memory_file` (which commits)
+     * and refuses a label that already exists.
+     */
+    suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block = adminRpcDecoded(
+        method = AdminRpcMethod("block.create_agent"),
+        path = AdminRpcPath("/v1/agents/${target.agentId}/core-memory/blocks"),
+        body = jsonBody {
+            put("agent_id", target.agentId)
+            put("label", target.label)
+            put("value", value)
+        },
+    )
+
+    /** bfooy.5: agent + label block delete (`block.delete_agent` -> committed `delete_memory_file`). */
+    suspend fun deleteAgentBlock(target: AgentBlockTarget) {
+        adminRpcResult(
+            method = AdminRpcMethod("block.delete_agent"),
+            path = AdminRpcPath("/v1/agents/${target.agentId}/core-memory/blocks/${target.label}"),
+            body = jsonBody {
+                put("agent_id", target.agentId)
+                put("label", target.label)
+            },
+        )
+    }
+
     /** Both block-update routes share one body shape: address keys + the changed fields. */
     private suspend fun sendBlockUpdate(route: BlockUpdateRoute, params: BlockUpdateParams): Block = adminRpcDecoded(
         method = route.method,

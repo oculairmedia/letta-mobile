@@ -171,6 +171,40 @@ class AppServerLocalRepositoriesTest {
         assertEquals(write.params.value, call.params?.get("value")?.jsonPrimitive?.content)
     }
 
+    @Test
+    fun blockRepositoryCreatesAndDeletesByAgentAndLabel() = runTest {
+        val transport = FakeTransport()
+        val repository = AppServerAgentBlockRepository(transport)
+        val target = AgentBlockTarget("agent-1", "notes")
+
+        val created = repository.createAgentBlock(target, "fresh")
+        repository.deleteAgentBlock(target)
+
+        assertEquals(target to "fresh", transport.lastCreate)
+        assertEquals("notes", created.label)
+        assertEquals("fresh", created.value)
+        assertEquals(target, transport.lastDelete)
+    }
+
+    @Test
+    fun defaultTransportSendsBlockCreateAgentAndDeleteAgent() = runTest {
+        val client = FakeClient { okBlocks("""{"id":"block-1","label":"notes","value":"fresh"}""") }
+        val transport = DefaultAppServerLocalRepositoryTransport({ client }) { it }
+        val target = AgentBlockTarget("agent-1", "notes")
+
+        transport.createAgentBlock(target, "fresh")
+        transport.deleteAgentBlock(target)
+
+        val (create, delete) = client.adminRpcCalls
+        assertEquals("block.create_agent", create.method)
+        assertEquals("agent-1", create.params?.get("agent_id")?.jsonPrimitive?.content)
+        assertEquals("notes", create.params?.get("label")?.jsonPrimitive?.content)
+        assertEquals("fresh", create.params?.get("value")?.jsonPrimitive?.content)
+        assertEquals("block.delete_agent", delete.method)
+        assertEquals("notes", delete.params?.get("label")?.jsonPrimitive?.content)
+        assertEquals(null, delete.params?.get("value"))
+    }
+
     private class FakeTransport(
         private val agents: JsonArray = JsonArray(emptyList()),
         private val blocks: JsonArray = JsonArray(emptyList()),
@@ -203,6 +237,21 @@ class AppServerLocalRepositoriesTest {
                 Block.serializer(),
                 Block(id = BlockId("block-${target.label}"), label = target.label, value = params.value.orEmpty()),
             )
+        }
+
+        var lastCreate: Pair<AgentBlockTarget, String>? = null
+        var lastDelete: AgentBlockTarget? = null
+
+        override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): JsonElement {
+            lastCreate = target to value
+            return AppServerProtocol.json.encodeToJsonElement(
+                Block.serializer(),
+                Block(id = BlockId("block-${target.label}"), label = target.label, value = value),
+            )
+        }
+
+        override suspend fun deleteAgentBlock(target: AgentBlockTarget) {
+            lastDelete = target
         }
     }
 

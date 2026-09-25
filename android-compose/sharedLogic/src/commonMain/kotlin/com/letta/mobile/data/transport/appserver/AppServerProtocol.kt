@@ -65,6 +65,7 @@ object AppServerProtocol {
         "cron_delete_response",
         "cron_delete_all_response",
         "write_memory_file_response",
+        "delete_memory_file_response",
         "get_reflection_settings_response",
         "set_reflection_settings_response",
         "get_cwd_map_response",

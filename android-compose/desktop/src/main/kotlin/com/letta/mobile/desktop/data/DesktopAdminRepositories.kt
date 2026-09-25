@@ -30,4 +30,10 @@ internal class DesktopLettaHttpAdminRepositories(
 
     override suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block =
         blockWriter.write(target, params)
+
+    override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =
+        blockWriter.create(target, value)
+
+    override suspend fun deleteAgentBlock(target: AgentBlockTarget) =
+        blockWriter.delete(target)
 }

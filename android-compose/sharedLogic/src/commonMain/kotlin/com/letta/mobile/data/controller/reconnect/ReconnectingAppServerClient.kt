@@ -360,6 +360,15 @@ class ReconnectingAppServerClient(
     override suspend fun updateModel(command: AppServerCommand.UpdateModel) = ready().updateModel(command)
 
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = ready().skillDisable(command)
+
+    // bfooy.5: without these forwarders the interface default throws
+    // UnsupportedOperationException, so the wrapper's block.update_agent /
+    // block.create_agent / block.delete_agent (routed through DualLane's
+    // runtime lane, a ReconnectingAppServerClient) could never reach the socket.
+    override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile) = ready().writeMemoryFile(command)
+
+    override suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile) = ready().deleteMemoryFile(command)
+
     override suspend fun cronList(command: AppServerCommand.CronList) = ready().cronList(command)
 
     override suspend fun cronAdd(command: AppServerCommand.CronAdd) = ready().cronAdd(command)

@@ -7,6 +7,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -19,6 +20,12 @@ interface AppServerLocalRepositoryTransport {
 
     /** `block.update_agent`: the App Server writes and commits `memory/system/<label>.md`. */
     suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
+
+    /** bfooy.5 `block.create_agent`: a new committed `memory/system/<label>.md`. */
+    suspend fun createAgentBlock(target: AgentBlockTarget, value: String): JsonElement
+
+    /** bfooy.5 `block.delete_agent`: a committed delete of `memory/system/<label>.md`. */
+    suspend fun deleteAgentBlock(target: AgentBlockTarget)
 }
 
 class DefaultAppServerLocalRepositoryTransport(
@@ -90,6 +97,23 @@ class DefaultAppServerLocalRepositoryTransport(
                 put("value", value)
             },
         ) ?: error("Bundled App Server block update returned no result")
+    }
+
+    override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): JsonElement =
+        adminRpc(
+            operation = "block-create",
+            method = "block.create_agent",
+            params = target.toParams { put("value", value) },
+        ) ?: error("Bundled App Server block create returned no result")
+
+    override suspend fun deleteAgentBlock(target: AgentBlockTarget) {
+        adminRpc(operation = "block-delete", method = "block.delete_agent", params = target.toParams())
+    }
+
+    private fun AgentBlockTarget.toParams(extra: JsonObjectBuilder.() -> Unit = {}): JsonObject = buildJsonObject {
+        put("agent_id", agentId)
+        put("label", label)
+        extra()
     }
 
     private suspend fun adminRpc(

@@ -35,19 +35,22 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
+/** [showTitle]: the host does not title the screen; [canCreateBlock]: offer "New block". */
+internal data class MemoryChromeOptions(val showTitle: Boolean, val canCreateBlock: Boolean)
+
 /** Title row, agent picker and stats strip above the graph. */
 @Composable
 internal fun MemoryPageChrome(
     parity: MemoryParityControllerState,
     actions: MemoryPageActions,
-    showTitle: Boolean,
+    options: MemoryChromeOptions,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        MemoryHeaderRow(parity, actions, showTitle)
+        MemoryHeaderRow(parity, actions, options)
         parity.errorMessage?.let { MemoryErrorBanner(it) }
         MemorySummaryStrip(parity.memory.summary.metrics)
     }
@@ -57,19 +60,24 @@ internal fun MemoryPageChrome(
 private fun MemoryHeaderRow(
     parity: MemoryParityControllerState,
     actions: MemoryPageActions,
-    showTitle: Boolean,
+    options: MemoryChromeOptions,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        if (showTitle) {
+        if (options.showTitle) {
             Text("Memory", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         }
         Box(Modifier.weight(1f)) {
             if (parity.agents.isNotEmpty()) {
                 MemoryAgentPicker(parity.agents, parity.memory.selectedAgentId, actions::selectAgent)
+            }
+        }
+        if (options.canCreateBlock) {
+            IconButton(onClick = actions::beginCreate) {
+                Icon(LettaIcons.Add, contentDescription = "New block")
             }
         }
         IconButton(onClick = actions::refresh, enabled = !parity.isLoading) {
