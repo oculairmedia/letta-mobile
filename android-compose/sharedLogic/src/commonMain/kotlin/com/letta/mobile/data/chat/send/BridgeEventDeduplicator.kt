@@ -1,71 +1,74 @@
 package com.letta.mobile.data.chat.send
 
-import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ReasoningMessage
-import com.letta.mobile.data.model.SystemMessage
-import com.letta.mobile.data.model.ToolCallMessage
-import com.letta.mobile.data.model.ToolReturnMessage
-import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.transport.TimelineEventKeys
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
-/** Bounded exact-event deduplication for fanout from shared bridge collectors. */
+/**
+ * Bounded exact-event deduplication for fanout from shared bridge collectors.
+ *
+ * letta-mobile-qygvv.11: this is now the SAFETY NET. Exact duplicates are
+ * dropped once at the transport ingest seam (`IngestFrameDeduplicator`, same
+ * [TimelineEventKeys]), so [exactDuplicatesDropped] should read zero in normal
+ * turns; a non-zero count means a duplicate source bypassed ingest.
+ *
+ * A message delta another coordinator already took is NOT a duplicate: every
+ * collector of one bridge receives the same memoized event instance, and the
+ * process-wide message window keeps first-coordinator-wins for it. That copy is
+ * counted separately ([fanoutCopiesSkipped]) and does not log.
+ */
 internal class BridgeEventDeduplicator {
     private val eventLock = SynchronizedObject()
     private val eventKeys = ArrayDeque<String>()
     private val eventKeySet = mutableSetOf<String>()
+    private var exactDuplicates = 0L
+    private var fanoutCopies = 0L
+
+    /** True duplicates this coordinator dropped (should be zero once ingest dedups). */
+    val exactDuplicatesDropped: Long get() = synchronized(eventLock) { exactDuplicates }
+
+    /** Same-frame copies already taken by another coordinator. */
+    val fanoutCopiesSkipped: Long get() = synchronized(eventLock) { fanoutCopies }
 
     fun isDuplicate(event: WsTimelineEvent, fallbackConversationId: String?): Boolean {
-        val key = event.key(fallbackConversationId) ?: return false
-        val duplicate = if (event is WsTimelineEvent.MessageDelta) {
-            synchronized(sharedMessageEventLock) {
-                rememberBounded(key, sharedMessageEventKeys, sharedMessageEventKeySet)
-            }
+        val key = TimelineEventKeys.key(event, fallbackConversationId) ?: return false
+        val verdict = if (event is WsTimelineEvent.MessageDelta) {
+            synchronized(sharedMessageEventLock) { rememberShared(key, event) }
         } else {
             synchronized(eventLock) {
-                rememberBounded(key, eventKeys, eventKeySet)
+                if (rememberBounded(key, eventKeys, eventKeySet)) Verdict.ExactDuplicate else Verdict.New
             }
         }
-        if (duplicate) {
-            Telemetry.event(
-                "AdminChatVM", "ws.event.exactDuplicateDropped",
-                "eventType" to (event::class.simpleName ?: ""),
-                "keyHash" to key.hashCode().toString(),
-            )
-        }
-        return duplicate
+        record(verdict, event, key)
+        return verdict != Verdict.New
     }
 
-    private fun WsTimelineEvent.key(fallbackConversationId: String?): String? = when (this) {
-        // `isReplay` is deliberately NOT part of the key. A resume replay
-        // re-delivers the turn_started the live connection already delivered;
-        // including the flag guaranteed the two could never collide, which
-        // defeated the only thing this key exists to do. (conversation, turn,
-        // run) identifies the turn regardless of how it reached us.
-        is WsTimelineEvent.TurnStarted -> "started|$conversationId|$turnId|$runId"
-        is WsTimelineEvent.MessageDelta -> {
-            val owner = conversationId ?: fallbackConversationId.orEmpty()
-            "message|$owner|${message.id}|${message.messageType}|${message.runId.orEmpty()}|${message.contentForDedupe()}"
+    private fun record(verdict: Verdict, event: WsTimelineEvent, key: String) {
+        when (verdict) {
+            Verdict.New -> return
+            Verdict.FanoutCopy -> synchronized(eventLock) { fanoutCopies++ }
+            Verdict.ExactDuplicate -> {
+                synchronized(eventLock) { exactDuplicates++ }
+                Telemetry.event(
+                    "AdminChatVM", "ws.event.exactDuplicateDropped",
+                    "eventType" to (event::class.simpleName ?: ""),
+                    "keyHash" to key.hashCode().toString(),
+                )
+            }
         }
-        is WsTimelineEvent.StopReason -> "stop|$turnId|$runId|$stopReason"
-        is WsTimelineEvent.UsageStatistics -> "usage|$turnId|$runId|$promptTokens|$completionTokens|$totalTokens"
-        is WsTimelineEvent.TurnDone -> "done|$turnId|$runId|$status|$lossy|$dropCount"
-        is WsTimelineEvent.Error -> "error|${conversationId.orEmpty()}|${turnId.orEmpty()}|${runId.orEmpty()}|$code|$message"
-        is WsTimelineEvent.UserActionOutcome -> "action|$frameId|${actionId.orEmpty()}|$outcome|${reason.orEmpty()}"
-        else -> null
     }
 
-    private fun LettaMessage.contentForDedupe(): String = when (this) {
-        is AssistantMessage -> content
-        is UserMessage -> content
-        is SystemMessage -> content
-        is ReasoningMessage -> reasoning
-        is ToolCallMessage -> effectiveToolCalls.joinToString(separator = "|") { it.effectiveId + ":" + (it.name ?: "") }
-        is ToolReturnMessage -> toolCallId.orEmpty() + ":" + toolReturn.funcResponse.orEmpty()
-        else -> date.orEmpty() + ":" + seqId.toString()
+    private fun rememberShared(key: String, event: WsTimelineEvent): Verdict {
+        val previous = sharedMessageEventKeySet[key]
+        if (previous != null) return if (previous === event) Verdict.FanoutCopy else Verdict.ExactDuplicate
+        sharedMessageEventKeySet[key] = event
+        sharedMessageEventKeys.addLast(key)
+        while (sharedMessageEventKeys.size > MAX_SEEN_EVENTS) {
+            sharedMessageEventKeySet.remove(sharedMessageEventKeys.removeFirst())
+        }
+        return Verdict.New
     }
 
     private fun rememberBounded(
@@ -82,6 +85,8 @@ internal class BridgeEventDeduplicator {
         return false
     }
 
+    private enum class Verdict { New, FanoutCopy, ExactDuplicate }
+
     private companion object {
         private const val MAX_SEEN_EVENTS = 512
 
@@ -90,17 +95,15 @@ internal class BridgeEventDeduplicator {
         private val sharedMessageEventLock = SynchronizedObject()
         private val sharedMessageEventKeys = ArrayDeque<String>()
 
-        // letta-mobile-463hb: PRE-EXISTING debt, not introduced here. This
-        // property is unchanged by the key() fix above, but guardrailDetekt
-        // analyses whole files changed from origin/main, so editing anything in
-        // this file pulls it into the required gate (the same trap recorded at
-        // TimelineAcquisitionProvenance.kt:357). The window genuinely has to
-        // outlive any single coordinator, so the fix is to give it an explicit
-        // owner -- tracked in 463hb -- not to swap the factory call for one the
-        // rule happens not to match. Suppressed by owner decision so a replay
-        // dedupe fix is not held hostage to an ownership refactor across ~45
+        // letta-mobile-463hb: PRE-EXISTING debt, not introduced here. The window
+        // genuinely has to outlive any single coordinator, so the fix is to give
+        // it an explicit owner -- tracked in 463hb -- not to swap the factory call
+        // for one the rule happens not to match. Suppressed by owner decision so
+        // a dedupe fix is not held hostage to an ownership refactor across ~45
         // construction sites. REMOVE THIS with the property.
+        // qygvv.11: values hold the first-seen event instance so a same-frame
+        // fanout copy (identical instance) is told apart from a true duplicate.
         @Suppress("NoProcessGlobalMutableState")
-        private val sharedMessageEventKeySet = mutableSetOf<String>()
+        private val sharedMessageEventKeySet = mutableMapOf<String, WsTimelineEvent>()
     }
 }

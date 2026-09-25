@@ -89,6 +89,36 @@ sealed interface AppServerInboundFrame {
         override val type: String = "abort_message_response"
     }
 
+    /** letta-mobile-qygvv.6: answer to a `resume_queue` that carried a `request_id`. */
+    @Serializable
+    @SerialName("resume_queue_response")
+    data class ResumeQueueResponse(
+        @SerialName("request_id") override val requestId: String,
+        override val runtime: AppServerRuntimeScope? = null,
+        /** Number of parked items the command released. */
+        val resumed: Int = 0,
+        val success: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient
+        override val type: String = "resume_queue_response"
+    }
+
+    /** letta-mobile-qygvv.6: answer to `remove_queue_item`; `success=false` means no such item. */
+    @Serializable
+    @SerialName("remove_queue_item_response")
+    data class RemoveQueueItemResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("item_id") val itemId: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient
+        override val type: String = "remove_queue_item_response"
+
+        @Transient
+        override val runtime: AppServerRuntimeScope? = null
+    }
+
     @Serializable
     @SerialName("stream_delta")
     data class StreamDelta(
@@ -192,12 +222,33 @@ sealed interface AppServerInboundFrame {
         @SerialName("emitted_at") val emittedAt: String,
         @SerialName("idempotency_key") val idempotencyKey: String,
         val queue: List<JsonObject>,
+        /**
+         * Ordered dequeue/cancel transitions since the previous snapshot (0.32+).
+         * Absent on older servers; the raw frame still carries every field.
+         */
+        val removed: List<AppServerQueueRemoval> = emptyList(),
+        /**
+         * letta-mobile-qygvv.6: a snapshot-level pause flag. Upstream 0.32.3 flags each parked
+         * item instead ([AppServerQueueItem.paused]); this is read too in case a server sends it.
+         */
+        @SerialName("paused") val pausedFlag: Boolean? = null,
     ) : AppServerInboundFrame {
         @Transient
         override val type: String = "update_queue"
 
         @Transient
         override val requestId: String? = null
+
+        /**
+         * letta-mobile-qygvv.6: typed view of [queue]. An entry that does not decode is skipped
+         * rather than failing the frame; unknown fields are ignored.
+         */
+        val items: List<AppServerQueueItem>
+            get() = queue.mapNotNull(AppServerQueueItem::decodeOrNull)
+
+        /** True when the server has parked items (after `abort_message`) until input or `resume_queue`. */
+        val paused: Boolean
+            get() = pausedFlag ?: items.any { it.paused }
     }
 
     @Serializable
@@ -784,5 +835,35 @@ sealed interface AppServerInboundFrame {
         companion object {
             const val DECODE_FAILURE_TYPE: String = "decode_failure"
         }
+    }
+}
+
+/**
+ * Upstream `QueueRemovalTransition`: `dequeued` means the item left the queue to
+ * start a turn; `cancelled` means it was dropped without running. Kept a string
+ * because the upstream union is open.
+ */
+@Serializable
+data class AppServerQueueRemoval(
+    @SerialName("client_message_id") val clientMessageId: String? = null,
+    val disposition: String? = null,
+)
+
+/**
+ * letta-mobile-qygvv.6: one entry of an `update_queue` snapshot (upstream `QueueMessage`).
+ * `content` stays in the raw [AppServerInboundFrame.UpdateQueue.queue] object.
+ */
+@Serializable
+data class AppServerQueueItem(
+    val id: String,
+    @SerialName("client_message_id") val clientMessageId: String? = null,
+    val kind: String? = null,
+    val source: String? = null,
+    @SerialName("enqueued_at") val enqueuedAt: String? = null,
+    val paused: Boolean = false,
+) {
+    companion object {
+        fun decodeOrNull(raw: JsonObject): AppServerQueueItem? =
+            runCatching { AppServerProtocol.json.decodeFromJsonElement(serializer(), raw) }.getOrNull()
     }
 }

@@ -44,6 +44,12 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
      */
     val runIdGate = TurnRunIdGate(leaseRef, ownerRef)
 
+    /** Authoritative turn boundaries for THIS key (letta-mobile-qygvv.2). */
+    val boundaryGate = TurnBoundaryGate()
+
+    /** Lease -> server run binding for THIS key (letta-mobile-qygvv.8). */
+    val runBinding = TurnRunBinding()
+
     /** Cached `runtime_start` scope for this key (was one global slot). */
     private val runtimeScopeRef = atomic<AppServerRuntimeScope?>(null)
 

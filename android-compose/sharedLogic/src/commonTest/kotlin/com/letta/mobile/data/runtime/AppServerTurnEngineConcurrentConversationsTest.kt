@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
@@ -29,7 +30,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -167,8 +167,9 @@ class AppServerTurnEngineConcurrentConversationsTest {
     @Test
     fun livenessReleaseOfOneConversationDoesNotReleaseAnothersLease() =
         runTest(UnconfinedTestDispatcher()) {
-            // run.get reports every probed run dead, so A's stale lease is
-            // reconciled away by A's own retry. B must be untouched.
+            // qygvv.3: the sync-replayed loop status reports every probed runtime
+            // idle, so A's stale lease is reconciled away by A's own retry. B must
+            // be untouched.
             val client = ConcurrentClient(runStatus = "failed")
             val engine = AppServerTurnEngine(client = client)
             val draftsB = mutableListOf<RuntimeEventDraft>()
@@ -195,10 +196,10 @@ class AppServerTurnEngineConcurrentConversationsTest {
             runCurrent()
 
             assertTrue(replacementAccepted, "the provably-dead owner run must be reconciled for its OWN key")
-            assertTrue(client.runGetRunIds.contains("run-a"), "the reconciler probed A's run")
+            assertTrue(client.syncConversations.contains(CONV_A), "the reconciler probed A's runtime")
             assertFalse(
-                client.runGetRunIds.contains("run-b"),
-                "the reconciler must never probe another conversation's run; probed=${client.runGetRunIds}",
+                client.syncConversations.contains(CONV_B),
+                "the reconciler must never probe another conversation's runtime; probed=${client.syncConversations}",
             )
             assertTrue(engine.isBusy(AGENT, CONV_B), "B's lease must survive A's liveness release")
 
@@ -433,7 +434,7 @@ class AppServerTurnEngineConcurrentConversationsTest {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 128)
 
         val inputConversations = mutableListOf<String>()
-        val runGetRunIds = mutableListOf<String>()
+        val syncConversations = mutableListOf<String>()
 
         override suspend fun runtimeStart(
             command: AppServerCommand.RuntimeStart,
@@ -450,46 +451,52 @@ class AppServerTurnEngineConcurrentConversationsTest {
             inputConversations += command.runtime.conversationId
         }
 
-        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("sync unused")
+        /** qygvv.3: replays the runtime's loop status; "failed" means no run is active. */
+        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse {
+            syncConversations += command.runtime.conversationId
+            val idle = runStatus == "failed"
+            emit(
+                AppServerInboundFrame.UpdateLoopStatus(
+                    runtime = command.runtime,
+                    eventSeq = 900,
+                    emittedAt = "2026-07-31T00:00:00Z",
+                    idempotencyKey = "loop-${command.runtime.conversationId}-${syncConversations.size}",
+                    loopStatus = AppServerLoopStatus(
+                        status = if (idle) "WAITING_ON_INPUT" else "PROCESSING_API_RESPONSE",
+                        activeRunIds = if (idle) emptyList() else listOf("run-live"),
+                    ),
+                ),
+            )
+            return AppServerInboundFrame.SyncResponse(
+                requestId = command.requestId.orEmpty(),
+                runtime = command.runtime,
+                success = true,
+            )
+        }
 
         override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
             error("abort unused")
 
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
-            when (command.method) {
-                "run.get" -> {
-                    command.params?.get("run_id")?.let { runGetRunIds += it.toString().trim('"') }
-                    return AppServerInboundFrame.AdminRpcResponse(
-                        requestId = command.requestId,
-                        success = true,
-                        result = buildJsonObject { put("status", runStatus) },
-                    )
-                }
-                "run.list" -> return AppServerInboundFrame.AdminRpcResponse(
-                    requestId = command.requestId,
-                    success = true,
-                    result = JsonArray(emptyList()),
-                )
-            }
-            return AppServerInboundFrame.AdminRpcResponse(
+        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+            AppServerInboundFrame.AdminRpcResponse(
                 requestId = command.requestId,
                 success = false,
                 error = "unexpected",
             )
-        }
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
-        fun emit(frame: AppServerInboundFrame.StreamDelta) {
+        fun emit(frame: AppServerInboundFrame) {
             (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
                 AppServerReceivedFrame(
                     channel = AppServerChannel.Stream,
                     frame = frame,
                     raw = buildJsonObject {
                         put("type", frame.type ?: "stream_delta")
-                        put("idempotency_key", frame.idempotencyKey)
-                        put("delta", frame.delta)
+                        if (frame is AppServerInboundFrame.StreamDelta) {
+                            put("idempotency_key", frame.idempotencyKey)
+                            put("delta", frame.delta)
+                        }
                     },
                 ),
             )

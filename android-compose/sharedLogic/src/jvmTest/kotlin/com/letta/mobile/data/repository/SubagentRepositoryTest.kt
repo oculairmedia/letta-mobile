@@ -2,7 +2,12 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.repository.api.SubagentParentScope
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -56,5 +61,25 @@ class SubagentRepositoryTest {
         assertEquals(now, entry.lastSeenAtMs)
         assertEquals(SubagentStatus.RUNNING, entry.status)
         assertEquals(null, entry.failureReason)
+    }
+
+    /**
+     * letta-mobile-g70jb.1: an HTTP (non-Iroh) desktop backend has no channel
+     * transport, so the session graph binds the registry to NoOpChannelTransport.
+     * The registry must degrade to an empty list, never throw.
+     */
+    @Test
+    fun noOpTransportDegradesToAnEmptyRegistry() = runBlocking {
+        val repository = SubagentRepository(NoOpChannelTransport(), includeAll = true)
+        try {
+            val refreshed = repository.refresh()
+            assertTrue(refreshed.exceptionOrNull() is UnsupportedOperationException)
+            assertTrue(repository.todos("tool-call-1").exceptionOrNull() is UnsupportedOperationException)
+            val scope = SubagentParentScope(parentAgentId = "agent-1", parentConversationId = "conv-1")
+            assertEquals(emptyList<SubagentEntry>(), repository.activeSubagentsFlow(scope).first())
+            assertEquals(emptyList<SubagentEntry>(), repository.currentActiveSubagents(scope))
+        } finally {
+            repository.close()
+        }
     }
 }
