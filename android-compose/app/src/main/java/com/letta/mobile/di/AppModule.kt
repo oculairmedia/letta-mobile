@@ -158,6 +158,9 @@ abstract class AppModule {
             delivery = com.letta.mobile.data.canvas.FileCanvasDeliveryStore(java.io.File(context.filesDir, "canvas-delivery.json")),
             topicOf = { id -> documents.relayTopicOf(id) },
             assets = assets,
+            // Ops for a board that is not open (the agent drawing while the person is in chat)
+            // go straight into the stored canvas (letta-mobile-qygvv.23).
+            closedBoard = com.letta.mobile.data.canvas.StoreCanvasClosedBoardApplier(documents, opLog),
         )
 
         @Provides
