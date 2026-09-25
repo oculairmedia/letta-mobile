@@ -370,6 +370,77 @@ sealed interface AppServerInboundFrame {
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
+    // Provider connect + model switch (letta-mobile-w4q4p), mirrored from
+    // protocol_v2.d.ts 0.32.17. Upstream sends target/providers on failure too
+    // (recorded: `Unknown provider: …` frames carry `providers: []`).
+
+    @Serializable
+    @SerialName("list_connect_providers_response")
+    data class ListConnectProvidersResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val target: String,
+        val providers: List<AppServerConnectProviderEntry>,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "list_connect_providers_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("connect_provider_response")
+    data class ConnectProviderResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val target: String,
+        val providers: List<AppServerConnectProviderEntry>,
+        @SerialName("models_may_have_changed") val modelsMayHaveChanged: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "connect_provider_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("disconnect_provider_response")
+    data class DisconnectProviderResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val target: String,
+        val providers: List<AppServerConnectProviderEntry>,
+        @SerialName("models_may_have_changed") val modelsMayHaveChanged: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "disconnect_provider_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    /**
+     * Response to `update_model`. The wire key `runtime` is a
+     * `ConversationRuntimeScope` (agent id nullable), exposed as [scope]; the
+     * interface-level [runtime] stays null because this is a correlated admin
+     * answer, not a runtime turn event.
+     */
+    @Serializable
+    @SerialName("update_model_response")
+    data class UpdateModelResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("runtime") val scope: AppServerConversationRuntimeScope? = null,
+        @SerialName("applied_to") val appliedTo: String? = null,
+        @SerialName("model_id") val modelId: String? = null,
+        @SerialName("model_handle") val modelHandle: String? = null,
+        @SerialName("model_settings") val modelSettings: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "update_model_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
     /**
      * Skill-set invalidation signal.
      *

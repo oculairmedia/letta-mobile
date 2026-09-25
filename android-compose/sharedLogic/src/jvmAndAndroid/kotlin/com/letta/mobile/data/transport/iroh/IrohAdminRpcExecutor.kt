@@ -67,6 +67,8 @@ internal class IrohAdminRpcExecutor(
     private suspend fun executeTracked(call: TrackedCall): AppServerInboundFrame.AdminRpcResponse {
         return try {
             call.execute()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             retryAfter(call, error)
         }
@@ -202,7 +204,7 @@ internal class IrohAdminRpcExecutor(
         internal const val ADMIN_RPC_FAILURE_THRESHOLD = 3
         internal const val STREAM_IDLE_THRESHOLD_MS = 30_000L
         private val READ_ONLY_ADMIN_RPC_METHODS = setOf(
-            "message.list", "message.get", "conversation.list", "conversation.get", "agent.get", "agent.list", "agent.count", "agent.context", "tool.get", "tool.list", "block.get", "block.list", "block.list_agent", "skill.get", "skill.list", "skill.list_agent", "slash_command.list", "slash_command.list_agent", "schedule.get", "schedule.list", "project.get", "project.list", "project.beadsRemoteStatus", "cron.list", "cron.get", "subagent.list", "subagent.todos", "health.check", "model.list", "goal.get",
+            "message.list", "message.get", "conversation.list", "conversation.get", "agent.get", "agent.list", "agent.count", "agent.context", "tool.get", "tool.list", "block.get", "block.list", "block.list_agent", "skill.get", "skill.list", "skill.list_agent", "slash_command.list", "slash_command.list_agent", "schedule.get", "schedule.list", "project.get", "project.list", "project.beadsRemoteStatus", "cron.list", "cron.get", "subagent.list", "subagent.todos", "health.check", "model.list", "model.exposure.get", "provider.list", "goal.get",
         )
     }
 }

@@ -92,6 +92,11 @@ object IrohPeerCapabilities {
         // held by DEFAULT_DESKTOP_ROLE) so it isn't denied. Agent LIFECYCLE
         // (agent.create / agent.delete) stays admin.full via the else branch.
         method == "agent.update" -> CONVERSATION_MANAGE
+        // letta-mobile-w4q4p: switching a conversation's model is the same
+        // desktop-manageable config edit as agent.update. Provider connect/
+        // disconnect and model.exposure.set change what EVERY client sees, so
+        // they stay admin.full via the else branch.
+        method == "model.update" -> CONVERSATION_MANAGE
         method.startsWith("block.") || method.startsWith("passage.") ->
             if (method.isReadMethod()) MEMORY_READ else MEMORY_WRITE
         // lgns8.16: reflection/sleeptime settings control WHEN the agent
@@ -157,6 +162,7 @@ object IrohPeerCapabilities {
     private val ADMIN_READ_METHODS = setOf(
         "health.check",
         "provider.list",
+        "model.exposure.get",
         "goal.get",
         "group.list",
         "folder.list",

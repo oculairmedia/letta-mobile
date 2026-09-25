@@ -4,51 +4,100 @@ import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
- * Model + provider catalogs.
+ * Model catalog, model switch and model exposure.
  *
- * `model.list` is native (`list_models`). lgns8.9 dispositions the other two:
- * admin-shim served `GET /v1/models/embedding` and `GET /v1/providers` from
- * HARD-CODED constants (a single `text-embedding-3-small` descriptor and a
- * single `lmstudio-local` BYOK provider built from `LMSTUDIO_BASE_URL`) — no
- * datastore, no upstream call. They are therefore controller-native constants
- * here, not a bounded REST adapter. The pinned v2 `list_connect_providers`
- * command is the App Server's connect-provider domain, NOT the Letta
- * `/v1/providers` catalog, and the matrix forbids conflating them.
+ * - `model.list` is native (`list_models`), filtered by the wrapper exposure
+ *   allow-list ([ModelExposureStore]; default = everything exposed). Hidden
+ *   rows are returned only with `include_hidden=true`; every row carries
+ *   `exposed` and, when upstream advertises variants, `reasoning_efforts`.
+ * - `model.update` is native (`update_model`) for one agent + conversation.
+ * - `model.exposure.get` / `model.exposure.set` read/write the wrapper-owned
+ *   exposure decisions. They never touch the App Server.
+ * - `model.list.embedding` stays a controller constant (lgns8.9).
+ *
+ * `provider.*` lives in [ProviderAdminHandlers].
  */
 object ModelAdminHandlers {
-    fun register(router: AdminRpcRouter, nativeClient: AppServerClient? = null, lmstudioBaseUrl: String = DEFAULT_LMSTUDIO_BASE_URL) {
-        router.register("model.list") { params ->
-            // Phase 2: native list_models is the only Letta-owned source. Legacy
-            // shim catalog shape is no longer the default; callers that still need
-            // the old REST catalog must wait for a bounded non-shim owner (Phase 3).
-            NativeAdmin.require(nativeClient, NativeAdminOp.ModelList) { c ->
-                val response = c.listModels(
-                    AppServerCommand.ListModels(
-                        requestId = NativeAdmin.requestId(),
-                        force = param(params, AdminParamKey("force"))?.toBooleanStrictOrNull(),
-                    ),
-                )
-                if (!response.success) {
-                    null
-                } else {
-                    AppServerListModelsAdapter.toLlmModelArray(
-                        response.entries ?: JsonArray(emptyList()),
-                    )
-                }
-            }
-        }
+    fun register(
+        router: AdminRpcRouter,
+        nativeClient: AppServerClient? = null,
+        exposure: ModelExposureStore = InMemoryModelExposureStore(),
+    ) {
+        router.register("model.list") { params -> listModels(nativeClient, exposure, params) }
+        router.register("model.update") { params -> updateModel(nativeClient, params) }
+        router.register("model.exposure.get") { exposureState(exposure.decisions()) }
+        router.register("model.exposure.set") { params -> setExposure(exposure, params) }
         router.register("model.list.embedding") { NativeAdminCatalogs.embeddingModelCatalog() }
-        router.register("provider.list") { NativeAdminCatalogs.providerCatalog(lmstudioBaseUrl) }
+        ProviderAdminHandlers.register(router, nativeClient)
     }
 
-    /** Mirrors admin-shim's `process.env.LMSTUDIO_BASE_URL || "http://localhost:8082/v1"`. */
-    val DEFAULT_LMSTUDIO_BASE_URL: String =
-        System.getenv("LMSTUDIO_BASE_URL")?.takeIf { it.isNotBlank() } ?: "http://localhost:8082/v1"
+    private suspend fun listModels(
+        nativeClient: AppServerClient?,
+        exposure: ModelExposureStore,
+        params: JsonObject?,
+    ): JsonArray {
+        val includeHidden = param(params, AdminParamKey("include_hidden"))?.toBooleanStrictOrNull() ?: false
+        return NativeAdmin.require(nativeClient, NativeAdminOp.ModelList) { c ->
+            val response = c.listModels(
+                AppServerCommand.ListModels(
+                    requestId = NativeAdmin.requestId(),
+                    force = param(params, AdminParamKey("force"))?.toBooleanStrictOrNull(),
+                ),
+            )
+            if (!response.success) return@require null
+            val raw = response.entries ?: JsonArray(emptyList())
+            val adapted = AppServerListModelsAdapter.toLlmModelArray(raw)
+            ModelListProjection.decorate(adapted, raw, exposure, includeHidden)
+                .also { ModelControlTelemetry.modelListed(it.size, includeHidden) }
+        }
+    }
 
-    /** Constant catalogs owned by the controller (no datastore, no shim). */
-    val CONSTANT_CATALOG_METHODS: Set<String> = setOf("model.list.embedding", "provider.list")
+    private suspend fun updateModel(nativeClient: AppServerClient?, params: JsonObject?): JsonObject {
+        val command = ModelUpdateParams.toCommand(params, NativeAdmin.requestId())
+        return NativeAdmin.require(nativeClient, NativeAdminOp.ModelUpdate) { c ->
+            val response = c.updateModel(command)
+            ModelControlTelemetry.modelUpdated(command, response.success, response.appliedTo)
+            if (!response.success) adminError(response.error ?: "update_model failed")
+            buildJsonObject {
+                put("agent_id", command.runtime.agentId)
+                put("conversation_id", command.runtime.conversationId)
+                response.appliedTo?.let { put("applied_to", it) }
+                response.modelId?.let { put("model_id", it) }
+                response.modelHandle?.let { put("model_handle", it) }
+                response.modelSettings?.let { put("model_settings", it) }
+            }
+        }
+    }
 
-    val METHODS: Set<String> = setOf("model.list") + CONSTANT_CATALOG_METHODS
+    private fun setExposure(exposure: ModelExposureStore, params: JsonObject?): JsonObject {
+        val changes = ModelExposureParams.changes(params)
+        val next = exposure.apply(changes)
+        ModelControlTelemetry.exposureChanged(changes.size, next.count { !it.value })
+        return exposureState(next)
+    }
+
+    /** `{default_exposed: true, hidden: [...], models: {"<handle>": false}}`. */
+    private fun exposureState(decisions: Map<String, Boolean>): JsonObject = buildJsonObject {
+        put("default_exposed", true)
+        put("hidden", JsonArray(decisions.filterValues { !it }.keys.sorted().map(::JsonPrimitive)))
+        put("models", JsonObject(decisions.mapValues { JsonPrimitive(it.value) }))
+    }
+
+    /** Controller-owned constant catalog (no datastore, no shim). */
+    val CONSTANT_CATALOG_METHODS: Set<String> = setOf("model.list.embedding")
+
+    /** Methods the retired admin REST adapter used to own (lgns8.9 inventory). */
+    val FORMER_ADMIN_REST_METHODS: Set<String> = CONSTANT_CATALOG_METHODS + "provider.list"
+
+    /** Wrapper-owned exposure state; never an App Server call. */
+    val EXPOSURE_METHODS: Set<String> = setOf("model.exposure.get", "model.exposure.set")
+
+    val METHODS: Set<String> =
+        setOf("model.list", "model.update") + CONSTANT_CATALOG_METHODS + EXPOSURE_METHODS + ProviderAdminHandlers.METHODS
 }

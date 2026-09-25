@@ -349,6 +349,16 @@ class ReconnectingAppServerClient(
 
     override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = ready().skillEnable(command)
 
+    override suspend fun listConnectProviders(command: AppServerCommand.ListConnectProviders) =
+        ready().listConnectProviders(command)
+
+    override suspend fun connectProvider(command: AppServerCommand.ConnectProvider) = ready().connectProvider(command)
+
+    override suspend fun disconnectProvider(command: AppServerCommand.DisconnectProvider) =
+        ready().disconnectProvider(command)
+
+    override suspend fun updateModel(command: AppServerCommand.UpdateModel) = ready().updateModel(command)
+
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = ready().skillDisable(command)
     override suspend fun cronList(command: AppServerCommand.CronList) = ready().cronList(command)
 
