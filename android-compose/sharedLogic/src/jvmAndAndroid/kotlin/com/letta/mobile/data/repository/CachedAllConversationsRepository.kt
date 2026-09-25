@@ -12,6 +12,7 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.BackendScopedCache
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
@@ -39,6 +40,12 @@ open class CachedAllConversationsRepository(
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
     private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+    /**
+     * letta-mobile-lks7m: when given, the list follows Meridian's `conversation_updated` pushes and
+     * re-reads after a reconnect, so conversations created on another device appear without a
+     * restart.
+     */
+    transport: IChannelTransport? = null,
 ) : IAllConversationsRepository, BackendScopedCache {
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
     override val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
@@ -68,6 +75,22 @@ open class CachedAllConversationsRepository(
                     level = Telemetry.Level.WARN,
                 )
             }
+        }
+        transport?.let { channelTransport ->
+            repositoryScope.launch { observeConversationUpdates(channelTransport) { refreshAfterPush("push") } }
+            repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterPush("reconnect") } }
+        }
+    }
+
+    /** Only a list that has loaded is refreshed: an unopened list loads fresh when first shown. */
+    private suspend fun refreshAfterPush(trigger: String) {
+        if (!hasLoadedAtLeastOnce) return
+        try {
+            refresh()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            Telemetry.event(TAG, "conversation_updated.refresh_failed", "trigger" to trigger, "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
         }
     }
 

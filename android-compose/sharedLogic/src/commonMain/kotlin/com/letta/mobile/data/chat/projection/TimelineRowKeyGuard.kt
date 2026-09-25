@@ -30,6 +30,10 @@ object TimelineRowKeyGuard {
                 "Timeline", "timeline.duplicateKeyDropped",
                 "key" to key,
                 "sources" to "${sources(first)}+${sources(index)}",
+                // The first occurrence keeps the content; this one renders empty.
+                "kept" to sources(first),
+                "dropped" to sources(index),
+                "index" to index,
                 level = Telemetry.Level.WARN,
             )
             val map = duplicates ?: mutableMapOf<Int, String>().also { duplicates = it }

@@ -427,6 +427,59 @@ class ChatSessionReducerTest {
         assertSame(state, ChatSessionReducer.conversationDeleted(state, "missing"))
     }
 
+    @Test
+    fun rosterRefreshAddsNewConversationsWithoutTouchingSelectionOrSession() {
+        val composer = ChatComposerState(text = "half-typed draft")
+        val messages = mapOf("a" to listOf(message("m1", "hello")))
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a"), conversation("b")),
+            selectedConversationId = "a",
+            messagesByConversationId = messages,
+            composer = composer,
+            connectionState = ChatConnectionState.Live,
+            isLoading = true,
+            statusMessage = "Syncing...",
+            selectionGeneration = 7,
+        )
+
+        val refreshed = ChatSessionReducer.conversationRosterRefreshed(
+            state,
+            listOf(conversation("new"), conversation("a"), conversation("b")),
+        )
+
+        assertEquals(listOf("new", "a", "b"), refreshed.conversations.map { it.id })
+        assertEquals("a", refreshed.selectedConversationId)
+        assertEquals(7L, refreshed.selectionGeneration)
+        assertSame(messages, refreshed.messagesByConversationId)
+        assertSame(composer, refreshed.composer)
+        assertTrue(refreshed.isLoading)
+        assertEquals("Syncing...", refreshed.statusMessage)
+        assertEquals(ChatConnectionState.Live, refreshed.connectionState)
+    }
+
+    @Test
+    fun rosterRefreshRetainsASelectedConversationTheFetchDidNotReturn() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("just-created"), conversation("a")),
+            selectedConversationId = "just-created",
+        )
+
+        val refreshed = ChatSessionReducer.conversationRosterRefreshed(state, listOf(conversation("a"), conversation("b")))
+
+        assertEquals(listOf("just-created", "a", "b"), refreshed.conversations.map { it.id })
+        assertEquals("just-created", refreshed.selectedConversationId)
+    }
+
+    @Test
+    fun unchangedRosterRefreshReturnsTheSameState() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a"), conversation("b")),
+            selectedConversationId = "a",
+        )
+
+        assertSame(state, ChatSessionReducer.conversationRosterRefreshed(state, listOf(conversation("a"), conversation("b"))))
+    }
+
     private fun conversation(
         id: String,
         unreadCount: Int = 0,
