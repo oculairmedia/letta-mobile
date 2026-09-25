@@ -59,7 +59,14 @@ class CanvasRelayClient(
      */
     private val assets: AssetStore? = null,
     private val assetFetchTimeoutMs: Long = ASSET_FETCH_TIMEOUT_MS,
+    /**
+     * Takes ops for canvases this app has but no board open on (letta-mobile-qygvv.23). Without
+     * one, such an op is left for the next join to replay rather than skipped.
+     */
+    private val closedBoard: CanvasClosedBoardApplier? = null,
 ) : CanvasSyncTransport, CanvasPresenceTransport {
+
+    private val gate = CanvasRelayApplyGate(closedBoard)
 
     private val lock = Mutex()
     private val canvases = mutableMapOf<CanvasId, Canvas>()
@@ -112,7 +119,7 @@ class CanvasRelayClient(
         healthFlows.getOrCreate(canvasId) { MutableStateFlow(CanvasSyncHealth.LocalOnly(NO_HOST)) }
 
     private inner class Canvas(val id: CanvasId, val topic: String) {
-        val appliers = mutableListOf<suspend (CanvasOp, String?) -> Unit>()
+        val appliers = mutableListOf<CanvasRelayApplier>()
         val health: MutableStateFlow<CanvasSyncHealth> = healthFlow(id)
 
         /**
@@ -180,13 +187,14 @@ class CanvasRelayClient(
 
     override suspend fun deliverVouchedTo(canvasId: CanvasId, apply: suspend (op: CanvasOp, vouchedActor: String?) -> Unit) {
         val canvas = canvas(canvasId)
-        lock.withLock { canvas.appliers += apply }
+        val missed = gate.attach(canvasId) { lock.withLock { canvas.appliers += apply } }
         try {
             coroutineScope {
                 launch { canvas.local.collect { apply(it, null) } }
+                missed?.let { (op, vouched) -> apply(op, vouched) }
                 val live = lock.withLock { current }
                 // A connection that fails here ends in [run]; this session keeps working locally.
-                if (live != null) runCatching { join(live, canvas.topic) }.onFailure { if (it is CancellationException) throw it }
+                if (live != null) runCatching { rejoin(live, canvas.topic) }.onFailure { if (it is CancellationException) throw it }
                 refresh(canvas.topic)
                 awaitCancellation()
             }
@@ -308,8 +316,8 @@ class CanvasRelayClient(
         }
         try {
             refreshAll()
-            val topics = lock.withLock { canvases.values.filter { it.appliers.isNotEmpty() }.map { it.topic }.toSet() }
-            topics.forEach { join(live, it) }
+            val open = lock.withLock { canvases.values.filter { it.appliers.isNotEmpty() }.map { it.topic } }
+            (open + knownTopics()).toSet().forEach { join(live, it) }
             while (true) {
                 val message = connection.receive() ?: break
                 if (!handle(live, message)) break
@@ -323,12 +331,29 @@ class CanvasRelayClient(
         }
     }
 
+    /**
+     * The topics of the canvases this app keeps current with no board open ([closedBoard]): joined
+     * on every connection, so an agent's edits land while the person is elsewhere (qygvv.23).
+     */
+    private suspend fun knownTopics(): List<String> =
+        closedBoard?.known().orEmpty().map { canvas(it).topic }
+
     private suspend fun join(live: Live, topic: String) {
         val send = lock.withLock { current === live && live.joinSent.add(topic) }
         if (!send) return
         val canvas = lock.withLock { canvases.values.first { it.topic == topic } }
         val after = delivery.cursor(live.connection.hostId, topic) ?: 0L
+        gate.joining(CanvasRelayTopic(topic))
         live.connection.send(CanvasRelayMessage.Join(topic, canvas.id.value, after))
+    }
+
+    /**
+     * [join], sent again when [topic] has a gap: an op arrived that nothing here took, so the stored
+     * cursor stopped short of it, and joining from there has the host replay it (qygvv.23).
+     */
+    private suspend fun rejoin(live: Live, topic: String) {
+        if (gate.hasGap(CanvasRelayTopic(topic))) lock.withLock { live.joinSent -= topic }
+        join(live, topic)
     }
 
     /** False when the connection must end. Messages from a superseded connection change nothing (I6). */
@@ -360,14 +385,25 @@ class CanvasRelayClient(
     }
 
     private suspend fun op(live: Live, message: CanvasRelayMessage.Op) {
-        applyLocally(message.topic, message.op, vouchedActor(message))
-        // Only after every session applied it: a crash before this replays it, never skips it.
-        delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
+        val applied = applyLocally(message.topic, message.op, vouchedActor(message))
+        if (!applied) unapplied(message)
+        // Only after it was applied, and nothing before it is missing: a crash before this
+        // replays it, and an op nothing took is replayed by the next join, never skipped.
+        if (applied && gate.mayAdvance(CanvasRelayTopic(message.topic))) delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
         raiseHostCursor(message.topic, message.cursor)
     }
 
+    private suspend fun unapplied(message: CanvasRelayMessage.Op) {
+        gate.markGap(CanvasRelayTopic(message.topic))
+        com.letta.mobile.util.Telemetry.event(
+            "CanvasRelayClient", "op.unapplied",
+            "topic" to message.topic, "cursor" to message.cursor, "opId" to message.op.opId,
+            level = com.letta.mobile.util.Telemetry.Level.WARN,
+        )
+    }
+
     private suspend fun caughtUp(live: Live, message: CanvasRelayMessage.CaughtUp) {
-        delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
+        if (gate.caughtUp(CanvasRelayTopic(message.topic))) delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
         lock.withLock { live.caughtUp += message.topic }
         raiseHostCursor(message.topic, message.cursor)
         refresh(message.topic)
@@ -378,8 +414,8 @@ class CanvasRelayClient(
         if (mine) {
             delivery.acknowledge(message.topic, message.opId)
             // The host acks in log order, after every earlier op it fanned out to this app, so the
-            // log is applied here up to this op too.
-            delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
+            // log is applied here up to this op too - unless one of them was not.
+            if (gate.mayAdvance(CanvasRelayTopic(message.topic))) delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
             raiseHostCursor(message.topic, message.cursor)
         }
         refresh(message.topic)
@@ -448,11 +484,16 @@ class CanvasRelayClient(
 
     private fun canvasesOf(topic: String): List<Canvas> = canvases.values.filter { it.topic == topic }
 
-    /** Every session of the canvases of [topic] in this app applies [op]; they skip ops they have. */
-    private suspend fun applyLocally(topic: String, op: CanvasOp, vouchedActor: String?) {
-        val appliers = lock.withLock { canvasesOf(topic).flatMap { it.appliers.toList() } }
-        for (apply in appliers) apply(op, vouchedActor)
-    }
+    /**
+     * Every session of the canvases of [topic] in this app applies [op] (they skip ops they have),
+     * or, with none open, the stored canvas does. False when nothing took it.
+     */
+    private suspend fun applyLocally(topic: String, op: CanvasOp, vouchedActor: String?): Boolean =
+        gate.apply(
+            { lock.withLock { canvasesOf(topic).map { CanvasRelayTarget(it.id, it.appliers.toList()) } } },
+            op,
+            vouchedActor,
+        )
 
     /**
      * The actor the host vouches for on [message]: an agent's op that the host's own canvas tools
