@@ -352,7 +352,6 @@ class AppServerTurnEngineTest {
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
-            // letta-mobile-qygvv.26: the tail keeps the server's order, usage first.
             assertEquals("usage_statistics", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
@@ -374,7 +373,6 @@ class AppServerTurnEngineTest {
             runCurrent()
             expectNoEvents()
 
-            // letta-mobile-qygvv.26: more frames follow, so the paused round's stop_reason goes out first.
             client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
             val paused = assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
             assertEquals("requires_approval", paused.body.jsonDeltaString("stop_reason"))
@@ -405,7 +403,6 @@ class AppServerTurnEngineTest {
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
-            // letta-mobile-qygvv.26: every usage frame, in order, then the stop_reason.
             val first = assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
             assertEquals("11", first.body.jsonDeltaString("total_tokens"))
             val last = assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
