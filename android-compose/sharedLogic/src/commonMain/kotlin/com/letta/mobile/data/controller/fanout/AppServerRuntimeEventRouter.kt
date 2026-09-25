@@ -84,6 +84,12 @@ class AppServerRuntimeEventRouter(
             fanout.subscribe(agentId, conversationId, subscriberId)
         }
 
+    /** Passive probe subscription; see [RuntimeEventFanout.observe]. */
+    fun observe(
+        agentId: AgentId,
+        conversationId: ConversationId,
+    ): Pair<String, Flow<AppServerReceivedFrame>> = fanout.observe(agentId, conversationId)
+
     fun unsubscribe(subscriberId: String): Boolean = fanout.unsubscribe(subscriberId)
 
     fun subscriberCount(): Int = fanout.subscriberCount()

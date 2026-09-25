@@ -50,7 +50,12 @@ internal class IrohObserverIngestor(
     // letta-mobile-p0gc: per-turn aggregated skip telemetry + cheap engine-owned
     // terminal gating; injectable sink keeps the aggregation deterministic under test.
     internal val engineOwnedSkipTelemetry: EngineOwnedSkipTelemetry = EngineOwnedSkipTelemetry(),
+    /** How long the engine has to publish its own terminal before the observer's copy stands in. */
+    private val observerTerminalGraceMs: Long = OBSERVER_TERMINAL_GRACE_MS,
 ) {
+    /** Observer terminal fallbacks waiting out their grace window, one per engine-owned turn. */
+    private val pendingObserverTerminals = java.util.concurrent.ConcurrentHashMap<String, Job>()
+
     private val observerGeneration = atomic(0)
 
     @Volatile
@@ -110,6 +115,8 @@ internal class IrohObserverIngestor(
         observerJob = null
         observerGeneration.incrementAndGet()
         job.cancel()
+        pendingObserverTerminals.values.forEach { it.cancel() }
+        pendingObserverTerminals.clear()
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to request.reason)
     }
 
@@ -293,19 +300,74 @@ internal class IrohObserverIngestor(
                 ),
             )
         }
-        val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
-        if (terminal is ServerFrame.TurnDone) {
-            val publication = IrohTerminalPublication(
-                turn = localTurn,
-                status = IrohTerminalStatus(terminal.status),
-                source = IrohTerminalSource.Observer,
+        claimObserverTerminal(localTurn, projectedFrames)
+    }
+
+    /**
+     * The observer's copy of an engine-owned turn's terminal is a safety net, not a race entry.
+     *
+     * The wrapper completes a turn on the idle loop status, and its fanned-out stop_reason reaches
+     * this path before the engine has projected the reply it streamed. Claiming here at once retired
+     * the turn ahead of its own deltas (device capture 2026-09-24, local-run-55: StopReason and
+     * TurnDone at 20:48:03.573, every assistant delta after them), so the whole reply reached the
+     * coordinator as a retired turn's tail and the timeline's turn-end repair was refused.
+     *
+     * The engine publishes its own terminal (turn_finished, or its settle window), so the observer
+     * waits [observerTerminalGraceMs] and stands in only if the engine still has not. The claim is
+     * exactly-once, so an engine terminal inside the window simply wins it. Assistant/reasoning
+     * deltas stay engine-owned and are never re-emitted here.
+     */
+    private fun claimObserverTerminal(localTurn: IrohActiveTurn, projectedFrames: List<ServerFrame>) {
+        val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone } as? ServerFrame.TurnDone ?: return
+        if (localTurn.hasTerminal) return
+        val endingFrames = projectedFrames.filter { it is ServerFrame.StopReason || it is ServerFrame.UsageStatistics }
+        val key = localTurn.turnId
+        if (pendingObserverTerminals[key]?.isActive == true) return
+        Telemetry.event(
+            "IrohObserver", "terminal.fallback_scheduled",
+            "conversationId" to localTurn.conversationId,
+            "turnId" to key,
+            "graceMs" to observerTerminalGraceMs,
+        )
+        val job = scope.launch {
+            kotlinx.coroutines.delay(observerTerminalGraceMs)
+            publishObserverTerminal(localTurn, terminal, endingFrames)
+        }
+        pendingObserverTerminals[key] = job
+        job.invokeOnCompletion { pendingObserverTerminals.remove(key, job) }
+    }
+
+    private suspend fun publishObserverTerminal(
+        localTurn: IrohActiveTurn,
+        terminal: ServerFrame.TurnDone,
+        endingFrames: List<ServerFrame>,
+    ) {
+        val publication = IrohTerminalPublication(
+            turn = localTurn,
+            status = IrohTerminalStatus(terminal.status),
+            source = IrohTerminalSource.Observer,
+        )
+        if (!turnRegistry.claimTerminal(publication)) {
+            Telemetry.event(
+                "IrohObserver", "terminal.fallback_superseded",
+                "conversationId" to localTurn.conversationId,
+                "turnId" to localTurn.turnId,
+                "terminalSource" to (localTurn.terminalSource?.toString() ?: ""),
             )
-            if (turnRegistry.claimTerminal(publication)) {
-                withContext(NonCancellable) {
-                    emitBoth(terminal)
-                    turnRegistry.retireClaimed(publication)
-                }
-            }
+            return
+        }
+        Telemetry.event(
+            "IrohObserver", "terminal.fallback_claimed",
+            "conversationId" to localTurn.conversationId,
+            "turnId" to localTurn.turnId,
+            level = Telemetry.Level.WARN,
+        )
+        // The turn's ending (stop reason / usage) goes ahead of the TurnDone, or the coordinator
+        // retires the turn with an empty stop reason.
+        withContext(NonCancellable) {
+            endingFrames.forEach { emitBoth(it) }
+            emitBoth(terminal)
+            turnRegistry.retireClaimed(publication)
         }
     }
 
@@ -444,6 +506,9 @@ internal class IrohObserverIngestor(
     companion object {
         /** Meridian's device-wide agent change push; see AgentChangeNotifier on the host. */
         private const val AGENT_UPDATED_TYPE = "agent_updated"
+
+        /** Longer than the engine's settle window (1.5 s), so a healthy engine always wins. */
+        internal const val OBSERVER_TERMINAL_GRACE_MS = 3_000L
         private val AGENT_UPDATED_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
         internal const val SUBAGENT_REASON_STARTED = "started"

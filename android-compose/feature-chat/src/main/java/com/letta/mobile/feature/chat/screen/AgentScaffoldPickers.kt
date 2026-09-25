@@ -749,6 +749,7 @@ internal fun ModelPickerSheet(
     onModelSelected: (String) -> Unit,
     onRefresh: () -> Unit,
 ) {
+    val reasoning = LocalModelPickerReasoning.current
     var isDismissingForAction by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -867,78 +868,18 @@ internal fun ModelPickerSheet(
                             },
                         ) { _, model ->
                             val handle = model.handle ?: model.name
-                            val isActive = model == activeModel
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("model_row_${handle}")
-                                    .combinedClickable(
-                                        enabled = !isDismissingForAction && !isActive,
-                                        onClick = {
-                                            selectThenDismiss { onModelSelected(handle) }
-                                        },
-                                    ),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isActive) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        CardDefaults.cardColors().containerColor
-                                    },
+                            ModelPickerRow(
+                                model = model,
+                                spec = ModelPickerRowSpec(
+                                    handle = handle,
+                                    isActive = model == activeModel,
+                                    enabled = !isDismissingForAction,
+                                    efforts = reasoning.effortsFor(handle),
+                                    subtitle = buildModelSubtitle(model),
                                 ),
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(LettaDimens.Space.md),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                                        ) {
-                                            Text(
-                                                text = model.displayName,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f, fill = false),
-                                            )
-                                            // Tier badge — only when the API provides it.
-                                            model.tier?.takeIf { it.isNotBlank() }?.let { tier ->
-                                                AssistChip(
-                                                    onClick = {},
-                                                    label = {
-                                                        Text(
-                                                            tier.replaceFirstChar { it.uppercase() },
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                        )
-                                                    },
-                                                    modifier = Modifier.height(LettaDimens.Space.xl),
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
-                                        Text(
-                                            text = buildModelSubtitle(model),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    if (isActive) {
-                                        Icon(
-                                            LettaIcons.CheckCircle,
-                                            contentDescription = stringResource(R.string.screen_agents_current_indicator),
-                                            modifier = Modifier
-                                                .padding(start = LettaDimens.Space.sm)
-                                                .size(LettaIconSizing.Toolbar),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                }
-                            }
+                                onSelect = { selectThenDismiss { onModelSelected(handle) } },
+                                onEffortSelected = { effort -> selectThenDismiss { reasoning.onEffortSelected(handle, effort) } },
+                            )
                         }
                     }
                 }

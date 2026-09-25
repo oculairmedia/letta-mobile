@@ -14,12 +14,11 @@ import kotlinx.coroutines.Job
  * The mapping is total and exclusive:
  *  - [BackendKind.LOCAL_RUNTIME] -> [LocalRuntimeChatSendStrategy]
  *  - [BackendKind.IROH]          -> [IrohChatSendStrategy]
- *  - [BackendKind.SHIM_WS]       -> [WsChatSendStrategy]  (shim configs only)
- *  - [BackendKind.REST]          -> [TimelineChatSendStrategy]
+ *  - [BackendKind.REST]          -> [TimelineChatSendStrategy] (g70jb.4: this
+ *                                   includes leftover shim-era configs)
  */
 internal class ChatSendStrategySelector(
     private val timelineStrategy: ChatSendStrategy,
-    private val wsStrategy: ChatSendStrategy,
     private val localStrategy: ChatSendStrategy,
     private val irohStrategy: ChatSendStrategy,
 ) {
@@ -30,7 +29,6 @@ internal class ChatSendStrategySelector(
         else -> when (context.backendKind) {
             BackendKind.LOCAL_RUNTIME -> localStrategy
             BackendKind.IROH -> irohStrategy
-            BackendKind.SHIM_WS -> wsStrategy
             BackendKind.REST -> timelineStrategy
         }
     }
@@ -48,7 +46,6 @@ internal class ChatSendStrategySelector(
             "attachments" to attachments.size,
             "conversationId" to context.explicitConversationId,
             "backendKind" to context.backendKind.name,
-            "isShimBackend" to context.isShimBackend,
             "isLocalRuntime" to context.isLocalRuntime,
             "isClientModeEnabled" to context.isClientModeEnabled,
         )
@@ -57,7 +54,6 @@ internal class ChatSendStrategySelector(
             "via" to strategy.routeName,
             "conversationId" to context.explicitConversationId,
             "backendKind" to context.backendKind.name,
-            "isShimBackend" to context.isShimBackend,
             "isLocalRuntime" to context.isLocalRuntime,
         )
         return strategy.send(text, attachments, context)
@@ -72,7 +68,6 @@ private val ChatSendStrategy.routeName: String
     get() = when (this) {
         is LocalRuntimeChatSendStrategy -> "local"
         is IrohChatSendStrategy -> "iroh"
-        is WsChatSendStrategy -> "ws"
         is TimelineChatSendStrategy -> "timeline"
         else -> this::class.simpleName.orEmpty()
     }

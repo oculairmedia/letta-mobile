@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.CanvasRelayClient
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.FileCanvasDeliveryStore
 import com.letta.mobile.data.canvas.FileCanvasOpLog
+import com.letta.mobile.data.canvas.StoreCanvasClosedBoardApplier
 import com.letta.mobile.data.canvas.relayTopicOf
 import com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +42,8 @@ object DesktopCanvasHostSync {
         ),
         topicOf = { documents.relayTopicOf(it) },
         assets = assets,
+        // Ops for a board no window has open go straight into the stored canvas (qygvv.23).
+        closedBoard = StoreCanvasClosedBoardApplier(documents, opLog),
     )
 
     @Suppress("NoDetachedCoroutineLifecycle") // Lives as long as the desktop process, like the op log.

@@ -48,7 +48,7 @@ import kotlinx.coroutines.flow.emptyFlow
 class WsChatBridge(
     private val transport: IChannelTransport,
 ) {
-    /** Re-export the connection state without forcing callers to know about ChannelTransport. */
+    /** Re-export the connection state without forcing callers to know about the transport. */
     val state: StateFlow<ChannelTransportState> = transport.state
 
     val connection: Flow<WsConnectionState> = transport.state.map { it.toConnectionState() }
@@ -75,9 +75,16 @@ class WsChatBridge(
         .map { it.toConnectionState() }
         .first()
 
-    /** High-level event stream tailored for chat consumers. */
+    /**
+     * High-level event stream tailored for chat consumers.
+     *
+     * letta-mobile-qygvv.11: every collector gets its own subscription (and so
+     * one copy of each frame), but the frame -> event projection is memoized on
+     * the published [TransportFrameEvent], so it runs once per frame no matter
+     * how many coordinators collect.
+     */
     val events: Flow<WsTimelineEvent> = merge(
-        transport.frameEvents.mapNotNull { it.toTimelineEvent() },
+        transport.frameEvents.mapNotNull { it.timelineEvent },
         // Surface terminal disconnects as their own event so the
         // ViewModel can show a banner / re-enable retry without
         // having to re-implement a state-collector.
@@ -335,7 +342,8 @@ sealed interface BridgeTurnStatus {
     }
 }
 
-private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
+/** Runs once per [TransportFrameEvent] via its memoized [TransportFrameEvent.timelineEvent]. */
+internal fun TransportFrameEvent.projectTimelineEvent(): WsTimelineEvent? {
     val event = frame.toTimelineEvent(isReplay)
     com.letta.mobile.util.Telemetry.event(
         "IrohGate", "gate2.bridgeEvent",
@@ -367,7 +375,7 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     // Welcome carries connection metadata, not chat content; surface via state.
     // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
     // Cron frames (letta-mobile-d52f.1) are observed directly off
-    // ChannelTransport.events by the cron repository — not chat content.
+    // IChannelTransport.events by the cron repository — not chat content.
     is ServerFrame.Welcome,
     is ServerFrame.A2ui,
     is ServerFrame.A2uiCapabilities,

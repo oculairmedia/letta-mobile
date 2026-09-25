@@ -1,7 +1,6 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.CronTask
-import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeChannelTransport

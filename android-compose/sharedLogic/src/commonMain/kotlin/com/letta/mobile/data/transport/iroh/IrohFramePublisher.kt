@@ -1,6 +1,8 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.transport.IngestFrameDeduplicator
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.TimelineEventKeys
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowIncident
 import kotlinx.atomicfu.atomic
@@ -54,9 +56,26 @@ internal class IrohFramePublisher(
     val events: SharedFlow<ServerFrame> =
         ServerFrameSharedFlow(EVENTS_SUBSCRIPTION, canonicalEvents)
 
-    /** Publishes once to every currently attached collector without awaiting one collector's drain. */
+    /**
+     * letta-mobile-qygvv.11: the single ingest dedup point. A frame that exactly
+     * repeats one already published (per [TimelineEventKeys.ingestKey]) is
+     * dropped HERE, once, instead of reaching every subscriber and being dropped
+     * by each coordinator after it paid to parse it.
+     */
+    private val ingestDeduplicator = IngestFrameDeduplicator()
+
+    /** Exact duplicates suppressed at ingest; diagnostics and tests. */
+    val ingestDuplicatesDropped: Long get() = ingestDeduplicator.droppedCount
+
+    /**
+     * Publishes once to every currently attached collector without awaiting one
+     * collector's drain. Every collector receives the SAME [TransportFrameEvent]
+     * instance, so its memoized chat projection is computed once per frame.
+     */
     suspend fun publish(frame: ServerFrame) {
-        canonicalEvents.publish(TransportFrameEvent(frame = frame))
+        val event = TransportFrameEvent(frame = frame)
+        if (ingestDeduplicator.isDuplicate(event)) return
+        canonicalEvents.publish(event)
     }
 
     companion object {

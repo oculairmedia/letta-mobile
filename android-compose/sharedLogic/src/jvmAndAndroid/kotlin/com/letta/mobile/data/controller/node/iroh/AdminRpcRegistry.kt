@@ -108,6 +108,12 @@ object AdminRpcRegistry {
         skillsListing: SkillsListingSource? = null,
         /** See [NativeReadTiers.agentChanges]. */
         agentChanges: AgentChangeNotifier? = null,
+        /**
+         * letta-mobile-w4q4p: JSON file holding the model exposure decisions
+         * (`model.exposure.*`, filters `model.list`). Null keeps them in memory
+         * for the router's lifetime (tests, stub CLI).
+         */
+        modelExposureFile: String? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -130,7 +136,7 @@ object AdminRpcRegistry {
         RunAdminHandlers.register(router, localBackendStore)
         ArchiveAdminHandlers.register(router)
         IdentityAdminHandlers.register(router)
-        ModelAdminHandlers.register(router, nativeClient)
+        ModelAdminHandlers.register(router, nativeClient, modelExposureStore(modelExposureFile))
         ScheduleAdminHandlers.register(router, nativeClient)
         ToolAdminHandlers.register(router, localBackendStore, nativeClient)
         McpAdminHandlers.register(router)
@@ -163,4 +169,9 @@ object AdminRpcRegistry {
     }
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos")
+
+    private fun modelExposureStore(path: String?): ModelExposureStore =
+        path?.takeIf { it.isNotBlank() }
+            ?.let { FileModelExposureStore(java.io.File(it)) }
+            ?: InMemoryModelExposureStore()
 }

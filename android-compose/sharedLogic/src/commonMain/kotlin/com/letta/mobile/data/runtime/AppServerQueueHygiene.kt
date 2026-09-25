@@ -175,6 +175,26 @@ internal class AppServerQueueHygiene(
         if (queued.size > removed) resume(runtime, key)
     }
 
+    /**
+     * letta-mobile-qygvv.9: a lease whose input is still waiting in the server queue was
+     * cancelled. Take that input off the queue, or the server runs it later with nobody
+     * observing. False when the item is not in the last snapshot or the removal failed.
+     */
+    suspend fun removeQueuedInput(runtime: AppServerRuntimeScope, clientMessageId: String): Boolean {
+        val key = runtime.key()
+        val item = _snapshots.value[key]?.items?.lastOrNull { it.clientMessageId == clientMessageId }
+        if (item == null) {
+            Telemetry.event(
+                TELEMETRY_TAG, "queue.item_not_found",
+                "key" to key.toString(),
+                "clientMessageId" to clientMessageId,
+                level = Telemetry.Level.WARN,
+            )
+            return false
+        }
+        return removeOwnItem(runtime, key, item)
+    }
+
     private suspend fun removeOwnItem(runtime: AppServerRuntimeScope, key: TurnRuntimeKey, item: AppServerQueueItem): Boolean {
         val clientMessageId = item.clientMessageId ?: return false
         val response = callOrNull("remove_queue_item", key) {

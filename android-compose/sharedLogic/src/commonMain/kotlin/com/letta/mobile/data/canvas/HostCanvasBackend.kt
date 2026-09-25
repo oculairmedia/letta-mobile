@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas
 
 import kotlinx.coroutines.channels.Channel
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -36,6 +38,7 @@ class HostCanvasBackend(
     private val store: CanvasRelayStore,
     private val directory: HostCanvasDirectory,
     private val newOpId: () -> String = { "agent-op-${Uuid.random()}" },
+    private val ackTimeout: Duration = DEFAULT_ACK_TIMEOUT,
 ) {
     /** The canvas [canvasId] for [caller]: known to the directory, or its own conversation's. */
     suspend fun open(caller: HostCanvasCaller, canvasId: String): HostCanvasAccess {
@@ -55,6 +58,13 @@ class HostCanvasBackend(
         if (conversationId == caller.conversationId) return claimConversation(caller, conversationId)
         return if (claim) HostCanvasAccess.Denied(notOwnConversation(caller, conversationId)) else null
     }
+
+    /**
+     * The canvas of the conversation [caller] runs in (claimed, so created, on first use), for a
+     * call that names no canvas; null when the caller is in no conversation.
+     */
+    suspend fun ownConversation(caller: HostCanvasCaller): HostCanvasAccess? =
+        caller.conversationId?.let { conversation(caller, it, claim = true) }
 
     /** A new canvas of no conversation, owned by the local user, the caller its writer. */
     suspend fun create(caller: HostCanvasCaller, title: String): HostCanvasEntry {
@@ -90,12 +100,24 @@ class HostCanvasBackend(
     /**
      * Publishes [ops] to [entry] as [caller], through a relay connection of the caller's own: each is
      * rebound to the caller (whatever actor it named) and stamped after everything in the log, so
-     * it wins over what the caller read. Returns the log's head once all are durable.
+     * it wins over what the caller read. Returns the log's head once the relay has acknowledged
+     * every op.
+     *
+     * Scenes and elements the apps cannot draw are refused before anything is sent
+     * ([CanvasSceneValidator]): published, they would be acknowledged, logged and fanned out, and
+     * show nothing (letta-mobile-qygvv.21).
      */
     suspend fun publish(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasPublish {
         if (!entry.acl.canWrite(caller.agentId)) {
             return HostCanvasPublish.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
+        return when (val checked = CanvasSceneValidator.ops(ops)) {
+            is CanvasOpsCheck.Invalid -> HostCanvasPublish.Invalid(checked.message)
+            is CanvasOpsCheck.Valid -> send(caller, entry, checked.ops)
+        }
+    }
+
+    private suspend fun send(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasPublish {
         val replies = Channel<CanvasRelayMessage>(Channel.UNLIMITED)
         val link = relay.connect(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX + caller.agentId) { replies.send(it) }
         try {
@@ -103,25 +125,11 @@ class HostCanvasBackend(
             var lamport = scene(entry).lamport
             val stamped = ops.map { it.withActor(caller.agentId).withStamp(newOpId(), ++lamport) }
             stamped.forEach { link.receive(CanvasRelayMessage.Publish(entry.topic, it)) }
-            return outcome(replies, stamped)
+            return HostCanvasAcks(stamped).await(replies, ackTimeout)
         } finally {
             link.close()
             replies.close()
         }
-    }
-
-    private fun outcome(replies: Channel<CanvasRelayMessage>, sent: List<CanvasOp>): HostCanvasPublish {
-        val ids = sent.map { it.opId }.toSet()
-        var head = 0L
-        val rejected = mutableListOf<String>()
-        while (true) {
-            when (val reply = replies.tryReceive().getOrNull() ?: break) {
-                is CanvasRelayMessage.Ack -> if (reply.opId in ids) head = maxOf(head, reply.cursor)
-                is CanvasRelayMessage.Rejected -> if (reply.opId in ids) rejected += reply.reason
-                else -> Unit
-            }
-        }
-        return if (rejected.isEmpty()) HostCanvasPublish.Published(head) else HostCanvasPublish.Denied("Rejected by the host: ${rejected.joinToString()}")
     }
 
     private suspend fun claimConversation(caller: HostCanvasCaller, conversationId: String): HostCanvasAccess {
@@ -146,6 +154,9 @@ class HostCanvasBackend(
     private companion object {
         const val CONVERSATION_CANVAS_TITLE = "Conversation canvas"
 
+        /** Generous: the relay acknowledges as soon as the op is durable, normally in the same call. */
+        val DEFAULT_ACK_TIMEOUT: Duration = 10.seconds
+
         /**
          * The local user owns it and the caller writes to it, as an app-made canvas; the caller is
          * also named as a reader, which makes the canvas private to those three rather than
@@ -165,4 +176,7 @@ sealed interface HostCanvasPublish {
     data class Published(val revision: Long) : HostCanvasPublish
 
     data class Denied(val reason: String) : HostCanvasPublish
+
+    /** Nothing was sent: [reason] names what the apps could not draw and how to write it. */
+    data class Invalid(val reason: String) : HostCanvasPublish
 }

@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.SubagentParentScope
-import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeChannelTransport

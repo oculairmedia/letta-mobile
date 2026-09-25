@@ -155,9 +155,7 @@ internal fun LettaDesktopApp(
         bootstrap.irohAgentDirectorySlot.value = irohAgentDirectory
     }
     rememberAndPublishGraphChannelTransport(
-        activeConfig = activeConfig,
         irohTransport = irohTransport,
-        chatScope = chatScope,
         publish = bootstrap.publishChannelTransport,
     )
     val chatController = rememberDesktopChatController(
@@ -202,14 +200,11 @@ internal fun LettaDesktopApp(
     var agentSlashCommands by remember(httpApis.slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
     val subagents = rememberSubagentRegistry(
         request = SubagentRegistryRequest(
-            activeConfig = activeConfig,
-            irohMode = irohMode,
             parentScope = subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId),
             irohTransport = irohTransport,
             graphSubagentRepository = sessionGraph.subagentRepository
                 as? com.letta.mobile.data.repository.SubagentRepository,
         ),
-        chatScope = chatScope,
     )
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents
@@ -433,7 +428,7 @@ internal fun LettaDesktopApp(
         )
     }
     val mentionables = remember(railAgents, memoryState) {
-        buildMentionables(BuildMentionablesParams(railAgents, memoryState))
+        buildMentionables(BuildMentionablesParams(railAgents, memoryState.parity))
     }
     val paletteItems = remember(chatState.conversations, railAgents, workPlayMode) {
         buildPaletteItems(chatState.conversations, railAgents, workPlayMode)
@@ -824,7 +819,6 @@ internal fun LettaDesktopApp(
                                 ),
                                 channelLibraryState = channelLibraryState,
                                 toolLibraryState = toolLibraryState,
-                                blockApi = blockApi,
                                 skills = DestinationSkillsInputs(
                                     skills = skillsPanel.all,
                                     installedSkillNames = skillsPanel.installedNames,
@@ -896,10 +890,7 @@ internal fun LettaDesktopApp(
                                     onSubmitPrompt = ::submitHomePrompt,
                                     onA2uiAction = ::dispatchA2uiAction,
                                 ),
-                                memory = DestinationMemoryActions(
-                                    onRefresh = libraries.memory::reload,
-                                    onAgentSelected = libraries.memory::selectAgent,
-                                ),
+                                memory = libraries.memory,
                                 schedules = destinationScheduleActions(
                                     ScheduleWiringDeps(
                                         schedules = libraries.schedules,

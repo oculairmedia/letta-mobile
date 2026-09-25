@@ -19,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,6 +28,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * letta-mobile-qygvv.5: approval responses sent by the engine (auto-approve and
@@ -111,6 +114,73 @@ class AppServerTurnEngineApprovalAcceptanceTest {
         turn.job.cancel()
     }
 
+    @Test
+    fun autoAllowReplyRejectedAsNoLongerPendingIsAlreadyResolvedAndClearsGate() = runTest {
+        val turn = startTurn(AppServerPermissionMode.Standard)
+        turn.client.emit(frames.userInputControlRequest())
+        runCurrent()
+        assertEquals(TEST_APPROVAL_REQUEST_ID, turn.engine.userInputApprovalId(USER_INPUT_TOOL_CALL_ID))
+        turn.client.approvalAck = InputAckFixture.rejected(APPROVAL_NOT_PENDING_ERROR)
+
+        val result = turn.engine.submitApprovalResponse(streamDeltaAutoAllow(TEST_APPROVAL_REQUEST_ID))
+        turn.engine.releaseUserInputGateUnlessRejected(result, USER_INPUT_TOOL_CALL_ID, TEST_APPROVAL_REQUEST_ID)
+
+        assertEquals(ApprovalSubmitResult.Accepted, result, "the server already resolved it")
+        assertNull(turn.engine.userInputApprovalId(USER_INPUT_TOOL_CALL_ID), "the gate is cleared as for an accepted reply")
+        turn.job.cancel()
+    }
+
+    @Test
+    fun controlRequestRejectedAsNoLongerPendingIsStillARejection() = runTest {
+        val turn = startTurn(AppServerPermissionMode.Standard)
+        turn.client.emit(frames.userInputControlRequest())
+        runCurrent()
+        turn.client.approvalAck = InputAckFixture.rejected(APPROVAL_NOT_PENDING_ERROR)
+
+        val controlRequestAnswer = streamDeltaAutoAllow(TEST_APPROVAL_REQUEST_ID).copy(answersStreamDelta = false)
+        val result = turn.engine.submitApprovalResponse(controlRequestAnswer)
+        turn.engine.releaseUserInputGateUnlessRejected(result, USER_INPUT_TOOL_CALL_ID, TEST_APPROVAL_REQUEST_ID)
+
+        assertEquals(ApprovalSubmitResult.Rejected(APPROVAL_NOT_PENDING_ERROR), result)
+        assertEquals(TEST_APPROVAL_REQUEST_ID, turn.engine.userInputApprovalId(USER_INPUT_TOOL_CALL_ID), "the gate stays open")
+        turn.job.cancel()
+    }
+
+    @Test
+    fun streamDeltaReplyRejectedForAnotherReasonIsStillARejection() = runTest {
+        val client = TurnEngineTestAckingClient(frames, InputAckFixture.Started)
+        client.approvalAck = InputAckFixture.rejected("Destination runtime is already processing")
+        val engine = engineFor(client, AppServerPermissionMode.Unrestricted)
+
+        val result = engine.submitApprovalResponse(streamDeltaAutoAllow("approval-2"))
+
+        assertEquals(ApprovalSubmitResult.Rejected("Destination runtime is already processing"), result)
+    }
+
+    @Test
+    fun unrestrictedApprovalRequestMessageSendsNoReply() = runTest {
+        val turn = startTurn(AppServerPermissionMode.Unrestricted)
+        turn.client.emit(frames.approvalRequestMessage(toolName = "Bash"))
+        runCurrent()
+
+        assertTrue(turn.client.approvalInputs().isEmpty(), "no approval_response for an informational delta")
+        assertTrue(turn.client.plainInputs.none { it.approvalRequestId() != null })
+        val toolCall = turn.drafts.mapNotNull { it.payload as? RuntimeEventPayload.ToolCallObserved }.single()
+        assertEquals("tool-call-1", toolCall.toolCallId.value)
+        assertEquals(0, turn.drafts.approvalCards())
+        turn.job.cancel()
+    }
+
+    @Test
+    fun unrestrictedControlRequestIsStillAnswered() = runTest {
+        val turn = startTurn(AppServerPermissionMode.Unrestricted)
+        turn.client.emit(frames.approvalControlRequest())
+        runCurrent()
+
+        assertEquals(listOf(TEST_APPROVAL_REQUEST_ID), turn.client.approvalInputs().map { it.approvalRequestId() })
+        turn.job.cancel()
+    }
+
     private class RunningTurn(
         val client: TurnEngineTestAckingClient,
         val engine: AppServerTurnEngine,
@@ -145,8 +215,28 @@ class AppServerTurnEngineApprovalAcceptanceTest {
         val allow = AppServerApprovalResponseDecision.Allow(message = "ok")
         val deny = AppServerApprovalResponseDecision.Deny(message = "not now")
 
+        const val USER_INPUT_TOOL_CALL_ID = "tool-call-ask-1"
+
         fun submission(approvalRequestId: String, decision: AppServerApprovalResponseDecision) =
             ApprovalSubmission(runtime, approvalRequestId, decision)
+
+        fun streamDeltaAutoAllow(approvalRequestId: String) = ApprovalSubmission(
+            runtime,
+            approvalRequestId,
+            AppServerApprovalResponseDecision.Allow(message = "Approved by default mobile policy."),
+            source = "auto_allow",
+            answersStreamDelta = true,
+            toolName = "Bash",
+        )
+
+        fun TurnEngineTestFrames.userInputControlRequest() = approvalControlRequest().copy(
+            request = buildJsonObject {
+                put("subtype", "can_use_tool")
+                put("tool_name", "AskUserQuestion")
+                put("tool_call_id", USER_INPUT_TOOL_CALL_ID)
+                put("input", buildJsonObject { put("question", "pick one") })
+            },
+        )
         val command = TurnCommand(
             backendId = BackendId("iroh-node-server"),
             runtimeId = RuntimeId("iroh-node:agent-1:conv-1"),

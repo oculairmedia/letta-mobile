@@ -19,6 +19,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
+import com.letta.mobile.data.repository.api.AgentBlockTarget
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -359,15 +360,45 @@ class IrohAdminRpcAgentDirectory(
         body = AdminRpcBody(json.encodeToString(BlockCreateParams.serializer(), params)),
     )
 
-    suspend fun updateBlock(blockId: BlockId, params: BlockUpdateParams): Block = adminRpcDecoded(
-        method = AdminRpcMethod("block.update"),
-        path = AdminRpcPath("/v1/blocks/${blockId.value}"),
+    suspend fun updateBlock(blockId: BlockId, params: BlockUpdateParams): Block = sendBlockUpdate(
+        BlockUpdateRoute(
+            method = AdminRpcMethod("block.update"),
+            path = AdminRpcPath("/v1/blocks/${blockId.value}"),
+            keys = mapOf("block_id" to blockId.value),
+        ),
+        params,
+    )
+
+    /**
+     * Agent + label block write (`block.update_agent`). The node maps it onto the
+     * App Server's `write_memory_file`, which commits the MemFS change; the
+     * global-id [updateBlock] route fails closed on the native local backend.
+     */
+    suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block = sendBlockUpdate(
+        BlockUpdateRoute(
+            method = AdminRpcMethod("block.update_agent"),
+            path = AdminRpcPath("/v1/agents/${target.agentId}/core-memory/blocks/${target.label}"),
+            keys = mapOf("agent_id" to target.agentId, "label" to target.label),
+        ),
+        params,
+    )
+
+    /** Both block-update routes share one body shape: address keys + the changed fields. */
+    private suspend fun sendBlockUpdate(route: BlockUpdateRoute, params: BlockUpdateParams): Block = adminRpcDecoded(
+        method = route.method,
+        path = route.path,
         body = jsonBody {
-            put("block_id", blockId.value)
+            route.keys.forEach { (key, value) -> put(key, value) }
             params.value?.let { put("value", it) }
             params.limit?.let { put("limit", it) }
             params.description?.let { put("description", it) }
         },
+    )
+
+    private data class BlockUpdateRoute(
+        val method: AdminRpcMethod,
+        val path: AdminRpcPath,
+        val keys: Map<String, String>,
     )
 
     suspend fun deleteBlock(blockId: BlockId) {

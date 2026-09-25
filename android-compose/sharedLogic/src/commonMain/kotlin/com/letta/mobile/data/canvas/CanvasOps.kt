@@ -213,6 +213,12 @@ data class CanvasGetSceneResult(
     @SerialName("scene_json")
     val sceneJson: String,
     val revision: Long,
+    /** The canvas read, so a call that named none learns which it got. */
+    @SerialName("canvas_id")
+    val canvasId: String? = null,
+    /** The element format in a line ([CanvasSceneSchema.hint]). */
+    @SerialName("schema_hint")
+    val schemaHint: String? = null,
 )
 
 @Serializable
@@ -227,6 +233,8 @@ data class CanvasReplaceSceneArgs(
 data class CanvasReplaceSceneResult(
     val ok: Boolean,
     val revision: Long,
+    @SerialName("canvas_id")
+    val canvasId: String? = null,
 )
 
 @Serializable
@@ -240,6 +248,8 @@ data class CanvasApplyOpsArgs(
 data class CanvasApplyOpsResult(
     val ok: Boolean,
     val revision: Long,
+    @SerialName("canvas_id")
+    val canvasId: String? = null,
 )
 
 @Serializable
@@ -264,4 +274,17 @@ data class CanvasListArgs(
 @Serializable
 data class CanvasListResult(
     val ids: List<String>,
+    /** The same canvases with what an agent needs to pick one; [CanvasListEntry.current] is the caller's own conversation's. */
+    val canvases: List<CanvasListEntry> = emptyList(),
+)
+
+@Serializable
+data class CanvasListEntry(
+    @SerialName("canvas_id")
+    val canvasId: String,
+    val title: String? = null,
+    @SerialName("conversation_id")
+    val conversationId: String? = null,
+    /** This is the canvas of the conversation the call came from: the one tools use when given no canvas_id. */
+    val current: Boolean = false,
 )

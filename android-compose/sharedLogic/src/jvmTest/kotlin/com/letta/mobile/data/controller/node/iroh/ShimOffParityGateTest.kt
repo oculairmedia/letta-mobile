@@ -167,6 +167,19 @@ class ShimOffParityGateTest {
         override suspend fun skillEnable(command: AppServerCommand.SkillEnable) =
             AppServerInboundFrame.SkillEnableResponse(command.requestId, true, "demo")
 
+        // letta-mobile-w4q4p: provider connect + model switch.
+        override suspend fun listConnectProviders(command: AppServerCommand.ListConnectProviders) =
+            AppServerInboundFrame.ListConnectProvidersResponse(command.requestId, true, command.target, emptyList())
+
+        override suspend fun connectProvider(command: AppServerCommand.ConnectProvider) =
+            AppServerInboundFrame.ConnectProviderResponse(command.requestId, true, command.target, emptyList(), true)
+
+        override suspend fun disconnectProvider(command: AppServerCommand.DisconnectProvider) =
+            AppServerInboundFrame.DisconnectProviderResponse(command.requestId, true, command.target, emptyList(), true)
+
+        override suspend fun updateModel(command: AppServerCommand.UpdateModel) =
+            AppServerInboundFrame.UpdateModelResponse(command.requestId, true, command.runtime, appliedTo = "conversation")
+
         override suspend fun skillDisable(command: AppServerCommand.SkillDisable) =
             AppServerInboundFrame.SkillDisableResponse(command.requestId, true)
 
@@ -324,6 +337,11 @@ class ShimOffParityGateTest {
         put("block_id", LocalBackendFixtureStore.blockId)
         put("label", LocalBackendFixtureStore.BLOCK_LABEL)
         put("value", "updated by the parity gate")
+        // letta-mobile-w4q4p rows: provider.connect/disconnect, model.update, model.exposure.set.
+        put("provider_id", "openai")
+        put("model_handle", "openai/gpt-sol")
+        put("handle", "openai/gpt-sol")
+        put("exposed", false)
         if (method == "schedule.create") {
             put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
             put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))

@@ -99,15 +99,14 @@ internal fun RunActivityDisclosure(
                     .rotate(if (collapsed) 0f else 180f),
             )
         }
-        Text(
-            text = text.title,
-            style = textStyle,
-            color = if (activity.isActive) {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f)
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
+        val titleColor = if (activity.isActive) {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        RunHeaderLabel(label = text.title, reducedMotion = rememberReducedMotionEnabled()) { title ->
+            Text(text = title, style = textStyle, color = titleColor)
+        }
         ActivityCounts(activity, isSimpleMode = isSimpleMode)
     }
 }

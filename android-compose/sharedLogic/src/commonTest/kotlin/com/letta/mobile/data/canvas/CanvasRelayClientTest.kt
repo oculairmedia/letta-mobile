@@ -67,8 +67,13 @@ internal class TestApp(
     val delivery: InMemoryCanvasDeliveryStore = InMemoryCanvasDeliveryStore(),
     val documents: CanvasDocumentStore = InMemoryCanvasDocumentStore(),
     val assets: com.letta.mobile.data.storage.AssetStore? = null,
+    /** Whether ops for a board that is not open go into the stored canvas, as the apps bind it. */
+    closedBoard: Boolean = false,
 ) {
-    val client = CanvasRelayClient(opLog, delivery, topicOf = { documents.relayTopicOf(it) }, assets = assets)
+    val client = CanvasRelayClient(
+        opLog, delivery, topicOf = { documents.relayTopicOf(it) }, assets = assets,
+        closedBoard = if (closedBoard) StoreCanvasClosedBoardApplier(documents, opLog) else null,
+    )
     lateinit var session: CanvasSession
     var connection: TestConnection? = null
     private var running: Job? = null
@@ -89,6 +94,11 @@ internal class TestApp(
         connection = next
         running = scope.launch { client.run(next) }
         return next
+    }
+
+    /** The board closes: its session stops taking ops, the connection stays. */
+    fun close() {
+        syncing?.cancel()
     }
 
     suspend fun disconnect() {

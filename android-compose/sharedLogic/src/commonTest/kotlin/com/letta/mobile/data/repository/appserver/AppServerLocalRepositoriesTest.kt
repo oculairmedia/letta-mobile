@@ -4,6 +4,8 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.BlockUpdateParams
+import com.letta.mobile.data.repository.api.AgentBlockTarget
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -22,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -142,6 +145,32 @@ class AppServerLocalRepositoriesTest {
         assertFailsWith<IllegalStateException> { transport.listAgentBlocks("agent-1") }
     }
 
+    @Test
+    fun blockRepositoryWritesByAgentAndLabel() = runTest {
+        val transport = FakeTransport()
+        val write = BlockWrite(AgentBlockTarget("agent-1", "human"), BlockUpdateParams(value = "Prefers tea"))
+
+        val saved = AppServerAgentBlockRepository(transport).writeAgentBlock(write.target, write.params)
+
+        assertEquals(write, transport.lastUpdate)
+        assertEquals(write.params.value, saved.value)
+    }
+
+    @Test
+    fun defaultTransportSendsBlockUpdateAgent() = runTest {
+        val client = FakeClient { okBlocks("""{"id":"block-1","label":"human","value":"new"}""") }
+        val transport = DefaultAppServerLocalRepositoryTransport({ client }) { it }
+
+        val write = BlockWrite(AgentBlockTarget("agent-1", "human"), BlockUpdateParams(value = "new"))
+
+        transport.updateAgentBlock(write.target, write.params)
+
+        val call = client.adminRpcCalls.single()
+        assertEquals("block.update_agent", call.method)
+        assertEquals(write.target.label, call.params?.get("label")?.jsonPrimitive?.content)
+        assertEquals(write.params.value, call.params?.get("value")?.jsonPrimitive?.content)
+    }
+
     private class FakeTransport(
         private val agents: JsonArray = JsonArray(emptyList()),
         private val blocks: JsonArray = JsonArray(emptyList()),
@@ -165,7 +194,20 @@ class AppServerLocalRepositoriesTest {
             lastBlockAgentId = agentId
             return blocks
         }
+
+        var lastUpdate: BlockWrite? = null
+
+        override suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement {
+            lastUpdate = BlockWrite(target, params)
+            return AppServerProtocol.json.encodeToJsonElement(
+                Block.serializer(),
+                Block(id = BlockId("block-${target.label}"), label = target.label, value = params.value.orEmpty()),
+            )
+        }
     }
+
+    /** One agent-block write as the transport sees it. */
+    private data class BlockWrite(val target: AgentBlockTarget, val params: BlockUpdateParams)
 
     private class FakeClient(
         private val responder: (AppServerCommand.AdminRpc) -> AppServerInboundFrame.AdminRpcResponse,

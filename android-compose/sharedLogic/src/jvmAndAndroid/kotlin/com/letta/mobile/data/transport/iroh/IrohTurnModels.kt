@@ -22,6 +22,9 @@ enum class IrohTerminalSource {
     Observer,
     CancelSynthetic,
     Disconnect,
+
+    /** letta-mobile-qygvv.16: the session carrying the turn was lost and nobody else ended it. */
+    SessionLost,
 }
 
 enum class IrohFrameOwner {

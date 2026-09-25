@@ -14,11 +14,8 @@ internal data class ChatSendContext(
     val backendKind: BackendKind = BackendKind.REST,
     val isLocalRuntime: Boolean = false,
 ) {
-    /** Iroh or shim WS — i.e. a duplex frame channel rather than REST. */
+    /** Iroh — i.e. a duplex frame channel rather than REST. */
     val usesChannelTransport: Boolean get() = backendKind.usesChannelTransport
-
-    /** ONLY the genuine LettaShim. Never true for Iroh. */
-    val isShimBackend: Boolean get() = backendKind.isShim
 }
 
 internal interface ChatSendStrategy {

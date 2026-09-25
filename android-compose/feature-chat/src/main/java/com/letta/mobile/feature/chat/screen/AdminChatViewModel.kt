@@ -169,6 +169,8 @@ internal class AdminChatViewModel @Inject constructor(
     /** App-wide run state; this screen publishes its conversation here for the lists and the mascots. */
     private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry =
         com.letta.mobile.data.presence.ConversationRunRegistry(),
+    /** letta-mobile-w4q4p: conversation-scoped model switch; null keeps the agent-update path. */
+    private val modelControl: com.letta.mobile.feature.chat.coordination.ChatModelControl? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -253,9 +255,8 @@ internal class AdminChatViewModel @Inject constructor(
         get() = routeArgs.explicitNewChat
     /**
      * lgns8.10.4.1: the chat screen's real question is "is this backend served
-     * by a frame channel?" (Iroh **or** shim WS) — not "is this the shim?".
-     * The detector answers both separately now; the old `activeIsShimBackend`
-     * returned true for Iroh, which is exactly the inversion this bead fixes.
+     * by a frame channel?" — not "is this the shim?". Since g70jb.4 only Iroh
+     * is; a leftover shim-era config classifies as REST.
      */
     private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
         .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveUsesChannelTransport())
@@ -406,6 +407,8 @@ internal class AdminChatViewModel @Inject constructor(
             settingsRepository = settingsRepository,
             activeAgent = activeAgent,
             bannerController = chatBannerController,
+            modelControl = modelControl,
+            conversationId = { conversationId?.value },
         )
     }
 
@@ -580,7 +583,19 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun refreshModels() = modelCoordinator.refreshModels()
 
-    fun updateActiveAgentModel(handle: String) = modelCoordinator.updateActiveAgentModel(handle)
+    fun updateActiveAgentModel(
+        handle: String,
+        effort: com.letta.mobile.feature.chat.coordination.EffortSelection =
+            com.letta.mobile.feature.chat.coordination.EffortSelection.Keep,
+    ) = modelCoordinator.updateActiveAgentModel(
+        com.letta.mobile.feature.chat.coordination.ModelPick(
+            com.letta.mobile.data.repository.modelcontrol.ModelHandle(handle.trim()),
+            effort,
+        ),
+    )
+
+    fun reasoningEffortsFor(handle: String?): List<String> =
+        modelCoordinator.reasoningEffortsFor(handle?.let { com.letta.mobile.data.repository.modelcontrol.ModelHandle(it) })
 
     fun refreshAvailableAgents() {
         viewModelScope.launch {
@@ -1056,6 +1071,28 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
     }
 
+    // --- Send queue (letta-mobile-1n5py) ---
+    /** True when a message sent during a turn is queued behind it (the Iroh route). */
+    val canQueueWhileStreaming: Boolean
+        get() = composerCoordinator.canQueueWhileStreaming()
+
+    /** letta-mobile-1n5py: the queued-sends panel's controls; Send now and Resume start a new turn. */
+    val queuedSendActions: com.letta.mobile.ui.chat.QueuedSendActions by lazy(LazyThreadSafetyMode.NONE) {
+        com.letta.mobile.ui.chat.QueuedSendActions(
+            onCancel = { id -> if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.sendQueue.cancel(id) },
+            onSendNow = { id -> startQueuedTurn { sendNow(id) } },
+            onResume = {
+                uiState.value.sendQueue.items.firstOrNull()?.conversationId?.let { id -> startQueuedTurn { resume(id) } }
+            },
+        )
+    }
+
+    private fun startQueuedTurn(action: com.letta.mobile.data.chat.send.ChatSendQueueControls.() -> Unit) {
+        if (replacingSendRuntime) return
+        composerCoordinator.beginQueuedTurn()
+        sendPipeline.wsChatSendCoordinator.sendQueue.action()
+    }
+
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
 
@@ -1066,12 +1103,6 @@ internal class AdminChatViewModel @Inject constructor(
     // Keep startup after all backing fields and lazy delegates: Main.immediate can
     // resolve a cached route and start its observer before this constructor returns.
     init {
-        viewModelScope.launch {
-            shimBackendDetector.refreshActive()
-            settingsRepository.activeConfigChanges.collect { config ->
-                shimBackendDetector.refresh(config)
-            }
-        }
         transportCoordinator.startObserving()
         goalCoordinator.startObserving()
         slashCommandsCoordinator.loadSlashCommands()

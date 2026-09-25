@@ -139,6 +139,22 @@ object LettaDimens {
     }
 
     /**
+     * Pane geometry for surfaces that switch between a phone sheet and a
+     * side panel: at or above [wideBreakpoint] a detail pane docks beside the
+     * content at [sidePanelWidth]; below it the pane overlays as a sheet.
+     */
+    object Pane {
+        val sidePanelWidth: Dp = 380.dp
+        val wideBreakpoint: Dp = 720.dp
+
+        /** Longest line a graph node label may take before it ellipsizes. */
+        val nodeLabelMaxWidth: Dp = 120.dp
+
+        /** Smallest height an in-pane multi-line editor collapses to. */
+        val editorMinHeight: Dp = 160.dp
+    }
+
+    /**
      * Content alpha floors.
      *
      * [disabled] is 0.6, not the 0.38 Material suggests, because the muted

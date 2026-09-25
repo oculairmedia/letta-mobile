@@ -50,7 +50,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * Right-side "Background tasks" panel (Penpot "App Mockups v2" desktop board):
  * the active-subagent registry split into Running (animated activity orb +
  * expandable todo log) and Finished (status icon + Clear). Fed by the shared
- * SubagentRepository over the desktop WS side-channel.
+ * SubagentRepository over the Iroh channel transport (empty on HTTP backends).
  */
 @Composable
 internal fun DesktopBackgroundTasksPanel(

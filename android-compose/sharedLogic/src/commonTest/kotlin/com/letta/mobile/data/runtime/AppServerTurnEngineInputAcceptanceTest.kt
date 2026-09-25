@@ -91,7 +91,7 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun queuedInputPausesWatchdogUntilFirstStreamFrame() = runTest {
+    fun queuedInputPausesWatchdogUntilDequeued() = runTest {
         val turn = startTurn(InputAckFixture.Queued)
 
         assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "queued input must be visible")
@@ -103,14 +103,14 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertTrue(turn.isBusy, "watchdog must be paused while queued")
         assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
 
-        // A stream frame from the earlier turn must not unpause the watchdog while queued.
-        turn.client.emitStreamDelta("assistant_message")
+        // A stream frame of the turn ahead is not this input starting: still paused.
+        turn.client.emitStreamDelta("assistant_message", runAhead)
         runCurrent()
         advanceTimeBy(IDLE_TIMEOUT_MS * 5)
         runCurrent()
-        assertTrue(turn.isBusy, "stream frame from earlier turn must not trip watchdog while queued")
+        assertTrue(turn.isBusy, "the turn ahead must not end the queued wait")
 
-        // Once dequeued, fresh silence trips the armed watchdog.
+        // This input is dequeued: the watchdog is armed again and trips on fresh silence.
         turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
         runCurrent()
         idleOut(turn)
@@ -226,12 +226,12 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
-    fun startEvidenceBeforeQueuedAckKeepsWatchdogArmed() = runTest {
+    fun dequeueBeforeQueuedAckKeepsWatchdogArmed() = runTest {
         val gate = CompletableDeferred<AppServerInboundFrame.InputAccepted>()
         val turn = startTurn(InputAckFixture.Queued) { ackGate = gate }
 
-        // The collector sees the turn start before the send coroutine resumes on the ack.
-        turn.client.emitStreamDelta("assistant_message")
+        // The collector sees this input dequeued before the send coroutine resumes on the ack.
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
         runCurrent()
         gate.complete(frames.inputAccepted(InputAckFixture.Queued))
         runCurrent()
@@ -239,6 +239,67 @@ class AppServerTurnEngineInputAcceptanceTest {
         assertFalse(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "a started turn must not regress to queued")
         idleOut(turn)
         assertEquals(RuntimeRunStatus.Failed, turn.drafts.lastLifecycle()?.status)
+    }
+
+    @Test
+    fun queuedLeaseDoesNotAdoptTheTurnAhead() = runTest {
+        val turn = startTurn(InputAckFixture.Queued)
+
+        // The turn ahead streams, stops, finishes and the loop goes idle while this input waits.
+        runAheadToIdle(turn)
+        advanceTimeBy(IDLE_TIMEOUT_MS / 2)
+        runCurrent()
+        assertTrue(turn.isBusy, "the turn ahead's terminal must not complete this lease")
+        assertEquals(RuntimeRunStatus.Running, turn.drafts.lastLifecycle()?.status)
+        assertFalse(turn.drafts.carriesRun(runAhead), "the turn ahead's run must not be adopted")
+
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        // A late turn_finished for the run ahead after the dequeue still belongs to that run.
+        turn.client.emitTurnFinished(runAhead, turn = 2)
+        runCurrent()
+        assertTrue(turn.isBusy)
+
+        finishOwnRun(turn)
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
+        assertFalse(turn.drafts.carriesRun(runAhead), "no draft of the run ahead reaches this lease")
+        assertFalse(turn.isBusy)
+    }
+
+    @Test
+    fun turnAheadFramesBeforeTheQueuedAckAreNotAdopted() = runTest {
+        val gate = CompletableDeferred<AppServerInboundFrame.InputAccepted>()
+        val turn = startTurn(InputAckFixture.Queued) { ackGate = gate }
+
+        // The turn ahead is still streaming when this input is sent; its delta beats the ack.
+        turn.client.emitStreamDelta("assistant_message", runAhead)
+        runCurrent()
+        gate.complete(frames.inputAccepted(InputAckFixture.Queued))
+        runCurrent()
+        assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "the input is queued, not started")
+
+        turn.client.emitTurnFinished(runAhead, turn = 1)
+        runCurrent()
+        assertTrue(turn.isBusy, "the turn ahead's turn_finished must not complete this lease")
+
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        finishOwnRun(turn)
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
+    }
+
+    @Test
+    fun acceptanceWaitEndsWhenTheTurnCompletes() = runTest {
+        // The ack never arrives (a lost input_accepted): the turn's own terminal must still end it.
+        val turn = startTurn(InputAckFixture.Started) { ackGate = CompletableDeferred() }
+
+        turn.client.emitStreamDelta("assistant_message")
+        turn.client.emitTurnFinished(TestRun("run-1"), turn = 1)
+        runCurrent()
+        advanceTimeBy(IDLE_TIMEOUT_MS / 2)
+        runCurrent()
+
+        assertTrue(turn.job.isCompleted, "a completed collector must not wait on the acceptance request")
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
+        assertFalse(turn.isBusy)
     }
 
     @Test
@@ -284,6 +345,24 @@ class AppServerTurnEngineInputAcceptanceTest {
         turn.job.join()
     }
 
+    /** The turn ahead of a queued input streams, stops, finishes and idles the loop. */
+    private fun TestScope.runAheadToIdle(turn: RunningTurn) {
+        turn.client.emitStreamDelta("assistant_message", runAhead)
+        turn.client.emitStreamDelta("stop_reason", runAhead)
+        turn.client.emitTurnFinished(runAhead, turn = 1)
+        turn.client.emitLoopStatus(TestLoopState.WaitingOnInput)
+        runCurrent()
+    }
+
+    /** This lease's own run streams and finishes; waits for the turn to end. */
+    private suspend fun TestScope.finishOwnRun(turn: RunningTurn) {
+        turn.client.emitStreamDelta("assistant_message", runOwn)
+        turn.client.emitTurnFinished(runOwn, turn = 3)
+        finish(turn)
+    }
+
+    private fun List<RuntimeEventDraft>.carriesRun(run: TestRun) = any { it.runId?.value == run.id }
+
     /** Lets the idle window lapse with no frames, then waits for the turn to end. */
     private suspend fun TestScope.idleOut(turn: RunningTurn) {
         advanceTimeBy(IDLE_TIMEOUT_MS + 1)
@@ -294,6 +373,8 @@ class AppServerTurnEngineInputAcceptanceTest {
         const val IDLE_TIMEOUT_MS = 1_000L
         const val LOCAL_MESSAGE_ID = "local-1"
         val frames = TurnEngineTestFrames(AppServerRuntimeScope("agent-1", "conv-1"))
+        val runAhead = TestRun("run-ahead")
+        val runOwn = TestRun("run-own")
         val command = TurnCommand(
             backendId = BackendId("iroh-node-server"),
             runtimeId = RuntimeId("iroh-node:agent-1:conv-1"),

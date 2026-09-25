@@ -47,6 +47,9 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
     /** Authoritative turn boundaries for THIS key (letta-mobile-qygvv.2). */
     val boundaryGate = TurnBoundaryGate()
 
+    /** Lease -> server run binding for THIS key (letta-mobile-qygvv.8). */
+    val runBinding = TurnRunBinding()
+
     /** Cached `runtime_start` scope for this key (was one global slot). */
     private val runtimeScopeRef = atomic<AppServerRuntimeScope?>(null)
 
@@ -75,6 +78,10 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
     var runtimeScope: AppServerRuntimeScope?
         get() = runtimeScopeRef.value
         set(value) { runtimeScopeRef.value = value }
+
+    /** The cached runtime scope, or the key's own scope when none was cached yet. */
+    fun runtimeScopeOrDefault(): AppServerRuntimeScope =
+        runtimeScope ?: AppServerRuntimeScope(agentId = key.agentId, conversationId = key.conversationId)
 
     /** A lease is held (Preparing … Streaming/Retiring) but has not gone Terminal. */
     val isBusy: Boolean

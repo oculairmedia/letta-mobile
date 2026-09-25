@@ -127,6 +127,22 @@ interface AppServerClient {
     suspend fun skillEnable(command: AppServerCommand.SkillEnable): AppServerInboundFrame.SkillEnableResponse =
         throw UnsupportedOperationException("skill_enable is not supported by this client")
 
+    suspend fun listConnectProviders(
+        command: AppServerCommand.ListConnectProviders,
+    ): AppServerInboundFrame.ListConnectProvidersResponse =
+        throw UnsupportedOperationException("list_connect_providers is not supported by this client")
+
+    suspend fun connectProvider(command: AppServerCommand.ConnectProvider): AppServerInboundFrame.ConnectProviderResponse =
+        throw UnsupportedOperationException("connect_provider is not supported by this client")
+
+    suspend fun disconnectProvider(
+        command: AppServerCommand.DisconnectProvider,
+    ): AppServerInboundFrame.DisconnectProviderResponse =
+        throw UnsupportedOperationException("disconnect_provider is not supported by this client")
+
+    suspend fun updateModel(command: AppServerCommand.UpdateModel): AppServerInboundFrame.UpdateModelResponse =
+        throw UnsupportedOperationException("update_model is not supported by this client")
+
     suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         throw UnsupportedOperationException("skill_disable is not supported by this client")
 
@@ -372,6 +388,22 @@ class DefaultAppServerClient(
 
     override suspend fun skillEnable(command: AppServerCommand.SkillEnable): AppServerInboundFrame.SkillEnableResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SkillEnableResponse }) { transport.sendControl(command) }
+
+    override suspend fun listConnectProviders(
+        command: AppServerCommand.ListConnectProviders,
+    ): AppServerInboundFrame.ListConnectProvidersResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ListConnectProvidersResponse }) { transport.sendControl(command) }
+
+    override suspend fun connectProvider(command: AppServerCommand.ConnectProvider): AppServerInboundFrame.ConnectProviderResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConnectProviderResponse }) { transport.sendControl(command) }
+
+    override suspend fun disconnectProvider(
+        command: AppServerCommand.DisconnectProvider,
+    ): AppServerInboundFrame.DisconnectProviderResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.DisconnectProviderResponse }) { transport.sendControl(command) }
+
+    override suspend fun updateModel(command: AppServerCommand.UpdateModel): AppServerInboundFrame.UpdateModelResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.UpdateModelResponse }) { transport.sendControl(command) }
 
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SkillDisableResponse }) { transport.sendControl(command) }

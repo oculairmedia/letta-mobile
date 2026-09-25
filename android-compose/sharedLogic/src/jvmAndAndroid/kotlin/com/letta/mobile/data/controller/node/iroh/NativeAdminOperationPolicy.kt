@@ -40,6 +40,11 @@ enum class NativeAdminOp(
     ToolReturnGet("tool_return.get", NativeAdminOperationPolicy.Read),
 
     ModelList("model.list", NativeAdminOperationPolicy.Read),
+    ModelUpdate("model.update", NativeAdminOperationPolicy.MutationAmbiguous),
+
+    ProviderList("provider.list", NativeAdminOperationPolicy.Read),
+    ProviderConnect("provider.connect", NativeAdminOperationPolicy.MutationAmbiguous),
+    ProviderDisconnect("provider.disconnect", NativeAdminOperationPolicy.MutationAmbiguous),
 
     SkillInstall("skill.install", NativeAdminOperationPolicy.MutationAmbiguous),
     SkillUninstall("skill.uninstall", NativeAdminOperationPolicy.MutationAmbiguous),

@@ -97,6 +97,11 @@ class IrohChannelTransport(
     // expire young-in-flight protection without waiting the production 45s window.
     private val livenessCongestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
     livenessMaxDetectionMs: Long = IrohLivenessProbe.MAX_DETECTION_MS,
+    // How long an engine-owned turn's own terminal has before the observer's copy stands in.
+    // Overridable so real-time tests of the fallback need not wait the production window.
+    private val observerTerminalGraceMs: Long = IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS,
+    // letta-mobile-qygvv.16: how long a turn whose session closed has to publish its own terminal.
+    private val sessionLossTerminalGraceMs: Long = IrohSessionLossCutOff.SESSION_LOSS_TERMINAL_GRACE_MS,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
@@ -118,7 +123,9 @@ class IrohChannelTransport(
     override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()
 
     /** Emit to canonical frame publisher so both direct consumers and
-     *  WsChatBridge (via frameEvents) see each frame exactly once without split histories. */
+     *  WsChatBridge (via frameEvents) see each frame exactly once without split histories.
+     *  letta-mobile-qygvv.11: this is the single ingest point — the publisher drops exact
+     *  duplicates here, before fan-out, so no subscriber pays for them. */
     private suspend fun emitBoth(frame: ServerFrame) {
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
         adminRpcExecutor.recordStreamActivity()
@@ -222,22 +229,22 @@ class IrohChannelTransport(
             .map { (it as? IrohConnectionState.Ready)?.handle }
             .distinctUntilChanged { a, b -> a === b }
 
+    /**
+     * letta-mobile-qygvv.16: the session is closing, so every turn it carried must still end. The
+     * cut-off lets each engine publish its own terminal before its job is cancelled, and stands
+     * in with a synthetic one when none arrives in time.
+     */
     private fun handleCloseResources(reason: String) {
-        turnRegistry.allSendJobEntries().forEach { registration ->
-            val conversationId = registration.conversationId
-            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
-            val turn = turnRegistry.getActiveTurn(conversationId)
-            if (turn != null && !turn.hasTerminal) {
-                Telemetry.event(
-                    "IrohTransport", "turn.torn_down_nonterminal",
-                    "reason" to reason,
-                    "conversationId" to conversationId.value,
-                    "turnId" to turn.turnId,
-                    "runId" to turn.runId,
-                )
-            }
-            runCatching { job.cancel() }
-        }
+        sessionLossCutOff.cutOff(reason)
+    }
+
+    private val sessionLossCutOff by lazy {
+        IrohSessionLossCutOff(
+            scope = scope,
+            registry = turnRegistry,
+            emitBoth = ::emitBoth,
+            graceMs = sessionLossTerminalGraceMs,
+        )
     }
 
     private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
@@ -357,6 +364,7 @@ class IrohChannelTransport(
             emitBoth = ::emitBoth,
             adminRpc = { method, path, body -> adminRpc(method, path, body) },
             recordFrameOwnership = ::recordFrameOwnership,
+            observerTerminalGraceMs = observerTerminalGraceMs,
         )
     }
 
@@ -908,11 +916,8 @@ class IrohChannelTransport(
                 val handle = supervisor.ready()
                 // letta-mobile-8xxzv: keyed abort — a cancel for THIS conversation
                 // must be addressed to THIS conversation's runtime scope.
-                handle.turnEngine?.abort(
-                    agentId = turn.agentId,
-                    conversationId = turn.conversationId,
-                    runId = turn.runId.takeUnless { it.isIrohSyntheticRunId() },
-                )
+                // letta-mobile-qygvv.9: never for a turn still queued on the server.
+                handle.turnEngine?.abortUnlessQueued(turn)
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 Telemetry.event(

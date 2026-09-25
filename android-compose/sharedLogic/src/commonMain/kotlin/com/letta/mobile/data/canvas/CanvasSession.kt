@@ -193,11 +193,28 @@ class CanvasSession(
             )
             return null
         }
-        if (opLog.has(canvasId, op.opId)) return null
+        if (opLog.has(canvasId, op.opId)) {
+            adoptNewerStored()
+            return null
+        }
         opLog.append(canvasId, op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         commitScene(newScene)
+    }
+
+    /**
+     * An op already in the log may have been applied without this session: straight into the store
+     * while no board was open ([CanvasClosedBoardApplier]), just as this one was loading. The store
+     * is then ahead of what this session holds, and is taken as it is; carrying on from the older
+     * copy would write the op back out of the scene on the next edit (letta-mobile-qygvv.23).
+     */
+    private suspend fun adoptNewerStored() {
+        val stored = store.get(canvasId) ?: return
+        val held = _document.value?.revision ?: return
+        if (stored.revision <= held) return
+        _document.value = stored
+        adoptLamportOf(stored)
     }
 
     /**

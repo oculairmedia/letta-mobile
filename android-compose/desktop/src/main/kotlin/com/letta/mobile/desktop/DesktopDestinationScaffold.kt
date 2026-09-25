@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
@@ -35,9 +36,9 @@ import com.letta.mobile.desktop.home.DesktopHomeActions
 import com.letta.mobile.desktop.home.DesktopHomeState
 import com.letta.mobile.desktop.home.DesktopHomeSurface
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
-import com.letta.mobile.desktop.memory.DesktopBlockApi
-import com.letta.mobile.desktop.memory.DesktopMemorySurface
-import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
+import com.letta.mobile.data.memory.graph.MemoryPageActions
+import com.letta.mobile.data.memory.graph.MemoryPageState
+import com.letta.mobile.ui.memory.MemoryPage
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
 import com.letta.mobile.desktop.skills.DesktopSkillsSurface
@@ -45,11 +46,6 @@ import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceActions
 import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceState
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.theme.LettaDimens
-
-internal data class DestinationMemoryActions(
-    val onRefresh: () -> Unit,
-    val onAgentSelected: (String) -> Unit,
-)
 
 internal data class DestinationScheduleInputs(
     val scheduleLibraryState: DesktopScheduleLibraryState,
@@ -111,11 +107,10 @@ internal data class DestinationContentInputs(
     val railRecencyDays: Int = RAIL_RECENCY_DAYS_DEFAULT,
     val home: DesktopHomeState,
     val chat: DesktopChatSurfaceState,
-    val memoryState: DesktopMemorySurfaceState,
+    val memoryState: MemoryPageState,
     val schedule: DestinationScheduleInputs,
     val channelLibraryState: DesktopChannelLibraryState,
     val toolLibraryState: DesktopToolLibraryState,
-    val blockApi: DesktopBlockApi?,
     val skills: DestinationSkillsInputs,
     val nucleus: DesktopNucleusState,
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
@@ -135,7 +130,7 @@ internal data class DestinationNucleusActions(
 internal data class DestinationContentActions(
     val home: DesktopHomeActions,
     val onRetryConnection: () -> Unit,
-    val memory: DestinationMemoryActions,
+    val memory: MemoryPageActions,
     val schedules: DestinationScheduleActions,
     val onChannelsRefresh: () -> Unit,
     val tools: DestinationToolsActions,
@@ -176,6 +171,7 @@ private val DesktopDestination.icon: ImageVector
         DesktopDestination.Memory -> Icons.Outlined.Memory
         DesktopDestination.Schedules -> Icons.Outlined.Schedule
         DesktopDestination.Channels -> Icons.Outlined.Hub
+        DesktopDestination.Providers -> Icons.Outlined.Tune
         DesktopDestination.Conversations -> Icons.Outlined.Forum
         DesktopDestination.Settings -> Icons.Outlined.Settings
     }
@@ -197,7 +193,6 @@ internal fun DestinationContent(
         )
         DesktopDestination.Memory -> MemoryDestinationContent(
             memoryState = inputs.memoryState,
-            blockApi = inputs.blockApi,
             actions = actions.memory,
             modifier = modifier,
         )
@@ -206,6 +201,9 @@ internal fun DestinationContent(
             actions = actions.schedules,
             modifier = modifier,
         )
+        DesktopDestination.Providers -> inputs.state.modelControlRpc?.let { rpc ->
+            ProvidersDestinationContent(rpc = rpc, modifier = modifier)
+        }
         DesktopDestination.Channels -> ChannelsDestinationContent(
             channelLibraryState = inputs.channelLibraryState,
             onChannelsRefresh = actions.onChannelsRefresh,
@@ -273,19 +271,11 @@ private fun HomeDestinationContent(
 
 @Composable
 private fun MemoryDestinationContent(
-    memoryState: DesktopMemorySurfaceState,
-    blockApi: DesktopBlockApi?,
-    actions: DestinationMemoryActions,
+    memoryState: MemoryPageState,
+    actions: MemoryPageActions,
     modifier: Modifier = Modifier,
 ) {
-    DesktopMemorySurface(
-        state = memoryState,
-        onRefresh = actions.onRefresh,
-        onAgentSelected = actions.onAgentSelected,
-        modifier = modifier,
-        blockApi = blockApi,
-        onBlockChanged = actions.onRefresh,
-    )
+    MemoryPage(state = memoryState, actions = actions, modifier = modifier)
 }
 
 @Composable

@@ -134,7 +134,7 @@ private fun backfillUnambiguousAssistantRun(
     }
 }
 
-private fun syntheticHydratedToolRunId(segment: List<UiMessage>): String? {
+internal fun syntheticHydratedToolRunId(segment: List<UiMessage>): String? {
     val assistantMessages = segment.filter { it.role == "assistant" }
     if (assistantMessages.size < 2 || assistantMessages.none { !it.toolCalls.isNullOrEmpty() }) return null
     if (assistantMessages.any { !it.runId.isNullOrBlank() }) return null
@@ -421,9 +421,11 @@ fun filterMessagesForMode(
     // model context, not user-visible conversation. Filter them from every
     // display mode so they never appear as user bubbles. The canonical skill
     // tool call (assistant TOOL_CALL) renders through the normal tool card.
+    // letta-mobile-jqiu3: whitespace-only assistant segments between tool calls draw
+    // nothing, so they must not become render rows that still claim padding.
     val afterFilter = messages.filterNot { msg ->
         SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role = msg.role, content = msg.content)
-    }
+    }.withoutContentlessSegments()
     return when (mode) {
         // letta-mobile-tz1sp (2026-08-05 product decision): Simple mode matches
         // Aether's standard streaming view. Mid-turn tool/reasoning frames must

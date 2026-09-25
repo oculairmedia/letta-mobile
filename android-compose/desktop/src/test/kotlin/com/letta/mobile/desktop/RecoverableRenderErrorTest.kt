@@ -36,7 +36,7 @@ class RecoverableRenderErrorTest {
         // The phrase alone is not the fault. A session, a transport or anything else saying it is
         // disposed is a real failure, and swallowing it would hide exactly what we need to see.
         assertFalse(isRecoverableRenderError(IllegalArgumentException("CanvasSession is already disposed")))
-        assertFalse(isRecoverableRenderError(IllegalArgumentException("DesktopWsChannelTransport is already disposed")))
+        assertFalse(isRecoverableRenderError(IllegalArgumentException("IrohChannelTransport is already disposed")))
     }
 
     @Test

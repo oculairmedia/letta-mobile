@@ -7,9 +7,6 @@ import com.letta.mobile.data.controller.extras.HostExternalTool
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonPrimitive
 
 private val hostCanvasJson = Json {
     ignoreUnknownKeys = true
@@ -29,31 +26,40 @@ object HostCanvasTools {
     fun all(backend: HostCanvasBackend): List<HostExternalTool> = listOf(
         HostCanvasTool(CanvasToolContract.create, "Failed to create canvas") { caller, input -> create(backend, caller, input) },
         HostCanvasTool(CanvasToolContract.getScene, "Failed to get scene") { caller, input ->
-            withCanvas(backend, caller, input) { entry ->
-                val scene = backend.scene(entry)
-                success(CanvasGetSceneResult(sceneJson = scene.sceneJson, revision = scene.revision))
-            }
+            withCanvas(backend, caller, input) { entry -> getScene(backend, entry) }
         },
         HostCanvasTool(CanvasToolContract.replaceScene, "Failed to replace scene") { caller, input ->
-            val sceneJson = input.string("scene_json") ?: return@HostCanvasTool missing("scene_json")
+            val sceneJson = HostCanvasToolInputs.sceneJson(input) ?: return@HostCanvasTool missing("scene_json")
             withCanvas(backend, caller, input) { entry ->
                 val replace = CanvasOp.ReplaceSceneOp(opId = "", actorId = caller.agentId, lamport = 0L, sceneJson = sceneJson)
-                published(backend.publish(caller, entry, listOf(replace))) { CanvasReplaceSceneResult(ok = true, revision = it) }
+                published(backend.publish(caller, entry, listOf(replace))) { CanvasReplaceSceneResult(ok = true, revision = it, canvasId = entry.canvasId) }
             }
         },
         HostCanvasTool(CanvasToolContract.applyOps, "Failed to apply ops") { caller, input ->
             val opsJson = input["ops"] ?: return@HostCanvasTool missing("ops")
-            val ops = hostCanvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
+            val ops = HostCanvasToolInputs.ops(opsJson)
             withCanvas(backend, caller, input) { entry ->
-                published(backend.publish(caller, entry, ops)) { CanvasApplyOpsResult(ok = true, revision = it) }
+                published(backend.publish(caller, entry, ops)) { CanvasApplyOpsResult(ok = true, revision = it, canvasId = entry.canvasId) }
             }
         },
         HostCanvasTool(CanvasToolContract.list, "Failed to list canvases") { caller, input -> list(backend, caller, input) },
     )
 
+    private suspend fun getScene(backend: HostCanvasBackend, entry: HostCanvasEntry): ExternalToolResult {
+        val scene = backend.scene(entry)
+        return success(
+            CanvasGetSceneResult(
+                sceneJson = scene.sceneJson,
+                revision = scene.revision,
+                canvasId = entry.canvasId,
+                schemaHint = CanvasSceneSchema.hint,
+            ),
+        )
+    }
+
     private suspend fun create(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
-        val conversationId = input.string("conversation_id")
-        val title = input.string("title") ?: "Untitled Canvas"
+        val conversationId = HostCanvasToolInputs.string(input, "conversation_id")
+        val title = HostCanvasToolInputs.string(input, "title") ?: "Untitled Canvas"
         val entry = if (conversationId == null) {
             backend.create(caller, title)
         } else {
@@ -66,28 +72,40 @@ object HostCanvasTools {
         return success(CanvasCreateResult(canvasId = entry.canvasId))
     }
 
+    /**
+     * The canvases [caller] may read, its own conversation's first and marked `current`: an agent
+     * picking the first entry used to draw on another conversation's board (letta-mobile-qygvv.21).
+     */
     private suspend fun list(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
-        val conversationId = input.string("conversation_id")
-        val ids = if (conversationId == null) {
-            backend.list(caller).map { it.canvasId }
+        val conversationId = HostCanvasToolInputs.string(input, "conversation_id")
+        val entries = if (conversationId == null) {
+            backend.list(caller)
         } else {
-            (backend.conversation(caller, conversationId, claim = false) as? HostCanvasAccess.Granted)
-                ?.let { listOf(it.entry.canvasId) }
-                .orEmpty()
+            listOfNotNull((backend.conversation(caller, conversationId, claim = false) as? HostCanvasAccess.Granted)?.entry)
         }
-        return success(CanvasListResult(ids = ids))
+        val listed = entries.map { it.listed(current = it.conversationId != null && it.conversationId == caller.conversationId) }
+            .sortedByDescending { it.current }
+        return success(CanvasListResult(ids = listed.map { it.canvasId }, canvases = listed))
     }
 
+    private fun HostCanvasEntry.listed(current: Boolean) = CanvasListEntry(canvasId, title, conversationId, current)
+
+    /**
+     * Runs [action] on the canvas the call names, or, naming none, on the canvas of the
+     * conversation the call came from (created on first use).
+     */
     private suspend fun withCanvas(
         backend: HostCanvasBackend,
         caller: HostCanvasCaller,
         input: JsonObject,
         action: suspend (HostCanvasEntry) -> ExternalToolResult,
     ): ExternalToolResult {
-        val canvasId = input.string("canvas_id") ?: return missing("canvas_id")
-        return when (val access = backend.open(caller, canvasId)) {
+        val canvasId = HostCanvasToolInputs.string(input, "canvas_id")?.takeIf { it.isNotBlank() }
+        val access = if (canvasId != null) backend.open(caller, canvasId) else backend.ownConversation(caller)
+        return when (access) {
             is HostCanvasAccess.Granted -> action(access.entry)
             is HostCanvasAccess.Denied -> ExternalToolResult.Error(access.reason)
+            null -> ExternalToolResult.Error(NO_DEFAULT_CANVAS)
         }
     }
 
@@ -95,6 +113,7 @@ object HostCanvasTools {
         when (outcome) {
             is HostCanvasPublish.Published -> success(result(outcome.revision))
             is HostCanvasPublish.Denied -> ExternalToolResult.Error(outcome.reason)
+            is HostCanvasPublish.Invalid -> ExternalToolResult.Error(outcome.reason)
         }
 
     private inline fun <reified T> success(value: T): ExternalToolResult =
@@ -102,7 +121,8 @@ object HostCanvasTools {
 
     private fun missing(parameter: String) = ExternalToolResult.Error("Missing required parameter: $parameter")
 
-    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+    private const val NO_DEFAULT_CANVAS =
+        "Missing required parameter: canvas_id (this call is not in a conversation, so there is no default canvas; use canvas.list or canvas.create)"
 }
 
 /** One host canvas tool: [definition] for the model, [run] for a call with a known caller. */

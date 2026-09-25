@@ -110,7 +110,18 @@ private data class ChatComposerUiModel(
     val canSendMessages: Boolean,
     val slashCommands: ImmutableList<SlashCommand>,
     val availableTools: List<Tool>,
-)
+    /** letta-mobile-1n5py: a send during a turn is queued behind it rather than refused. */
+    val canQueueWhileStreaming: Boolean = false,
+) {
+    val hasSendableContent: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
+
+    /**
+     * The action button stops the run only when there is nothing to queue: with a draft in the
+     * field during a turn it sends (queues) instead, and Stop returns once the field is empty.
+     */
+    val actionStops: Boolean
+        get() = isStreaming && (isCancelling || !canQueueWhileStreaming || !hasSendableContent)
+}
 
 private data class ChatComposerCallbacks(
     val onTextChange: (String) -> Unit,
@@ -163,6 +174,7 @@ internal fun ChatComposer(
     companionStatus: (@Composable () -> Unit)? = null,
     /** The companion mascot was tapped: open the agent's pane. */
     onCompanionClick: (() -> Unit)? = null,
+    canQueueWhileStreaming: Boolean = false,
 ) {
     val model = ChatComposerUiModel(
         agentId = agentId,
@@ -173,6 +185,7 @@ internal fun ChatComposer(
         canSendMessages = canSendMessages,
         slashCommands = slashCommands,
         availableTools = availableTools,
+        canQueueWhileStreaming = canQueueWhileStreaming,
     )
     val callbacks = ChatComposerCallbacks(
         onTextChange = onTextChange,
@@ -381,8 +394,8 @@ private fun ChatComposerInput(
     onOpenActions: () -> Unit,
 ) {
     val model = state.model
-    val hasSendableContent = model.inputText.isNotBlank() || model.pendingAttachments.isNotEmpty()
-    val canSend = !model.isStreaming && model.canSendMessages && hasSendableContent
+    val stops = model.actionStops
+    val canSend = (!model.isStreaming || model.canQueueWhileStreaming) && model.canSendMessages && model.hasSendableContent
     // letta-mobile-6237v.2: bar grows 50% taller at rest, then animates back
     // to its compact previous state when the IME slides up — typing surface
     // reclaims the padding. Driven off ime visibility rather than focus so it
@@ -404,19 +417,19 @@ private fun ChatComposerInput(
         placeholder = stringResource(R.string.screen_chat_input_hint),
         sendContentDescription = stringResource(R.string.action_send_message),
         enabled = model.canSendMessages,
-        canSendOverride = if (model.isStreaming) true else canSend,
-        actionIcon = if (model.isStreaming) LettaIcons.Close else LettaIcons.Send,
+        canSendOverride = if (stops) true else canSend,
+        actionIcon = if (stops) LettaIcons.Close else LettaIcons.Send,
         actionContentDescription = when {
             model.isCancelling -> stringResource(R.string.action_stopping_run)
-            model.isStreaming -> stringResource(R.string.action_stop_run)
+            stops -> stringResource(R.string.action_stop_run)
             else -> stringResource(R.string.action_send_message)
         },
-        actionContainerColor = if (model.isStreaming) MaterialTheme.colorScheme.errorContainer else null,
-        actionContentColor = if (model.isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
-        actionSizeFraction = if (model.isStreaming) 0.7f else 1f,
+        actionContainerColor = if (stops) MaterialTheme.colorScheme.errorContainer else null,
+        actionContentColor = if (stops) MaterialTheme.colorScheme.onErrorContainer else null,
+        actionSizeFraction = if (stops) 0.7f else 1f,
         // Stop pulsing once a stop is pending: the button is now "stopping…",
         // and a second press is the local force-clear escape hatch.
-        actionPulse = model.isStreaming && !model.isCancelling,
+        actionPulse = stops && !model.isCancelling,
         actionVisible = state.showAction || state.voice.enabled,
         hasStagedContent = model.pendingAttachments.isNotEmpty(),
         customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),
@@ -433,7 +446,7 @@ private fun ChatComposerInput(
             )
         },
         onSend = { text ->
-            if (model.isStreaming) callbacks.onStop() else callbacks.onSend(text)
+            if (stops) callbacks.onStop() else callbacks.onSend(text)
         },
     )
 }

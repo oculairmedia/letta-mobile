@@ -73,7 +73,7 @@ internal class TurnEngineTestFrames(
         error = ack.error,
     )
 
-    fun streamDelta(messageType: String): AppServerInboundFrame.StreamDelta {
+    fun streamDelta(messageType: String, run: TestRun = TestRun(runId)): AppServerInboundFrame.StreamDelta {
         seq += 1
         return AppServerInboundFrame.StreamDelta(
             runtime = runtime,
@@ -82,9 +82,14 @@ internal class TurnEngineTestFrames(
             idempotencyKey = "evt-$messageType-$seq",
             delta = buildJsonObject {
                 put("message_type", messageType)
-                put("run_id", runId)
+                put("run_id", run.id)
             },
         )
+    }
+
+    fun loopStatus(state: TestLoopState): AppServerInboundFrame.UpdateLoopStatus {
+        seq += 1
+        return state.frame().copy(eventSeq = seq, idempotencyKey = "loop-$seq")
     }
 
     fun updateQueue(update: QueueUpdateFixture): AppServerInboundFrame.UpdateQueue {
@@ -112,6 +117,27 @@ internal class TurnEngineTestFrames(
         agentId = runtime.agentId,
         conversationId = runtime.conversationId,
     )
+
+    /** An `approval_request_message` stream delta for `tool-call-1` (letta-mobile-qygvv.13). */
+    fun approvalRequestMessage(toolName: String): AppServerInboundFrame.StreamDelta {
+        seq += 1
+        return AppServerInboundFrame.StreamDelta(
+            runtime = runtime,
+            eventSeq = seq,
+            emittedAt = FIXTURE_EMITTED_AT,
+            idempotencyKey = "evt-approval-$seq",
+            delta = buildJsonObject {
+                put("message_type", "approval_request_message")
+                put("id", "letta-msg-$seq")
+                put("run_id", runId)
+                put("tool_call", buildJsonObject {
+                    put("tool_call_id", "tool-call-1")
+                    put("name", toolName)
+                    put("arguments", "{}")
+                })
+            },
+        )
+    }
 
     /** [run]'s `turn_finished` for turn number [turn], sequenced after the frames already built. */
     fun turnFinished(run: TestRun, turn: Int): AppServerInboundFrame.TurnFinished {
@@ -164,9 +190,13 @@ internal class TurnEngineTestAckingClient(
 
     fun emitStreamDelta(messageType: String) = emit(frames.streamDelta(messageType))
 
+    fun emitStreamDelta(messageType: String, run: TestRun) = emit(frames.streamDelta(messageType, run))
+
     fun emitUpdateQueue(update: QueueUpdateFixture) = emit(frames.updateQueue(update))
 
     fun emitTurnFinished(run: TestRun, turn: Int) = emit(frames.turnFinished(run, turn))
+
+    fun emitLoopStatus(state: TestLoopState) = emit(frames.loopStatus(state))
 
     override fun emit(frame: AppServerInboundFrame) {
         (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(frame.onStreamChannel())
@@ -187,6 +217,8 @@ private fun AppServerInboundFrame.rawJson(): JsonObject = buildJsonObject {
             put("delta", frame.delta)
         }
         is AppServerInboundFrame.UpdateQueue -> put("idempotency_key", frame.idempotencyKey)
+        is AppServerInboundFrame.TurnFinished -> put("idempotency_key", frame.idempotencyKey)
+        is AppServerInboundFrame.UpdateLoopStatus -> put("idempotency_key", frame.idempotencyKey)
         else -> Unit
     }
 }

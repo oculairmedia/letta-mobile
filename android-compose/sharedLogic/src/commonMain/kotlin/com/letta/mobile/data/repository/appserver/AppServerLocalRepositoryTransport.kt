@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.model.BlockUpdateParams
+import com.letta.mobile.data.repository.api.AgentBlockTarget
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
@@ -14,6 +16,9 @@ interface AppServerLocalRepositoryTransport {
     suspend fun listAgents(): JsonArray
     suspend fun getContext(agentId: String, conversationId: String?): JsonObject?
     suspend fun listAgentBlocks(agentId: String): JsonArray
+
+    /** `block.update_agent`: the App Server writes and commits `memory/system/<label>.md`. */
+    suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
 }
 
 class DefaultAppServerLocalRepositoryTransport(
@@ -72,6 +77,19 @@ class DefaultAppServerLocalRepositoryTransport(
             offset += blocks.size
         }
         error("Bundled App Server block listing exceeded $BLOCK_LIST_MAX_PAGES pages")
+    }
+
+    override suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement {
+        val value = requireNotNull(params.value) { "block.update_agent writes the memory file contents; value is required" }
+        return adminRpc(
+            operation = "block-update",
+            method = "block.update_agent",
+            params = buildJsonObject {
+                put("agent_id", target.agentId)
+                put("label", target.label)
+                put("value", value)
+            },
+        ) ?: error("Bundled App Server block update returned no result")
     }
 
     private suspend fun adminRpc(

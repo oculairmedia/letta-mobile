@@ -97,9 +97,19 @@ data class AppServerCreatedRuntimeEntities(
     val conversation: Boolean,
 )
 
+/**
+ * `update_loop_status.loop_status`. [clientMessageIdsByRunId] and [executingToolCallIds]
+ * arrived in App Server 0.32.17; both default to empty so older servers still decode
+ * (letta-mobile-qygvv.8).
+ */
 @Serializable
 data class AppServerLoopStatus(
     val status: String,
     @SerialName("active_run_ids") val activeRunIds: List<String> = emptyList(),
+    /** Exact `client_message_id`s each recently observed run consumed (server insertion order). */
+    @SerialName("client_message_ids_by_run_id")
+    val clientMessageIdsByRunId: Map<String, List<String>> = emptyMap(),
+    /** Tool call ids executing client-side; populated only while `EXECUTING_CLIENT_SIDE_TOOL`. */
+    @SerialName("executing_tool_call_ids") val executingToolCallIds: List<String> = emptyList(),
 )
 

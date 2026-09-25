@@ -1,0 +1,3 @@
+{"type":"connect_provider_response","request_id":"c1","success":false,"target":"local","providers":[],"models_may_have_changed":false,"error":"Unknown provider: no-such-provider"}
+{"type":"disconnect_provider_response","request_id":"d1","success":false,"target":"local","providers":[],"models_may_have_changed":false,"error":"Unknown provider: no-such-provider"}
+{"type":"update_model_response","request_id":"u1","success":false,"runtime":{"agent_id":"agent-does-not-exist","conversation_id":"conv-does-not-exist"},"model_id":"lmstudio/none","model_handle":"lmstudio/none","error":"Agent agent-does-not-exist not found"}
