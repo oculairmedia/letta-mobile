@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import com.letta.mobile.data.chat.send.ChatSendQueueControls
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.SendQueues
@@ -21,12 +22,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /** The selected conversation's queued sends on the canonical route; empty off it. */
 @Composable
 internal fun rememberSelectedSendQueue(
-    chatController: DesktopChatController,
+    queueControls: () -> ChatSendQueueControls?,
     canonicalPresentation: CanonicalTimelinePresentation?,
     selectedConversationId: String?,
 ): ConversationSendQueue {
     val queues by remember(canonicalPresentation, selectedConversationId) {
-        chatController.canonicalSendQueue()?.state ?: MutableStateFlow<SendQueues>(emptyMap())
+        queueControls()?.state ?: MutableStateFlow<SendQueues>(emptyMap())
     }.collectAsState()
     return selectedConversationId?.let { queues[QueueConversationId(it)] } ?: ConversationSendQueue()
 }

@@ -179,7 +179,6 @@ internal fun LettaDesktopApp(
     val chatState by chatController.state.collectAsState()
     val canonicalPresentation by chatController.canonicalPresentation.collectAsState()
     val canonicalStatus by chatController.canonicalStatus.collectAsState()
-    val selectedSendQueue = rememberSelectedSendQueue(chatController, canonicalPresentation, chatState.selectedConversationId)
     var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
@@ -804,7 +803,6 @@ internal fun LettaDesktopApp(
                                 workingDirectory = selectedConversationWorkingDirectory,
                                 workingDirectorySupported = chatController.supportsWorkingDirectory,
                                 workingDirectoryLoading = workingDirectoryLoading,
-                                sendQueue = selectedSendQueue,
                             ),
                             destinationInputs = DestinationContentInputs(
                                 railRecencyDays = railPrefs.recencyDays,

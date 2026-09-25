@@ -92,9 +92,6 @@ internal data class ChatDetailPaneState(
     val workingDirectory: String? = null,
     val workingDirectorySupported: Boolean = false,
     val workingDirectoryLoading: Boolean = false,
-    /** letta-mobile-1n5py: the selected conversation's messages waiting behind its turn. */
-    val sendQueue: com.letta.mobile.data.chat.send.ConversationSendQueue =
-        com.letta.mobile.data.chat.send.ConversationSendQueue(),
 )
 
 /** Interaction callbacks for [ChatDetailPane]. */
@@ -120,6 +117,8 @@ internal data class ChatDetailPaneActions(
     val onChangeWorkingDirectory: ((String) -> Unit)? = null,
     /** letta-mobile-1n5py: queued-send controls (cancel one, push one through, resume). */
     val queue: com.letta.mobile.ui.chat.QueuedSendActions = com.letta.mobile.ui.chat.QueuedSendActions(),
+    /** letta-mobile-1n5py: the send queue serving the selected conversation (canonical route only). */
+    val queueControls: () -> com.letta.mobile.data.chat.send.ChatSendQueueControls? = { null },
 )
 
 @Composable
@@ -209,7 +208,11 @@ private fun ChatDetailBody(
             ?.let { transport.activeStage(it) == com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION } ?: false
         ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
         com.letta.mobile.ui.chat.QueuedSendsPanel(
-            queue = state.sendQueue,
+            queue = com.letta.mobile.desktop.rememberSelectedSendQueue(
+                actions.queueControls,
+                state.canonicalPresentation,
+                surface.selectedConversationId,
+            ),
             actions = actions.queue,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.xxl),
         )

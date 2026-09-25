@@ -508,6 +508,7 @@ internal fun createDesktopChatDetailPaneActions(
         },
         onOpenAgent = params.onOpenAgent,
         queue = desktopQueuedSendActions(chatController),
+        queueControls = chatController::canonicalSendQueue,
     )
 }
 
