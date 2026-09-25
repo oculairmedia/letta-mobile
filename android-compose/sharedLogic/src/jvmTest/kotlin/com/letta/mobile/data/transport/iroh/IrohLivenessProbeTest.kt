@@ -65,7 +65,7 @@ class IrohLivenessProbeTest {
 
     // Compressed cadence: the production defaults (20s/10s) are asserted
     // separately by IrohLivenessProbeWiringTest.
-    private val probeTimeoutMs = 150L
+    private val probeTimeoutMs = PROBE_TIMEOUT_MS
 
     private data class ProbeCall(val session: String, val method: String, val atMs: Long)
 
@@ -81,7 +81,21 @@ class IrohLivenessProbeTest {
         val hangHealthCheckOn: String? = null,
         val observerStream: MutableSharedFlow<AppServerReceivedFrame>? = null,
         val intervalMs: Long = COMPRESSED_PROBE_INTERVAL_MS,
-    )
+        val timeoutMs: Long = PROBE_TIMEOUT_MS,
+        /** Per-method answer latency (every session); absent = answers immediately. */
+        val methodLatencyMs: Map<String, Long> = emptyMap(),
+        val congestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
+    ) {
+        suspend fun answerLatency(session: String, method: String) {
+            if (session == hangHealthCheckOn && method == "health.check") {
+                // Black hole: never completes. The caller MUST impose its
+                // own bound (the legacy control-channel fallback would
+                // otherwise stretch this to 30s/60s).
+                delay(600_000L)
+            }
+            methodLatencyMs[method]?.let { delay(it) }
+        }
+    }
 
     private fun transportWith(scenario: ProbeScenario): IrohChannelTransport = with(scenario) {
         IrohChannelTransport(
@@ -96,12 +110,7 @@ class IrohLivenessProbeTest {
                     observerStreamFrames = observerStream,
                     adminRpcCall = { method, _, _ ->
                         calls += ProbeCall(session, method, System.currentTimeMillis())
-                        if (session == hangHealthCheckOn && method == "health.check") {
-                            // Black hole: never completes. The caller MUST impose its
-                            // own bound (the legacy control-channel fallback would
-                            // otherwise stretch this to 30s/60s).
-                            delay(600_000L)
-                        }
+                        answerLatency(session, method)
                         AppServerInboundFrame.AdminRpcResponse(
                             requestId = method,
                             success = true,
@@ -113,8 +122,9 @@ class IrohLivenessProbeTest {
                 )
             },
             livenessProbeIntervalMs = intervalMs,
-            livenessProbeTimeoutMs = probeTimeoutMs,
+            livenessProbeTimeoutMs = timeoutMs,
             livenessProbeFailuresToDeclareDead = 2,
+            livenessCongestionGraceMs = congestionGraceMs,
         )
     }
 
@@ -395,54 +405,14 @@ class IrohLivenessProbeTest {
     fun probeTimeoutDuringInFlightAdminRpcDoesNotRedial() = runBlocking {
         val calls = CopyOnWriteArrayList<ProbeCall>()
         val dials = AtomicInteger(0)
-        val hangHealth = "session-1"
-        val transport = IrohChannelTransport(
-            scope = scope,
-            activeConfigProvider = { config },
-            testDialer = { dialConfig ->
-                val session = "session-${dials.incrementAndGet()}"
-                IrohConnectionHandle(
-                    config = dialConfig,
-                    ticket = "ticket",
-                    sessionId = session,
-                    adminRpcCall = { method, _, _ ->
-                        calls += ProbeCall(session, method, System.currentTimeMillis())
-                        if (session == hangHealth && method == "health.check") {
-                            delay(600_000L)
-                        }
-                        if (method == "model.list") {
-                            // Stay in flight longer than several probe budgets —
-                            // this is the congested hydrate concurrent with the probe.
-                            delay(600_000L)
-                        }
-                        if (method == "agent.list") {
-                            // Slow but ANSWERING: completes inside every probe wait.
-                            delay(CONGESTED_ANSWER_LATENCY_MS)
-                        }
-                        AppServerInboundFrame.AdminRpcResponse(
-                            requestId = method,
-                            success = true,
-                            result = JsonPrimitive(session),
-                        )
-                    },
-                    connectionAlive = { true },
-                    close = {},
-                )
-            },
-            livenessProbeIntervalMs = COMPRESSED_PROBE_INTERVAL_MS,
-            // Wider than the answer latency so each probe window sees a completion.
-            livenessProbeTimeoutMs = CONGESTED_PROBE_TIMEOUT_MS,
-            livenessProbeFailuresToDeclareDead = 2,
-            // Keep grace covering the whole assert window so soft-fail holds.
-            livenessCongestionGraceMs = 60_000L,
-        )
+        val transport = transportWith(congestedButAnsweringScenario(calls, dials))
         transport.connect("iroh://ticket", "", "device", "test")
-        val hydrate = scope.launch {
-            runCatching { transport.adminRpc("model.list", "/v1/models", null) }
-        }
-        val answering = scope.launch {
-            while (true) runCatching { transport.adminRpc("agent.list", "/v1/agents", null) }
-        }
+        // model.list: the congested hydrate, in flight across several probe budgets.
+        // agent.list: slow but ANSWERING, completing inside every probe wait.
+        val load = listOf(
+            scope.launch { runCatching { transport.adminRpc("model.list", "/v1/models", null) } },
+            scope.launch { while (true) runCatching { transport.adminRpc("agent.list", "/v1/agents", null) } },
+        )
         try {
             assertTrue(
                 awaitTrue { calls.any { it.method == "health.check" } },
@@ -450,24 +420,38 @@ class IrohLivenessProbeTest {
             )
             // Let the probe have multiple chances to declare death.
             delay((COMPRESSED_PROBE_INTERVAL_MS + CONGESTED_PROBE_TIMEOUT_MS) * 4)
-            assertTrue(
-                calls.any { it.method == "health.check" },
-                "probe must still issue health.check; calls=${calls.toList()}",
-            )
-            assertEquals(
-                1, dials.get(),
-                "in-flight model.list must soft-fail probe timeouts (congestion), not redial; " +
-                    "dials=${dials.get()} calls=${calls.toList()}",
-            )
-            assertTrue(
-                transport.state.value is ChannelTransportState.Connected,
-                "state stays Connected under congestion; state=${transport.state.value}",
-            )
+            assertStillConnectedOnFirstDial(transport, dials, calls)
         } finally {
-            answering.cancel()
-            hydrate.cancel()
+            load.forEach { it.cancel() }
             transport.disconnect()
         }
+    }
+
+    private fun congestedButAnsweringScenario(calls: MutableList<ProbeCall>, dials: AtomicInteger) = ProbeScenario(
+        calls = calls,
+        dials = dials,
+        hangHealthCheckOn = "session-1",
+        // Wider than the answer latency so each probe window sees a completion.
+        timeoutMs = CONGESTED_PROBE_TIMEOUT_MS,
+        methodLatencyMs = mapOf("model.list" to 600_000L, "agent.list" to CONGESTED_ANSWER_LATENCY_MS),
+        // Keep grace covering the whole assert window so soft-fail holds.
+        congestionGraceMs = 60_000L,
+    )
+
+    private fun assertStillConnectedOnFirstDial(
+        transport: IrohChannelTransport,
+        dials: AtomicInteger,
+        calls: List<ProbeCall>,
+    ) {
+        assertEquals(
+            1, dials.get(),
+            "in-flight model.list must soft-fail probe timeouts (congestion), not redial; " +
+                "dials=${dials.get()} calls=${calls.toList()}",
+        )
+        assertTrue(
+            transport.state.value is ChannelTransportState.Connected,
+            "state stays Connected under congestion; state=${transport.state.value}",
+        )
     }
 
     // ============================================================
@@ -622,6 +606,7 @@ class IrohLivenessProbeTest {
          * defaults (20s/10s) are asserted separately by IrohLivenessProbeWiringTest.
          */
         const val COMPRESSED_PROBE_INTERVAL_MS = 300L
+        const val PROBE_TIMEOUT_MS = 150L
 
         /** Test 8: answers every 500ms; a 600ms probe wait always spans one. */
         const val CONGESTED_ANSWER_LATENCY_MS = 500L
