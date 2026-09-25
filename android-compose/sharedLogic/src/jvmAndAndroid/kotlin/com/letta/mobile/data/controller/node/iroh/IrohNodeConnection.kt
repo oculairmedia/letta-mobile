@@ -2,9 +2,11 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.TurnInputAcknowledgement
 import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -114,6 +116,11 @@ class IrohNodeConnection(
      * mid-turn, replayed on redial re-send (P3, q71yi). Injectable for tests.
      */
     private val parkedTerminals: ParkedTerminalStore = SHARED_PARKED_TERMINALS,
+    /**
+     * letta-mobile-qygvv.3: node-owned home of this connection's turns. A turn outlives its
+     * initiator's connection (it is detached, not cancelled), so it must not be a child of it.
+     */
+    private val turnHost: NodeTurnHost = NodeTurnHost.SHARED,
 ) {
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
     // base — replaces the shared mutable companion var that raced across
@@ -121,6 +128,18 @@ class IrohNodeConnection(
     private val eventSeq = IrohEventSeqAllocator.newConnectionSeq()
     private val streamWriteMutex = Mutex()
     private lateinit var observerWrites: ObserverWriteQueue
+
+    // letta-mobile-qygvv.12: control responses and relayed turns' input_accepted acks share
+    // the control stream, so writes to it are serialized.
+    private val controlWriteMutex = Mutex()
+    private var controlSend: SendStream? = null
+
+    private suspend fun writeControl(frame: String) {
+        val send = controlSend ?: return
+        controlWriteMutex.withLock {
+            IrohFrameCodec.write(send, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
+        }
+    }
     // Pre-authenticated only when the explicit policy requires no token:
     // InsecureAnonymousForTestOnly, or PeerAllowlist (the endpoint's accept
     // loop has already vetted the peer identity before constructing this).
@@ -133,14 +152,6 @@ class IrohNodeConnection(
 
     /** Whether this peer has authenticated; side protocols from the same peer are gated on it. */
     val isAuthenticated: Boolean get() = authenticated.get()
-    
-    /**
-     * Mid-turn redial fix: thread-local storage for tracking the active turn's
-     * clientMessageId and frames. Set at the start of handleInput, cleared when
-     * the turn completes or fails. Used by writeStreamDelta to track frames for
-     * parking if the stream dies mid-turn.
-     */
-    private val activeTurnTracking = ThreadLocal<ActiveTurnTracking?>()
 
     /**
      * Transport capabilities advertised by the peer in its auth frame.
@@ -394,6 +405,7 @@ class IrohNodeConnection(
         streamSend: SendStream,
     ) = coroutineScope {
         val sendStream = biStream.send()
+        controlSend = sendStream
         val activeTurnJobs = LinkedHashSet<Job>()
         val activeTurnJobsMutex = Mutex()
         observerWrites = ObserverWriteQueue(this)
@@ -423,9 +435,7 @@ class IrohNodeConnection(
                         activeTurnJobs = activeTurnJobs,
                         activeTurnJobsMutex = activeTurnJobsMutex,
                     )
-                    if (response != null) {
-                        IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
-                    }
+                    if (response != null) writeControl(response)
                 } catch (ce: CancellationException) {
                     throw ce
                 } catch (error: Exception) {
@@ -500,7 +510,8 @@ class IrohNodeConnection(
         activeTurnJobsMutex: Mutex,
     ) {
         val job = launch(start = CoroutineStart.LAZY) {
-            handleInput(frameJson, streamSend)
+            val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson)
+            handleInput(input as AppServerCommand.Input, streamSend)
         }
         activeTurnJobsMutex.withLock { activeTurnJobs += job }
         job.invokeOnCompletion { cause ->
@@ -801,28 +812,34 @@ class IrohNodeConnection(
         }
     }
 
-    /** Builds one turn fanout with connection-owned observer ordering and initiator parking. */
+    /**
+     * Builds one turn fanout with initiator parking. The initiator's writes stay on this
+     * connection's queue; observer writes use the node-owned queue so a detached turn
+     * (letta-mobile-qygvv.3) still reaches the remaining viewers.
+     */
     private fun createTurnFanout(
         input: AppServerCommand.Input,
         streamSend: SendStream,
+        tracker: TurnFrameTracker?,
     ) = ConversationTurnFanout(
         conversationId = input.runtime.conversationId,
         runtime = input.runtime,
         viewersFor = { conversationId -> connectionRegistry?.viewersFor(conversationId) ?: emptySet() },
         initiatorViewer = ensureSelfViewer(streamSend),
-        trackInitiatorFrame = { deltaJson -> activeTurnTracking.get()?.tracker?.track(deltaJson) },
+        trackInitiatorFrame = { deltaJson -> tracker?.track(deltaJson) },
         unregisterViewer = { conversationId, viewer -> connectionRegistry?.unregister(conversationId, viewer) },
-        observerWrites = observerWrites,
+        observerWrites = turnHost.observerWrites,
+        initiatorWrites = observerWrites,
     )
 
+    private fun firstUserMessage(input: AppServerCommand.Input): AppServerInputMessage? =
+        (input.payload as? AppServerInputPayload.CreateMessage)?.messages?.firstOrNull { it.role == "user" }
+
     private suspend fun handleInput(
-        frameJson: String,
+        input: AppServerCommand.Input,
         streamSend: SendStream,
     ) {
-        val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as AppServerCommand.Input
-        val userMsg = (input.payload as? AppServerInputPayload.CreateMessage)
-            ?.messages
-            ?.firstOrNull { it.role == "user" }
+        val userMsg = firstUserMessage(input)
         val contentParts = userMsg?.content as? JsonArray
         val text = userMsg?.content
             ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
@@ -834,6 +851,7 @@ class IrohNodeConnection(
             // them — replay them now so the client's turn resolves instead of
             // hanging forever (q71yi + mid-turn redial fix). Otherwise the original
             // turn is still in-flight or already completed, so drop silently.
+            ackRedialResend(input)
             val parkedFrameSequence = parkedTerminals.takeParked(clientMsgId)
             if (parkedFrameSequence != null) {
                 Telemetry.event(
@@ -877,88 +895,56 @@ class IrohNodeConnection(
                 contentPartsJson = contentParts?.toString(),
             ),
         )
-        // Mid-turn redial fix: set thread-local tracking so the INITIATOR-ONLY
-        // parking hook can record frames for parking if the stream dies mid-turn.
-        if (clientMsgId != null) {
-            activeTurnTracking.set(ActiveTurnTracking(clientMessageId = clientMsgId))
-        }
-        val fanout = createTurnFanout(input, streamSend)
-        try {
-            // eaczz.5: live user-echo fanout. Before the assistant stream, emit a
-            // snapshot `user_message` delta so OBSERVERS see the sender's prompt
-            // immediately, in order, ahead of the reply (today they only get it on
-            // a later message.list reconcile — so the reply could appear first).
-            // The initiator does NOT double-render: the echo carries the sender's
-            // otid (== clientMsgId), which the reducer collapses against the
-            // initiator's own optimistic Local row (idempotent snapshot, never
-            // appended twice). No-op when there is no client_message_id (nothing
-            // to key optimistic dedup on) — the fanout is best-effort regardless.
-            if (clientMsgId != null) {
-                runCatching {
-                    fanout.broadcastUserEcho(
-                        clientMessageId = clientMsgId,
-                        text = text,
-                        contentParts = contentParts,
-                    )
-                }
-            }
-            runCatching {
-                controller.runTurn(command).collect { draft ->
-                    val payload = draft.payload
-                    if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) {
-                        Telemetry.event(
-                            "IrohNode", "stream.terminal_duplicate_skipped",
-                            "remoteEndpointId" to remoteEndpointId,
-                            "agentId" to input.runtime.agentId,
-                            "conversationId" to input.runtime.conversationId,
-                        )
-                        return@collect
-                    }
-                    // Before a failure/cancel terminal, close any dangling tool_calls
-                    // so the client never renders a tool_call without a return.
-                    if (fanout.isFailureOrCancelLifecycle(payload)) {
-                        fanout.flushOpenToolCalls()
-                    }
-                    fanout.onDraft(payload)
-                }
-            }.onFailure { error ->
-                handleInputFailure(error, fanout, clientMsgId, input, parkedTerminals)
-            }
-        } finally {
-            // Clear thread-local tracking when the turn completes or fails
-            activeTurnTracking.remove()
-        }
+        // Mid-turn redial fix: the INITIATOR-ONLY parking record for this turn.
+        val tracker = clientMsgId?.let { TurnFrameTracker() }
+        val fanout = createTurnFanout(input, streamSend, tracker)
+        val echo = clientMsgId?.let { RelayedUserEcho(it, text, contentParts) }
+        val turn = RelayedInputTurn(input, clientMsgId, fanout, relayedTurnProtocol(input, fanout, echo, ::writeControl), tracker)
+        // letta-mobile-qygvv.3: the collector runs on the node-owned host. If this
+        // connection closes first, the turn is detached, not cancelled: the server
+        // turn keeps its approvals, external tools and other viewers, and its tail
+        // is parked for this initiator's redial.
+        turnHost.run(
+            NodeTurn(
+                conversationId = input.runtime.conversationId,
+                clientMessageId = clientMsgId,
+                fanout = fanout,
+                tracker = tracker ?: TurnFrameTracker(),
+                parkedTerminals = parkedTerminals,
+            ) {
+                relayTurn(controller, command, turn.protocol) { error -> handleInputFailure(error, turn) }
+            },
+        )
     }
 
-    private suspend fun handleInputFailure(
-        error: Throwable,
-        fanout: ConversationTurnFanout,
-        clientMsgId: String?,
-        input: AppServerCommand.Input,
-        parkedTerminals: ParkedTerminalStore,
-    ) {
+    /** letta-mobile-qygvv.12: a redial re-send still gets its ack; the original turn owns the input. */
+    private suspend fun ackRedialResend(input: AppServerCommand.Input) {
+        val requestId = input.requestId ?: return
+        runCatching { writeControl(inputAcceptedFrame(requestId, input.runtime, TurnInputAcknowledgement.Started)) }
+            .onFailure { if (it is CancellationException) throw it }
+    }
+
+    private suspend fun handleInputFailure(error: Throwable, turn: RelayedInputTurn) {
         val errorText = error.message ?: error.toString()
         if (isTurnAlreadyActiveMessage(errorText)) {
-            emitBusyRejectionToInitiator(fanout, errorText, error)
+            emitBusyRejectionToInitiator(turn.fanout, error)
             return
         }
         val wroteTerminal = runCatching {
             withContext(NonCancellable) {
-                fanout.flushOpenToolCalls()
-                fanout.emitErrorTerminal(errorText)
+                turn.fanout.flushOpenToolCalls()
+                turn.fanout.emitErrorTerminal(errorText)
+                turn.protocol.onTurnError(errorText)
             }
         }.isSuccess
         if (!wroteTerminal) {
-            parkInterruptedTerminal(error, fanout, clientMsgId, input, parkedTerminals)
+            parkInterruptedTerminal(error, turn.fanout, turn.clientMsgId, turn.input, turn.tracker)
         }
         if (error is CancellationException) throw error
     }
 
-    private suspend fun emitBusyRejectionToInitiator(
-        fanout: ConversationTurnFanout,
-        errorText: String,
-        error: Throwable,
-    ) {
+    private suspend fun emitBusyRejectionToInitiator(fanout: ConversationTurnFanout, error: Throwable) {
+        val errorText = error.message ?: error.toString()
         // Concurrent send while a turn is live: do NOT fan out error_message to
         // conversation viewers (they would map it onto the live turn). Still
         // deliver an initiator-only busy rejection so the submitting peer gets a
@@ -982,7 +968,7 @@ class IrohNodeConnection(
         fanout: ConversationTurnFanout,
         clientMsgId: String?,
         input: AppServerCommand.Input,
-        parkedTerminals: ParkedTerminalStore,
+        tracker: TurnFrameTracker?,
     ) {
         Telemetry.event(
             "IrohNode", "stream.closed_before_terminal",
@@ -992,21 +978,14 @@ class IrohNodeConnection(
             level = Telemetry.Level.WARN,
         )
         if (clientMsgId == null || fanout.anyTerminalWritten) return
-        val tracking = activeTurnTracking.get()
-        tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
+        tracker?.parkFrames(parkedTerminals, clientMsgId, NodeTurnHost.INTERRUPTED_TERMINAL)
         Telemetry.event(
             "IrohNode", "stream.frames_parked",
             "remoteEndpointId" to remoteEndpointId,
             "clientMessageId" to clientMsgId,
             "conversationId" to input.runtime.conversationId,
-            "frameCount" to (tracking?.tracker?.frameCount() ?: 0),
+            "frameCount" to (tracker?.frameCount() ?: 0),
         )
-    }
-
-    private fun interruptedTerminalDelta(): JsonObject = buildJsonObject {
-        put("message_type", "error_message")
-        put("message", "connection interrupted before the turn completed")
-        put("status", "cancelled")
     }
 
     private fun extractTextFromContentParts(parts: JsonArray?): String? =
@@ -1054,8 +1033,6 @@ class IrohNodeConnection(
         streamWriteMutex.withLock {
             IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
         }
-        // Mid-turn redial fix: track the delta JSON for parking if stream dies
-        activeTurnTracking.get()?.tracker?.track(delta.toString())
     }
 
 

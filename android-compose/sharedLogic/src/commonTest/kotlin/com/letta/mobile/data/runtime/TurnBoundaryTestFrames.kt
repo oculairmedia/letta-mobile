@@ -20,11 +20,13 @@ private const val BOUNDARY_TEST_EMITTED_AT = "2026-09-24T00:00:00Z"
 internal enum class TestStopReason(val wire: String) {
     EndTurn("end_turn"),
     RequiresApproval("requires_approval"),
+    Cancelled("cancelled"),
 }
 
 internal enum class TestLoopState(val wire: String) {
     WaitingOnInput("WAITING_ON_INPUT"),
     WaitingOnApproval("WAITING_ON_APPROVAL"),
+    ProcessingApiResponse("PROCESSING_API_RESPONSE"),
     ;
 
     /** An `update_loop_status` frame in this state, with [activeRuns] still running. */

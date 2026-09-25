@@ -74,6 +74,9 @@ open class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.AppServerInfoResponse,
             // Acknowledges an input that carried request_id; correlated by the registry.
             is AppServerInboundFrame.InputAccepted,
+            // Queue control answers (letta-mobile-qygvv.6); correlated by the registry.
+            is AppServerInboundFrame.ResumeQueueResponse,
+            is AppServerInboundFrame.RemoveQueueItemResponse,
             -> emptyList()
             // Decoded as Unknown before 0.32 typing; kept on the same observable path, plus the
             // authoritative lifecycle terminal it carries (letta-mobile-qygvv.2).

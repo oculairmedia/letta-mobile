@@ -37,6 +37,10 @@ data class TurnLease(
         get() = phase == TurnLeasePhase.Preparing ||
             phase == TurnLeasePhase.Starting ||
             phase == TurnLeasePhase.Queued
+
+    /** Retiring or Terminal: the lease is already on its way out. */
+    val isEnding: Boolean
+        get() = phase == TurnLeasePhase.Retiring || phase == TurnLeasePhase.Terminal
 }
 
 enum class TurnLeasePhase {
@@ -77,3 +81,9 @@ internal fun TurnLease.toInitialOwner(): AppServerTurnEngine.ActiveTurnOwner = A
     settleDeadlineMs = settleDeadlineMs,
     watchdogDeadlineMs = watchdogDeadlineMs,
 )
+
+/** Whether this owner telemetry was recorded for [lease] (same runtime, conversation and acquire time). */
+internal fun AppServerTurnEngine.ActiveTurnOwner.isFor(lease: TurnLease): Boolean =
+    runtimeId == lease.runtimeId &&
+        conversationId == lease.conversationId &&
+        acquiredAtMs == lease.acquiredAtMs

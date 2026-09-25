@@ -60,6 +60,10 @@ sealed interface AppServerCommandRetryClass {
             // Aborting / approval / tool-result are effectful and non-idempotent.
             is AppServerCommand.AbortMessage -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ExternalToolCallResponse -> AmbiguousMutation(dedupKey = null)
+            // letta-mobile-qygvv.6: removing an item twice is a no-op (success=false), so the item
+            // id dedupes it. A replayed resume could release items a later abort parked.
+            is AppServerCommand.RemoveQueueItem -> AmbiguousMutation(dedupKey = command.itemId)
+            is AppServerCommand.ResumeQueue -> AmbiguousMutation(dedupKey = null)
             // Absolute values, but device state is shared by every client on the runtime: a
             // replay could overwrite a change another client made after this one.
             is AppServerCommand.ChangeDeviceState -> AmbiguousMutation(dedupKey = null)

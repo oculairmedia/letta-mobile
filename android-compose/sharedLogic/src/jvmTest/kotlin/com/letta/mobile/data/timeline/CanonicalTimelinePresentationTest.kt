@@ -180,6 +180,35 @@ class CanonicalTimelinePresentationTest {
         assertTrue(coordinator.retire(owner))
     }
 
+    /**
+     * Owner report 2026-09-24: after a turn whose turn-end repair never committed, the next send's
+     * reply arrived but the earlier prompt vanished. The next turn replaced the overlay that held
+     * the prompt's echo while the remembered echo still hid the local bubble.
+     */
+    @Test fun promptStaysOnScreenWhenTheNextTurnReplacesAnUndurableEcho() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        coordinator.appendPending(
+            owner, CanonicalPendingLocalStore.Record("local-1", "question", emptyList(), "2026-01-01T00:00:00Z"),
+        )
+        val first = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(echo("question", "echo", "local-1"))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(assistant("hello", "reply"))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Done))
+        runCurrent()
+        assertEquals(listOf("hello", "question"), contents(presentation.live.value))
+
+        // The durable echo never landed; the agent's next turn opens over the settled overlay.
+        val next = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Message(assistant("again", "reply-2"))))
+        runCurrent()
+
+        assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
+        assertEquals(listOf("again", "question"), contents(presentation.live.value))
+        presentation.close()
+    }
+
     @Test fun turnWithoutEventsReleasesTheFenceWithoutAnyResidentRow() = runTest {
         val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))

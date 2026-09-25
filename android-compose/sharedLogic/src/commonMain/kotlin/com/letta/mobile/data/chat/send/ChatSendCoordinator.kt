@@ -13,6 +13,7 @@ import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.api.TimelineIngestSources
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -506,9 +507,16 @@ class ChatSendCoordinator(
         return state.turnId != key && state.identity.isFenced(key)
     }
 
-    /** [resolveStateByTurnId] restricted to frames that may still mutate live turn state. */
-    private fun liveStateForTurn(turnId: String?): ConversationTurnState? =
-        resolveStateByTurnId(turnId)?.takeUnless { isRetiredTurn(it, turnId) }
+    /** Live state a stop/usage tail may mutate; a retired turn's tail is only forwarded ([forwardRetiredTurnTail]). */
+    private fun liveTailStateOrForward(event: WsTimelineEvent, tail: TurnTail): ConversationTurnState? {
+        val state = resolveStateByTurnId(tail.turnId)
+        when {
+            state == null -> reportUnmatchedFrame(event, tail.turnId, tail.runId)
+            !isRetiredTurn(state, tail.turnId) -> return state
+            else -> forwardRetiredTurnTail(runtimeEventBatcher, event, tail, state.localConversationId ?: state.conversationId)
+        }
+        return null
+    }
 
     /**
      * [ChatSendUiSink] is a SINGLETON bound to whatever conversation is on
@@ -944,11 +952,7 @@ class ChatSendCoordinator(
             is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
             is WsTimelineEvent.MessageDelta -> handleMessageDelta(event)
             is WsTimelineEvent.StopReason -> {
-                val state = liveStateForTurn(event.turnId)
-                if (state == null) {
-                    reportUnmatchedFrame(event, event.turnId, event.runId)
-                    return
-                }
+                val state = liveTailStateOrForward(event, TurnTail(event.turnId, event.runId)) ?: return
                 val effectiveConversationId = state.localConversationId ?: state.conversationId
                 runtimeEventBatcher.enqueue(event, effectiveConversationId)
                 if (ignoreForeignTurnStop(state, event)) return
@@ -956,11 +960,7 @@ class ChatSendCoordinator(
                 markTurnVisuallyComplete(state, reason = "stopReason")
             }
             is WsTimelineEvent.UsageStatistics -> {
-                val state = liveStateForTurn(event.turnId)
-                if (state == null) {
-                    reportUnmatchedFrame(event, event.turnId, event.runId)
-                    return
-                }
+                val state = liveTailStateOrForward(event, TurnTail(event.turnId, event.runId)) ?: return
                 val effectiveConversationId = state.localConversationId ?: state.conversationId
                 runtimeEventBatcher.enqueue(event, effectiveConversationId)
                 // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
@@ -1026,6 +1026,17 @@ class ChatSendCoordinator(
         }
     }
 
+    /** A delta naming a turn this conversation has already finished is that turn's tail. */
+    private fun isRetiredTurnTail(event: WsTimelineEvent.MessageDelta, conversationId: String): Boolean {
+        val state = peekState(conversationId) ?: return false
+        val turnId = event.turnId?.takeIf { it.isNotBlank() }
+        if (turnId != null) return isRetiredTurn(state, turnId)
+        // A frame without a turn id still names its run; a settled run that is not the live one
+        // is a finished turn's tail too.
+        val runId = event.message.runId?.takeIf { it.isNotBlank() } ?: return false
+        return runId != state.runId && runId in state.settledRunIds
+    }
+
     /**
      * Prefer the state the otid bound, then the state that owns this turn, then whatever the
      * frame's conversation resolves to. The frame's own id is the last thing to trust: it is the
@@ -1052,7 +1063,7 @@ class ChatSendCoordinator(
         // No conversation on the frame: legacy WS frames only (Iroh always stamps agent, conversation
         // and turn). The WS contract attributes these to this chat's own send or open conversation,
         // pinned by WsChatSendCoordinatorTest (replay, live stream, pre-conversation buffering).
-        val state = boundState ?: event.turnId?.let { liveStateForTurn(it) }
+        val state = boundState ?: event.turnId?.let { id -> resolveStateByTurnId(id)?.takeUnless { isRetiredTurn(it, id) } }
         return state?.let { it.localConversationId ?: it.conversationId }
             ?: lastActiveConversationId
             ?: activeConversationId()
@@ -1107,7 +1118,23 @@ class ChatSendCoordinator(
             frameConversationId = event.conversationId,
             isReplay = event.isReplay,
         )
-        timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
+        val retiredTail = isRetiredTurnTail(event, conversationId)
+        timelineRepository.ingestExternalTransportMessage(
+            agentId, conversationId, event.message,
+            source = TimelineIngestSources.coordinator(retiredTail),
+        )
+        if (retiredTail) {
+            // A reply's last deltas can reach us after its terminal (Iroh emits them behind
+            // turn_finished). The timeline folds them into the finished turn, but the turn is over:
+            // latching typing here re-lit Thinking/Stop run with no terminal left to clear them.
+            Telemetry.event(
+                "AdminChatVM", "ws.event.retiredTurnTailDelta",
+                "turnId" to event.turnId,
+                "messageType" to event.message.messageType,
+                "conversationId" to conversationId,
+            )
+            return
+        }
         if (!event.isReplay) {
             postSendReconciler.recordLiveIngest(conversationId)
             // Finding 1: a background conversation's delta must not latch

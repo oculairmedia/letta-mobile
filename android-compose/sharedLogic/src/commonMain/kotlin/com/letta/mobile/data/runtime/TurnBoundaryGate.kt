@@ -58,8 +58,8 @@ internal data class TurnBoundaryInput(
  */
 internal class TurnBoundaryGate {
     private val lock = SynchronizedObject()
-    private val finishedTurnIds = RecentIds(RECENT_CAPACITY)
-    private val settledRunIds = RecentIds(RECENT_CAPACITY)
+    private val finishedTurnIds = RecentIds<String>(RECENT_CAPACITY)
+    private val settledRunIds = RecentIds<String>(RECENT_CAPACITY)
     private var leaseToken: Long? = null
     private var evidenceSeen = false
     private var abortRequested = false
@@ -75,10 +75,16 @@ internal class TurnBoundaryGate {
     /** An `abort_message` was sent for this key: a later idle loop status reads as Cancelled. */
     fun noteAbortRequested(): Unit = synchronized(lock) { abortRequested = true }
 
+    /** Whether an abort was already requested for the current lease (letta-mobile-qygvv.3). */
+    fun isAbortRequested(): Boolean = synchronized(lock) { abortRequested }
+
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
-    fun noteSettled(runId: String?): Unit = synchronized(lock) {
-        runId?.takeIf { it.isNotBlank() }?.let(settledRunIds::add)
-        Unit
+    fun noteSettled(runId: String?) {
+        if (!runId.isNullOrBlank()) {
+            synchronized(lock) {
+                settledRunIds.add(runId)
+            }
+        }
     }
 
     fun decide(input: TurnBoundaryInput): TurnBoundaryDecision = synchronized(lock) {
@@ -136,12 +142,12 @@ internal class TurnBoundaryGate {
     }
 
     /** Insertion-ordered, bounded set: the oldest id is evicted once [capacity] is exceeded. */
-    private class RecentIds(private val capacity: Int) {
-        private val ids = LinkedHashSet<String>()
+    private class RecentIds<T>(private val capacity: Int) {
+        private val ids = LinkedHashSet<T>()
 
-        operator fun contains(id: String): Boolean = id in ids
+        operator fun contains(id: T): Boolean = id in ids
 
-        fun add(id: String) {
+        fun add(id: T) {
             ids.remove(id)
             ids.add(id)
             if (ids.size > capacity) ids.remove(ids.first())

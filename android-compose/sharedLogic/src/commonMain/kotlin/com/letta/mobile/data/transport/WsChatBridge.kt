@@ -75,9 +75,16 @@ class WsChatBridge(
         .map { it.toConnectionState() }
         .first()
 
-    /** High-level event stream tailored for chat consumers. */
+    /**
+     * High-level event stream tailored for chat consumers.
+     *
+     * letta-mobile-qygvv.11: every collector gets its own subscription (and so
+     * one copy of each frame), but the frame -> event projection is memoized on
+     * the published [TransportFrameEvent], so it runs once per frame no matter
+     * how many coordinators collect.
+     */
     val events: Flow<WsTimelineEvent> = merge(
-        transport.frameEvents.mapNotNull { it.toTimelineEvent() },
+        transport.frameEvents.mapNotNull { it.timelineEvent },
         // Surface terminal disconnects as their own event so the
         // ViewModel can show a banner / re-enable retry without
         // having to re-implement a state-collector.
@@ -335,7 +342,8 @@ sealed interface BridgeTurnStatus {
     }
 }
 
-private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
+/** Runs once per [TransportFrameEvent] via its memoized [TransportFrameEvent.timelineEvent]. */
+internal fun TransportFrameEvent.projectTimelineEvent(): WsTimelineEvent? {
     val event = frame.toTimelineEvent(isReplay)
     com.letta.mobile.util.Telemetry.event(
         "IrohGate", "gate2.bridgeEvent",
