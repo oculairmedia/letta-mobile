@@ -77,8 +77,15 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
     }
 }
 
-/** Switches one conversation's model (and reasoning effort) through `model.update`. */
-class ConversationModelRepository(private val rpc: AdminRpcInvoker) {
+/**
+ * Switches one conversation's model (and reasoning effort) through `model.update`.
+ * Every successful model switch is recorded in [selections] so pickers show the
+ * conversation's model rather than the agent's (letta-mobile-okvyf).
+ */
+class ConversationModelRepository(
+    private val rpc: AdminRpcInvoker,
+    val selections: ConversationModelSelections = ConversationModelSelections(),
+) {
     suspend fun updateModel(
         target: ConversationModelTarget,
         modelHandle: ModelHandle?,
@@ -86,7 +93,20 @@ class ConversationModelRepository(private val rpc: AdminRpcInvoker) {
     ): ConversationModelUpdate {
         require(modelHandle != null || effort != ReasoningEffortChoice.Unchanged) { "nothing to update" }
         val params = ModelControlWire.updateParams(target, modelHandle, effort)
-        return ModelControlWire.modelUpdate(rpc.invoke(ModelControlWire.MODEL_UPDATE, params))
+        val update = ModelControlWire.modelUpdate(rpc.invoke(ModelControlWire.MODEL_UPDATE, params))
+        if (modelHandle != null) {
+            if (update.appliedTo == APPLIED_TO_AGENT) {
+                // The agent's own model moved; the refreshed agent is the source of truth.
+                selections.clear(target.conversationId)
+            } else {
+                selections.record(target.conversationId, update.modelHandle ?: modelHandle.value)
+            }
+        }
+        return update
+    }
+
+    private companion object {
+        const val APPLIED_TO_AGENT = "agent"
     }
 }
 

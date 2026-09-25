@@ -6,6 +6,7 @@ import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import javax.inject.Inject
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * letta-mobile-w4q4p: the chat picker's view of the host model catalog
@@ -21,6 +22,10 @@ class ChatModelControl @Inject constructor(
     }
 
     fun reasoningEffortsFor(handle: ModelHandle?): List<String> = catalog.reasoningEffortsFor(handle)
+
+    /** letta-mobile-okvyf: conversation id -> model applied by a per-conversation switch. */
+    val conversationSelections: StateFlow<Map<String, String>>
+        get() = conversationModels.selections.byConversation
 
     suspend fun switchConversationModel(target: ConversationModelTarget, pick: ModelPick) {
         conversationModels.updateModel(target, pick.handle, pick.effort.toChoice())
