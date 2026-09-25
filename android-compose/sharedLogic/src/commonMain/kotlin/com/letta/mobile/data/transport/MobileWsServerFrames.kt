@@ -197,6 +197,21 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
+     * letta-mobile-1n5py.1: this device's input was accepted but parked in the App Server's queue
+     * behind another client's turn (the engine's `Running` lifecycle with the queued reason). The
+     * turn it belongs to has not started; its own frames follow once the server dequeues it.
+     */
+    @Serializable
+    data class TurnQueued(
+        override val v: Int = 1,
+        val type: String = "turn_queued",
+        override val id: String,
+        override val ts: String,
+        @SerialName("turn_id") val turnId: String,
+        @SerialName("conversation_id") val conversationId: String,
+    ) : ServerFrame
+
+    /**
      * Spec §4.7: bare-envelope shape — the inner field is `stop_reason`
      * (NOT `reason`), matching the SSE/REST emit and the existing
      * Kotlin [com.letta.mobile.data.model.StopReasonMessage]. The WS

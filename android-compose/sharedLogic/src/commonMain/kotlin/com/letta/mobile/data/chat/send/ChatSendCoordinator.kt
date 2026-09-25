@@ -114,6 +114,12 @@ class ChatSendCoordinator(
         CoordinatorQueueTurns(turnStateMutex, wsChatBridge) { dispatchPendingSend(it, clearComposer = false) },
     )
 
+    private val serverQueueMarks = ServerQueueMarks(
+        queue = queuedSends,
+        sendOfTurn = { turnId -> snapshotStates().firstOrNull { it.turnId == turnId }?.inFlightSend },
+        sendOfConversation = { conversationId -> peekState(conversationId)?.inFlightSend },
+    )
+
     /** letta-mobile-1n5py: the send queue a chat screen shows and controls. */
     val sendQueue: ChatSendQueueControls = ChatSendQueueControls(scope, queueDriver, queuedSends.state)
     private val bridgeEventDeduplicator = BridgeEventDeduplicator()
@@ -173,6 +179,9 @@ class ChatSendCoordinator(
         /** Terminal fence + generation ownership for THIS conversation only. */
         val identity = TurnIdentityLifecycle()
         @Volatile var otid: String? = null
+
+        /** letta-mobile-1n5py.1: the send behind [otid], kept so a busy bounce can wait and retry it. */
+        @Volatile var inFlightSend: QueuedChatSend? = null
         @Volatile var localConversationId: String? = null
         @Volatile var serverConversationId: String? = null
 
@@ -754,6 +763,7 @@ class ChatSendCoordinator(
             },
             onAccepted = {
                 state.otid = pending.id.value
+                state.inFlightSend = pending
                 state.localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
                 state.reachedTerminal = false
                 pending.conversationId.value.takeIf { it.isNotBlank() }?.let { lastActiveConversationId = it }
@@ -903,8 +913,8 @@ class ChatSendCoordinator(
                 }
                 failActiveTurnForDisconnect(event)
             }
-            is WsTimelineEvent.GoalsUpdated -> Unit
-            is WsTimelineEvent.AgentUpdated -> Unit
+            is WsTimelineEvent.GoalsUpdated, is WsTimelineEvent.AgentUpdated -> Unit
+            is WsTimelineEvent.TurnQueued -> serverQueueMarks.markQueuedOnServer(event)
             is WsTimelineEvent.UserActionOutcome ->
                 runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
         }
@@ -972,6 +982,7 @@ class ChatSendCoordinator(
 
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
+        serverQueueMarks.onOwnTurnFrame(event)
         val otid = event.message.otid
         val boundState = if (otid != null && !event.isReplay) {
             bindInboundTurnByOtid(
@@ -1071,18 +1082,12 @@ class ChatSendCoordinator(
                 "activeRunId" to (owner?.runId ?: ""),
                 "status" to event.status,
             )
+            // letta-mobile-1n5py.1: a terminal of no send of this device may end the other
+            // client's turn a held queue waits for.
+            queueDriver.onForeignTerminalLocked()
             return
         }
-        finishActiveTurn(
-            state = owner,
-            status = event.status,
-            runId = event.runId,
-            turnId = event.turnId,
-            lossy = event.lossy,
-            dropCount = event.dropCount,
-            reason = "turnDone",
-            recordEvent = event,
-        )
+        finishTurnDone(owner, event)
     }
 
     private suspend fun handleErrorFrame(event: WsTimelineEvent.Error) {
@@ -1667,6 +1672,41 @@ class ChatSendCoordinator(
     }
 
     /**
+     * The owned terminal of [owner]'s turn.
+     *
+     * letta-mobile-1n5py.1: when another client (a second device) already runs this conversation,
+     * the wrapper bounces this device's send before it starts. Instead of failing, the send waits
+     * at the head of the queue and goes again once that turn ends. Its otid is not settled, so the
+     * retry reuses it and the row the user already sees. A terminal that carried no send of this
+     * device may be that other turn's end, so it releases held queues, after it is handled.
+     */
+    private suspend fun finishTurnDone(owner: ConversationTurnState, event: WsTimelineEvent.TurnDone) {
+        val send = owner.inFlightSend
+        val bounced = otherClientBounce(send, event.status, owner.bufferedErrorMessage, owner.deliveredAssistantContent)
+        if (bounced != null) {
+            owner.otid = null
+            owner.reachedTerminal = true
+            clearActiveTurnState(owner, reason = "otherClientBusy")
+            timelineRepository.clearExternalTransportActive(bounced.conversationId.value)
+            if (ownsForegroundUi(bounced.conversationId.value)) ui.onTurnVisuallyComplete()
+            queueDriver.holdForOtherClientLocked(bounced)
+            ui.onSendQueued(bounced.conversationId.value)
+            return
+        }
+        finishActiveTurn(
+            state = owner,
+            status = event.status,
+            runId = event.runId,
+            turnId = event.turnId,
+            lossy = event.lossy,
+            dropCount = event.dropCount,
+            reason = "turnDone",
+            recordEvent = event,
+        )
+        if (send == null) queueDriver.onForeignTerminalLocked()
+    }
+
+    /**
      * letta-mobile-or40x PR2: SCOPED to the conversation whose presence is being
      * healed. The unscoped `hasAnyActiveChatTurn` read meant conversation B's live
      * turn suppressed conversation A's self-heal, so an evicted or orphaned A
@@ -1735,6 +1775,8 @@ class ChatSendCoordinator(
         state.retainSettledRunId(state.runId)
         state.otid?.let { retainSettledOtid(it) }
         state.otid = null
+        state.inFlightSend?.let { queuedSends.clearQueuedOnServer(it.conversationId) }
+        state.inFlightSend = null
         state.identity.clear()
         state.localConversationId = null
         state.serverConversationId = null
