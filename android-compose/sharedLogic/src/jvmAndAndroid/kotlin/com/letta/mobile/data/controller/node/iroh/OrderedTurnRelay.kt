@@ -121,16 +121,21 @@ internal suspend fun relayServerTail(
 ) {
     protocol.beforeDraft(terminal)
     if (fanout.isFailureOrCancelLifecycle(terminal.payload)) fanout.flushOpenToolCalls()
-    if (!fanout.anyTerminalDeltaRelayed && tail.frames.none { it.isTerminalDelta }) {
-        fanout.onDraft(terminal.payload, terminal.runId)
-    }
-    tail.frames.forEach { frame ->
+    var synthesize = !fanout.anyTerminalDeltaRelayed && tail.frames.none { it.isTerminalDelta }
+    // A synthesized terminal goes after the server's last delta and before its idle loop status.
+    val lastDelta = tail.frames.indexOfLast { it.type == TapFrame.STREAM_DELTA }
+    tail.frames.forEachIndexed { index, frame ->
+        if (synthesize && index > lastDelta && frame.type == TapFrame.UPDATE_LOOP_STATUS) {
+            fanout.onDraft(terminal.payload, terminal.runId)
+            synthesize = false
+        }
         when (frame.type) {
             TapFrame.STREAM_DELTA -> fanout.relayServerDelta(frame.raw)
             TapFrame.UPDATE_LOOP_STATUS, TapFrame.UPDATE_QUEUE -> protocol.forwardServerFrame(frame)
             else -> Unit
         }
     }
+    if (synthesize) fanout.onDraft(terminal.payload, terminal.runId)
     fanout.markTerminalWritten()
     protocol.finishWithServerFrame(tail.turnFinished)
 }

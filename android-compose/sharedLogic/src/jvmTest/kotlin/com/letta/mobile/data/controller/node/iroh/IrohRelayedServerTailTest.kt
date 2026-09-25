@@ -54,6 +54,41 @@ class IrohRelayedServerTailTest {
         assertEquals(RUN, stream.last().json.parityString("run_id"))
     }
 
+    /** turn_finished rides the control lane and can reach the tap before the stream lane's tail. */
+    @Test
+    fun turnFinishedArrivingBeforeTheStreamTailStillEndsOnTheServersOwnFrames() = runTest {
+        val assistant = delta("assistant_message") { put("content", "Hi") }
+        val error = delta("error_message") { put("message", "400 bad model") }
+        val stop = delta("stop_reason") { put("stop_reason", "error") }
+        val idle = idle()
+        val finished = turnFinished("error")
+        val drafts = listOf(remote(assistant), lifecycle(RuntimeRunStatus.Failed, "400 bad model"))
+
+        val stream = relay(listOf(assistant, finished, error, stop, idle), drafts)
+
+        assertEquals(
+            listOf("assistant_message", "error_message", "stop_reason", "update_loop_status", "turn_finished"),
+            stream.map { it.kind },
+        )
+        assertEquals(RUN, (stream[1].json["delta"] as JsonObject).parityString("run_id"))
+    }
+
+    /** A cancel the engine ended on its own: its stop_reason goes after the server's last delta, before idle. */
+    @Test
+    fun synthesizedCancelFollowsTheServersLastDelta() = runTest {
+        val assistant = delta("assistant_message") { put("content", "Hi") }
+        val usage = delta("usage_statistics") { put("total_tokens", 3) }
+        val server = listOf(assistant, usage, idle(), turnFinished("cancelled"))
+        val drafts = listOf(remote(assistant), lifecycle(RuntimeRunStatus.Cancelled, "stopped"))
+
+        val stream = relay(server, drafts)
+
+        assertEquals(
+            listOf("assistant_message", "usage_statistics", "stop_reason", "update_loop_status", "turn_finished"),
+            stream.map { it.kind },
+        )
+    }
+
     @Test
     fun cancelWithoutAServerTerminalDeltaStaysACancel() = runTest {
         val server = listOf(delta("assistant_message") { put("content", "Hi") }, idle(), turnFinished("cancelled"))

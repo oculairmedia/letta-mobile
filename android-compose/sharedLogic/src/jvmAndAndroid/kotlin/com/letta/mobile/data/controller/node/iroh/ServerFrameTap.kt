@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
 
 /*
  * letta-mobile-qygvv.28: the App Server's own end of a relayed turn.
@@ -43,6 +44,10 @@ internal class TapFrame(val key: String?, val type: String?, val raw: JsonObject
             "loop_error" -> ((raw["delta"] as? JsonObject)?.get("is_terminal") as? JsonPrimitive)?.booleanOrNull != false
             else -> false
         }
+
+    /** The App Server's frame sequence number, shared by both lanes. */
+    val eventSeq: Long?
+        get() = (raw["event_seq"] as? JsonPrimitive)?.longOrNull
 
     val loopStatus: String?
         get() = ((raw["loop_status"] as? JsonObject)?.get("status") as? JsonPrimitive)?.contentOrNull
@@ -137,12 +142,26 @@ internal class ServerFrameTap private constructor() {
         ServerTurnTail(frames, buffer[end])
     }
 
+    /**
+     * Control frames (`turn_finished`) and stream frames (deltas, loop status, queue) reach the tap
+     * on two lanes, so a frame can arrive after one the server sent later. Until the tail is taken,
+     * frames go in `event_seq` order; afterwards (the post-turn queue relay reads by index) they are
+     * appended as they come.
+     */
     private fun append(frame: TapFrame) {
         val count = synchronized(lock) {
-            buffer += frame
+            buffer.add(insertionIndex(frame), frame)
             buffer.size
         }
         size.value = count
+    }
+
+    private fun insertionIndex(frame: TapFrame): Int {
+        val seq = frame.eventSeq
+        if (seq == null || turnFinishedAt >= 0) return buffer.size
+        var index = buffer.size
+        while (index > 0 && (buffer[index - 1].eventSeq ?: Long.MIN_VALUE) > seq) index -= 1
+        return index
     }
 
     private fun startsNextTurn(frame: TapFrame): Boolean = when (frame.type) {
