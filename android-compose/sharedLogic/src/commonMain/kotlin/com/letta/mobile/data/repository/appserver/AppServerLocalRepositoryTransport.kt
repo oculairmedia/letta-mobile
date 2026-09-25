@@ -14,6 +14,9 @@ interface AppServerLocalRepositoryTransport {
     suspend fun listAgents(): JsonArray
     suspend fun getContext(agentId: String, conversationId: String?): JsonObject?
     suspend fun listAgentBlocks(agentId: String): JsonArray
+
+    /** `block.update_agent`: the App Server writes and commits `memory/system/<label>.md`. */
+    suspend fun updateAgentBlock(agentId: String, label: String, value: String): JsonElement
 }
 
 class DefaultAppServerLocalRepositoryTransport(
@@ -73,6 +76,17 @@ class DefaultAppServerLocalRepositoryTransport(
         }
         error("Bundled App Server block listing exceeded $BLOCK_LIST_MAX_PAGES pages")
     }
+
+    override suspend fun updateAgentBlock(agentId: String, label: String, value: String): JsonElement =
+        adminRpc(
+            operation = "block-update",
+            method = "block.update_agent",
+            params = buildJsonObject {
+                put("agent_id", agentId)
+                put("label", label)
+                put("value", value)
+            },
+        ) ?: error("Bundled App Server block update returned no result")
 
     private suspend fun adminRpc(
         operation: String,

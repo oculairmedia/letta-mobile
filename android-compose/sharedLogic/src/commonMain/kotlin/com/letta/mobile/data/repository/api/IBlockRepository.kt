@@ -10,10 +10,20 @@ interface IAgentBlockRepository {
     suspend fun getBlocks(agentId: String): List<Block>
 }
 
-interface IBlockRepository : IAgentBlockRepository {
+/**
+ * Per-agent block write, addressed by agent + label. On the letta-code local
+ * backend this is `block.update_agent`, which the App Server serves with
+ * `write_memory_file` and a commit message, so the edit lands in the MemFS git
+ * HEAD that the compiled system prompt reads. Global-id block writes fail closed
+ * there, so memory editors must write through this seam.
+ */
+interface IAgentBlockWriteRepository : IAgentBlockRepository {
+    suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block
+}
+
+interface IBlockRepository : IAgentBlockWriteRepository {
     suspend fun retrieveBlock(blockId: String): Block
     suspend fun countBlocks(): Int
-    suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block
     suspend fun updateGlobalBlock(
         blockId: String,
         params: BlockUpdateParams,

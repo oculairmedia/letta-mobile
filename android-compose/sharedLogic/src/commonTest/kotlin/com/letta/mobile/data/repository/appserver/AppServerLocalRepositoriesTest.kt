@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -22,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -142,6 +144,30 @@ class AppServerLocalRepositoriesTest {
         assertFailsWith<IllegalStateException> { transport.listAgentBlocks("agent-1") }
     }
 
+    @Test
+    fun blockRepositoryWritesByAgentAndLabel() = runTest {
+        val transport = FakeTransport()
+
+        val saved = AppServerAgentBlockRepository(transport)
+            .updateAgentBlock("agent-1", "human", BlockUpdateParams(value = "Prefers tea"))
+
+        assertEquals(Triple("agent-1", "human", "Prefers tea"), transport.lastUpdate)
+        assertEquals("Prefers tea", saved.value)
+    }
+
+    @Test
+    fun defaultTransportSendsBlockUpdateAgent() = runTest {
+        val client = FakeClient { okBlocks("""{"id":"block-1","label":"human","value":"new"}""") }
+        val transport = DefaultAppServerLocalRepositoryTransport({ client }) { it }
+
+        transport.updateAgentBlock("agent-1", "human", "new")
+
+        val call = client.adminRpcCalls.single()
+        assertEquals("block.update_agent", call.method)
+        assertEquals("human", call.params?.get("label")?.jsonPrimitive?.content)
+        assertEquals("new", call.params?.get("value")?.jsonPrimitive?.content)
+    }
+
     private class FakeTransport(
         private val agents: JsonArray = JsonArray(emptyList()),
         private val blocks: JsonArray = JsonArray(emptyList()),
@@ -164,6 +190,16 @@ class AppServerLocalRepositoriesTest {
         override suspend fun listAgentBlocks(agentId: String): JsonArray {
             lastBlockAgentId = agentId
             return blocks
+        }
+
+        var lastUpdate: Triple<String, String, String>? = null
+
+        override suspend fun updateAgentBlock(agentId: String, label: String, value: String): JsonElement {
+            lastUpdate = Triple(agentId, label, value)
+            return AppServerProtocol.json.encodeToJsonElement(
+                Block.serializer(),
+                Block(id = BlockId("block-$label"), label = label, value = value),
+            )
         }
     }
 

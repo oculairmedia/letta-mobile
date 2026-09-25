@@ -370,6 +370,23 @@ class IrohAdminRpcAgentDirectory(
         },
     )
 
+    /**
+     * Agent + label block write (`block.update_agent`). The node maps it onto the
+     * App Server's `write_memory_file`, which commits the MemFS change; the
+     * global-id [updateBlock] route fails closed on the native local backend.
+     */
+    suspend fun updateAgentBlock(agentId: AgentId, label: String, params: BlockUpdateParams): Block = adminRpcDecoded(
+        method = AdminRpcMethod("block.update_agent"),
+        path = AdminRpcPath("/v1/agents/${agentId.value}/core-memory/blocks/$label"),
+        body = jsonBody {
+            put("agent_id", agentId.value)
+            put("label", label)
+            params.value?.let { put("value", it) }
+            params.limit?.let { put("limit", it) }
+            params.description?.let { put("description", it) }
+        },
+    )
+
     suspend fun deleteBlock(blockId: BlockId) {
         adminRpcResult(
             method = AdminRpcMethod("block.delete"),

@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentImportParams
@@ -19,7 +20,7 @@ import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.api.IAgentBlockRepository
+import com.letta.mobile.data.repository.api.IAgentBlockWriteRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.util.Telemetry
@@ -67,7 +68,7 @@ open class LettaHttpAdminRepositories(
     private val config: LettaConfig,
     private val httpClient: HttpClient,
     private val nowMillis: () -> Long,
-) : IAgentRepository, IAgentBlockRepository, IToolRepository, IScheduleRepository, AutoCloseable {
+) : IAgentRepository, IAgentBlockWriteRepository, IToolRepository, IScheduleRepository, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
     private val agentsFlow = MutableStateFlow<List<Agent>>(emptyList())
     override val agents: StateFlow<List<Agent>> = agentsFlow.asStateFlow()
@@ -87,6 +88,9 @@ open class LettaHttpAdminRepositories(
 
     override suspend fun getBlocks(agentId: String): List<Block> =
         getJson("/v1/agents/$agentId/core-memory/blocks")
+
+    override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block =
+        patchJson("/v1/agents/$agentId/core-memory/blocks/$blockLabel", params)
 
     override suspend fun refreshAgents() {
         val sharedSweep = agentRefreshMutex.isLocked
