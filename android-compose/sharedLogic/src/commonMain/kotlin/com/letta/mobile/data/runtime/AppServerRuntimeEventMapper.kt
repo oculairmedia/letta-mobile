@@ -165,7 +165,12 @@ open class AppServerRuntimeEventMapper {
                 val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
                 val lifecycleDraft = when (AppServerStopReason.boundaryOf(stopReason)) {
                     AppServerTurnBoundary.AwaitingApproval, AppServerTurnBoundary.Continuing -> null
-                    AppServerTurnBoundary.Cancelled -> command.runLifecycleDraft(RuntimeRunStatus.Cancelled, runId = runId)
+                    // letta-mobile-qygvv.28: a relaying node carries the cancel's reason here.
+                    AppServerTurnBoundary.Cancelled -> command.runLifecycleDraft(
+                        RuntimeRunStatus.Cancelled,
+                        runId = runId,
+                        reason = deltaObject.string("message"),
+                    )
                     AppServerTurnBoundary.Failed -> command.runLifecycleDraft(
                         RuntimeRunStatus.Failed,
                         runId = runId,

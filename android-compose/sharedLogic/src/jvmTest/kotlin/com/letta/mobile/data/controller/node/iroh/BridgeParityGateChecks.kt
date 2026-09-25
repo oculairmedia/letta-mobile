@@ -120,11 +120,12 @@ internal val NODE_ONLY_KINDS = mapOf(
     "resume_queue_response" to "the App Server's reply to the node's own resume_queue",
 )
 
-/** Kinds the node's engine re-projects before relaying, and the kind the phone gets instead. */
+/**
+ * Kinds the node's engine re-projects before relaying, and the kind the phone gets instead.
+ * `client_tool_start` / `client_tool_end` reach the phone as themselves (qygvv.27).
+ */
 internal val PROJECTED_KINDS = mapOf(
     "approval_request_message" to "tool_call_message", // auto-allowed: the card is suppressed, the call is not
-    "client_tool_start" to "tool_call_message",
-    "client_tool_end" to "tool_return_message",
 )
 
 private fun frameKinds(runs: ParityRuns): String? {
