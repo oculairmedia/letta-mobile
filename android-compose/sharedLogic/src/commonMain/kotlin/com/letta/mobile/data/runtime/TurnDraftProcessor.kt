@@ -35,8 +35,7 @@ internal class TurnDraftProcessor(
 ) {
     val ledger = TurnToolCallLedger()
     private var pendingCompleted: RuntimeEventDraft? = null
-    private var pendingStop: RuntimeEventDraft? = null
-    private var pendingUsage: RuntimeEventDraft? = null
+    private val tail = TurnTailBuffer()
     private var terminalArmed = false
     private var speculativeCompletionArmed = false
     private var sawToolReturn = false
@@ -75,12 +74,21 @@ internal class TurnDraftProcessor(
         return TurnCutOffOutcome.FallbackPublished
     }
 
+    /** The turn's terminal flush: the final round's tail, in the order the server sent it. */
     suspend fun flushTail() {
         callbacks.clearApprovals()
-        pendingStop?.let { callbacks.emit(it) }
-        pendingStop = null
-        pendingUsage?.let { callbacks.emit(it) }
-        pendingUsage = null
+        tail.drain().forEach { callbacks.emit(it) }
+    }
+
+    /**
+     * letta-mobile-qygvv.26: a round's tail (usage_statistics, stop_reason) is closed once its
+     * stop_reason arrived. The next non-terminal frame means the turn continues into another round,
+     * so that round's tail goes out now, ahead of the frame, instead of being overwritten or held
+     * back until the turn's terminal.
+     */
+    private suspend fun flushClosedRoundTail(draft: RuntimeEventDraft) {
+        if (!tail.closed || !draft.continuesTurn()) return
+        tail.drain().forEach { callbacks.emit(it) }
     }
 
     /**
@@ -90,6 +98,7 @@ internal class TurnDraftProcessor(
      * waiting out the quiet period the `stop_reason` delta fallback needs.
      */
     suspend fun process(draft: RuntimeEventDraft, frameSeq: Long?, authoritative: Boolean = false) {
+        flushClosedRoundTail(draft)
         if (emitAutoApproved(draft)) return
         callbacks.track(draft, ledger)
         observeContinuedActivity(draft)
@@ -132,13 +141,9 @@ internal class TurnDraftProcessor(
     }
 
     private fun bufferTail(draft: RuntimeEventDraft, frameSeq: Long?): Boolean {
-        if (draft.isStopReasonFrame()) {
-            pendingStop = draft
-            return true
-        }
-        if (!draft.isUsageStatisticsFrame()) return false
-        if (pendingUsage == null) pendingUsage = draft
-        armSpeculativeCompletionAfterUsage(draft, frameSeq)
+        if (!draft.isTailFrame()) return false
+        tail.add(draft, closesRound = draft.isStopReasonFrame())
+        if (draft.isUsageStatisticsFrame()) armSpeculativeCompletionAfterUsage(draft, frameSeq)
         return true
     }
 
@@ -201,6 +206,31 @@ internal class TurnDraftProcessor(
     }
 }
 
+/**
+ * letta-mobile-qygvv.26: the buffered end-of-round frames, kept in arrival order (the App Server
+ * sends usage_statistics, then stop_reason) and every one of them: a multi-round turn reports each
+ * round's usage and stop_reason, not the first usage and the last stop_reason.
+ */
+private class TurnTailBuffer {
+    private val frames = mutableListOf<RuntimeEventDraft>()
+
+    /** A stop_reason is buffered: the round these frames close has ended. */
+    var closed = false
+        private set
+
+    fun add(draft: RuntimeEventDraft, closesRound: Boolean) {
+        frames += draft
+        if (closesRound) closed = true
+    }
+
+    fun drain(): List<RuntimeEventDraft> {
+        val drained = frames.toList()
+        frames.clear()
+        closed = false
+        return drained
+    }
+}
+
 /** letta-mobile-qygvv.16: how [TurnDraftProcessor.cutOff] ended a turn whose session was lost. */
 internal enum class TurnCutOffOutcome {
     /** The turn's own terminal was already out; nothing more was emitted. */
@@ -255,6 +285,11 @@ private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val even
     ).any { it }
     else -> false
 }
+
+/** A frame that carries the turn on past a closed round tail: neither a tail frame nor a terminal. */
+private fun RuntimeEventDraft.continuesTurn(): Boolean = !isTailFrame() && !isTerminalLifecycle()
+
+private fun RuntimeEventDraft.isTailFrame(): Boolean = isStopReasonFrame() || isUsageStatisticsFrame()
 
 private fun RuntimeEventDraft.isStopReasonFrame(): Boolean = when (val event = payload) {
     is RuntimeEventPayload.RemoteStreamFrame -> event.matchesAnyType(RuntimeFrameTypes.stopReason)

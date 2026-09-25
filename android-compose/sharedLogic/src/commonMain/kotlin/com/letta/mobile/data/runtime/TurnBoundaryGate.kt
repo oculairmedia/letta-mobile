@@ -50,7 +50,10 @@ internal data class TurnBoundaryInput(
  *     and ignored when it names a run other than the lease's promoted run.
  *  2. `update_loop_status` WAITING_ON_INPUT with no active runs is the completion fallback, but only
  *     after this lease has seen evidence (any stream delta), never while an approval is outstanding,
- *     and never for WAITING_ON_APPROVAL (that is the approval continuation boundary).
+ *     never for WAITING_ON_APPROVAL (that is the approval continuation boundary), and never while
+ *     the lease's latest round stopped to continue (`requires_approval`): that idle sits between
+ *     approval-continuation rounds, and the next round's run follows it (letta-mobile-qygvv.29).
+ *     After an abort request the idle still ends the turn as Cancelled.
  *  3. The terminal `stop_reason` delta with its settle window, for servers without `turn_finished`.
  *
  * Settled run ids and finished turn ids outlive a lease so a late or replayed terminal for a turn
@@ -64,12 +67,16 @@ internal class TurnBoundaryGate {
     private var evidenceSeen = false
     private var abortRequested = false
 
+    /** letta-mobile-qygvv.29: the lease's latest stop_reason paused the run for a continuation round. */
+    private var roundContinues = false
+
     /** Reset per-lease state when a new turn lease starts collecting. */
     fun beginLease(token: Long): Unit = synchronized(lock) {
         if (leaseToken == token) return@synchronized
         leaseToken = token
         evidenceSeen = false
         abortRequested = false
+        roundContinues = false
     }
 
     /** An `abort_message` was sent for this key: a later idle loop status reads as Cancelled. */
@@ -105,7 +112,13 @@ internal class TurnBoundaryGate {
             return TurnBoundaryDecision.ProjectSettledRunDraft
         }
         evidenceSeen = true
+        noteRoundStop(received)
         return TurnBoundaryDecision.Project
+    }
+
+    private fun noteRoundStop(received: AppServerReceivedFrame) {
+        if (received.terminalMessageTypeOrNull() != STOP_REASON) return
+        roundContinues = received.stopReasonOrNull() == AppServerStopReason.REQUIRES_APPROVAL
     }
 
     private fun decideTurnFinished(
@@ -137,6 +150,7 @@ internal class TurnBoundaryGate {
         if (!evidenceSeen || input.approvalOutstanding) return TurnBoundaryDecision.Project
         if (frame.loopStatus.status != LOOP_WAITING_ON_INPUT) return TurnBoundaryDecision.Project
         if (frame.loopStatus.activeRunIds.isNotEmpty()) return TurnBoundaryDecision.Project
+        if (roundContinues && !abortRequested) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }
@@ -157,5 +171,6 @@ internal class TurnBoundaryGate {
     companion object {
         const val LOOP_WAITING_ON_INPUT: String = "WAITING_ON_INPUT"
         private const val RECENT_CAPACITY = 32
+        private const val STOP_REASON = "stop_reason"
     }
 }

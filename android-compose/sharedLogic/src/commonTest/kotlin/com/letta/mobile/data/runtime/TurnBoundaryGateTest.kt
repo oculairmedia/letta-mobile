@@ -74,6 +74,40 @@ class TurnBoundaryGateTest {
     }
 
     @Test
+    fun idleBetweenApprovalContinuationRoundsDoesNotComplete() {
+        // letta-mobile-qygvv.29: round 1 paused on requires_approval, its tool ran, the loop idled.
+        gate.decideFrame(run1.assistantDelta())
+        gate.decideFrame(run1.stopDelta(TestStopReason.RequiresApproval))
+        assertEquals(TurnBoundaryDecision.Project, gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run1))
+    }
+
+    @Test
+    fun idleAfterTheFinalRoundCompletes() {
+        gate.decideFrame(run1.stopDelta(TestStopReason.RequiresApproval))
+        gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run1)
+        gate.decideFrame(run2.assistantDelta())
+        gate.decideFrame(run2.stopDelta())
+        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run2))
+        assertEquals(RuntimeRunStatus.Completed, idle.status)
+    }
+
+    @Test
+    fun idleBetweenRoundsAfterAbortCancels() {
+        gate.decideFrame(run1.stopDelta(TestStopReason.RequiresApproval))
+        gate.noteAbortRequested()
+        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run1))
+        assertEquals(RuntimeRunStatus.Cancelled, idle.status)
+    }
+
+    @Test
+    fun newLeaseForgetsAContinuingRound() {
+        gate.decideFrame(run1.stopDelta(TestStopReason.RequiresApproval))
+        gate.beginLease(2)
+        gate.decideFrame(run2.assistantDelta())
+        assertIs<TurnBoundaryDecision.LoopIdle>(gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run2))
+    }
+
+    @Test
     fun newLeaseResetsEvidenceAndAbort() {
         gate.decideFrame(run1.assistantDelta())
         gate.noteAbortRequested()
