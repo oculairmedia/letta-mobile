@@ -14,6 +14,7 @@ import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.api.TimelineIngestSources
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -1128,11 +1129,15 @@ class ChatSendCoordinator(
             frameConversationId = event.conversationId,
             isReplay = event.isReplay,
         )
-        timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
-        if (isRetiredTurnTail(event, conversationId)) {
+        val retiredTail = isRetiredTurnTail(event, conversationId)
+        timelineRepository.ingestExternalTransportMessage(
+            agentId, conversationId, event.message,
+            source = if (retiredTail) TimelineIngestSources.RETIRED_TURN_TAIL else "coordinator",
+        )
+        if (retiredTail) {
             // A reply's last deltas can reach us after its terminal (Iroh emits them behind
-            // turn_finished). The timeline decides what the tail is worth, but the turn is over: latching
-            // typing here re-lit Thinking/Stop run with no terminal left to clear them.
+            // turn_finished). The timeline folds them into the finished turn, but the turn is over:
+            // latching typing here re-lit Thinking/Stop run with no terminal left to clear them.
             Telemetry.event(
                 "AdminChatVM", "ws.event.retiredTurnTailDelta",
                 "turnId" to event.turnId,

@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.timeline.api.TimelineIngestSources
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -120,6 +121,64 @@ class CanonicalLateTailSettlementTest {
         assertEquals(emptyList(), owner.session.pending.value, "the user echo must confirm the local row")
         assertEquals(TimelineEnginePageOutcome.Applied, harness.coordinator.reconcileRecent(owner))
         assertTrue(harness.coordinator.retire(owner))
+    }
+
+    /**
+     * The 20:48:03 shape (local-run-55): the observer's terminal retired the turn before the engine
+     * projected ANY of the reply, so the settled turn held only the user echo (synthetic run id)
+     * and nothing in the reply's frames matched it. The send coordinator names them as the retired
+     * turn's tail; they complete the settled overlay and never open a new turn.
+     */
+    @Test
+    fun wholeReplyBehindTheTerminalCompletesTheSettledTurn() = runTest {
+        val store = InMemoryTimelineStore()
+        val harness = harness(store)
+        val owner = harness.coordinator.acquire(scope)
+        val screen = assertNotNull(harness.coordinator.attach(owner))
+        val agent = scope.agentId
+        val conversation = scope.conversationId
+        harness.external.appendExternalTransportLocal(agent, conversation, "hi", otid, emptyList())
+        harness.external.markExternalTransportLocalSent(agent, conversation, otid)
+        harness.external.turnStarted(agent, conversation, "iroh-run-d19c14d2", "iroh-turn-a87c9edf")
+        harness.external.ingestExternalTransportMessage(
+            agent, conversation,
+            UserMessage(id = "cm-user-$otid", contentRaw = JsonPrimitive("hi"), date = sentAt, otid = otid, runId = "iroh-run-d19c14d2"),
+        )
+        harness.external.turnEnded(agent, conversation, clean = true)
+        harness.external.clearExternalTransportActive(agent, conversation)
+        val tail = AssistantMessage(
+            id = "ui-msg-9173262", contentRaw = JsonPrimitive("Hello there"), date = sentAt, runId = "local-run-55",
+        )
+        harness.external.ingestExternalTransportMessage(agent, conversation, tail, TimelineIngestSources.RETIRED_TURN_TAIL)
+
+        val settled = assertNotNull(owner.session.live.value)
+        assertNotNull(settled.settlementRevision)
+        assertEquals(settled.fence, owner.liveFence)
+        assertEquals(listOf("cm-user-$otid", "ui-msg-9173262"), settled.block.events.map { it.serverId })
+
+        advanceUntilIdle()
+        assertEquals(emptyList(), harness.failures, "turn-end repair must run, not be refused")
+        assertEquals(emptyList(), owner.session.pending.value, "the user echo must confirm the local row")
+        harness.coordinator.detach(screen)
+    }
+
+    @Test
+    fun signalledTailNeverEntersTheNextTurn() = runTest {
+        val store = InMemoryTimelineStore()
+        val harness = harness(store)
+        val owner = harness.coordinator.acquire(scope)
+        val screen = assertNotNull(harness.coordinator.attach(owner))
+        harness.playPhoneTurn()
+        harness.external.turnStarted(scope.agentId, scope.conversationId, "iroh-run-next", "iroh-turn-next")
+        val stale = AssistantMessage(
+            id = "ui-msg-1", contentRaw = JsonPrimitive("old"), date = sentAt, runId = "local-run-49",
+        )
+        harness.external.ingestExternalTransportMessage(
+            scope.agentId, scope.conversationId, stale, TimelineIngestSources.RETIRED_TURN_TAIL,
+        )
+        assertEquals(null, owner.session.live.value?.block?.events?.firstOrNull { it.serverId == "ui-msg-1" })
+        advanceUntilIdle()
+        harness.coordinator.detach(screen)
     }
 
     @Test

@@ -125,9 +125,17 @@ class CanonicalTimelineCoordinator(
         }
     }
 
-    suspend fun ingestExternal(owner: Owner, message: com.letta.mobile.data.model.LettaMessage): Boolean = mutex.withLock {
+    /**
+     * [retiredTail] is the send coordinator's word that [message] belongs to a turn it already
+     * finished. Such a frame never opens a turn, whatever it names.
+     */
+    suspend fun ingestExternal(
+        owner: Owner,
+        message: com.letta.mobile.data.model.LettaMessage,
+        retiredTail: Boolean = false,
+    ): Boolean = mutex.withLock {
         if (owners[owner.selection.scope] !== owner) return@withLock false
-        if (absorbsSettledTail(owner, message)) return@withLock true
+        if (absorbsSettledTail(owner, message, retiredTail)) return@withLock true
         val frame = TimelineStreamFrame.Message(message)
         val fence = owner.liveFence ?: openLive(owner)
         if (owner.session.ingest(fence, frame)) return@withLock true
@@ -147,17 +155,27 @@ class CanonicalTimelineCoordinator(
      * row held the composer on Thinking. The settled overlay is frozen and reconcile carries the
      * durable row, so the tail is absorbed here.
      */
-    private fun absorbsSettledTail(owner: Owner, message: com.letta.mobile.data.model.LettaMessage): Boolean {
+    private suspend fun absorbsSettledTail(
+        owner: Owner,
+        message: com.letta.mobile.data.model.LettaMessage,
+        retiredTail: Boolean,
+    ): Boolean {
         val live = owner.session.live.value
         val settled = when {
             live?.settlementRevision != null -> live
             owner.liveFence == null -> owner.settledTail
             else -> null
-        } ?: return false
-        if (!settled.claimsLateTail(message)) return false
+        }
+        val claimed = retiredTail || settled?.claimsLateTail(message) == true
+        if (!claimed) return false
+        // While the settled overlay is still on screen the tail completes it, so the reply renders
+        // whole and adopts its stored row by content. Otherwise reconcile carries the durable row.
+        val folded = live != null && live.settlementRevision != null && live.fence === owner.liveFence &&
+            owner.session.engine.ingestSettledTail(live.fence, message)
         com.letta.mobile.util.Telemetry.event(
             "CanonicalTimeline", "external.settledTailAbsorbed",
             "messageType" to message.messageType, "runId" to (message.runId ?: ""),
+            "folded" to folded, "signalled" to retiredTail,
         )
         return true
     }

@@ -125,6 +125,34 @@ class CanonicalTimelineEngine(
         true
     }
 
+    /**
+     * Folds a settled turn's late tail into its overlay without reopening the turn.
+     *
+     * A transport can deliver a reply's last deltas after its terminal; dropping them left the
+     * overlay short of the stored reply, so content adoption failed and the positional fallback
+     * had to guess. The settlement revision and aliases are kept: this is the same turn, only now
+     * complete. False when no settled overlay of [fence] is resident to take it.
+     */
+    suspend fun ingestSettledTail(fence: TimelineLiveFence, message: com.letta.mobile.data.model.LettaMessage): Boolean =
+        mutex.withLock {
+            if (liveFence !== fence || fence.selection !== mutablePublication.value.selection) return@withLock false
+            val current = mutableLive.value ?: return@withLock false
+            if (current.fence !== fence || current.settlementRevision == null) return@withLock false
+            val previous = liveReduction ?: return@withLock false
+            val output = reduceStreamFrame(TimelineReducerInput(previous.timeline, message,
+                previous.pendingToolReturnsByCallId, agentId = fence.selection.scope.agentId))
+            val next = previous.copy(timeline = output.next, pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId)
+            val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+            val returnedId = (message as? com.letta.mobile.data.model.ToolReturnMessage)
+                ?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
+            val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
+            if (overflowReason(events, nextReturns) != null) return@withLock true
+            liveReduction = next
+            liveReturns = nextReturns
+            mutableLive.value = current.copy(block = current.block.copy(events = events))
+            true
+        }
+
     /** Names the budget a frame would outgrow, or null when the overlay can still carry it. */
     private fun overflowReason(events: List<TimelineEvent.Confirmed>, returns: Set<String>): String? {
         if (events.size > budget.maxMetadataRows) return "row budget"
@@ -234,6 +262,16 @@ class CanonicalTimelineEngine(
         val adopted = linkedMapOf<String, TimelineMessageId>()
         val unpaired = mutableListOf<TimelineEvent.Confirmed>()
         for (event in block.events) {
+            // The ledger may name the row exactly as the stream did (0.32.17 message.list returns
+            // the streamed ui-msg ids). That row is this event; it must never be offered to the
+            // positional fallback as someone else's.
+            val direct = unclaimed.firstOrNull {
+                it.identity.value == event.serverId && it.event.messageType == event.messageType
+            }
+            if (direct != null) {
+                unclaimed.remove(direct)
+                continue
+            }
             when (val claim = event.claimAdoption(unclaimed, aliases)) {
                 is Adoption.Alias -> adopted[claim.streamedId] = claim.identity
                 Adoption.AlreadyNamed -> Unit
@@ -267,7 +305,10 @@ class CanonicalTimelineEngine(
             it.isNew && it.event.messageType == TimelineMessageType.ASSISTANT && it.identity !in taken
         }
         if (candidates.isEmpty()) return emptyMap()
-        return unpaired.zip(candidates)
+        // A page can append an EARLIER turn's rows too (its own repair never ran), so this turn's
+        // replies are the newest candidates: align the two lists at their newest ends.
+        val count = minOf(unpaired.size, candidates.size)
+        return unpaired.takeLast(count).zip(candidates.takeLast(count))
             .filter { (event, row) -> row.identity.value != event.serverId }
             .associate { (event, row) -> event.serverId to row.identity }
     }

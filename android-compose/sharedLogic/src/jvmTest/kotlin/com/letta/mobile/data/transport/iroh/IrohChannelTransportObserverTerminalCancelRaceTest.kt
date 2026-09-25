@@ -156,6 +156,7 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
                 )
             },
             serverTerminalWaitMs = 150L,
+            observerTerminalGraceMs = 100L,
         )
         val frames = CopyOnWriteArrayList<ServerFrame>()
         val frameEvents = CopyOnWriteArrayList<TransportFrameEvent>()

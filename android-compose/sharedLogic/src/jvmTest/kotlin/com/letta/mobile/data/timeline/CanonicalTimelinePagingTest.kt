@@ -360,6 +360,57 @@ class CanonicalTimelinePagingTest {
         }
     }
 
+    /**
+     * Crash 2026-09-24 20:49:40 (`Key "segment-ui-msg-9173264" was already used`). The previous
+     * turn's repair never committed, so this turn's repair page appended BOTH turns' replies. The
+     * stream and the 0.32.17 ledger share the ui-msg id, but the overlay's text was short (its
+     * tail was dropped), so content could not pair them and the positional fallback paired the
+     * streamed reply with the OLDER turn's row. That row inherited `segment-ui-msg-9173264` while
+     * the true row kept the same key under its own identity.
+     */
+    @Test fun settledOverlayNeverLendsItsKeyToAnEarlierTurnsRow() = runBlocking {
+        val store = InMemoryTimelineStore()
+        val earlier = AssistantMessage(
+            id = "ui-msg-9173262", contentRaw = JsonPrimitive("Earlier answer"), date = "2026-01-01T00:00:01Z",
+        )
+        val reply = AssistantMessage(
+            id = "ui-msg-9173264", contentRaw = JsonPrimitive("Hello there, friend"), date = "2026-01-01T00:00:02Z",
+        )
+        val transport = object : TimelineTransport by PageTransport(0) {
+            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
+                TimelineRemotePageResult.Page(
+                    request.requestId, request.selectionGeneration,
+                    listOf(TimelineRemoteRecord(TimelineMessageId(reply.id), reply, 0),
+                        TimelineRemoteRecord(TimelineMessageId(earlier.id), earlier, 0)),
+                    null, false, 0,
+                )
+        }
+        val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val owner = coordinator.acquire(scope)
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        val fence = coordinator.beginLive(owner)
+        // The overlay holds the reply under the stream's (and ledger's) id, short of its tail.
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(reply.copy(contentRaw = JsonPrimitive("Hello")))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        assertEquals(emptyMap(), owner.session.live.value?.aliases, "an exact id match needs no alias")
+        val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
+        try {
+            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
+            presenter.awaitRows(2) { "settled rows never arrived" }
+            presenter.awaitIdle()
+            val keys = presenter.snapshot().items.map { it.identity.value to it.item.key }
+            assertEquals(
+                listOf("ui-msg-9173264" to "segment-ui-msg-9173264", "ui-msg-9173262" to "segment-ui-msg-9173262"),
+                keys,
+            )
+            presentation.close()
+        } finally {
+            ui.cancel()
+        }
+    }
+
     private class RecordingPresenter<T : Any> : PagingDataPresenter<T>(Dispatchers.Default, null) {
         override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) = Unit
 

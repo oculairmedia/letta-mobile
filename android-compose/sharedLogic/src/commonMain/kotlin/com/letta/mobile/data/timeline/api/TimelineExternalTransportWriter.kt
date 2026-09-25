@@ -104,3 +104,12 @@ interface TimelineExternalTransportWriter {
      */
     suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {}
 }
+
+/** Provenance values an ingest's `source` may carry that a writer acts on, not just logs. */
+object TimelineIngestSources {
+    /**
+     * A frame of a turn the send coordinator has already finished: its tail arrived behind the
+     * terminal. A canonical writer folds it into that turn and never opens a new turn for it.
+     */
+    const val RETIRED_TURN_TAIL = "coordinator.retiredTurnTail"
+}
