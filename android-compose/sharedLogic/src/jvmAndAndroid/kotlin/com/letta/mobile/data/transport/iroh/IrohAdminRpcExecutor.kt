@@ -67,6 +67,8 @@ internal class IrohAdminRpcExecutor(
     private suspend fun executeTracked(call: TrackedCall): AppServerInboundFrame.AdminRpcResponse {
         return try {
             call.execute()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             retryAfter(call, error)
         }
