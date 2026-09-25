@@ -89,6 +89,13 @@ class AppStartupActionsTest {
     }
 
     @Test
+    fun `prewarmSettings resolves the settings repository`() = runTest {
+        startupActions.prewarmSettings()
+
+        verify(exactly = 1) { lazySettingsRepository.get() }
+    }
+
+    @Test
     fun `scheduleChannelHeartbeat calls channelHeartbeatScheduler`() = runTest {
         startupActions.scheduleChannelHeartbeat()
 

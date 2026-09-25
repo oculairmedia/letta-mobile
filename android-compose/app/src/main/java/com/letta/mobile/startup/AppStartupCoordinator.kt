@@ -6,8 +6,10 @@ import com.letta.mobile.di.DefaultDispatcher
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,11 +27,29 @@ class AppStartupCoordinator @Inject constructor(
         }
     }
 
-    suspend fun runStartupTasks(application: Application) {
+    /**
+     * Runs the startup work; [start] calls this on the background dispatcher.
+     *
+     * [criticalPathWarmups] start first and run concurrently with the ordered
+     * [startupTasks]: they build singletons the first Activity frame needs, so they
+     * must not queue behind unrelated work (letta-mobile-wyo3p). `UNDISPATCHED`
+     * makes each warm-up begin before the ordered tasks; it only runs until the
+     * warm-up's first suspension (its switch to the IO dispatcher).
+     */
+    suspend fun runStartupTasks(application: Application): Unit = coroutineScope {
+        criticalPathWarmups().forEach { task ->
+            launch(start = CoroutineStart.UNDISPATCHED) { runTask(task) }
+        }
         startupTasks(application).forEach { task ->
             runTask(task)
         }
     }
+
+    private fun criticalPathWarmups(): List<AppStartupTask> = listOf(
+        AppStartupTask("prewarm settings") {
+            actions.prewarmSettings()
+        },
+    )
 
     private fun startupTasks(application: Application): List<AppStartupTask> = listOf(
         AppStartupTask("prewarm database") {

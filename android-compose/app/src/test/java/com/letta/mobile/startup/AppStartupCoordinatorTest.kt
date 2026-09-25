@@ -3,9 +3,13 @@ package com.letta.mobile.startup
 import android.app.Application
 import com.letta.mobile.util.Telemetry
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -68,6 +72,7 @@ class AppStartupCoordinatorTest {
         } catch (_: CancellationException) {
             assertEquals(
                 listOf(
+                    "prewarm settings",
                     "prewarm database",
                     "notification channel",
                     "automation auth bootstrap",
@@ -81,14 +86,60 @@ class AppStartupCoordinatorTest {
         }
     }
 
+    @Test
+    fun startRunsNoStartupWorkOnTheCallingThread() = runTest {
+        // Application.onCreate calls start() on the main thread; every initialiser,
+        // including the settings / EncryptedSharedPreferences warm-up, must be deferred
+        // to the startup dispatcher rather than invoked inline (letta-mobile-wyo3p).
+        val actions = FakeStartupActions()
+        val coordinator = AppStartupCoordinator(actions, StandardTestDispatcher(testScheduler))
+
+        coordinator.start(application)
+
+        assertEquals(emptyList<String>(), actions.calls)
+        advanceUntilIdle()
+        assertEquals(ExpectedStartupOrder, actions.calls)
+    }
+
+    @Test
+    fun settingsWarmupDoesNotQueueBehindTheOrderedStartupTasks() = runTest {
+        val databaseGate = CompletableDeferred<Unit>()
+        val actions = FakeStartupActions(databaseGate = databaseGate)
+        val coordinator = AppStartupCoordinator(actions, StandardTestDispatcher(testScheduler))
+
+        coordinator.start(application)
+        runCurrent()
+
+        // The database prewarm is still suspended, yet the settings warm-up already ran.
+        assertEquals(listOf("prewarm settings", "prewarm database"), actions.calls)
+        assertTrue(actions.settingsWarmupFinished)
+
+        databaseGate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(ExpectedStartupOrder, actions.calls)
+    }
+
     private class FakeStartupActions(
         private val failure: StartupFailure? = null,
+        private val databaseGate: CompletableDeferred<Unit>? = null,
     ) : AppStartupActions {
         val calls = mutableListOf<String>()
+        var settingsWarmupFinished = false
+            private set
 
         override suspend fun ensureNotificationChannel() = record("notification channel")
 
-        override suspend fun prewarmDatabase() = record("prewarm database")
+        override suspend fun prewarmSettings() {
+            record("prewarm settings")
+            // Real warm-up hops to IO; model that suspension so the ordered tasks can proceed.
+            yield()
+            settingsWarmupFinished = true
+        }
+
+        override suspend fun prewarmDatabase() {
+            record("prewarm database")
+            databaseGate?.await()
+        }
 
         override suspend fun importPendingAutomationConfig() = record("automation auth bootstrap")
 
@@ -115,6 +166,7 @@ class AppStartupCoordinatorTest {
 
     private companion object {
         val ExpectedStartupOrder = listOf(
+            "prewarm settings",
             "prewarm database",
             "notification channel",
             "automation auth bootstrap",
