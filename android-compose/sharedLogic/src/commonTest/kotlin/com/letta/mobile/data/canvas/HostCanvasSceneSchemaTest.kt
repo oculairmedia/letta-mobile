@@ -167,6 +167,51 @@ class HostCanvasSceneSchemaTest {
     }
 
     @Test
+    fun documentOpsAreValidatedBeforeHostPublication() = runTest {
+        val unrecognized = """{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"x"}]}]}"""
+        val malformed = "{"
+
+        for ((documentId, documentJson) in listOf("prose-mirror-note" to unrecognized, "malformed-note" to malformed)) {
+            val host = Host()
+            val op = buildJsonObject {
+                put("type", "set_document")
+                put("documentId", documentId)
+                put("documentJson", documentJson)
+            }
+
+            val refusal = host.call(CanvasToolContract.APPLY_OPS, buildJsonObject {
+                put("ops", JsonArray(listOf(op)))
+            }).error()
+
+            assertTrue(documentId in refusal && "blocks" in refusal, refusal)
+            assertEquals(emptyList(), host.logged(conversationTopic), "an unrenderable document never enters the log")
+        }
+    }
+
+    @Test
+    fun validCascadeDocumentsArePublishedAndLoggedThroughTheHost() = runTest {
+        val host = Host()
+        val cascade = """{"version":2,"blocks":[{"id":"p1","content":{"text":"x"}}]}"""
+        val empty = """{"version":2,"blocks":[]}"""
+
+        for ((documentId, documentJson) in listOf("cascade-note" to cascade, "empty-note" to empty)) {
+            val op = buildJsonObject {
+                put("type", "set_document")
+                put("documentId", documentId)
+                put("documentJson", documentJson)
+            }
+            val result = host.call(CanvasToolContract.APPLY_OPS, buildJsonObject {
+                put("ops", JsonArray(listOf(op)))
+            }).content()
+            assertEquals(true, json.decodeFromString<CanvasApplyOpsResult>(result).ok)
+        }
+
+        val logged = host.logged(conversationTopic).map { assertIs<CanvasOp.SetDocumentOp>(it.op) }
+        assertEquals(listOf("cascade-note", "empty-note"), logged.map { it.documentId })
+        assertEquals(listOf(cascade, empty), logged.map { it.documentJson })
+    }
+
+    @Test
     fun opsWithoutIdentityAndWithObjectElementsAreAccepted() = runTest {
         val host = Host()
         val op = buildJsonObject {
