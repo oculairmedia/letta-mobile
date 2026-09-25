@@ -125,16 +125,33 @@ class ChatSendCoordinator(
     )
     private val runtimeEventBatcher = RuntimeEventBatcher(scope, recordRuntimeEvents)
 
+    // letta-mobile-ztuog: this coordinator's agent-keyed subscription. Only frames the bridge
+    // attributes to [agentId] arrive; it detaches once another chat is selected and nothing of
+    // ours is in flight, and re-attaches (turn state intact) when selected again.
+    private val eventAttachment = wsChatBridge.agentScopes.attachment(agentId, isBusy = ::hasWorkInFlight)
+
     init {
         scope.launch {
-            wsChatBridge.events.collect { event -> handleEvent(event) }
+            eventAttachment.deliveries.collect { event -> handleEvent(event) }
         }
+        scope.coroutineContext[Job]?.invokeOnCompletion { eventAttachment.release() }
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
                 contained("RedialWhileTurnActive") { handleRedialWhileTurnActive(event) }
             }
         }
     }
+
+    /**
+     * letta-mobile-ztuog: this chat is the one on screen. Every other chat detaches from the
+     * transport once its in-flight turns settle; this one (re)attaches immediately.
+     */
+    fun selectForEvents() = eventAttachment.select()
+
+    /** A send, a queued send, or a turn that has not settled keeps an unselected chat attached. */
+    private fun hasWorkInFlight(): Boolean =
+        snapshotStates().any { it.isTracking && !it.reachedTerminal } ||
+            queuedSends.state.value.values.any { !it.isEmpty }
 
     /**
      * One frame must never take the process down. Everything a frame reaches reports a violated
@@ -597,6 +614,9 @@ class ChatSendCoordinator(
         // synchronous call site so a later switch cannot rebind it. agentId is
         // already a construction-time constant and needs no capture.
         val targetConversationId = activeConversationId()
+        // letta-mobile-ztuog: only the chat on screen sends, so a send claims the selection
+        // (and so attaches) before its turn's first frame can arrive.
+        eventAttachment.claimForSend()
         return scope.launch {
             sendInternal(text, attachments, targetConversationId)
         }
@@ -809,9 +829,9 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleEventLocked(event: WsTimelineEvent) {
-        // letta-mobile-sfex6: strict agent scoping. wsChatBridge.events is a
-        // GLOBAL flow — every per-(agentId,conversationId) coordinator collects
-        // it, so a frame for one agent reaches every coordinator. When two
+        // letta-mobile-sfex6: strict agent scoping. Delivery is agent-keyed
+        // (letta-mobile-ztuog), but a frame whose owner the router cannot
+        // attribute still reaches every attached coordinator. When two
         // agents share the bare conversation id "default" (main + a subagent),
         // a foreign agent's TurnStarted would otherwise open a turn entry in THIS
         // coordinator and its deltas would ingest into our timeline — the
@@ -829,11 +849,14 @@ class ChatSendCoordinator(
             else -> null
         }
         if (eventAgentId != null && eventAgentId != agentId) {
+            // letta-mobile-ztuog: defensive only. The bridge's agent-keyed subscription already
+            // withholds foreign frames, so reaching this line means routing leaked.
             Telemetry.event(
                 "AdminChatVM", "ws.event.foreignAgentDropped",
                 "eventType" to (event::class.simpleName ?: ""),
                 "eventAgentId" to eventAgentId,
                 "boundAgentId" to agentId,
+                level = Telemetry.Level.WARN,
             )
             return
         }

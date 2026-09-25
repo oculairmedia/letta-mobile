@@ -101,6 +101,12 @@ class WsChatBridge(
             },
     )
 
+    /**
+     * letta-mobile-ztuog: agent-keyed views of [events]. Chat coordinators subscribe here, never
+     * to [events] directly, so a frame reaches only the coordinator of the agent it belongs to.
+     */
+    val agentScopes: AgentEventScopes = AgentEventScopes(events)
+
     /** A2UI frame stream, kept separate from text/tool timeline events. */
     val a2uiEvents: Flow<A2uiFrameEvent> = transport.events.mapNotNull { frame ->
         (frame as? ServerFrame.A2ui)?.toA2uiEvent()
@@ -137,6 +143,7 @@ class WsChatBridge(
         } else {
             buildContentParts(text, attachments).toJsonArray()
         }
+        agentScopes.learnSend(agentId, conversationId)
         return transport.send(
             agentId = agentId,
             conversationId = conversationId,

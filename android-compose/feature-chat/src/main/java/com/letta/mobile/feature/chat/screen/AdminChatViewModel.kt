@@ -316,6 +316,8 @@ internal class AdminChatViewModel @Inject constructor(
     private var currentSendPipeline: AdminChatSendPipeline? = null
     private var replacingSendRuntime = false
     private var runtimeCollectorStarted = false
+    /** letta-mobile-ztuog: resumed and not since paused; a replacement send pipeline inherits the selection. */
+    private var screenSelected = false
     private var pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
 
     private val sendPipeline: AdminChatSendPipeline
@@ -341,6 +343,7 @@ internal class AdminChatViewModel @Inject constructor(
                                 selectedRuntime = next
                                 selectedSendOwner = next?.let(::newSendOwner)
                                 currentSendPipeline = createSendPipeline()
+                                if (screenSelected) currentSendPipeline?.wsChatSendCoordinator?.selectForEvents()
                                 replacingSendRuntime = false
                                 chatConversationCoordinator.activeConversationId?.let(::startTimelineObserver)
                             }
@@ -1028,9 +1031,20 @@ internal class AdminChatViewModel @Inject constructor(
     val canSendMessages: Boolean
         get() = ChatSessionReducer.canSend(_sessionState.value)
 
-    fun onScreenPaused() = screenLifecycleCoordinator.onScreenPaused()
+    fun onScreenPaused() {
+        // Pausing (backgrounding, or another chat covering this one) does not detach: only
+        // another chat's resume does, so a backgrounded chat keeps receiving its own frames.
+        screenSelected = false
+        screenLifecycleCoordinator.onScreenPaused()
+    }
 
-    fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
+    fun onScreenResumed() {
+        // letta-mobile-ztuog: the chat on screen owns the event selection; every other agent's
+        // coordinator stops receiving frames as soon as its in-flight turns settle.
+        screenSelected = true
+        sendPipeline.wsChatSendCoordinator.selectForEvents()
+        screenLifecycleCoordinator.onScreenResumed()
+    }
 
     override fun onCleared() {
         publishedRunKey?.let(runPhases::clear)
