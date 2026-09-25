@@ -1043,9 +1043,13 @@ class ChatSendCoordinator(
 
     /** A delta naming a turn this conversation has already finished is that turn's tail. */
     private fun isRetiredTurnTail(event: WsTimelineEvent.MessageDelta, conversationId: String): Boolean {
-        val turnId = event.turnId?.takeIf { it.isNotBlank() } ?: return false
         val state = peekState(conversationId) ?: return false
-        return isRetiredTurn(state, turnId)
+        val turnId = event.turnId?.takeIf { it.isNotBlank() }
+        if (turnId != null) return isRetiredTurn(state, turnId)
+        // A frame without a turn id still names its run; a settled run that is not the live one
+        // is a finished turn's tail too.
+        val runId = event.message.runId?.takeIf { it.isNotBlank() } ?: return false
+        return runId != state.runId && runId in state.settledRunIds
     }
 
     /**

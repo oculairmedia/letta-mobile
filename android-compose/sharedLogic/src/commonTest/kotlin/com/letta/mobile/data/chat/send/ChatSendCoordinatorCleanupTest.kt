@@ -869,6 +869,12 @@ class ChatSendCoordinatorCleanupTest {
         assertFalse(ui.isAgentTyping())
         // The tail still reaches the timeline, which decides what it is worth.
         assertEquals(2, timeline.ingestedMessages.filterIsInstance<AssistantMessage>().count { it.id == "ui-msg-9173252" })
+
+        // A tail frame without a turn id is still recognised by its settled run.
+        coordinator.handleEvent(tail.copy(turnId = null))
+        advanceUntilIdle()
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
     }
 
     private fun coordinator(
