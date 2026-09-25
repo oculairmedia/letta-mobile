@@ -384,6 +384,7 @@ internal class AdminChatViewModel @Inject constructor(
             uiState = _uiState,
             composerController = composerController,
             chatBannerController = chatBannerController,
+            submitApproval = chatApprovalController::submitApproval,
             // lgns8.10.4.1: config truth, resolved once in ShimBackendDetector.
             // The inline iroh:// URL sniff that used to live here is gone.
             backendKind = { backendKind.value },
