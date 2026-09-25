@@ -1,10 +1,13 @@
 package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.addShape
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.arrow1
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.batchOf
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.box1
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.box2
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.ghost
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.label1
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.labelledBox
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.note
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.owner
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.remove
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.note1
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.sceneOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,45 +20,40 @@ class CanvasBatchValidatorTest {
 
     @Test
     fun aBoardThatAlreadyBreaksARuleStillTakesUnrelatedWrites() {
-        val dangling = sceneOf(labelledBox("box-1", "label-1") + remove("box-1"))
+        val dangling = sceneOf(labelledBox(box1, label1) + box1.remove())
 
-        assertIs<CanvasBatchCheck.Valid>(CanvasBatchValidator.check(dangling, listOf(addShape("box-2"))))
+        assertIs<CanvasBatchCheck.Valid>(CanvasBatchValidator.check(dangling, listOf(box2.add())))
     }
 
     @Test
     fun anAddOfAnIdAlreadyOnTheBoardIsRefused() {
-        val scene = sceneOf(listOf(addShape("box-1")))
+        val scene = sceneOf(listOf(box1.add()))
 
-        assertEquals(listOf("0 element.duplicateId"), invariantsOf(CanvasBatchValidator.check(scene, listOf(addShape("box-1")))))
+        assertEquals(listOf("0 element.duplicateId"), invariantsOf(CanvasBatchValidator.check(scene, listOf(box1.add()))))
     }
 
     @Test
     fun aNoteThatIsNotACascadeDocumentIsRefused() {
-        val proseMirror = "{\"type\":\"doc\",\"content\":[]}"
-
-        assertEquals(listOf("0 document.decodes"), invariantsOf(CanvasBatchValidator.check("", listOf(note("n-1", proseMirror)))))
+        assertEquals(listOf("0 document.decodes"), invariantsOf(CanvasBatchValidator.check("", listOf(note1.set(FixtureNoteBody.PROSE_MIRROR)))))
     }
 
     @Test
     fun anOwnerNamingAMissingShapeIsBlamedOnItsOp() {
-        val batch = listOf(note("label-1"), owner("label-1", "ghost"))
+        val batch = listOf(label1.set(), label1.ownedBy(ghost))
 
         assertEquals(listOf("1 label.owner"), invariantsOf(CanvasBatchValidator.check("", batch)))
     }
 
     @Test
     fun opsInsideABatchOpAreNamedByTheirPlace() {
-        val nested = CanvasOp.BatchOp("", "", 0L, listOf(addShape("box-1"), remove("ghost")))
+        val nested = batchOf(listOf(box1.add(), ghost.remove()))
 
         assertEquals(listOf("0.1 element.exists"), invariantsOf(CanvasBatchValidator.check("", listOf(nested))))
     }
 
     @Test
     fun anArrowBoundToAMissingShapeIsRefused() {
-        val arrow = CanvasOp.AddElementOp(
-            "", "", 0L, "arrow-1",
-            CanvasBatchFixtures.shapeJson("arrow-1").replace("\"RECTANGLE\"", "\"ARROW\"").replace("\"text\":\"Plan\"", "\"endBinding\":\"ghost\""),
-        )
+        val arrow = arrow1.add(FixtureShapeKind.ARROW, endBinding = ghost)
 
         assertEquals(listOf("0 element.binding"), invariantsOf(CanvasBatchValidator.check("", listOf(arrow))))
     }

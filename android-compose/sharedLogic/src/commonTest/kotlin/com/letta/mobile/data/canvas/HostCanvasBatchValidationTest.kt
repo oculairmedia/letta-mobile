@@ -1,11 +1,11 @@
 package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.addShape
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.box1
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.box2
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.box7
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.ghost
+import com.letta.mobile.data.canvas.CanvasBatchFixtures.label1
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.labelledBox
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.partialUpdate
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.remove
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.removeNote
-import com.letta.mobile.data.canvas.CanvasBatchFixtures.updateShape
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import kotlinx.coroutines.test.runTest
@@ -53,10 +53,10 @@ class HostCanvasBatchValidationTest {
     @Test
     fun removingAShapeItsLabelStillNamesRefusesTheWholeBatch() = runTest {
         val host = Host()
-        host.apply(labelledBox("box-1", "label-1")).content()
+        host.apply(labelledBox(box1, label1)).content()
         val before = host.loggedCount()
 
-        val refusal = host.apply(listOf(addShape("box-2"), remove("box-1"))).error()
+        val refusal = host.apply(listOf(box2.add(), box1.remove())).error()
 
         assertTrue("op 1 (remove_element 'box-1')" in refusal, refusal)
         assertTrue("[label.owner on 'label-1']" in refusal, refusal)
@@ -66,19 +66,19 @@ class HostCanvasBatchValidationTest {
     @Test
     fun removingTheShapeAndItsLabelTogetherIsAccepted() = runTest {
         val host = Host()
-        host.apply(labelledBox("box-1", "label-1")).content()
+        host.apply(labelledBox(box1, label1)).content()
 
-        host.apply(listOf(remove("box-1"), removeNote("label-1"))).content()
+        host.apply(listOf(box1.remove(), label1.remove())).content()
     }
 
     @Test
     fun anUpdateOfAMissingElementIsRefused() = runTest {
         val host = Host()
-        host.apply(listOf(addShape("box-1"))).content()
+        host.apply(listOf(box1.add())).content()
         val before = host.loggedCount()
 
-        val whole = host.apply(listOf(updateShape("box-1"), updateShape("ghost"))).error()
-        val partial = host.apply(listOf(partialUpdate("ghost"))).error()
+        val whole = host.apply(listOf(box1.update(), ghost.update())).error()
+        val partial = host.apply(listOf(ghost.partialUpdate())).error()
 
         assertTrue("op 1 (update_element 'ghost')" in whole && "[element.exists on 'ghost']" in whole, whole)
         assertTrue("op 0 (update_element 'ghost')" in partial && "[element.shape on 'ghost']" in partial, partial)
@@ -88,24 +88,24 @@ class HostCanvasBatchValidationTest {
     @Test
     fun aValidBatchIsPublishedWhole() = runTest {
         val host = Host()
-        val batch = labelledBox("box-1", "label-1") + updateShape("box-1")
+        val batch = labelledBox(box1, label1) + box1.update()
 
         val result = json.decodeFromString<CanvasApplyOpsResult>(host.apply(batch).content())
 
         assertTrue(result.ok)
         assertEquals(batch.size, host.loggedCount())
-        assertEquals(listOf("label-1"), CanvasOpProjector.documentsOf(logScene(host)).map { it.id })
-        assertEquals(mapOf("label-1" to "box-1"), CanvasOpProjector.labelOwnersOf(logScene(host)))
+        assertEquals(listOf(label1.id), CanvasOpProjector.documentsOf(logScene(host)).map { it.id })
+        assertEquals(mapOf(label1.id to box1.id), CanvasOpProjector.labelOwnersOf(logScene(host)))
     }
 
     @Test
     fun aDryRunReportsWithoutPublishing() = runTest {
         val host = Host()
-        host.apply(listOf(addShape("box-1"))).content()
+        host.apply(listOf(box1.add())).content()
         val before = host.loggedCount()
 
-        val invalid = json.decodeFromString<CanvasDryRunResult>(host.apply(listOf(remove("ghost")), dryRun = true).content())
-        val valid = json.decodeFromString<CanvasDryRunResult>(host.apply(listOf(updateShape("box-1")), dryRun = true).content())
+        val invalid = json.decodeFromString<CanvasDryRunResult>(host.apply(listOf(ghost.remove()), dryRun = true).content())
+        val valid = json.decodeFromString<CanvasDryRunResult>(host.apply(listOf(box1.update()), dryRun = true).content())
 
         assertEquals(false, invalid.valid)
         assertEquals(listOf("0"), invalid.problems.map { it.opIndex })
@@ -119,7 +119,7 @@ class HostCanvasBatchValidationTest {
     fun aReplaceThatDropsALabelledShapeIsRefusedAndCanBeDryRun() = runTest {
         val host = Host()
         // The example scene draws box-1 and title-1: box-7, which owns the label, is dropped.
-        host.apply(labelledBox("box-7", "label-1")).content()
+        host.apply(labelledBox(box7, label1)).content()
         val input = buildJsonObject {
             put("scene_json", CanvasSceneSchema.sceneExample.toString())
             put(CanvasDryRun.PARAM, true)
