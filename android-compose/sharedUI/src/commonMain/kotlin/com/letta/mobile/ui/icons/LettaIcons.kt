@@ -49,6 +49,9 @@ import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.QrCode
 import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Save
+import com.composables.icons.lucide.Scan
+import com.composables.icons.lucide.ZoomIn
+import com.composables.icons.lucide.ZoomOut
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Send
 import com.composables.icons.lucide.Settings
@@ -96,6 +99,11 @@ object LettaIcons {
     val Edit: ImageVector get() = Lucide.Pencil
     val Delete: ImageVector get() = Lucide.Trash2
     val Save: ImageVector get() = Lucide.Save
+
+    // Graph viewport controls (memory graph).
+    val ZoomIn: ImageVector get() = Lucide.ZoomIn
+    val ZoomOut: ImageVector get() = Lucide.ZoomOut
+    val FitToView: ImageVector get() = Lucide.Scan
     val Search: ImageVector get() = Lucide.Search
     val Clear: ImageVector get() = Lucide.X
     val Refresh: ImageVector get() = Lucide.RefreshCw

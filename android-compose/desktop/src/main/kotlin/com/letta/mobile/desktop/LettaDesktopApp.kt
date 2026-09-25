@@ -428,7 +428,7 @@ internal fun LettaDesktopApp(
         )
     }
     val mentionables = remember(railAgents, memoryState) {
-        buildMentionables(BuildMentionablesParams(railAgents, memoryState))
+        buildMentionables(BuildMentionablesParams(railAgents, memoryState.parity))
     }
     val paletteItems = remember(chatState.conversations, railAgents, workPlayMode) {
         buildPaletteItems(chatState.conversations, railAgents, workPlayMode)
@@ -819,7 +819,6 @@ internal fun LettaDesktopApp(
                                 ),
                                 channelLibraryState = channelLibraryState,
                                 toolLibraryState = toolLibraryState,
-                                blockApi = blockApi,
                                 skills = DestinationSkillsInputs(
                                     skills = skillsPanel.all,
                                     installedSkillNames = skillsPanel.installedNames,
@@ -891,10 +890,7 @@ internal fun LettaDesktopApp(
                                     onSubmitPrompt = ::submitHomePrompt,
                                     onA2uiAction = ::dispatchA2uiAction,
                                 ),
-                                memory = DestinationMemoryActions(
-                                    onRefresh = libraries.memory::reload,
-                                    onAgentSelected = libraries.memory::selectAgent,
-                                ),
+                                memory = libraries.memory,
                                 schedules = destinationScheduleActions(
                                     ScheduleWiringDeps(
                                         schedules = libraries.schedules,

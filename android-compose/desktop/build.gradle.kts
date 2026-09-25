@@ -267,8 +267,6 @@ dependencies {
     implementation(libs.compose.desktop.material3)
     implementation(libs.compose.desktop.material.icons)
     implementation(libs.skiko.awt)
-    implementation(libs.kuiver)
-    implementation(libs.autolinktext)
     // Conversation tab strip drag-to-reorder (letta-mobile#1258): same
     // library the mobile dashboard already uses for its pinned-items grid
     // (see app/build.gradle.kts and HomeScreenWidgets.kt's
