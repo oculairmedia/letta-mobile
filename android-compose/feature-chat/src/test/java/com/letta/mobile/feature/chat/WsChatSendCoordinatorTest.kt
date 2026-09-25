@@ -394,36 +394,47 @@ class WsChatSendCoordinatorTest {
         runtime.retire()
     }
 
+    private fun queueCoordinator(
+        wsChatBridge: WsChatBridge,
+        timelineRepository: FakeTimelineExternalTransportWriter,
+        uiState: MutableStateFlow<ChatUiState>,
+        scope: CoroutineScope,
+        activeConversation: () -> String = { "conv-1" },
+        onClear: () -> Unit = {},
+    ) = WsChatSendCoordinator(
+        scope = scope,
+        agentId = "agent-1",
+        activeConfig = settingsRepository(),
+        wsChatBridge = wsChatBridge,
+        timelineRepository = timelineRepository,
+        conversationRepository = stubConversationRepository(),
+        uiState = uiState,
+        clearComposerAfterSend = onClear,
+        activeConversationId = activeConversation,
+        setActiveConversationId = {},
+        startTimelineObserver = {},
+        clientVersionProvider = clientVersionProvider,
+    )
+
     @Test
-    fun `busy send is queued with optimistic local and drains on turn done`() = runTest {
-        val wsChatBridge = mockBridge(sendResults = listOf(false, true))
+    fun `busy send is queued without a row and runs after turn done`() = runTest {
+        var busy = true
+        val wsChatBridge = mockBridge(sendResults = listOf(false, true), activeTurn = { busy })
         val timelineRepository = FakeTimelineExternalTransportWriter()
         var cleared = false
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
-        val coordinator = WsChatSendCoordinator(
-            scope = backgroundScope,
-            agentId = "agent-1",
-            activeConfig = settingsRepository(),
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = stubConversationRepository(),
-            uiState = uiState,
-            clearComposerAfterSend = { cleared = true },
-            activeConversationId = { "conv-1" },
-            setActiveConversationId = {},
-            startTimelineObserver = {},
-            clientVersionProvider = clientVersionProvider,
-        )
+        val coordinator = queueCoordinator(wsChatBridge, timelineRepository, uiState, backgroundScope, onClear = { cleared = true })
 
         coordinator.send("hello").join()
+        runCurrent()
 
         assertNull(uiState.value.error)
         assertTrue(cleared)
         assertTrue(uiState.value.isStreaming)
-        assertEquals(1, timelineRepository.externalLocals.size)
-        assertEquals("conv-1", timelineRepository.externalLocals.single().conversationId)
-        assertEquals("hello", timelineRepository.externalLocals.single().content)
+        assertTrue(timelineRepository.externalLocals.isEmpty())
+        assertEquals(listOf("hello"), uiState.value.sendQueue.items.map { it.text })
 
+        busy = false
         coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
@@ -436,54 +447,31 @@ class WsChatSendCoordinatorTest {
                 attachments = emptyList(),
             )
         }
+        assertEquals("hello", timelineRepository.externalLocals.single().content)
+        assertTrue(uiState.value.sendQueue.isEmpty)
     }
 
     @Test
-    fun `busy send queue drops overflow without appending optimistic local`() = runTest {
-        val wsChatBridge = mockBridge(sendAccepted = false)
+    fun `busy sends queue without a limit and never raise an error`() = runTest {
+        val wsChatBridge = mockBridge(sendResults = listOf(false), activeTurn = { true })
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
-        val coordinator = WsChatSendCoordinator(
-            scope = backgroundScope,
-            agentId = "agent-1",
-            activeConfig = settingsRepository(),
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = stubConversationRepository(),
-            uiState = uiState,
-            clearComposerAfterSend = {},
-            activeConversationId = { "conv-1" },
-            setActiveConversationId = {},
-            startTimelineObserver = {},
-            clientVersionProvider = clientVersionProvider,
-        )
+        val coordinator = queueCoordinator(wsChatBridge, timelineRepository, uiState, backgroundScope)
 
-        repeat(11) { index -> coordinator.send("message-$index").join() }
+        repeat(25) { index -> coordinator.send("message-$index").join() }
+        runCurrent()
 
-        assertEquals("WebSocket send queue is full; wait for the current turn to finish", uiState.value.error)
-        assertEquals(10, timelineRepository.externalLocals.size)
-        assertTrue(timelineRepository.externalLocals.all { it.conversationId == "conv-1" })
+        assertNull(uiState.value.error)
+        assertEquals((0 until 25).map { "message-$it" }, uiState.value.sendQueue.items.map { it.text })
+        assertTrue(timelineRepository.externalLocals.isEmpty())
     }
 
     @Test
-    fun `disconnect clears queued sends and marks optimistic locals failed`() = runTest {
-        val wsChatBridge = mockBridge(sendAccepted = false)
+    fun `disconnect pauses queued sends instead of dropping them`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = false, activeTurn = { true })
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))
-        val coordinator = WsChatSendCoordinator(
-            scope = backgroundScope,
-            agentId = "agent-1",
-            activeConfig = settingsRepository(),
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = stubConversationRepository(),
-            uiState = uiState,
-            clearComposerAfterSend = {},
-            activeConversationId = { "conv-1" },
-            setActiveConversationId = {},
-            startTimelineObserver = {},
-            clientVersionProvider = clientVersionProvider,
-        )
+        val coordinator = queueCoordinator(wsChatBridge, timelineRepository, uiState, backgroundScope)
 
         coordinator.send("one").join()
         coordinator.send("two").join()
@@ -493,9 +481,90 @@ class WsChatSendCoordinatorTest {
 
         assertEquals("network lost", uiState.value.error)
         assertEquals(false, uiState.value.isStreaming)
-        assertEquals(false, uiState.value.isAgentTyping)
-        assertEquals(2, timelineRepository.failedLocals.size)
-        assertTrue(timelineRepository.failedLocals.all { it.conversationId == "conv-1" })
+        assertTrue(timelineRepository.failedLocals.isEmpty())
+        assertTrue(uiState.value.sendQueue.paused)
+        assertEquals(listOf("one", "two"), uiState.value.sendQueue.items.map { it.text })
+    }
+
+    @Test
+    fun `stop pauses only the active conversation queue`() = runTest {
+        val wsChatBridge = mockBridge(sendResults = listOf(false), activeTurn = { true }, cancelResult = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        var activeConversation = "conv-a"
+        val coordinator = queueCoordinator(
+            wsChatBridge, timelineRepository, MutableStateFlow(ChatUiState(agentName = "Agent")), backgroundScope,
+            activeConversation = { activeConversation },
+        )
+
+        coordinator.send("one").join()
+        activeConversation = "conv-b"
+        coordinator.send("two").join()
+
+        activeConversation = "conv-a"
+        assertTrue(coordinator.cancel())
+        advanceUntilIdle()
+
+        verify(exactly = 1) { wsChatBridge.cancel("conv-a") }
+        val queues = coordinator.sendQueues.value
+        assertEquals(true, queues["conv-a"]?.paused)
+        assertEquals(false, queues["conv-b"]?.paused)
+        assertTrue(timelineRepository.failedLocals.isEmpty())
+    }
+
+    @Test
+    fun `a rejected stop leaves the queue running into the next turn`() = runTest {
+        var busy = true
+        val wsChatBridge = mockBridge(sendResults = listOf(false, true), activeTurn = { busy }, cancelResult = false)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val coordinator = queueCoordinator(
+            wsChatBridge, timelineRepository, MutableStateFlow(ChatUiState(agentName = "Agent")), backgroundScope,
+            activeConversation = { "conv-a" },
+        )
+
+        coordinator.send("one").join()
+
+        assertEquals(false, coordinator.cancel())
+        advanceUntilIdle()
+        assertEquals(false, coordinator.sendQueues.value["conv-a"]?.paused)
+
+        busy = false
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = BridgeTurnStatus.Completed))
+        advanceUntilIdle()
+
+        verify(exactly = 2) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-a",
+                text = "one",
+                otid = any(),
+                attachments = emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun `send now aborts the running turn and runs the chosen message first`() = runTest {
+        var busy = true
+        val wsChatBridge = mockBridge(sendResults = listOf(false), activeTurn = { busy }, cancelResult = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = queueCoordinator(wsChatBridge, timelineRepository, uiState, backgroundScope)
+        coordinator.send("first").join()
+        coordinator.send("second").join()
+        runCurrent()
+        val second = uiState.value.sendQueue.items.last()
+
+        coordinator.sendQueuedNow(second.otid).join()
+        verify(exactly = 1) { wsChatBridge.cancel("conv-1") }
+        assertEquals(listOf("second", "first"), uiState.value.sendQueue.items.map { it.text })
+
+        every { wsChatBridge.send(any(), any(), any(), any(), any(), any()) } returns true
+        busy = false
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Cancelled))
+        advanceUntilIdle()
+
+        assertEquals("second", timelineRepository.externalLocals.single().content)
+        assertEquals(listOf("first"), uiState.value.sendQueue.items.map { it.text })
     }
 
     @Test
@@ -685,100 +754,6 @@ class WsChatSendCoordinatorTest {
             ),
             timelineRepository.abandonedFragmentCleanups.first(),
         )
-    }
-
-    @Test
-    fun `cancel clears only queued sends for active conversation`() = runTest {
-        val wsChatBridge = mockBridge(sendResults = listOf(false, false, true), cancelResult = true)
-        val timelineRepository = FakeTimelineExternalTransportWriter()
-        var activeConversation = "conv-a"
-        val coordinator = WsChatSendCoordinator(
-            scope = backgroundScope,
-            agentId = "agent-1",
-            activeConfig = settingsRepository(),
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = stubConversationRepository(),
-            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
-            clearComposerAfterSend = {},
-            activeConversationId = { activeConversation },
-            setActiveConversationId = { activeConversation = it },
-            startTimelineObserver = {},
-            clientVersionProvider = clientVersionProvider,
-        )
-
-        coordinator.send("one").join()
-        activeConversation = "conv-b"
-        coordinator.send("two").join()
-
-        activeConversation = "conv-a"
-        assertTrue(coordinator.cancel())
-        advanceUntilIdle()
-
-        verify(exactly = 1) { wsChatBridge.cancel("conv-a") }
-
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = BridgeTurnStatus.Cancelled))
-        advanceUntilIdle()
-
-        verify(exactly = 1) {
-            wsChatBridge.send(
-                agentId = "agent-1",
-                conversationId = "conv-a",
-                text = "one",
-                otid = any(),
-                attachments = emptyList(),
-            )
-        }
-        verify(exactly = 2) {
-            wsChatBridge.send(
-                agentId = "agent-1",
-                conversationId = "conv-b",
-                text = "two",
-                otid = any(),
-                attachments = emptyList(),
-            )
-        }
-    }
-
-    @Test
-    fun `cancel does not clear queued sends when bridge rejects cancel`() = runTest {
-        val wsChatBridge = mockBridge(sendResults = listOf(false, true), cancelResult = false)
-        val timelineRepository = FakeTimelineExternalTransportWriter()
-        var activeConversation = "conv-a"
-        val coordinator = WsChatSendCoordinator(
-            scope = backgroundScope,
-            agentId = "agent-1",
-            activeConfig = settingsRepository(),
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = stubConversationRepository(),
-            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
-            clearComposerAfterSend = {},
-            activeConversationId = { activeConversation },
-            setActiveConversationId = { activeConversation = it },
-            startTimelineObserver = {},
-            clientVersionProvider = clientVersionProvider,
-        )
-
-        coordinator.send("one").join()
-
-        assertEquals(false, coordinator.cancel())
-        advanceUntilIdle()
-        assertTrue(timelineRepository.failedLocals.isEmpty())
-
-        activeConversation = "conv-a"
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = BridgeTurnStatus.Completed))
-        advanceUntilIdle()
-
-        verify(exactly = 2) {
-            wsChatBridge.send(
-                agentId = "agent-1",
-                conversationId = "conv-a",
-                text = "one",
-                otid = any(),
-                attachments = emptyList(),
-            )
-        }
     }
 
     @Test
@@ -1668,11 +1643,13 @@ class WsChatSendCoordinatorTest {
         eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
         redialFlow: kotlinx.coroutines.flow.Flow<RedialWhileTurnActive> = emptyFlow(),
         cancelResult: Boolean = true,
+        activeTurn: () -> Boolean = { false },
     ): WsChatBridge = mockBridge(
         sendResults = listOf(sendAccepted),
         eventFlow = eventFlow,
         redialFlow = redialFlow,
         cancelResult = cancelResult,
+        activeTurn = activeTurn,
     )
 
     private fun mockBridge(
@@ -1680,7 +1657,9 @@ class WsChatSendCoordinatorTest {
         eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
         redialFlow: kotlinx.coroutines.flow.Flow<RedialWhileTurnActive> = emptyFlow(),
         cancelResult: Boolean = true,
+        activeTurn: () -> Boolean = { false },
     ): WsChatBridge = mockk(relaxed = true) {
+        every { hasActiveChatTurn(any()) } answers { activeTurn() }
         every { state } returns MutableStateFlow(
             ChannelTransportState.Connected(
                 serverId = "server-1",

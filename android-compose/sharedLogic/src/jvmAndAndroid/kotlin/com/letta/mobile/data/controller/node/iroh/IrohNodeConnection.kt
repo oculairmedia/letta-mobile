@@ -134,6 +134,9 @@ class IrohNodeConnection(
     private val controlWriteMutex = Mutex()
     private var controlSend: SendStream? = null
 
+    /** letta-mobile-1n5py: a client's `remove_queue_item` / `resume_queue`, forwarded upstream. */
+    private val queueControlRelay = IrohQueueControlRelay(controller)
+
     private suspend fun writeControl(frame: String) {
         val send = controlSend ?: return
         controlWriteMutex.withLock {
@@ -492,6 +495,11 @@ class IrohNodeConnection(
                 "abort_message" -> ifAuthorized(requestId) {
                     ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("abort_message")) {
                         handleAbort(frameJson, requestId)
+                    }
+                }
+                "remove_queue_item", "resume_queue" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand(type.orEmpty())) {
+                        queueControlRelay.handle(frameJson)
                     }
                 }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""

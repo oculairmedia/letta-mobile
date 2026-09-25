@@ -53,6 +53,7 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.chat.QueuedSendsPanel
 
 /**
  * Feature flag: when false, the tool-affordance chip strip above the
@@ -526,39 +527,50 @@ private fun ChatScreenComposerInputSection(
         pendingCount = composerState.pendingAttachments.size,
     )
     val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
-    ChatComposer(
-        agentId = viewModel.agentId.value,
-        // The thinking indicator sits beside the mascot companion, in its row (letta-mobile-8jtf3).
-        companionStatus = { ChatScreenThinkingTokenSection(state, reducedMotion) },
-        onCompanionClick = navigation.onOpenAgentPane,
-        inputText = composerState.inputText,
-        pendingAttachments = composerState.pendingAttachments,
-        isStreaming = state.isStreaming,
-        isCancelling = state.isCancellingRun,
-        canSendMessages = viewModel.canSendMessages,
-        onTextChange = { newText ->
-            if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
-                navigation.onBugCommand?.invoke()
-            }
-        },
-        onSend = {
-            if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
-                navigation.onBugCommand?.invoke()
-            }
-        },
-        onStop = { viewModel.interruptRun() },
-        onRemoveAttachment = { viewModel.removeAttachment(it) },
-        onAttachImage = launchPicker,
-        slashCommands = composerState.slashCommands,
-        onSlashCommandSelected = viewModel::selectSlashCommand,
-        onSlashCommandUninstall = viewModel::uninstallSlashCommand,
-        availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
-            activeAgent?.tools.orEmpty()
-        } else {
-            emptyList()
-        },
-        onOpenCanvas = navigation.onOpenCanvas,
-    )
+    Column {
+        // letta-mobile-1n5py: messages sent during the turn wait here, above the field.
+        QueuedSendsPanel(
+            queue = state.sendQueue,
+            onCancel = viewModel::cancelQueuedMessage,
+            onSendNow = viewModel::sendQueuedMessageNow,
+            onResume = viewModel::resumeSendQueue,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+        )
+        ChatComposer(
+            agentId = viewModel.agentId.value,
+            canQueueWhileStreaming = viewModel.canQueueWhileStreaming,
+            // The thinking indicator sits beside the mascot companion, in its row (letta-mobile-8jtf3).
+            companionStatus = { ChatScreenThinkingTokenSection(state, reducedMotion) },
+            onCompanionClick = navigation.onOpenAgentPane,
+            inputText = composerState.inputText,
+            pendingAttachments = composerState.pendingAttachments,
+            isStreaming = state.isStreaming,
+            isCancelling = state.isCancellingRun,
+            canSendMessages = viewModel.canSendMessages,
+            onTextChange = { newText ->
+                if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
+                    navigation.onBugCommand?.invoke()
+                }
+            },
+            onSend = {
+                if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
+                    navigation.onBugCommand?.invoke()
+                }
+            },
+            onStop = { viewModel.interruptRun() },
+            onRemoveAttachment = { viewModel.removeAttachment(it) },
+            onAttachImage = launchPicker,
+            slashCommands = composerState.slashCommands,
+            onSlashCommandSelected = viewModel::selectSlashCommand,
+            onSlashCommandUninstall = viewModel::uninstallSlashCommand,
+            availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
+                activeAgent?.tools.orEmpty()
+            } else {
+                emptyList()
+            },
+            onOpenCanvas = navigation.onOpenCanvas,
+        )
+    }
 }
 
 @Composable

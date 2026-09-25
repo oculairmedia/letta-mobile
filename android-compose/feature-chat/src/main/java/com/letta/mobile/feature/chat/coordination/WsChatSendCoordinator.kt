@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.chat.send.ChatSendCoordinator
+import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.ChatSendUiSink
 import com.letta.mobile.data.chat.send.ScopedRuntimeEvent
 import com.letta.mobile.data.model.AgentId
@@ -17,7 +18,12 @@ import com.letta.mobile.runtime.RuntimeEventDraft
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -191,6 +197,34 @@ internal class WsChatSendCoordinator(
     ): Job = delegate.send(text, attachments)
 
     fun cancel(): Boolean = delegate.cancel()
+
+    /** letta-mobile-1n5py: every conversation's queued messages; the UI reads [ChatUiState.sendQueue]. */
+    val sendQueues: StateFlow<Map<String, ConversationSendQueue>> get() = delegate.sendQueue
+
+    /** letta-mobile-1n5py: queue controls for the visible conversation's queued messages. */
+    fun cancelQueued(otid: String): Job = delegate.cancelQueued(otid)
+
+    fun sendQueuedNow(otid: String): Job = delegate.sendQueuedNow(otid)
+
+    fun resumeQueue(conversationId: String): Job = delegate.resumeQueue(conversationId)
+
+    init {
+        mirrorVisibleSendQueue(scope)
+    }
+
+    /** Keeps [ChatUiState.sendQueue] on the visible conversation's queue as either one changes. */
+    private fun mirrorVisibleSendQueue(scope: CoroutineScope) {
+        val visibleConversation = uiState
+            .map { (it.conversationState as? ConversationState.Ready)?.conversationId }
+            .distinctUntilChanged()
+        scope.launch {
+            combine(delegate.sendQueue, visibleConversation) { queues, visible ->
+                (visible ?: activeConversationId())?.let(queues::get) ?: ConversationSendQueue()
+            }
+                .distinctUntilChanged()
+                .collect { queue -> uiState.update { it.copy(sendQueue = queue) } }
+        }
+    }
 
     internal suspend fun handleEvent(event: WsTimelineEvent) = delegate.handleEvent(event)
 

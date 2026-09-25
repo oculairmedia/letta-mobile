@@ -907,6 +907,13 @@ class IrohChannelTransport(
             // quickly and this cancel captured the old ActiveTurn, aborting would
             // target the NEW turn. Only proceed if this is still the active turn.
             if (turnRegistry.getActiveTurn(IrohConversationId(conversationId)) !== turn) return@launch
+            // letta-mobile-qygvv.9: a turn whose input still waits in the server queue has no run
+            // to abort (an abort would stop the turn ahead of it). Ending its job releases the
+            // lease, which takes the input off the server queue; the synthetic terminal follows.
+            if (isQueuedOnServer(turn)) {
+                finishCancelledTurn(conversationId, turn)
+                return@launch
+            }
             // 1. Ask the server to abort the active run so it emits its own
             //    authoritative terminal (and, per 8s45p, closes open tool_calls).
             //    A still-synthetic run id means the real run id has not streamed
@@ -969,6 +976,29 @@ class IrohChannelTransport(
             }
         }
         return true
+    }
+
+    private suspend fun isQueuedOnServer(turn: IrohActiveTurn): Boolean = runCatching {
+        supervisor.ready().turnEngine?.isQueued(turn.agentId, turn.conversationId) == true
+    }.getOrElse { error ->
+        if (error is CancellationException) throw error
+        false
+    }
+
+    /** Publishes the cancelled terminal (unless one already won) and tears the turn down. */
+    private suspend fun finishCancelledTurn(conversationId: String, turn: IrohActiveTurn) {
+        val cancelFrame = ServerFrame.TurnDone(
+            id = IrohTransportSupport.frameId("cancelled"),
+            ts = IrohTransportSupport.nowIso(),
+            turnId = turn.turnId,
+            runId = turn.runId,
+            status = "cancelled",
+        )
+        emitTerminalFrame(turn, cancelFrame, IrohTerminalSource.CancelSynthetic)
+        turn.job?.cancel()
+        turn.job?.let { turnRegistry.unregisterSendJob(IrohSendJobRegistration(IrohConversationId(conversationId), it)) }
+        turnRegistry.finish(turn.token)
+        Telemetry.event("IrohTransport", "cancel.queued_turn", "conversationId" to conversationId, "turnId" to turn.turnId)
     }
 
     private fun cancelWithoutActiveTurn(conversationId: String): Boolean {

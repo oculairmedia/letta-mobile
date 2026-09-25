@@ -122,7 +122,7 @@ internal class AdminChatComposerCoordinator(
                     // while a stop is in flight — matching the existing
                     // "no free-form steering during an active run" convention.
                     composerController.setError(STOPPING_SEND_BLOCKED_MESSAGE)
-                } else if (isStreaming()) {
+                } else if (isStreaming() && !canQueueWhileStreaming()) {
                     composerController.setError(
                         "Letta does not support free-form steering during an active run yet. Stop the run before sending another message."
                     )
@@ -157,7 +157,43 @@ internal class AdminChatComposerCoordinator(
         }
 
         val payload = composerController.payloadForSend(text) ?: return
-        sendMessagePayload(payload.text, payload.attachments)
+        if (isStreaming() && canQueueWhileStreaming()) {
+            queueMessagePayload(payload.text, payload.attachments)
+        } else {
+            sendMessagePayload(payload.text, payload.attachments)
+        }
+    }
+
+    /**
+     * letta-mobile-1n5py: the Iroh route queues a message sent during a turn instead of refusing
+     * it. The other routes still have no queue, so they keep the "stop first" rule.
+     */
+    fun canQueueWhileStreaming(): Boolean {
+        val context = chatSendContext()
+        return !context.isLocalRuntime && context.backendKind == BackendKind.IROH
+    }
+
+    /**
+     * The turn ahead keeps running, so none of the new-turn bookkeeping below applies: its cancel
+     * watcher, banners and send epoch belong to it until its terminal.
+     */
+    private fun queueMessagePayload(
+        text: String,
+        attachments: List<MessageContentPart.Image>,
+    ) {
+        chatSendStrategySelector.send(text, attachments, chatSendContext())
+    }
+
+    /**
+     * letta-mobile-1n5py: a queued message is about to become a new turn outside [sendMessage]
+     * (Send now, Resume). Retire the previous turn's cancel watcher first, or its ghost-resume
+     * guard would read the new turn's first frames as the stopped turn's tail and clear them.
+     */
+    fun beginQueuedTurn() {
+        sendEpoch += 1
+        cancelWatchJob?.cancel()
+        cancelWatchJob = null
+        chatBannerController.clearCancelling()
     }
 
     fun rerunMessage(message: UiMessage) {

@@ -179,6 +179,10 @@ internal fun LettaDesktopApp(
     val chatState by chatController.state.collectAsState()
     val canonicalPresentation by chatController.canonicalPresentation.collectAsState()
     val canonicalStatus by chatController.canonicalStatus.collectAsState()
+    // letta-mobile-1n5py: the canonical route's send queue; re-resolved when the route reopens.
+    val sendQueues by remember(canonicalPresentation, chatState.selectedConversationId) {
+        chatController.canonicalSendQueues() ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
+    }.collectAsState()
     var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
@@ -803,6 +807,8 @@ internal fun LettaDesktopApp(
                                 workingDirectory = selectedConversationWorkingDirectory,
                                 workingDirectorySupported = chatController.supportsWorkingDirectory,
                                 workingDirectoryLoading = workingDirectoryLoading,
+                                sendQueue = chatState.selectedConversationId?.let(sendQueues::get)
+                                    ?: com.letta.mobile.data.chat.send.ConversationSendQueue(),
                             ),
                             destinationInputs = DestinationContentInputs(
                                 railRecencyDays = railPrefs.recencyDays,

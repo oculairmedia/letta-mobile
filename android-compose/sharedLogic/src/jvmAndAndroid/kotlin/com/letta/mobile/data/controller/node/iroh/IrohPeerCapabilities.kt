@@ -64,6 +64,9 @@ object IrohPeerCapabilities {
         "input" -> CHAT_SEND
         "sync" -> CHAT_READ
         "abort_message" -> CHAT_SEND
+        // letta-mobile-1n5py: queue controls act on the sender's own queued inputs.
+        "remove_queue_item" -> CHAT_SEND
+        "resume_queue" -> CHAT_SEND
         "admin_rpc" -> null // resolved per-method via forAdminMethod
         else -> null
     }

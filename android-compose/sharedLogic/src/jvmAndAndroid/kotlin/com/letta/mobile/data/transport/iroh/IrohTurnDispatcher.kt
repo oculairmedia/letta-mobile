@@ -13,7 +13,10 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Executes the engine-owned portion of an Iroh turn after [IrohTurnRegistry] has
@@ -29,11 +32,15 @@ internal class IrohTurnDispatcher(
     private val ready get() = dependencies.ready
     private val emitTurnFrame get() = dependencies.emitTurnFrame
     private val emitDraft get() = dependencies.emitDraft
-    private val emitBoth get() = dependencies.emitBoth
     private val currentGeneration get() = dependencies.currentGeneration
 
+    /**
+     * letta-mobile-1n5py: false when [submission]'s conversation already has a turn. That is not a
+     * failure: the send coordinator queues the message behind the running turn, so no error or
+     * failed terminal is published for it.
+     */
     fun submit(submission: IrohTurnSubmission): Boolean {
-        val turn = admit(submission) ?: return true
+        val turn = admit(submission) ?: return false
         reportConcurrentTurns(turn)
         track(launch(IrohTurnDispatch(turn, submission.input)), turn)
         return true
@@ -68,17 +75,6 @@ internal class IrohTurnDispatcher(
             "activeTurnId" to result.activeTurn.turnId,
             "rejectedTurnId" to request.token.turnId.value,
         )
-        scope.launch {
-            emitBoth(ServerFrame.Error(
-                id = IrohTransportSupport.frameId("error"), ts = IrohTransportSupport.nowIso(),
-                code = "iroh_turn_engine_busy", message = "a turn is already active for this conversation",
-                conversationId = conversationId, turnId = request.token.turnId.value, runId = request.runId.value,
-            ))
-            emitBoth(ServerFrame.TurnDone(
-                id = IrohTransportSupport.frameId("turn_done"), ts = IrohTransportSupport.nowIso(),
-                turnId = request.token.turnId.value, runId = request.runId.value, status = "failed",
-            ))
-        }
     }
 
     private fun reportConcurrentTurns(turn: IrohActiveTurn) {
@@ -110,13 +106,22 @@ internal class IrohTurnDispatcher(
         Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to request.turn.turnId, "runId" to request.turn.runId)
         val handle = readyHandle(request) ?: return
         val engine = handle.turnEngine ?: error("Iroh send requested without turn engine")
-        if (engine.isBusy(request.agentId, request.conversationId)) {
+        // letta-mobile-1n5py: the registry retires a turn as its terminal is published, a moment
+        // before the engine releases that turn's lease. A queued send drained on that terminal
+        // must wait out the release, not fail as busy.
+        if (!awaitEngineRelease(engine, request)) {
             reportBusyTurn(request, engine)
             return
         }
         emitStarted(request)
         collectTurn(request, handle, engine)
     }
+
+    private suspend fun awaitEngineRelease(engine: AppServerTurnEngine, request: IrohTurnDispatch): Boolean =
+        withTimeoutOrNull(ENGINE_RELEASE_GRACE_MS.milliseconds) {
+            while (engine.isBusy(request.agentId, request.conversationId)) delay(ENGINE_RELEASE_POLL_MS.milliseconds)
+            true
+        } ?: false
 
     private suspend fun readyHandle(request: IrohTurnDispatch): IrohConnectionHandle? =
         runCatching { ready() }.getOrElse { error ->
@@ -230,6 +235,9 @@ internal class IrohTurnDispatcher(
         )
     }
 }
+
+private const val ENGINE_RELEASE_GRACE_MS = 2_000L
+private const val ENGINE_RELEASE_POLL_MS = 20L
 
 internal data class IrohTurnDispatcherDependencies(
     val scope: CoroutineScope,

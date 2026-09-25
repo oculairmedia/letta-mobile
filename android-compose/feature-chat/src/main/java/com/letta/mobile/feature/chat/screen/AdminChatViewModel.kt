@@ -1054,6 +1054,28 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
     }
 
+    // --- Send queue (letta-mobile-1n5py) ---
+    /** True when a message sent during a turn is queued behind it (the Iroh route). */
+    val canQueueWhileStreaming: Boolean
+        get() = composerCoordinator.canQueueWhileStreaming()
+
+    fun cancelQueuedMessage(otid: String) {
+        if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.cancelQueued(otid)
+    }
+
+    fun sendQueuedMessageNow(otid: String) {
+        if (replacingSendRuntime) return
+        composerCoordinator.beginQueuedTurn()
+        sendPipeline.wsChatSendCoordinator.sendQueuedNow(otid)
+    }
+
+    fun resumeSendQueue() {
+        if (replacingSendRuntime) return
+        val conversationId = uiState.value.sendQueue.items.firstOrNull()?.conversationId ?: return
+        composerCoordinator.beginQueuedTurn()
+        sendPipeline.wsChatSendCoordinator.resumeQueue(conversationId)
+    }
+
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
 

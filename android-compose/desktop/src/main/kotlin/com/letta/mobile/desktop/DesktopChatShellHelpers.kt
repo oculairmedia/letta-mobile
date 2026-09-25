@@ -31,6 +31,7 @@ import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
+import com.letta.mobile.desktop.chat.QueuedSendActions
 import kotlinx.coroutines.launch
 
 /** Model picker options: display label to route-stable selection token. */
@@ -507,6 +508,11 @@ internal fun createDesktopChatDetailPaneActions(
             }
         },
         onOpenAgent = params.onOpenAgent,
+        queue = QueuedSendActions(
+            onCancel = chatController::cancelQueuedSend,
+            onSendNow = chatController::sendQueuedNow,
+            onResume = chatController::resumeQueuedSends,
+        ),
     )
 }
 

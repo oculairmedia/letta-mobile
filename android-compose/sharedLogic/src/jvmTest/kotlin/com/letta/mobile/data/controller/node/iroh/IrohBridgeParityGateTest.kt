@@ -21,9 +21,9 @@ class IrohBridgeParityGateTest {
     @Test
     fun bridgeRunReachesTheDirectRunTerminal() = runTest {
         for (fixture in FIXTURES) {
-            val recording = AppServerRecording.load(fixture)
-            val direct = directRun(recording)
-            val bridge = bridgeRun(recording).outcome
+            val recording = fixture.load()
+            val direct = directRun(recording, fixture)
+            val bridge = bridgeRun(recording, fixture).outcome
             assertNotNull(direct.status, "$fixture: direct run never ended")
             assertEquals(direct.status, bridge.status, "$fixture: terminal status")
             assertEquals(direct.reason, bridge.reason, "$fixture: stop reason")
@@ -34,8 +34,8 @@ class IrohBridgeParityGateTest {
     @Test
     fun bridgeTerminalFramesKeepAppServerOrder() = runTest {
         for (fixture in FIXTURES) {
-            val recording = AppServerRecording.load(fixture)
-            val stream = bridgeRun(recording).phone.stream
+            val recording = fixture.load()
+            val stream = bridgeRun(recording, fixture).phone.stream
             val usage = stream.indexOfLast { it.kind == "usage_statistics" }
             val stop = stream.indexOfLast { it.kind == "stop_reason" }
             val idle = stream.indexOfLast { it.type == "update_loop_status" && it.loopStatus == WAITING_ON_INPUT }
@@ -51,7 +51,7 @@ class IrohBridgeParityGateTest {
     @Test
     fun inputAcceptedArrivesBeforeTheFirstStreamFrame() = runTest {
         for (fixture in FIXTURES) {
-            val log = bridgeRun(AppServerRecording.load(fixture)).phone.log
+            val log = bridgeRun(fixture.load(), fixture).phone.log
             val ack = log.first()
             assertEquals(WireChannel.Control, ack.channel, "$fixture: first frame ${ack.json}")
             assertEquals("input_accepted", ack.type)
@@ -64,7 +64,7 @@ class IrohBridgeParityGateTest {
     @Test
     fun bridgeLeaseReleasesOnTurnFinishedWithoutTheSettleWindow() = runTest {
         for (fixture in FIXTURES) {
-            val bridge = bridgeRun(AppServerRecording.load(fixture)).outcome
+            val bridge = bridgeRun(fixture.load(), fixture).outcome
             assertNotNull(bridge.status, "$fixture: bridge run never ended")
             assertTrue(
                 bridge.elapsedMs < AppServerTurnEngine.DEFAULT_TERMINAL_SETTLE_QUIET_MS,
@@ -76,21 +76,43 @@ class IrohBridgeParityGateTest {
     @Test
     fun bridgeCarriesEveryAppServerFrameKind() = runTest {
         for (fixture in FIXTURES) {
-            val recording = AppServerRecording.load(fixture)
+            val recording = fixture.load()
             val recorded = recording.parsedFrames.mapNotNull { WireFrame(WireChannel.Stream, it).kind }.toSet()
-            val bridged = bridgeRun(recording).phone.stream.mapNotNull { it.kind }.toSet()
+            val bridged = bridgeRun(recording, fixture).phone.stream.mapNotNull { it.kind }.toSet()
             val missing = recorded - bridged - OBSERVER_ONLY_KINDS
             assertTrue(missing.isEmpty(), "$fixture: the bridge dropped $missing (bridged $bridged)")
         }
     }
 
+    /**
+     * letta-mobile-1n5py / qygvv.4: an input the App Server queued reaches the phone as queued, and
+     * the `update_queue` that dequeues it is relayed, so the phone's lease leaves its queued wait.
+     */
+    @Test
+    fun queuedInputReachesThePhoneWithItsQueueUpdates() = runTest {
+        val fixture = FIXTURES.single { it.clientMessageId == QUEUED_CLIENT_MESSAGE_ID }
+        val phone = bridgeRun(fixture.load(), fixture).phone
+
+        assertEquals("queued", phone.control.single().json.parityString("disposition"))
+        val dequeued = phone.stream.filter { it.type == "update_queue" }.any { frame ->
+            frame.json["removed"].toString().contains(QUEUED_CLIENT_MESSAGE_ID) &&
+                frame.json["removed"].toString().contains("dequeued")
+        }
+        assertTrue(dequeued, "the dequeue of this input must reach the phone: ${phone.stream.map { it.kind }}")
+        assertTrue(
+            phone.stream.none { it.json["delta"]?.toString()?.contains("local-run-40") == true },
+            "the turn ahead's frames are not this phone's turn",
+        )
+    }
+
     @Test
     fun failedRelayAnswersTheInputWithARejection() = runTest {
-        val recording = AppServerRecording.load(FIXTURES.first())
-        val phone = FakePhoneLink(recording.runtime, CLIENT_MESSAGE_ID, REQUEST_ID, backgroundScope)
+        val fixture = FIXTURES.first()
+        val recording = fixture.load()
+        val phone = FakePhoneLink(recording.runtime, fixture.clientMessageId, REQUEST_ID, backgroundScope)
         val busy = controllerRunning { flow { error("Another turn is already active") } }
         var failure: Throwable? = null
-        relayTurn(busy, turnCommandFor(recording.runtime, CLIENT_MESSAGE_ID), phone.protocol) {
+        relayTurn(busy, turnCommandFor(recording.runtime, fixture.clientMessageId), phone.protocol) {
             failure = it
         }
         assertNotNull(failure)
@@ -100,19 +122,19 @@ class IrohBridgeParityGateTest {
         assertEquals("Another turn is already active", ack.json.parityString("error"))
     }
 
-    private suspend fun TestScope.directRun(recording: AppServerRecording): EngineOutcome {
+    private suspend fun TestScope.directRun(recording: AppServerRecording, fixture: ParityFixture): EngineOutcome {
         val client = RecordedAppServerClient(recording.ackJson, recording.frames, backgroundScope)
-        return runEngineOn(client, turnCommandFor(recording.runtime, CLIENT_MESSAGE_ID))
+        return runEngineOn(client, turnCommandFor(recording.runtime, fixture.clientMessageId))
     }
 
     private class BridgeRun(val phone: FakePhoneLink, val outcome: EngineOutcome)
 
     /** The node relays the recording to a fake phone, whose capture then drives a second engine. */
-    private suspend fun TestScope.bridgeRun(recording: AppServerRecording): BridgeRun {
+    private suspend fun TestScope.bridgeRun(recording: AppServerRecording, fixture: ParityFixture): BridgeRun {
         val upstream = RecordedAppServerClient(recording.ackJson, recording.frames, backgroundScope)
         val nodeEngine = AppServerTurnEngine(client = upstream, turnIdleTimeoutMs = 600_000, nowMs = { testScheduler.currentTime })
-        val command = turnCommandFor(recording.runtime, CLIENT_MESSAGE_ID)
-        val phone = FakePhoneLink(recording.runtime, CLIENT_MESSAGE_ID, REQUEST_ID, backgroundScope)
+        val command = turnCommandFor(recording.runtime, fixture.clientMessageId)
+        val phone = FakePhoneLink(recording.runtime, fixture.clientMessageId, REQUEST_ID, backgroundScope)
         phone.relay(controllerRunning { nodeEngine.runTurn(it) }, command)
         val captured = RecordedAppServerClient(
             ackJson = phone.control.single().json.toString(),
@@ -130,9 +152,20 @@ class IrohBridgeParityGateTest {
 
     private fun recordedRunId(recording: AppServerRecording) = recordedTurnFinished(recording).parityString("run_id")
 
+    /** One recorded turn and the client message id its input carried. */
+    private data class ParityFixture(val resource: String, val clientMessageId: String) {
+        fun load(): AppServerRecording = AppServerRecording.load(resource)
+
+        override fun toString(): String = resource
+    }
+
     private companion object {
-        val FIXTURES = listOf("appserver/bridge-parity/thinking-turn.jsonl")
-        const val CLIENT_MESSAGE_ID = "cm-parity-thinking-1"
+        val FIXTURES = listOf(
+            ParityFixture("appserver/bridge-parity/thinking-turn.jsonl", "cm-parity-thinking-1"),
+            // letta-mobile-1n5py: an input queued behind another viewer's turn, then dequeued and run.
+            ParityFixture("appserver/bridge-parity/queued-turn.jsonl", QUEUED_CLIENT_MESSAGE_ID),
+        )
+        const val QUEUED_CLIENT_MESSAGE_ID = "cm-parity-queued-1"
         const val REQUEST_ID = "phone-req-1"
         const val WAITING_ON_INPUT = "WAITING_ON_INPUT"
 
