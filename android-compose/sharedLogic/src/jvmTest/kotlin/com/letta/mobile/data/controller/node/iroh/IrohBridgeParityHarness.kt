@@ -3,32 +3,19 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.runtime.AppServerTurnEngine
-import com.letta.mobile.data.runtime.runLifecycleStatus
-import com.letta.mobile.data.runtime.turnEngineTerminalStatuses
-import com.letta.mobile.data.transport.appserver.AppServerChannel
-import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
-import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.test.TestScope
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -76,66 +63,14 @@ internal class AppServerRecording(val ackJson: String, val frames: List<String>)
     }
 }
 
-/**
- * An App Server that acknowledges the input with [ackJson] and then streams [frames] exactly as
- * recorded, decoded by the production [AppServerProtocol.decodeFrame].
- */
-internal class RecordedAppServerClient(
-    private val ackJson: String,
-    private val frames: List<String>,
-    private val scope: CoroutineScope,
-) : AppServerClient {
-    private val inbound = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 256)
-    override val events: Flow<AppServerReceivedFrame> = inbound
-
-    override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
-        AppServerInboundFrame.RuntimeStartResponse(
-            requestId = command.requestId,
-            success = true,
-            runtime = AppServerRuntimeScope(requireNotNull(command.agentId), requireNotNull(command.conversationId)),
-        )
-
-    override suspend fun input(command: AppServerCommand.Input) = Unit
-
-    override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
-        val ack = AppServerProtocol.decodeFrame(ackJson, AppServerChannel.Control).frame as AppServerInboundFrame.InputAccepted
-        // The App Server streams the turn after it answers the ack.
-        scope.launch { frames.forEach { inbound.emit(AppServerProtocol.decodeFrame(it, AppServerChannel.Stream)) } }
-        return ack.copy(requestId = requireNotNull(command.requestId))
-    }
-
-    override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-        AppServerInboundFrame.SyncResponse(requestId = command.requestId.orEmpty(), runtime = command.runtime, success = true)
-
-    override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-        error("abort unused")
-
-    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-        AppServerInboundFrame.AdminRpcResponse(requestId = command.requestId, success = true, result = null)
-
-    override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
-}
-
-/** How an engine ended a turn, and how much virtual time it took. */
+/** How an engine ended a turn, how much virtual time it took, and whether it still holds the lease. */
 internal data class EngineOutcome(
     val status: RuntimeRunStatus?,
     val reason: String?,
     val runId: String?,
     val elapsedMs: Long,
+    val busyAfter: Boolean = false,
 )
-
-internal suspend fun TestScope.runEngineOn(client: AppServerClient, command: TurnCommand): EngineOutcome {
-    val engine = AppServerTurnEngine(client = client, turnIdleTimeoutMs = 600_000, nowMs = { testScheduler.currentTime })
-    val startedAt = testScheduler.currentTime
-    val drafts = engine.runTurn(command).toList()
-    val terminal = drafts.lastOrNull { it.runLifecycleStatus() in turnEngineTerminalStatuses }
-    return EngineOutcome(
-        status = terminal?.runLifecycleStatus(),
-        reason = (terminal?.payload as? RuntimeEventPayload.RunLifecycleChanged)?.reason,
-        runId = terminal?.runId?.value,
-        elapsedMs = testScheduler.currentTime - startedAt,
-    )
-}
 
 internal fun turnCommandFor(runtime: AppServerRuntimeScope, clientMessageId: String) = TurnCommand(
     backendId = BackendId("iroh-node-server"),
