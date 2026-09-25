@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +36,14 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
+/** What the node card renders: the selection plus graph-derived decoration. */
+@Immutable
+internal data class MemoryNodeCardState(
+    val selection: MemoryNodeSelection,
+    val degree: Int,
+    val accent: Color,
+)
+
 /**
  * The selected node's card: identity, stats, and its full contents. Memory
  * blocks load their complete value and, when the backend can commit a write,
@@ -42,18 +51,17 @@ import com.letta.mobile.ui.theme.customColors
  */
 @Composable
 internal fun MemoryNodeCardContent(
-    selection: MemoryNodeSelection,
-    degree: Int,
+    card: MemoryNodeCardState,
     actions: MemoryPageActions,
-    accent: Color,
     modifier: Modifier = Modifier,
 ) {
+    val selection = card.selection
     Column(
         modifier = modifier.padding(LettaDimens.Space.lg),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        MemoryNodeCardHeader(selection, accent, onClose = actions::clearSelection)
-        MemoryNodeStats(selection, degree)
+        MemoryNodeCardHeader(selection, card.accent, onClose = actions::clearSelection)
+        MemoryNodeStats(selection, card.degree)
         val editor = selection.editor
         if (editor != null) {
             MemoryNodeEditorPane(selection, editor, actions)

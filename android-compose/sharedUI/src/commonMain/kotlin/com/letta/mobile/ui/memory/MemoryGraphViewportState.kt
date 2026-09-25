@@ -40,7 +40,13 @@ class MemoryGraphViewportState internal constructor(
         val resized = canvasSize != size
         size = canvasSize
         if (newLayout) userMoved = false
-        if ((newLayout || resized) && !userMoved) fit(layout)
+        if (shouldRefit(newLayout, resized)) fit(layout)
+    }
+
+    /** Something changed under the view and the user has not taken over panning. */
+    private fun shouldRefit(newLayout: Boolean, resized: Boolean): Boolean {
+        val changed = newLayout || resized
+        return changed && !userMoved
     }
 
     fun fit(layout: MemoryGraphLayout) {

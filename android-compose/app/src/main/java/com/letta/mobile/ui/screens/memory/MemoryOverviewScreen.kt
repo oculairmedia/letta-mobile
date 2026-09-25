@@ -18,6 +18,7 @@ import ca.oculair.meridian.R
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.memory.MemoryPage
+import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 /**
@@ -50,8 +51,7 @@ fun MemoryOverviewScreen(
         MemoryPage(
             state = state,
             actions = viewModel.actions,
-            showTitle = false,
-            reducedMotion = rememberReducedMotionEnabled(),
+            options = MemoryPageOptions(showTitle = false, reducedMotion = rememberReducedMotionEnabled()),
             modifier = Modifier.padding(paddingValues),
         )
     }

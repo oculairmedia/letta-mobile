@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,20 +35,19 @@ import com.letta.mobile.ui.theme.LettaDimens
  * docks as a side panel; on a phone it rises from the bottom over the graph,
  * above the keyboard while editing.
  *
- * Hosts own navigation chrome (top bar, back handling) and pass [showTitle]
- * false when they already title the screen. [reducedMotion] turns the
- * reveal-selected-node pan into a jump.
+ * Hosts own navigation chrome (top bar, back handling) and tune the rest
+ * through [MemoryPageOptions].
  */
 @Composable
 fun MemoryPage(
     state: MemoryPageState,
     actions: MemoryPageActions,
     modifier: Modifier = Modifier,
-    showTitle: Boolean = true,
-    reducedMotion: Boolean = false,
+    options: MemoryPageOptions = MemoryPageOptions(),
 ) {
+    val reducedMotion = options.reducedMotion
     Column(modifier.fillMaxSize()) {
-        MemoryPageChrome(state.parity, actions, showTitle)
+        MemoryPageChrome(state.parity, actions, options.showTitle)
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val layout = MemoryPageLayout(state, actions, reducedMotion)
             if (maxWidth >= LettaDimens.Pane.wideBreakpoint) {
@@ -58,6 +58,16 @@ fun MemoryPage(
         }
     }
 }
+
+/**
+ * Host presentation choices: [showTitle] false when the host already titles
+ * the screen; [reducedMotion] turns the reveal-selected-node pan into a jump.
+ */
+@Immutable
+data class MemoryPageOptions(
+    val showTitle: Boolean = true,
+    val reducedMotion: Boolean = false,
+)
 
 private class MemoryPageLayout(
     val state: MemoryPageState,
@@ -132,10 +142,12 @@ private fun MemoryNodeCardFor(
     val palette = rememberMemoryGraphPalette()
     val node = state.view.node(selection.detail.nodeId)
     MemoryNodeCardContent(
-        selection = selection,
-        degree = state.view.degreeOf(selection.detail.nodeId),
+        card = MemoryNodeCardState(
+            selection = selection,
+            degree = state.view.degreeOf(selection.detail.nodeId),
+            accent = node?.let(palette::nodeColor) ?: palette.kindColor(selection.detail.kind),
+        ),
         actions = actions,
-        accent = node?.let(palette::nodeColor) ?: palette.kindColor(selection.detail.kind),
         modifier = modifier,
     )
 }
