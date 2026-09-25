@@ -2,9 +2,6 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
-import com.letta.mobile.data.repository.subagent.ParentContext
-import com.letta.mobile.data.repository.subagent.SubagentCorrelator
-import com.letta.mobile.data.subagents.SubagentParentProjection
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
@@ -38,7 +35,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.runtime.RuntimeEventDraft
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -56,7 +52,6 @@ import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.util.UUID
-import com.letta.mobile.data.transport.iroh.IrohTransportSupport.string
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -180,27 +175,6 @@ class IrohChannelTransport(
     internal fun activeTurnsCount(): Int = turnRegistry.activeTurnsCount()
     internal fun activeSendJobsCount(): Int = turnRegistry.activeSendJobsCount()
 
-    /**
-     * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
-     * correlation reducer — the Kotlin analogue of the shim's
-     * `ingestParentFrame`. Fed additively from [ingestObserverFrame] as the
-     * observer path decodes the parent run's frames. STRICTLY dispatch +
-     * return correlation; identity-from-body (m6oa1.3) and lifecycle/terminal
-     * nuance (m6oa1.4) are out of scope. Confined to the single-threaded
-     * observer collector, so the reducer's non-synchronized map is safe.
-     */
-    private val subagentCorrelator = SubagentCorrelator()
-
-    /**
-     * letta-mobile-m6oa1.3: the correlator revision last PUBLISHED as a
-     * [ServerFrame.SubagentsUpdated]. Emission is gated on this so idempotent
-     * re-observes (which the pure reducer already no-ops on, leaving
-     * [SubagentCorrelator.revision] unchanged) do NOT spam the event flow with
-     * duplicate snapshots. Only advanced by the single-threaded observer
-     * collector, so a plain field is safe (same confinement as the reducer).
-     */
-    private var lastEmittedSubagentRevision: Long = 0L
-
     private var explicitConfig: IrohConnectConfig? = null
 
     private val irohDialer = IrohDialer(
@@ -318,8 +292,8 @@ class IrohChannelTransport(
         failuresToDeclareDead = livenessProbeFailuresToDeclareDead,
         maxDetectionMs = livenessMaxDetectionMs,
         millisSinceLastProofOfLife = { adminRpcExecutor.millisSinceLastProofOfLife() },
-        youngInFlightAdminRpcCount = {
-            adminRpcExecutor.youngInFlightAdminRpcCount(graceMs = livenessCongestionGraceMs)
+        adminRpcPathEvidence = { windowMs ->
+            adminRpcExecutor.pathEvidence(windowMs = windowMs, graceMs = livenessCongestionGraceMs)
         },
         // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
         // after a redial destroys the healthy NEW handle.
@@ -342,7 +316,6 @@ class IrohChannelTransport(
     // long-lived collector fixes that: while connected it continuously ingests
     // stream_delta frames into the SAME _events/_frameEvents seam the initiator
     // uses, so observer frames reduce identically.
-    private val observerMapper = AppServerRuntimeEventMapper()
 
     // Own generation-bound observer and viewer re-subscription work in a typed
     // session so stale handles cannot mutate a successor connection.
@@ -381,289 +354,6 @@ class IrohChannelTransport(
             currentGeneration = connectionSession::currentGeneration,
         ),
     )
-
-    /**
-     * Ingest ONE fanned-out stream frame the observer path owns.
-     *
-     * DUAL-INGEST GUARD (letta-mobile-h30cy hazard): the engine's runTurn ALSO
-     * collects this exact SharedFlow (via client.events = merge(control, stream))
-     * while a local turn is active — both collectors therefore see every frame.
-     * To keep exactly ONE consumer per frame, the observer collector SKIPS any
-     * frame whose conversation has a live local turn: the engine OWNS frames for
-     * its own conversation while that conversation's turn runs. The observer OWNS
-     * a frame only when NO local turn is active for that frame's conversation.
-     *
-     * letta-mobile-or40x — THE INVARIANT IS PER CONVERSATION. Ownership is decided
-     * by looking up the frame's own conversation_id in [turnRegistry], keyed
-     * by conversationId. It is therefore airtight per conversation: for a given
-     * conversation a frame is engine-owned XOR observer-owned (no overlap), every
-     * stream_delta is owned by exactly one side (no gap), and — critically — that
-     * answer CANNOT change mid-stream because of activity on some OTHER
-     * conversation. Before or40x this compared against a single process-wide
-     * `activeTurn`, so starting a turn on conversation B evicted conversation A
-     * and silently flipped A's still-streaming frames from engine-owned to
-     * observer-owned (double-emitting them). Any residual flip is now reported
-     * via `ingest.ownership_switched` rather than absorbed.
-     */
-    private suspend fun ingestObserverFrame(received: AppServerReceivedFrame) {
-        val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
-        if (!streamDelta.subagentId.isNullOrBlank()) {
-            SubagentParentProjection.activityLine(streamDelta.delta)?.let { line ->
-                Telemetry.event(
-                    "IrohObserver", "subagent.activity_suppressed",
-                    "subagentId" to streamDelta.subagentId,
-                    "conversationId" to streamDelta.runtime.conversationId,
-                    "activityBytes" to line.encodeToByteArray().size,
-                )
-            }
-            return
-        }
-        val engineScope = engineOwnedProjectionScope(streamDelta)
-        if (engineScope != null) {
-            recordEngineOwnedObserverFrame(engineScope, received)
-            return
-        }
-        ingestPassiveObserverFrame(streamDelta, received)
-    }
-
-    private suspend fun recordEngineOwnedObserverFrame(
-        scope: ObserverProjectionScope,
-        received: AppServerReceivedFrame,
-    ) {
-        Telemetry.event(
-            "IrohObserver", "ingest.skip_engine_owned",
-            "conversationId" to scope.conversationId,
-            "turnId" to scope.localTurn.turnId,
-        )
-        projectEngineOwnedObserverDelta(scope, received)
-    }
-
-    private suspend fun ingestPassiveObserverFrame(
-        streamDelta: AppServerInboundFrame.StreamDelta,
-        received: AppServerReceivedFrame,
-    ) {
-        val conversationId = streamDelta.runtime.conversationId
-        val agentId = streamDelta.runtime.agentId
-        if (isRetiredObserverFrame(streamDelta, conversationId)) return
-        correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
-        emitObserverProjection(streamDelta, sanitizeAgentReturn(streamDelta, received), agentId, conversationId)
-    }
-
-    private fun isRetiredObserverFrame(
-        streamDelta: AppServerInboundFrame.StreamDelta,
-        conversationId: String,
-    ): Boolean {
-        val delta = streamDelta.delta as? JsonObject
-        val runId = delta?.string("run_id") ?: delta?.string("runId")
-        if (runId == null || !turnRegistry.isRetiredRun(IrohRunId(runId))) return false
-        Telemetry.event(
-            "IrohObserver", "ingest.skip_already_retired",
-            "conversationId" to conversationId,
-            "runId" to runId,
-        )
-        return true
-    }
-
-    private suspend fun emitObserverProjection(
-        streamDelta: AppServerInboundFrame.StreamDelta,
-        received: AppServerReceivedFrame,
-        agentId: String,
-        conversationId: String,
-    ) {
-        val command = IrohTransportSupport.observerTurnCommand(agentId, conversationId)
-        observerMapper.map(command, received).forEach { draft ->
-            val frames = payloadToServerFrames(
-                payload = draft.payload,
-                agentId = draft.agentId?.value ?: agentId,
-                conversationId = draft.conversationId?.value ?: conversationId,
-                turnId = "iroh-observer-turn-$conversationId",
-                runId = draft.runId?.value ?: "iroh-observer-run-$conversationId",
-            )
-            frames.forEach { emitBoth(it) }
-        }
-    }
-
-    private fun engineOwnedProjectionScope(
-        streamDelta: AppServerInboundFrame.StreamDelta,
-    ): ObserverProjectionScope? {
-        val conversationId = streamDelta.runtime.conversationId
-        val localTurn = turnRegistry.getActiveTurn(IrohConversationId(conversationId))
-        recordFrameOwnership(conversationId, localTurn)
-        return localTurn?.let {
-            ObserverProjectionScope(streamDelta.runtime.agentId, conversationId, it)
-        }
-    }
-
-    /**
-     * letta-mobile-dir4k: When the observer sees a frame for a conversation
-     * whose local turn is still active, the engine path already owns it. The
-     * observer must not re-emit it. But the projection is still worth running
-     * in one specific case: if the projection carries a `TurnDone` for the
-     * LOCAL turn id, the engine path's terminal `emitTurnFrame` will not run
-     * (race / engine collect already returned / frame was dropped) and we must
-     * retire the `ActiveTurn` ourselves — otherwise the composer keeps
-     * showing "Thinking…" indefinitely. The engine owns the emit slot (see
-     * [emitTurnFrame]'s exactly-once guard), so we retire using
-     * [retireActiveTurn] without re-emitting the frame. Anything else is
-     * engine-owned and we drop it as before.
-     */
-    private suspend fun projectEngineOwnedObserverDelta(
-        scope: ObserverProjectionScope,
-        received: AppServerReceivedFrame,
-    ) {
-        val command = IrohTransportSupport.observerTurnCommand(scope.agentId, scope.conversationId)
-        val projectedFrames = observerMapper.map(command, received).flatMap { draft ->
-            payloadToServerFrames(
-                payload = draft.payload,
-                agentId = draft.agentId?.value ?: scope.agentId,
-                conversationId = draft.conversationId?.value ?: scope.conversationId,
-                turnId = scope.localTurn.turnId,
-                runId = draft.runId?.value ?: scope.localTurn.runId,
-            )
-        }
-        val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
-        if (terminal is ServerFrame.TurnDone) {
-            emitTerminalFrame(scope.localTurn, terminal, IrohTerminalSource.Observer)
-        }
-    }
-
-    /**
-     * letta-mobile-dir4k: bundle the local conversation context that drives an
-     * observer-side projection. Keeps [projectEngineOwnedObserverDelta]'s arg
-     * count under the CodeScene "max 4 function args" threshold so the
-     * extraction stays the kind of helper a reviewer approves on first read.
-     */
-    private data class ObserverProjectionScope(
-        val agentId: String,
-        val conversationId: String,
-        val localTurn: IrohActiveTurn,
-    )
-
-    /**
-     * letta-mobile-m6oa1.1 / m6oa1.3: decode ONE observer StreamDelta and, when
-     * it is a parent `Agent` tool_call dispatch or its matching tool_return,
-     * feed the [subagentCorrelator]. All other frames are ignored. Parsing is
-     * defensive (the whole body is wrapped in [runCatching]) so the correlation
-     * tap can never disturb the projection path — on any failure it returns an
-     * empty list and the projection continues unaffected.
-     *
-     * m6oa1.3 (consumer wiring): this is where the previously WRITE-ONLY
-     * correlator becomes OBSERVABLE. After mutating the reducer, if the
-     * reducer's observable state advanced ([SubagentCorrelator.revision] moved
-     * past [lastEmittedSubagentRevision]), it RETURNS a
-     * [ServerFrame.SubagentsUpdated] carrying the changed [SubagentEntry], a
-     * fresh full snapshot, and the informational [reason] (`started` on
-     * dispatch, `completed` on return) — matching the exact frame shape the
-     * repository's `observePushEvents` fold already consumes via
-     * `mergeSnapshot(frame.subagentsActive, terminal = frame.subagent)`. It does
-     * NOT emit itself: the pure reducer decides WHAT to publish; the suspend
-     * caller [ingestObserverFrame] performs the [emitBoth]. When nothing
-     * observable changed (idempotent re-observe, unknown-id return, non-Agent
-     * tool_call) it returns an empty list — revision-gating suppresses any
-     * duplicate push.
-     *
-     * Frame shapes (mirrors [AppServerTurnEngine.extractToolCallId] / the
-     * mapper): the tool_call_id is `delta.tool_call.tool_call_id` (dispatch) or
-     * `delta.tool_call_id` (return); the tool name is `delta.tool_call.name`;
-     * the arguments are `delta.tool_call.arguments`; the parent runId is
-     * `delta.run_id`.
-     */
-    private fun correlateAgentFrame(
-        streamDelta: AppServerInboundFrame.StreamDelta,
-    ): List<ServerFrame> = runCatching {
-        val delta = streamDelta.delta as? JsonObject ?: return@runCatching emptyList()
-        val messageType = delta.string("message_type") ?: return@runCatching emptyList()
-        val toolCall = delta["tool_call"]?.jsonObject
-        val parent = ParentContext(
-            agentId = streamDelta.runtime.agentId,
-            conversationId = streamDelta.runtime.conversationId,
-            runId = delta.string("run_id"),
-        )
-        val changedToolCallId: String
-        val reason: String
-        when (messageType) {
-            "tool_call_message", "approval_request_message" -> {
-                // Only the parent `Agent` dispatch is in scope.
-                val name = toolCall?.string("name") ?: return@runCatching emptyList()
-                if (name != "Agent") return@runCatching emptyList()
-                val toolCallId = toolCall.string("tool_call_id")
-                    ?: delta.string("tool_call_id") ?: return@runCatching emptyList()
-                val arguments = toolCall["arguments"]?.toString()
-                    ?: delta["arguments"]?.toString()
-                subagentCorrelator.onAgentDispatch(toolCallId, arguments, parent)
-                changedToolCallId = toolCallId
-                reason = SUBAGENT_REASON_STARTED
-            }
-            "tool_return_message" -> {
-                // Returns don't carry the tool name; correlate purely by id.
-                // onDispatchReturn ignores ids it never recorded as an Agent
-                // dispatch, so passing every return id here is safe — a
-                // non-Agent tool's return simply no-ops (revision unchanged).
-                val toolCallId = toolCall?.string("tool_call_id")
-                    ?: delta.string("tool_call_id") ?: return@runCatching emptyList()
-                subagentCorrelator.onDispatchReturn(toolCallId, parent)
-                changedToolCallId = toolCallId
-                reason = SUBAGENT_REASON_DISPATCHED
-            }
-            else -> return@runCatching emptyList()
-        }
-        buildSubagentsUpdatedIfChanged(changedToolCallId, reason)
-    }.getOrElse { emptyList() }
-
-    /**
-     * letta-mobile-m6oa1.3: REVISION-GATED projection of the correlator into a
-     * [ServerFrame.SubagentsUpdated]. Returns the frame only when the reducer's
-     * [SubagentCorrelator.revision] advanced past the last published revision —
-     * so an idempotent re-observe (which leaves the revision untouched) yields
-     * NO frame and never spams the flow. The changed entry is looked up from
-     * the fresh snapshot by [changedToolCallId]; the snapshot is the same list
-     * the shim-shaped frame carried, so the repository fold reduces identically.
-     */
-    private fun buildSubagentsUpdatedIfChanged(
-        changedToolCallId: String,
-        reason: String,
-    ): List<ServerFrame> {
-        val revision = subagentCorrelator.revision
-        if (revision == lastEmittedSubagentRevision) return emptyList()
-        lastEmittedSubagentRevision = revision
-        val snapshot = subagentCorrelator.snapshot()
-        val changed = snapshot.firstOrNull { it.toolCallId == changedToolCallId }
-        val nowIso = IrohTransportSupport.nowIso()
-        return listOf(
-            ServerFrame.SubagentsUpdated(
-                id = IrohTransportSupport.frameId("subagents_updated"),
-                ts = nowIso,
-                reason = reason,
-                subagent = changed,
-                subagentsActive = snapshot,
-                at = nowIso,
-            ),
-        )
-    }
-
-    private fun sanitizeAgentReturn(
-        streamDelta: AppServerInboundFrame.StreamDelta,
-        received: AppServerReceivedFrame,
-    ): AppServerReceivedFrame {
-        val delta = streamDelta.delta as? JsonObject ?: return received
-        if (delta.string("message_type") != "tool_return_message") return received
-        val toolCallId = delta.string("tool_call_id") ?: return received
-        val body = listOf("tool_return", "output", "result")
-            .firstNotNullOfOrNull { key -> delta[key]?.toString() }
-            .orEmpty()
-        val explicitlySubagent = body.contains("<task-notification", ignoreCase = true) ||
-            delta["subagent_id"] != null || delta["task_id"] != null
-        if (!explicitlySubagent && subagentCorrelator.snapshot().none { it.toolCallId == toolCallId }) return received
-        val sanitized = SubagentParentProjection.sanitizedAgentReturn(
-            delta,
-            streamDelta.runtime.conversationId,
-            delta.string("id"),
-        )
-        return received.copy(
-            frame = streamDelta.copy(delta = sanitized),
-            raw = JsonObject(received.raw.toMutableMap().apply { this["delta"] = sanitized }),
-        )
-    }
 
     /**
      * letta-mobile-or40x: recovery is announced PER CONVERSATION. Every
@@ -1012,8 +702,6 @@ class IrohChannelTransport(
         }
         turnRegistry.clear()
         adminRpcExecutor.clear()
-        subagentCorrelator.reset()
-        lastEmittedSubagentRevision = 0L
         livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
@@ -1136,7 +824,7 @@ class IrohChannelTransport(
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {
         val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
-            ?: return subagentListFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
+            ?: return subagentListFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
         return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
@@ -1169,7 +857,7 @@ class IrohChannelTransport(
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse {
         val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
-            ?: return subagentTodosFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
+            ?: return subagentTodosFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
         return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
@@ -1202,6 +890,9 @@ class IrohChannelTransport(
         )
     }
 
+    /** A scoped-RPC failure: which request failed, and why. */
+    private data class ScopedRpcFailure(val requestId: String, val error: String)
+
     private data class ScopedRpcLabels(
         val unsupported: String,
         val timedOut: String,
@@ -1214,18 +905,18 @@ class IrohChannelTransport(
         labels: ScopedRpcLabels,
         call: suspend () -> AppServerInboundFrame.AdminRpcResponse?,
         mapSuccess: (JsonElement) -> T,
-        onFailure: (String, String) -> T,
+        onFailure: (ScopedRpcFailure) -> T,
     ): T = try {
         withTimeoutOrNull(timeoutMs.milliseconds) {
-            val response = call() ?: return@withTimeoutOrNull onFailure(requestId, labels.unsupported)
-            if (!response.success) return@withTimeoutOrNull onFailure(requestId, response.error ?: labels.failed)
-            val result = response.result ?: return@withTimeoutOrNull onFailure(requestId, "${labels.failed}: no result")
+            val response = call() ?: return@withTimeoutOrNull onFailure(ScopedRpcFailure(requestId, labels.unsupported))
+            if (!response.success) return@withTimeoutOrNull onFailure(ScopedRpcFailure(requestId, response.error ?: labels.failed))
+            val result = response.result ?: return@withTimeoutOrNull onFailure(ScopedRpcFailure(requestId, "${labels.failed}: no result"))
             mapSuccess(result)
-        } ?: onFailure(requestId, labels.timedOut)
+        } ?: onFailure(ScopedRpcFailure(requestId, labels.timedOut))
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: Exception) {
-        onFailure(requestId, error.message ?: labels.failed)
+        onFailure(ScopedRpcFailure(requestId, error.message ?: labels.failed))
     }
 
     private suspend fun callScopedSubagentRpc(
@@ -1253,12 +944,12 @@ class IrohChannelTransport(
         return SubagentRpcScope(conversationId.value, agentId)
     }
 
-    private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(
-        id = IrohTransportSupport.frameId("subagent_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun subagentListFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentListResponse(
+        id = IrohTransportSupport.frameId("subagent_list"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun subagentTodosFailure(requestId: String, error: String) = ServerFrame.SubagentTodosResponse(
-        id = IrohTransportSupport.frameId("subagent_todos"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun subagentTodosFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentTodosResponse(
+        id = IrohTransportSupport.frameId("subagent_todos"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
     /** Shared scoped-RPC labels for the cron.* bridge methods (op = the admin_rpc method). */
@@ -1279,7 +970,7 @@ class IrohChannelTransport(
         timeoutMs: Long,
         body: JsonObject,
         mapSuccess: (JsonElement) -> T,
-        onFailure: (String, String) -> T,
+        onFailure: (ScopedRpcFailure) -> T,
     ): T = invokeScopedRpc(
         requestId = requestId,
         timeoutMs = timeoutMs,
@@ -1289,24 +980,24 @@ class IrohChannelTransport(
         onFailure = onFailure,
     )
 
-    private fun cronListFailure(requestId: String, error: String) = ServerFrame.CronListResponse(
-        id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronListFailure(failure: ScopedRpcFailure) = ServerFrame.CronListResponse(
+        id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronAddFailure(requestId: String, error: String) = ServerFrame.CronAddResponse(
-        id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronAddFailure(failure: ScopedRpcFailure) = ServerFrame.CronAddResponse(
+        id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronGetFailure(requestId: String, error: String) = ServerFrame.CronGetResponse(
-        id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronGetFailure(failure: ScopedRpcFailure) = ServerFrame.CronGetResponse(
+        id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronDeleteFailure(requestId: String, error: String) = ServerFrame.CronDeleteResponse(
-        id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronDeleteFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteResponse(
+        id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronDeleteAllFailure(requestId: String, error: String) = ServerFrame.CronDeleteAllResponse(
-        id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronDeleteAllFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteAllResponse(
+        id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
     @Serializable
@@ -1338,16 +1029,6 @@ class IrohChannelTransport(
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
-        // letta-mobile-m6oa1.3: informational `reason` vocabulary on the
-        // SubagentsUpdated push. Mirrors the shim's (§13.4) `started` / `completed`
-        // strings the repository fold treats as informational (it keys terminal
-        // detection off `subagent.status`, not this reason).
-        /** letta-mobile-or40x: frame-ownership path labels for SENSING (c). */
-        private const val OWNERSHIP_ENGINE = "engine"
-        private const val OWNERSHIP_OBSERVER = "observer"
-
-        internal const val SUBAGENT_REASON_STARTED = "started"
-        internal const val SUBAGENT_REASON_DISPATCHED = "dispatched"
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
@@ -1439,7 +1120,7 @@ class IrohChannelTransport(
  * id, which is always born `iroh-run-${UUID}` in `send()` and only ever
  * promoted to a REAL server run id — never to an observer id. The observer
  * placeholder `iroh-observer-run-*` is stamped solely in the passive projection
- * path (`ingestObserverFrame`, which is skipped while a turn is engine-owned)
+ * path (`IrohObserverIngestor.ingestObserverFrame`, which is skipped while a turn is engine-owned)
  * and is emitted straight to the timeline; it never enters an ActiveTurn nor
  * this predicate. Broadening it here would be dead code and would risk coupling
  * observer classification to transport abort timing, so it stays separate.

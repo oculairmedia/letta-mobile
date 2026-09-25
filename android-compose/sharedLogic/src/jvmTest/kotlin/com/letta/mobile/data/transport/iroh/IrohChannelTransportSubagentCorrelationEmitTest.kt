@@ -30,8 +30,8 @@ import kotlin.time.Duration.Companion.seconds
  * letta-mobile-m6oa1.3 (consumer wiring): end-to-end proof that the
  * previously WRITE-ONLY [SubagentCorrelator] is now OBSERVABLE. Frames flow
  * through the REAL transport observer path
- * ([IrohChannelTransport.ingestObserverFrame] ->
- * [IrohChannelTransport.correlateAgentFrame]) and the resulting
+ * ([IrohObserverIngestor.ingestObserverFrame] ->
+ * [IrohObserverIngestor.correlateAgentFrame]) and the resulting
  * [ServerFrame.SubagentsUpdated] pushes are asserted on the transport's public
  * `events` flow — the exact seam `SubagentRepository.observePushEvents`
  * consumes.
@@ -136,7 +136,7 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
                 while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10.milliseconds)
             }
             val updated = frames.filterIsInstance<ServerFrame.SubagentsUpdated>().single()
-            assertEquals(IrohChannelTransport.SUBAGENT_REASON_STARTED, updated.reason)
+            assertEquals(IrohObserverIngestor.SUBAGENT_REASON_STARTED, updated.reason)
             // The changed entry rides on `subagent`.
             assertEquals("tc-1", updated.subagent?.toolCallId)
             assertEquals("scout the repo", updated.subagent?.description)
@@ -205,7 +205,7 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
 
             val updates = frames.filterIsInstance<ServerFrame.SubagentsUpdated>()
             assertEquals(1, updates.size)
-            assertEquals(IrohChannelTransport.SUBAGENT_REASON_STARTED, updates.single().reason)
+            assertEquals(IrohObserverIngestor.SUBAGENT_REASON_STARTED, updates.single().reason)
             assertEquals(SubagentStatus.RUNNING, updates.single().subagentsActive.single().status)
 
         } finally {

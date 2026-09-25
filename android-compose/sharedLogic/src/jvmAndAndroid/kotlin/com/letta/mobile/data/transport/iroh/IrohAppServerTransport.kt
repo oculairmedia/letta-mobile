@@ -97,6 +97,7 @@ class IrohAppServerTransport(
     private lateinit var controlBiStream: BiStream
     private lateinit var streamBiStream: BiStream
     private var pathWatchJob: Job? = null
+    private val selectedPathTelemetry = IrohSelectedPathTelemetry()
     private val readerExitReported = AtomicBoolean(false)
     private val legacyAdminRpcResponsesMutex = Mutex()
     private val legacyAdminRpcResponses = mutableMapOf<String, CompletableDeferred<AppServerInboundFrame.AdminRpcResponse>>()
@@ -286,6 +287,10 @@ class IrohAppServerTransport(
         runCatching { connection.close() }
     }
 
+    // Pre-existing: the connect catch deliberately handles EVERY failure, cancellation
+    // included, so connectionReady/streamReady are always completed and awaiters never
+    // hang on a cancelled dial.
+    @Suppress("CancellationMustPropagate")
     private suspend fun runControlChannel() = coroutineScope {
         // Establish connection and open control bi-stream
         try {
@@ -293,6 +298,7 @@ class IrohAppServerTransport(
                 endpoint.connect(remoteAddr, alpn)
             }
             Telemetry.event("IrohTransport", "connect.ok", *IrohDiagnostics.connectionAttributes(connection).toTypedArray())
+            selectedPathTelemetry.onConnect(runCatching { connection.paths() }.getOrDefault(emptyList()))
             controlBiStream = connection.openBi()
             Telemetry.event("IrohTransport", "control.opened")
             connectionReady.complete(Unit)
@@ -411,6 +417,7 @@ class IrohAppServerTransport(
             connection.watchPaths(object : PathChangeCallback {
                 override suspend fun onChange(paths: List<computer.iroh.PathSnapshot>) {
                     val summary = IrohDiagnostics.summarizePaths(paths)
+                    selectedPathTelemetry.onPathsChanged(paths)
                     Telemetry.event(
                         "IrohTransport", "paths.changed",
                         "remoteEndpointId" to (attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: ""),
