@@ -25,6 +25,14 @@ internal fun isOtherClientBusyRejection(
     !deliveredAssistantContent &&
     (bufferedErrorMessage == OTHER_CLIENT_BUSY_CODE || isTurnAlreadyActiveMessage(bufferedErrorMessage))
 
+/** [send] when its terminal is [isOtherClientBusyRejection]: it never started and can wait. */
+internal fun otherClientBounce(
+    send: QueuedChatSend?,
+    status: BridgeTurnStatus,
+    bufferedErrorMessage: String?,
+    deliveredAssistantContent: Boolean,
+): QueuedChatSend? = send?.takeIf { isOtherClientBusyRejection(status, bufferedErrorMessage, deliveredAssistantContent) }
+
 /** The error code the Iroh mapper gives a busy rejection (buffered when the message is blank). */
 private const val OTHER_CLIENT_BUSY_CODE = "iroh_turn_engine_busy"
 
@@ -93,20 +101,14 @@ internal class ServerQueueMarks(
     private val sendOfTurn: (String) -> QueuedChatSend?,
     private val sendOfConversation: (String) -> QueuedChatSend?,
 ) {
-    fun observe(event: WsTimelineEvent) {
-        when (event) {
-            is WsTimelineEvent.TurnQueued -> onTurnQueued(event)
-            is WsTimelineEvent.MessageDelta -> onMessageDelta(event)
-            else -> Unit
-        }
-    }
-
-    private fun onTurnQueued(event: WsTimelineEvent.TurnQueued) {
+    /** This device's send waits in the App Server queue behind another client's turn. */
+    fun markQueuedOnServer(event: WsTimelineEvent.TurnQueued) {
         val send = sendOfTurn(event.turnId) ?: sendOfConversation(event.conversationId) ?: return
         queue.markQueuedOnServer(send)
     }
 
-    private fun onMessageDelta(event: WsTimelineEvent.MessageDelta) {
+    /** A live frame of this device's own turn: a send the server had queued has started. */
+    fun onOwnTurnFrame(event: WsTimelineEvent.MessageDelta) {
         if (event.isReplay) return
         val send = event.turnId?.let(sendOfTurn) ?: return
         queue.clearQueuedOnServer(send.conversationId)

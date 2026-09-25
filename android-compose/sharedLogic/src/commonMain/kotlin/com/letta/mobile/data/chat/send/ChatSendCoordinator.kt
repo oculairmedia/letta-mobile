@@ -859,7 +859,6 @@ class ChatSendCoordinator(
             null
         }
         if (bridgeEventDeduplicator.isDuplicate(event, fallbackConversationId)) return
-        serverQueueMarks.observe(event)
         when (event) {
             is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
             is WsTimelineEvent.MessageDelta -> handleMessageDelta(event)
@@ -931,8 +930,8 @@ class ChatSendCoordinator(
                 }
                 failActiveTurnForDisconnect(event)
             }
-            is WsTimelineEvent.GoalsUpdated, is WsTimelineEvent.TurnQueued -> Unit
-            is WsTimelineEvent.AgentUpdated -> Unit
+            is WsTimelineEvent.GoalsUpdated, is WsTimelineEvent.AgentUpdated -> Unit
+            is WsTimelineEvent.TurnQueued -> serverQueueMarks.markQueuedOnServer(event)
             is WsTimelineEvent.UserActionOutcome ->
                 runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
         }
@@ -1000,6 +999,7 @@ class ChatSendCoordinator(
 
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
+        serverQueueMarks.onOwnTurnFrame(event)
         val otid = event.message.otid
         val boundState = if (otid != null && !event.isReplay) {
             bindInboundTurnByOtid(
@@ -1699,14 +1699,15 @@ class ChatSendCoordinator(
      */
     private suspend fun finishTurnDone(owner: ConversationTurnState, event: WsTimelineEvent.TurnDone) {
         val send = owner.inFlightSend
-        if (send != null && isOtherClientBusyRejection(event.status, owner.bufferedErrorMessage, owner.deliveredAssistantContent)) {
+        val bounced = otherClientBounce(send, event.status, owner.bufferedErrorMessage, owner.deliveredAssistantContent)
+        if (bounced != null) {
             owner.otid = null
             owner.reachedTerminal = true
             clearActiveTurnState(owner, reason = "otherClientBusy")
-            timelineRepository.clearExternalTransportActive(send.conversationId.value)
-            if (ownsForegroundUi(send.conversationId.value)) ui.onTurnVisuallyComplete()
-            queueDriver.holdForOtherClientLocked(send)
-            ui.onSendQueued(send.conversationId.value)
+            timelineRepository.clearExternalTransportActive(bounced.conversationId.value)
+            if (ownsForegroundUi(bounced.conversationId.value)) ui.onTurnVisuallyComplete()
+            queueDriver.holdForOtherClientLocked(bounced)
+            ui.onSendQueued(bounced.conversationId.value)
             return
         }
         finishActiveTurn(
