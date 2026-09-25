@@ -323,11 +323,15 @@ internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boole
  * wait. A `stream_delta` is not start evidence: while this input is pending or
  * queued it may belong to the turn ahead (review of PR #1661). Servers that
  * answer `queued` (0.32+) also send `update_queue.removed`.
+ *
+ * letta-mobile-1n5py.1 (qygvv.9 race 2): a terminal that beats this input's ack first waits for it.
  */
-internal fun observeQueueProgress(
+internal suspend fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
+    ownership: RunOwnership,
 ): QueueRemovalDisposition? {
+    lease.queuedInput.acknowledgement.awaitBefore(received, ownership)
     val removal = (received.frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
     if (removal == QueueRemovalDisposition.Dequeued && lease.queuedInput.markStarted()) {
         leaveQueued(lease, "update_queue")

@@ -1045,11 +1045,9 @@ class AppServerTurnEngine(
         // letta-mobile-qygvv.8: a run bound to another client_message_id never reaches this lease.
         val ownership = context.lease.slot.bindRun(received, context.lease.token)
         if (ownership == RunOwnership.Foreign) return
-        // letta-mobile-1n5py.1: a terminal that beats this input's ack waits for it (qygvv.9 race 2).
-        context.lease.queuedInput.acknowledgement.awaitBefore(received, ownership)
         context.idleWatchdog.markFrame()
         queueHygiene.observeTurnFrame(received.frame)
-        val queueRemoval = observeQueueProgress(received, context.lease)
+        val queueRemoval = observeQueueProgress(received, context.lease, ownership)
         // Review of PR #1661: a queued lease must not adopt the turn ahead of it. The gate runs
         // first so it records the run ids seen while queued even for frames held below.
         if (context.queuedFrames.skip(received, context.lease.current?.runId, ownership)) return

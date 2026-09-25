@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.BridgeTurnStatus
+import com.letta.mobile.data.transport.WsTimelineEvent
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
@@ -79,5 +80,35 @@ internal class OtherClientHold(
     private companion object {
         const val INITIAL_RETRY_MS = 2_000L
         const val MAX_RETRY_MS = 30_000L
+    }
+}
+
+/**
+ * letta-mobile-1n5py.1: keeps the "queued on server" mark of a sent message. The App Server parks
+ * this device's input behind another client's turn ([WsTimelineEvent.TurnQueued]); the first live
+ * frame of this device's own turn means it started. Its terminal clears the mark with the turn state.
+ */
+internal class ServerQueueMarks(
+    private val queue: ChatSendQueue,
+    private val sendOfTurn: (String) -> QueuedChatSend?,
+    private val sendOfConversation: (String) -> QueuedChatSend?,
+) {
+    fun observe(event: WsTimelineEvent) {
+        when (event) {
+            is WsTimelineEvent.TurnQueued -> onTurnQueued(event)
+            is WsTimelineEvent.MessageDelta -> onMessageDelta(event)
+            else -> Unit
+        }
+    }
+
+    private fun onTurnQueued(event: WsTimelineEvent.TurnQueued) {
+        val send = sendOfTurn(event.turnId) ?: sendOfConversation(event.conversationId) ?: return
+        queue.markQueuedOnServer(send)
+    }
+
+    private fun onMessageDelta(event: WsTimelineEvent.MessageDelta) {
+        if (event.isReplay) return
+        val send = event.turnId?.let(sendOfTurn) ?: return
+        queue.clearQueuedOnServer(send.conversationId)
     }
 }

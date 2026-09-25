@@ -80,7 +80,8 @@ internal class InputAcknowledgementLatch {
      * turn's own terminal still ends it (the behaviour before acknowledgement existed).
      */
     suspend fun awaitBefore(received: AppServerReceivedFrame, ownership: RunOwnership) {
-        if (isOpen || ownership == RunOwnership.Own || !received.canEndTurn()) return
+        if (isOpen || ownership == RunOwnership.Own) return
+        if (!received.canEndTurn()) return
         withTimeoutOrNull(PRE_ACK_TERMINAL_WAIT_MS.milliseconds) { resolved.await() } ?: release()
     }
 

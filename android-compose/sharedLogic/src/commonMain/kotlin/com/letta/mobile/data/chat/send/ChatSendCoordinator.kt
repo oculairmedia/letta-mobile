@@ -114,6 +114,12 @@ class ChatSendCoordinator(
         CoordinatorQueueTurns(turnStateMutex, wsChatBridge) { dispatchPendingSend(it, clearComposer = false) },
     )
 
+    private val serverQueueMarks = ServerQueueMarks(
+        queue = queuedSends,
+        sendOfTurn = { turnId -> snapshotStates().firstOrNull { it.turnId == turnId }?.inFlightSend },
+        sendOfConversation = { conversationId -> peekState(conversationId)?.inFlightSend },
+    )
+
     /** letta-mobile-1n5py: the send queue a chat screen shows and controls. */
     val sendQueue: ChatSendQueueControls = ChatSendQueueControls(scope, queueDriver, queuedSends.state)
     private val bridgeEventDeduplicator = BridgeEventDeduplicator()
@@ -853,13 +859,10 @@ class ChatSendCoordinator(
             null
         }
         if (bridgeEventDeduplicator.isDuplicate(event, fallbackConversationId)) return
+        serverQueueMarks.observe(event)
         when (event) {
             is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
-            is WsTimelineEvent.MessageDelta -> {
-                handleMessageDelta(event)
-                if (!event.isReplay) noteOwnTurnFrame(event.turnId)
-            }
-            is WsTimelineEvent.TurnQueued -> handleTurnQueued(event)
+            is WsTimelineEvent.MessageDelta -> handleMessageDelta(event)
             is WsTimelineEvent.StopReason -> {
                 val state = liveTailStateOrForward(event, TurnTail(event.turnId, event.runId)) ?: return
                 val effectiveConversationId = state.localConversationId ?: state.conversationId
@@ -928,7 +931,7 @@ class ChatSendCoordinator(
                 }
                 failActiveTurnForDisconnect(event)
             }
-            is WsTimelineEvent.GoalsUpdated -> Unit
+            is WsTimelineEvent.GoalsUpdated, is WsTimelineEvent.TurnQueued -> Unit
             is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome ->
                 runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
@@ -1071,20 +1074,7 @@ class ChatSendCoordinator(
         val stale = owner == null ||
             isRetiredTurn(owner, event.turnId) ||
             !owner.identity.acceptsTerminal(event.turnId)
-        // letta-mobile-1n5py.1: a terminal that carries no send of this device may end the other
-        // client's turn a held queue waits for. Released only after this terminal is handled, so a
-        // retried send is never finished by it.
-        val carriedOwnSend = !stale && owner?.inFlightSend != null
-        finishTurnDoneFrame(event, owner, stale)
-        if (!carriedOwnSend) queueDriver.onForeignTerminalLocked()
-    }
-
-    private suspend fun finishTurnDoneFrame(
-        event: WsTimelineEvent.TurnDone,
-        owner: ConversationTurnState?,
-        stale: Boolean,
-    ) {
-        if (owner == null || stale) {
+        if (stale) {
             if (owner == null) reportUnmatchedFrame(event, event.turnId, event.runId)
             if (event.status is BridgeTurnStatus.Failed || event.status is BridgeTurnStatus.Cancelled) {
                 val conversationId = (owner ?: fallbackState())?.conversationId
@@ -1109,18 +1099,12 @@ class ChatSendCoordinator(
                 "activeRunId" to (owner?.runId ?: ""),
                 "status" to event.status,
             )
+            // letta-mobile-1n5py.1: a terminal of no send of this device may end the other
+            // client's turn a held queue waits for.
+            queueDriver.onForeignTerminalLocked()
             return
         }
-        finishActiveTurn(
-            state = owner,
-            status = event.status,
-            runId = event.runId,
-            turnId = event.turnId,
-            lossy = event.lossy,
-            dropCount = event.dropCount,
-            reason = "turnDone",
-            recordEvent = event,
-        )
+        finishTurnDone(owner, event)
     }
 
     private suspend fun handleErrorFrame(event: WsTimelineEvent.Error) {
@@ -1610,7 +1594,6 @@ class ChatSendCoordinator(
     ) {
         val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
             ?: defaultShimConversationId(agentId)
-        if (waitForOtherClient(state, status, conversationId)) return
         val completion = MainReplyCompletionPolicy.classify(
             deliveredAssistantContent = state.deliveredAssistantContent,
             stopReason = state.stopReason,
@@ -1706,49 +1689,37 @@ class ChatSendCoordinator(
     }
 
     /**
-     * letta-mobile-1n5py.1: another client (a second device) already runs this conversation, so the
-     * wrapper bounced this send before it started. Instead of failing, the send waits at the head of
-     * the queue and goes again once that turn ends. Its otid is not settled, so the retry reuses it
-     * and the row the user already sees. Returns false for any other terminal.
+     * The owned terminal of [owner]'s turn.
+     *
+     * letta-mobile-1n5py.1: when another client (a second device) already runs this conversation,
+     * the wrapper bounces this device's send before it starts. Instead of failing, the send waits
+     * at the head of the queue and goes again once that turn ends. Its otid is not settled, so the
+     * retry reuses it and the row the user already sees. A terminal that carried no send of this
+     * device may be that other turn's end, so it releases held queues, after it is handled.
      */
-    private suspend fun waitForOtherClient(
-        state: ConversationTurnState,
-        status: BridgeTurnStatus,
-        conversationId: String,
-    ): Boolean {
-        val send = state.inFlightSend ?: return false
-        if (!isOtherClientBusyRejection(status, state.bufferedErrorMessage, state.deliveredAssistantContent)) return false
-        state.otid = null
-        state.reachedTerminal = true
-        clearActiveTurnState(state, reason = "otherClientBusy")
-        timelineRepository.clearExternalTransportActive(conversationId)
-        if (ownsForegroundUi(conversationId)) ui.onTurnVisuallyComplete()
-        queueDriver.holdForOtherClientLocked(send)
-        ui.onSendQueued(send.conversationId.value)
-        Telemetry.event(
-            "AdminChatVM", "ws.send.heldForOtherClient",
-            "conversationId" to send.conversationId.value,
-            "otid" to send.id.value,
+    private suspend fun finishTurnDone(owner: ConversationTurnState, event: WsTimelineEvent.TurnDone) {
+        val send = owner.inFlightSend
+        if (send != null && isOtherClientBusyRejection(event.status, owner.bufferedErrorMessage, owner.deliveredAssistantContent)) {
+            owner.otid = null
+            owner.reachedTerminal = true
+            clearActiveTurnState(owner, reason = "otherClientBusy")
+            timelineRepository.clearExternalTransportActive(send.conversationId.value)
+            if (ownsForegroundUi(send.conversationId.value)) ui.onTurnVisuallyComplete()
+            queueDriver.holdForOtherClientLocked(send)
+            ui.onSendQueued(send.conversationId.value)
+            return
+        }
+        finishActiveTurn(
+            state = owner,
+            status = event.status,
+            runId = event.runId,
+            turnId = event.turnId,
+            lossy = event.lossy,
+            dropCount = event.dropCount,
+            reason = "turnDone",
+            recordEvent = event,
         )
-        return true
-    }
-
-    /** letta-mobile-1n5py.1: this device's send [WsTimelineEvent.TurnQueued] waits on the server. */
-    private fun handleTurnQueued(event: WsTimelineEvent.TurnQueued) {
-        val state = snapshotStates().firstOrNull { it.turnId == event.turnId } ?: peekState(event.conversationId)
-        val send = state?.inFlightSend ?: return
-        queuedSends.markQueuedOnServer(send)
-        Telemetry.event(
-            "AdminChatVM", "ws.send.queuedOnServer",
-            "conversationId" to send.conversationId.value,
-            "otid" to send.id.value,
-        )
-    }
-
-    /** A frame of this device's own turn: a send the server had queued has started. */
-    private fun noteOwnTurnFrame(turnId: String?) {
-        val key = turnId?.takeIf { it.isNotBlank() } ?: return
-        snapshotStates().firstOrNull { it.turnId == key }?.inFlightSend?.let { queuedSends.clearQueuedOnServer(it.conversationId) }
+        if (send == null) queueDriver.onForeignTerminalLocked()
     }
 
     /**
