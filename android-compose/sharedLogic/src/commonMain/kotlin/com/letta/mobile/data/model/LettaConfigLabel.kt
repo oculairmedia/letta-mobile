@@ -14,8 +14,12 @@ private fun String.toLocalRuntimeLabel(): String = when (localRuntimeScheme()) {
     else -> "Local LettaCode"
 }
 
+private const val IROH_SCHEME = "iroh://"
+private const val IROH_ID_PREVIEW_CHARS = 8
+
 private fun String.toSelfHostedBackendLabel(): String {
     val trimmed = trim()
+    if (trimmed.startsWith(IROH_SCHEME, ignoreCase = true)) return trimmed.toIrohBackendLabel()
     val parsedLabel = parsedHostLabel(trimmed)
         ?: parsedHostLabel("https://$trimmed")
     val fallbackLabel = trimmed
@@ -47,3 +51,21 @@ private fun parsedHostLabel(value: String): String? {
 
 private fun String.localRuntimeScheme(): String =
     trim().substringBefore("://", missingDelimiterValue = trim()).lowercase()
+
+/**
+ * An Iroh address is a node id plus dial hints, or a whole ticket: hundreds of opaque characters
+ * that no one reads on a conversation page. Label it by its first dial host when it has one,
+ * otherwise by a short preview of the node id or ticket.
+ */
+private fun String.toIrohBackendLabel(): String {
+    val body = substring(IROH_SCHEME.length).trim()
+    val firstHost = body.substringAfter('@', missingDelimiterValue = "")
+        .substringBefore(',')
+        .substringBefore('/')
+        .trim()
+    if (firstHost.isNotEmpty()) return "Iroh \u00b7 $firstHost"
+    val id = body.substringBefore('/').substringBefore('?')
+    if (id.isBlank()) return "Iroh"
+    val preview = if (id.length > IROH_ID_PREVIEW_CHARS) id.take(IROH_ID_PREVIEW_CHARS) + "\u2026" else id
+    return "Iroh \u00b7 $preview"
+}
