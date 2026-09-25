@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
+import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeAgentRepository
@@ -20,6 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -359,6 +361,83 @@ class ConversationRepositoryTest {
 
         assertTrue(result.first().archived == true)
     }
+
+    // The all-conversations screen archives rows whose agent list was never opened; the write must
+    // still reach the server, or the row only looks archived until the next refresh.
+    @Test
+    fun `setConversationArchived reaches the server when the agent list is not cached`() = runTest {
+        fakeApi.conversations.add(TestData.conversation(id = "1", agentId = "a1", summary = "Old").copy(archived = false))
+
+        repository.setConversationArchived("1", "a1", true)
+
+        assertTrue(fakeApi.calls.any { it.startsWith("updateConversation") })
+    }
+
+    // letta-mobile-xj85j: a conversation another device creates lands in a loaded agent list.
+    @Test
+    fun `conversation_updated push upserts the conversation into a loaded agent list`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, path, _ ->
+                assertEquals("conversation.get", method)
+                assertEquals("/v1/conversations/from-phone", path)
+                AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req",
+                    success = true,
+                    result = Json.parseToJsonElement("""{"id":"from-phone","agent_id":"a1","summary":"From phone"}"""),
+                )
+            }
+        }
+        database.conversationDao().upsert(
+            ConversationEntity.fromConversation(TestData.conversation(id = "1", agentId = "a1"), cachedAtEpochMs = 10L),
+        )
+        val pushed = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = backgroundScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(conversationPush("from-phone", agentId = "a1"))
+
+        val listed = pushed.getConversations("a1").first { rows -> rows.any { it.id.value == "from-phone" } }
+        assertEquals(setOf("1", "from-phone"), listed.map { it.id.value }.toSet())
+    }
+
+    @Test
+    fun `conversation_updated push for an agent never loaded here fetches nothing`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ -> fail("unexpected $method"); error("unreachable") }
+        }
+        ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = backgroundScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(conversationPush("elsewhere", agentId = "a-unloaded"))
+        runCurrent()
+
+        assertTrue(transport.adminRpcCalls.isEmpty())
+    }
+
+    private fun conversationPush(conversationId: String, agentId: String?) = ServerFrame.ConversationUpdated(
+        id = "conversation-updated-$conversationId",
+        ts = "2026-09-25T21:00:00Z",
+        conversationId = conversationId,
+        agentId = agentId,
+        reason = "created",
+    )
 
     @Test
     fun `cancelConversation delegates to api`() = runTest {

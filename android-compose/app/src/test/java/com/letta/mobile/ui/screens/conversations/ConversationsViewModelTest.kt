@@ -486,6 +486,22 @@ class ConversationsViewModelTest {
         assertEquals(true, updated.conversation.archived)
     }
 
+    // An archived row must not come back when the shared list emits again (a page load, a push):
+    // the archive lands in the list the screen renders from, not only in this screen's state.
+    @Test
+    fun `archived row stays archived when the shared list emits again`() = runTest {
+        val conversation = TestData.conversation(id = "1", agentId = "a1").copy(archived = false)
+        fakeAllRepo.setConversations(listOf(conversation))
+        viewModel.loadConversations()
+        val display = viewModel.uiState.value.conversations.first()
+
+        viewModel.setConversationArchived(display, true)
+        fakeAllRepo.handleOptimisticUpdate(TestData.conversation(id = "2", agentId = "a1"))
+
+        val row = viewModel.uiState.value.conversations.first { it.conversation.id == ConversationId("1") }
+        assertEquals(true, row.conversation.archived)
+    }
+
     @Test
     fun `recompileConversation stores preview`() = runTest {
         val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
@@ -572,8 +588,14 @@ class ConversationsViewModelTest {
         override fun handleOptimisticDelete(conversationId: ConversationId) {
             _conversations.value = _conversations.value.filter { it.id != conversationId }
         }
+        // Replaces in place like the real repository, adding only an unknown conversation.
         override fun handleOptimisticUpdate(conversation: Conversation) {
-            _conversations.value = _conversations.value + conversation
+            val current = _conversations.value
+            _conversations.value = if (current.any { it.id == conversation.id }) {
+                current.map { if (it.id == conversation.id) conversation else it }
+            } else {
+                current + conversation
+            }
         }
     }
 

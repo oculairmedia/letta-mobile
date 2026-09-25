@@ -406,7 +406,12 @@ class ConversationsViewModel @Inject constructor(
         // letta-mobile-pus2w: the row leaves (or returns) in the same frame as the gesture; the
         // network write follows and only a failure moves it back. Waiting on the write left the
         // dismissed row in the list for a round-trip, then removed it in a second, visible step.
+        //
+        // The shared list the screen renders from takes the change too: holding it only in this
+        // screen's state let the next list emission (a page load, a refresh) republish the stale
+        // copy, bringing an archived row back until the server's answer removed it again.
         applyArchived(display.conversation.id, archived)
+        allConversationsRepository.handleOptimisticUpdate(display.conversation.copy(archived = archived))
         viewModelScope.launch {
             try {
                 conversationRepository.setConversationArchived(display.conversation.id, display.conversation.agentId, archived)
@@ -415,6 +420,7 @@ class ConversationsViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Archive toggle failed", e)
                 applyArchived(display.conversation.id, !archived)
+                allConversationsRepository.handleOptimisticUpdate(display.conversation)
             }
         }
     }

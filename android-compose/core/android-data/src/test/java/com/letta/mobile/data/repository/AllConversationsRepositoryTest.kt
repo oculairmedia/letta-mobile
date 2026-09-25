@@ -202,6 +202,52 @@ class AllConversationsRepositoryTest {
         assertEquals("conversation.list", transport.adminRpcCalls.single().method)
     }
 
+    // The list screen's Archived tab filters locally, so the fetch must ask for archived rows too;
+    // the server's default (active only) emptied that tab on every refresh. A push then refetches
+    // only the conversation it names, so a scrolled list is not reset to its first page.
+    @Test
+    fun `iroh list asks for archived rows and a push refetches only the named conversation`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, body ->
+                when (method) {
+                    "conversation.list" -> {
+                        assertTrue("fetch must include archived rows: $body", body.orEmpty().contains("\"archive_status\":\"all\""))
+                        AppServerInboundFrame.AdminRpcResponse(
+                            requestId = "req",
+                            success = true,
+                            result = Json.parseToJsonElement(Json.encodeToString(listOf(TestData.conversation(id = "1")))),
+                        )
+                    }
+                    "conversation.get" -> AppServerInboundFrame.AdminRpcResponse(
+                        requestId = "req",
+                        success = true,
+                        result = Json.parseToJsonElement("""{"id":"1","agent_id":"agent-1","summary":"Archived elsewhere","archived":true}"""),
+                    )
+                    else -> error("unexpected $method")
+                }
+            }
+        }
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
+        )
+        val pushed = AllConversationsRepository(
+            conversationApi = armedConversationApi(),
+            conversationDao = null,
+            repositoryScope = backgroundScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+        runCurrent()
+        pushed.refresh()
+
+        transport.events.emit(conversationPush("1"))
+        runCurrent()
+
+        assertEquals(true, pushed.conversations.value.single().archived)
+        assertEquals(listOf("conversation.list", "conversation.get"), transport.adminRpcCalls.map { it.method })
+    }
+
     @Test
     fun `refresh clears and reloads`() = runTest {
         fakeApi.conversations.addAll(listOf(
