@@ -22,6 +22,14 @@ data class MemoryParityControllerState(
     val errorMessage: String? = null,
 )
 
+/** The memory overview load seam the page controller composes (tests fake it). */
+interface MemoryParitySource : AutoCloseable {
+    val state: StateFlow<MemoryParityControllerState>
+    fun start()
+    fun reload()
+    fun selectAgent(agentId: String)
+}
+
 @Immutable
 data class MemoryParityAgentOption(
     val id: String,
@@ -34,26 +42,26 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
     private val sectionReader: MemoryParitySectionReader = MemoryParitySectionReader(),
     private val errorMessageMapper: (Throwable) -> String = ::safeMemoryErrorMessage,
     private val maxAgeMs: Long = DEFAULT_MEMORY_REFRESH_MAX_AGE_MS,
-) : AutoCloseable {
+) : MemoryParitySource {
     private val stateFlow = MutableStateFlow(MemoryParityControllerState())
-    val state: StateFlow<MemoryParityControllerState> = stateFlow
+    override val state: StateFlow<MemoryParityControllerState> = stateFlow
     private var loadJob: Job? = null
     private var selectedAgentId: String? = null
     private var selectedAgentDetail: Agent? = null
     private var selectedAgentGraphId: Long? = null
 
-    fun start() {
+    override fun start() {
         if (stateFlow.value.memory.sections.isEmpty()) {
             reload()
         }
     }
 
-    fun reload() {
+    override fun reload() {
         loadJob?.cancel()
         loadJob = scope.launch { load(selectedAgentId) }
     }
 
-    fun selectAgent(agentId: String) {
+    override fun selectAgent(agentId: String) {
         if (selectedAgentId == agentId) return
         selectedAgentId = agentId
         reload()
