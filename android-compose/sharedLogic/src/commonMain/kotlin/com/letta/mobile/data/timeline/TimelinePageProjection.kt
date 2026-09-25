@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
+import com.letta.mobile.data.chat.projection.hasNoRenderableContent
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
@@ -121,15 +122,19 @@ private fun TimelinePageProjectionInput.claimRun(
  * Skill instruction envelopes are hidden model context, not human turn boundaries. Returns are
  * folded into their canonical owners before projection; do not infer ownership for arbitrary
  * hidden rows (including orphan returns). A run's own stop_reason and usage frames close a step, not
- * the turn.
+ * the turn, and (letta-mobile-jqiu3) neither does a whitespace-only text segment between its tool
+ * calls, which the settled projection drops.
  */
 private fun TimelinePageProjectionInput.spansVisibleGap(sources: List<IndexedRenderedRecord>): Boolean =
     sources.map { it.index }.sorted().zipWithNext().any { (left, right) ->
-        (left + 1 until right).any { index -> !records[index].isRunInterior() }
+        (left + 1 until right).any { index -> !isRunInterior(records[index]) }
     }
 
-private fun TimelineProjectionRecord.isRunInterior(): Boolean =
-    event?.isSyntheticSkillEnvelope() == true || isRunMetadata()
+private fun TimelinePageProjectionInput.isRunInterior(record: TimelineProjectionRecord): Boolean =
+    record.event?.isSyntheticSkillEnvelope() == true || record.isRunMetadata() || isContentlessSegment(record.event)
+
+private fun TimelinePageProjectionInput.isContentlessSegment(event: TimelineEvent.Confirmed?): Boolean =
+    event != null && timelineEventToUiMessage(event, context.ownAgentId)?.hasNoRenderableContent() == true
 
 private fun IndexedRenderedRecord.residentEvent() = TimelineResidentEvent(
     identity = record.key.identity,

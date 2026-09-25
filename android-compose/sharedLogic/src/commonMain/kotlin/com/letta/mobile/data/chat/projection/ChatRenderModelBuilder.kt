@@ -421,9 +421,11 @@ fun filterMessagesForMode(
     // model context, not user-visible conversation. Filter them from every
     // display mode so they never appear as user bubbles. The canonical skill
     // tool call (assistant TOOL_CALL) renders through the normal tool card.
+    // letta-mobile-jqiu3: whitespace-only assistant segments between tool calls draw
+    // nothing, so they must not become render rows that still claim padding.
     val afterFilter = messages.filterNot { msg ->
         SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role = msg.role, content = msg.content)
-    }
+    }.withoutContentlessSegments()
     return when (mode) {
         // letta-mobile-tz1sp (2026-08-05 product decision): Simple mode matches
         // Aether's standard streaming view. Mid-turn tool/reasoning frames must

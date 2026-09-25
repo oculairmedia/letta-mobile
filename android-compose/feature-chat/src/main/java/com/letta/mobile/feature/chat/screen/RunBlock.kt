@@ -13,7 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
@@ -135,7 +134,8 @@ internal fun RunBlock(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .offset { IntOffset(0, bodyLift.roundToPx()) },
+                // letta-mobile-jqiu3: lift via layout so the lifted distance leaves no band below.
+                .pullUp { -bodyLift },
         ) {
             // Timeline gutter â€” drawn behind the rows so the vertical rule
             // passes through every dot. Sized via the same Column so its

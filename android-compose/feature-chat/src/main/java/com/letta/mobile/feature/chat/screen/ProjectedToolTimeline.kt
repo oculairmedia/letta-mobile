@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.ui.theme.chatDimens
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -94,7 +95,10 @@ internal fun ProjectedToolTimelineGroupStepRow(
         approvalRequests = step.approvalRequests,
         activeApprovalRequestId = activeApprovalRequestId,
         onApprovalDecision = onApprovalDecision,
-        modifier = Modifier.fillMaxWidth().then(modifier),
+        // letta-mobile-jqiu3: a tool group is a run step like a message row, so it takes the
+        // same step spacing RenderChatMessage gives every other step instead of abutting the
+        // step above it.
+        modifier = Modifier.fillMaxWidth().padding(top = MaterialTheme.chatDimens.groupedMessageSpacing).then(modifier),
         animateRows = animateRows,
         onAttachmentImageTap = onAttachmentImageTap,
         autoExpandDelayMs = autoExpandDelayMs,

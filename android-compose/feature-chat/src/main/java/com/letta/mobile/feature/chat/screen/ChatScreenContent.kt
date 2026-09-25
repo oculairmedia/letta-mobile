@@ -177,19 +177,20 @@ private fun ChatContentMessageArea(
     appearance: ChatContentAppearance,
     a2uiStackHeightDp: Dp,
 ) {
+    val listBottomPadding = chatListBottomPadding(
+        composerPadding = appearance.bottomPadding,
+        a2uiShown = state.a2uiSurfaces.isNotEmpty(),
+        a2uiStackHeight = a2uiStackHeightDp,
+    )
     LocalChatPagingPresentation.current?.let { paging ->
         key(paging) {
-            PagedChatMessageList(paging, state, callbacks, appearance.copy(
-                bottomPadding = appearance.bottomPadding + a2uiStackHeightDp,
-            ))
+            PagedChatMessageList(paging, state, callbacks, appearance.copy(bottomPadding = listBottomPadding))
         }
         return
     }
     val hasMessagesOrStreaming = state.messages.isNotEmpty() || state.isStreaming
     if (!hasMessagesOrStreaming) return
 
-    val listBottomPadding = appearance.bottomPadding +
-        if (state.a2uiSurfaces.isNotEmpty()) a2uiStackHeightDp else 0.dp
     ChatMessageList(
         state = state,
         renderItems = renderItems,
@@ -458,3 +459,11 @@ internal fun A2uiDebugOverlay(
         }
     }
 }
+
+/**
+ * letta-mobile-jqiu3: the list's bottom reserve. The A2UI stack's last measured height outlives the
+ * stack itself, so it is reserved only while surfaces are shown; otherwise it would stay behind as
+ * an empty band above the composer.
+ */
+internal fun chatListBottomPadding(composerPadding: Dp, a2uiShown: Boolean, a2uiStackHeight: Dp): Dp =
+    composerPadding + if (a2uiShown) a2uiStackHeight else 0.dp
