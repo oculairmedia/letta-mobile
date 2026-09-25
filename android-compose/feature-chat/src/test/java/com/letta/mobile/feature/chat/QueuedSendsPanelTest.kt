@@ -6,7 +6,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedChatSend
+import com.letta.mobile.data.chat.send.QueuedSendId
+import com.letta.mobile.ui.chat.QueuedSendActions
 import com.letta.mobile.ui.chat.QueuedSendsPanel
 import com.letta.mobile.ui.chat.QueuedSendsPanelTestTags
 import com.letta.mobile.ui.theme.LettaTheme
@@ -36,9 +39,11 @@ class QueuedSendsPanelTest {
             LettaTheme {
                 QueuedSendsPanel(
                     queue = queue,
-                    onCancel = { cancelled += it },
-                    onSendNow = { sentNow += it },
-                    onResume = { resumed += 1 },
+                    actions = QueuedSendActions(
+                        onCancel = { cancelled += it.value },
+                        onSendNow = { sentNow += it.value },
+                        onResume = { resumed += 1 },
+                    ),
                 )
             }
         }
@@ -85,5 +90,6 @@ class QueuedSendsPanelTest {
         assertTrue(cancelled.isEmpty())
     }
 
-    private fun send(otid: String, text: String) = QueuedChatSend(otid = otid, conversationId = "conv-1", text = text)
+    private fun send(id: String, text: String) =
+        QueuedChatSend(id = QueuedSendId(id), conversationId = QueueConversationId("conv-1"), text = text)
 }

@@ -15,21 +15,31 @@ internal interface QueuedSendTurns {
     suspend fun <T> serialized(block: suspend () -> T): T
 
     /** The transport still owns a turn for [conversationId]. */
-    fun hasActiveTurn(conversationId: String): Boolean
+    fun hasActiveTurn(conversationId: QueueConversationId): Boolean
 
     /** Asks the transport to abort [conversationId]'s turn; false when it had none to abort. */
-    fun abortTurn(conversationId: String): Boolean
+    fun abortTurn(conversationId: QueueConversationId): Boolean
 
     /** Dispatches [item] as a new turn (optimistic row included); false when not accepted. Locked. */
     suspend fun dispatch(item: QueuedChatSend): Boolean
+}
+
+/** The queue transitions [QueuedSendDriver] reports. */
+private enum class QueueEvent(val wireName: String) {
+    Paused("queue.paused"),
+    Cancelled("queue.cancelled"),
+    Resumed("queue.resumed"),
+    SendNow("queue.sendNow"),
+    Dispatched("queue.dispatched"),
+    DrainDeferred("queue.drainDeferred"),
 }
 
 /**
  * letta-mobile-1n5py: runs the [ChatSendQueue] against the live transport.
  *
  * A message sent while its conversation is busy is queued here instead of failing. The head runs
- * once the running turn is over: after its terminal ([onTurnFinished]), on [resume], or right after
- * the current turn is aborted to push an item through ([sendNow]). A Stop pauses the queue
+ * once the running turn is over: after its terminal ([onTurnFinishedLocked]), on [resume], or right
+ * after the current turn is aborted to push an item through ([sendNow]). A Stop pauses the queue
  * ([onStopped]), matching the App Server, which parks its own queue on `abort_message`.
  *
  * The transport retires a turn a moment after its terminal frame is published, so a drain that
@@ -40,11 +50,13 @@ internal class QueuedSendDriver(
     private val scope: CoroutineScope,
     private val queue: ChatSendQueue,
     private val turns: QueuedSendTurns,
-    private val retryDelayMs: Long = DRAIN_RETRY_DELAY_MS,
-    private val retryAttempts: Int = DRAIN_RETRY_ATTEMPTS,
+    private val retry: DrainRetry = DrainRetry(),
 ) {
+    /** How long a drain keeps retrying a conversation whose turn has not retired yet. */
+    data class DrainRetry(val delayMs: Long = DRAIN_RETRY_DELAY_MS, val attempts: Int = DRAIN_RETRY_ATTEMPTS)
+
     private val drainLock = SynchronizedObject()
-    private val drains = HashMap<String, Job>()
+    private val drains = HashMap<QueueConversationId, Job>()
 
     /** Queues [item] (caller holds the turn lock); returns its 1-based position. */
     suspend fun enqueueLocked(item: QueuedChatSend): Int {
@@ -56,53 +68,55 @@ internal class QueuedSendDriver(
     }
 
     /** The conversation's turn reached its terminal (caller holds the turn lock). */
-    suspend fun onTurnFinishedLocked(conversationId: String) {
+    suspend fun onTurnFinishedLocked(conversationId: QueueConversationId) {
         if (queue.hasItems(conversationId)) drainLocked(conversationId)
     }
 
     /** A user Stop: hold what is queued. */
-    fun onStopped(conversationId: String) {
-        if (queue.pause(conversationId)) telemetry("queue.paused", conversationId)
+    fun onStopped(conversationId: QueueConversationId) {
+        if (queue.pause(conversationId)) report(QueueEvent.Paused, conversationId)
     }
 
     /** A terminal disconnect: hold every queue rather than drop what the user typed. */
     fun onDisconnected() {
-        queue.pauseAll().forEach { telemetry("queue.paused", it, "reason" to "disconnect") }
+        queue.pauseAll().forEach { report(QueueEvent.Paused, it) }
     }
 
-    suspend fun cancel(otid: String): Boolean = turns.serialized {
-        val removed = queue.remove(otid) ?: return@serialized false
-        telemetry("queue.cancelled", removed.conversationId, "otid" to otid)
+    suspend fun cancel(id: QueuedSendId): Boolean = turns.serialized {
+        val removed = queue.remove(id) ?: return@serialized false
+        report(QueueEvent.Cancelled, removed.conversationId, id)
         true
     }
 
-    suspend fun resume(conversationId: String) = turns.serialized {
+    suspend fun resume(conversationId: QueueConversationId) = turns.serialized {
         queue.resume(conversationId)
-        telemetry("queue.resumed", conversationId)
+        report(QueueEvent.Resumed, conversationId)
         drainLocked(conversationId)
     }
 
     /**
-     * Makes [otid] the next message to run and ends the current turn so it runs now. Items it
+     * Makes [id] the next message to run and ends the current turn so it runs now. Items it
      * jumps keep their order behind it. With no turn running it simply drains.
      */
-    suspend fun sendNow(otid: String): Boolean = turns.serialized {
-        val conversationId = queue.conversationOf(otid) ?: return@serialized false
-        queue.promote(otid)
+    suspend fun sendNow(id: QueuedSendId): Boolean = turns.serialized {
+        val conversationId = queue.conversationOf(id) ?: return@serialized false
+        queue.promote(id)
         queue.resume(conversationId)
-        val aborted = turns.hasActiveTurn(conversationId) && turns.abortTurn(conversationId)
-        telemetry("queue.sendNow", conversationId, "otid" to otid, "abortedCurrent" to aborted)
+        report(QueueEvent.SendNow, conversationId, id)
         // An aborted turn drains from its own terminal; without one, drain now.
-        if (!aborted) drainLocked(conversationId)
+        if (!abortRunningTurn(conversationId)) drainLocked(conversationId)
         true
     }
 
+    private fun abortRunningTurn(conversationId: QueueConversationId): Boolean =
+        turns.hasActiveTurn(conversationId) && turns.abortTurn(conversationId)
+
     /** Runs the head now if it can; otherwise retries briefly off the lock. */
-    private suspend fun drainLocked(conversationId: String) {
+    private suspend fun drainLocked(conversationId: QueueConversationId) {
         if (!drainOnceLocked(conversationId)) scheduleDrain(conversationId)
     }
 
-    private fun scheduleDrain(conversationId: String) {
+    private fun scheduleDrain(conversationId: QueueConversationId) {
         synchronized(drainLock) {
             if (drains[conversationId]?.isActive == true) return
             val job = scope.launch { drainWithRetry(conversationId) }
@@ -113,32 +127,32 @@ internal class QueuedSendDriver(
         }
     }
 
-    private suspend fun drainWithRetry(conversationId: String) {
-        repeat(retryAttempts) {
+    private suspend fun drainWithRetry(conversationId: QueueConversationId) {
+        repeat(retry.attempts) {
+            delay(retry.delayMs.milliseconds)
             if (turns.serialized { drainOnceLocked(conversationId) }) return
-            delay(retryDelayMs.milliseconds)
         }
-        telemetry("queue.drainDeferred", conversationId, "attempts" to retryAttempts)
+        report(QueueEvent.DrainDeferred, conversationId)
     }
 
     /** True when the drain is finished (dispatched, or nothing runnable); false to retry. */
-    private suspend fun drainOnceLocked(conversationId: String): Boolean {
+    private suspend fun drainOnceLocked(conversationId: QueueConversationId): Boolean {
         if (turns.hasActiveTurn(conversationId)) return false
         val next = queue.takeNext(conversationId) ?: return true
         if (turns.dispatch(next)) {
-            telemetry("queue.dispatched", conversationId, "otid" to next.otid)
+            report(QueueEvent.Dispatched, conversationId, next.id)
             return true
         }
         queue.putBack(next)
         return false
     }
 
-    private fun telemetry(event: String, conversationId: String, vararg attrs: Pair<String, Any?>) {
+    private fun report(event: QueueEvent, conversationId: QueueConversationId, id: QueuedSendId? = null) {
         Telemetry.event(
-            TELEMETRY_TAG, event,
-            "conversationId" to conversationId,
+            TELEMETRY_TAG, event.wireName,
+            "conversationId" to conversationId.value,
+            "otid" to id?.value,
             "depth" to queue.queueFor(conversationId).items.size,
-            *attrs,
         )
     }
 

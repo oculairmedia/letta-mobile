@@ -16,7 +16,7 @@ class ChatSendQueueTest {
 
         assertEquals(listOf(1, 2, 3, 4, 5), positions)
         assertEquals(listOf("m1", "m2", "m3", "m4", "m5"), queue.texts(CONV))
-        assertEquals(3, queue.queueFor(CONV).positionOf("otid-m3"))
+        assertEquals(3, queue.queueFor(CONV).positionOf(QueuedSendId("otid-m3")))
     }
 
     @Test
@@ -31,18 +31,18 @@ class ChatSendQueueTest {
     fun cancellingTheMiddleItemKeepsTheRestInOrder() {
         val queue = queueOf("a", "b", "c")
 
-        assertEquals("b", queue.remove("otid-b")?.text)
+        assertEquals("b", queue.remove(QueuedSendId("otid-b"))?.text)
         assertEquals(listOf("a", "c"), queue.texts(CONV))
-        assertNull(queue.remove("otid-b"), "a second cancel of the same item is a no-op")
+        assertNull(queue.remove(QueuedSendId("otid-b")), "a second cancel of the same item is a no-op")
     }
 
     @Test
     fun promoteMovesTheItemFirstAndKeepsTheJumpedItemsInOrder() {
         val queue = queueOf("a", "b", "c", "d")
 
-        assertTrue(queue.promote("otid-c"))
+        assertTrue(queue.promote(QueuedSendId("otid-c")))
         assertEquals(listOf("c", "a", "b", "d"), queue.texts(CONV))
-        assertFalse(queue.promote("otid-missing"))
+        assertFalse(queue.promote(QueuedSendId("otid-missing")))
     }
 
     @Test
@@ -72,7 +72,7 @@ class ChatSendQueueTest {
         val queue = queueOf("a")
         queue.pause(CONV)
 
-        queue.remove("otid-a")
+        queue.remove(QueuedSendId("otid-a"))
         queue.enqueue(send("b"))
 
         assertFalse(queue.isPaused(CONV))
@@ -92,24 +92,24 @@ class ChatSendQueueTest {
     @Test
     fun conversationsAreIndependent() {
         val queue = ChatSendQueue()
-        queue.enqueue(send("a", conversationId = "conv-a"))
-        queue.enqueue(send("b", conversationId = "conv-b"))
+        queue.enqueue(send("a", conversationId = QueueConversationId("conv-a")))
+        queue.enqueue(send("b", conversationId = QueueConversationId("conv-b")))
 
-        queue.pause("conv-a")
+        queue.pause(QueueConversationId("conv-a"))
 
-        assertNull(queue.takeNext("conv-a"))
-        assertEquals("b", queue.takeNext("conv-b")?.text)
-        assertEquals(listOf("conv-a"), queue.pauseAll(), "only a conversation with items has anything to hold")
+        assertNull(queue.takeNext(QueueConversationId("conv-a")))
+        assertEquals("b", queue.takeNext(QueueConversationId("conv-b"))?.text)
+        assertEquals(listOf(QueueConversationId("conv-a")), queue.pauseAll(), "only a conversation with items has anything to hold")
     }
 
     private fun queueOf(vararg texts: String) = ChatSendQueue().apply { texts.forEach { enqueue(send(it)) } }
 
-    private fun ChatSendQueue.texts(conversationId: String) = queueFor(conversationId).items.map { it.text }
+    private fun ChatSendQueue.texts(conversationId: QueueConversationId) = queueFor(conversationId).items.map { it.text }
 
     private companion object {
-        const val CONV = "conv-1"
+        val CONV = QueueConversationId("conv-1")
 
-        fun send(text: String, conversationId: String = CONV) =
-            QueuedChatSend(otid = "otid-$text", conversationId = conversationId, text = text)
+        fun send(text: String, conversationId: QueueConversationId = CONV) =
+            QueuedChatSend(id = QueuedSendId("otid-$text"), conversationId = conversationId, text = text)
     }
 }

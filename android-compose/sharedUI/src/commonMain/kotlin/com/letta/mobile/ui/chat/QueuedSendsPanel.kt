@@ -18,10 +18,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueuedChatSend
+import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** Test tags for [QueuedSendsPanel]; row tags are suffixed with the message's otid. */
+/** letta-mobile-1n5py: what the queued-sends panel can do; shared by the Android and desktop hosts. */
+data class QueuedSendActions(
+    val onCancel: (QueuedSendId) -> Unit = {},
+    val onSendNow: (QueuedSendId) -> Unit = {},
+    val onResume: () -> Unit = {},
+)
+
+/** Test tags for [QueuedSendsPanel]; row tags are suffixed with the message's id. */
 object QueuedSendsPanelTestTags {
     const val PANEL = "queued_sends_panel"
     const val ROW = "queued_send_row_"
@@ -49,9 +57,7 @@ fun queuedSendsHeader(queue: ConversationSendQueue): String {
 @Composable
 fun QueuedSendsPanel(
     queue: ConversationSendQueue,
-    onCancel: (otid: String) -> Unit,
-    onSendNow: (otid: String) -> Unit,
-    onResume: () -> Unit,
+    actions: QueuedSendActions,
     modifier: Modifier = Modifier,
 ) {
     if (queue.isEmpty) return
@@ -61,10 +67,8 @@ fun QueuedSendsPanel(
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
-            QueuedSendsHeader(queue, onResume)
-            queue.items.forEachIndexed { index, item ->
-                QueuedSendRow(item, position = index + 1, onCancel = onCancel, onSendNow = onSendNow)
-            }
+            QueuedSendsHeader(queue, actions.onResume)
+            queue.items.forEachIndexed { index, item -> QueuedSendRow(item, position = index + 1, actions) }
         }
     }
 }
@@ -90,11 +94,10 @@ private fun QueuedSendsHeader(queue: ConversationSendQueue, onResume: () -> Unit
 private fun QueuedSendRow(
     item: QueuedChatSend,
     position: Int,
-    onCancel: (String) -> Unit,
-    onSendNow: (String) -> Unit,
+    actions: QueuedSendActions,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().testTag(QueuedSendsPanelTestTags.ROW + item.otid),
+        modifier = Modifier.fillMaxWidth().testTag(QueuedSendsPanelTestTags.ROW + item.id.value),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
@@ -112,14 +115,14 @@ private fun QueuedSendRow(
             )
         }
         TextButton(
-            onClick = { onSendNow(item.otid) },
-            modifier = Modifier.testTag(QueuedSendsPanelTestTags.SEND_NOW + item.otid),
+            onClick = { actions.onSendNow(item.id) },
+            modifier = Modifier.testTag(QueuedSendsPanelTestTags.SEND_NOW + item.id.value),
         ) {
             Text("Send now")
         }
         IconButton(
-            onClick = { onCancel(item.otid) },
-            modifier = Modifier.testTag(QueuedSendsPanelTestTags.CANCEL + item.otid),
+            onClick = { actions.onCancel(item.id) },
+            modifier = Modifier.testTag(QueuedSendsPanelTestTags.CANCEL + item.id.value),
         ) {
             Icon(LettaIcons.Close, contentDescription = "Cancel queued message")
         }

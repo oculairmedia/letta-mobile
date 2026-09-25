@@ -919,22 +919,9 @@ class DesktopChatController(
         return canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(activeGateway, conversation))
     }
 
-    /** letta-mobile-1n5py: every conversation's queued sends on the canonical route, else null. */
-    fun canonicalSendQueues(): StateFlow<Map<String, com.letta.mobile.data.chat.send.ConversationSendQueue>>? =
+    /** letta-mobile-1n5py: the canonical route's send queue for the selected conversation, else null. */
+    fun canonicalSendQueue(): com.letta.mobile.data.chat.send.ChatSendQueueControls? =
         selectedCanonicalCoordinator()?.sendQueue
-
-    fun cancelQueuedSend(otid: String) {
-        selectedCanonicalCoordinator()?.cancelQueued(otid)
-    }
-
-    fun sendQueuedNow(otid: String) {
-        selectedCanonicalCoordinator()?.sendQueuedNow(otid)
-    }
-
-    fun resumeQueuedSends() {
-        val conversationId = _state.value.selectedConversationId ?: return
-        selectedCanonicalCoordinator()?.resumeQueue(conversationId)
-    }
 
     private fun launchCanonicalSend(draft: ChatComposerSendDraft) {
         val conversationId = _state.value.selectedConversationId

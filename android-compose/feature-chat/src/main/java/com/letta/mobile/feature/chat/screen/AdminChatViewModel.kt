@@ -1059,21 +1059,21 @@ internal class AdminChatViewModel @Inject constructor(
     val canQueueWhileStreaming: Boolean
         get() = composerCoordinator.canQueueWhileStreaming()
 
-    fun cancelQueuedMessage(otid: String) {
-        if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.cancelQueued(otid)
+    /** letta-mobile-1n5py: the queued-sends panel's controls; Send now and Resume start a new turn. */
+    val queuedSendActions: com.letta.mobile.ui.chat.QueuedSendActions by lazy(LazyThreadSafetyMode.NONE) {
+        com.letta.mobile.ui.chat.QueuedSendActions(
+            onCancel = { id -> if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.sendQueue.cancel(id) },
+            onSendNow = { id -> startQueuedTurn { sendNow(id) } },
+            onResume = {
+                uiState.value.sendQueue.items.firstOrNull()?.conversationId?.let { id -> startQueuedTurn { resume(id) } }
+            },
+        )
     }
 
-    fun sendQueuedMessageNow(otid: String) {
+    private fun startQueuedTurn(action: com.letta.mobile.data.chat.send.ChatSendQueueControls.() -> Unit) {
         if (replacingSendRuntime) return
         composerCoordinator.beginQueuedTurn()
-        sendPipeline.wsChatSendCoordinator.sendQueuedNow(otid)
-    }
-
-    fun resumeSendQueue() {
-        if (replacingSendRuntime) return
-        val conversationId = uiState.value.sendQueue.items.firstOrNull()?.conversationId ?: return
-        composerCoordinator.beginQueuedTurn()
-        sendPipeline.wsChatSendCoordinator.resumeQueue(conversationId)
+        sendPipeline.wsChatSendCoordinator.sendQueue.action()
     }
 
     // --- A2UI coordination delegates ---

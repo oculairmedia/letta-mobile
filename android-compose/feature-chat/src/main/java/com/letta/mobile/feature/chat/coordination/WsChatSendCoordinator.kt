@@ -1,7 +1,9 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.chat.send.ChatSendCoordinator
+import com.letta.mobile.data.chat.send.ChatSendQueueControls
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.ChatSendUiSink
 import com.letta.mobile.data.chat.send.ScopedRuntimeEvent
 import com.letta.mobile.data.model.AgentId
@@ -18,7 +20,6 @@ import com.letta.mobile.runtime.RuntimeEventDraft
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -198,15 +199,8 @@ internal class WsChatSendCoordinator(
 
     fun cancel(): Boolean = delegate.cancel()
 
-    /** letta-mobile-1n5py: every conversation's queued messages; the UI reads [ChatUiState.sendQueue]. */
-    val sendQueues: StateFlow<Map<String, ConversationSendQueue>> get() = delegate.sendQueue
-
-    /** letta-mobile-1n5py: queue controls for the visible conversation's queued messages. */
-    fun cancelQueued(otid: String): Job = delegate.cancelQueued(otid)
-
-    fun sendQueuedNow(otid: String): Job = delegate.sendQueuedNow(otid)
-
-    fun resumeQueue(conversationId: String): Job = delegate.resumeQueue(conversationId)
+    /** letta-mobile-1n5py: the send queue; the UI reads the visible one from [ChatUiState.sendQueue]. */
+    val sendQueue: ChatSendQueueControls get() = delegate.sendQueue
 
     init {
         mirrorVisibleSendQueue(scope)
@@ -218,8 +212,8 @@ internal class WsChatSendCoordinator(
             .map { (it.conversationState as? ConversationState.Ready)?.conversationId }
             .distinctUntilChanged()
         scope.launch {
-            combine(delegate.sendQueue, visibleConversation) { queues, visible ->
-                (visible ?: activeConversationId())?.let(queues::get) ?: ConversationSendQueue()
+            combine(delegate.sendQueue.state, visibleConversation) { queues, visible ->
+                (visible ?: activeConversationId())?.let { queues[QueueConversationId(it)] } ?: ConversationSendQueue()
             }
                 .distinctUntilChanged()
                 .collect { queue -> uiState.update { it.copy(sendQueue = queue) } }

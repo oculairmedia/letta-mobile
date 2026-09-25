@@ -33,7 +33,7 @@ class AppServerTurnEngineQueuedCancelTest {
         val turn = startQueuedTurn()
         turn.client.emit(frames.updateQueue(QueueUpdateFixture.of(QueueItemFixture("item-7", LOCAL_MESSAGE_ID))))
         runCurrent()
-        assertTrue(turn.engine.isQueued(AGENT, CONV), "the input waits in the server queue")
+        assertTrue(turn.engine.isQueued(TurnRuntimeKey(AGENT, CONV)), "the input waits in the server queue")
 
         turn.job.cancel()
         advanceUntilIdle()

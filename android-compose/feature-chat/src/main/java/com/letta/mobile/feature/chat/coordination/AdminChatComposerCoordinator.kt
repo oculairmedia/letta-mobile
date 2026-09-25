@@ -158,7 +158,7 @@ internal class AdminChatComposerCoordinator(
 
         val payload = composerController.payloadForSend(text) ?: return
         if (isStreaming() && canQueueWhileStreaming()) {
-            queueMessagePayload(payload.text, payload.attachments)
+            queueMessagePayload(payload)
         } else {
             sendMessagePayload(payload.text, payload.attachments)
         }
@@ -177,11 +177,8 @@ internal class AdminChatComposerCoordinator(
      * The turn ahead keeps running, so none of the new-turn bookkeeping below applies: its cancel
      * watcher, banners and send epoch belong to it until its terminal.
      */
-    private fun queueMessagePayload(
-        text: String,
-        attachments: List<MessageContentPart.Image>,
-    ) {
-        chatSendStrategySelector.send(text, attachments, chatSendContext())
+    private fun queueMessagePayload(payload: ComposerSendPayload) {
+        chatSendStrategySelector.send(payload.text, payload.attachments, chatSendContext())
     }
 
     /**

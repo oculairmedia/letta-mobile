@@ -43,8 +43,8 @@ class QueuedSendDriverTest {
         val rig = rig(busy = true)
         listOf("a", "b", "c").forEach { rig.enqueue(it) }
 
-        assertTrue(rig.driver.cancel("otid-b"))
-        assertFalse(rig.driver.cancel("otid-b"))
+        assertTrue(rig.driver.cancel(QueuedSendId("otid-b")))
+        assertFalse(rig.driver.cancel(QueuedSendId("otid-b")))
         repeat(3) { rig.finishTurn() }
 
         assertEquals(listOf("a", "c"), rig.turns.dispatched)
@@ -55,7 +55,7 @@ class QueuedSendDriverTest {
         val rig = rig(busy = true)
         listOf("a", "b", "c").forEach { rig.enqueue(it) }
 
-        assertTrue(rig.driver.sendNow("otid-c"))
+        assertTrue(rig.driver.sendNow(QueuedSendId("otid-c")))
         assertEquals(listOf(CONV), rig.turns.aborted)
         assertEquals(listOf("c", "a", "b"), rig.queuedTexts())
 
@@ -74,7 +74,7 @@ class QueuedSendDriverTest {
         rig.enqueue("b")
         rig.turns.busy = false
 
-        rig.driver.sendNow("otid-b")
+        rig.driver.sendNow(QueuedSendId("otid-b"))
         advanceUntilIdle()
 
         assertTrue(rig.turns.aborted.isEmpty())
@@ -117,7 +117,7 @@ class QueuedSendDriverTest {
         rig.driver.onStopped(CONV)
         rig.turns.busy = false
 
-        rig.driver.sendNow("otid-a")
+        rig.driver.sendNow(QueuedSendId("otid-a"))
         advanceUntilIdle()
 
         assertEquals(listOf("a"), rig.turns.dispatched)
@@ -158,23 +158,23 @@ class QueuedSendDriverTest {
     fun disconnectPausesEveryQueue() = runTest {
         val rig = rig(busy = true)
         rig.enqueue("a")
-        rig.enqueue("b", conversationId = "conv-2")
+        rig.enqueue("b", conversationId = QueueConversationId("conv-2"))
 
         rig.driver.onDisconnected()
 
         assertTrue(rig.queue.isPaused(CONV))
-        assertTrue(rig.queue.isPaused("conv-2"))
+        assertTrue(rig.queue.isPaused(QueueConversationId("conv-2")))
     }
 
     private class ScriptedTurns(var busy: Boolean) : QueuedSendTurns {
         private val lock = Mutex()
         var accept = true
         val dispatched = mutableListOf<String>()
-        val aborted = mutableListOf<String>()
+        val aborted = mutableListOf<QueueConversationId>()
 
         override suspend fun <T> serialized(block: suspend () -> T): T = lock.withLock { block() }
-        override fun hasActiveTurn(conversationId: String): Boolean = busy
-        override fun abortTurn(conversationId: String): Boolean {
+        override fun hasActiveTurn(conversationId: QueueConversationId): Boolean = busy
+        override fun abortTurn(conversationId: QueueConversationId): Boolean {
             aborted += conversationId
             return busy
         }
@@ -192,18 +192,18 @@ class QueuedSendDriverTest {
         val turns: ScriptedTurns,
         val driver: QueuedSendDriver,
     ) {
-        suspend fun enqueue(text: String, conversationId: String = CONV) {
-            turns.serialized { driver.enqueueLocked(QueuedChatSend("otid-$text", conversationId, text)) }
+        suspend fun enqueue(text: String, conversationId: QueueConversationId = CONV) {
+            turns.serialized { driver.enqueueLocked(QueuedChatSend(QueuedSendId("otid-$text"), conversationId, text)) }
         }
 
         /** The running turn ends: its terminal is seen and the transport retires it. */
-        suspend fun finishTurn(conversationId: String = CONV) {
+        suspend fun finishTurn(conversationId: QueueConversationId = CONV) {
             turns.busy = false
             turnFinished(conversationId)
         }
 
         /** Only the terminal is seen; the transport may still report the turn. */
-        suspend fun turnFinished(conversationId: String = CONV) {
+        suspend fun turnFinished(conversationId: QueueConversationId = CONV) {
             turns.serialized { driver.onTurnFinishedLocked(conversationId) }
             scope.runCurrent()
         }
@@ -215,11 +215,11 @@ class QueuedSendDriverTest {
         val queue = ChatSendQueue()
         val turns = ScriptedTurns(busy)
         val driverScope: CoroutineScope = backgroundScope
-        return Rig(this, queue, turns, QueuedSendDriver(driverScope, queue, turns, retryDelayMs = RETRY_DELAY_MS))
+        return Rig(this, queue, turns, QueuedSendDriver(driverScope, queue, turns, QueuedSendDriver.DrainRetry(delayMs = RETRY_DELAY_MS)))
     }
 
     private companion object {
-        const val CONV = "conv-1"
+        val CONV = QueueConversationId("conv-1")
         const val RETRY_DELAY_MS = 50L
     }
 }

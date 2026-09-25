@@ -531,9 +531,7 @@ private fun ChatScreenComposerInputSection(
         // letta-mobile-1n5py: messages sent during the turn wait here, above the field.
         QueuedSendsPanel(
             queue = state.sendQueue,
-            onCancel = viewModel::cancelQueuedMessage,
-            onSendNow = viewModel::sendQueuedMessageNow,
-            onResume = viewModel::resumeSendQueue,
+            actions = viewModel.queuedSendActions,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
         )
         ChatComposer(

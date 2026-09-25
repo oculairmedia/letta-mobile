@@ -250,7 +250,7 @@ class AppServerTurnEngine(
     )
 
     /** letta-mobile-qygvv.9: a cancelled Queued lease takes its input off the server queue. */
-    private val queuedInputRemoval = QueuedInputRemoval(remove = queueHygiene::removeQueuedInput)
+    private val queuedInputRemoval = QueuedInputRemoval(queueHygiene::removeQueuedInput)
 
     /** Without an [eventRouter] the engine feeds [queueHygiene] the frames its turns collect. */
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
@@ -510,15 +510,11 @@ class AppServerTurnEngine(
      * THIS {agentId, conversationId} runtime — the App Server's own unit of turn
      * exclusion. A lease on another runtime never makes this one busy.
      */
-    /**
-     * letta-mobile-qygvv.9: true while this runtime's lease waits in the App Server queue. Such a
-     * turn has no run of its own, so a cancel must not `abort_message` (that hits the turn ahead).
-     */
-    fun isQueued(agentId: String, conversationId: String): Boolean =
-        leases.peek(TurnRuntimeKey(agentId, conversationId))?.lease?.phase == TurnLeasePhase.Queued
-
     fun isBusy(agentId: String, conversationId: String): Boolean =
         leases.peek(TurnRuntimeKey(agentId, conversationId))?.isBusy == true
+
+    /** letta-mobile-qygvv.9: [key]'s input waits in the server queue, so a cancel must not abort. */
+    fun isQueued(key: TurnRuntimeKey): Boolean = leases.peek(key)?.lease?.phase == TurnLeasePhase.Queued
 
     /**
      * true when ANY runtime key holds a lease. Aggregate — use [isBusy] for a
