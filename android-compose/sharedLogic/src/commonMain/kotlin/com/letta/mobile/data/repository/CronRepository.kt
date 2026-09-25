@@ -28,6 +28,9 @@ import kotlinx.coroutines.sync.withLock
  * [SupervisorJob]. Exposed as a factory so tests can substitute a
  * `kotlinx.coroutines.test.TestScope`.
  */
+// Intentional process-lifetime scope: this is the injectable default the session graph binds and
+// tests replace with a TestScope; the repository itself never creates scopes ad hoc.
+@Suppress("NoDetachedCoroutineLifecycle")
 fun defaultCronScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
