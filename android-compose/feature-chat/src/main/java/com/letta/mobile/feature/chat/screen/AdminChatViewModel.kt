@@ -330,24 +330,7 @@ internal class AdminChatViewModel @Inject constructor(
                 currentSendPipeline = createSendPipeline()
                 if (runtimes != null) viewModelScope.launch {
                     try {
-                        runtimes.collect { next ->
-                            if (next !== selectedRuntime) {
-                                replacingSendRuntime = true
-                                retireSelectedGeneration(
-                                    stopPresentation = ::stopTimelineObserver,
-                                    pipeline = pipelineLifetime,
-                                    owner = selectedSendOwner,
-                                    runtime = selectedRuntime,
-                                )
-                                pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
-                                selectedRuntime = next
-                                selectedSendOwner = next?.let(::newSendOwner)
-                                currentSendPipeline = createSendPipeline()
-                                if (screenSelected) currentSendPipeline?.wsChatSendCoordinator?.selectForEvents()
-                                replacingSendRuntime = false
-                                chatConversationCoordinator.activeConversationId?.let(::startTimelineObserver)
-                            }
-                        }
+                        runtimes.collect { next -> if (next !== selectedRuntime) replaceSendRuntime(next) }
                     } finally {
                         replacingSendRuntime = true
                         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
@@ -360,6 +343,26 @@ internal class AdminChatViewModel @Inject constructor(
             }
             return checkNotNull(currentSendPipeline)
         }
+
+    /** Retires the current send generation and builds the next one on [next]. */
+    private suspend fun replaceSendRuntime(next: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime?) {
+        replacingSendRuntime = true
+        retireSelectedGeneration(
+            stopPresentation = ::stopTimelineObserver,
+            pipeline = pipelineLifetime,
+            owner = selectedSendOwner,
+            runtime = selectedRuntime,
+        )
+        pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
+        selectedRuntime = next
+        selectedSendOwner = next?.let(::newSendOwner)
+        val pipeline = createSendPipeline()
+        currentSendPipeline = pipeline
+        // letta-mobile-ztuog: the replacement coordinator inherits the on-screen selection.
+        if (screenSelected) pipeline.wsChatSendCoordinator.selectForEvents()
+        replacingSendRuntime = false
+        chatConversationCoordinator.activeConversationId?.let(::startTimelineObserver)
+    }
 
     private fun newSendOwner(runtime: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime) =
         com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner(

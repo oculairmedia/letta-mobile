@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -29,13 +31,14 @@ class AgentEventScopes internal constructor(private val events: Flow<WsTimelineE
     private val census = AgentSubscriberCensus()
 
     /** One coordinator's attachment; see [AgentEventAttachment]. */
-    fun attachment(agentId: String, isBusy: () -> Boolean): AgentEventAttachment =
+    fun attachment(agentId: AgentId, isBusy: () -> Boolean): AgentEventAttachment =
         AgentEventAttachment(this, agentId, isBusy)
 
     /** Live subscriptions for [agentId] right now — the leak signal the census reports. */
-    fun liveSubscriberCount(agentId: String): Int = census.count(agentId)
+    fun liveSubscriberCount(agentId: AgentId): Int = census.count(agentId)
 
-    internal fun learnSend(agentId: String, conversationId: String) = router.learnSend(agentId, conversationId)
+    internal fun learnSend(agentId: AgentId, conversationId: ConversationId) =
+        router.learnSend(agentId, conversationId)
 
     /**
      * [agentId]'s frames, in wire order, until [stayAttached] turns false. The predicate is checked
@@ -43,8 +46,8 @@ class AgentEventScopes internal constructor(private val events: Flow<WsTimelineE
      * handling — so a detach can never tear a frame half-applied, and a deselected, idle chat
      * receives nothing further: the next frame of any agent ends its subscription.
      */
-    fun eventsFor(agentId: String, stayAttached: () -> Boolean = { true }): Flow<WsTimelineEvent> = flow {
-        census.opened(agentId)
+    fun eventsFor(agentId: AgentId, stayAttached: () -> Boolean = { true }): Flow<WsTimelineEvent> = flow {
+        census.record(agentId, CensusChange.Subscribed)
         try {
             emitAll(
                 events.transformWhile { event ->
@@ -54,11 +57,11 @@ class AgentEventScopes internal constructor(private val events: Flow<WsTimelineE
                 },
             )
         } finally {
-            census.closed(agentId)
+            census.record(agentId, CensusChange.Unsubscribed)
         }
     }
 
-    private fun deliversTo(agentId: String, event: WsTimelineEvent): Boolean =
+    private fun deliversTo(agentId: AgentId, event: WsTimelineEvent): Boolean =
         when (val owner = router.ownerOf(event)) {
             is EventOwner.Agent -> (owner.agentId == agentId).also { if (!it) census.suppressed() }
             EventOwner.Everyone, EventOwner.Unknown -> true
@@ -73,24 +76,36 @@ class AgentEventScopes internal constructor(private val events: Flow<WsTimelineE
  * the selected owner stays attached while idle; everyone else detaches when their turns settle.
  */
 internal class ChatSelection {
-    val selected = MutableStateFlow<Any?>(Unmanaged)
+    val selected = MutableStateFlow<ChatSelectionState>(ChatSelectionState.Unmanaged)
 
-    fun select(owner: Any) {
-        selected.value = owner
+    fun select(owner: AgentEventAttachment) {
+        selected.value = ChatSelectionState.Selected(owner)
     }
 
     /** A no-op while unmanaged: a host that never selects keeps every chat attached. */
-    fun selectIfManaged(owner: Any) {
-        if (selected.value !== Unmanaged) selected.value = owner
+    fun selectIfManaged(owner: AgentEventAttachment) {
+        if (selected.value != ChatSelectionState.Unmanaged) select(owner)
     }
 
-    fun release(owner: Any) {
-        selected.compareAndSet(owner, null)
+    fun release(owner: AgentEventAttachment) {
+        selected.compareAndSet(ChatSelectionState.Selected(owner), ChatSelectionState.NoneSelected)
     }
 
-    fun isSelected(owner: Any): Boolean = selected.value.let { it === Unmanaged || it === owner }
+    fun isSelected(owner: AgentEventAttachment): Boolean = when (val state = selected.value) {
+        ChatSelectionState.Unmanaged -> true
+        ChatSelectionState.NoneSelected -> false
+        is ChatSelectionState.Selected -> state.owner === owner
+    }
+}
 
-    private object Unmanaged
+internal sealed interface ChatSelectionState {
+    /** No host has expressed a selection yet: every chat counts as selected. */
+    data object Unmanaged : ChatSelectionState
+
+    /** The selected chat went away and no other has been selected since. */
+    data object NoneSelected : ChatSelectionState
+
+    data class Selected(val owner: AgentEventAttachment) : ChatSelectionState
 }
 
 /**
@@ -103,7 +118,7 @@ internal class ChatSelection {
  */
 class AgentEventAttachment internal constructor(
     private val scopes: AgentEventScopes,
-    private val agentId: String,
+    private val agentId: AgentId,
     private val isBusy: () -> Boolean,
 ) {
     fun select() = scopes.selection.select(this)
@@ -122,49 +137,54 @@ class AgentEventAttachment internal constructor(
             emitAll(scopes.eventsFor(agentId, ::shouldStayAttached))
             Telemetry.event(
                 "AgentEventScopes", "ws.route.detached",
-                "agentId" to agentId,
+                "agentId" to agentId.value,
                 "liveForAgent" to scopes.liveSubscriberCount(agentId),
             )
         }
     }
 }
 
+internal enum class CensusChange(val eventName: String, val delta: Int) {
+    Subscribed("ws.route.subscribed", 1),
+    Unsubscribed("ws.route.unsubscribed", -1),
+}
+
 /** Counts live per-agent subscriptions and suppressed foreign frames; reports what would reveal a leak. */
 private class AgentSubscriberCensus {
     private val lock = SynchronizedObject()
-    private val live = mutableMapOf<String, Int>()
+    private val live = mutableMapOf<AgentId, Int>()
     private var suppressedFrames = 0L
 
-    fun count(agentId: String): Int = synchronized(lock) { live[agentId] ?: 0 }
-
-    fun opened(agentId: String) = report("ws.route.subscribed", agentId, delta = 1)
-
-    fun closed(agentId: String) = report("ws.route.unsubscribed", agentId, delta = -1)
+    fun count(agentId: AgentId): Int = synchronized(lock) { live[agentId] ?: 0 }
 
     fun suppressed() {
         synchronized(lock) { suppressedFrames += 1 }
     }
 
-    private fun report(name: String, agentId: String, delta: Int) {
-        val (forAgent, agents, total, suppressed) = synchronized(lock) {
-            val next = (live[agentId] ?: 0) + delta
+    fun record(agentId: AgentId, change: CensusChange) {
+        val snapshot = synchronized(lock) {
+            val next = (live[agentId] ?: 0) + change.delta
             if (next > 0) live[agentId] = next else live.remove(agentId)
-            listOf(next.toLong(), live.size.toLong(), live.values.sum().toLong(), suppressedFrames)
+            CensusSnapshot(next, live.size, live.values.sum(), suppressedFrames)
         }
-        val suspicious = forAgent > 1 || agents > MAX_EXPECTED_LIVE_AGENTS
+        val suspicious = change.delta > 0 && snapshot.looksLeaked()
         Telemetry.event(
-            "AgentEventScopes", name,
-            "agentId" to agentId,
-            "liveForAgent" to forAgent,
-            "liveAgents" to agents,
-            "liveTotal" to total,
-            "foreignSuppressed" to suppressed,
-            level = if (suspicious && delta > 0) Telemetry.Level.WARN else Telemetry.Level.INFO,
+            "AgentEventScopes", change.eventName,
+            "agentId" to agentId.value,
+            "liveForAgent" to snapshot.forAgent,
+            "liveAgents" to snapshot.agents,
+            "liveTotal" to snapshot.total,
+            "foreignSuppressed" to snapshot.suppressed,
+            level = if (suspicious) Telemetry.Level.WARN else Telemetry.Level.INFO,
         )
     }
+}
+
+private data class CensusSnapshot(val forAgent: Int, val agents: Int, val total: Int, val suppressed: Long) {
+    /** The selected agent plus one finishing a turn in the background is expected; more is a leak. */
+    fun looksLeaked(): Boolean = forAgent > 1 || agents > MAX_EXPECTED_LIVE_AGENTS
 
     private companion object {
-        /** The selected agent plus one finishing a turn in the background; more means a leak. */
         const val MAX_EXPECTED_LIVE_AGENTS = 2
     }
 }

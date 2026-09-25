@@ -3,6 +3,8 @@ package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
@@ -143,7 +145,7 @@ class WsChatBridge(
         } else {
             buildContentParts(text, attachments).toJsonArray()
         }
-        agentScopes.learnSend(agentId, conversationId)
+        agentScopes.learnSend(AgentId(agentId), ConversationId(conversationId))
         return transport.send(
             agentId = agentId,
             conversationId = conversationId,

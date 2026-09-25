@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
@@ -8,7 +10,7 @@ import kotlinx.atomicfu.locks.synchronized
  */
 internal sealed interface EventOwner {
     /** The frame belongs to exactly this agent; no other agent's chat may see it. */
-    data class Agent(val agentId: String) : EventOwner
+    data class Agent(val agentId: AgentId) : EventOwner
 
     /** Connection-wide (disconnects, goal refreshes): every agent's chat needs it. */
     data object Everyone : EventOwner
@@ -20,6 +22,20 @@ internal sealed interface EventOwner {
      */
     data object Unknown : EventOwner
 }
+
+/** The kinds of wire id an agent can own. */
+internal enum class OwnershipKind {
+    Turn,
+    Run,
+    Conversation,
+    ;
+
+    /** Null for an absent or blank id: such an id identifies nothing. */
+    fun key(id: String?): OwnershipKey? = id?.takeIf { it.isNotBlank() }?.let { OwnershipKey(this, it) }
+}
+
+/** A turn, run or conversation id, typed so the three id spaces can never collide. */
+internal data class OwnershipKey(val kind: OwnershipKind, val id: String)
 
 /**
  * letta-mobile-ztuog: turns a frame into its owning agent.
@@ -37,67 +53,54 @@ internal class AgentEventRouter(capacity: Int = DEFAULT_CAPACITY) {
     private val owners = AgentOwnerTable(capacity)
 
     fun ownerOf(event: WsTimelineEvent): EventOwner {
-        learn(event)
-        return resolve(event)
+        if (event.isConnectionWide()) return EventOwner.Everyone
+        val keys = event.ownershipKeys()
+        val claimed = event.claimedAgent()
+        if (claimed != null) {
+            keys.forEach { owners.learn(it, claimed) }
+            return EventOwner.Agent(claimed)
+        }
+        return keys.firstNotNullOfOrNull(owners::ownerOf)?.let(EventOwner::Agent) ?: EventOwner.Unknown
     }
 
     /** A send names its agent and conversation before any frame of the turn exists. */
-    fun learnSend(agentId: String, conversationId: String) {
-        owners.learn(conversationKey(conversationId), agentId)
+    fun learnSend(agentId: AgentId, conversationId: ConversationId) {
+        OwnershipKind.Conversation.key(conversationId.value)?.let { owners.learn(it, agentId) }
     }
-
-    private fun learn(event: WsTimelineEvent) {
-        when (event) {
-            is WsTimelineEvent.TurnStarted ->
-                learnKeys(event.agentId, event.turnId, event.runId, event.conversationId)
-            is WsTimelineEvent.MessageDelta -> event.agentId?.let { agent ->
-                learnKeys(agent, event.turnId, event.message.runId, event.conversationId)
-            }
-            is WsTimelineEvent.UserActionOutcome -> event.agentId?.let { agent ->
-                learnKeys(agent, event.turnId, event.runId, event.conversationId)
-            }
-            else -> Unit
-        }
-    }
-
-    private fun learnKeys(agentId: String, turnId: String?, runId: String?, conversationId: String?) {
-        owners.learn(turnKey(turnId), agentId)
-        owners.learn(runKey(runId), agentId)
-        owners.learn(conversationKey(conversationId), agentId)
-    }
-
-    private fun resolve(event: WsTimelineEvent): EventOwner = when (event) {
-        is WsTimelineEvent.TurnStarted -> EventOwner.Agent(event.agentId)
-        is WsTimelineEvent.AgentUpdated -> EventOwner.Agent(event.agentId)
-        is WsTimelineEvent.MessageDelta -> tagged(event.agentId)
-            ?: lookup(turnKey(event.turnId), runKey(event.message.runId), conversationKey(event.conversationId))
-        is WsTimelineEvent.UserActionOutcome -> tagged(event.agentId)
-            ?: lookup(turnKey(event.turnId), runKey(event.runId), conversationKey(event.conversationId))
-        is WsTimelineEvent.StopReason -> lookup(turnKey(event.turnId), runKey(event.runId))
-        is WsTimelineEvent.UsageStatistics -> lookup(turnKey(event.turnId), runKey(event.runId))
-        is WsTimelineEvent.TurnDone -> lookup(turnKey(event.turnId), runKey(event.runId))
-        is WsTimelineEvent.SubscribeDone -> lookup(runKey(event.runId))
-        is WsTimelineEvent.Error ->
-            lookup(turnKey(event.turnId), runKey(event.runId), conversationKey(event.conversationId))
-        is WsTimelineEvent.Disconnected,
-        is WsTimelineEvent.GoalsUpdated,
-        -> EventOwner.Everyone
-    }
-
-    private fun tagged(agentId: String?): EventOwner? =
-        agentId?.takeIf { it.isNotBlank() }?.let(EventOwner::Agent)
-
-    private fun lookup(vararg keys: String?): EventOwner =
-        keys.firstNotNullOfOrNull { owners.ownerOf(it) }?.let(EventOwner::Agent) ?: EventOwner.Unknown
 
     private companion object {
         const val DEFAULT_CAPACITY = 512
-
-        fun turnKey(id: String?) = id?.takeIf { it.isNotBlank() }?.let { "t:$it" }
-        fun runKey(id: String?) = id?.takeIf { it.isNotBlank() }?.let { "r:$it" }
-        fun conversationKey(id: String?) = id?.takeIf { it.isNotBlank() }?.let { "c:$it" }
     }
 }
+
+private fun WsTimelineEvent.isConnectionWide(): Boolean =
+    this is WsTimelineEvent.Disconnected || this is WsTimelineEvent.GoalsUpdated
+
+/** The agent the frame names itself, when it names one. */
+private fun WsTimelineEvent.claimedAgent(): AgentId? = when (this) {
+    is WsTimelineEvent.TurnStarted -> agentId
+    is WsTimelineEvent.AgentUpdated -> agentId
+    is WsTimelineEvent.MessageDelta -> agentId
+    is WsTimelineEvent.UserActionOutcome -> agentId
+    else -> null
+}?.takeIf { it.isNotBlank() }?.let(::AgentId)
+
+/** The ids the frame carries, most specific first: turn, then run, then conversation. */
+private fun WsTimelineEvent.ownershipKeys(): List<OwnershipKey> = when (this) {
+    is WsTimelineEvent.TurnStarted -> listOfNotNull(turn(turnId), run(runId), conversation(conversationId))
+    is WsTimelineEvent.MessageDelta -> listOfNotNull(turn(turnId), run(message.runId), conversation(conversationId))
+    is WsTimelineEvent.UserActionOutcome -> listOfNotNull(turn(turnId), run(runId), conversation(conversationId))
+    is WsTimelineEvent.Error -> listOfNotNull(turn(turnId), run(runId), conversation(conversationId))
+    is WsTimelineEvent.StopReason -> listOfNotNull(turn(turnId), run(runId))
+    is WsTimelineEvent.UsageStatistics -> listOfNotNull(turn(turnId), run(runId))
+    is WsTimelineEvent.TurnDone -> listOfNotNull(turn(turnId), run(runId))
+    is WsTimelineEvent.SubscribeDone -> listOfNotNull(run(runId))
+    else -> emptyList()
+}
+
+private fun turn(id: String?) = OwnershipKind.Turn.key(id)
+private fun run(id: String?) = OwnershipKind.Run.key(id)
+private fun conversation(id: String?) = OwnershipKind.Conversation.key(id)
 
 /**
  * Bounded `key -> agent` table. A key two agents have claimed (the bare `default` conversation
@@ -106,23 +109,16 @@ internal class AgentEventRouter(capacity: Int = DEFAULT_CAPACITY) {
  */
 internal class AgentOwnerTable(private val capacity: Int) {
     private val lock = SynchronizedObject()
-    private val owners = LinkedHashMap<String, String>()
 
-    fun learn(key: String?, agentId: String) {
-        if (key == null || agentId.isBlank()) return
-        synchronized(lock) {
-            val known = owners.remove(key)
-            owners[key] = if (known == null || known == agentId) agentId else AMBIGUOUS
-            while (owners.size > capacity) owners.remove(owners.keys.first())
-        }
+    /** A null owner marks the key ambiguous. */
+    private val owners = LinkedHashMap<OwnershipKey, AgentId?>()
+
+    fun learn(key: OwnershipKey, agentId: AgentId) = synchronized(lock) {
+        val known = owners.containsKey(key)
+        val previous = owners.remove(key)
+        owners[key] = agentId.takeUnless { known && previous != agentId }
+        while (owners.size > capacity) owners.remove(owners.keys.first())
     }
 
-    fun ownerOf(key: String?): String? {
-        if (key == null) return null
-        return synchronized(lock) { owners[key] }?.takeUnless { it == AMBIGUOUS }
-    }
-
-    private companion object {
-        const val AMBIGUOUS = "\u0000ambiguous"
-    }
+    fun ownerOf(key: OwnershipKey): AgentId? = synchronized(lock) { owners[key] }
 }

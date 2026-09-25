@@ -221,7 +221,7 @@ internal class WsChatSendCoordinator(
     }
 
     /** letta-mobile-ztuog: this chat is on screen; other agents' chats detach once idle. */
-    fun selectForEvents() = delegate.selectForEvents()
+    fun selectForEvents() = delegate.eventSubscription.select()
 
     internal suspend fun handleEvent(event: WsTimelineEvent) = delegate.handleEvent(event)
 

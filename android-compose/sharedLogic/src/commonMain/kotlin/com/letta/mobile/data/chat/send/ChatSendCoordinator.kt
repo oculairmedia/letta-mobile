@@ -125,33 +125,22 @@ class ChatSendCoordinator(
     )
     private val runtimeEventBatcher = RuntimeEventBatcher(scope, recordRuntimeEvents)
 
-    // letta-mobile-ztuog: this coordinator's agent-keyed subscription. Only frames the bridge
-    // attributes to [agentId] arrive; it detaches once another chat is selected and nothing of
-    // ours is in flight, and re-attaches (turn state intact) when selected again.
-    private val eventAttachment = wsChatBridge.agentScopes.attachment(agentId, isBusy = ::hasWorkInFlight)
+    /** letta-mobile-ztuog: this chat's agent-keyed subscription; hosts select it when it is on screen. */
+    val eventSubscription = ChatSendEventSubscription(
+        scope = scope,
+        attachment = wsChatBridge.agentScopes.attachment(AgentId(agentId)) {
+            snapshotStates().any { it.isTracking && !it.reachedTerminal } || queuedSends.state.value.values.any { !it.isEmpty }
+        },
+        handle = { event -> handleEvent(event) },
+    )
 
     init {
-        scope.launch {
-            eventAttachment.deliveries.collect { event -> handleEvent(event) }
-        }
-        scope.coroutineContext[Job]?.invokeOnCompletion { eventAttachment.release() }
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
                 contained("RedialWhileTurnActive") { handleRedialWhileTurnActive(event) }
             }
         }
     }
-
-    /**
-     * letta-mobile-ztuog: this chat is the one on screen. Every other chat detaches from the
-     * transport once its in-flight turns settle; this one (re)attaches immediately.
-     */
-    fun selectForEvents() = eventAttachment.select()
-
-    /** A send, a queued send, or a turn that has not settled keeps an unselected chat attached. */
-    private fun hasWorkInFlight(): Boolean =
-        snapshotStates().any { it.isTracking && !it.reachedTerminal } ||
-            queuedSends.state.value.values.any { !it.isEmpty }
 
     /**
      * One frame must never take the process down. Everything a frame reaches reports a violated
@@ -616,7 +605,7 @@ class ChatSendCoordinator(
         val targetConversationId = activeConversationId()
         // letta-mobile-ztuog: only the chat on screen sends, so a send claims the selection
         // (and so attaches) before its turn's first frame can arrive.
-        eventAttachment.claimForSend()
+        eventSubscription.claimForSend()
         return scope.launch {
             sendInternal(text, attachments, targetConversationId)
         }
@@ -829,37 +818,8 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleEventLocked(event: WsTimelineEvent) {
-        // letta-mobile-sfex6: strict agent scoping. Delivery is agent-keyed
-        // (letta-mobile-ztuog), but a frame whose owner the router cannot
-        // attribute still reaches every attached coordinator. When two
-        // agents share the bare conversation id "default" (main + a subagent),
-        // a foreign agent's TurnStarted would otherwise open a turn entry in THIS
-        // coordinator and its deltas would ingest into our timeline — the
-        // cross-conversation leak. Drop any event that carries an explicit
-        // agentId not matching ours BEFORE it can mutate any turn entry.
-        // (MessageDelta/StopReason/etc. carry no agentId; they are scoped
-        // transitively because a conversation entry only ever gains a turn id
-        // from a TurnStarted that passed this gate.)
-        val eventAgentId: String? = when (event) {
-            is WsTimelineEvent.TurnStarted -> event.agentId
-            is WsTimelineEvent.AgentUpdated -> event.agentId
-            // Message frames name their run's agent too; a foreign agent's delta must not
-            // reach turn resolution at all (cross-agent timeline bleed, 2026-09-14).
-            is WsTimelineEvent.MessageDelta -> event.agentId
-            else -> null
-        }
-        if (eventAgentId != null && eventAgentId != agentId) {
-            // letta-mobile-ztuog: defensive only. The bridge's agent-keyed subscription already
-            // withholds foreign frames, so reaching this line means routing leaked.
-            Telemetry.event(
-                "AdminChatVM", "ws.event.foreignAgentDropped",
-                "eventType" to (event::class.simpleName ?: ""),
-                "eventAgentId" to eventAgentId,
-                "boundAgentId" to agentId,
-                level = Telemetry.Level.WARN,
-            )
-            return
-        }
+        // letta-mobile-sfex6: strict agent scoping, kept as a defensive gate (see isForeignTo).
+        if (event.isForeignTo(agentId)) return
         Telemetry.event(
             "IrohTrace", "coordinator.event",
             "type" to (event::class.simpleName ?: ""),
