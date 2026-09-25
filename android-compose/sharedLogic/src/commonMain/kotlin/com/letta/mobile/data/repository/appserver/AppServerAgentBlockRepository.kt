@@ -16,11 +16,9 @@ class AppServerAgentBlockRepository(
             transport.listAgentBlocks(agentId),
         )
 
-    override suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block {
-        val value = requireNotNull(params.value) { "block.update_agent writes the memory file contents; value is required" }
-        return AppServerProtocol.json.decodeFromJsonElement(
+    override suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block =
+        AppServerProtocol.json.decodeFromJsonElement(
             Block.serializer(),
-            transport.updateAgentBlock(target, value),
+            transport.updateAgentBlock(target, params),
         )
-    }
 }

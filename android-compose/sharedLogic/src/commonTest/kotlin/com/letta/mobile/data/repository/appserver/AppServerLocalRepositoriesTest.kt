@@ -148,13 +148,12 @@ class AppServerLocalRepositoriesTest {
     @Test
     fun blockRepositoryWritesByAgentAndLabel() = runTest {
         val transport = FakeTransport()
-        val write = BlockWrite(AgentBlockTarget("agent-1", "human"), "Prefers tea")
+        val write = BlockWrite(AgentBlockTarget("agent-1", "human"), BlockUpdateParams(value = "Prefers tea"))
 
-        val saved = AppServerAgentBlockRepository(transport)
-            .writeAgentBlock(write.target, BlockUpdateParams(value = write.value))
+        val saved = AppServerAgentBlockRepository(transport).writeAgentBlock(write.target, write.params)
 
         assertEquals(write, transport.lastUpdate)
-        assertEquals(write.value, saved.value)
+        assertEquals(write.params.value, saved.value)
     }
 
     @Test
@@ -162,14 +161,14 @@ class AppServerLocalRepositoriesTest {
         val client = FakeClient { okBlocks("""{"id":"block-1","label":"human","value":"new"}""") }
         val transport = DefaultAppServerLocalRepositoryTransport({ client }) { it }
 
-        val write = BlockWrite(AgentBlockTarget("agent-1", "human"), "new")
+        val write = BlockWrite(AgentBlockTarget("agent-1", "human"), BlockUpdateParams(value = "new"))
 
-        transport.updateAgentBlock(write.target, write.value)
+        transport.updateAgentBlock(write.target, write.params)
 
         val call = client.adminRpcCalls.single()
         assertEquals("block.update_agent", call.method)
         assertEquals(write.target.label, call.params?.get("label")?.jsonPrimitive?.content)
-        assertEquals(write.value, call.params?.get("value")?.jsonPrimitive?.content)
+        assertEquals(write.params.value, call.params?.get("value")?.jsonPrimitive?.content)
     }
 
     private class FakeTransport(
@@ -198,17 +197,17 @@ class AppServerLocalRepositoriesTest {
 
         var lastUpdate: BlockWrite? = null
 
-        override suspend fun updateAgentBlock(target: AgentBlockTarget, value: String): JsonElement {
-            lastUpdate = BlockWrite(target, value)
+        override suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement {
+            lastUpdate = BlockWrite(target, params)
             return AppServerProtocol.json.encodeToJsonElement(
                 Block.serializer(),
-                Block(id = BlockId("block-${target.label}"), label = target.label, value = value),
+                Block(id = BlockId("block-${target.label}"), label = target.label, value = params.value.orEmpty()),
             )
         }
     }
 
     /** One agent-block write as the transport sees it. */
-    private data class BlockWrite(val target: AgentBlockTarget, val value: String)
+    private data class BlockWrite(val target: AgentBlockTarget, val params: BlockUpdateParams)
 
     private class FakeClient(
         private val responder: (AppServerCommand.AdminRpc) -> AppServerInboundFrame.AdminRpcResponse,
