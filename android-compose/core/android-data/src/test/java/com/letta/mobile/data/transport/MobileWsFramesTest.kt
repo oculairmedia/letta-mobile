@@ -1,24 +1,15 @@
 package com.letta.mobile.data.transport
 
-import com.letta.mobile.data.a2ui.A2UI_DEFAULT_SUPPORTED_CATALOGS
-import com.letta.mobile.data.a2ui.A2UI_DEFAULT_SUPPORTED_WIDGETS
-import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.a2ui.A2uiMessage
-import com.letta.mobile.data.a2ui.LETTA_TOOL_APPROVAL_WIDGET_ID
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Tag
 
 /**
- * letta-mobile-9vgk: lock the wire shapes of [ClientFrame] /
+ * letta-mobile-9vgk: lock the wire shapes of
  * [ServerFrame] against the contracts in
  * `admin-shim/docs/MOBILE_WS_PROTOCOL.md`. Each test name cites the
  * spec section being defended.
@@ -31,193 +22,6 @@ class MobileWsFramesTest : WordSpec({
         encodeDefaults = true
         explicitNulls = false
         coerceInputValues = true
-    }
-
-    "ClientFrame serialization" should {
-        "spec §2.1 hello — embeds token, device_id, client_version" {
-            val frame = HelloFrame(
-                id = "fid-1",
-                ts = "2026-05-15T12:00:00Z",
-                token = "secret",
-                deviceId = "android-1",
-                clientVersion = "letta-mobile/0.6.1",
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"hello\""
-            out shouldContain "\"token\":\"secret\""
-            out shouldContain "\"device_id\":\"android-1\""
-            out shouldContain "\"client_version\":\"letta-mobile/0.6.1\""
-            // Spec §2.1: capability fields are top-level on the
-            // hello envelope, NOT nested under `a2ui_capability`.
-            out shouldContain "\"a2ui_version\":\"0.9\""
-            out shouldContain "\"supported_catalogs\""
-            out shouldContain "\"supported_widgets\""
-            out shouldContain "\"theme_hints\""
-            out shouldContain LETTA_TOOL_APPROVAL_WIDGET_ID
-            val hello = json.parseToJsonElement(out).jsonObject
-            hello["supported_catalogs"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
-                A2UI_DEFAULT_SUPPORTED_CATALOGS
-            hello["supported_widgets"]!!.jsonArray.map { it.jsonPrimitive.content } shouldBe
-                A2UI_DEFAULT_SUPPORTED_WIDGETS
-            (out.contains("\"a2ui_capability\"")) shouldBe false
-            (out.contains("\"resume\"")) shouldBe false
-        }
-
-        "letta-mobile-24c7x hello — serializes conversation resume cursors when present" {
-            val frame = HelloFrame(
-                id = "fid-1",
-                ts = "2026-05-15T12:00:00Z",
-                token = "secret",
-                resume = listOf(
-                    ResumeCursor(conversationId = "conv-a", afterSeq = 12L),
-                    ResumeCursor(conversationId = "conv-b", afterSeq = 44L),
-                ),
-            )
-
-            val out = frame.encodeJson(json)
-
-            out shouldContain "\"resume\":["
-            out shouldContain "\"conv_id\":\"conv-a\""
-            out shouldContain "\"after_seq\":12"
-            out shouldContain "\"conv_id\":\"conv-b\""
-            out shouldContain "\"after_seq\":44"
-        }
-
-        "spec §2.1 send_message — round-trips otid via snake_case" {
-            val frame = SendMessageFrame(
-                id = "fid-2",
-                ts = "2026-05-15T12:00:00Z",
-                agentId = "agent-x",
-                conversationId = "conv-default-agent-x",
-                text = "hello",
-                otid = "cm-android-abc",
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"agent_id\":\"agent-x\""
-            out shouldContain "\"conversation_id\":\"conv-default-agent-x\""
-            out shouldContain "\"start_new_conversation\":false"
-            out shouldContain "\"otid\":\"cm-android-abc\""
-        }
-
-        "letta-mobile-wdrc send_message — can request shim-side conversation creation" {
-            val frame = SendMessageFrame(
-                id = "fid-2-start",
-                ts = "2026-05-25T12:00:00Z",
-                agentId = "agent-x",
-                conversationId = "",
-                startNewConversation = true,
-                text = "hello",
-                otid = "cm-android-start",
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"conversation_id\":\"\""
-            out shouldContain "\"start_new_conversation\":true"
-        }
-
-        "lcp-dlj send_message — content_parts omitted when null" {
-            val frame = SendMessageFrame(
-                id = "fid-2a",
-                ts = "2026-05-15T12:00:00Z",
-                agentId = "agent-x",
-                conversationId = "conv-default-agent-x",
-                text = "hello",
-                otid = "cm-android-abc",
-                contentParts = null,
-            )
-            val out = frame.encodeJson(json)
-            (out.contains("content_parts")) shouldBe false
-        }
-
-        "lcp-dlj send_message — content_parts serializes text-first then image with raw base64" {
-            val parts = com.letta.mobile.data.model.buildContentParts(
-                text = "look",
-                images = listOf(
-                    com.letta.mobile.data.model.MessageContentPart.Image(
-                        base64 = "AAA=",
-                        mediaType = "image/jpeg",
-                    )
-                ),
-            ).toJsonArray()
-            val frame = SendMessageFrame(
-                id = "fid-2b",
-                ts = "2026-05-15T12:00:00Z",
-                agentId = "agent-x",
-                conversationId = "conv-default-agent-x",
-                text = "look",
-                otid = "cm-android-def",
-                contentParts = parts,
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"content_parts\":["
-            // Insertion order: text first, image second.
-            val textIdx = out.indexOf("\"type\":\"text\"")
-            val imageIdx = out.indexOf("\"type\":\"image\"")
-            (textIdx in 0..<imageIdx) shouldBe true
-            // Letta-shape source: base64 + media_type with raw base64 (no `data:` prefix).
-            out shouldContain "\"media_type\":\"image/jpeg\""
-            out shouldContain "\"data\":\"AAA=\""
-            (out.contains("data:image")) shouldBe false
-        }
-
-        "spec §2.1 cancel — run_id is mandatory and snake_cased" {
-            val frame = CancelFrame(
-                id = "fid-3",
-                ts = "2026-05-15T12:00:00Z",
-                runId = "run-7",
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"cancel\""
-            out shouldContain "\"run_id\":\"run-7\""
-        }
-
-        "letta-mobile-2rkdj subscribe — encodes run_id + cursor for resume" {
-            val frame = SubscribeFrame(
-                id = "fid-sub",
-                ts = "2026-05-21T20:00:00Z",
-                runId = "run-9",
-                cursor = 42L,
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"subscribe\""
-            out shouldContain "\"run_id\":\"run-9\""
-            out shouldContain "\"cursor\":42"
-        }
-
-        "letta-mobile-2rkdj subscribe — cursor=0 means full replay" {
-            val frame = SubscribeFrame(
-                id = "fid-sub-0",
-                ts = "2026-05-21T20:00:00Z",
-                runId = "run-9",
-                cursor = 0L,
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"cursor\":0"
-        }
-
-        "letta-mobile-51xm.7 user_action sends routing ids name surface_id and resolved context" {
-            val frame = UserActionFrame(
-                id = "fid-action",
-                ts = "2026-05-17T12:00:00Z",
-                name = "submit_booking",
-                surfaceId = "booking-1",
-                runId = "run-1",
-                turnId = "turn-1",
-                actionId = "action-1",
-                context = buildJsonObject {
-                    put("partySize", 4)
-                    put("reservationTime", "2026-05-17T18:30")
-                },
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"user_action\""
-            out shouldContain "\"name\":\"submit_booking\""
-            out shouldContain "\"surface_id\":\"booking-1\""
-            out shouldContain "\"run_id\":\"run-1\""
-            out shouldContain "\"turn_id\":\"turn-1\""
-            out shouldContain "\"action_id\":\"action-1\""
-            out shouldContain "\"partySize\":4"
-            out shouldContain "\"reservationTime\":\"2026-05-17T18:30\""
-        }
     }
 
     "ServerFrame deserialization" should {
@@ -503,76 +307,7 @@ class MobileWsFramesTest : WordSpec({
         }
     }
 
-    "Cron frame serialization (letta-mobile-d52f.1, sister to lcp-d5g)" should {
-        "cron_list — encodes request_id and omits null filters" {
-            val frame = CronListFrame(
-                id = "f-list",
-                ts = "2026-05-19T00:00:00Z",
-                requestId = "req-1",
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"cron_list\""
-            out shouldContain "\"request_id\":\"req-1\""
-            (out.contains("\"agent_id\"")) shouldBe false
-            (out.contains("\"conversation_id\"")) shouldBe false
-        }
-
-        "cron_list — includes filters when set" {
-            val frame = CronListFrame(
-                id = "f-list-2",
-                ts = "2026-05-19T00:00:00Z",
-                requestId = "req-2",
-                agentId = "agent-x",
-                conversationId = "conv-default-agent-x",
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"agent_id\":\"agent-x\""
-            out shouldContain "\"conversation_id\":\"conv-default-agent-x\""
-        }
-
-        "cron_add — round-trips every selector and recurring flag" {
-            val frame = CronAddFrame(
-                id = "f-add",
-                ts = "2026-05-19T00:00:00Z",
-                requestId = "req-add-1",
-                agentId = "agent-x",
-                name = "daily-brief",
-                description = "Morning brief",
-                prompt = "Summarize overnight",
-                recurring = true,
-                cron = "0 9 * * 1-5",
-                timezone = "America/Toronto",
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"cron_add\""
-            out shouldContain "\"request_id\":\"req-add-1\""
-            out shouldContain "\"agent_id\":\"agent-x\""
-            out shouldContain "\"name\":\"daily-brief\""
-            out shouldContain "\"recurring\":true"
-            out shouldContain "\"cron\":\"0 9 * * 1-5\""
-            out shouldContain "\"timezone\":\"America/Toronto\""
-            // The three selectors are mutually exclusive in practice but
-            // serialization just omits the unset ones (explicitNulls=false).
-            (out.contains("\"every\"")) shouldBe false
-            (out.contains("\"at\"")) shouldBe false
-        }
-
-        "cron_get / cron_delete — carry task_id" {
-            val get = CronGetFrame(id = "f-g", ts = "t", requestId = "rg", taskId = "task-1").encodeJson(json)
-            get shouldContain "\"type\":\"cron_get\""
-            get shouldContain "\"task_id\":\"task-1\""
-
-            val del = CronDeleteFrame(id = "f-d", ts = "t", requestId = "rd", taskId = "task-1").encodeJson(json)
-            del shouldContain "\"type\":\"cron_delete\""
-            del shouldContain "\"task_id\":\"task-1\""
-        }
-
-        "cron_delete_all — carries agent_id" {
-            val out = CronDeleteAllFrame(id = "f", ts = "t", requestId = "rda", agentId = "agent-x").encodeJson(json)
-            out shouldContain "\"type\":\"cron_delete_all\""
-            out shouldContain "\"agent_id\":\"agent-x\""
-        }
-
+    "Cron frame deserialization (letta-mobile-d52f.1, sister to lcp-d5g)" should {
         "cron_list_response — parses tasks array and request_id" {
             val payload = """
                 {"v":1,"type":"cron_list_response","id":"r-1","ts":"t","request_id":"req-1",
@@ -652,42 +387,7 @@ class MobileWsFramesTest : WordSpec({
         }
     }
 
-    "Subagent frame serialization (letta-mobile-73o2h.3, §13)" should {
-        "subagent_list — encodes request_id and all flag (§13.2)" {
-            val frame = SubagentListFrame(
-                id = "f-sa-list",
-                ts = "2026-06-01T00:00:00Z",
-                requestId = "r1",
-                all = false,
-            )
-            val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"subagent_list\""
-            out shouldContain "\"request_id\":\"r1\""
-            out shouldContain "\"all\":false"
-        }
-
-        "subagent_list — all=true includes terminal entries" {
-            val out = SubagentListFrame(
-                id = "f-sa-list-2",
-                ts = "2026-06-01T00:00:00Z",
-                requestId = "r2",
-                all = true,
-            ).encodeJson(json)
-            out shouldContain "\"all\":true"
-        }
-
-        "subagent_todos — carries tool_call_id keyed by parent Agent call (§13.3)" {
-            val out = SubagentTodosFrame(
-                id = "f-sa-todos",
-                ts = "2026-06-01T00:00:00Z",
-                requestId = "r3",
-                toolCallId = "toolu_abc",
-            ).encodeJson(json)
-            out shouldContain "\"type\":\"subagent_todos\""
-            out shouldContain "\"request_id\":\"r3\""
-            out shouldContain "\"tool_call_id\":\"toolu_abc\""
-        }
-
+    "Subagent frame deserialization (letta-mobile-73o2h.3, §13)" should {
         "subagent_list_response — parses subagents array and correlation id (§13.2)" {
             val payload = """
                 {"v":1,"type":"subagent_list_response","id":"r-1","ts":"t","request_id":"r1",

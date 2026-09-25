@@ -194,7 +194,6 @@ class ShimRetirementArchitectureGateTest {
          */
         val SHIM_MOBILE_WS_ALLOWED = setOf(
             // Wire-shape contracts / renderer docs that describe the protocol.
-            "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/MobileWsFrames.kt",
             "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/render/ChatUiModels.kt",
         )
 

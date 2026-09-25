@@ -36,8 +36,8 @@ class ChatSendStrategySelectorTest {
     //
     // Before this bead ShimBackendDetector reported `isShimBackend = true` for
     // Iroh backends, so the live production transport selected the shim-shaped
-    // WS strategy. Routing now keys on BackendKind. These cases pin BOTH
-    // directions: reverting the selector to the isShimBackend key fails them.
+    // WS strategy. Routing now keys on BackendKind (and since g70jb.4 there is
+    // no shim backend kind at all).
     // ---------------------------------------------------------------------
 
     @Test
@@ -51,27 +51,15 @@ class ChatSendStrategySelectorTest {
     }
 
     @Test
-    fun `shim ws backend falls back to the timeline strategy`() {
-        val f = Fixture()
-
-        assertSame(f.timeline, f.selectFor(BackendKind.SHIM_WS))
-    }
-
-    @Test
-    fun `an iroh context is never a shim context`() {
-        val iroh = ChatSendContext(
-            isClientModeEnabled = false,
-            explicitConversationId = null,
-            backendKind = BackendKind.IROH,
-        )
-        val shim = iroh.copy(backendKind = BackendKind.SHIM_WS)
-
-        // Both stream frames...
-        assertEquals(true, iroh.usesChannelTransport)
-        assertEquals(true, shim.usesChannelTransport)
-        // ...but only one of them is the shim.
-        assertEquals(false, iroh.isShimBackend)
-        assertEquals(true, shim.isShimBackend)
+    fun `only an iroh context uses the channel transport`() {
+        for (kind in BackendKind.entries) {
+            val context = ChatSendContext(
+                isClientModeEnabled = false,
+                explicitConversationId = null,
+                backendKind = kind,
+            )
+            assertEquals("kind=$kind", kind == BackendKind.IROH, context.usesChannelTransport)
+        }
     }
 
     @Test

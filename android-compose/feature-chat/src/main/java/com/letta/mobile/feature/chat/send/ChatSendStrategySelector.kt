@@ -14,11 +14,8 @@ import kotlinx.coroutines.Job
  * The mapping is total and exclusive:
  *  - [BackendKind.LOCAL_RUNTIME] -> [LocalRuntimeChatSendStrategy]
  *  - [BackendKind.IROH]          -> [IrohChatSendStrategy]
- *  - [BackendKind.SHIM_WS]       -> [TimelineChatSendStrategy] (g70jb.3: the shim
- *                                   WebSocket transport is gone; leftover shim
- *                                   configs send over REST until SHIM_WS itself
- *                                   is removed)
- *  - [BackendKind.REST]          -> [TimelineChatSendStrategy]
+ *  - [BackendKind.REST]          -> [TimelineChatSendStrategy] (g70jb.4: this
+ *                                   includes leftover shim-era configs)
  */
 internal class ChatSendStrategySelector(
     private val timelineStrategy: ChatSendStrategy,
@@ -32,7 +29,7 @@ internal class ChatSendStrategySelector(
         else -> when (context.backendKind) {
             BackendKind.LOCAL_RUNTIME -> localStrategy
             BackendKind.IROH -> irohStrategy
-            BackendKind.SHIM_WS, BackendKind.REST -> timelineStrategy
+            BackendKind.REST -> timelineStrategy
         }
     }
 
@@ -49,7 +46,6 @@ internal class ChatSendStrategySelector(
             "attachments" to attachments.size,
             "conversationId" to context.explicitConversationId,
             "backendKind" to context.backendKind.name,
-            "isShimBackend" to context.isShimBackend,
             "isLocalRuntime" to context.isLocalRuntime,
             "isClientModeEnabled" to context.isClientModeEnabled,
         )
@@ -58,7 +54,6 @@ internal class ChatSendStrategySelector(
             "via" to strategy.routeName,
             "conversationId" to context.explicitConversationId,
             "backendKind" to context.backendKind.name,
-            "isShimBackend" to context.isShimBackend,
             "isLocalRuntime" to context.isLocalRuntime,
         )
         return strategy.send(text, attachments, context)
