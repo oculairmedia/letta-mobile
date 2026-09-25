@@ -97,6 +97,9 @@ class IrohChannelTransport(
     // expire young-in-flight protection without waiting the production 45s window.
     private val livenessCongestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
     livenessMaxDetectionMs: Long = IrohLivenessProbe.MAX_DETECTION_MS,
+    // How long an engine-owned turn's own terminal has before the observer's copy stands in.
+    // Overridable so real-time tests of the fallback need not wait the production window.
+    private val observerTerminalGraceMs: Long = IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
@@ -118,7 +121,9 @@ class IrohChannelTransport(
     override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()
 
     /** Emit to canonical frame publisher so both direct consumers and
-     *  WsChatBridge (via frameEvents) see each frame exactly once without split histories. */
+     *  WsChatBridge (via frameEvents) see each frame exactly once without split histories.
+     *  letta-mobile-qygvv.11: this is the single ingest point — the publisher drops exact
+     *  duplicates here, before fan-out, so no subscriber pays for them. */
     private suspend fun emitBoth(frame: ServerFrame) {
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
         adminRpcExecutor.recordStreamActivity()
@@ -357,6 +362,7 @@ class IrohChannelTransport(
             emitBoth = ::emitBoth,
             adminRpc = { method, path, body -> adminRpc(method, path, body) },
             recordFrameOwnership = ::recordFrameOwnership,
+            observerTerminalGraceMs = observerTerminalGraceMs,
         )
     }
 

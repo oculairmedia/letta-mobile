@@ -1,5 +1,6 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
@@ -151,7 +152,7 @@ internal suspend fun connectWasmAppServerSession(
                 client = client,
                 requestIdFactory = { nextRequestId("turn") },
                 eventRouter = eventRouter,
-            ),
+            ).also { engine -> engine.answerApprovalReplaysFrom(eventRouter, scope) },
             router = eventRouter,
             transport = transport,
             label = label,

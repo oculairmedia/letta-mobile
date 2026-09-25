@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.sync.withLock
 
@@ -24,6 +25,22 @@ class CanonicalTimelineCoordinator(
         val selection: TimelineEngineSelection,
     ) {
         internal var liveFence: TimelineLiveFence? = null
+        /**
+         * The turn that settled last, kept until the next turn opens. Its overlay may already be
+         * released (no viewport) or acknowledged, but a transport can still deliver its tail.
+         */
+        internal var settledTail: TimelineLivePublication? = null
+
+        /** The turn a late frame could belong to: the resident settled overlay, else the last one. */
+        internal fun settledTurn(): TimelineLivePublication? {
+            val live = session.live.value
+            if (live?.settlementRevision != null) return live
+            return settledTail.takeIf { liveFence == null }
+        }
+
+        /** The fence of a settled overlay still resident for this owner, able to take a tail. */
+        internal fun residentSettledFence(): TimelineLiveFence? =
+            session.live.value?.takeIf { it.settlementRevision != null && it.fence === liveFence }?.fence
         internal var activeRepairs: Int = 0
         internal val presentations = mutableSetOf<Presentation>()
     }
@@ -101,34 +118,89 @@ class CanonicalTimelineCoordinator(
 
     suspend fun beginLive(owner: Owner): TimelineLiveFence = mutex.withLock {
         check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
-        owner.session.beginLive(owner.selection).also { owner.liveFence = it }
+        openLive(owner)
     }
 
-    suspend fun ingest(owner: Owner, fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean = mutex.withLock {
-        if (owners[owner.selection.scope] !== owner || fence.selection !== owner.selection) return@withLock false
-        owner.session.ingest(fence, frame).also { accepted ->
-            if (accepted) releaseUnobservedSettlement(owner)
+    private suspend fun openLive(owner: Owner): TimelineLiveFence =
+        owner.session.beginLive(owner.selection).also {
+            owner.liveFence = it
+            owner.settledTail = null
         }
+
+    suspend fun ingest(owner: Owner, fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean =
+        mutex.withLock { ingestLocked(owner, fence, frame) }
+
+    private suspend fun ingestLocked(owner: Owner, fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean {
+        if (owners[owner.selection.scope] !== owner || fence.selection !== owner.selection) return false
+        val accepted = owner.session.ingest(fence, frame)
+        if (!accepted) return false
+        if (frame == TimelineStreamFrame.Done) rememberSettlement(owner)
+        releaseUnobservedSettlement(owner)
+        return true
     }
 
-    suspend fun ingestExternal(owner: Owner, message: com.letta.mobile.data.model.LettaMessage): Boolean = mutex.withLock {
-        if (owners[owner.selection.scope] !== owner) return@withLock false
+    /**
+     * [retiredTail] is the send coordinator's word that [message] belongs to a turn it already
+     * finished. Such a frame never opens a turn, whatever it names.
+     */
+    suspend fun ingestExternal(
+        owner: Owner,
+        message: LettaMessage,
+        retiredTail: Boolean = false,
+    ): Boolean = mutex.withLock { ingestExternalLocked(owner, message, retiredTail) }
+
+    private suspend fun ingestExternalLocked(
+        owner: Owner,
+        message: LettaMessage,
+        retiredTail: Boolean,
+    ): Boolean {
+        if (owners[owner.selection.scope] !== owner) return false
+        if (absorbsSettledTail(owner, message, retiredTail)) return true
         val frame = TimelineStreamFrame.Message(message)
-        val fence = owner.liveFence ?: owner.session.beginLive(owner.selection).also { owner.liveFence = it }
-        if (owner.session.ingest(fence, frame)) return@withLock true
+        val fence = owner.liveFence ?: openLive(owner)
+        if (owner.session.ingest(fence, frame)) return true
         // A frame arriving after this conversation's last turn settled belongs to the next turn, not
         // to an error. The settled overlay refuses it until the screen acknowledges settlement, and
         // that acknowledgement waits on a reconcile, so an agent replying twice in a row would
         // otherwise be rejected. Open the fence the absent turnStarted would have opened.
-        if (owner.session.live.value?.settlementRevision == null) return@withLock false
-        val renewed = owner.session.beginLive(owner.selection).also { owner.liveFence = it }
-        owner.session.ingest(renewed, frame)
+        if (owner.session.live.value?.settlementRevision == null) return false
+        return owner.session.ingest(openLive(owner), frame)
+    }
+
+    /**
+     * A frame of the turn that just settled is its tail, not the next turn. Transports deliver a
+     * reply's last deltas after its terminal (Iroh emits them behind turn_finished, device capture
+     * 2026-09-24). Opening a fence for one left a live turn nothing would ever settle: every
+     * turn-end repair was refused as NoProgress, the user's echo never confirmed, and its pending
+     * row held the composer on Thinking. The settled overlay is frozen and reconcile carries the
+     * durable row, so the tail is absorbed here.
+     */
+    private suspend fun absorbsSettledTail(
+        owner: Owner,
+        message: LettaMessage,
+        retiredTail: Boolean,
+    ): Boolean {
+        if (!retiredTail && owner.settledTurn()?.claimsLateTail(message) != true) return false
+        // While the settled overlay is still on screen the tail completes it, so the reply renders
+        // whole and adopts its stored row by content. Otherwise reconcile carries the durable row.
+        val folded = owner.residentSettledFence()?.let { owner.session.engine.ingestSettledTail(it, message) } ?: false
+        com.letta.mobile.util.Telemetry.event(
+            "CanonicalTimeline", "external.settledTailAbsorbed",
+            "messageType" to message.messageType, "runId" to (message.runId ?: ""),
+            "folded" to folded, "signalled" to retiredTail,
+        )
+        return true
+    }
+
+    private fun rememberSettlement(owner: Owner) {
+        owner.session.live.value?.takeIf { it.settlementRevision != null }?.let { owner.settledTail = it }
     }
 
     suspend fun completeExternal(owner: Owner) = mutex.withLock {
         if (owners[owner.selection.scope] !== owner) return@withLock
         val fence = owner.liveFence ?: return@withLock
         owner.session.ingest(fence, TimelineStreamFrame.Done)
+        rememberSettlement(owner)
         releaseUnobservedSettlement(owner)
     }
 

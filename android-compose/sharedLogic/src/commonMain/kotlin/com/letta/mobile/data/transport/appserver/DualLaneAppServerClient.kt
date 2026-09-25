@@ -32,6 +32,8 @@ class DualLaneAppServerClient(
     override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = runtime.changeDeviceState(command)
     override suspend fun sync(command: AppServerCommand.Sync) = runtime.sync(command)
     override suspend fun abort(command: AppServerCommand.AbortMessage) = runtime.abort(command)
+    override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue) = runtime.resumeQueue(command)
+    override suspend fun removeQueueItem(command: AppServerCommand.RemoveQueueItem) = runtime.removeQueueItem(command)
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
         runtime.sendExternalToolResponse(command)
 
