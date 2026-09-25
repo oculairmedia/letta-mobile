@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.runtime.TurnBoundaryGate
 import com.letta.mobile.data.runtime.TurnInputAcknowledgement
 import com.letta.mobile.data.runtime.TurnInputAcknowledgementListener
+import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerStopReason
@@ -18,6 +19,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -84,7 +86,7 @@ internal class IrohRelayedTurnProtocol(
     private val runtime: AppServerRuntimeScope,
     private val requestId: String?,
     private val clientMessageId: String?,
-    private val fanout: ConversationTurnFanout,
+    val fanout: ConversationTurnFanout,
     private val writeControl: suspend (String) -> Unit,
     /** Runs once, right after an accepted ack (the observer user echo). */
     private val afterAccepted: suspend () -> Unit = {},
@@ -129,9 +131,9 @@ internal class IrohRelayedTurnProtocol(
     suspend fun afterDraft(draft: RuntimeEventDraft) {
         when (val payload = draft.payload) {
             is RuntimeEventPayload.RemoteStreamFrame -> if (payload.messageType == "stop_reason") {
-                upstreamStopReason = innerStopReason(payload.body) ?: upstreamStopReason
+                upstreamStopReason = innerStopReason(payload) ?: upstreamStopReason
             }
-            is RuntimeEventPayload.ExternalTransportFrame -> forwardQueueSnapshot(payload.body)
+            is RuntimeEventPayload.ExternalTransportFrame -> forwardQueueSnapshot(payload)
             is RuntimeEventPayload.RunLifecycleChanged -> onLifecycle(payload, draft)
             else -> Unit
         }
@@ -174,7 +176,7 @@ internal class IrohRelayedTurnProtocol(
         runId = boundRunId
         if (announcedRunId == boundRunId || finished) return
         announcedRunId = boundRunId
-        fanout.writeInitiatorProtocolFrame("update_loop_status", loopStatusFields(LOOP_PROCESSING, active = true))
+        fanout.writeInitiatorProtocolFrame("update_loop_status", loopStatusFields(LOOP_PROCESSING))
     }
 
     /** App Server order after the stop_reason delta: idle loop status, then turn_finished. */
@@ -183,7 +185,7 @@ internal class IrohRelayedTurnProtocol(
         finished = true
         fanout.writeInitiatorProtocolFrame(
             "update_loop_status",
-            loopStatusFields(TurnBoundaryGate.LOOP_WAITING_ON_INPUT, active = false),
+            loopStatusFields(TurnBoundaryGate.LOOP_WAITING_ON_INPUT),
         )
         val turnFinished = buildJsonObject {
             put("turn_id", runId ?: clientMessageId?.let { "turn-$it" } ?: "turn-${UUID.randomUUID()}")
@@ -200,8 +202,10 @@ internal class IrohRelayedTurnProtocol(
         )
     }
 
-    private fun loopStatusFields(status: String, active: Boolean): JsonObject {
+    /** Only the processing status lists the bound run as active; idle lists none. */
+    private fun loopStatusFields(status: String): JsonObject {
         val run = runId
+        val active = status == LOOP_PROCESSING
         return buildJsonObject {
             put(
                 "loop_status",
@@ -222,8 +226,8 @@ internal class IrohRelayedTurnProtocol(
     }
 
     /** Re-wraps an upstream `update_queue` for this runtime with the initiator's own envelope. */
-    private suspend fun forwardQueueSnapshot(body: String) {
-        val raw = runCatching { AppServerProtocol.json.parseToJsonElement(body).jsonObject }.getOrNull() ?: return
+    private suspend fun forwardQueueSnapshot(frame: RuntimeEventPayload.ExternalTransportFrame) {
+        val raw = runCatching { AppServerProtocol.json.parseToJsonElement(frame.body).jsonObject }.getOrNull() ?: return
         if ((raw["type"] as? JsonPrimitive)?.contentOrNull != "update_queue") return
         val fields = JsonObject(raw.filterKeys { it !in ENVELOPE_KEYS })
         fanout.writeInitiatorProtocolFrame("update_queue", fields)
@@ -244,8 +248,8 @@ internal class IrohRelayedTurnProtocol(
         }
     }
 
-    private fun innerStopReason(body: String): String? = runCatching {
-        val delta = AppServerProtocol.json.parseToJsonElement(body).jsonObject["delta"]?.jsonObject
+    private fun innerStopReason(frame: RuntimeEventPayload.RemoteStreamFrame): String? = runCatching {
+        val delta = AppServerProtocol.json.parseToJsonElement(frame.body).jsonObject["delta"]?.jsonObject
         (delta?.get("stop_reason") as? JsonPrimitive)?.contentOrNull
     }.getOrNull()
 
@@ -260,17 +264,17 @@ internal class IrohRelayedTurnProtocol(
 }
 
 /**
- * Runs [command] through [controller] and relays every draft to [fanout], with [protocol] adding
+ * Runs [command] through [controller] and relays every draft to the [protocol]'s fanout, adding
  * the App Server frames around them. [onFailure] handles an exception out of the collector, after
  * an input that never got its ack is answered `accepted:false` (busy rejection, input failure).
  */
 internal suspend fun relayTurn(
     controller: AppServerController,
     command: TurnCommand,
-    fanout: ConversationTurnFanout,
     protocol: IrohRelayedTurnProtocol,
     onFailure: suspend (Throwable) -> Unit,
 ) {
+    val fanout = protocol.fanout
     runCatching {
         withContext(protocol.listener) {
             controller.runTurn(command).collect { draft -> relayDraft(fanout, protocol, draft) }
@@ -306,3 +310,39 @@ private suspend fun relayDraft(
     fanout.onDraft(payload)
     protocol.afterDraft(draft)
 }
+
+/**
+ * letta-mobile-qygvv.12: input_accepted / loop status / turn_finished for the initiator.
+ *
+ * eaczz.5: live user-echo fanout. Before the assistant stream, [echo] goes out as a snapshot
+ * `user_message` delta so OBSERVERS see the sender's prompt immediately, in order, ahead of
+ * the reply. The initiator does NOT double-render: the echo carries the sender's otid
+ * (== clientMsgId), which the reducer collapses against its optimistic Local row. It goes out
+ * right after the accepted ack (the ack precedes every stream frame), and not at all for a
+ * rejected input.
+ */
+internal fun relayedTurnProtocol(
+    input: AppServerCommand.Input,
+    fanout: ConversationTurnFanout,
+    echo: RelayedUserEcho?,
+    writeControl: suspend (String) -> Unit,
+) = IrohRelayedTurnProtocol(
+    runtime = input.runtime,
+    requestId = input.requestId,
+    clientMessageId = echo?.clientMessageId,
+    fanout = fanout,
+    writeControl = writeControl,
+    afterAccepted = { echo?.let { runCatching { fanout.broadcastUserEcho(it.clientMessageId, it.text, it.contentParts) } } },
+)
+
+/** The sender's prompt, echoed to observers once its input is accepted (eaczz.5). */
+internal class RelayedUserEcho(val clientMessageId: String, val text: String, val contentParts: JsonArray?)
+
+/** One relayed input's node-side state, for its failure path. */
+internal class RelayedInputTurn(
+    val input: AppServerCommand.Input,
+    val clientMsgId: String?,
+    val fanout: ConversationTurnFanout,
+    val protocol: IrohRelayedTurnProtocol,
+    val tracker: TurnFrameTracker?,
+)

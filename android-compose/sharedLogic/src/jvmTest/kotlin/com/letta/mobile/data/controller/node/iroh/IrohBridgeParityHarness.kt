@@ -198,7 +198,7 @@ internal class FakePhoneLink(
     val stream: List<WireFrame> get() = log.filter { it.channel == WireChannel.Stream }
 
     suspend fun relay(controller: AppServerController, command: TurnCommand) {
-        relayTurn(controller, command, fanout, protocol) { error -> throw AssertionError("relayed turn failed", error) }
+        relayTurn(controller, command, protocol) { error -> throw AssertionError("relayed turn failed", error) }
     }
 
     private fun parse(frame: String): JsonObject = AppServerProtocol.json.parseToJsonElement(frame).jsonObject

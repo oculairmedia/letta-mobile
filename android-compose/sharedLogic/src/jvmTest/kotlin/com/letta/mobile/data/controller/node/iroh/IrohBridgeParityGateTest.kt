@@ -90,7 +90,7 @@ class IrohBridgeParityGateTest {
         val phone = FakePhoneLink(recording.runtime, CLIENT_MESSAGE_ID, REQUEST_ID, backgroundScope)
         val busy = controllerRunning { flow { error("Another turn is already active") } }
         var failure: Throwable? = null
-        relayTurn(busy, turnCommandFor(recording.runtime, CLIENT_MESSAGE_ID), phone.fanout, phone.protocol) {
+        relayTurn(busy, turnCommandFor(recording.runtime, CLIENT_MESSAGE_ID), phone.protocol) {
             failure = it
         }
         assertNotNull(failure)
