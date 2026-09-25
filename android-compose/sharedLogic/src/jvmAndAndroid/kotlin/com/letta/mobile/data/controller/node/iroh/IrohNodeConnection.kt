@@ -207,6 +207,14 @@ class IrohNodeConnection(
             agentEventsGate = {
                 authenticated.get() && IrohPeerCapabilities.isAllowed(effectiveCapabilities(), IrohPeerCapabilities.CHAT_READ)
             },
+            // Conversation pushes name conversations, so they reach only peers whose conversation
+            // scope is unrestricted (the same rule conversation.list scoping applies, lgns8.12).
+            conversationEventsGate = {
+                val capabilities = effectiveCapabilities()
+                authenticated.get() &&
+                    IrohPeerCapabilities.isAllowed(capabilities, IrohPeerCapabilities.CHAT_READ) &&
+                    IrohPeerCapabilities.conversationScope(capabilities, viewedConversationId = null) == null
+            },
         )
         selfViewer = handle
         return handle

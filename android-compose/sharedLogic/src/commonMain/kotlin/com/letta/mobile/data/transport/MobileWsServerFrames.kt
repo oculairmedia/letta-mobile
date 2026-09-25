@@ -524,6 +524,23 @@ sealed interface ServerFrame {
         val at: String = "",
     ) : ServerFrame
 
+    /**
+     * letta-mobile-lks7m: Meridian's device-wide push after a conversation write (created, updated,
+     * archived, restored) from any client, so conversation lists follow other devices without a
+     * restart. [agentId] is the owning agent when the host knew it.
+     */
+    @Serializable
+    data class ConversationUpdated(
+        override val v: Int = 1,
+        val type: String = "conversation_updated",
+        override val id: String,
+        override val ts: String,
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("agent_id") val agentId: String? = null,
+        val reason: String = "",
+        val at: String = "",
+    ) : ServerFrame
+
     // ─── Subagent server frames (letta-mobile-73o2h.3) ──────────────
     //
     // `request_id` echoes the client's outbound request so the repo

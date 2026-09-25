@@ -391,6 +391,8 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.SubagentListResponse,
     is ServerFrame.SubagentTodosResponse,
     is ServerFrame.SubagentsUpdated,
+    // letta-mobile-lks7m: conversation pushes route to the conversation lists, not chat content.
+    is ServerFrame.ConversationUpdated,
     // letta-mobile-2rkdj: subscribe wrappers don't surface to chat
     // directly — the inner BridgeFrame is unwrapped and re-routed
     // through the normal handler upstream of this mapper, so by the

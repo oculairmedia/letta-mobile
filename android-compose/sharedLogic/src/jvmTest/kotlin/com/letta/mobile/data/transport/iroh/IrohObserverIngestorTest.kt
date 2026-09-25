@@ -292,6 +292,30 @@ class IrohObserverIngestorTest {
     }
 
     @Test
+    fun meridianConversationUpdatedPushIsRepublishedForTheConversationLists() = testScope.runTest {
+        val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = IrohObserverIngestor(
+            scope = testScope,
+            turnRegistry = IrohTurnRegistry(),
+            connectionGeneration = { 1L },
+            emitBoth = { emittedFrames.add(it) },
+            adminRpc = { _, _, _ -> error("unexpected") },
+            recordFrameOwnership = { _, _ -> error("a conversation push is not a turn frame") },
+        )
+        // Exactly what ConversationChangeNotifier writes, as the Iroh transport decodes it off the stream.
+        val wire = """{"v":1,"type":"conversation_updated","id":"conversation-updated-1","ts":"2026-09-25T21:00:00Z","conversation_id":"conv-9","agent_id":"agent-7","reason":"created","at":"2026-09-25T21:00:00Z"}"""
+        val received = AppServerProtocol.decodeFrame(wire, AppServerChannel.Stream)
+        assertIs<AppServerInboundFrame.Unknown>(received.frame)
+
+        ingestor.ingestObserverFrame(ObserverFrameRequest(received, 1L))
+
+        val pushed = assertIs<ServerFrame.ConversationUpdated>(emittedFrames.single())
+        assertEquals("conv-9", pushed.conversationId)
+        assertEquals("agent-7", pushed.agentId)
+        assertEquals("created", pushed.reason)
+    }
+
+    @Test
     fun otherUnknownStreamFramesStayIgnored() = testScope.runTest {
         val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
         val ingestor = IrohObserverIngestor(

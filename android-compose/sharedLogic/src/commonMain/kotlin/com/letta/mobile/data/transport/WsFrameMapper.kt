@@ -100,6 +100,8 @@ object WsFrameMapper {
         is ServerFrame.CronsUpdated,
         is ServerFrame.GoalsUpdated,
         is ServerFrame.AgentUpdated,
+        // letta-mobile-lks7m: conversation pushes drive the conversation lists, not the timeline.
+        is ServerFrame.ConversationUpdated,
         // letta-mobile-73o2h: active-subagent registry frames are
         // routing-only — they drive the SubagentRepository state machine
         // (active-bar), not the chat timeline. Same treatment as crons.
