@@ -29,7 +29,10 @@ internal object AgentBlockWriteHandlers {
     const val CREATE = "block.create_agent"
     const val DELETE = "block.delete_agent"
 
-    val METHODS: Set<String> = setOf(UPDATE, CREATE, DELETE)
+    /** bfooy.5 additions; [UPDATE] predates them (lgns8.9). */
+    val CREATE_DELETE_METHODS: Set<String> = setOf(CREATE, DELETE)
+
+    val METHODS: Set<String> = CREATE_DELETE_METHODS + UPDATE
 
     fun register(router: AdminRpcRouter, store: LocalBackendAdminStore?, nativeClient: AppServerClient?) {
         router.register(UPDATE) { params ->

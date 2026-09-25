@@ -220,4 +220,13 @@ object ToolAdminHandlers {
 
     val METHODS: Set<String> = TOOL_CATALOG_METHODS + TOOL_WRITE_METHODS +
         BLOCK_READ_METHODS + BLOCK_NATIVE_WRITE_METHODS + BLOCK_DENIED_METHODS
+
+    /**
+     * bfooy.5: agent-scoped block create/delete were added after the admin REST
+     * adapter retired; they were native (App Server v2) from the start.
+     */
+    val POST_RETIREMENT_METHODS: Set<String> = AgentBlockWriteHandlers.CREATE_DELETE_METHODS
+
+    /** Methods the retired admin REST adapter used to own (lgns8.9 inventory). */
+    val FORMER_ADMIN_REST_METHODS: Set<String> = METHODS - POST_RETIREMENT_METHODS
 }
