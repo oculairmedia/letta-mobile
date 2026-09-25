@@ -76,6 +76,11 @@ object Telemetry {
     // Per-gate Iroh frame-flow content-length diagnostic (see IrohFrameFlowDiagnostics).
     val frameFlowDiagEnabled = TelemetryFlag(false)
 
+    // letta-mobile-erx7m: touch-stall diagnostics (tag `Input`). Debug builds
+    // switch this on at startup; release builds never do, so the feature-module
+    // gesture probes cost a single flag read.
+    val inputDiagEnabled = TelemetryFlag(false)
+
     // letta-mobile-z5lqt: roster-completeness probe. When on, a finished agent
     // roster sweep additionally reads the authoritative `agent.count` purely so
     // the swept size can be compared against it (RosterNameTelemetry). The

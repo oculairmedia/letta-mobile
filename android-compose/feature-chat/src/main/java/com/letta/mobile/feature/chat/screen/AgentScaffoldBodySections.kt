@@ -71,6 +71,7 @@ internal fun AgentScaffoldInteractionEffects(state: AgentScaffoldRuntimeState) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AgentScaffoldDrawerScaffold(state: AgentScaffoldRuntimeState) {
+    LogDrawerTransitions(state.drawerState)
     ModalNavigationDrawer(
         drawerState = state.drawerState,
         drawerContent = { AgentScaffoldDrawerSheet(state) },
