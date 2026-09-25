@@ -100,8 +100,12 @@ class TimelineExactCanonicalWriter(
         return CanonicalToolIndex.observe(transaction, callId, owner, true) || merged
     }
 
-    suspend fun mergeEvent(transaction: TimelineStoreTransaction, incoming: TimelineEvent.Confirmed): Boolean {
-        val identity = canonicalEventIdentity(transaction, incoming)
+    suspend fun mergeEvent(transaction: TimelineStoreTransaction, arriving: TimelineEvent.Confirmed): Boolean {
+        val resident = residentRow(transaction, arriving)
+        // A part refused its shared otid's row is named by its own id alone, so every later
+        // reader resolves the stored row back to the identity it is stored under.
+        val incoming = if (resident.renamed) arriving.copy(otid = arriving.serverId) else arriving
+        val identity = resident.identity
         val suppression = transaction.evidence("suppression/server/${identity.value}", 64 * 1024)
         if (suppression != null && incoming.messageType == TimelineMessageType.ASSISTANT) {
             val decision = TimelineSnapshotCodec.json.decodeFromString(
@@ -111,23 +115,13 @@ class TimelineExactCanonicalWriter(
         }
         val ownerKey = "terminal/server/${identity.value}"
         val ownerBytes = transaction.evidence(ownerKey, 64 * 1024)
-        val owner = ownerBytes?.let {
+        if (resident.vacated && ownerBytes != null) transaction.deleteEvidence(ownerKey)
+        val owner = ownerBytes?.takeUnless { resident.vacated }?.let {
             TimelineSnapshotCodec.json.decodeFromString(TerminalOwnershipEvidence.serializer(), it.decodeToString())
         }
-        val key = transaction.locate(identity) ?: TimelinePageKey(
-            timelineInstantDurationMillis(parseTimelineInstant("1970-01-01T00:00:00Z"), incoming.date), identity,
-        )
-        val old = transaction.metadata(TimelineReadPosition.Around(key), 1).rows.singleOrNull { it.key == key }
-        var historical: TimelineEvent.Confirmed? = null
-        var historicalBytes: ByteArray? = null
-        if (old != null) {
-            if (old.body.encodedBytes > maxHistoricalBytes) throw TimelineMergeUnavailable(identity, "historical_body_budget")
-            val bytes = transaction.readHistoricalBody(identity, old.body)
-            historicalBytes = bytes
-            historical = TimelineSnapshotCodec.json.decodeFromString(
-                StoredTimelineEvent.serializer(), bytes.decodeToString(),
-            ).toConfirmedTimelineEvent()
-        }
+        val key = resident.key
+        val historical = resident.event
+        val historicalBytes = resident.bytes
         var merged = if (owner != null) {
             when (val decision = mergeOwnedTerminal(scope, owner, incoming, maxHistoricalBytes.toLong(),
                 TerminalHistoricalBodyReader { _, _, _ -> historical })) {
@@ -247,6 +241,49 @@ class TimelineExactCanonicalWriter(
             offset += chunk.size
         }
         return stored
+    }
+
+    /**
+     * The row [incoming] merges onto. An alias that lands on the other prose part of the same
+     * source message is refused and the event takes its own server id instead; a row already
+     * under that id that still holds the other part is vacated, so the event replaces the
+     * misfiled body instead of merging into it (letta-mobile-iyj4s).
+     */
+    private suspend fun residentRow(
+        transaction: TimelineStoreTransaction,
+        incoming: TimelineEvent.Confirmed,
+    ): CanonicalResidentRow {
+        val resolved = readResident(transaction, canonicalEventIdentity(transaction, incoming), incoming)
+        if (!resolved.holdsOtherPartOf(incoming)) return resolved
+        val own = TimelineMessageId(incoming.serverId)
+        val named = if (resolved.identity == own || incoming.serverId.isBlank()) resolved
+        else readResident(transaction, own, incoming).renamed().also { transaction.dropServerIdAlias(incoming.serverId, own) }
+        return if (named.holdsOtherPartOf(incoming)) named.vacate() else named
+    }
+
+    /** A reply's server id recorded as an alias of the reasoning row it was collapsed onto. */
+    private suspend fun TimelineStoreTransaction.dropServerIdAlias(serverId: String, own: TimelineMessageId) {
+        val key = "identity/serverId/$serverId"
+        val alias = evidence(key, 64 * 1024)?.decodeToString() ?: return
+        if (alias != own.value) deleteEvidence(key)
+    }
+
+    private suspend fun readResident(
+        transaction: TimelineStoreTransaction,
+        identity: TimelineMessageId,
+        incoming: TimelineEvent.Confirmed,
+    ): CanonicalResidentRow {
+        val key = transaction.locate(identity) ?: TimelinePageKey(
+            timelineInstantDurationMillis(parseTimelineInstant("1970-01-01T00:00:00Z"), incoming.date), identity,
+        )
+        val old = transaction.metadata(TimelineReadPosition.Around(key), 1).rows.singleOrNull { it.key == key }
+            ?: return CanonicalResidentRow(identity, key, null, null)
+        if (old.body.encodedBytes > maxHistoricalBytes) throw TimelineMergeUnavailable(identity, "historical_body_budget")
+        val bytes = transaction.readHistoricalBody(identity, old.body)
+        val event = TimelineSnapshotCodec.json.decodeFromString(
+            StoredTimelineEvent.serializer(), bytes.decodeToString(),
+        ).toConfirmedTimelineEvent()
+        return CanonicalResidentRow(identity, key, bytes, event)
     }
 
     private fun deferredReturnKey(callId: String) = "tool-return/deferred/$callId"
