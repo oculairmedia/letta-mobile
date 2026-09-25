@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// The scope is process-lifetime by design: startup work runs once per process and ends with it.
+@Suppress("NoDetachedCoroutineLifecycle")
 @Singleton
 class AppStartupCoordinator @Inject constructor(
     private val actions: AppStartupActions,

@@ -10,7 +10,6 @@ import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
 import dagger.Lazy
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -58,7 +57,7 @@ class AppStartupActionsTest {
     fun `ensureNotificationChannel calls channelNotificationPublisher`() = runTest {
         startupActions.ensureNotificationChannel()
 
-        coVerify { channelNotificationPublisher.ensureChannel() }
+        verify { channelNotificationPublisher.ensureChannel() }
     }
 
     @Test
