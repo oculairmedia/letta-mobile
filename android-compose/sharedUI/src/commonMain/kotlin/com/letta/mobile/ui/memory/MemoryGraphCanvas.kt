@@ -7,7 +7,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -62,17 +64,20 @@ internal fun MemoryGraphCanvas(
     val density = LocalDensity.current
     val minTouchPx = with(density) { MemoryGraphNodeMetrics.MIN_TOUCH_RADIUS * this.density }
     val labelGapPx = with(density) { LettaDimens.Space.xs.toPx() }
+    val current by rememberUpdatedState(params)
     LaunchedEffect(params.layout) { viewportState.sync(params.layout, viewportState.size) }
     Canvas(
         modifier = modifier
-            .onSizeChanged { viewportState.sync(params.layout, MemoryGraphSize(it.width.toFloat(), it.height.toFloat())) }
+            .onSizeChanged { viewportState.sync(current.layout, MemoryGraphSize(it.width.toFloat(), it.height.toFloat())) }
             .graphGestures(viewportState)
-            .pointerInput(params.view, params.layout, params.onNodeTap) {
+            // Keyed on the viewport holder and reading [current]: a reload must not restart
+            // (and drop) an in-flight tap.
+            .pointerInput(viewportState) {
                 // No onDoubleTap: it would hold every single tap for the
                 // double-tap timeout. Zoom lives on pinch, wheel and the buttons.
                 detectTapGestures { offset ->
-                    val target = MemoryGraphHitTarget(params.view, params.layout, viewportState.viewport, minTouchPx)
-                    params.onNodeTap(MemoryGraphHitTest.nodeAt(offset.toPoint(), target))
+                    val target = MemoryGraphHitTarget(current.view, current.layout, viewportState.viewport, minTouchPx)
+                    current.onNodeTap(MemoryGraphHitTest.nodeAt(offset.toPoint(), target))
                 }
             }
             .semantics { contentDescription = "Memory graph, ${params.view.nodes.size} nodes" },
