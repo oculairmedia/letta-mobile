@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
+import com.letta.mobile.data.chat.projection.hasNoRenderableContent
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
@@ -84,9 +85,7 @@ internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
         // Returns are folded into their canonical owners before projection; do not infer
         // ownership for arbitrary hidden rows (including orphan returns).
         if (sourceIndexes.zipWithNext().any { (left, right) ->
-                (left + 1 until right).any { index ->
-                    records[index].event?.isSyntheticSkillEnvelope() != true
-                }
+                (left + 1 until right).any { index -> !isHiddenWithinRun(records[index].event) }
             }) return@forEach
         val owner = sources.minBy { it.index }
         output[owner.index] = owner.record.copy(
@@ -109,6 +108,17 @@ internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
     }
     return output
 }
+
+/**
+ * Rows the chat never shows and that cannot end a turn: skill instruction envelopes, and
+ * (letta-mobile-jqiu3) whitespace-only assistant segments between a turn's tool calls, which the
+ * settled projection drops. Anything else hidden stays a boundary.
+ */
+private fun TimelinePageProjectionInput.isHiddenWithinRun(event: TimelineEvent.Confirmed?): Boolean =
+    event != null && (
+        event.isSyntheticSkillEnvelope() ||
+            timelineEventToUiMessage(event, context.ownAgentId)?.hasNoRenderableContent() == true
+        )
 
 private fun TimelineRunEnvelope.containsComplete(runId: String): Boolean =
     older != TimelineRunBoundary.Continues(runId) && newer != TimelineRunBoundary.Continues(runId)
