@@ -24,6 +24,11 @@ class CanonicalTimelineCoordinator(
         val selection: TimelineEngineSelection,
     ) {
         internal var liveFence: TimelineLiveFence? = null
+        /**
+         * The turn that settled last, kept until the next turn opens. Its overlay may already be
+         * released (no viewport) or acknowledged, but a transport can still deliver its tail.
+         */
+        internal var settledTail: TimelineLivePublication? = null
         internal var activeRepairs: Int = 0
         internal val presentations = mutableSetOf<Presentation>()
     }
@@ -101,34 +106,71 @@ class CanonicalTimelineCoordinator(
 
     suspend fun beginLive(owner: Owner): TimelineLiveFence = mutex.withLock {
         check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
-        owner.session.beginLive(owner.selection).also { owner.liveFence = it }
+        openLive(owner)
     }
+
+    private suspend fun openLive(owner: Owner): TimelineLiveFence =
+        owner.session.beginLive(owner.selection).also {
+            owner.liveFence = it
+            owner.settledTail = null
+        }
 
     suspend fun ingest(owner: Owner, fence: TimelineLiveFence, frame: TimelineStreamFrame): Boolean = mutex.withLock {
         if (owners[owner.selection.scope] !== owner || fence.selection !== owner.selection) return@withLock false
         owner.session.ingest(fence, frame).also { accepted ->
-            if (accepted) releaseUnobservedSettlement(owner)
+            if (accepted) {
+                if (frame == TimelineStreamFrame.Done) rememberSettlement(owner)
+                releaseUnobservedSettlement(owner)
+            }
         }
     }
 
     suspend fun ingestExternal(owner: Owner, message: com.letta.mobile.data.model.LettaMessage): Boolean = mutex.withLock {
         if (owners[owner.selection.scope] !== owner) return@withLock false
+        if (absorbsSettledTail(owner, message)) return@withLock true
         val frame = TimelineStreamFrame.Message(message)
-        val fence = owner.liveFence ?: owner.session.beginLive(owner.selection).also { owner.liveFence = it }
+        val fence = owner.liveFence ?: openLive(owner)
         if (owner.session.ingest(fence, frame)) return@withLock true
         // A frame arriving after this conversation's last turn settled belongs to the next turn, not
         // to an error. The settled overlay refuses it until the screen acknowledges settlement, and
         // that acknowledgement waits on a reconcile, so an agent replying twice in a row would
         // otherwise be rejected. Open the fence the absent turnStarted would have opened.
         if (owner.session.live.value?.settlementRevision == null) return@withLock false
-        val renewed = owner.session.beginLive(owner.selection).also { owner.liveFence = it }
-        owner.session.ingest(renewed, frame)
+        owner.session.ingest(openLive(owner), frame)
+    }
+
+    /**
+     * A frame of the turn that just settled is its tail, not the next turn. Transports deliver a
+     * reply's last deltas after its terminal (Iroh emits them behind turn_finished, device capture
+     * 2026-09-24). Opening a fence for one left a live turn nothing would ever settle: every
+     * turn-end repair was refused as NoProgress, the user's echo never confirmed, and its pending
+     * row held the composer on Thinking. The settled overlay is frozen and reconcile carries the
+     * durable row, so the tail is absorbed here.
+     */
+    private fun absorbsSettledTail(owner: Owner, message: com.letta.mobile.data.model.LettaMessage): Boolean {
+        val live = owner.session.live.value
+        val settled = when {
+            live?.settlementRevision != null -> live
+            owner.liveFence == null -> owner.settledTail
+            else -> null
+        } ?: return false
+        if (!settled.claimsLateTail(message)) return false
+        com.letta.mobile.util.Telemetry.event(
+            "CanonicalTimeline", "external.settledTailAbsorbed",
+            "messageType" to message.messageType, "runId" to (message.runId ?: ""),
+        )
+        return true
+    }
+
+    private fun rememberSettlement(owner: Owner) {
+        owner.session.live.value?.takeIf { it.settlementRevision != null }?.let { owner.settledTail = it }
     }
 
     suspend fun completeExternal(owner: Owner) = mutex.withLock {
         if (owners[owner.selection.scope] !== owner) return@withLock
         val fence = owner.liveFence ?: return@withLock
         owner.session.ingest(fence, TimelineStreamFrame.Done)
+        rememberSettlement(owner)
         releaseUnobservedSettlement(owner)
     }
 

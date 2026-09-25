@@ -835,6 +835,40 @@ class ChatSendCoordinatorCleanupTest {
             assertFalse(ui.isStreaming())
         }
 
+    /**
+     * Frame order captured on device 2026-09-24 (local-conv-496): the last assistant delta of a
+     * turn reaches the coordinator after its stop reason and TurnDone. It must not relight presence.
+     */
+    @Test
+    fun lateAssistantDeltaAfterTurnDoneDoesNotRelatchPresence() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+        fun delta(content: String) = WsTimelineEvent.MessageDelta(
+            AssistantMessage(id = "ui-msg-9173252", contentRaw = JsonPrimitive(content), runId = "local-run-50"),
+            conversationId = "conv-1", turnId = "turn-1", agentId = AGENT_ID,
+        )
+
+        coordinator.send("hi").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "iroh-run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "local-run-50"))
+        coordinator.handleEvent(delta("Hello"))
+        assertTrue(ui.isStreaming())
+        coordinator.handleEvent(WsTimelineEvent.StopReason("turn-1", "local-run-50", "end_turn"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-50", BridgeTurnStatus.Completed))
+        advanceUntilIdle()
+        assertFalse(ui.isStreaming())
+
+        coordinator.handleEvent(delta(" there"))
+        coordinator.handleEvent(WsTimelineEvent.UsageStatistics("turn-1", "local-run-50", 1, 2, 3, 0, 0))
+        advanceUntilIdle()
+
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        // The tail still reaches the timeline, which decides what it is worth.
+        assertEquals(2, timeline.ingestedMessages.filterIsInstance<AssistantMessage>().count { it.id == "ui-msg-9173252" })
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,

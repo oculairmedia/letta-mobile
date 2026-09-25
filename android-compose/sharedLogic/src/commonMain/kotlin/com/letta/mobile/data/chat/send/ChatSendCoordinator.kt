@@ -1040,6 +1040,13 @@ class ChatSendCoordinator(
         }
     }
 
+    /** A delta naming a turn this conversation has already finished is that turn's tail. */
+    private fun isRetiredTurnTail(event: WsTimelineEvent.MessageDelta, conversationId: String): Boolean {
+        val turnId = event.turnId?.takeIf { it.isNotBlank() } ?: return false
+        val state = peekState(conversationId) ?: return false
+        return isRetiredTurn(state, turnId)
+    }
+
     /**
      * Prefer the state the otid bound, then the state that owns this turn, then whatever the
      * frame's conversation resolves to. The frame's own id is the last thing to trust: it is the
@@ -1122,6 +1129,18 @@ class ChatSendCoordinator(
             isReplay = event.isReplay,
         )
         timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
+        if (isRetiredTurnTail(event, conversationId)) {
+            // A reply's last deltas can reach us after its terminal (Iroh emits them behind
+            // turn_finished). The timeline decides what the tail is worth, but the turn is over: latching
+            // typing here re-lit Thinking/Stop run with no terminal left to clear them.
+            Telemetry.event(
+                "AdminChatVM", "ws.event.retiredTurnTailDelta",
+                "turnId" to event.turnId,
+                "messageType" to event.message.messageType,
+                "conversationId" to conversationId,
+            )
+            return
+        }
         if (!event.isReplay) {
             postSendReconciler.recordLiveIngest(conversationId)
             // Finding 1: a background conversation's delta must not latch
