@@ -10,20 +10,24 @@ interface IAgentBlockRepository {
     suspend fun getBlocks(agentId: String): List<Block>
 }
 
+/** One core-memory block addressed the way MemFS stores it: agent + label. */
+data class AgentBlockTarget(val agentId: String, val label: String)
+
 /**
- * Per-agent block write, addressed by agent + label. On the letta-code local
- * backend this is `block.update_agent`, which the App Server serves with
+ * Per-agent block write, addressed by [AgentBlockTarget]. On the letta-code
+ * local backend this is `block.update_agent`, which the App Server serves with
  * `write_memory_file` and a commit message, so the edit lands in the MemFS git
  * HEAD that the compiled system prompt reads. Global-id block writes fail closed
  * there, so memory editors must write through this seam.
  */
 interface IAgentBlockWriteRepository : IAgentBlockRepository {
-    suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block
+    suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block
 }
 
-interface IBlockRepository : IAgentBlockWriteRepository {
+interface IBlockRepository : IAgentBlockRepository {
     suspend fun retrieveBlock(blockId: String): Block
     suspend fun countBlocks(): Int
+    suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block
     suspend fun updateGlobalBlock(
         blockId: String,
         params: BlockUpdateParams,
