@@ -4,26 +4,27 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
+import com.letta.mobile.util.InputDiagnostics
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * letta-mobile-erx7m: gesture-state probes for the touch-stall investigation, logged under the
  * `Input` tag next to the app's `touch.dispatch` / `pointer.root` lines. Everything is gated on
- * [Telemetry.inputDiagEnabled], which only debug builds switch on.
+ * [InputDiagnostics.enabled], which only debug builds switch on.
  */
 private const val INPUT_TAG = "Input"
 
 internal object SwipeUpToCanvasDiagnostics {
     /** The composer swipe claimed the stream (first consumed upward move past slop). */
     fun started() {
-        if (!Telemetry.inputDiagEnabled.get()) return
+        if (!InputDiagnostics.enabled.get()) return
         Telemetry.event(INPUT_TAG, "swipeUpToCanvas.start")
     }
 
     /** How a claimed gesture ended: Committed, Released, Cancelled or detached. */
     fun ended(outcome: String) {
-        if (!Telemetry.inputDiagEnabled.get()) return
+        if (!InputDiagnostics.enabled.get()) return
         val name = if (outcome == SwipeUpToCanvasOutcome.Committed.name) "commit" else "abandon"
         Telemetry.event(INPUT_TAG, "swipeUpToCanvas.$name", "result" to outcome)
     }
@@ -33,7 +34,7 @@ internal object SwipeUpToCanvasDiagnostics {
 @Composable
 internal fun LogDrawerTransitions(drawerState: DrawerState) {
     LaunchedEffect(drawerState) {
-        if (!Telemetry.inputDiagEnabled.get()) return@LaunchedEffect
+        if (!InputDiagnostics.enabled.get()) return@LaunchedEffect
         snapshotFlow { drawerState.currentValue to drawerState.targetValue }
             .distinctUntilChanged()
             .collect { (current, target) ->

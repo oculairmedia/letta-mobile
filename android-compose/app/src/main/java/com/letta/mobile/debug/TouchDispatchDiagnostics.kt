@@ -2,6 +2,7 @@ package com.letta.mobile.debug
 
 import android.view.MotionEvent
 import ca.oculair.meridian.BuildConfig
+import com.letta.mobile.util.InputDiagnostics
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -21,7 +22,7 @@ internal object TouchDispatchDiagnostics {
 
     /** Switches the feature-module gesture probes on; a no-op in release builds. */
     fun enableForDebugBuild() {
-        if (BuildConfig.DEBUG) Telemetry.inputDiagEnabled.set(true)
+        if (BuildConfig.DEBUG) InputDiagnostics.enabled.set(true)
     }
 
     /** Called with every event the activity window dispatched; a no-op in release builds. */
