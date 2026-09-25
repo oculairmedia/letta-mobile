@@ -1,6 +1,7 @@
 package com.letta.mobile.debug
 
 import android.view.MotionEvent
+import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -8,7 +9,7 @@ import com.letta.mobile.util.Telemetry
  * receives, so a stall can be split into "the window never saw it", "Compose dropped it" and
  * "a node swallowed it".
  *
- * Call sites guard with `BuildConfig.DEBUG`; nothing here runs in a release build. Only
+ * Every entry point checks `BuildConfig.DEBUG`; nothing here runs in a release build. Only
  * DOWN / UP / CANCEL and their pointer variants are logged, never MOVE.
  *
  * `source` and `toolType` are logged because Compose's AndroidComposeView resets its whole
@@ -18,7 +19,17 @@ import com.letta.mobile.util.Telemetry
 internal object TouchDispatchDiagnostics {
     const val TAG = "Input"
 
-    fun record(event: MotionEvent, handled: Boolean) {
+    /** Switches the feature-module gesture probes on; a no-op in release builds. */
+    fun enableForDebugBuild() {
+        if (BuildConfig.DEBUG) Telemetry.inputDiagEnabled.set(true)
+    }
+
+    /** Called with every event the activity window dispatched; a no-op in release builds. */
+    fun onDispatched(event: MotionEvent, handled: Boolean) {
+        if (BuildConfig.DEBUG) record(event, handled)
+    }
+
+    private fun record(event: MotionEvent, handled: Boolean) {
         val action = event.actionMasked
         if (!isLoggedTouchAction(action)) return
         Telemetry.event(

@@ -1,6 +1,7 @@
 package com.letta.mobile.debug
 
 import androidx.compose.ui.Modifier
+import ca.oculair.meridian.BuildConfig
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -20,9 +21,12 @@ import com.letta.mobile.util.Telemetry
  *  - `pressed` counts more pointers than the finger has → a phantom pointer is stuck pressed in
  *    Compose's state (every awaitEachGesture detector then waits for "all pointers up").
  *
- * It never consumes anything. Only attach it in debug builds.
+ * It never consumes anything. [debugRootPointerObserver] attaches it in debug builds only.
  */
-internal fun Modifier.rootPointerConsumptionObserver(): Modifier = pointerInput(Unit) {
+internal fun debugRootPointerObserver(): Modifier =
+    if (BuildConfig.DEBUG) Modifier.rootPointerConsumptionObserver() else Modifier
+
+private fun Modifier.rootPointerConsumptionObserver(): Modifier = pointerInput(Unit) {
     awaitPointerEventScope {
         while (true) {
             val initial = awaitPointerEvent(PointerEventPass.Initial)

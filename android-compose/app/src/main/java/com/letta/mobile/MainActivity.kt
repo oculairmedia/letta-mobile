@@ -3,7 +3,6 @@ package com.letta.mobile
 import android.Manifest
 import android.os.Bundle
 import android.view.MotionEvent
-import ca.oculair.meridian.BuildConfig
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -27,9 +26,7 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.debug.TouchDispatchDiagnostics
-import com.letta.mobile.debug.rootPointerConsumptionObserver
-import com.letta.mobile.util.Telemetry
-import androidx.compose.ui.Modifier
+import com.letta.mobile.debug.debugRootPointerObserver
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.content.Intent
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -65,12 +62,15 @@ class MainActivity : ComponentActivity() {
 
     private val launchTarget = mutableStateOf<AppLaunchTarget?>(null)
 
+    init {
+        // letta-mobile-erx7m: touch-stall probes, debug builds only.
+        TouchDispatchDiagnostics.enableForDebugBuild()
+    }
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        // letta-mobile-erx7m: touch-stall diagnostics, debug builds only.
-        if (BuildConfig.DEBUG) Telemetry.inputDiagEnabled.set(true)
         ProfileCaptureKeyguardHelper.allowProfileCaptureLaunch(this)
         importAutomationPayloadFromLaunchIntent()
         launchTarget.value = AppLaunchTarget.fromIntent(intent)
@@ -158,10 +158,7 @@ class MainActivity : ComponentActivity() {
                         settings = deps.secureSettingsStore,
                         runs = deps.conversationRunRegistry,
                     ) {
-                        Scaffold(
-                            modifier = if (BuildConfig.DEBUG) Modifier.rootPointerConsumptionObserver() else Modifier,
-                            snackbarHost = { SnackbarHost(snackbarHostState) },
-                        ) { _ ->
+                        Scaffold(modifier = debugRootPointerObserver(), snackbarHost = { SnackbarHost(snackbarHostState) }) { _ ->
                             val navController = rememberNavController()
                             AdaptiveScaffold(navController = navController) {
                                 AppNavGraph(
@@ -184,7 +181,7 @@ class MainActivity : ComponentActivity() {
     /** letta-mobile-erx7m: logs DOWN/UP/CANCEL reaching the window and whether it was handled. */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         val handled = super.dispatchTouchEvent(ev)
-        if (BuildConfig.DEBUG) TouchDispatchDiagnostics.record(ev, handled)
+        TouchDispatchDiagnostics.onDispatched(ev, handled)
         return handled
     }
 
