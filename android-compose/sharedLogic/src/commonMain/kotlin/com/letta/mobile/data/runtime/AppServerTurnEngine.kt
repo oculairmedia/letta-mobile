@@ -8,6 +8,7 @@ import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
+import com.letta.mobile.data.controller.fanout.isRuntimeStreamDetached
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
@@ -34,6 +35,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1259,6 +1262,12 @@ class AppServerTurnEngine(
             settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn timeout")
             throw idle
         } catch (e: CancellationException) {
+            // letta-mobile-qygvv.16: the router detached because the session carrying this turn
+            // is gone. No server terminal will ever arrive, so end the turn with one of our own.
+            if (e.isRuntimeStreamDetached() && currentCoroutineContext().isActive) {
+                cutOffTurnForSessionLoss(draftProcessor, command, lease)
+                throw TurnCompleted
+            }
             // letta-mobile-oqfbj: settle on cancellation/abort.
             // fix(no-settle-on-clean-completion): structured concurrency can
             // deliver a CLEAN completion's `throw TurnCompleted` (thrown from

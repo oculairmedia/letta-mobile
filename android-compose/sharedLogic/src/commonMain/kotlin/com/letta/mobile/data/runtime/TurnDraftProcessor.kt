@@ -6,6 +6,7 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -43,6 +44,31 @@ internal class TurnDraftProcessor(
     private var pendingCompletedSeq: Long? = null
     var terminalSettleJob: Job? = null
         private set
+
+    /** letta-mobile-qygvv.16: set once this turn's terminal lifecycle has been emitted. */
+    var terminalEmitted = false
+        private set
+
+    /**
+     * letta-mobile-qygvv.16: the transport session carrying this turn is gone, so no server terminal
+     * will ever arrive. Ends the turn through the same terminal path a server terminal takes: a
+     * completion already waiting out its settle window is published as it stands, otherwise
+     * [fallback] is. Never emits a second terminal. Returns what it did; the caller completes.
+     */
+    suspend fun cutOff(fallback: RuntimeEventDraft): TurnCutOffOutcome {
+        terminalSettleJob?.cancelAndJoin()
+        terminalSettleJob = null
+        if (terminalEmitted) return TurnCutOffOutcome.AlreadyTerminal
+        val pending = pendingCompleted
+        if (pending != null) {
+            flushTail()
+            callbacks.noteCompleted(pendingCompletedSeq)
+            emitMarkingTerminal(pending)
+            return TurnCutOffOutcome.PendingCompletionPublished
+        }
+        publishTerminal(fallback, frameSeq = null)
+        return TurnCutOffOutcome.FallbackPublished
+    }
 
     suspend fun flushTail() {
         callbacks.clearApprovals()
@@ -124,13 +150,22 @@ internal class TurnDraftProcessor(
     }
 
     private suspend fun emitTerminal(draft: RuntimeEventDraft, frameSeq: Long?) {
+        publishTerminal(draft, frameSeq)
+        callbacks.complete()
+    }
+
+    private suspend fun publishTerminal(draft: RuntimeEventDraft, frameSeq: Long?) {
         if (draft.isAbnormalTerminal()) {
             callbacks.settle(ledger, "Tool execution interrupted by turn termination")
         }
         flushTail()
         callbacks.recordTerminal(draft, frameSeq)
-        callbacks.emit(draft)
-        callbacks.complete()
+        emitMarkingTerminal(draft)
+    }
+
+    private suspend fun emitMarkingTerminal(terminal: RuntimeEventDraft) {
+        callbacks.emit(terminal)
+        terminalEmitted = true
     }
 
     private fun cancelSpeculativeCompletion() {
@@ -155,10 +190,22 @@ internal class TurnDraftProcessor(
             val terminal = pendingCompleted ?: return@launch
             flushTail()
             callbacks.noteCompleted(pendingCompletedSeq)
-            callbacks.emit(terminal)
+            emitMarkingTerminal(terminal)
             callbacks.complete()
         }
     }
+}
+
+/** letta-mobile-qygvv.16: how [TurnDraftProcessor.cutOff] ended a turn whose session was lost. */
+internal enum class TurnCutOffOutcome {
+    /** The turn's own terminal was already out; nothing more was emitted. */
+    AlreadyTerminal,
+
+    /** A completion waiting out its settle window was published as the terminal. */
+    PendingCompletionPublished,
+
+    /** No terminal was in sight, so the session-loss fallback terminal was published. */
+    FallbackPublished,
 }
 
 private val terminalStatuses = setOf(

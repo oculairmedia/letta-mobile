@@ -395,10 +395,9 @@ class RuntimeEventFanout(
         val open = subscribers.values.toList()
         subscribers.clear()
         // Close with a cause so turn collectors fail the lease instead of
-        // treating detach as a clean end-of-stream completion.
-        val cause = kotlinx.coroutines.CancellationException(
-            "AppServerRuntimeEventRouter detached",
-        )
+        // treating detach as a clean end-of-stream completion. The typed cause
+        // tells them the session was lost (letta-mobile-qygvv.16).
+        val cause = RuntimeStreamDetachedCancellation()
         open.forEach { it.channel.close(cause) }
     }
 

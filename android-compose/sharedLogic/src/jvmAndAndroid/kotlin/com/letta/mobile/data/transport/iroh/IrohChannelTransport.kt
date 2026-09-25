@@ -100,6 +100,8 @@ class IrohChannelTransport(
     // How long an engine-owned turn's own terminal has before the observer's copy stands in.
     // Overridable so real-time tests of the fallback need not wait the production window.
     private val observerTerminalGraceMs: Long = IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS,
+    // letta-mobile-qygvv.16: how long a turn whose session closed has to publish its own terminal.
+    private val sessionLossTerminalGraceMs: Long = IrohSessionLossCutOff.SESSION_LOSS_TERMINAL_GRACE_MS,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
@@ -227,22 +229,22 @@ class IrohChannelTransport(
             .map { (it as? IrohConnectionState.Ready)?.handle }
             .distinctUntilChanged { a, b -> a === b }
 
+    /**
+     * letta-mobile-qygvv.16: the session is closing, so every turn it carried must still end. The
+     * cut-off lets each engine publish its own terminal before its job is cancelled, and stands
+     * in with a synthetic one when none arrives in time.
+     */
     private fun handleCloseResources(reason: String) {
-        turnRegistry.allSendJobEntries().forEach { registration ->
-            val conversationId = registration.conversationId
-            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
-            val turn = turnRegistry.getActiveTurn(conversationId)
-            if (turn != null && !turn.hasTerminal) {
-                Telemetry.event(
-                    "IrohTransport", "turn.torn_down_nonterminal",
-                    "reason" to reason,
-                    "conversationId" to conversationId.value,
-                    "turnId" to turn.turnId,
-                    "runId" to turn.runId,
-                )
-            }
-            runCatching { job.cancel() }
-        }
+        sessionLossCutOff.cutOff(reason)
+    }
+
+    private val sessionLossCutOff by lazy {
+        IrohSessionLossCutOff(
+            scope = scope,
+            registry = turnRegistry,
+            emitBoth = ::emitBoth,
+            graceMs = sessionLossTerminalGraceMs,
+        )
     }
 
     private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {

@@ -29,6 +29,9 @@ private val TERMINAL_REASON_FAMILIES = listOf(
     // Provider refusal surfaced as an OpenAI-compat finish_reason
     // (e.g. "Model provider error: Provider finish_reason: content_filter").
     ReasonFamily("content_filter", anyOf = listOf("content_filter", "refusal")),
+    // letta-mobile-qygvv.16: SESSION_LOST_TERMINAL_REASON, before the generic families it
+    // would otherwise fall into.
+    ReasonFamily("connection_lost", anyOf = listOf("connection lost")),
     ReasonFamily("approval_pending", anyOf = listOf("waiting for approval")),
     ReasonFamily("invalid_tool_call_ids", anyOf = listOf("invalid tool call ids")),
     ReasonFamily("conversation_busy", allOf = listOf("conversation", "busy")),
