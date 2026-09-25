@@ -7,7 +7,14 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
+import com.letta.mobile.data.runtime.AppServerQueueSnapshot
+import com.letta.mobile.data.runtime.CancelledQueuedInput
+import com.letta.mobile.data.runtime.TurnRuntimeKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * Single control client for one App Server process.
@@ -34,6 +41,20 @@ interface AppServerController {
      * Current connection state.
      */
     val state: Flow<AppServerControllerState>
+
+    /**
+     * letta-mobile-qygvv.6: the latest App Server queue per runtime (items and whether they are
+     * parked after an abort). A runtime with an empty queue has no entry.
+     */
+    val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>>
+        get() = EMPTY_QUEUE_SNAPSHOTS
+
+    /**
+     * letta-mobile-qygvv.6: this client's queued inputs removed after a user abort, each with the
+     * Cancelled lifecycle draft for its turn.
+     */
+    val cancelledQueuedInputs: Flow<CancelledQueuedInput>
+        get() = emptyFlow()
 
     /**
      * Starts a runtime for the given agent and conversation.
@@ -105,6 +126,11 @@ interface AppServerController {
         runId: String? = null,
     ): AppServerInboundFrame.AbortMessageResponse
 
+    /**
+     * Sends one approval decision and waits for the App Server's `input_accepted`
+     * (letta-mobile-qygvv.5). [ApprovalSubmitResult.Rejected] carries the server's
+     * reason (e.g. "Approval request is no longer pending") and must be surfaced.
+     */
     suspend fun submitApproval(
         agentId: AgentId,
         conversationId: ConversationId? = null,
@@ -119,7 +145,7 @@ interface AppServerController {
         // being re-decoded from the `reason` sentinel here. When present and
         // approving, the tool call is closed via `Allow(updated_input=…)`.
         updatedInput: kotlinx.serialization.json.JsonObject? = null,
-    ) {
+    ): ApprovalSubmitResult {
         error("submitApproval is not supported by this controller")
     }
 
@@ -174,6 +200,9 @@ interface AppServerController {
         // Default no-op for test fakes.
     }
 }
+
+private val EMPTY_QUEUE_SNAPSHOTS: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>> =
+    MutableStateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>>(emptyMap()).asStateFlow()
 
 /**
  * Connection state for the App Server controller.

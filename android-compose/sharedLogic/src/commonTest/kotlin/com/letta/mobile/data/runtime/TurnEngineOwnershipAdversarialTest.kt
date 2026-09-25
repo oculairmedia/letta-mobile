@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
@@ -31,15 +32,15 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
  * letta-mobile-lgns8.22.1 / .22.2 — adversarial ownership / routing invariants.
  *
- * Owner-token lease tests (lgns8.22.2) assert preflight is never stolen via idle
- * run.list and stale owner finally cannot clear a replacement lease. Frame
+ * Owner-token lease tests (lgns8.22.2) assert preflight is never stolen via an idle
+ * loop status (qygvv.3: the busy path reads the `sync`-replayed `update_loop_status`)
+ * and stale owner finally cannot clear a replacement lease. Frame
  * correlation across runs stays `@Ignore` until lgns8.22.4.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -50,9 +51,9 @@ class TurnEngineOwnershipAdversarialTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun preflightOwnerWithNoRunIdIsNotForceReleasedWhenRunListIdle() =
+    fun preflightOwnerWithNoRunIdIsNotForceReleasedWhenLoopIdle() =
         runTest(UnconfinedTestDispatcher()) {
-            val client = AdversarialClient(hangFirstRuntimeStartOnly = true, runListIdle = true)
+            val client = AdversarialClient(hangFirstRuntimeStartOnly = true, runStatus = "completed")
             val engine = AppServerTurnEngine(client = client)
 
             val a = backgroundScope.launch {
@@ -73,7 +74,7 @@ class TurnEngineOwnershipAdversarialTest {
 
             assertFalse(
                 bAccepted,
-                "Preparing lease without run_id must not be stolen via idle run.list",
+                "Preparing lease without run_id must not be stolen via an idle loop status",
             )
             assertTrue(engine.isBusy("agent-1", "conv-1"))
             a.cancel()
@@ -151,7 +152,7 @@ class TurnEngineOwnershipAdversarialTest {
             client.emitAssistant("run-b")
             runCurrent()
 
-            // B is live — mark run.get alive before C's busy-path reconcile.
+            // B is live — the replayed loop status shows its run before C's busy-path reconcile.
             client.runStatusOverride = "in_progress"
 
             var cAccepted = false
@@ -208,15 +209,14 @@ class TurnEngineOwnershipAdversarialTest {
      */
     private class AdversarialClient(
         private val hangFirstRuntimeStartOnly: Boolean = false,
-        private val runListIdle: Boolean = false,
         runStatus: String = "in_progress",
     ) : AppServerClient {
         private val eventsHub = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
         override val events: Flow<AppServerReceivedFrame> = eventsHub
 
         var runStatusOverride: String = runStatus
-        var runGetQueried = false
-        var runListQueried = false
+        var syncCount = 0
+        private var lastRunId: String? = null
         var inputCalled = false
         var inputSentAfterEventsSubscribed = false
         private var runtimeStartCount = 0
@@ -253,53 +253,46 @@ class TurnEngineOwnershipAdversarialTest {
             inputSentAfterEventsSubscribed = eventsHub.subscriptionCount.value > 0
         }
 
-        override suspend fun sync(command: AppServerCommand.Sync) = error("unused")
+        /**
+         * qygvv.3: the busy path asks the App Server for its loop state. A finished run
+         * ("failed"/"completed") replays an idle loop; anything else replays an active run.
+         */
+        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse {
+            syncCount++
+            val idle = runStatusOverride == "failed" || runStatusOverride == "completed"
+            trackCollectorsAndEmit(
+                AppServerInboundFrame.UpdateLoopStatus(
+                    runtime = command.runtime,
+                    eventSeq = 90L + syncCount,
+                    emittedAt = "t",
+                    idempotencyKey = "loop-$syncCount",
+                    loopStatus = AppServerLoopStatus(
+                        status = if (idle) "WAITING_ON_INPUT" else "PROCESSING_API_RESPONSE",
+                        activeRunIds = if (idle) emptyList() else listOfNotNull(lastRunId),
+                    ),
+                ),
+            )
+            return AppServerInboundFrame.SyncResponse(
+                requestId = command.requestId.orEmpty(),
+                runtime = command.runtime,
+                success = true,
+            )
+        }
+
         override suspend fun abort(command: AppServerCommand.AbortMessage) = error("unused")
 
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
-            when (command.method) {
-                "run.get" -> {
-                    runGetQueried = true
-                    return AppServerInboundFrame.AdminRpcResponse(
-                        requestId = command.requestId,
-                        success = true,
-                        result = buildJsonObject { put("status", runStatusOverride) },
-                    )
-                }
-                "run.list" -> {
-                    runListQueried = true
-                    val body = if (runListIdle) {
-                        JsonArray(emptyList())
-                    } else {
-                        JsonArray(
-                            listOf(
-                                buildJsonObject {
-                                    put("conversation_id", "conv-1")
-                                    put("status", runStatusOverride)
-                                },
-                            ),
-                        )
-                    }
-                    return AppServerInboundFrame.AdminRpcResponse(
-                        requestId = command.requestId,
-                        success = true,
-                        result = body,
-                    )
-                }
-                else -> {
-                    // Preflight probes (agent.get / conversation.get / …) succeed empty.
-                    return AppServerInboundFrame.AdminRpcResponse(
-                        requestId = command.requestId,
-                        success = true,
-                        result = buildJsonObject {},
-                    )
-                }
-            }
-        }
+        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+            // Preflight probes (agent.get / conversation.get / …) succeed empty.
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = command.requestId,
+                success = true,
+                result = buildJsonObject {},
+            )
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
         fun emitAssistant(runId: String) {
+            lastRunId = runId
             trackCollectorsAndEmit(
                 AppServerInboundFrame.StreamDelta(
                     runtime = AppServerRuntimeScope("agent-1", "conv-1"),

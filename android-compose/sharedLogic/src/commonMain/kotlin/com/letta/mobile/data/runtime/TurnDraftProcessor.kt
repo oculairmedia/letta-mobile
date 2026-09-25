@@ -210,3 +210,16 @@ private fun RuntimeEventDraft.isStopReasonFrame(): Boolean = when (val event = p
     else -> false
 }
 
+internal suspend fun TurnDraftProcessor.promoteAndProcess(
+    drafts: List<RuntimeEventDraft>,
+    frameSeq: Long?,
+    slot: TurnLeaseSlot,
+    leaseToken: Long,
+) {
+    val runId = drafts.firstOrNull { it.runId != null }?.runId?.value
+    if (runId != null) {
+        slot.runIdGate.promote(runId, leaseToken)
+    }
+    drafts.forEach { draft -> process(draft, frameSeq) }
+}
+

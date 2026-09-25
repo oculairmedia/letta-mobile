@@ -592,11 +592,12 @@ class AppServerTurnEngineTest {
             )
             runCurrent()
 
-            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
-            assertEquals(runtime, approvalInput.runtime)
-            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
-            assertEquals("approval-1", approval.requestId)
-            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            // letta-mobile-qygvv.13: the server already approved the tool under
+            // Unrestricted; the delta is informational, so no approval_response is sent.
+            assertTrue(
+                client.sentCommands.none { (it as? AppServerCommand.Input)?.payload is AppServerInputPayload.ApprovalResponse },
+                "no redundant approval_response for an unrestricted approval_request_message",
+            )
             // Approval card suppressed; tool-call announcement surfaces so the
             // Skill tool chip renders live (toolchip-live fix).
             val toolCall = assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
@@ -1020,6 +1021,38 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun releasedTelemetryKeepsWatchdogTimeoutAsReleaseReason() = runTest {
+        // letta-mobile-qygvv.1 regression: the input-acceptance refactor made the
+        // post-join step return "normal_completion", which overwrote the reason
+        // the collector had already recorded. A watchdog release must still say
+        // so, otherwise the orphan-abort path (qygvv.3) never sees it.
+        com.letta.mobile.util.Telemetry.clear()
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            turnIdleTimeoutMs = 300,
+            nowMs = { testScheduler.currentTime },
+        )
+        val payloads = MutableStateFlow<List<RuntimeEventPayload>>(emptyList())
+        val job = launch {
+            engine.runTurn(command).collect { draft -> payloads.update { it + draft.payload } }
+        }
+        runCurrent()
+        assertTrue(client.sentCommands.any { it is AppServerCommand.Input })
+
+        advanceTimeBy(300L * 4)
+        runCurrent()
+        job.join()
+
+        val failed = payloads.value.filterIsInstance<RuntimeEventPayload.RunLifecycleChanged>().last()
+        assertEquals(RuntimeRunStatus.Failed, failed.status)
+        val released = com.letta.mobile.util.Telemetry.snapshot().first {
+            it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
+        }
+        assertEquals("watchdog_timeout", released.attrs["releaseReason"])
+    }
+
+    @Test
     fun supersededRunIdFramesAreDroppedAfterMidTurnReassignment() = runTest {
         // lgns8.22.4: after the lease promotes from run-1 → run-2, a late
         // run-1 terminal must not complete the turn.
@@ -1196,8 +1229,10 @@ class AppServerTurnEngineTest {
             listOf("agent-1", "agent-2"),
             client.runtimeStartCommands.map { it.agentId },
         )
+        // letta-mobile-qygvv.1: each user-message input also draws a request_id
+        // (for input_accepted), so the second runtime_start gets the third id.
         assertEquals(
-            listOf("runtime-start-1", "runtime-start-2"),
+            listOf("runtime-start-1", "runtime-start-3"),
             client.runtimeStartCommands.map { it.requestId },
         )
     }

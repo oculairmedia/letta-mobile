@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
@@ -159,6 +160,7 @@ internal class IrohDialer(
             eventRouter = eventRouter,
             externalToolRegistry = externalToolRegistry,
         )
+        engine.answerApprovalReplaysFrom(eventRouter, routerScope)
         return engine to eventRouter
     }
 

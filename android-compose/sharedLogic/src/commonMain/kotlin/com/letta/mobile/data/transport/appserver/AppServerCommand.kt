@@ -87,6 +87,31 @@ sealed interface AppServerCommand {
         @SerialName("run_id") val runId: String? = null,
     ) : AppServerCommand
 
+    /**
+     * letta-mobile-qygvv.6: releases queue items parked by an `abort_message` (upstream 0.32+,
+     * `queue-update-protocol.d.ts`). The server answers with `resume_queue_response` only when
+     * [requestId] is set.
+     */
+    @Serializable
+    @SerialName("resume_queue")
+    data class ResumeQueue(
+        val runtime: AppServerRuntimeScope,
+        @SerialName("request_id") val requestId: String? = null,
+    ) : AppServerCommand
+
+    /**
+     * letta-mobile-qygvv.6: drops one queued input without stopping the active turn (upstream
+     * 0.32+, `task-control-protocol.d.ts`). [itemId] is the queue item's `id`, not its
+     * `client_message_id`; the server then emits an `update_queue` removal `cancelled`.
+     */
+    @Serializable
+    @SerialName("remove_queue_item")
+    data class RemoveQueueItem(
+        @SerialName("request_id") val requestId: String,
+        val runtime: AppServerRuntimeScope,
+        @SerialName("item_id") val itemId: String,
+    ) : AppServerCommand
+
     @Serializable
     @SerialName("external_tool_call_response")
     data class ExternalToolCallResponse(

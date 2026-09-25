@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.api.TimelineIngestSources
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -77,7 +78,8 @@ class CanonicalExternalTransportWriter(
     override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) {
         // A refused frame is a dropped row on screen until the next reconcile, never a reason to
         // fail the turn: this runs on the transport's own dispatcher, where throwing killed the app.
-        if (!coordinator.ingestExternal(owner(agentId, conversationId), message)) {
+        val retiredTail = source == TimelineIngestSources.RETIRED_TURN_TAIL
+        if (!coordinator.ingestExternal(owner(agentId, conversationId), message, retiredTail)) {
             Telemetry.event(
                 "CanonicalTimeline", "external.frameRejected",
                 "source" to source, "conversationId" to conversationId,
