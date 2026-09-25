@@ -105,6 +105,10 @@ class AppServerProtocolCompatibilityTest {
             "abort_message",
             "external_tool_call_response",
             "admin_rpc",
+            "list_connect_providers",
+            "connect_provider",
+            "disconnect_provider",
+            "update_model",
         )
 
         val INBOUND_TYPES = setOf(
@@ -120,6 +124,10 @@ class AppServerProtocolCompatibilityTest {
             "update_device_status",
             "update_queue",
             "update_subagent_state",
+            "list_connect_providers_response",
+            "connect_provider_response",
+            "disconnect_provider_response",
+            "update_model_response",
         )
     }
 }

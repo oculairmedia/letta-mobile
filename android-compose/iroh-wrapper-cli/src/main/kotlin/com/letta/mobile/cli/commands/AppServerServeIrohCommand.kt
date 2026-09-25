@@ -104,6 +104,8 @@ fun buildProductionAdminRouter(
     eventScope: CoroutineScope? = null,
     /** Pushes `agent_updated` to connected clients after agent writes. */
     agentChanges: com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier? = null,
+    /** letta-mobile-w4q4p: persisted model exposure decisions; null keeps them in memory. */
+    modelExposureFile: String? = null,
 ): AdminRpcRouter {
     val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
@@ -150,6 +152,7 @@ fun buildProductionAdminRouter(
         localBackendDir = localBackendDir,
         skillsListing = skillsCatalog.asListingSource(),
         agentChanges = agentChanges,
+        modelExposureFile = modelExposureFile,
     )
 }
 
@@ -214,6 +217,13 @@ class AppServerServeIrohCommand : CliktCommand(
         envvar = "LETTA_CANVAS_ASSETS_DIR",
         help = "Directory for the assets (images, files) apps put on shared canvases " +
             "(default ~/.letta/canvas-relay/assets), kept by their hash and served to the other apps.",
+    )
+
+    private val modelExposureFile by option(
+        "--model-exposure-file",
+        envvar = "LETTA_MODEL_EXPOSURE_FILE",
+        help = "JSON file holding which App Server models are exposed to app model pickers " +
+            "(model.exposure.*; default: model-exposure.json next to host-canvases.json).",
     )
 
     private val pairingStoreFile by option(
@@ -444,6 +454,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
                 eventScope = scope,
                 agentChanges = agentChanges,
+                modelExposureFile = resolvedModelExposureFile(),
             )
             endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             agentChanges.attach(endpoint.agentChangeTarget())
@@ -737,6 +748,9 @@ class AppServerServeIrohCommand : CliktCommand(
         println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
         return canvasRelay
     }
+
+    private fun resolvedModelExposureFile(): String =
+        com.letta.mobile.data.controller.node.iroh.FileModelExposureStore.resolvePath(modelExposureFile, canvasOpsDir)
 
     /** The host's canvas.* tools, set by [startCanvasRelay]. */
     private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()

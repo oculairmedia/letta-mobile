@@ -236,6 +236,53 @@ sealed interface AppServerCommand {
         val name: String,
     ) : AppServerCommand
 
+    // Provider connect + model switch (letta-mobile-w4q4p). `target` has no
+    // default on purpose: encodeDefaults=false would drop it, and upstream
+    // requires it — callers pass APP_SERVER_PROVIDER_TARGET_LOCAL.
+
+    @Serializable
+    @SerialName("list_connect_providers")
+    data class ListConnectProviders(
+        @SerialName("request_id") val requestId: String,
+        val target: String,
+    ) : AppServerCommand
+
+    /** Carries provider credentials in [fields]; [toString] never prints their values. */
+    @Serializable
+    @SerialName("connect_provider")
+    data class ConnectProvider(
+        @SerialName("request_id") val requestId: String,
+        val target: String,
+        @SerialName("provider_id") val providerId: String,
+        @SerialName("auth_method_id") val authMethodId: String? = null,
+        val fields: Map<String, String>,
+        @SerialName("provider_name") val providerName: String? = null,
+        /** `ConnectProviderOAuthConfig` token bundle; opaque here. */
+        @SerialName("oauth_config") val oauthConfig: JsonObject? = null,
+    ) : AppServerCommand {
+        override fun toString(): String =
+            "ConnectProvider(requestId=$requestId, target=$target, providerId=$providerId, " +
+                "authMethodId=$authMethodId, fieldKeys=${fields.keys.sorted()}, providerName=$providerName, " +
+                "oauthConfig=${if (oauthConfig == null) "null" else "<redacted>"})"
+    }
+
+    @Serializable
+    @SerialName("disconnect_provider")
+    data class DisconnectProvider(
+        @SerialName("request_id") val requestId: String,
+        val target: String,
+        @SerialName("provider_id") val providerId: String,
+        @SerialName("provider_name") val providerName: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("update_model")
+    data class UpdateModel(
+        @SerialName("request_id") val requestId: String,
+        val runtime: AppServerConversationRuntimeScope,
+        val payload: AppServerUpdateModelPayload,
+    ) : AppServerCommand
+
     // Native cron scheduling (lgns8.8): replaces the legacy mobile-WS cron
     // path, which retires with the shim in lgns8.11.
 

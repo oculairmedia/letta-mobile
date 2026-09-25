@@ -88,6 +88,14 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.SkillEnable -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.SkillDisable -> AmbiguousMutation(dedupKey = null)
 
+            // Provider connect + model switch (letta-mobile-w4q4p): the listing is a
+            // read; connect/disconnect write the provider store and update_model
+            // rewrites agent/conversation model settings, so none replay blindly.
+            is AppServerCommand.ListConnectProviders -> SafeRead
+            is AppServerCommand.ConnectProvider -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.DisconnectProvider -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.UpdateModel -> AmbiguousMutation(dedupKey = null)
+
             // Cron scheduling (lgns8.8): reads replay safely; schedule
             // mutations and manual triggers are ambiguous after disconnect.
             is AppServerCommand.CronList -> SafeRead

@@ -17,3 +17,11 @@
 {"type":"update_device_status","runtime":{"agent_id":"agent-fixture","conversation_id":"conversation-fixture"},"event_seq":3,"emitted_at":"2026-06-27T00:00:02Z","idempotency_key":"event-fixture-3","device_status":{"connected":true}}
 {"type":"update_queue","runtime":{"agent_id":"agent-fixture","conversation_id":"conversation-fixture"},"event_seq":4,"emitted_at":"2026-06-27T00:00:03Z","idempotency_key":"event-fixture-4","queue":[]}
 {"type":"update_subagent_state","runtime":{"agent_id":"agent-fixture","conversation_id":"conversation-fixture"},"event_seq":5,"emitted_at":"2026-06-27T00:00:04Z","idempotency_key":"event-fixture-5","subagents":[]}
+{"type":"list_connect_providers","request_id":"req-lcp","target":"local"}
+{"type":"list_connect_providers_response","request_id":"req-lcp","success":true,"target":"local","providers":[]}
+{"type":"connect_provider","request_id":"req-cp","target":"local","provider_id":"openai-compatible","fields":{"apiKey":"<redacted>","baseUrl":"http://127.0.0.1:1234/v1"}}
+{"type":"connect_provider_response","request_id":"req-cp","success":false,"target":"local","providers":[],"models_may_have_changed":false,"error":"Unknown provider: no-such-provider"}
+{"type":"disconnect_provider","request_id":"req-dp","target":"local","provider_id":"openai-compatible"}
+{"type":"disconnect_provider_response","request_id":"req-dp","success":false,"target":"local","providers":[],"models_may_have_changed":false,"error":"Unknown provider: no-such-provider"}
+{"type":"update_model","request_id":"req-um","runtime":{"agent_id":"agent-fixture","conversation_id":"conversation-fixture"},"payload":{"model_handle":"lmstudio/fixture-model","reasoning_effort":"high"}}
+{"type":"update_model_response","request_id":"req-um","success":true,"runtime":{"agent_id":"agent-fixture","conversation_id":"conversation-fixture"},"applied_to":"conversation","model_id":"lmstudio/fixture-model","model_handle":"lmstudio/fixture-model","model_settings":null}
