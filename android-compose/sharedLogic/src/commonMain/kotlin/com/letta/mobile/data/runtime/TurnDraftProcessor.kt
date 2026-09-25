@@ -87,7 +87,7 @@ internal class TurnDraftProcessor(
      * back until the turn's terminal.
      */
     private suspend fun flushClosedRoundTail(draft: RuntimeEventDraft) {
-        if (!tail.closed || draft.isTailFrame() || draft.isTerminalLifecycle()) return
+        if (!tail.closed || !draft.continuesTurn()) return
         tail.drain().forEach { callbacks.emit(it) }
     }
 
@@ -285,6 +285,9 @@ private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val even
     ).any { it }
     else -> false
 }
+
+/** A frame that carries the turn on past a closed round tail: neither a tail frame nor a terminal. */
+private fun RuntimeEventDraft.continuesTurn(): Boolean = !isTailFrame() && !isTerminalLifecycle()
 
 private fun RuntimeEventDraft.isTailFrame(): Boolean = isStopReasonFrame() || isUsageStatisticsFrame()
 
