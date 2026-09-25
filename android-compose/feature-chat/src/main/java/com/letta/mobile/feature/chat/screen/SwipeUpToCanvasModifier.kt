@@ -3,9 +3,12 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -16,6 +19,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.haptics.HapticEffects
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 
 /**
@@ -43,6 +47,10 @@ import kotlin.math.abs
  * Horizontal drags are not consumed — the LazyColumn above continues to
  * scroll. The gesture only commits when the dominant direction of the
  * drag is upward.
+ *
+ * A cancelled stream (ACTION_CANCEL, window focus loss) never commits:
+ * Compose delivers the cancel as a release whose change is already consumed
+ * (letta-mobile-erx7m), and a consumed release is treated as an abandon.
  */
 @Composable
 fun Modifier.swipeUpToCanvas(
@@ -52,12 +60,14 @@ fun Modifier.swipeUpToCanvas(
     if (!enabled || onTrigger == null) return@composed this
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    val onTriggerState = remember(onTrigger) { onTrigger }
-    this.pointerInput(onTriggerState) {
+    // Keyed on Unit: a fresh lambda from the caller must not restart the
+    // detector (and drop an in-flight drag) on every recomposition.
+    val currentOnTrigger by rememberUpdatedState(onTrigger)
+    this.pointerInput(Unit) {
         runSwipeUpToCanvasGesture(
             haptic = haptic,
             view = view,
-            onTrigger = onTriggerState,
+            onTrigger = { currentOnTrigger() },
         )
     }
 }
@@ -73,115 +83,132 @@ private fun isVerticalDominant(totalDx: Float, totalDy: Float): Boolean =
 private fun isDragAbandoned(verticalDominant: Boolean, totalDx: Float, totalDy: Float): Boolean =
     !verticalDominant && abs(totalDx) > abs(totalDy) * 2f
 
-private fun isReleaseCommitted(
-    thresholdCrossed: Boolean,
-    distanceUp: Float,
-    totalDx: Float,
-    totalDy: Float,
-    velocityUp: Float,
-    distanceThresholdPx: Float,
-    velocityThresholdPx: Float,
-): Boolean {
-    val distanceCommitted = thresholdCrossed || distanceUp >= distanceThresholdPx
-    if (distanceCommitted) return true
-    val upward = distanceUp > 0f
-    val verticalDominant = isVerticalDominant(totalDx, totalDy)
-    return upward && verticalDominant && velocityUp >= velocityThresholdPx
-}
+/** Pixel thresholds for one pointer-input scope. */
+private class SwipeUpThresholds(
+    val distancePx: Float,
+    val velocityPx: Float,
+    val slopPx: Float,
+)
 
-private fun processDragEvent(
-    change: PointerInputChange,
-    distanceUp: Float,
-    verticalDominant: Boolean,
-    slopPx: Float,
-    distanceThresholdPx: Float,
-    thresholdCrossed: Boolean,
-    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
-    view: android.view.View?,
-): Boolean {
-    val upward = distanceUp > 0f
-    val pastSlop = upward && verticalDominant && distanceUp > slopPx
-    if (!pastSlop) return thresholdCrossed
-    change.consume()
-    if (!thresholdCrossed && distanceUp >= distanceThresholdPx) {
-        HapticEffects.gestureThreshold(haptic, view)
-        return true
-    }
-    return thresholdCrossed
+/** What the end of one swipe-up gesture amounted to. */
+internal enum class SwipeUpToCanvasOutcome {
+    /** Released past the distance or velocity threshold: open the canvas. */
+    Committed,
+
+    /** Released short of both thresholds. */
+    Released,
+
+    /** The stream was cancelled, or another node claimed the release. */
+    Cancelled,
 }
 
 /**
- * Detect the swipe-up gesture within a [PointerInputScope]. The scope gives
- * us access to density (for dp -> px conversion) and the awaitPointerEvent
- * machinery. The gesture loop:
+ * Decide a release. A consumed release is a cancel synthesised by Compose
+ * (or a release another node claimed) and never commits, whatever the drag
+ * had reached.
+ */
+internal fun swipeUpReleaseOutcome(releaseConsumed: Boolean, thresholdsMet: Boolean): SwipeUpToCanvasOutcome = when {
+    releaseConsumed -> SwipeUpToCanvasOutcome.Cancelled
+    thresholdsMet -> SwipeUpToCanvasOutcome.Committed
+    else -> SwipeUpToCanvasOutcome.Released
+}
+
+/** Accumulated state of one gesture, from the DOWN to its end. */
+private class SwipeUpGesture(
+    down: PointerInputChange,
+    private val thresholds: SwipeUpThresholds,
+) {
+    private val velocityTracker = VelocityTracker().apply { addPosition(down.uptimeMillis, down.position) }
+    private var totalDx = 0f
+    private var totalDy = 0f
+    var claimed = false
+        private set
+    var thresholdCrossed = false
+        private set
+
+    private val distanceUp get() = -totalDy
+
+    fun track(change: PointerInputChange) {
+        val delta = change.positionChange()
+        totalDy += delta.y
+        totalDx += delta.x
+        velocityTracker.addPosition(change.uptimeMillis, change.position)
+    }
+
+    fun isAbandoned(): Boolean = isDragAbandoned(isVerticalDominant(totalDx, totalDy), totalDx, totalDy)
+
+    /** Consume the move once upward intent is clear. True when the distance threshold is first crossed. */
+    fun claimIfUpward(change: PointerInputChange): Boolean {
+        val pastSlop = distanceUp > thresholds.slopPx && isVerticalDominant(totalDx, totalDy)
+        if (!pastSlop) return false
+        change.consume()
+        if (!claimed) {
+            claimed = true
+            SwipeUpToCanvasDiagnostics.started()
+        }
+        if (thresholdCrossed || distanceUp < thresholds.distancePx) return false
+        thresholdCrossed = true
+        return true
+    }
+
+    fun release(change: PointerInputChange): SwipeUpToCanvasOutcome =
+        swipeUpReleaseOutcome(releaseConsumed = change.isConsumed, thresholdsMet = thresholdsMet())
+
+    private fun thresholdsMet(): Boolean {
+        if (thresholdCrossed || distanceUp >= thresholds.distancePx) return true
+        val velocityUp = -velocityTracker.calculateVelocity().y // pointer Y grows downward
+        return distanceUp > 0f && isVerticalDominant(totalDx, totalDy) && velocityUp >= thresholds.velocityPx
+    }
+}
+
+/**
+ * Detect the swipe-up gesture within a [PointerInputScope]. The gesture loop:
  *  - wait for ACTION_DOWN
  *  - on each pointer event, accumulate dx/dy + velocity samples
  *  - consume the gesture once the upward intent is clear (vertical-dominant,
  *    past slop)
  *  - on release, commit if distance OR velocity threshold met; otherwise
- *    swallow the gesture and stay in chat
+ *    swallow the gesture and stay in chat; a cancelled stream never commits
  *
  * `onTrigger` is invoked at most once per gesture.
  */
 private suspend fun PointerInputScope.runSwipeUpToCanvasGesture(
-    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    haptic: HapticFeedback,
     view: android.view.View?,
     onTrigger: () -> Unit,
 ) {
-    val distanceThresholdPx = SwipeUpToCanvasDistanceThresholdDp.toPx()
-    val velocityThresholdPx = SwipeUpToCanvasVelocityThresholdDpPerSec.toPx()
-    val slopPx = SwipeUpToCanvasSlopDp.toPx()
-
+    val thresholds = SwipeUpThresholds(
+        distancePx = SwipeUpToCanvasDistanceThresholdDp.toPx(),
+        velocityPx = SwipeUpToCanvasVelocityThresholdDpPerSec.toPx(),
+        slopPx = SwipeUpToCanvasSlopDp.toPx(),
+    )
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Main)
-        val velocityTracker = VelocityTracker()
-        velocityTracker.addPosition(down.uptimeMillis, down.position)
-        var totalDy = 0f
-        var totalDx = 0f
-        var thresholdCrossed = false
-
-        while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Main)
-            val change: PointerInputChange = event.changes.firstOrNull() ?: break
-
-            if (!change.pressed) {
-                // Release. Commit if distance or dominant upward velocity threshold met.
-                val velocityY = velocityTracker.calculateVelocity().y
-                val velocityUp = -velocityY // pointer Y grows downward
-                val distanceUp = -totalDy
-                val committed = isReleaseCommitted(
-                    thresholdCrossed = thresholdCrossed,
-                    distanceUp = distanceUp,
-                    totalDx = totalDx,
-                    totalDy = totalDy,
-                    velocityUp = velocityUp,
-                    distanceThresholdPx = distanceThresholdPx,
-                    velocityThresholdPx = velocityThresholdPx,
-                )
-                if (committed) onTrigger()
-                break
-            }
-
-            if (change.isConsumed) break
-
-            val delta = change.positionChange()
-            totalDy += delta.y
-            totalDx += delta.x
-            velocityTracker.addPosition(change.uptimeMillis, change.position)
-
-            val verticalDominant = isVerticalDominant(totalDx, totalDy)
-            if (isDragAbandoned(verticalDominant, totalDx, totalDy)) break
-
-            thresholdCrossed = processDragEvent(
-                change = change,
-                distanceUp = -totalDy,
-                verticalDominant = verticalDominant,
-                slopPx = slopPx,
-                distanceThresholdPx = distanceThresholdPx,
-                thresholdCrossed = thresholdCrossed,
-                haptic = haptic,
-                view = view,
-            )
+        val gesture = SwipeUpGesture(down, thresholds)
+        val end = try {
+            trackSwipeUp(gesture) { HapticEffects.gestureThreshold(haptic, view) }
+        } catch (cancelled: CancellationException) {
+            // The detector left composition (navigation, enabled flipped) mid-gesture.
+            if (gesture.claimed) SwipeUpToCanvasDiagnostics.ended("detached")
+            throw cancelled
         }
+        if (gesture.claimed || end == SwipeUpToCanvasOutcome.Committed) SwipeUpToCanvasDiagnostics.ended(end.name)
+        if (end == SwipeUpToCanvasOutcome.Committed) onTrigger()
+    }
+}
+
+/** Runs one gesture from its DOWN to its end and says how it ended. */
+private suspend fun AwaitPointerEventScope.trackSwipeUp(
+    gesture: SwipeUpGesture,
+    onThresholdCrossed: () -> Unit,
+): SwipeUpToCanvasOutcome {
+    while (true) {
+        val change = awaitPointerEvent(PointerEventPass.Main).changes.firstOrNull()
+            ?: return SwipeUpToCanvasOutcome.Cancelled
+        if (!change.pressed) return gesture.release(change)
+        if (change.isConsumed) return SwipeUpToCanvasOutcome.Cancelled
+        gesture.track(change)
+        if (gesture.isAbandoned()) return SwipeUpToCanvasOutcome.Released
+        if (gesture.claimIfUpward(change)) onThresholdCrossed()
     }
 }

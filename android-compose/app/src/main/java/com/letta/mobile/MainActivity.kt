@@ -2,6 +2,7 @@ package com.letta.mobile
 
 import android.Manifest
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -24,6 +25,8 @@ import com.letta.mobile.channel.ChatPushService
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.debug.AutomationAuthBootstrap
+import com.letta.mobile.debug.TouchDispatchDiagnostics
+import com.letta.mobile.debug.debugRootPointerObserver
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.content.Intent
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -58,6 +61,11 @@ class MainActivity : ComponentActivity() {
     private val crashReporter get() = deps.crashReporter
 
     private val launchTarget = mutableStateOf<AppLaunchTarget?>(null)
+
+    init {
+        // letta-mobile-erx7m: touch-stall probes, debug builds only.
+        TouchDispatchDiagnostics.enableForDebugBuild()
+    }
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -150,9 +158,7 @@ class MainActivity : ComponentActivity() {
                         settings = deps.secureSettingsStore,
                         runs = deps.conversationRunRegistry,
                     ) {
-                        Scaffold(
-                            snackbarHost = { SnackbarHost(snackbarHostState) },
-                        ) { _ ->
+                        Scaffold(modifier = debugRootPointerObserver(), snackbarHost = { SnackbarHost(snackbarHostState) }) { _ ->
                             val navController = rememberNavController()
                             AdaptiveScaffold(navController = navController) {
                                 AppNavGraph(
@@ -170,6 +176,13 @@ class MainActivity : ComponentActivity() {
         // (Play Console) for accurate cold-start measurement beyond TTID. Called
         // once — subsequent calls on the same activity are no-ops.
         reportFullyDrawn()
+    }
+
+    /** letta-mobile-erx7m: logs DOWN/UP/CANCEL reaching the window and whether it was handled. */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val handled = super.dispatchTouchEvent(ev)
+        TouchDispatchDiagnostics.onDispatched(ev, handled)
+        return handled
     }
 
     override fun onNewIntent(intent: Intent) {
