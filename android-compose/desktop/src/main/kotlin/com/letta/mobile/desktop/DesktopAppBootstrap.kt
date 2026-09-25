@@ -26,7 +26,8 @@ import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
-import com.letta.mobile.desktop.memory.DesktopMemoryController
+import com.letta.mobile.data.memory.graph.MemoryPageController
+import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
 import com.letta.mobile.desktop.runtime.DesktopLocalBackendDirectorySettings
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
@@ -114,7 +115,7 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
 
 /** The per-agent library controllers behind the sidebar destinations. */
 internal class DesktopLibraryControllers(
-    val memory: DesktopMemoryController,
+    val memory: MemoryPageController,
     val schedules: DesktopScheduleLibraryController,
     val channels: DesktopChannelLibraryController,
     val tools: DesktopToolLibraryController,
@@ -127,7 +128,11 @@ internal fun rememberDesktopLibraryControllers(
     chatScope: CoroutineScope,
 ): DesktopLibraryControllers {
     val memory = remember(sessionGraphId, chatScope) {
-        DesktopMemoryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
+        MemoryPageController.forSession(
+            sessionGraphProvider = sessionGraphProvider,
+            scope = chatScope,
+            errorMessageMapper = ::desktopMemoryErrorMessage,
+        )
     }
     val schedules = remember(sessionGraphId, chatScope) {
         DesktopScheduleLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
@@ -140,6 +145,12 @@ internal fun rememberDesktopLibraryControllers(
     }
     return DesktopLibraryControllers(memory, schedules, channels, tools)
 }
+
+private fun desktopMemoryErrorMessage(throwable: Throwable): String =
+    when (throwable) {
+        is DesktopRepositoryUnavailableException -> "Desktop memory repositories are not available for this backend yet."
+        else -> throwable.message ?: throwable::class.simpleName ?: "Memory data could not be loaded."
+    }
 
 internal data class DesktopDestinationSelection(
     val selectedDestination: DesktopDestination,
