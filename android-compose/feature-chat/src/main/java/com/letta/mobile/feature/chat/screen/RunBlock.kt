@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
@@ -105,7 +107,7 @@ internal fun RunBlock(
         modifier = modifier
             .fillMaxWidth(),
     ) {
-        if (activity.isActive || showCompletedDisclosure) {
+        AnimatedRunHeader(visible = activity.isActive || showCompletedDisclosure, reducedMotion = reducedMotion) {
             RunActivityDisclosure(
                 activity = activity,
                 collapsed = effectiveCollapsed,
@@ -129,10 +131,11 @@ internal fun RunBlock(
             return@Column
         }
 
+        val bodyLift by animatedRunBodyLift(latestCompletedDisclosure, reducedMotion)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (latestCompletedDisclosure) Modifier.offset(y = (-22).dp) else Modifier),
+                .offset { IntOffset(0, bodyLift.roundToPx()) },
         ) {
             // Timeline gutter â€” drawn behind the rows so the vertical rule
             // passes through every dot. Sized via the same Column so its
