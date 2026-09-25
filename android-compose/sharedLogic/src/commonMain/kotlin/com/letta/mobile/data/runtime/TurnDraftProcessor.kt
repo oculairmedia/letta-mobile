@@ -53,11 +53,16 @@ internal class TurnDraftProcessor(
      * letta-mobile-qygvv.16: the transport session carrying this turn is gone, so no server terminal
      * will ever arrive. Ends the turn through the same terminal path a server terminal takes: a
      * completion already waiting out its settle window is published as it stands, otherwise
-     * [fallback] is. Never emits a second terminal. Returns what it did; the caller completes.
+     * [fallback] is. Never emits a second terminal. Reports what it did, then completes the turn.
      */
-    suspend fun cutOff(fallback: RuntimeEventDraft): TurnCutOffOutcome {
+    suspend fun cutOff(fallback: RuntimeEventDraft, report: (TurnCutOffOutcome) -> Unit): Nothing {
         terminalSettleJob?.cancelAndJoin()
         terminalSettleJob = null
+        report(publishCutOffTerminal(fallback))
+        callbacks.complete()
+    }
+
+    private suspend fun publishCutOffTerminal(fallback: RuntimeEventDraft): TurnCutOffOutcome {
         if (terminalEmitted) return TurnCutOffOutcome.AlreadyTerminal
         val pending = pendingCompleted
         if (pending != null) {
