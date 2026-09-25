@@ -349,14 +349,21 @@ internal class TurnInputSender(
         val input = command.toInputCommand(scope, externalToolRegistry)
         // letta-mobile-qygvv.5: approval responses await input_accepted too; a
         // rejected decision fails the turn instead of parking it.
-        input.approvalResponseOrNull()?.let { return approvalSender.sendAsTurnInput(scope, it) }
+        input.approvalResponseOrNull()?.let { approval ->
+            val failure = approvalSender.sendAsTurnInput(scope, approval)
+            reportInputAcknowledgement(failure?.toAcknowledgement() ?: TurnInputAcknowledgement.Started)
+            return failure
+        }
         if (command.input !is TurnInput.UserMessage) {
             client.input(input)
+            reportInputAcknowledgement(TurnInputAcknowledgement.Started)
             return null
         }
         noteSentInput(lease.key, lease.queuedInput.clientMessageId, command)
         val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
         val failure = acceptance.recordAndFailure(command.conversationId)
+        // letta-mobile-qygvv.12: before the queued draft, so a relaying node acks before it forwards.
+        reportInputAcknowledgement(acceptance.toAcknowledgement())
         if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, emit)
         return failure
     }
