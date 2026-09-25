@@ -152,7 +152,11 @@ private suspend fun executeReplaceScene(
     val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
         ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
-        val revision = commitSceneUpdate(context.store, activeSession, doc, sceneJson, callerId)
+        val checkedScene = when (val checked = CanvasSceneValidator.scene(sceneJson)) {
+            is CanvasSceneCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
+            is CanvasSceneCheck.Valid -> checked.json
+        }
+        val revision = commitSceneUpdate(context.store, activeSession, doc, checkedScene, callerId)
             ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
             canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
@@ -180,7 +184,11 @@ private suspend fun executeApplyOps(
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
         // The caller has already passed the write check; every op it sends is its own, whatever
         // actor the input named, so the log, the broadcast and scene provenance all carry it.
-        val ops = suppliedOps.map { it.withActor(callerId) }
+        val callerOps = suppliedOps.map { it.withActor(callerId) }
+        val ops = when (val checked = CanvasSceneValidator.ops(callerOps)) {
+            is CanvasOpsCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
+            is CanvasOpsCheck.Valid -> checked.ops
+        }
         val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
             ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(

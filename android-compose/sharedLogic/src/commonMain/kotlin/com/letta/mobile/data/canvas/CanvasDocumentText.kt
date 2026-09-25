@@ -18,6 +18,15 @@ import kotlinx.serialization.json.contentOrNull
 object CanvasDocumentText {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * A recognizable Cascade document has the `blocks` array the renderer traverses. The array may
+     * be empty: that is how a newly created note is represented, unlike an unrelated JSON format.
+     */
+    fun isRecognizedDocument(documentJson: String): Boolean {
+        val root = runCatching { json.parseToJsonElement(documentJson) }.getOrNull() as? JsonObject ?: return false
+        return root["blocks"] is JsonArray
+    }
+
     fun plainText(documentJson: String): String {
         if (documentJson.isBlank()) return ""
         val root = runCatching { json.parseToJsonElement(documentJson) }.getOrNull() as? JsonObject ?: return ""
