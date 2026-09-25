@@ -51,6 +51,10 @@ enum class DesktopDestination(
         label = "Channels",
         summary = "Shared channel state shows live backend transport, delivery, and A2UI capability status.",
     ),
+    Providers(
+        label = "Providers & Models",
+        summary = "Connect App Server model providers and choose which models the pickers show.",
+    ),
     Conversations(
         label = "Conversations",
         summary = "Desktop chat uses a persistent conversation list, shared render models, and a JVM Compose detail pane.",

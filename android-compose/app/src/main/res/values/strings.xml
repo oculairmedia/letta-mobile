@@ -1058,6 +1058,7 @@
     <string name="screen_models_no_models">No models available</string>
     <string name="screen_models_tab_llm">LLM Models</string>
     <string name="screen_models_tab_embedding">Embedding Models</string>
+    <string name="screen_models_tab_exposure">Visibility</string>
     <string name="screen_models_detail_handle">Handle: %1$s</string>
     <string name="screen_models_detail_provider">Provider: %1$s</string>
     <string name="screen_models_detail_provider_name">Provider Name: %1$s</string>

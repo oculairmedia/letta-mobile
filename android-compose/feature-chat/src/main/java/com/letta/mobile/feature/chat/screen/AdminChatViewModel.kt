@@ -169,6 +169,8 @@ internal class AdminChatViewModel @Inject constructor(
     /** App-wide run state; this screen publishes its conversation here for the lists and the mascots. */
     private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry =
         com.letta.mobile.data.presence.ConversationRunRegistry(),
+    /** letta-mobile-w4q4p: conversation-scoped model switch; null keeps the agent-update path. */
+    private val modelControl: com.letta.mobile.feature.chat.coordination.ChatModelControl? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -404,6 +406,8 @@ internal class AdminChatViewModel @Inject constructor(
             settingsRepository = settingsRepository,
             activeAgent = activeAgent,
             bannerController = chatBannerController,
+            modelControl = modelControl,
+            conversationId = { conversationId?.value },
         )
     }
 
@@ -578,7 +582,13 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun refreshModels() = modelCoordinator.refreshModels()
 
-    fun updateActiveAgentModel(handle: String) = modelCoordinator.updateActiveAgentModel(handle)
+    fun updateActiveAgentModel(
+        handle: String,
+        effort: com.letta.mobile.feature.chat.coordination.EffortSelection =
+            com.letta.mobile.feature.chat.coordination.EffortSelection.Keep,
+    ) = modelCoordinator.updateActiveAgentModel(handle, effort)
+
+    fun reasoningEffortsFor(handle: String?): List<String> = modelCoordinator.reasoningEffortsFor(handle)
 
     fun refreshAvailableAgents() {
         viewModelScope.launch {

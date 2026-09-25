@@ -805,6 +805,7 @@ internal fun LettaDesktopApp(
                                 workingDirectoryLoading = workingDirectoryLoading,
                             ),
                             destinationInputs = DestinationContentInputs(
+                                modelControlRpc = rememberModelControlRpc(bootstrap.channelTransportSlot),
                                 railRecencyDays = railPrefs.recencyDays,
                                 state = bootstrapState,
                                 home = homeState,
