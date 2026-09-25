@@ -2,6 +2,9 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * letta-mobile-qygvv.3 (PR #1661 review): keeps a QUEUED lease from adopting the turn ahead of it.
@@ -50,5 +53,45 @@ internal class QueuedLeaseFrameGate(private val queuedInput: QueuedInputTracker)
     private fun AppServerReceivedFrame.runIdOrNull(): String? = when (val frame = frame) {
         is AppServerInboundFrame.TurnFinished -> frame.runId?.takeIf { it.isNotBlank() }
         else -> frameRunIdOrNull()
+    }
+}
+
+/**
+ * letta-mobile-1n5py.1 (the second qygvv.9 race): opens once this lease's `input_accepted` is
+ * resolved, whatever it said.
+ *
+ * The collector runs while the send coroutine still awaits the ack. A terminal of the turn ahead
+ * that reaches the collector first used to complete this lease, because the input was not known
+ * to be Queued yet. [awaitBefore] holds such a frame until the ack is resolved, so the Queued
+ * gate ([QueuedLeaseFrameGate]) can recognise it as foreign.
+ */
+internal class InputAcknowledgementLatch {
+    private val resolved = CompletableDeferred<Unit>()
+
+    val isOpen: Boolean get() = resolved.isCompleted
+
+    fun release() {
+        resolved.complete(Unit)
+    }
+
+    /**
+     * Holds a frame that could end the turn until the ack is resolved. Frames of this input's own
+     * run never wait. A lost ack opens the latch after [PRE_ACK_TERMINAL_WAIT_MS], once, so the
+     * turn's own terminal still ends it (the behaviour before acknowledgement existed).
+     */
+    suspend fun awaitBefore(received: AppServerReceivedFrame, ownership: RunOwnership) {
+        if (isOpen || ownership == RunOwnership.Own || !received.canEndTurn()) return
+        withTimeoutOrNull(PRE_ACK_TERMINAL_WAIT_MS.milliseconds) { resolved.await() } ?: release()
+    }
+
+    private fun AppServerReceivedFrame.canEndTurn(): Boolean = when (frame) {
+        is AppServerInboundFrame.TurnFinished, is AppServerInboundFrame.UpdateLoopStatus -> true
+        is AppServerInboundFrame.StreamDelta -> lifecycleStatusFromTerminal() != null
+        else -> false
+    }
+
+    internal companion object {
+        /** The ack precedes the terminal on the wire; this only bounds a lost ack. */
+        const val PRE_ACK_TERMINAL_WAIT_MS = 250L
     }
 }

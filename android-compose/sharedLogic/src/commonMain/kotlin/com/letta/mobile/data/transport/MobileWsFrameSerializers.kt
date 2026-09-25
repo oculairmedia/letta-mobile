@@ -44,6 +44,7 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "a2ui_capabilities" -> ServerFrame.A2uiCapabilities.serializer()
             "subscribe_frame" -> SubscribeFrameDeserializer
             "subscribe_done" -> ServerFrame.SubscribeDone.serializer()
+            "turn_queued" -> ServerFrame.TurnQueued.serializer()
             "user_action_ack" -> ServerFrame.UserActionAck.serializer()
             "user_action_outcome" -> ServerFrame.UserActionOutcome.serializer()
             "cron_list_response" -> ServerFrame.CronListResponse.serializer()

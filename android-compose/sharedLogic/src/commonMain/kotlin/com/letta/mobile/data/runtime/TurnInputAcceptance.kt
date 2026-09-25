@@ -207,6 +207,9 @@ internal enum class QueueRemovalDisposition {
 internal class QueuedInputTracker(val clientMessageId: String?) {
     private val state = atomic(PENDING)
 
+    /** letta-mobile-1n5py.1 (qygvv.9 second race): released once `input_accepted` is resolved. */
+    val acknowledgement = InputAcknowledgementLatch()
+
     val isQueued: Boolean get() = state.value == QUEUED
 
     fun isWatchdogPaused(isConnectionSuperseded: Boolean): Boolean =
@@ -340,7 +343,23 @@ internal class TurnInputSender(
     /** letta-mobile-qygvv.6: records a user input before it is sent, so its queue item is recognised. */
     private val noteSentInput: (TurnRuntimeKey, String?, TurnCommand) -> Unit = { _, _, _ -> },
 ) {
+    /**
+     * Sends [command]'s input. letta-mobile-1n5py.1: the lease's acknowledgement latch opens only
+     * once this returns (after [enterQueued]), so a terminal the collector held for the ack sees the
+     * Queued state and is recognised as the turn ahead's.
+     */
     suspend fun sendInput(
+        command: TurnCommand,
+        scope: AppServerRuntimeScope,
+        lease: LeaseRef,
+        emit: suspend (RuntimeEventDraft) -> Unit,
+    ): InputAcceptance.Failure? = try {
+        sendAndAwaitAcceptance(command, scope, lease, emit)
+    } finally {
+        lease.queuedInput.acknowledgement.release()
+    }
+
+    private suspend fun sendAndAwaitAcceptance(
         command: TurnCommand,
         scope: AppServerRuntimeScope,
         lease: LeaseRef,

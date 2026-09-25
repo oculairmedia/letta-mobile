@@ -287,6 +287,43 @@ class AppServerTurnEngineInputAcceptanceTest {
     }
 
     @Test
+    fun turnAheadTerminalBeforeTheQueuedAckDoesNotCompleteTheLease() = runTest {
+        // letta-mobile-1n5py.1 (qygvv.9 race 2): the turn ahead FINISHES before this input's ack.
+        val gate = CompletableDeferred<AppServerInboundFrame.InputAccepted>()
+        val turn = startTurn(InputAckFixture.Queued) { ackGate = gate }
+
+        turn.client.emitStreamDelta("assistant_message", runAhead)
+        turn.client.emitTurnFinished(runAhead, turn = 1)
+        runCurrent()
+        assertTrue(turn.isBusy, "a terminal that beats the ack waits for it")
+        gate.complete(frames.inputAccepted(InputAckFixture.Queued))
+        runCurrent()
+
+        assertTrue(turn.isBusy, "the turn ahead's pre-ack terminal must not complete this lease")
+        assertTrue(INPUT_QUEUED_REASON in turn.drafts.lifecycleReasons(), "the input is queued, not finished")
+        turn.client.emitUpdateQueue(QueueUpdateFixture.dequeued(LOCAL_MESSAGE_ID))
+        finishOwnRun(turn)
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
+    }
+
+    @Test
+    fun ownTerminalHeldForTheAckEndsTheTurnOnceStarted() = runTest {
+        val gate = CompletableDeferred<AppServerInboundFrame.InputAccepted>()
+        val turn = startTurn(InputAckFixture.Started) { ackGate = gate }
+
+        turn.client.emitStreamDelta("assistant_message", runOwn)
+        turn.client.emitTurnFinished(runOwn, turn = 1)
+        runCurrent()
+        gate.complete(frames.inputAccepted(InputAckFixture.Started))
+        runCurrent()
+
+        assertEquals(RuntimeRunStatus.Completed, turn.drafts.lastLifecycle()?.status)
+        assertTrue(testScheduler.currentTime < InputAcknowledgementLatch.PRE_ACK_TERMINAL_WAIT_MS, "released by the ack, not the timeout")
+        finish(turn)
+        assertFalse(turn.isBusy)
+    }
+
+    @Test
     fun acceptanceWaitEndsWhenTheTurnCompletes() = runTest {
         // The ack never arrives (a lost input_accepted): the turn's own terminal must still end it.
         val turn = startTurn(InputAckFixture.Started) { ackGate = CompletableDeferred() }

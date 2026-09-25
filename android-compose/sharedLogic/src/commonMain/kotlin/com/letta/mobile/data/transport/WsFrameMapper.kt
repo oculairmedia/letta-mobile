@@ -112,6 +112,8 @@ object WsFrameMapper {
         // SubscribeDone is metadata for cursor cleanup.
         is ServerFrame.SubscribeFrameMessage,
         is ServerFrame.SubscribeDone,
+        // letta-mobile-1n5py.1: queue state for the send coordinator, not timeline content.
+        is ServerFrame.TurnQueued,
         is ServerFrame.Unknown -> null
     }
 
