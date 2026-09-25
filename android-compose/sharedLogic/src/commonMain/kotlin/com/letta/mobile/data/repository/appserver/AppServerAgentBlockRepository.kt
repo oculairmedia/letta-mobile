@@ -25,7 +25,7 @@ class AppServerAgentBlockRepository(
     override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =
         AppServerProtocol.json.decodeFromJsonElement(
             Block.serializer(),
-            transport.createAgentBlock(target, value),
+            transport.createAgentBlock(target, BlockUpdateParams(value = value)),
         )
 
     override suspend fun deleteAgentBlock(target: AgentBlockTarget) =

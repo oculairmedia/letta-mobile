@@ -92,12 +92,11 @@ internal class MemoryBlockLifecycle(
         val draft = state.value.creation ?: return
         if (!draft.canSubmit) return
         updateDraft { it.copy(isSaving = true, error = null) }
-        scope.launch {
-            attempt { blocks.create(draft.agentId, draft.normalizedLabel, draft.value) }.fold(
-                onSuccess = { committed { it.copy(creation = null) } },
-                onFailure = { failure -> updateDraft { it.copy(isSaving = false, error = errorMessage(failure)) } },
-            )
-        }
+        launchCommit(
+            work = { blocks.create(draft.agentId, draft.normalizedLabel, draft.value) },
+            onSuccess = { it.copy(creation = null) },
+            onFailed = { message -> updateDraft { it.copy(isSaving = false, error = message) } },
+        )
     }
 
     override fun requestDelete() {
@@ -116,17 +115,25 @@ internal class MemoryBlockLifecycle(
         val deletion = state.value.deletion ?: return
         if (deletion.isDeleting) return
         updateDeletion { it.copy(isDeleting = true, error = null) }
-        scope.launch {
-            attempt { blocks.delete(deletion.ref) }.fold(
-                onSuccess = { committed { it.withoutDeleted(deletion.ref) } },
-                onFailure = { failure -> updateDeletion { it.copy(isDeleting = false, error = errorMessage(failure)) } },
-            )
-        }
+        launchCommit(
+            work = { blocks.delete(deletion.ref) },
+            onSuccess = { it.withoutDeleted(deletion.ref) },
+            onFailed = { message -> updateDeletion { it.copy(isDeleting = false, error = message) } },
+        )
     }
 
-    private fun committed(transform: (MemoryPageState) -> MemoryPageState) {
-        state.update(transform)
-        onCommitted()
+    /** Run one committing write; on success apply [onSuccess] and reload, else report the message. */
+    private fun launchCommit(
+        work: suspend () -> Unit,
+        onSuccess: (MemoryPageState) -> MemoryPageState,
+        onFailed: (String) -> Unit,
+    ) {
+        scope.launch {
+            val failure = attempt { work() }.exceptionOrNull()
+            if (failure != null) return@launch onFailed(errorMessage(failure))
+            state.update(onSuccess)
+            onCommitted()
+        }
     }
 
     private fun MemoryPageState.withoutDeleted(ref: MemoryBlockRef): MemoryPageState = copy(

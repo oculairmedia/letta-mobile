@@ -192,7 +192,7 @@ class AppServerLocalRepositoriesTest {
         val transport = DefaultAppServerLocalRepositoryTransport({ client }) { it }
         val target = AgentBlockTarget("agent-1", "notes")
 
-        transport.createAgentBlock(target, "fresh")
+        transport.createAgentBlock(target, BlockUpdateParams(value = "fresh"))
         transport.deleteAgentBlock(target)
 
         val (create, delete) = client.adminRpcCalls
@@ -242,11 +242,11 @@ class AppServerLocalRepositoriesTest {
         var lastCreate: Pair<AgentBlockTarget, String>? = null
         var lastDelete: AgentBlockTarget? = null
 
-        override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): JsonElement {
-            lastCreate = target to value
+        override suspend fun createAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement {
+            lastCreate = target to params.value.orEmpty()
             return AppServerProtocol.json.encodeToJsonElement(
                 Block.serializer(),
-                Block(id = BlockId("block-${target.label}"), label = target.label, value = value),
+                Block(id = BlockId("block-${target.label}"), label = target.label, value = params.value.orEmpty()),
             )
         }
 

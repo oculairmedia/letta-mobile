@@ -7,7 +7,6 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -22,7 +21,7 @@ interface AppServerLocalRepositoryTransport {
     suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
 
     /** bfooy.5 `block.create_agent`: a new committed `memory/system/<label>.md`. */
-    suspend fun createAgentBlock(target: AgentBlockTarget, value: String): JsonElement
+    suspend fun createAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
 
     /** bfooy.5 `block.delete_agent`: a committed delete of `memory/system/<label>.md`. */
     suspend fun deleteAgentBlock(target: AgentBlockTarget)
@@ -48,12 +47,14 @@ class DefaultAppServerLocalRepositoryTransport(
 
     override suspend fun getContext(agentId: String, conversationId: String?): JsonObject? =
         adminRpc(
-            operation = "agent-context",
-            method = "agent.context",
-            params = buildJsonObject {
-                put("agent_id", agentId)
-                conversationId?.let { put("conversation_id", it) }
-            },
+            LocalAdminCall(
+                operation = "agent-context",
+                method = "agent.context",
+                params = buildJsonObject {
+                    put("agent_id", agentId)
+                    conversationId?.let { put("conversation_id", it) }
+                },
+            ),
         ) as? JsonObject
 
     override suspend fun listAgentBlocks(agentId: String): JsonArray {
@@ -61,13 +62,15 @@ class DefaultAppServerLocalRepositoryTransport(
         var offset = 0
         repeat(BLOCK_LIST_MAX_PAGES) {
             val result = adminRpc(
-                operation = "block-list",
-                method = "block.list_agent",
-                params = buildJsonObject {
-                    put("agent_id", agentId)
-                    put("limit", BLOCK_LIST_PAGE_SIZE.toString())
-                    put("offset", offset.toString())
-                },
+                LocalAdminCall(
+                    operation = "block-list",
+                    method = "block.list_agent",
+                    params = buildJsonObject {
+                        put("agent_id", agentId)
+                        put("limit", BLOCK_LIST_PAGE_SIZE.toString())
+                        put("offset", offset.toString())
+                    },
+                ),
             ) ?: error("Bundled App Server block listing returned no result")
             if (result is JsonArray) return JsonArray(merged + result)
             val page = result as? JsonObject
@@ -88,49 +91,49 @@ class DefaultAppServerLocalRepositoryTransport(
 
     override suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement {
         val value = requireNotNull(params.value) { "block.update_agent writes the memory file contents; value is required" }
-        return adminRpc(
-            operation = "block-update",
-            method = "block.update_agent",
-            params = buildJsonObject {
-                put("agent_id", target.agentId)
-                put("label", target.label)
-                put("value", value)
-            },
-        ) ?: error("Bundled App Server block update returned no result")
+        return adminRpc(target.call(AgentBlockCall.Update, value))
+            ?: error("Bundled App Server block update returned no result")
     }
 
-    override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): JsonElement =
-        adminRpc(
-            operation = "block-create",
-            method = "block.create_agent",
-            params = target.toParams { put("value", value) },
-        ) ?: error("Bundled App Server block create returned no result")
+    override suspend fun createAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement =
+        adminRpc(target.call(AgentBlockCall.Create, params.value.orEmpty()))
+            ?: error("Bundled App Server block create returned no result")
 
     override suspend fun deleteAgentBlock(target: AgentBlockTarget) {
-        adminRpc(operation = "block-delete", method = "block.delete_agent", params = target.toParams())
+        adminRpc(target.call(AgentBlockCall.Delete, value = null))
     }
 
-    private fun AgentBlockTarget.toParams(extra: JsonObjectBuilder.() -> Unit = {}): JsonObject = buildJsonObject {
-        put("agent_id", agentId)
-        put("label", label)
-        extra()
+    /** An agent-scoped block call: always agent + label, plus the value for writes. */
+    private fun AgentBlockTarget.call(kind: AgentBlockCall, value: String?) = LocalAdminCall(
+        operation = kind.operation,
+        method = kind.method,
+        params = buildJsonObject {
+            put("agent_id", agentId)
+            put("label", label)
+            value?.let { put("value", it) }
+        },
+    )
+
+    private enum class AgentBlockCall(val operation: String, val method: String) {
+        Update("block-update", "block.update_agent"),
+        Create("block-create", "block.create_agent"),
+        Delete("block-delete", "block.delete_agent"),
     }
 
-    private suspend fun adminRpc(
-        operation: String,
-        method: String,
-        params: JsonObject,
-    ): JsonElement? {
+    private suspend fun adminRpc(call: LocalAdminCall): JsonElement? {
         val response = clientProvider().adminRpc(
             AppServerCommand.AdminRpc(
-                requestId = requestId(operation),
-                method = method,
-                params = params,
+                requestId = requestId(call.operation),
+                method = call.method,
+                params = call.params,
             ),
         )
-        check(response.success) { response.error ?: "Bundled App Server $operation failed" }
+        check(response.success) { response.error ?: "Bundled App Server ${call.operation} failed" }
         return response.result
     }
+
+    /** One admin_rpc request: [operation] names the request id prefix and error text. */
+    private class LocalAdminCall(val operation: String, val method: String, val params: JsonObject)
 
     private companion object {
         const val BLOCK_LIST_PAGE_SIZE = 50

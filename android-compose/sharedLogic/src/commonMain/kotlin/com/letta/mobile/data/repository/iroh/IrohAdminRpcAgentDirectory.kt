@@ -374,53 +374,40 @@ class IrohAdminRpcAgentDirectory(
      * App Server's `write_memory_file`, which commits the MemFS change; the
      * global-id [updateBlock] route fails closed on the native local backend.
      */
-    suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block = sendBlockUpdate(
-        BlockUpdateRoute(
-            method = AdminRpcMethod("block.update_agent"),
-            path = AdminRpcPath("/v1/agents/${target.agentId}/core-memory/blocks/${target.label}"),
-            keys = mapOf("agent_id" to target.agentId, "label" to target.label),
-        ),
-        params,
-    )
+    suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block =
+        sendBlockUpdate(agentBlockRoute(AGENT_BLOCK_UPDATE, target), params)
 
     /**
      * bfooy.5: agent + label block create (`block.create_agent`). The node writes
      * a NEW `memory/system/<label>.md` through `write_memory_file` (which commits)
-     * and refuses a label that already exists.
+     * and refuses a label that already exists. Same body shape as an update.
      */
-    suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block = adminRpcDecoded(
-        method = AdminRpcMethod("block.create_agent"),
-        path = AdminRpcPath("/v1/agents/${target.agentId}/core-memory/blocks"),
-        body = jsonBody {
-            put("agent_id", target.agentId)
-            put("label", target.label)
-            put("value", value)
-        },
-    )
+    suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =
+        sendBlockUpdate(agentBlockRoute(AGENT_BLOCK_CREATE, target), BlockUpdateParams(value = value))
 
     /** bfooy.5: agent + label block delete (`block.delete_agent` -> committed `delete_memory_file`). */
     suspend fun deleteAgentBlock(target: AgentBlockTarget) {
-        adminRpcResult(
-            method = AdminRpcMethod("block.delete_agent"),
-            path = AdminRpcPath("/v1/agents/${target.agentId}/core-memory/blocks/${target.label}"),
-            body = jsonBody {
-                put("agent_id", target.agentId)
-                put("label", target.label)
-            },
-        )
+        val route = agentBlockRoute(AGENT_BLOCK_DELETE, target)
+        adminRpcResult(route.method, route.path, route.body())
     }
 
-    /** Both block-update routes share one body shape: address keys + the changed fields. */
-    private suspend fun sendBlockUpdate(route: BlockUpdateRoute, params: BlockUpdateParams): Block = adminRpcDecoded(
-        method = route.method,
-        path = route.path,
-        body = jsonBody {
-            route.keys.forEach { (key, value) -> put(key, value) }
-            params.value?.let { put("value", it) }
-            params.limit?.let { put("limit", it) }
-            params.description?.let { put("description", it) }
-        },
+    /** Every agent-scoped block route addresses the block by agent + label, and nothing else. */
+    private fun agentBlockRoute(method: AdminRpcMethod, target: AgentBlockTarget) = BlockUpdateRoute(
+        method = method,
+        path = AdminRpcPath("/v1/agents/${target.agentId}/core-memory/blocks/${target.label}"),
+        keys = mapOf("agent_id" to target.agentId, "label" to target.label),
     )
+
+    /** Block routes share one body shape: address keys + the changed fields. */
+    private suspend fun sendBlockUpdate(route: BlockUpdateRoute, params: BlockUpdateParams): Block =
+        adminRpcDecoded(method = route.method, path = route.path, body = route.body(params))
+
+    private fun BlockUpdateRoute.body(params: BlockUpdateParams = BlockUpdateParams()): AdminRpcBody = jsonBody {
+        keys.forEach { (key, value) -> put(key, value) }
+        params.value?.let { put("value", it) }
+        params.limit?.let { put("limit", it) }
+        params.description?.let { put("description", it) }
+    }
 
     private data class BlockUpdateRoute(
         val method: AdminRpcMethod,
@@ -524,6 +511,10 @@ class IrohAdminRpcAgentDirectory(
         const val AGENT_LIST_PAGE_SIZE = 25
         const val AGENT_BLOCK_LIST_PAGE_SIZE = 50
         const val AGENT_BLOCK_LIST_MAX_PAGES = 100
+
+        private val AGENT_BLOCK_UPDATE = AdminRpcMethod("block.update_agent")
+        private val AGENT_BLOCK_CREATE = AdminRpcMethod("block.create_agent")
+        private val AGENT_BLOCK_DELETE = AdminRpcMethod("block.delete_agent")
 
         private val SCHEDULE_GET_NOT_FOUND = Regex(
             "^(?:scheduled message \\S+ not found|HTTP 404(?::.*)?|not_found(?::.*)?)$",

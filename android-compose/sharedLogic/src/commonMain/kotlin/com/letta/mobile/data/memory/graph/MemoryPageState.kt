@@ -57,15 +57,29 @@ data class MemoryNodeSelection(
     val displayText: String
         get() = (content as? MemoryNodeContent.Loaded)?.value ?: detail.body
 
-    val canEdit: Boolean
-        get() = writable && !detail.readOnly && detail.blockRef != null && content is MemoryNodeContent.Loaded
+    val canEdit: Boolean get() = MemorySelectionRules.canEdit(this)
 
     /** A writable, non-read-only block that is not mid-save. */
-    val canDelete: Boolean
-        get() = writable && !detail.readOnly && detail.blockRef != null && editor?.isSaving != true
+    val canDelete: Boolean get() = MemorySelectionRules.canDelete(this)
 
-    val canSave: Boolean
-        get() = editor != null && !editor.isSaving && editor.isDirty && !editor.exceeds(detail.limit)
+    val canSave: Boolean get() = MemorySelectionRules.canSave(this)
+}
+
+/** The selection's capability rules, kept in named functions rather than property initializers. */
+internal object MemorySelectionRules {
+    private fun isWritableBlock(selection: MemoryNodeSelection): Boolean =
+        selection.writable && !selection.detail.readOnly && selection.detail.blockRef != null
+
+    fun canEdit(selection: MemoryNodeSelection): Boolean =
+        isWritableBlock(selection) && selection.content is MemoryNodeContent.Loaded
+
+    fun canDelete(selection: MemoryNodeSelection): Boolean =
+        isWritableBlock(selection) && selection.editor?.isSaving != true
+
+    fun canSave(selection: MemoryNodeSelection): Boolean {
+        val editor = selection.editor ?: return false
+        return !editor.isSaving && editor.isDirty && !editor.exceeds(selection.detail.limit)
+    }
 }
 
 /** Everything the page can ask for. The controller implements it; UI calls it. */
