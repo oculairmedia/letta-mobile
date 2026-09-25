@@ -5,13 +5,10 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,22 +30,18 @@ class ShimBackendDetector internal constructor(
     @Inject
     constructor(settingsRepository: SettingsRepository) : this(settingsRepository.activeConfig)
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    val activeBackendKind: StateFlow<BackendKind> = activeConfig
-        .map(::kindOf)
-        .stateIn(scope, SharingStarted.Eagerly, kindOf(activeConfig.value))
+    // Derived without a scope: the classification is a pure function of the config, so the
+    // flows below compute it from the config's current value on every read. Nothing is shared
+    // eagerly on a background scope, and a read right after a config change never observes the
+    // previous classification.
+    val activeBackendKind: StateFlow<BackendKind> = DerivedStateFlow(activeConfig, ::kindOf)
 
     /** True only for Iroh: the one backend served by an `IChannelTransport`. */
-    val activeUsesChannelTransport: StateFlow<Boolean> = activeBackendKind
-        .map { it.usesChannelTransport }
-        .stateIn(scope, SharingStarted.Eagerly, kindOf(activeConfig.value).usesChannelTransport)
+    val activeUsesChannelTransport: StateFlow<Boolean> =
+        DerivedStateFlow(activeBackendKind) { it.usesChannelTransport }
 
-    // The cached accessors are computed directly rather than read off the
-    // shared StateFlows: those are `stateIn`-ed on a background IO scope, so a
-    // caller that reads them immediately after a config change can observe the
-    // previous value. Callers use these as the seed for their own `stateIn`, so
-    // a stale seed is a visible first-frame misroute.
+    // Callers use these as the seed for their own `stateIn`; they read the same current value
+    // the flows expose.
     fun cachedActiveUsesChannelTransport(): Boolean = cachedActiveBackendKind().usesChannelTransport
 
     fun cachedActiveBackendKind(): BackendKind = kindOf(activeConfig.value)
@@ -63,3 +56,17 @@ class ShimBackendDetector internal constructor(
  */
 private fun kindOf(config: LettaConfig?): BackendKind =
     config?.backendKind(forceIroh = IrohChannelTransport.shouldUseIroh(config.serverUrl)) ?: BackendKind.REST
+
+/** A [StateFlow] whose value is [transform] of [source]'s current value; it owns no coroutine. */
+private class DerivedStateFlow<T, R>(
+    private val source: StateFlow<T>,
+    private val transform: (T) -> R,
+) : StateFlow<R> {
+    override val value: R get() = transform(source.value)
+    override val replayCache: List<R> get() = listOf(value)
+
+    override suspend fun collect(collector: FlowCollector<R>): Nothing {
+        source.map(transform).distinctUntilChanged().collect(collector)
+        error("a StateFlow never completes")
+    }
+}
