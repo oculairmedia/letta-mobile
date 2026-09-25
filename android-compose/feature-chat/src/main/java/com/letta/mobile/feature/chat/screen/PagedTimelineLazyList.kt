@@ -31,7 +31,7 @@ import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
-import com.letta.mobile.data.chat.projection.TimelineRowKeyGuard
+import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.screen.PagedTimelineEffects.timelinePinchZoom
@@ -58,7 +58,8 @@ import kotlinx.coroutines.launch
 
 internal class PagedTimelineLazyListParams(
     val pages: LazyPagingItems<ChatRenderItem>,
-    val displayedLive: List<ChatRenderItem>,
+    /** The whole live overlay; the list hides the rows the settled snapshot has taken over. */
+    val live: List<ChatRenderItem>,
     val presentation: ChatPagingPresentation,
     val listState: LazyListState,
     val kineticOverscroll: androidx.compose.foundation.OverscrollEffect?,
@@ -72,7 +73,7 @@ internal class PagedTimelineViewportParams(
     val state: ChatUiState,
     val pages: LazyPagingItems<ChatRenderItem>,
     val displayedLive: List<ChatRenderItem>,
-    val live: List<ChatRenderItem> = emptyList(),
+    val live: List<ChatRenderItem>,
     val listState: LazyListState,
     val following: Boolean,
     val onFollowingChange: (Boolean) -> Unit,
@@ -154,32 +155,32 @@ internal object PagedTimelineLazyLayout {
 
     private fun LazyListScope.timelineRowItems(params: PagedTimelineLazyListParams) {
         val settledKey = params.pages.itemKey { it.key }
-        val liveCount = params.displayedLive.size
-        // A repeated key would throw inside LazyColumn measurement; the guard turns it into one
-        // empty row instead. itemSnapshotList is what itemKey reads, so both agree on every index.
-        val duplicates = TimelineRowKeyGuard.duplicateRows(
-            params.displayedLive.map { it.key } + params.pages.itemSnapshotList.map { it?.key },
-        ) { index -> if (index < liveCount) "live" else "settled" }
+        // One read of both sources (letta-mobile-qygvv.24): which live rows are still shown is
+        // decided against the same settled snapshot the keys come from, at measure. A settled row
+        // that took over a live row's key therefore replaces it in the same pass instead of
+        // colliding with a live list filtered at composition, a page earlier.
+        val rows = TimelineRowAssembly.assemble(params.live, params.pages.itemSnapshotList.map { it?.key })
         items(
-            count = liveCount + params.pages.itemCount,
+            count = rows.size,
             key = { index ->
-                duplicates[index]
-                    ?: params.displayedLive.getOrNull(index)?.key
-                    ?: settledKey(index - liveCount)
+                rows.duplicates[index]
+                    ?: rows.live.getOrNull(index)?.key
+                    ?: settledKey(index - rows.liveCount)
             },
         ) { index ->
-            if (index in duplicates) return@items
-            TimelineRowItem(index, params)
+            if (index in rows.duplicates) return@items
+            TimelineRowItem(index, rows.live, params)
         }
     }
 
     @Composable
     private fun TimelineRowItem(
         index: Int,
+        live: List<ChatRenderItem>,
         params: PagedTimelineLazyListParams,
     ) {
-        val liveRow = params.displayedLive.getOrNull(index)
-        val pageIndex = index - params.displayedLive.size
+        val liveRow = live.getOrNull(index)
+        val pageIndex = index - live.size
         val row = liveRow ?: params.pages[pageIndex]
         if (row == null) {
             Spacer(Modifier.height(LettaDimens.Orb.railSlotWidth))
@@ -190,20 +191,21 @@ internal object PagedTimelineLazyLayout {
                 DeferredWindowControls(row.key, reader)
             }
         }
-        val older = resolveOlderRow(liveRow, index, params)
+        val older = resolveOlderRow(liveRow, index, live, params)
         Row(row, index, older, params.context)
     }
 
     private fun resolveOlderRow(
         liveRow: ChatRenderItem?,
         index: Int,
+        live: List<ChatRenderItem>,
         params: PagedTimelineLazyListParams,
     ): ChatRenderItem? {
         if (liveRow != null) {
-            return params.displayedLive.getOrNull(index + 1)
+            return live.getOrNull(index + 1)
                 ?: if (params.pages.itemCount > 0) params.pages.peek(0) else null
         }
-        val pageIndex = index - params.displayedLive.size
+        val pageIndex = index - live.size
         return if (pageIndex + 1 < params.pages.itemCount) params.pages.peek(pageIndex + 1) else null
     }
 
@@ -358,7 +360,7 @@ internal object PagedTimelineLazyLayout {
             LazyList(
                 params = PagedTimelineLazyListParams(
                     pages = params.pages,
-                    displayedLive = params.displayedLive,
+                    live = params.live,
                     presentation = params.presentation,
                     listState = params.listState,
                     kineticOverscroll = kineticOverscroll,
