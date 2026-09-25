@@ -947,13 +947,11 @@ class IrohNodeConnection(
     ) {
         val errorText = error.message ?: error.toString()
         if (isTurnAlreadyActiveMessage(errorText)) {
-            runCatching { withContext(NonCancellable) { protocol.rejectInput(errorText) } }
             emitBusyRejectionToInitiator(fanout, errorText, error)
             return
         }
         val wroteTerminal = runCatching {
             withContext(NonCancellable) {
-                protocol.rejectInput(errorText)
                 fanout.flushOpenToolCalls()
                 fanout.emitErrorTerminal(errorText)
                 protocol.onTurnError(errorText)

@@ -14,6 +14,7 @@ import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -260,7 +261,8 @@ internal class IrohRelayedTurnProtocol(
 
 /**
  * Runs [command] through [controller] and relays every draft to [fanout], with [protocol] adding
- * the App Server frames around them. [onFailure] handles an exception out of the collector.
+ * the App Server frames around them. [onFailure] handles an exception out of the collector, after
+ * an input that never got its ack is answered `accepted:false` (busy rejection, input failure).
  */
 internal suspend fun relayTurn(
     controller: AppServerController,
@@ -273,7 +275,12 @@ internal suspend fun relayTurn(
         withContext(protocol.listener) {
             controller.runTurn(command).collect { draft -> relayDraft(fanout, protocol, draft) }
         }
-    }.onFailure { error -> onFailure(error) }
+    }.onFailure { error ->
+        if (error !is CancellationException) {
+            runCatching { withContext(NonCancellable) { protocol.rejectInput(error.message ?: error.toString()) } }
+        }
+        onFailure(error)
+    }
 }
 
 private suspend fun relayDraft(
