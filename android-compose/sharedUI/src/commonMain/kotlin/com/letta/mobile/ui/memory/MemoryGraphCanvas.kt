@@ -77,7 +77,7 @@ internal fun MemoryGraphCanvas(
             }
             .semantics { contentDescription = "Memory graph, ${params.view.nodes.size} nodes" },
     ) {
-        val frame = GraphFrame(params, viewportState.viewport, palette, labels, density)
+        val frame = GraphFrame(params, viewportState.viewport, palette, labels, this.density)
         drawEdges(frame)
         drawNodes(frame, labelGapPx)
     }
