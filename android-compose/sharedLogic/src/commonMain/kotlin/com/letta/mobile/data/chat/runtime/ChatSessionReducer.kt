@@ -98,6 +98,31 @@ object ChatSessionReducer {
     }
 
     /**
+     * letta-mobile-lks7m: a background re-read of the roster (another client created or renamed a
+     * conversation). Unlike [conversationsLoaded], this is NOT a (re)load of the session: it swaps
+     * the list and nothing else. Selection, selection generation, hydrated messages, composer draft,
+     * send/loading flags and status all stay exactly where they are, so a periodic refresh can never
+     * jump the user to another conversation or tear down the timeline they are reading.
+     *
+     * The selected conversation is kept even when the fetched roster lacks it: the fetch may have
+     * raced this client's own create, and a remote delete of the open conversation is reconciled by
+     * the next full load rather than by yanking the view away mid-read.
+     *
+     * Returns [state] itself when nothing changed, so an idle poll emits no new state.
+     */
+    fun conversationRosterRefreshed(
+        state: ChatSessionState,
+        conversations: List<ChatConversationSummary>,
+    ): ChatSessionState {
+        val selectedId = state.selectedConversationId
+        val retainedSelection = selectedId
+            ?.takeIf { id -> conversations.none { it.id == id } }
+            ?.let { id -> state.conversations.firstOrNull { it.id == id } }
+        val roster = if (retainedSelection != null) listOf(retainedSelection) + conversations else conversations
+        return if (roster == state.conversations) state else state.copy(conversations = roster)
+    }
+
+    /**
      * Remove a single conversation in place without rebuilding the whole session.
      * Deleting a background conversation leaves the active selection and its
      * hydrated messages untouched (no reload, no flash). Deleting the active

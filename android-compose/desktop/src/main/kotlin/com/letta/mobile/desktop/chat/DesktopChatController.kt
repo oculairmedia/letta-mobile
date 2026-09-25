@@ -8,6 +8,9 @@ import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
+import com.letta.mobile.data.chat.runtime.ChatConnectionState
+import com.letta.mobile.data.chat.runtime.ChatConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationRosterRefresher
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -48,6 +51,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 class DesktopChatController(
@@ -74,6 +78,9 @@ class DesktopChatController(
     ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
         RealDesktopTimelineLoop.create(gateway, conversation, loopScope, timelinePersistence)
     },
+    /** How often the roster is re-read while the window is focused (letta-mobile-lks7m). */
+    rosterRefreshInterval: Duration = ConversationRosterRefresher.DEFAULT_INTERVAL,
+    rosterRefreshDebounce: Duration = ConversationRosterRefresher.DEFAULT_DEBOUNCE,
 ) {
     private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)
     private val _state = MutableStateFlow(initialState)
@@ -305,6 +312,18 @@ class DesktopChatController(
 
     private var gateway: DesktopChatGateway? = null
 
+    /**
+     * letta-mobile-lks7m: conversations other clients create (e.g. a new chat started on Android)
+     * have no push event and never reach this connection's viewer-scoped stream fan-out, so the
+     * roster is re-read periodically while focused and whenever the window regains focus.
+     */
+    private val rosterRefresher = ConversationRosterRefresher(
+        scope = scope,
+        refresh = ::refreshConversationRoster,
+        debounce = rosterRefreshDebounce,
+        interval = rosterRefreshInterval,
+    )
+
     private val modelCatalogHelper = DesktopChatModelCatalogHelper(
         scope = scope,
         agentByIdProvider = agentByIdProvider,
@@ -451,6 +470,7 @@ class DesktopChatController(
 
     fun retryConnection() {
         if (closed) return
+        rosterRefresher.stop()
         loadJob?.cancel()
         selectJob?.cancel()
         sendJob?.cancel()
@@ -474,6 +494,7 @@ class DesktopChatController(
         if (closed) return
         closed = true
         presenceJob.cancel()
+        rosterRefresher.stop()
         runPhases.close()
         connectionWatcher.stop()
         loadJob?.cancel()
@@ -1048,6 +1069,9 @@ class DesktopChatController(
 
             gatewayExtras?.let(modelCatalogHelper::startModelCatalogLoad)
 
+            // Started before the first load so a roster that only arrives on a later reconnect is
+            // still kept fresh; each refresh gates itself on the session being settled.
+            rosterRefresher.start()
             reloadConversationsAndSelect(preferConversationId = null)
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -1067,6 +1091,19 @@ class DesktopChatController(
 
     private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
         val nextGateway = gateway ?: return
+        val summaries = loadConversationSummaries(nextGateway)
+        if (closed) return
+        val loadedRuntime = ChatSessionReducer.conversationsLoaded(
+            state = _state.value.runtimeState,
+            conversations = summaries,
+        )
+        _state.update { it.withRuntimeState(loadedRuntime) }
+        val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
+            ?: summaries.firstOrNull()?.id
+        selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+    }
+
+    private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         // An empty map here silently degrades every conversation label to its
@@ -1080,18 +1117,52 @@ class DesktopChatController(
                 )
             }
             .getOrDefault(emptyMap())
-        val summaries = conversations.toChatConversationSummaries(agentNamesById)
+        return conversations.toChatConversationSummaries(agentNamesById)
             .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
+    }
+
+    /**
+     * letta-mobile-lks7m: the window gained or lost focus. Focused windows poll the roster; regaining
+     * focus re-reads it at once so a conversation started on another device shows up on return.
+     */
+    fun onWindowFocusChanged(focused: Boolean) {
         if (closed) return
-        val loadedRuntime = ChatSessionReducer.conversationsLoaded(
-            state = _state.value.runtimeState,
-            conversations = summaries,
-        )
-        _state.update { it.withRuntimeState(loadedRuntime) }
-        val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
-            ?: summaries.firstOrNull()?.id
-        selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+        rosterRefresher.setActive(focused)
+    }
+
+    /** Asks for a background roster re-read (debounced and coalesced; never changes the selection). */
+    fun requestConversationRosterRefresh() {
+        if (closed) return
+        rosterRefresher.requestRefresh()
+    }
+
+    /**
+     * Re-reads the roster WITHOUT reloading the session: the list is merged through
+     * [ChatSessionReducer.conversationRosterRefreshed], so the selection, its timeline loop and the
+     * composer draft are untouched. Only an empty session (nothing selected yet) takes the full load
+     * path, because then there is no selection to preserve and the first conversation should open.
+     */
+    private suspend fun refreshConversationRoster() {
+        if (closed) return
+        val nextGateway = gateway ?: return
+        val runtime = _state.value.runtimeState
+        if (!runtime.isRemoteBacked || runtime.connectionState !in ROSTER_REFRESHABLE_STATES) return
+        if (runtime.selectedConversationId == null) {
+            reloadConversationsAndSelect(preferConversationId = null)
+            return
+        }
+        val deleting = _deletingConversationIds.value
+        val summaries = loadConversationSummaries(nextGateway).filterNot { it.id in deleting }
+        if (closed || gateway !== nextGateway) return
+        val before = _state.value.runtimeState.conversations.size
+        _state.update { current ->
+            current.withRuntimeState(ChatSessionReducer.conversationRosterRefreshed(current.runtimeState, summaries))
+        }
+        val after = _state.value.runtimeState.conversations.size
+        if (after != before) {
+            Telemetry.event(TELEMETRY_TAG, "roster.refreshed", "before" to before, "after" to after)
+        }
     }
 
     /**
@@ -1287,6 +1358,14 @@ class DesktopChatController(
 private const val NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS = 5_000L
 
 private const val TELEMETRY_TAG = "DesktopChat"
+
+/** Connection states in which the session is settled enough to merge a re-read roster into. */
+private val ROSTER_REFRESHABLE_STATES = setOf(
+    ChatConnectionState.Live,
+    ChatConnectionState.NoConversations,
+    ChatConnectionState.Sending,
+    ChatConnectionState.SendFailed,
+)
 
 /** letta-mobile-lgns8.19: shown when a send is attempted while a stop is pending. */
 internal const val STOPPING_SEND_BLOCKED_MESSAGE =

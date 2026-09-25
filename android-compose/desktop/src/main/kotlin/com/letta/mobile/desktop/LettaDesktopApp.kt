@@ -24,6 +24,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.desktopshell.ConversationTabsReducer
@@ -176,6 +177,12 @@ internal fun LettaDesktopApp(
         isLocalMode = activeConfig.mode == LettaConfig.Mode.LOCAL,
         onRestartRequested = chatController::retryConnection,
     )
+    // letta-mobile-lks7m: poll the conversation roster only while focused, and re-read it on
+    // refocus, so conversations started on another device appear without a restart.
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    LaunchedEffect(chatController, windowFocused) {
+        chatController.onWindowFocusChanged(windowFocused)
+    }
     val chatState by chatController.state.collectAsState()
     val canonicalPresentation by chatController.canonicalPresentation.collectAsState()
     val canonicalStatus by chatController.canonicalStatus.collectAsState()
