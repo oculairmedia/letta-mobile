@@ -599,6 +599,20 @@ class DefaultAppServerController(
         turnEngine.abort(runtime, runId)
     }
 
+    override suspend fun removeQueueItem(
+        runtime: AppServerRuntimeScope,
+        itemId: String,
+    ): AppServerInboundFrame.RemoveQueueItemResponse = runtime.controllerCall("remove_queue_item") {
+        client.removeQueueItem(
+            AppServerCommand.RemoveQueueItem(requestId = requestIdFactory(), runtime = runtime, itemId = itemId),
+        )
+    }
+
+    override suspend fun resumeQueue(runtime: AppServerRuntimeScope): AppServerInboundFrame.ResumeQueueResponse =
+        runtime.controllerCall("resume_queue") {
+            client.resumeQueue(AppServerCommand.ResumeQueue(runtime = runtime, requestId = requestIdFactory()))
+        }
+
     /**
      * Internal key for runtime cache.
      */

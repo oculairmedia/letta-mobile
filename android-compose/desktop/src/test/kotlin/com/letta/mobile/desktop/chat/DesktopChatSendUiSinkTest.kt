@@ -34,6 +34,22 @@ class DesktopChatSendUiSinkTest {
     }
 
     /** A send into the conversation on screen carries no id; the indicator must still attach. */
+    /**
+     * letta-mobile-1n5py: the coordinator owns what happens to the next send (it queues behind the
+     * running turn), so an accepted send releases the composer while the turn keeps running.
+     */
+    @Test fun anAcceptedSendReleasesTheComposerButKeepsTheTurnRunning() {
+        val dispatched = FakeSurface()
+        sink(dispatched).onSendDispatched("conv-1")
+        assertEquals(false, dispatched.settled)
+        assertEquals("conv-1", dispatched.streaming)
+
+        val queued = FakeSurface()
+        sink(queued).onSendQueued("conv-1")
+        assertEquals(false, queued.settled)
+        assertEquals("conv-1", queued.thinking)
+    }
+
     @Test fun aDispatchWithoutAConversationFallsBackToTheSelection() {
         val surface = FakeSurface(selected = "conv-9")
         sink(surface).onSendDispatched(null)

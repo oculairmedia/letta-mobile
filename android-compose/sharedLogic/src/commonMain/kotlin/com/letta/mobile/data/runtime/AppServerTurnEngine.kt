@@ -249,6 +249,9 @@ class AppServerTurnEngine(
         noteSettled = { key, runId -> leases.peek(key)?.boundaryGate?.noteSettled(runId) },
     )
 
+    /** letta-mobile-qygvv.9: a cancelled Queued lease takes its input off the server queue. */
+    private val queuedInputRemoval = QueuedInputRemoval(queueHygiene::removeQueuedInput)
+
     /** Without an [eventRouter] the engine feeds [queueHygiene] the frames its turns collect. */
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
@@ -510,6 +513,9 @@ class AppServerTurnEngine(
     fun isBusy(agentId: String, conversationId: String): Boolean =
         leases.peek(TurnRuntimeKey(agentId, conversationId))?.isBusy == true
 
+    /** letta-mobile-qygvv.9: [key]'s input waits in the server queue, so a cancel must not abort. */
+    fun isQueued(key: TurnRuntimeKey): Boolean = leases.peek(key)?.lease?.phase == TurnLeasePhase.Queued
+
     /**
      * true when ANY runtime key holds a lease. Aggregate — use [isBusy] for a
      * send/routing decision; this exists for whole-engine liveness assertions
@@ -725,20 +731,20 @@ class AppServerTurnEngine(
                 // letta-mobile-qygvv.3: abort BEFORE releasing, so no successor input can
                 // queue behind a server turn nobody observes any more.
                 slot.lease?.takeIf { it.token == leaseToken }?.let { held ->
-                    orphanAborter.abortIfOrphaned(
-                        LeaseReleaseFacts(
-                            key = slot.key,
-                            leaseToken = leaseToken,
-                            releaseReason = releaseReason,
-                            releaseCause = releaseCause,
-                            phase = held.phase,
-                            runId = held.runId?.takeIf { it.isNotBlank() },
-                            lastTerminal = held.lastTerminal,
-                            lastTerminalSource = held.lastTerminalSource,
-                            generationSuperseded = held.connectionGeneration != connectionGenerationProvider(),
-                            abortAlreadyRequested = slot.boundaryGate.isAbortRequested(),
-                        ),
+                    val facts = LeaseReleaseFacts(
+                        key = slot.key,
+                        leaseToken = leaseToken,
+                        releaseReason = releaseReason,
+                        releaseCause = releaseCause,
+                        phase = held.phase,
+                        runId = held.runId?.takeIf { it.isNotBlank() },
+                        lastTerminal = held.lastTerminal,
+                        lastTerminalSource = held.lastTerminalSource,
+                        generationSuperseded = held.connectionGeneration != connectionGenerationProvider(),
+                        abortAlreadyRequested = slot.boundaryGate.isAbortRequested(),
                     )
+                    orphanAborter.abortIfOrphaned(facts)
+                    queuedInputRemoval.removeIfQueued(facts, slot.runtimeScopeOrDefault(), queuedInput.clientMessageId)
                 }
                 // Token-validated release: a successor lease is never cleared by
                 // us — and, letta-mobile-8xxzv, only OUR key's slot is touched, so

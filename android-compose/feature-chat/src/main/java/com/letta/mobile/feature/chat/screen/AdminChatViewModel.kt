@@ -1070,6 +1070,28 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
     }
 
+    // --- Send queue (letta-mobile-1n5py) ---
+    /** True when a message sent during a turn is queued behind it (the Iroh route). */
+    val canQueueWhileStreaming: Boolean
+        get() = composerCoordinator.canQueueWhileStreaming()
+
+    /** letta-mobile-1n5py: the queued-sends panel's controls; Send now and Resume start a new turn. */
+    val queuedSendActions: com.letta.mobile.ui.chat.QueuedSendActions by lazy(LazyThreadSafetyMode.NONE) {
+        com.letta.mobile.ui.chat.QueuedSendActions(
+            onCancel = { id -> if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.sendQueue.cancel(id) },
+            onSendNow = { id -> startQueuedTurn { sendNow(id) } },
+            onResume = {
+                uiState.value.sendQueue.items.firstOrNull()?.conversationId?.let { id -> startQueuedTurn { resume(id) } }
+            },
+        )
+    }
+
+    private fun startQueuedTurn(action: com.letta.mobile.data.chat.send.ChatSendQueueControls.() -> Unit) {
+        if (replacingSendRuntime) return
+        composerCoordinator.beginQueuedTurn()
+        sendPipeline.wsChatSendCoordinator.sendQueue.action()
+    }
+
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
 

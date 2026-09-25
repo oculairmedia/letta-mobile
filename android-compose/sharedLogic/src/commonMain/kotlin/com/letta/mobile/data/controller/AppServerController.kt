@@ -150,6 +150,20 @@ interface AppServerController {
     }
 
     /**
+     * letta-mobile-1n5py / qygvv.9: drops one queued input ([itemId] is the queue item's `id`).
+     * Lets a relaying node forward its clients' `remove_queue_item`.
+     */
+    suspend fun removeQueueItem(
+        runtime: AppServerRuntimeScope,
+        itemId: String,
+    ): AppServerInboundFrame.RemoveQueueItemResponse =
+        throw UnsupportedOperationException("remove_queue_item is not supported by this controller")
+
+    /** letta-mobile-1n5py: releases queue items parked by an abort (`resume_queue`). */
+    suspend fun resumeQueue(runtime: AppServerRuntimeScope): AppServerInboundFrame.ResumeQueueResponse =
+        throw UnsupportedOperationException("resume_queue is not supported by this controller")
+
+    /**
      * Evict any cached runtime(s) for [agentId] so the next turn issues a fresh
      * runtime_start, reseeding the model from the (freshly-updated) agent record.
      *

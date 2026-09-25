@@ -26,7 +26,6 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -43,7 +42,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * What lives here (pure orchestration, no Compose / Dagger / Android):
  *   - optimistic user-bubble construction via [TimelineExternalTransportWriter]
  *   - otid generation + reconciliation (mark-sent / mark-failed / reconcile)
- *   - the bounded pending-send queue + drain/clear/cancel semantics
+ *   - the unbounded busy-send queue (letta-mobile-1n5py, [QueuedSendDriver])
  *   - turn-state transitions (active otid/turn id, first-wins stop_reason +
  *     usage guards, buffered-error-until-TurnDone ordering)
  *   - the [WsTimelineEvent] state machine, including the strict
@@ -106,8 +105,17 @@ class ChatSendCoordinator(
     // where the wire gives us nothing to key on (see [resolveStateByTurnId]).
     @Volatile private var lastActiveConversationId: String? = null
     private val preConversationMessageDeltas = ArrayDeque<WsTimelineEvent.MessageDelta>()
-    private val pendingSendLock = SynchronizedObject()
-    private val pendingSends = ArrayDeque<PendingWsSend>()
+    // letta-mobile-1n5py: messages sent while their conversation is busy wait here, unbounded,
+    // and run in order once the turn ahead ends. See [QueuedSendDriver].
+    private val queuedSends = ChatSendQueue()
+    private val queueDriver = QueuedSendDriver(
+        scope,
+        queuedSends,
+        CoordinatorQueueTurns(turnStateMutex, wsChatBridge) { dispatchPendingSend(it, clearComposer = false) },
+    )
+
+    /** letta-mobile-1n5py: the send queue a chat screen shows and controls. */
+    val sendQueue: ChatSendQueueControls = ChatSendQueueControls(scope, queueDriver, queuedSends.state)
     private val bridgeEventDeduplicator = BridgeEventDeduplicator()
     private val postSendReconciler = PostSendReconciler(
         scope = scope,
@@ -667,24 +675,20 @@ class ChatSendCoordinator(
             return
         }
 
-        val pending = PendingWsSend(
-            conversationId = conversationId,
+        val pending = QueuedChatSend(
+            id = QueuedSendId(otidGenerator()),
+            conversationId = QueueConversationId(conversationId),
             text = text,
             attachments = attachments,
-            otid = otidGenerator(),
         )
-        Telemetry.event("IrohTrace", "coordinator.dispatch.begin", "conversationId" to conversationId, "otid" to pending.otid)
-        val accepted = dispatchPendingSend(pending, appendOptimisticLocal = true)
-        Telemetry.event("IrohTrace", "coordinator.dispatch.done", "conversationId" to conversationId, "otid" to pending.otid, "accepted" to accepted)
-        if (!accepted && !enqueuePendingSend(pending)) {
-            ui.onError("WebSocket send queue is full; wait for the current turn to finish")
-            timer.stop("accepted" to false, "reason" to "busy")
-            return
-        }
+        // letta-mobile-1n5py: never jump messages already waiting, and never fail a send because
+        // a turn is running: queue it behind that turn instead.
+        val accepted = !queuedSends.hasItems(pending.conversationId) && dispatchPendingSend(pending, clearComposer = true)
+        if (!accepted) enqueueBusySend(pending)
         timer.stop(
             "accepted" to true,
             "conversationId" to conversationId,
-            "otid" to pending.otid,
+            "otid" to pending.id.value,
             "attachments" to attachments.size,
             "queued" to !accepted,
         )
@@ -709,180 +713,77 @@ class ChatSendCoordinator(
     fun cancel(): Boolean {
         val conversationId = activeConversationId() ?: lastActiveConversationId ?: return false
         val accepted = wsChatBridge.cancel(conversationId)
-        if (accepted) {
-            val dropped = removePendingSends(conversationId)
-            if (dropped.isNotEmpty()) {
-                scope.launch { markPendingSendsFailed(dropped, "cancel", conversationId) }
-            }
-        }
+        // letta-mobile-1n5py: a Stop holds what is queued (the App Server parks its own queue on
+        // abort too) instead of running it or throwing it away.
+        if (accepted) queueDriver.onStopped(QueueConversationId(conversationId))
         return accepted
     }
 
     private suspend fun dispatchPendingSend(
-        pending: PendingWsSend,
-        appendOptimisticLocal: Boolean,
+        pending: QueuedChatSend,
+        clearComposer: Boolean,
     ): Boolean {
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.begin",
             "agentId" to agentId,
-            "conversationId" to pending.conversationId,
-            "otid" to pending.otid,
-            "appendOptimisticLocal" to appendOptimisticLocal,
+            "conversationId" to pending.conversationId.value,
+            "otid" to pending.id.value,
+            "clearComposer" to clearComposer,
         )
-        val state = stateFor(pending.conversationId)
+        val state = stateFor(pending.conversationId.value)
         val accepted = state.identity.acceptSend(
-            conversationId = pending.conversationId,
+            conversationId = pending.conversationId.value,
             send = {
                 wsChatBridge.send(
                     agentId = agentId,
-                    conversationId = pending.conversationId,
+                    conversationId = pending.conversationId.value,
                     text = pending.text,
-                    otid = pending.otid,
+                    otid = pending.id.value,
                     attachments = pending.attachments,
                     startNewConversation = false,
                 )
             },
             onAccepted = {
-                state.otid = pending.otid
-                state.localConversationId = pending.conversationId.takeIf { it.isNotBlank() }
+                state.otid = pending.id.value
+                state.localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
                 state.reachedTerminal = false
-                pending.conversationId.takeIf { it.isNotBlank() }?.let { lastActiveConversationId = it }
+                pending.conversationId.value.takeIf { it.isNotBlank() }?.let { lastActiveConversationId = it }
             },
         )
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
-            "conversationId" to pending.conversationId,
-            "otid" to pending.otid,
+            "conversationId" to pending.conversationId.value,
+            "otid" to pending.id.value,
             "accepted" to accepted,
         )
         if (!accepted) return false
 
-        if (appendOptimisticLocal) {
-            timelineRepository.appendExternalTransportLocal(
-                agentId = agentId,
-                conversationId = pending.conversationId,
-                content = pending.text,
-                otid = pending.otid,
-                attachments = pending.attachments,
-            )
-            clearComposerAfterSend()
-        }
-        postSendReconciler.schedule(pending.conversationId, pending.otid)
-        ui.onSendDispatched(pending.conversationId.takeIf { it.isNotBlank() })
-        return true
-    }
-
-    private suspend fun enqueuePendingSend(pending: PendingWsSend): Boolean {
-        val queued = synchronized(pendingSendLock) {
-            if (pendingSends.size >= MAX_PENDING_SENDS) {
-                false
-            } else {
-                pendingSends.addLast(pending)
-                true
-            }
-        }
-        if (!queued) {
-            Telemetry.event(
-                "AdminChatVM", "ws.queue.dropped",
-                "conversationId" to pending.conversationId,
-                "otid" to pending.otid,
-                "capacity" to MAX_PENDING_SENDS,
-            )
-            return false
-        }
+        // A queued message gets its timeline row only now that it runs, so it lands after the
+        // reply it waited behind rather than above it.
         timelineRepository.appendExternalTransportLocal(
             agentId = agentId,
-            conversationId = pending.conversationId,
+            conversationId = pending.conversationId.value,
             content = pending.text,
-            otid = pending.otid,
+            otid = pending.id.value,
             attachments = pending.attachments,
         )
-        clearComposerAfterSend()
-        ui.onSendQueued(pending.conversationId)
-        Telemetry.event(
-            "AdminChatVM", "ws.send.enqueued",
-            "conversationId" to pending.conversationId,
-            "otid" to pending.otid,
-            "queueDepth" to pendingQueueDepth(),
-        )
+        if (clearComposer) clearComposerAfterSend()
+        postSendReconciler.schedule(pending.conversationId.value, pending.id.value)
+        ui.onSendDispatched(pending.conversationId.value.takeIf { it.isNotBlank() })
         return true
     }
 
-    private suspend fun drainPendingSend() {
-        val pending = synchronized(pendingSendLock) { pendingSends.removeFirstOrNull() } ?: return
+    private suspend fun enqueueBusySend(pending: QueuedChatSend) {
+        val position = queueDriver.enqueueLocked(pending)
+        clearComposerAfterSend()
+        ui.onSendQueued(pending.conversationId.value)
         Telemetry.event(
-            "AdminChatVM", "ws.send.dequeued",
-            "conversationId" to pending.conversationId,
-            "otid" to pending.otid,
-            "queueDepth" to pendingQueueDepth(),
-        )
-        if (!dispatchPendingSend(pending, appendOptimisticLocal = false)) {
-            synchronized(pendingSendLock) { pendingSends.addFirst(pending) }
-            Telemetry.event(
-                "AdminChatVM", "ws.send.dequeueBlocked",
-                "conversationId" to pending.conversationId,
-                "otid" to pending.otid,
-                "queueDepth" to pendingQueueDepth(),
-            )
-            // Avoid a tight loop if TurnDone and the transport in-flight flag race.
-            delay(DEQUEUE_RETRY_DELAY_MS.milliseconds)
-        }
-    }
-
-    private suspend fun clearPendingSends(reason: String) {
-        val dropped = removeAllPendingSends()
-        markPendingSendsFailed(dropped, reason, conversationId = null)
-    }
-
-    private fun removePendingSends(conversationId: String): List<PendingWsSend> {
-        return synchronized(pendingSendLock) {
-            val matching = mutableListOf<PendingWsSend>()
-            val retained = ArrayDeque<PendingWsSend>()
-            while (true) {
-                val pending = pendingSends.removeFirstOrNull() ?: break
-                if (pending.conversationId == conversationId) {
-                    matching.add(pending)
-                } else {
-                    retained.addLast(pending)
-                }
-            }
-            while (true) {
-                pendingSends.addLast(retained.removeFirstOrNull() ?: break)
-            }
-            matching
-        }
-    }
-
-    private fun removeAllPendingSends(): List<PendingWsSend> = synchronized(pendingSendLock) {
-        val drained = mutableListOf<PendingWsSend>()
-        while (true) {
-            val pending = pendingSends.removeFirstOrNull() ?: break
-            drained.add(pending)
-        }
-        drained
-    }
-
-    private suspend fun markPendingSendsFailed(
-        dropped: List<PendingWsSend>,
-        reason: String,
-        conversationId: String?,
-    ) {
-        if (dropped.isEmpty()) return
-        dropped.forEach { pending ->
-            timelineRepository.markExternalTransportLocalFailed(agentId, pending.conversationId, pending.otid)
-        }
-        val attrs = buildList {
-            add("reason" to reason)
-            if (conversationId != null) add("conversationId" to conversationId)
-            add("count" to dropped.size)
-        }
-        Telemetry.event(
-            "AdminChatVM", "ws.queue.cleared",
-            *attrs.toTypedArray(),
+            "AdminChatVM", "ws.send.enqueued",
+            "conversationId" to pending.conversationId.value,
+            "otid" to pending.id.value,
+            "position" to position,
         )
     }
-
-    private fun pendingQueueDepth(): Int = synchronized(pendingSendLock) { pendingSends.size }
 
     private suspend fun ensureConnected(config: LettaConfig): Boolean {
         if (wsChatBridge.isConnected()) return true
@@ -1779,7 +1680,7 @@ class ChatSendCoordinator(
         state.reachedTerminal = true
         clearActiveTurnState(state, reason = "turnFinished")
         timelineRepository.clearExternalTransportActive(conversationId)
-        drainPendingSend()
+        queueDriver.onTurnFinishedLocked(QueueConversationId(conversationId))
     }
 
     /**
@@ -1870,7 +1771,7 @@ class ChatSendCoordinator(
         // its own conversation id instead of one guessed global.
         val states = snapshotStates()
         preConversationMessageDeltas.clear()
-        clearPendingSends("disconnect")
+        queueDriver.onDisconnected()
         states.forEach { state -> failConversationForDisconnect(state, event) }
         if (states.isEmpty()) {
             // Nothing was tracked, but the visible conversation still needs its
@@ -2025,7 +1926,6 @@ class ChatSendCoordinator(
 
     internal companion object {
         private const val CONNECT_WAIT_MS = 1_500L
-        private const val MAX_PENDING_SENDS = 10
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val MAX_SETTLED_RUN_IDS = 8
         private const val MAX_SETTLED_OTIDS = 16
@@ -2035,7 +1935,6 @@ class ChatSendCoordinator(
         // usage keeps a handful live; the cap only stops an unbounded map when
         // frames arrive for many conversations. Overflow eviction is telemetered.
         private const val MAX_TRACKED_CONVERSATION_TURN_STATES = 32
-        private const val DEQUEUE_RETRY_DELAY_MS = 50L
         internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
             "Agent run failed after your message was sent. No error details were provided by the shim."
@@ -2066,12 +1965,5 @@ class ChatSendCoordinator(
             )
         }
     }
-
-    private data class PendingWsSend(
-        val conversationId: String,
-        val text: String,
-        val attachments: List<MessageContentPart.Image>,
-        val otid: String,
-    )
 
 }

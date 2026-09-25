@@ -79,6 +79,10 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
         get() = runtimeScopeRef.value
         set(value) { runtimeScopeRef.value = value }
 
+    /** The cached runtime scope, or the key's own scope when none was cached yet. */
+    fun runtimeScopeOrDefault(): AppServerRuntimeScope =
+        runtimeScope ?: AppServerRuntimeScope(agentId = key.agentId, conversationId = key.conversationId)
+
     /** A lease is held (Preparing … Streaming/Retiring) but has not gone Terminal. */
     val isBusy: Boolean
         get() = leaseRef.value?.let { it.phase != TurnLeasePhase.Terminal } ?: false

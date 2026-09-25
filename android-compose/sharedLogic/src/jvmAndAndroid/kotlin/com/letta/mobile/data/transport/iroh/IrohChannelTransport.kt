@@ -916,11 +916,8 @@ class IrohChannelTransport(
                 val handle = supervisor.ready()
                 // letta-mobile-8xxzv: keyed abort — a cancel for THIS conversation
                 // must be addressed to THIS conversation's runtime scope.
-                handle.turnEngine?.abort(
-                    agentId = turn.agentId,
-                    conversationId = turn.conversationId,
-                    runId = turn.runId.takeUnless { it.isIrohSyntheticRunId() },
-                )
+                // letta-mobile-qygvv.9: never for a turn still queued on the server.
+                handle.turnEngine?.abortUnlessQueued(turn)
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 Telemetry.event(

@@ -115,6 +115,10 @@ internal data class ChatDetailPaneActions(
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Change the selected conversation's working directory (folder picker result). */
     val onChangeWorkingDirectory: ((String) -> Unit)? = null,
+    /** letta-mobile-1n5py: queued-send controls (cancel one, push one through, resume). */
+    val queue: com.letta.mobile.ui.chat.QueuedSendActions = com.letta.mobile.ui.chat.QueuedSendActions(),
+    /** letta-mobile-1n5py: the send queue serving the selected conversation (canonical route only). */
+    val queueControls: () -> com.letta.mobile.data.chat.send.ChatSendQueueControls? = { null },
 )
 
 @Composable
@@ -203,6 +207,15 @@ private fun ChatDetailBody(
         val companionPresent = surface.selectedConversation?.agentId
             ?.let { transport.activeStage(it) == com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION } ?: false
         ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
+        com.letta.mobile.ui.chat.QueuedSendsPanel(
+            queue = com.letta.mobile.desktop.rememberSelectedSendQueue(
+                actions.queueControls,
+                state.canonicalPresentation,
+                surface.selectedConversationId,
+            ),
+            actions = actions.queue,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.xxl),
+        )
         ComposerBar(
             companion = companion,
             companionPresent = companionPresent,

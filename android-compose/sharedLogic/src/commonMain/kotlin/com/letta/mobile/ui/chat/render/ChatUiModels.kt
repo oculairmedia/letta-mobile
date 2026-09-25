@@ -308,6 +308,12 @@ data class ChatUiState(
      * turn, and so cancel state resolves atomically with the terminal.
      */
     val isCancelling: Boolean = false,
+    /**
+     * letta-mobile-1n5py: messages the user sent during a turn in the visible conversation,
+     * waiting to run in this order. Empty when nothing is queued.
+     */
+    val sendQueue: com.letta.mobile.data.chat.send.ConversationSendQueue =
+        com.letta.mobile.data.chat.send.ConversationSendQueue(),
 ) {
     /**
      * letta-mobile-lgns8.19: true only while a cancel is outstanding AND the

@@ -906,17 +906,26 @@ class DesktopChatController(
      * land in the canonical ledger the paginated list is already reading, so there is no second
      * durable copy of the conversation and no second send path to keep in agreement with this one.
      */
+    /**
+     * The shared send coordinator serving the selected conversation, resolved by the same routing
+     * the presentation used, so the send and the history it lands beside are indexed against one
+     * transport. Null off the canonical route.
+     */
+    private fun selectedCanonicalCoordinator(): com.letta.mobile.data.chat.send.ChatSendCoordinator? {
+        val conversationId = _state.value.selectedConversationId
+        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return null
+        val agentId = conversation.agentId ?: return null
+        val activeGateway = gateway ?: return null
+        return canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(activeGateway, conversation))
+    }
+
+    /** letta-mobile-1n5py: the canonical route's send queue for the selected conversation, else null. */
+    fun canonicalSendQueue(): com.letta.mobile.data.chat.send.ChatSendQueueControls? =
+        selectedCanonicalCoordinator()?.sendQueue
+
     private fun launchCanonicalSend(draft: ChatComposerSendDraft) {
         val conversationId = _state.value.selectedConversationId
-        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId }
-        val activeGateway = gateway
-        // Resolved by the same routing the presentation used, so the send and the history it lands
-        // beside are indexed against one transport.
-        val coordinator = conversation?.agentId?.let { agentId ->
-            activeGateway?.let { gw ->
-                canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(gw, conversation))
-            }
-        }
+        val coordinator = selectedCanonicalCoordinator()
         if (coordinator == null) {
             showComposerError("This conversation cannot send on the canonical timeline route.")
             return
