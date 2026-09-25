@@ -104,6 +104,7 @@ fun buildProductionAdminRouter(
     eventScope: CoroutineScope? = null,
     /** Pushes `agent_updated` to connected clients after agent writes. */
     agentChanges: com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier? = null,
+    conversationChanges: com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier? = null,
     /** letta-mobile-w4q4p: persisted model exposure decisions; null keeps them in memory. */
     modelExposureFile: String? = null,
 ): AdminRpcRouter {
@@ -152,6 +153,7 @@ fun buildProductionAdminRouter(
         localBackendDir = localBackendDir,
         skillsListing = skillsCatalog.asListingSource(),
         agentChanges = agentChanges,
+        conversationChanges = conversationChanges,
         modelExposureFile = modelExposureFile,
     )
 }
@@ -444,6 +446,7 @@ class AppServerServeIrohCommand : CliktCommand(
             // LettaShim admin base / HTTP subagent discovery.
             // One notifier for the whole host: agent handlers feed it, the endpoint delivers it.
             val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
+            val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
             val adminRpcRouter = buildProductionAdminRouter(
                 controller = controller,
                 pairingService = pairingService,
@@ -454,10 +457,12 @@ class AppServerServeIrohCommand : CliktCommand(
                 localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
                 eventScope = scope,
                 agentChanges = agentChanges,
+                conversationChanges = conversationChanges,
                 modelExposureFile = resolvedModelExposureFile(),
             )
             endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             agentChanges.attach(endpoint.agentChangeTarget())
+            conversationChanges.attach(endpoint.conversationChangeTarget())
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
                     "(methods: ${adminRpcRouter.methodCount}, " +

@@ -61,7 +61,7 @@ object ConversationAdminHandlers {
     ) {
         val nativeClient = tiers.nativeClient
         registerConversationReadRoutes(router, nativeClient, tiers)
-        registerConversationWriteRoutes(router, nativeClient, controller)
+        registerConversationWriteRoutes(router, nativeClient, controller, tiers.conversationChanges)
         registerMessageRoutes(router, nativeClient, tiers.localBackendStore)
     }
 
@@ -148,16 +148,31 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
         controller: com.letta.mobile.data.controller.AppServerController?,
+        changes: ConversationChangeNotifier?,
     ) {
+        // Every conversation write from an Iroh client lands in these handlers, so this is where
+        // connected clients learn of it (ConversationChangeNotifier, letta-mobile-lks7m). Only a
+        // successful write notifies: a failed one tells no client to refetch.
+        suspend fun notifyChanged(
+            result: JsonElement?,
+            fallbackId: String?,
+            kind: ConversationChangeKind,
+            fallbackAgentId: String? = null,
+        ) {
+            val conversation = result as? JsonObject
+            val id = conversation?.get("id")?.jsonPrimitive?.contentOrNull ?: fallbackId ?: return
+            val agentId = conversation?.get("agent_id")?.jsonPrimitive?.contentOrNull ?: fallbackAgentId
+            changes?.notify(id, agentId, kind)
+        }
         router.register("conversation.create") { params ->
-            params.requireParam(AdminParamKey("agent_id"))
+            val agentId = params.requireParam(AdminParamKey("agent_id"))
             val createBody = checkNotNull(params)
             NativeAdmin.require(nativeClient, NativeAdminOp.ConversationCreate) { c ->
                 val response = c.conversationCreate(
                     AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
                 )
                 if (response.success) response.conversation else null
-            }
+            }.also { if (it is JsonObject) notifyChanged(it, fallbackId = null, ConversationChangeKind.Created, fallbackAgentId = agentId) }
         }
         router.register("conversation.delete") { params ->
             params.requireParam(AdminParamKey("conversation_id"))
@@ -181,6 +196,7 @@ object ConversationAdminHandlers {
                 )
                 if (response.success) response.conversation else null
             }
+            if (result is JsonObject) notifyChanged(result, fallbackId = id, ConversationChangeKind.Updated)
             if (RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(body)) {
                 val agentId = param(params, AdminParamKey("agent_id"))
                     ?: (result as? JsonObject)?.get("agent_id")?.jsonPrimitive?.contentOrNull
@@ -203,7 +219,7 @@ object ConversationAdminHandlers {
                     ),
                 )
                 if (response.success) response.conversation else null
-            }
+            }.also { if (it is JsonObject) notifyChanged(it, fallbackId = id, ConversationChangeKind.Archived) }
         }
         router.register("conversation.restore") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
@@ -218,7 +234,7 @@ object ConversationAdminHandlers {
                     ),
                 )
                 if (response.success) response.conversation else null
-            }
+            }.also { if (it is JsonObject) notifyChanged(it, fallbackId = id, ConversationChangeKind.Restored) }
         }
     }
 

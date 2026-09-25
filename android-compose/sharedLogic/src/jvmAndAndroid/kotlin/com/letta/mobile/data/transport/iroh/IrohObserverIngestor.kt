@@ -136,18 +136,19 @@ internal class IrohObserverIngestor(
     }
 
     /**
-     * Meridian's device-wide `agent_updated` push (not an App Server message, so it decodes as
-     * [AppServerInboundFrame.Unknown]) is republished as [ServerFrame.AgentUpdated], the frame the
-     * agent repositories already react to. Returns true when [received] was that frame.
+     * Meridian's device-wide `agent_updated` / `conversation_updated` pushes (not App Server
+     * messages, so they decode as [AppServerInboundFrame.Unknown]) are republished as
+     * [ServerFrame.AgentUpdated] / [ServerFrame.ConversationUpdated], the frames the agent and
+     * conversation repositories react to. Returns true when [received] was one of them.
      */
-    private suspend fun republishAgentUpdated(received: AppServerReceivedFrame): Boolean {
+    private suspend fun republishDevicePush(received: AppServerReceivedFrame): Boolean {
         val unknown = received.frame as? AppServerInboundFrame.Unknown ?: return false
-        if (unknown.type != AGENT_UPDATED_TYPE) return false
+        if (unknown.type != AGENT_UPDATED_TYPE && unknown.type != CONVERSATION_UPDATED_TYPE) return false
         val frame = runCatching {
-            AGENT_UPDATED_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
-        }.getOrNull() as? ServerFrame.AgentUpdated
+            DEVICE_PUSH_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
+        }.getOrNull()?.takeIf { it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated }
         if (frame == null) {
-            Telemetry.event("IrohObserver", "agent_updated.undecodable", level = Telemetry.Level.WARN)
+            Telemetry.event("IrohObserver", "${unknown.type}.undecodable", level = Telemetry.Level.WARN)
             return true
         }
         emitBoth(frame)
@@ -157,7 +158,7 @@ internal class IrohObserverIngestor(
     suspend fun ingestObserverFrame(request: ObserverFrameRequest) {
         if (request.expectedGeneration != null && connectionGeneration() != request.expectedGeneration) return
         val received = request.received
-        if (republishAgentUpdated(received)) return
+        if (republishDevicePush(received)) return
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
         ingestStreamDelta(streamDelta, received)
     }
@@ -507,9 +508,12 @@ internal class IrohObserverIngestor(
         /** Meridian's device-wide agent change push; see AgentChangeNotifier on the host. */
         private const val AGENT_UPDATED_TYPE = "agent_updated"
 
+        /** Meridian's device-wide conversation change push; see ConversationChangeNotifier on the host. */
+        private const val CONVERSATION_UPDATED_TYPE = "conversation_updated"
+
         /** Longer than the engine's settle window (1.5 s), so a healthy engine always wins. */
         internal const val OBSERVER_TERMINAL_GRACE_MS = 3_000L
-        private val AGENT_UPDATED_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        private val DEVICE_PUSH_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
         internal const val SUBAGENT_REASON_STARTED = "started"
         internal const val SUBAGENT_REASON_DISPATCHED = "dispatched"

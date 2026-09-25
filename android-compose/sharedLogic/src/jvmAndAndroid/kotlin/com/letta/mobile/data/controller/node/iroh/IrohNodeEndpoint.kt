@@ -103,6 +103,15 @@ class IrohNodeEndpoint(
     }
 
     /**
+     * Delivers device-wide `conversation_updated` frames to every live connection allowed to read
+     * every conversation (see [ViewerHandle.receivesConversationEvents]), on its stream channel.
+     */
+    fun conversationChangeTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
+        val result = connectionRegistry.broadcast(frame) { it.receivesConversationEvents() }
+        Telemetry.event("IrohNode", "conversation_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
+    }
+
+    /**
      * The admin RPC router for this endpoint. Created lazily so handlers can
      * register before [start] is called. Passed to every incoming connection.
      */
