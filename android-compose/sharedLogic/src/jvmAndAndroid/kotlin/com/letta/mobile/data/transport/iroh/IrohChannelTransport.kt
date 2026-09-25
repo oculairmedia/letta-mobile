@@ -824,7 +824,7 @@ class IrohChannelTransport(
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {
         val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
-            ?: return subagentListFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
+            ?: return subagentListFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
         return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
@@ -857,7 +857,7 @@ class IrohChannelTransport(
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse {
         val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
-            ?: return subagentTodosFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
+            ?: return subagentTodosFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
         return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
@@ -890,6 +890,9 @@ class IrohChannelTransport(
         )
     }
 
+    /** A scoped-RPC failure: which request failed, and why. */
+    private data class ScopedRpcFailure(val requestId: String, val error: String)
+
     private data class ScopedRpcLabels(
         val unsupported: String,
         val timedOut: String,
@@ -902,18 +905,18 @@ class IrohChannelTransport(
         labels: ScopedRpcLabels,
         call: suspend () -> AppServerInboundFrame.AdminRpcResponse?,
         mapSuccess: (JsonElement) -> T,
-        onFailure: (String, String) -> T,
+        onFailure: (ScopedRpcFailure) -> T,
     ): T = try {
         withTimeoutOrNull(timeoutMs.milliseconds) {
-            val response = call() ?: return@withTimeoutOrNull onFailure(requestId, labels.unsupported)
-            if (!response.success) return@withTimeoutOrNull onFailure(requestId, response.error ?: labels.failed)
-            val result = response.result ?: return@withTimeoutOrNull onFailure(requestId, "${labels.failed}: no result")
+            val response = call() ?: return@withTimeoutOrNull onFailure(ScopedRpcFailure(requestId, labels.unsupported))
+            if (!response.success) return@withTimeoutOrNull onFailure(ScopedRpcFailure(requestId, response.error ?: labels.failed))
+            val result = response.result ?: return@withTimeoutOrNull onFailure(ScopedRpcFailure(requestId, "${labels.failed}: no result"))
             mapSuccess(result)
-        } ?: onFailure(requestId, labels.timedOut)
+        } ?: onFailure(ScopedRpcFailure(requestId, labels.timedOut))
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: Exception) {
-        onFailure(requestId, error.message ?: labels.failed)
+        onFailure(ScopedRpcFailure(requestId, error.message ?: labels.failed))
     }
 
     private suspend fun callScopedSubagentRpc(
@@ -941,12 +944,12 @@ class IrohChannelTransport(
         return SubagentRpcScope(conversationId.value, agentId)
     }
 
-    private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(
-        id = IrohTransportSupport.frameId("subagent_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun subagentListFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentListResponse(
+        id = IrohTransportSupport.frameId("subagent_list"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun subagentTodosFailure(requestId: String, error: String) = ServerFrame.SubagentTodosResponse(
-        id = IrohTransportSupport.frameId("subagent_todos"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun subagentTodosFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentTodosResponse(
+        id = IrohTransportSupport.frameId("subagent_todos"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
     /** Shared scoped-RPC labels for the cron.* bridge methods (op = the admin_rpc method). */
@@ -967,7 +970,7 @@ class IrohChannelTransport(
         timeoutMs: Long,
         body: JsonObject,
         mapSuccess: (JsonElement) -> T,
-        onFailure: (String, String) -> T,
+        onFailure: (ScopedRpcFailure) -> T,
     ): T = invokeScopedRpc(
         requestId = requestId,
         timeoutMs = timeoutMs,
@@ -977,24 +980,24 @@ class IrohChannelTransport(
         onFailure = onFailure,
     )
 
-    private fun cronListFailure(requestId: String, error: String) = ServerFrame.CronListResponse(
-        id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronListFailure(failure: ScopedRpcFailure) = ServerFrame.CronListResponse(
+        id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronAddFailure(requestId: String, error: String) = ServerFrame.CronAddResponse(
-        id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronAddFailure(failure: ScopedRpcFailure) = ServerFrame.CronAddResponse(
+        id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronGetFailure(requestId: String, error: String) = ServerFrame.CronGetResponse(
-        id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronGetFailure(failure: ScopedRpcFailure) = ServerFrame.CronGetResponse(
+        id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronDeleteFailure(requestId: String, error: String) = ServerFrame.CronDeleteResponse(
-        id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronDeleteFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteResponse(
+        id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
-    private fun cronDeleteAllFailure(requestId: String, error: String) = ServerFrame.CronDeleteAllResponse(
-        id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
+    private fun cronDeleteAllFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteAllResponse(
+        id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
     @Serializable

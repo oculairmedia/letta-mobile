@@ -81,6 +81,7 @@ internal class IrohLivenessProbe(
      * scope (see [scope]); unit tests pass a virtual-time scope + scheduler clock and
      * drive the loop with `advanceTimeBy` (never `advanceUntilIdle` — the loop is endless).
      */
+    @Suppress("NoDetachedCoroutineLifecycle") // deliberate: see [scope] — wall clock, owned via start/stop
     internal class Runtime(
         val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
         val clock: () -> Long = System::currentTimeMillis,

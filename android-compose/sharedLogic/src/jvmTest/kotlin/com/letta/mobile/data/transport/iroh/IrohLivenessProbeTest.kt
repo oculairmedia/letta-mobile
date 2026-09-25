@@ -86,14 +86,14 @@ class IrohLivenessProbeTest {
         val methodLatencyMs: Map<String, Long> = emptyMap(),
         val congestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
     ) {
-        suspend fun answerLatency(session: String, method: String) {
-            if (session == hangHealthCheckOn && method == "health.check") {
+        suspend fun answerLatency(call: ProbeCall) {
+            if (call.session == hangHealthCheckOn && call.method == "health.check") {
                 // Black hole: never completes. The caller MUST impose its
                 // own bound (the legacy control-channel fallback would
                 // otherwise stretch this to 30s/60s).
                 delay(600_000L)
             }
-            methodLatencyMs[method]?.let { delay(it) }
+            methodLatencyMs[call.method]?.let { delay(it) }
         }
     }
 
@@ -109,8 +109,9 @@ class IrohLivenessProbeTest {
                     sessionId = session,
                     observerStreamFrames = observerStream,
                     adminRpcCall = { method, _, _ ->
-                        calls += ProbeCall(session, method, System.currentTimeMillis())
-                        answerLatency(session, method)
+                        val call = ProbeCall(session, method, System.currentTimeMillis())
+                        calls += call
+                        answerLatency(call)
                         AppServerInboundFrame.AdminRpcResponse(
                             requestId = method,
                             success = true,
