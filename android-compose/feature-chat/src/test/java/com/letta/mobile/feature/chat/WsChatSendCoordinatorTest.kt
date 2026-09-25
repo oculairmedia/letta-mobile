@@ -448,6 +448,7 @@ class WsChatSendCoordinatorTest {
             )
         }
         assertEquals("hello", timelineRepository.externalLocals.single().content)
+        runCurrent() // the queue mirror collects on the coordinator's background scope
         assertTrue(uiState.value.sendQueue.isEmpty)
     }
 
@@ -482,6 +483,7 @@ class WsChatSendCoordinatorTest {
         assertEquals("network lost", uiState.value.error)
         assertEquals(false, uiState.value.isStreaming)
         assertTrue(timelineRepository.failedLocals.isEmpty())
+        runCurrent()
         assertTrue(uiState.value.sendQueue.paused)
         assertEquals(listOf("one", "two"), uiState.value.sendQueue.items.map { it.text })
     }
@@ -555,6 +557,7 @@ class WsChatSendCoordinatorTest {
         val second = uiState.value.sendQueue.items.last()
 
         coordinator.sendQueuedNow(second.otid).join()
+        runCurrent()
         verify(exactly = 1) { wsChatBridge.cancel("conv-1") }
         assertEquals(listOf("second", "first"), uiState.value.sendQueue.items.map { it.text })
 
@@ -562,6 +565,7 @@ class WsChatSendCoordinatorTest {
         busy = false
         coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Cancelled))
         advanceUntilIdle()
+        runCurrent()
 
         assertEquals("second", timelineRepository.externalLocals.single().content)
         assertEquals(listOf("first"), uiState.value.sendQueue.items.map { it.text })
