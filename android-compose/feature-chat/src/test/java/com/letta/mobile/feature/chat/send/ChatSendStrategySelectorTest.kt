@@ -41,51 +41,20 @@ class ChatSendStrategySelectorTest {
     // ---------------------------------------------------------------------
 
     @Test
-    fun `iroh backend selects the iroh strategy and never the shim ws strategy`() {
-        val f = Fixture()
-
-        val selected = f.selector.select(
-            ChatSendContext(
-                isClientModeEnabled = false,
-                explicitConversationId = null,
-                backendKind = BackendKind.IROH,
-            ),
-        )
-
-        assertSame(f.iroh, selected)
-        assertNotSame(f.ws, selected)
+    fun `iroh backend selects the iroh strategy whatever the client mode flag`() {
+        for (clientMode in listOf(false, true)) {
+            val f = Fixture()
+            val selected = f.selectFor(BackendKind.IROH, clientMode = clientMode)
+            assertSame("clientMode=$clientMode", f.iroh, selected)
+            assertNotSame(f.timeline, selected)
+        }
     }
 
     @Test
-    fun `iroh backend selects the iroh strategy even when client mode flag is set`() {
+    fun `shim ws backend falls back to the timeline strategy`() {
         val f = Fixture()
 
-        val selected = f.selector.select(
-            ChatSendContext(
-                isClientModeEnabled = true,
-                explicitConversationId = null,
-                backendKind = BackendKind.IROH,
-            ),
-        )
-
-        assertSame(f.iroh, selected)
-        assertNotSame(f.ws, selected)
-    }
-
-    @Test
-    fun `shim ws backend still selects the shim ws strategy`() {
-        val f = Fixture()
-
-        val selected = f.selector.select(
-            ChatSendContext(
-                isClientModeEnabled = false,
-                explicitConversationId = null,
-                backendKind = BackendKind.SHIM_WS,
-            ),
-        )
-
-        assertSame(f.ws, selected)
-        assertNotSame(f.iroh, selected)
+        assertSame(f.timeline, f.selectFor(BackendKind.SHIM_WS))
     }
 
     @Test
@@ -125,15 +94,7 @@ class ChatSendStrategySelectorTest {
     fun `local runtime backend kind selects the local strategy`() {
         val f = Fixture()
 
-        val selected = f.selector.select(
-            ChatSendContext(
-                isClientModeEnabled = false,
-                explicitConversationId = null,
-                backendKind = BackendKind.LOCAL_RUNTIME,
-            ),
-        )
-
-        assertSame(f.local, selected)
+        assertSame(f.local, f.selectFor(BackendKind.LOCAL_RUNTIME))
     }
 
     @Test
@@ -145,13 +106,12 @@ class ChatSendStrategySelectorTest {
         f.selector.send("hello", listOf(image), context)
 
         assertEquals(listOf(RecordedSend("hello", listOf(image), context)), f.timeline.sent)
-        assertEquals(0, f.ws.sent.size)
         assertEquals(0, f.local.sent.size)
         assertEquals(0, f.iroh.sent.size)
     }
 
     @Test
-    fun `send and cancel over an iroh backend never reach the shim ws strategy`() {
+    fun `send and cancel over an iroh backend never reach the timeline strategy`() {
         val f = Fixture()
         val context = ChatSendContext(
             isClientModeEnabled = false,
@@ -164,20 +124,22 @@ class ChatSendStrategySelectorTest {
 
         assertEquals(1, f.iroh.sent.size)
         assertEquals(1, f.iroh.cancels)
-        assertEquals(0, f.ws.sent.size)
-        assertEquals(0, f.ws.cancels)
+        assertEquals(0, f.timeline.sent.size)
+        assertEquals(0, f.timeline.cancels)
     }
 
     private class Fixture {
         val timeline = RecordingStrategy()
-        val ws = RecordingStrategy()
         val local = RecordingStrategy()
         val iroh = RecordingStrategy()
         val selector = ChatSendStrategySelector(
             timelineStrategy = timeline,
-            wsStrategy = ws,
             localStrategy = local,
             irohStrategy = iroh,
+        )
+
+        fun selectFor(kind: BackendKind, clientMode: Boolean = false): ChatSendStrategy = selector.select(
+            ChatSendContext(isClientModeEnabled = clientMode, explicitConversationId = null, backendKind = kind),
         )
     }
 

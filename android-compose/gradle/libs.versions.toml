@@ -40,7 +40,6 @@ tracing = "1.2.0"
 security-crypto = "1.1.0"
 lifecycle = "2.9.4"
 datastore = "1.3.0-alpha09"
-okhttp-mockwebserver = "5.3.2"
 fuzzywuzzy = "1.4.0"
 androidx-espresso = "3.7.0"
 androidx-uiautomator = "2.4.0-beta02"
@@ -86,7 +85,6 @@ mockk-chat = "1.14.11"
 kotest-chat = "6.2.3"
 junit-jupiter-chat = "6.1.3"
 ktor-chat = "3.5.2"
-okhttp-mockwebserver-chat = "5.4.0"
 datastore-chat = "1.3.0-alpha10"
 kotlinx-collections-immutable-chat = "0.5.1"
 coil3-chat = "3.5.0"
@@ -180,7 +178,6 @@ androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", 
 androidx-lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel", version.ref = "lifecycle" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
-okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp-mockwebserver" }
 fuzzywuzzy = { module = "me.xdrop:fuzzywuzzy", version.ref = "fuzzywuzzy" }
 androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-espresso" }
 androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-uiautomator" }
@@ -259,7 +256,6 @@ junit-jupiter-engine-chat = { module = "org.junit.jupiter:junit-jupiter-engine",
 junit-platform-launcher-chat = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-jupiter-chat" }
 junit-vintage-engine-chat = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit-jupiter-chat" }
 ktor-client-core-chat = { module = "io.ktor:ktor-client-core", version.ref = "ktor-chat" }
-okhttp-mockwebserver-chat = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp-mockwebserver-chat" }
 kotlinx-collections-immutable-chat = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable-chat" }
 androidx-hilt-navigation-compose-chat = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidx-hilt-navigation-chat" }
 androidx-lifecycle-viewmodel-compose-chat = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle-chat" }

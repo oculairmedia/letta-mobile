@@ -4,18 +4,13 @@ import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.backendKind
-import com.letta.mobile.data.transport.WebSocketConnection
 import io.mockk.Called
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import okhttp3.WebSocketListener
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,8 +24,10 @@ import org.junit.Test
  *
  *  1. an Iroh config is classified as [BackendKind.IROH], never [BackendKind.SHIM_WS];
  *  2. [ShimBackendDetector] issues no HTTP probe at all for an Iroh config —
- *     that probe was itself a dial at the shim's address;
- *  3. [WebSocketConnection] refuses to open `/shim/v1/mobile` for an Iroh URL.
+ *     that probe was itself a dial at the shim's address.
+ *
+ * (The third case — the shim `WebSocketConnection` refusing `/shim/v1/mobile`
+ * for an Iroh URL — went away with the shim WebSocket transport in g70jb.3.)
  */
 class IrohBackendNeverDialsShimTest {
 
@@ -89,27 +86,6 @@ class IrohBackendNeverDialsShimTest {
         assertFalse(detector.refreshActive())
         verify { apiClient wasNot Called }
         assertEquals(BackendKind.LOCAL_RUNTIME, detector.cachedActiveBackendKind())
-    }
-
-    @Test
-    fun `websocket connection refuses to dial the shim mobile channel for iroh urls`() {
-        val connection = WebSocketConnection(TestScope(), Json { ignoreUnknownKeys = true })
-
-        for (url in IROH_URLS) {
-            val error = assertThrows(IllegalArgumentException::class.java) {
-                connection.connect(
-                    baseShimUrl = url,
-                    token = "",
-                    deviceId = "device",
-                    clientVersion = "test",
-                    listener = object : WebSocketListener() {},
-                )
-            }
-            assertTrue(
-                "message should name the refused shim path: ${error.message}",
-                error.message.orEmpty().contains("/shim/v1/mobile"),
-            )
-        }
     }
 
     private fun config(url: String) = LettaConfig(

@@ -131,7 +131,6 @@ dependencies {
     // Deliberate override of catalog ktor=3.5.0; do not silently flatten.
     testImplementation(libs.ktor.client.core.chat)
     testImplementation(libs.mockk.chat)
-    testImplementation(libs.okhttp.mockwebserver.chat)
     testImplementation(libs.kotest.runner.junit5.chat)
     testImplementation(libs.kotest.assertions.core.chat)
     testImplementation(libs.kotest.property.chat)

@@ -438,10 +438,16 @@ class CanonicalTimelinePagingTest {
             if (idle == null) fail("Paging did not settle: ${loadStateFlow.value}")
         }
 
-        /** Waits for the row count, and names what the pipeline had done when it did not arrive. */
+        /**
+         * Waits for the row count, and names what the pipeline had done when it did not arrive.
+         * Polls the condition rather than waiting on [onPagesUpdatedFlow]: that flow has no replay,
+         * so a page update that landed before this call subscribed would never be observed and the
+         * wait would time out with the rows already present (CI, 2026-09-24).
+         */
         suspend fun awaitRows(expected: Int, detail: () -> String) {
             val settled = withTimeoutOrNull(10_000) {
-                onPagesUpdatedFlow.first { size == expected }
+                while (size != expected) delay(10)
+                true
             }
             if (settled == null) {
                 fail("presenter never reached $expected rows: size=$size loadState=${loadStateFlow.value} ${detail()}")

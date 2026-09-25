@@ -14,12 +14,14 @@ import kotlinx.coroutines.Job
  * The mapping is total and exclusive:
  *  - [BackendKind.LOCAL_RUNTIME] -> [LocalRuntimeChatSendStrategy]
  *  - [BackendKind.IROH]          -> [IrohChatSendStrategy]
- *  - [BackendKind.SHIM_WS]       -> [WsChatSendStrategy]  (shim configs only)
+ *  - [BackendKind.SHIM_WS]       -> [TimelineChatSendStrategy] (g70jb.3: the shim
+ *                                   WebSocket transport is gone; leftover shim
+ *                                   configs send over REST until SHIM_WS itself
+ *                                   is removed)
  *  - [BackendKind.REST]          -> [TimelineChatSendStrategy]
  */
 internal class ChatSendStrategySelector(
     private val timelineStrategy: ChatSendStrategy,
-    private val wsStrategy: ChatSendStrategy,
     private val localStrategy: ChatSendStrategy,
     private val irohStrategy: ChatSendStrategy,
 ) {
@@ -30,8 +32,7 @@ internal class ChatSendStrategySelector(
         else -> when (context.backendKind) {
             BackendKind.LOCAL_RUNTIME -> localStrategy
             BackendKind.IROH -> irohStrategy
-            BackendKind.SHIM_WS -> wsStrategy
-            BackendKind.REST -> timelineStrategy
+            BackendKind.SHIM_WS, BackendKind.REST -> timelineStrategy
         }
     }
 
@@ -72,7 +73,6 @@ private val ChatSendStrategy.routeName: String
     get() = when (this) {
         is LocalRuntimeChatSendStrategy -> "local"
         is IrohChatSendStrategy -> "iroh"
-        is WsChatSendStrategy -> "ws"
         is TimelineChatSendStrategy -> "timeline"
         else -> this::class.simpleName.orEmpty()
     }

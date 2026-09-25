@@ -11,7 +11,6 @@ import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
@@ -524,7 +523,7 @@ class WsChatSendCoordinatorTest {
 
         coordinator.handleEvent(
             WsTimelineEvent.Disconnected(
-                code = ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE,
+                code = 4001, // keepalive pong-timeout close code
                 reason = "pong timeout",
                 willReconnect = true,
                 reconnectAttempt = 1,
