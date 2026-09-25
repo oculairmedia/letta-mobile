@@ -1,7 +1,6 @@
 package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.model.ModelCatalogNormalizer
-import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.ApprovalSubmission
@@ -1446,20 +1445,17 @@ class AppServerTurnEngine(
         // successor-generation recovery replay answered by a decision the server
         // may never have received.
         val claimGeneration = connectionGenerationProvider()
+        // letta-mobile-qygvv.13: under Unrestricted the server already approved
+        // the tool; the streamed delta is informational, so no reply is sent.
+        if (approval.isInformationalUnderUnrestricted()) {
+            recordAutoAllowSkippedUnrestricted(approval)
+            markInboundControlAnswered(approval.requestId, claimGeneration)
+            return true
+        }
         // letta-mobile-qygvv.5: awaits input_accepted. A rejection means the gate
         // is no longer pending (someone else resolved it), so the card stays
         // suppressed either way; the result is recorded as telemetry.
-        submitApprovalResponse(
-            ApprovalSubmission(
-                runtime = scope,
-                approvalRequestId = approval.requestId,
-                decision = AppServerApprovalResponseDecision.Allow(
-                    message = "Approved by default mobile policy.",
-                ),
-                source = "auto_allow",
-            ),
-            claimGeneration = claimGeneration,
-        )
+        submitApprovalResponse(approval.autoAllowSubmission(scope), claimGeneration = claimGeneration)
         return true
     }
 

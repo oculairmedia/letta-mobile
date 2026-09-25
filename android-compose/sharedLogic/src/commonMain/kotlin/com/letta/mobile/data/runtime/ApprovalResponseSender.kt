@@ -36,8 +36,34 @@ internal class ApprovalResponseSender(
         )
         decisions.remember(cached)
         val result = deliver(cached)
+        if (submission.isAlreadyResolvedBy(result)) {
+            recordAlreadyResolved(submission)
+            return ApprovalSubmitResult.Accepted
+        }
         record(cached, result, submission.source)
         return result
+    }
+
+    /**
+     * letta-mobile-qygvv.13: under Unrestricted the App Server approves the tool itself and
+     * still streams an `approval_request_message`; a reply to that delta is acked with
+     * "Approval request is no longer pending". That is the server having resolved it, so it
+     * is handled exactly like an accepted reply. A real `control_request` keeps the rejection.
+     */
+    private fun ApprovalSubmission.isAlreadyResolvedBy(result: ApprovalSubmitResult): Boolean =
+        answersStreamDelta &&
+            result is ApprovalSubmitResult.Rejected &&
+            result.error == APPROVAL_NO_LONGER_PENDING
+
+    private fun recordAlreadyResolved(submission: ApprovalSubmission) {
+        Telemetry.event(
+            TELEMETRY_TAG, "approval.already_resolved",
+            "approvalId" to submission.approvalRequestId,
+            "conversationId" to submission.runtime.conversationId,
+            "toolName" to (submission.toolName ?: ""),
+            "source" to submission.source,
+            level = Telemetry.Level.INFO,
+        )
     }
 
     fun cachedDecisionFor(frame: AppServerInboundFrame.ControlRequest): ApprovalDecisionCache.CachedDecision? =
@@ -111,8 +137,11 @@ internal class ApprovalResponseSender(
         is ApprovalSubmitResult.Unacknowledged -> "unacknowledged"
     }
 
-    private companion object {
+    internal companion object {
         const val TELEMETRY_TAG = "ApprovalResponse"
+
+        /** The App Server's `input_accepted` error for an approval with no pending gate. */
+        const val APPROVAL_NO_LONGER_PENDING = "Approval request is no longer pending"
     }
 }
 
