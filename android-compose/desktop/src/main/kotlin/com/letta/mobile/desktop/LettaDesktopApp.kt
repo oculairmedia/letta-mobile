@@ -155,9 +155,7 @@ internal fun LettaDesktopApp(
         bootstrap.irohAgentDirectorySlot.value = irohAgentDirectory
     }
     rememberAndPublishGraphChannelTransport(
-        activeConfig = activeConfig,
         irohTransport = irohTransport,
-        chatScope = chatScope,
         publish = bootstrap.publishChannelTransport,
     )
     val chatController = rememberDesktopChatController(
@@ -202,14 +200,11 @@ internal fun LettaDesktopApp(
     var agentSlashCommands by remember(httpApis.slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
     val subagents = rememberSubagentRegistry(
         request = SubagentRegistryRequest(
-            activeConfig = activeConfig,
-            irohMode = irohMode,
             parentScope = subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId),
             irohTransport = irohTransport,
             graphSubagentRepository = sessionGraph.subagentRepository
                 as? com.letta.mobile.data.repository.SubagentRepository,
         ),
-        chatScope = chatScope,
     )
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents

@@ -18,7 +18,6 @@ import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.data.DesktopCanonicalSendInstall
 import com.letta.mobile.desktop.data.DesktopCanonicalTimelineHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
-import com.letta.mobile.desktop.data.DesktopWsChannelTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancelAndJoin
@@ -77,22 +76,8 @@ private fun connectParamsFromIroh(config: LettaConfig): DesktopConnectParams {
     )
 }
 
-private fun connectParamsFromWs(config: LettaConfig): DesktopConnectParams =
-    DesktopConnectParams(
-        baseShimUrl = config.serverUrl,
-        token = config.accessToken.orEmpty(),
-        deviceId = DESKTOP_DEVICE_ID,
-        clientVersion = DESKTOP_DEVICE_ID,
-    )
-
 private suspend fun connectIrohTransport(transport: IrohChannelTransport, config: LettaConfig) {
     connectWithParams(transport::connect, connectParamsFromIroh(config))
-}
-
-private suspend fun connectSubagentTransport(transport: DesktopWsChannelTransport, config: LettaConfig) {
-    // WS side-channel keeps the shorter clientVersion label used historically
-    // for mobile-shim subagent registry dials (distinct from iroh's label).
-    connectWithParams(transport::connect, connectParamsFromWs(config))
 }
 
 private data class DesktopTransportLifecycleHooks<T>(
@@ -186,38 +171,20 @@ internal fun rememberIrohTransport(
 /**
  * Publishes the live channel transport into the session graph slot.
  *
- * Iroh mode reuses the main QUIC transport. HTTP backends create the lean WS
- * side-channel (chat itself stays on SSE) so Cron/SelfTodo/Subagent and A2UI
- * actions share one connected [IChannelTransport] with the graph.
+ * Only Iroh mode has a channel transport (the main QUIC transport). HTTP
+ * backends publish null, so the graph falls back to NoOpChannelTransport and
+ * its Cron/SelfTodo/Subagent repositories degrade to empty (the legacy shim
+ * WebSocket side-channel that used to feed them was removed in g70jb.1).
  */
 @Composable
 internal fun rememberAndPublishGraphChannelTransport(
-    activeConfig: LettaConfig,
     irohTransport: IrohChannelTransport?,
-    chatScope: CoroutineScope,
     publish: (com.letta.mobile.data.transport.api.IChannelTransport?) -> Unit,
 ): com.letta.mobile.data.transport.api.IChannelTransport? {
-    val irohMode = irohTransport != null
-    val wsTransport = remember(activeConfig, irohMode) {
-        createSubagentTransport(activeConfig, irohMode, chatScope)
+    androidx.compose.runtime.LaunchedEffect(irohTransport) {
+        publish(irohTransport)
     }
-    DesktopTransportLifecycleEffect(
-        DesktopTransportLifecycleRequest(
-            transport = wsTransport,
-            activeConfig = activeConfig,
-            chatScope = chatScope,
-            hooks = DesktopTransportLifecycleHooks(
-                onConnect = ::connectSubagentTransport,
-                onDisposeTransport = { it.close() },
-            ),
-        ),
-    )
-    val transport: com.letta.mobile.data.transport.api.IChannelTransport? =
-        irohTransport ?: wsTransport
-    androidx.compose.runtime.LaunchedEffect(transport) {
-        publish(transport)
-    }
-    return transport
+    return irohTransport
 }
 
 internal data class DesktopChatRuntime(
@@ -310,36 +277,14 @@ private fun buildDesktopChatController(
     )
 }
 
-/** The subagent side-channel plus the live active-subagent list it feeds. */
+/** The subagent registry repository plus the live active-subagent list it feeds. */
 internal class DesktopSubagentRegistry(
     val repository: SubagentRepository?,
     val activeSubagents: State<List<SubagentEntry>>,
 )
 
-/**
- * Active-subagent registry (Background tasks) side-channel for HTTP backends:
- * desktop streams chat over SSE but the WS protocol carries the registry, so
- * a lean WS side-channel feeds the shared SubagentRepository. Skipped in iroh
- * mode — the registry rides the main iroh transport there (see
- * [rememberSubagentRegistry]).
- */
-private fun createSubagentTransport(
-    activeConfig: LettaConfig,
-    irohMode: Boolean,
-    chatScope: CoroutineScope,
-): DesktopWsChannelTransport? =
-    activeConfig.takeIf {
-        it.mode != LettaConfig.Mode.LOCAL &&
-            it.serverUrl.isNotBlank() &&
-            !it.accessToken.isNullOrBlank() &&
-            !irohMode
-    }
-        ?.let { DesktopWsChannelTransport(chatScope) }
-
 /** Inputs for the active-subagent registry. */
 internal data class SubagentRegistryRequest(
-    val activeConfig: LettaConfig,
-    val irohMode: Boolean,
     val parentScope: SubagentParentScope?,
     val irohTransport: IrohChannelTransport? = null,
     /** Phase 4c: prefer the session-graph repository when it is a real impl. */
@@ -347,48 +292,24 @@ internal data class SubagentRegistryRequest(
 )
 
 @Composable
-internal fun rememberSubagentRegistry(
-    request: SubagentRegistryRequest,
-    chatScope: CoroutineScope,
-): DesktopSubagentRegistry {
-    val activeConfig = request.activeConfig
-    val irohMode = request.irohMode
+internal fun rememberSubagentRegistry(request: SubagentRegistryRequest): DesktopSubagentRegistry {
     val parentScope = request.parentScope
     val irohTransport = request.irohTransport
     val graphSubagentRepository = request.graphSubagentRepository
-    // Graph owns Cron/SelfTodo/Subagent after Phase 4c. Keep the legacy
-    // side-channel only when the graph still exposes a non-concrete stub
+    // Graph owns Cron/SelfTodo/Subagent after Phase 4c. Own an Iroh-backed
+    // repository only when the graph still exposes a non-concrete stub
     // (early bootstrap / tests without adapters).
-    val subagentTransport = remember(activeConfig, irohMode, graphSubagentRepository) {
-        if (graphSubagentRepository != null) {
-            null
-        } else {
-            createSubagentTransport(activeConfig, irohMode, chatScope)
-        }
-    }
-    val ownedRepository = remember(subagentTransport, irohTransport, graphSubagentRepository) {
+    val ownedRepository = remember(irohTransport, graphSubagentRepository) {
         if (graphSubagentRepository != null) {
             null
         } else {
             irohTransport?.let { SubagentRepository(it, includeAll = true) }
-                ?: subagentTransport?.let { SubagentRepository(it, includeAll = true) }
         }
     }
     val subagentRepository = graphSubagentRepository ?: ownedRepository
     DisposableEffect(ownedRepository) {
         onDispose { ownedRepository?.close() }
     }
-    DesktopTransportLifecycleEffect(
-        DesktopTransportLifecycleRequest(
-            transport = subagentTransport,
-            activeConfig = activeConfig,
-            chatScope = chatScope,
-            hooks = DesktopTransportLifecycleHooks(
-                onConnect = ::connectSubagentTransport,
-                onDisposeTransport = { it.close() },
-            ),
-        ),
-    )
     val activeSubagents = produceState(
         initialValue = emptyList(),
         subagentRepository,
