@@ -89,19 +89,13 @@ class CanonicalTimelineEngine(
         ) return@withLock false
         val previous = checkNotNull(liveReduction)
         val next = when (frame) {
-            is TimelineStreamFrame.Message -> {
-                val output = reduceStreamFrame(TimelineReducerInput(previous.timeline, frame.message,
-                    previous.pendingToolReturnsByCallId, agentId = fence.selection.scope.agentId))
-                previous.copy(timeline = output.next, pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId)
-            }
+            is TimelineStreamFrame.Message -> previous.reduceLive(frame.message, fence.selection.scope.agentId)
             TimelineStreamFrame.Heartbeat -> return@withLock true
             TimelineStreamFrame.Done -> previous
             is TimelineStreamFrame.RawEvent -> error("Raw events must be decoded by the transport before ingest")
         }
         val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
-        val returnedId = ((frame as? TimelineStreamFrame.Message)?.message as? com.letta.mobile.data.model.ToolReturnMessage)
-            ?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
-        val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
+        val nextReturns = liveReturns + listOfNotNull((frame as? TimelineStreamFrame.Message)?.message?.returnedCallId())
         // The overlay is a bounded resident view of a turn, not its record: a turn long enough to
         // exceed the budget is legal, and the durable rows still arrive through reconcile. Outgrowing
         // the budget therefore stops the overlay growing - it must never fail the turn, and it used
@@ -134,24 +128,28 @@ class CanonicalTimelineEngine(
      * complete. False when no settled overlay of [fence] is resident to take it.
      */
     suspend fun ingestSettledTail(fence: TimelineLiveFence, message: com.letta.mobile.data.model.LettaMessage): Boolean =
-        mutex.withLock {
-            if (liveFence !== fence || fence.selection !== mutablePublication.value.selection) return@withLock false
-            val current = mutableLive.value ?: return@withLock false
-            if (current.fence !== fence || current.settlementRevision == null) return@withLock false
-            val previous = liveReduction ?: return@withLock false
-            val output = reduceStreamFrame(TimelineReducerInput(previous.timeline, message,
-                previous.pendingToolReturnsByCallId, agentId = fence.selection.scope.agentId))
-            val next = previous.copy(timeline = output.next, pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId)
-            val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
-            val returnedId = (message as? com.letta.mobile.data.model.ToolReturnMessage)
-                ?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
-            val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
-            if (overflowReason(events, nextReturns) != null) return@withLock true
-            liveReduction = next
-            liveReturns = nextReturns
-            mutableLive.value = current.copy(block = current.block.copy(events = events))
-            true
+        mutex.withLock { foldSettledTail(fence, message) }
+
+    private fun foldSettledTail(fence: TimelineLiveFence, message: com.letta.mobile.data.model.LettaMessage): Boolean {
+        val current = settledOverlayOf(fence) ?: return false
+        val previous = liveReduction ?: return false
+        val next = previous.reduceLive(message, fence.selection.scope.agentId)
+        val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+        val nextReturns = liveReturns + listOfNotNull(message.returnedCallId())
+        if (overflowReason(events, nextReturns) != null) return true
+        liveReduction = next
+        liveReturns = nextReturns
+        mutableLive.value = current.copy(block = current.block.copy(events = events))
+        return true
+    }
+
+    /** The resident settled overlay of [fence] for the current selection, if there is one. */
+    private fun settledOverlayOf(fence: TimelineLiveFence): TimelineLivePublication? =
+        mutableLive.value?.takeIf {
+            liveFence === fence && fence.selection === mutablePublication.value.selection &&
+                it.fence === fence && it.settlementRevision != null
         }
+
 
     /** Names the budget a frame would outgrow, or null when the overlay can still carry it. */
     private fun overflowReason(events: List<TimelineEvent.Confirmed>, returns: Set<String>): String? {
@@ -265,13 +263,6 @@ class CanonicalTimelineEngine(
             // The ledger may name the row exactly as the stream did (0.32.17 message.list returns
             // the streamed ui-msg ids). That row is this event; it must never be offered to the
             // positional fallback as someone else's.
-            val direct = unclaimed.firstOrNull {
-                it.identity.value == event.serverId && it.event.messageType == event.messageType
-            }
-            if (direct != null) {
-                unclaimed.remove(direct)
-                continue
-            }
             when (val claim = event.claimAdoption(unclaimed, aliases)) {
                 is Adoption.Alias -> adopted[claim.streamedId] = claim.identity
                 Adoption.AlreadyNamed -> Unit
@@ -345,6 +336,19 @@ class CanonicalTimelineEngine(
         aliases: Map<String, TimelineMessageId>,
     ): Adoption? {
         if (serverId in aliases) return Adoption.AlreadyNamed
+        // The ledger may name the row exactly as the stream did (0.32.17 message.list returns the
+        // streamed ui-msg ids). That row is this event; it must never be offered to the positional
+        // fallback as someone else's.
+        if (unclaimed.removeFirstMatching { it.identity.value == serverId && it.event.messageType == messageType }) {
+            return Adoption.AlreadyNamed
+        }
+        val match = contentMatch(unclaimed) ?: return null
+        return if (match.identity.value == serverId) Adoption.AlreadyNamed
+        else Adoption.Alias(serverId, match.identity)
+    }
+
+    /** The committed row with this event's type and adoption key, consumed when it is a reply. */
+    private fun TimelineEvent.Confirmed.contentMatch(unclaimed: MutableList<CommittedRow>): CommittedRow? {
         val key = adoptionKey() ?: return null
         val match = unclaimed.firstOrNull {
             it.event.messageType == messageType && it.event.adoptionKey() == key
@@ -352,8 +356,7 @@ class CanonicalTimelineEngine(
         if (messageType == TimelineMessageType.ASSISTANT || messageType == TimelineMessageType.REASONING) {
             unclaimed.remove(match)
         }
-        return if (match.identity.value == serverId) Adoption.AlreadyNamed
-        else Adoption.Alias(serverId, match.identity)
+        return match
     }
 
     /**
