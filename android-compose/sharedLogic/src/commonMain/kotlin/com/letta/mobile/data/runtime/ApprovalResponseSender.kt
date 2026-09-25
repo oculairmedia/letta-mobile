@@ -28,6 +28,8 @@ internal class ApprovalResponseSender(
     private val decisions: ApprovalDecisionCache,
     private val requestIdFactory: () -> String,
 ) {
+    private val inFlight = InFlightApprovalSends()
+
     suspend fun send(submission: ApprovalSubmission): ApprovalSubmitResult {
         val cached = ApprovalDecisionCache.CachedDecision(
             submission.runtime,
@@ -71,6 +73,7 @@ internal class ApprovalResponseSender(
 
     /** Re-sends a cached decision for a server replay of the same request. */
     suspend fun reanswer(cached: ApprovalDecisionCache.CachedDecision): ApprovalSubmitResult {
+        if (inFlight.contains(cached.key)) return coalescedWithInFlight(cached)
         val result = deliver(cached)
         Telemetry.event(
             TELEMETRY_TAG, "approval.replay_reanswered",
@@ -82,7 +85,20 @@ internal class ApprovalResponseSender(
         return result
     }
 
-    private suspend fun deliver(cached: ApprovalDecisionCache.CachedDecision): ApprovalSubmitResult {
+    /** letta-mobile-qygvv.10: the same decision is awaiting its ack; its own result settles it. */
+    private fun coalescedWithInFlight(cached: ApprovalDecisionCache.CachedDecision): ApprovalSubmitResult {
+        Telemetry.event(
+            TELEMETRY_TAG, "approval.replay_in_flight",
+            "approvalId" to cached.requestId,
+            "conversationId" to cached.runtime.conversationId,
+        )
+        return ApprovalSubmitResult.Unacknowledged(IN_FLIGHT_REASON)
+    }
+
+    private suspend fun deliver(cached: ApprovalDecisionCache.CachedDecision): ApprovalSubmitResult =
+        inFlight.track(cached.key) { deliverNow(cached) }
+
+    private suspend fun deliverNow(cached: ApprovalDecisionCache.CachedDecision): ApprovalSubmitResult {
         val command = AppServerCommand.Input(
             runtime = cached.runtime,
             payload = AppServerInputPayload.ApprovalResponse(
@@ -142,6 +158,9 @@ internal class ApprovalResponseSender(
 
         /** The App Server's `input_accepted` error for an approval with no pending gate. */
         const val APPROVAL_NO_LONGER_PENDING = "Approval request is no longer pending"
+
+        /** A replay of a decision whose send is still awaiting `input_accepted`. */
+        const val IN_FLIGHT_REASON = "in_flight"
     }
 }
 

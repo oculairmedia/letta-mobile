@@ -267,6 +267,9 @@ internal class IrohRelayedTurnProtocol(
  * Runs [command] through [controller] and relays every draft to the [protocol]'s fanout, adding
  * the App Server frames around them. [onFailure] handles an exception out of the collector, after
  * an input that never got its ack is answered `accepted:false` (busy rejection, input failure).
+ *
+ * letta-mobile-qygvv.18: the terminal is written only once the engine's flow has ended (see
+ * [OrderedTurnRelay]), so `turn_finished` is the last frame the initiator gets for the turn.
  */
 internal suspend fun relayTurn(
     controller: AppServerController,
@@ -274,20 +277,21 @@ internal suspend fun relayTurn(
     protocol: IrohRelayedTurnProtocol,
     onFailure: suspend (Throwable) -> Unit,
 ) {
-    val fanout = protocol.fanout
-    runCatching {
+    val relay = OrderedTurnRelay(protocol.fanout, protocol)
+    val collected = runCatching {
         withContext(protocol.listener) {
-            controller.runTurn(command).collect { draft -> relayDraft(fanout, protocol, draft) }
+            controller.runTurn(command).collect { draft -> relay.relay(draft) }
         }
-    }.onFailure { error ->
-        if (error !is CancellationException) {
-            runCatching { withContext(NonCancellable) { protocol.rejectInput(error.message ?: error.toString()) } }
-        }
-        onFailure(error)
     }
+    val released = runCatching { relay.releaseHeldTerminal() }
+    val error = collected.exceptionOrNull() ?: released.exceptionOrNull() ?: return
+    if (error !is CancellationException) {
+        runCatching { withContext(NonCancellable) { protocol.rejectInput(error.message ?: error.toString()) } }
+    }
+    onFailure(error)
 }
 
-private suspend fun relayDraft(
+internal suspend fun relayDraft(
     fanout: ConversationTurnFanout,
     protocol: IrohRelayedTurnProtocol,
     draft: RuntimeEventDraft,

@@ -155,6 +155,12 @@ internal class TurnEngineTestRecordingClient(
     val adminRpcs = mutableListOf<AppServerCommand.AdminRpc>()
     var onAbort: () -> Unit = {}
 
+    /**
+     * letta-mobile-qygvv.10: when set, `approval_response` inputs are acknowledged through this
+     * (it may suspend, holding the ack) instead of taking the no-ack fallback.
+     */
+    var approvalAcks: (suspend (AppServerCommand.Input) -> AppServerInboundFrame.InputAccepted)? = null
+
     val approvalResponses: List<AppServerInputPayload.ApprovalResponse>
         get() = inputs.map { it.payload }.filterIsInstance<AppServerInputPayload.ApprovalResponse>()
 
@@ -175,6 +181,11 @@ internal class TurnEngineTestRecordingClient(
     }
 
     override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
+        val approvalAck = approvalAcks?.takeIf { command.payload is AppServerInputPayload.ApprovalResponse }
+        if (approvalAck != null) {
+            inputs += command
+            return approvalAck(command)
+        }
         if (!queuedAck) throw UnsupportedOperationException("no ack")
         inputs += command
         return AppServerInboundFrame.InputAccepted(

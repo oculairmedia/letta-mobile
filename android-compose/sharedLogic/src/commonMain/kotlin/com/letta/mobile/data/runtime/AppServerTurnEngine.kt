@@ -234,7 +234,7 @@ class AppServerTurnEngine(
     )
 
     private val unleasedApprovals = UnleasedApprovalAnswerer(
-        client = client,
+        sender = approvalSender,
         inboundControlRegistry = inboundControlRegistry,
         connectionGenerationProvider = connectionGenerationProvider,
         leaseHeld = { key -> leases.peek(key)?.lease != null },

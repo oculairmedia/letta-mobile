@@ -1,11 +1,10 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.ApprovalSubmission
+import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
-import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.model.AgentId
@@ -37,6 +36,20 @@ internal enum class UnleasedApprovalOutcome {
     AlreadyClaimed,
 
     /**
+     * letta-mobile-qygvv.10: this client already sent a decision for the request (a retry, a
+     * second observer, or a server replay). No second frame: a replay is re-answered from the
+     * [com.letta.mobile.data.controller.fanout.ApprovalDecisionCache] by the router's responder.
+     */
+    AlreadyDecided,
+
+    /**
+     * letta-mobile-qygvv.10: the App Server's `input_accepted` rejected the auto-allow (e.g.
+     * "Approval request is no longer pending"). Recorded as `approval.rejected`, exactly like a
+     * leased send, and the claim is handed back.
+     */
+    Rejected,
+
+    /**
      * No turn on this engine ever ran on the runtime key: another client owns it, and its own
      * permission policy decides. Left pending, never auto-allowed.
      */
@@ -58,7 +71,8 @@ internal enum class UnleasedApprovalOutcome {
  * so a turn that subscribes later drops the already-answered request instead of answering twice.
  */
 internal class UnleasedApprovalAnswerer(
-    private val client: AppServerClient,
+    /** letta-mobile-qygvv.10: the same sender leased approvals use (decision cache + `input_accepted`). */
+    private val sender: ApprovalResponseSender,
     private val inboundControlRegistry: InboundControlRequestRegistry,
     private val connectionGenerationProvider: () -> Long,
     private val leaseHeld: (TurnRuntimeKey) -> Boolean,
@@ -76,6 +90,7 @@ internal class UnleasedApprovalAnswerer(
         if (leaseHeld(key)) return UnleasedApprovalOutcome.Deferred
         if (request.request.string("subtype") != CAN_USE_TOOL) return UnleasedApprovalOutcome.NotApproval
         val toolName = request.request.string("tool_name")
+        if (sender.cachedDecisionFor(request) != null) return UnleasedApprovalOutcome.AlreadyDecided
         val details = ApprovalDetails(request, key, toolName, permissionModeFor(key))
         return withheldOutcome(details) ?: autoAllow(details, runtime, connectionGeneration)
     }
@@ -105,7 +120,11 @@ internal class UnleasedApprovalAnswerer(
         if (!claim(details.request, details.key, generation)) return UnleasedApprovalOutcome.AlreadyClaimed
         val ref = InboundControlRequestRegistry.RequestRef(details.request.requestId)
         val targetRuntime = runtimeScopeFor(details.key) ?: runtime
-        sendAutoAllow(details.request.requestId, targetRuntime, ref, generation)
+        val result = sendAutoAllow(details.request.requestId, targetRuntime, ref, generation)
+        if (result is ApprovalSubmitResult.Rejected) {
+            record("approval.unleasedRejected", details)
+            return UnleasedApprovalOutcome.Rejected
+        }
         record("approval.unleasedAutoAllow", details)
         return UnleasedApprovalOutcome.AutoAllowed
     }
@@ -115,30 +134,34 @@ internal class UnleasedApprovalAnswerer(
         return RuntimeUserInputTools.requiresUserInput(toolName)
     }
 
+    /**
+     * letta-mobile-qygvv.10: sends through [sender] like a leased auto-approve: the decision is
+     * cached before the send and `input_accepted` is awaited. Marked answered unless rejected
+     * (the same rule as `AppServerTurnEngine.submitApprovalResponse`); a rejection or a send
+     * failure hands the claim back so a later turn or replay can still answer it.
+     */
     private suspend fun sendAutoAllow(
         requestId: String,
         targetRuntime: AppServerRuntimeScope,
         ref: InboundControlRequestRegistry.RequestRef,
         generation: Long,
-    ) {
-        try {
-            client.input(
-                AppServerCommand.Input(
-                    runtime = targetRuntime,
-                    payload = AppServerInputPayload.ApprovalResponse(
-                        requestId = requestId,
-                        decision = AppServerApprovalResponseDecision.Allow(
-                            message = "Approved by default mobile policy.",
-                        ),
-                    ),
-                ),
-            )
+    ): ApprovalSubmitResult {
+        val result = try {
+            sender.send(autoAllowSubmission(targetRuntime, requestId))
         } catch (error: Throwable) {
-            // Hand the request back so a replay or a later turn can still answer it.
-            inboundControlRegistry.releaseClaim(ref, AppServerTurnEngine.UNLEASED_LEASE_TOKEN, generation)
+            releaseClaim(ref, generation)
             throw error
         }
-        inboundControlRegistry.markAnswered(ref, generation)
+        if (result is ApprovalSubmitResult.Rejected) {
+            releaseClaim(ref, generation)
+        } else {
+            inboundControlRegistry.markAnswered(ref, generation)
+        }
+        return result
+    }
+
+    private fun releaseClaim(ref: InboundControlRequestRegistry.RequestRef, generation: Long) {
+        inboundControlRegistry.releaseClaim(ref, AppServerTurnEngine.UNLEASED_LEASE_TOKEN, generation)
     }
 
     private fun claim(
@@ -190,6 +213,14 @@ internal class UnleasedApprovalAnswerer(
         const val CAN_USE_TOOL = "can_use_tool"
     }
 }
+
+/** The unleased auto-allow, as the one approval sender takes it. */
+private fun autoAllowSubmission(runtime: AppServerRuntimeScope, requestId: String) = ApprovalSubmission(
+    runtime = runtime,
+    approvalRequestId = requestId,
+    decision = AppServerApprovalResponseDecision.Allow(message = "Approved by default mobile policy."),
+    source = "unleased_auto_allow",
+)
 
 /**
  * A stand-in command for a runtime key with no turn, so the host's per-command permission-mode
