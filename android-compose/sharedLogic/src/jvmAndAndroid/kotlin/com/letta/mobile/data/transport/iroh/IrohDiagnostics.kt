@@ -13,6 +13,7 @@ object IrohDiagnostics {
         val kind: String,
         val isRelay: Boolean,
         val isIp: Boolean,
+        val remoteAddr: String,
         val rttMs: Long,
         val lostPackets: Long,
         val lostBytes: Long,
@@ -23,6 +24,9 @@ object IrohDiagnostics {
     data class PathSummary(
         val selectedKind: String,
         val selectedPathId: String,
+        /** qygvv.22: `ip:port` for a direct path, the relay URL for a relay path. */
+        val selectedRemoteAddr: String = "",
+        val selectedIsRelay: Boolean = false,
         val pathCount: Int,
         val relayPathCount: Int,
         val directPathCount: Int,
@@ -44,6 +48,7 @@ object IrohDiagnostics {
             "rttMs" to runCatching { connection.rtt()?.toLong() }.getOrNull(),
             "selectedPathKind" to summary.selectedKind,
             "selectedPathId" to summary.selectedPathId,
+            "selectedRemoteAddr" to summary.selectedRemoteAddr,
             "pathCount" to summary.pathCount,
             "relayPathCount" to summary.relayPathCount,
             "directPathCount" to summary.directPathCount,
@@ -68,6 +73,8 @@ object IrohDiagnostics {
         return PathSummary(
             selectedKind = selected?.kind ?: "unknown",
             selectedPathId = selected?.id.orEmpty(),
+            selectedRemoteAddr = selected?.remoteAddr.orEmpty(),
+            selectedIsRelay = selected?.isRelay ?: false,
             pathCount = normalized.size,
             relayPathCount = normalized.count { it.isRelay },
             directPathCount = normalized.count { it.kind == "direct" },
@@ -85,6 +92,7 @@ object IrohDiagnostics {
             kind = pathKind(isRelay = path.isRelay, isIp = path.isIp),
             isRelay = path.isRelay,
             isIp = path.isIp,
+            remoteAddr = path.remoteAddr,
             rttMs = path.rttMs.toLong(),
             lostPackets = stats.lostPackets.toLong(),
             lostBytes = stats.lostBytes.toLong(),
@@ -103,6 +111,7 @@ object IrohDiagnostics {
             "event" to "selected",
             "pathId" to event.id,
             "pathKind" to pathKind(event.remoteAddr),
+            "remoteAddr" to event.remoteAddr,
         )
         is PathEvent.Closed -> listOf(
             "event" to "closed",

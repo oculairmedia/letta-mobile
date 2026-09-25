@@ -384,7 +384,12 @@ class IrohLivenessProbeTest {
     // ============================================================
     // 8. letta-mobile-parg0: CONGESTION ≠ DEATH.
     //    A hung health.check while another young admin_rpc is in flight
-    //    must NOT redial (that is the intermittent false-dead on hydrate).
+    //    must NOT redial (that is the intermittent false-dead on hydrate) —
+    //    PROVIDED the path is still answering. qygvv.22: in-flight work alone
+    //    is no longer proof of life (a black hole has in-flight work too), so
+    //    a slow-but-completing admin_rpc lane keeps answering inside every
+    //    probe window here. The virtual-time twin is
+    //    IrohLivenessEscalationTest.congestedButAlivePathDoesNotRedial.
     // ============================================================
     @Test
     fun probeTimeoutDuringInFlightAdminRpcDoesNotRedial() = runBlocking {
@@ -410,6 +415,10 @@ class IrohLivenessProbeTest {
                             // this is the congested hydrate concurrent with the probe.
                             delay(600_000L)
                         }
+                        if (method == "agent.list") {
+                            // Slow but ANSWERING: completes inside every probe wait.
+                            delay(CONGESTED_ANSWER_LATENCY_MS)
+                        }
                         AppServerInboundFrame.AdminRpcResponse(
                             requestId = method,
                             success = true,
@@ -421,7 +430,8 @@ class IrohLivenessProbeTest {
                 )
             },
             livenessProbeIntervalMs = COMPRESSED_PROBE_INTERVAL_MS,
-            livenessProbeTimeoutMs = probeTimeoutMs,
+            // Wider than the answer latency so each probe window sees a completion.
+            livenessProbeTimeoutMs = CONGESTED_PROBE_TIMEOUT_MS,
             livenessProbeFailuresToDeclareDead = 2,
             // Keep grace covering the whole assert window so soft-fail holds.
             livenessCongestionGraceMs = 60_000L,
@@ -430,9 +440,16 @@ class IrohLivenessProbeTest {
         val hydrate = scope.launch {
             runCatching { transport.adminRpc("model.list", "/v1/models", null) }
         }
+        val answering = scope.launch {
+            while (true) runCatching { transport.adminRpc("agent.list", "/v1/agents", null) }
+        }
         try {
-            // Wait until the probe has had multiple chances to declare death.
-            delay((COMPRESSED_PROBE_INTERVAL_MS + probeTimeoutMs) * 6)
+            assertTrue(
+                awaitTrue { calls.any { it.method == "health.check" } },
+                "probe must still issue health.check; calls=${calls.toList()}",
+            )
+            // Let the probe have multiple chances to declare death.
+            delay((COMPRESSED_PROBE_INTERVAL_MS + CONGESTED_PROBE_TIMEOUT_MS) * 4)
             assertTrue(
                 calls.any { it.method == "health.check" },
                 "probe must still issue health.check; calls=${calls.toList()}",
@@ -447,6 +464,7 @@ class IrohLivenessProbeTest {
                 "state stays Connected under congestion; state=${transport.state.value}",
             )
         } finally {
+            answering.cancel()
             hydrate.cancel()
             transport.disconnect()
         }
@@ -604,6 +622,10 @@ class IrohLivenessProbeTest {
          * defaults (20s/10s) are asserted separately by IrohLivenessProbeWiringTest.
          */
         const val COMPRESSED_PROBE_INTERVAL_MS = 300L
+
+        /** Test 8: answers every 500ms; a 600ms probe wait always spans one. */
+        const val CONGESTED_ANSWER_LATENCY_MS = 500L
+        const val CONGESTED_PROBE_TIMEOUT_MS = 600L
     }
 
 }

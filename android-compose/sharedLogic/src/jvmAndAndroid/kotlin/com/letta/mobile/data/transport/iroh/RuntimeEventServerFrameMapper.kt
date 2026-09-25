@@ -14,7 +14,7 @@ import java.util.UUID
 /**
  * Shared payload -> [ServerFrame] projection used by BOTH the initiator send
  * path ([IrohChannelTransport.emitDraft]) and the passive OBSERVER ingestion
- * loop ([IrohChannelTransport.ingestObserverFrame]).
+ * loop ([IrohObserverIngestor.ingestObserverFrame]).
  *
  * Extracting it guarantees the observer produces byte-identical frame shapes
  * to the initiator — the ONLY difference between the two paths is who supplies
