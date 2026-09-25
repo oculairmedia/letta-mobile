@@ -103,18 +103,30 @@ class HostCanvasBackend(
      * it wins over what the caller read. Returns the log's head once the relay has acknowledged
      * every op.
      *
-     * Scenes and elements the apps cannot draw are refused before anything is sent
-     * ([CanvasSceneValidator]): published, they would be acknowledged, logged and fanned out, and
-     * show nothing (letta-mobile-qygvv.21).
+     * The batch is all or nothing ([check]): elements the apps cannot draw (letta-mobile-qygvv.21)
+     * and a board state they cannot draw as meant (letta-mobile-qygvv.30) refuse the whole of it
+     * before anything is sent. Published, a bad op would be acknowledged, logged and fanned out.
      */
-    suspend fun publish(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasPublish {
+    suspend fun publish(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasPublish =
+        when (val checked = check(caller, entry, ops)) {
+            is HostCanvasCheck.Denied -> HostCanvasPublish.Denied(checked.reason)
+            is HostCanvasCheck.Checked -> when (val result = checked.result) {
+                is CanvasBatchCheck.Invalid -> HostCanvasPublish.Invalid(result.message)
+                is CanvasBatchCheck.Valid -> send(caller, entry, result.ops)
+            }
+        }
+
+    /**
+     * What publishing [ops] would do, without publishing them: the batch applied to a scratch copy
+     * of [entry]'s scene and the result checked ([CanvasBatchValidator]). A `dry_run` call answers
+     * with this; [publish] refuses on it.
+     */
+    suspend fun check(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasCheck {
         if (!entry.acl.canWrite(caller.agentId)) {
-            return HostCanvasPublish.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
+            return HostCanvasCheck.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
-        return when (val checked = CanvasSceneValidator.ops(ops)) {
-            is CanvasOpsCheck.Invalid -> HostCanvasPublish.Invalid(checked.message)
-            is CanvasOpsCheck.Valid -> send(caller, entry, checked.ops)
-        }
+        val scene = scene(entry)
+        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.agentId) }))
     }
 
     private suspend fun send(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasPublish {
@@ -168,6 +180,14 @@ class HostCanvasBackend(
             readerAgentIds = setOf(caller.agentId),
         )
     }
+}
+
+/** A batch checked against a canvas without being published to it. */
+sealed interface HostCanvasCheck {
+    data class Denied(val reason: String) : HostCanvasCheck
+
+    /** [result] for the scene at [revision]. */
+    data class Checked(val revision: Long, val result: CanvasBatchCheck) : HostCanvasCheck
 }
 
 /** How a host publish ended. */
