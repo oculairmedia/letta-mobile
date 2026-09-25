@@ -121,7 +121,9 @@ class IrohChannelTransport(
     override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()
 
     /** Emit to canonical frame publisher so both direct consumers and
-     *  WsChatBridge (via frameEvents) see each frame exactly once without split histories. */
+     *  WsChatBridge (via frameEvents) see each frame exactly once without split histories.
+     *  letta-mobile-qygvv.11: this is the single ingest point — the publisher drops exact
+     *  duplicates here, before fan-out, so no subscriber pays for them. */
     private suspend fun emitBoth(frame: ServerFrame) {
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
         adminRpcExecutor.recordStreamActivity()

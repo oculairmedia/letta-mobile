@@ -349,6 +349,32 @@ internal class ConversationTurnFanout(
     }
 
     /**
+     * letta-mobile-qygvv.12: write one non-delta App Server frame (`update_loop_status`,
+     * `turn_finished`, `update_queue`) to the INITIATOR only, on the same ordered chain as its
+     * deltas, so it lands after every delta already queued. [drain] waits for it to reach the wire.
+     * Observers are left alone: their ingest reconciles through message.list.
+     */
+    suspend fun writeInitiatorProtocolFrame(type: String, fields: JsonObject, drain: Boolean = false) {
+        if (initiatorDetached) return
+        val viewer = initiatorViewer ?: return
+        val queue = initiatorWrites
+        if (queue == null) {
+            writeProtocolFrameTo(viewer, type, fields)
+            return
+        }
+        queue.enqueue(viewer) { writeProtocolFrameTo(viewer, type, fields) }
+        if (drain) queue.drain(viewer)
+    }
+
+    private suspend fun writeProtocolFrameTo(viewer: ViewerHandle, type: String, fields: JsonObject) {
+        if (viewer is IrohViewerHandle) {
+            viewer.writeProtocolFrame(type, runtime, fields)
+        } else {
+            viewer.writeFrame(protocolFrame(type, runtime, fields, eventSeq = null).toString())
+        }
+    }
+
+    /**
      * eaczz.5 — live user-echo fanout. Synthesize a `user_message` wire delta for
      * the sender's prompt and fan it out to EVERY viewer at turn start, BEFORE
      * any assistant stream. Observers render it as a fresh user row so the prompt

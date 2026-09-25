@@ -111,6 +111,24 @@ class ChatSendLeafComponentsTest {
         assertFalse(secondCoordinator.isDuplicate(event, fallbackConversationId = "different-owner"))
     }
 
+    @Test
+    fun bridgeEventDeduplicatorCountsFanoutCopySeparatelyFromExactDuplicate() {
+        val firstCoordinator = BridgeEventDeduplicator()
+        val secondCoordinator = BridgeEventDeduplicator()
+        val shared = WsTimelineEvent.MessageDelta(
+            message = assistantMessage("leaf-fanout-message"),
+            conversationId = "leaf-fanout-conversation",
+        )
+
+        assertFalse(firstCoordinator.isDuplicate(shared, fallbackConversationId = null))
+        assertTrue(secondCoordinator.isDuplicate(shared, fallbackConversationId = null))
+        assertEquals(1L, secondCoordinator.fanoutCopiesSkipped)
+        assertEquals(0L, secondCoordinator.exactDuplicatesDropped)
+
+        assertTrue(firstCoordinator.isDuplicate(shared.copy(), fallbackConversationId = null))
+        assertEquals(1L, firstCoordinator.exactDuplicatesDropped)
+    }
+
     private fun assistantMessage(id: String): AssistantMessage = AssistantMessage(
         id = id,
         contentRaw = JsonPrimitive("content-$id"),
