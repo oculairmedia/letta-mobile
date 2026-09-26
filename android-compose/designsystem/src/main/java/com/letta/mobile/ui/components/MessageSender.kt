@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun MessageSender(
@@ -25,6 +26,6 @@ fun MessageSender(
         textAlign = alignment,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isUser) 52.dp else 4.dp, vertical = 2.dp)
+            .padding(horizontal = if (isUser) 52.dp else LettaDimens.Space.xs, vertical = LettaDimens.Space.hair)
     )
 }

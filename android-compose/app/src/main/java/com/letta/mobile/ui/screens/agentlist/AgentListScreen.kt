@@ -41,6 +41,7 @@ import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Public entry-point parameters bundled for the [AgentListScreen] composable.
@@ -393,7 +394,7 @@ private fun PreviewAgentListContent(
             state = previewAgentListContentState(uiState).copy(filteredAgents = filteredAgents),
             actions = previewAgentListContentActions(),
             layout = AgentListContentLayout(
-                paddingValues = PaddingValues(16.dp),
+                paddingValues = PaddingValues(LettaDimens.Space.lg),
                 listState = rememberLazyListState(),
                 gridState = rememberLazyGridState(),
                 haptic = haptic,

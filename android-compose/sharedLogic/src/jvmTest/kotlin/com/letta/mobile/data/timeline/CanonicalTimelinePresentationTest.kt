@@ -5,6 +5,9 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
@@ -16,8 +19,30 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.JsonPrimitive
 
 class CanonicalTimelinePresentationTest {
+    @Test fun fourLiveToolCallsProjectAsOneRunBlock() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        val fence = coordinator.beginLive(owner)
+
+        repeat(4) { index ->
+            val number = index + 1
+            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(toolCall(number))))
+            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(toolReturn(number))))
+        }
+        runCurrent()
+
+        val block = presentation.live.value.single() as ChatRenderItem.RunBlock
+        assertEquals("run-four-tools", block.runId)
+        assertEquals(4, block.messages.sumOf { it.first.toolCalls.orEmpty().size })
+        assertEquals(listOf("output-1", "output-2", "output-3", "output-4"),
+            block.messages.flatMap { it.first.toolCalls.orEmpty() }.map { it.result })
+        presentation.close()
+    }
+
     @Test fun missingSearchKeepsTailAndClosingOnlyDetaches() = runTest {
         val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
@@ -155,6 +180,35 @@ class CanonicalTimelinePresentationTest {
         assertTrue(coordinator.retire(owner))
     }
 
+    /**
+     * Owner report 2026-09-24: after a turn whose turn-end repair never committed, the next send's
+     * reply arrived but the earlier prompt vanished. The next turn replaced the overlay that held
+     * the prompt's echo while the remembered echo still hid the local bubble.
+     */
+    @Test fun promptStaysOnScreenWhenTheNextTurnReplacesAnUndurableEcho() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        coordinator.appendPending(
+            owner, CanonicalPendingLocalStore.Record("local-1", "question", emptyList(), "2026-01-01T00:00:00Z"),
+        )
+        val first = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(echo("question", "echo", "local-1"))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(assistant("hello", "reply"))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Done))
+        runCurrent()
+        assertEquals(listOf("hello", "question"), contents(presentation.live.value))
+
+        // The durable echo never landed; the agent's next turn opens over the settled overlay.
+        val next = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Message(assistant("again", "reply-2"))))
+        runCurrent()
+
+        assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
+        assertEquals(listOf("again", "question"), contents(presentation.live.value))
+        presentation.close()
+    }
+
     @Test fun turnWithoutEventsReleasesTheFenceWithoutAnyResidentRow() = runTest {
         val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
@@ -192,6 +246,24 @@ class CanonicalTimelinePresentationTest {
 
     private fun reasoning(content: String, id: String) = ReasoningMessage(
         id = id, reasoning = content, date = "2026-01-01T00:00:00Z",
+    )
+
+    private fun toolCall(number: Int) = ToolCallMessage(
+        id = "tool-message-$number",
+        toolCalls = listOf(ToolCall(id = "call-$number", name = "Bash", arguments = "command-$number")),
+        date = "2026-01-01T00:00:0${number}Z",
+        runId = "run-four-tools",
+        seqId = number * 2,
+    )
+
+    private fun toolReturn(number: Int) = ToolReturnMessage(
+        id = "return-$number",
+        toolCallId = "call-$number",
+        toolReturnRaw = JsonPrimitive("output-$number"),
+        status = "success",
+        date = "2026-01-01T00:00:0${number}Z",
+        runId = "run-four-tools",
+        seqId = number * 2 + 1,
     )
 
     private fun echo(content: String, id: String, otid: String) = UserMessage(

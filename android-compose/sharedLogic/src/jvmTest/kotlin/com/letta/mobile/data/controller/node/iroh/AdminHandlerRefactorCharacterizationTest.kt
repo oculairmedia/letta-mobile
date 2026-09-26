@@ -92,7 +92,8 @@ class AdminHandlerRefactorCharacterizationTest {
         checkNativeWithoutProxy("job.list", null)
         checkNativeWithoutProxy("tool.list", null)
         checkNativeWithoutProxy("model.list.embedding", null)
-        checkNativeWithoutProxy("provider.list", null)
+        // letta-mobile-w4q4p: provider.list is live list_connect_providers now.
+        checkNativeFailClosed("provider.list", null)
 
         // Store-owned reads and native-owned schedule writes fail closed when
         // unwired — again without a proxy dial.

@@ -1,18 +1,18 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AskUserQuestion
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.WsChatBridge
-import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.send.IrohChatSendStrategy
 import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
-import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -41,6 +41,7 @@ internal class AdminChatSendPipeline(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val composerController: ChatComposerController,
     private val chatBannerController: ChatBannerController,
+    private val submitApproval: (String, List<String>, Boolean, String?) -> Unit,
     private val backendKind: () -> BackendKind,
     private val activeConversationId: () -> String?,
     private val setActiveConversationId: (String?) -> Unit,
@@ -102,10 +103,6 @@ internal class AdminChatSendPipeline(
         )
     }
 
-    val wsChatSendStrategy: WsChatSendStrategy by lazy {
-        WsChatSendStrategy(wsChatSendCoordinator)
-    }
-
     val localRuntimeChatSendCoordinator: LocalRuntimeChatSendCoordinator by lazy {
         LocalRuntimeChatSendCoordinator(
             scope = scope,
@@ -125,11 +122,9 @@ internal class AdminChatSendPipeline(
     }
 
     /**
-     * lgns8.10.4.1: Iroh's own send route. Shares [wsChatSendCoordinator] with
-     * [wsChatSendStrategy] because that coordinator is transport-neutral — it
-     * drives whichever `IChannelTransport` the session graph bound. The types
-     * are distinct so the routing decision (and its telemetry) can never
-     * silently send an Iroh backend down the shim route.
+     * lgns8.10.4.1: Iroh's own send route, driving [wsChatSendCoordinator]
+     * (transport-neutral: it talks to whichever `IChannelTransport` the session
+     * graph bound).
      */
     val irohChatSendStrategy: IrohChatSendStrategy by lazy {
         IrohChatSendStrategy(wsChatSendCoordinator)
@@ -138,7 +133,6 @@ internal class AdminChatSendPipeline(
     val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
             timelineStrategy = timelineChatSendStrategy,
-            wsStrategy = wsChatSendStrategy,
             localStrategy = localRuntimeChatSendStrategy,
             irohStrategy = irohChatSendStrategy,
         )
@@ -158,6 +152,28 @@ internal class AdminChatSendPipeline(
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
             isStreaming = { uiState.value.isStreaming },
+            pendingUserInput = {
+                uiState.value.messages.asReversed().firstNotNullOfOrNull { message ->
+                    val approval = message.approvalRequest ?: return@firstNotNullOfOrNull null
+                    val toolCall = approval.toolCalls.singleOrNull {
+                        it.name == AskUserQuestion.ASK_USER_QUESTION_TOOL
+                    } ?: return@firstNotNullOfOrNull null
+                    val question = AskUserQuestion.parse(toolCall.arguments)
+                        ?.questions
+                        ?.singleOrNull()
+                        ?.question
+                        ?: return@firstNotNullOfOrNull null
+                    AdminChatComposerCoordinator.PendingUserInput(
+                        requestId = approval.requestId,
+                        toolCallId = toolCall.toolCallId,
+                        arguments = toolCall.arguments,
+                        question = question,
+                    )
+                }
+            },
+            submitUserInput = { pending, reason ->
+                submitApproval(pending.requestId, listOf(pending.toolCallId), true, reason)
+            },
             projectContextAvailable = projectContextAvailable,
         )
     }

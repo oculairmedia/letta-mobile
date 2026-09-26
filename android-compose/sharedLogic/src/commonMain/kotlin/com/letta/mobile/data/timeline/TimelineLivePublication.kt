@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.hasNoRenderableContent
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 import com.letta.mobile.util.Telemetry
@@ -31,6 +32,7 @@ data class TimelineLiveBlock(
 data class TimelinePreparedPage(
     val metadata: TimelineMetadataPage,
     val records: List<TimelineSettledRecord>,
+    val projectionInput: TimelinePageProjectionInput,
 )
 
 data class TimelineSettledRecord(
@@ -87,8 +89,16 @@ sealed interface TimelineSettledPresentation {
     data class Render(
         val event: TimelineEvent.Confirmed,
         val item: com.letta.mobile.data.chat.projection.ChatRenderItem,
+        val residentEvents: List<TimelineResidentEvent> = emptyList(),
     ) : TimelineSettledPresentation
 }
+
+data class TimelineResidentEvent(
+    val identity: TimelineMessageId,
+    val revision: Long,
+    val otid: String,
+    val serverId: String,
+)
 
 /** Testable seam for the complete-record decode and UI projection used by the settled pager. */
 data class TimelineSettledProjectionAdapter(
@@ -104,7 +114,8 @@ internal val DefaultTimelineSettledProjectionAdapter = TimelineSettledProjection
         ).toConfirmedTimelineEvent()
     },
     project = project@{ record, event, ownAgentId ->
-        val message = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId) ?: return@project null
+        val message = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId)
+            ?.takeUnless { it.hasNoRenderableContent() } ?: return@project null
         if (message.runId != null) com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock(
             message.runId, listOf(message to com.letta.mobile.ui.common.GroupPosition.None),
             stableKey = "segment-${record.key.identity.value}",
@@ -147,7 +158,7 @@ internal fun TimelineSettledRecord.presentationWithAdapter(
  * can reach; the live/hydration/stream reducers filter it earlier. Without this check a
  * `<skill_content …>` body persisted as a USER row renders as a real "You" bubble on relaunch.
  */
-private fun TimelineEvent.Confirmed.isSyntheticSkillEnvelope(): Boolean =
+internal fun TimelineEvent.Confirmed.isSyntheticSkillEnvelope(): Boolean =
     com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(
         role = when (messageType) {
             TimelineMessageType.USER -> "user"
@@ -167,7 +178,8 @@ fun TimelineSettledRecord.toRenderItem(ownAgentId: String? = null): com.letta.mo
         body.decodeToString(throwOnInvalidSequence = true),
     )
     val event = stored.toConfirmedTimelineEvent()
-    val message = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId) ?: return null
+    val message = com.letta.mobile.data.chat.projection.timelineEventToUiMessage(event, ownAgentId)
+        ?.takeUnless { it.hasNoRenderableContent() } ?: return null
     return if (message.runId != null) com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock(
         message.runId, listOf(message to com.letta.mobile.ui.common.GroupPosition.None),
         stableKey = "segment-${key.identity.value}",

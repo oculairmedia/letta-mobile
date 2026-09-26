@@ -61,7 +61,20 @@ interface ExternalTool {
      * @return The tool result (success or error)
      */
     suspend fun invoke(input: JsonObject, agentId: String? = null): ExternalToolResult
+
+    /**
+     * [invoke] with the whole runtime scope of the call. A tool that needs to know which
+     * conversation the agent is running in (the host's canvas tools, which let an agent open its
+     * own conversation's canvas) overrides this; every other tool gets the agent id alone.
+     */
+    suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult = invoke(input, caller.agentId)
 }
+
+/**
+ * Who a tool call comes from: the runtime scope the App Server stamped on the request, which the
+ * model cannot choose. [agentId] and [conversationId] are null when the frame carried no scope.
+ */
+data class ExternalToolCaller(val agentId: String?, val conversationId: String? = null)
 
 /**
  * Host-owned external tool that is available because of the client device, not

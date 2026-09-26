@@ -3,9 +3,6 @@ package com.letta.mobile.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
-import com.letta.mobile.cli.commands.ConnectCommand
-import com.letta.mobile.cli.commands.CaptureCommand
-import com.letta.mobile.cli.commands.DisconnectCommand
 import com.letta.mobile.cli.commands.DumpTimelineCommand
 import com.letta.mobile.cli.commands.ProfileCommand
 import com.letta.mobile.cli.commands.ProfileDeleteCommand
@@ -15,9 +12,7 @@ import com.letta.mobile.cli.commands.ProfileListCommand
 import com.letta.mobile.cli.commands.ProfileSetCommand
 import com.letta.mobile.cli.commands.ProfileShowCommand
 import com.letta.mobile.cli.commands.ProfileUseCommand
-import com.letta.mobile.cli.commands.RecordCommand
 import com.letta.mobile.cli.commands.RecordCursorStateCommand
-import com.letta.mobile.cli.commands.ReconnectCommand
 import com.letta.mobile.cli.commands.RestCommand
 import com.letta.mobile.cli.commands.RestDeleteCommand
 import com.letta.mobile.cli.commands.RestGetCommand
@@ -25,7 +20,6 @@ import com.letta.mobile.cli.commands.RestPatchCommand
 import com.letta.mobile.cli.commands.RestPostCommand
 import com.letta.mobile.cli.commands.RestPutCommand
 import com.letta.mobile.cli.commands.ReplayCommand
-import com.letta.mobile.cli.commands.SendCommand
 import com.letta.mobile.cli.commands.AppServerServeCommand
 import com.letta.mobile.cli.commands.AgentMessageCommand
 import com.letta.mobile.cli.commands.AgentMessageSendCommand
@@ -61,15 +55,9 @@ object Main {
         }
         LettaMobileCli()
             .subcommands(
-                ConnectCommand(),
-                CaptureCommand(),
-                SendCommand(),
                 DumpTimelineCommand(),
                 ReplayCommand(),
-                RecordCommand(),
                 RecordCursorStateCommand(),
-                DisconnectCommand(),
-                ReconnectCommand(),
                 RestCommand().subcommands(
                     RestGetCommand(),
                     RestPostCommand(),
@@ -119,15 +107,9 @@ object Main {
           ./gradlew :cli:run -PcliArgs="<command> [options]"
 
         Commands:
-          connect        Open admin-shim mobile WS and print welcome/session state.
-          capture        Capture REST hydrate snapshots and WS frames as replayable JSONL.
-          send           Send through admin-shim WS and fold frames into a headless timeline.
           dump-timeline  Fetch conversation history and emit stable timeline JSON.
-          replay         Replay a recorded WS JSONL fixture through the reducer.
-          record         Capture admin-shim WS wire frames as replay-compatible JSONL.
+          replay         Replay a recorded JSONL fixture through the reducer.
           record-cursor-state  Snapshot highest observed run cursors from a JSONL fixture.
-          disconnect     Open WS and close it cleanly.
-          reconnect      Exercise disconnect/reconnect and optional run resume.
           rest           Call arbitrary authenticated Letta REST endpoints.
           profile        Manage local CLI backend profiles and defaults.
           setup          Apply/export declarative CLI app/server setup files.

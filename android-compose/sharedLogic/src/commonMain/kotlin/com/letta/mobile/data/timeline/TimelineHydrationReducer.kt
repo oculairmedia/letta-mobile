@@ -392,8 +392,10 @@ private fun TimelineEvent.Confirmed.semanticIdentityKeyOrNull(): String? {
         // first matching branch -- so tool calls silently keyed on content and
         // approval/tool_call pairs never collapsed.
         TimelineMessageType.ASSISTANT,
-        TimelineMessageType.REASONING,
         TimelineMessageType.ERROR -> "semantic:${messageType.name}:$stableRunId:${content.trim()}"
+        // Reasoning can legitimately repeat within one run. Its stream/server identity is
+        // authoritative; content-based identity would erase a distinct second thought.
+        TimelineMessageType.REASONING -> null
         // Hydrated history can expose one logical invocation twice: once as a
         // tool_call_message and once as an approval_request_message. Their
         // server ids and rendered content can differ, but the call id is the

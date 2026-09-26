@@ -38,6 +38,7 @@ import ca.oculair.meridian.R
 import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Server-mode invite-generation screen (letta-mobile-g2d2i): mints a QR via
@@ -87,9 +88,9 @@ fun PairInviteScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(LettaDimens.Space.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             Text(
                 text = "Open the Letta app on the other device, choose \"Scan a pairing code\", and point its camera at this code.",
@@ -108,9 +109,9 @@ private fun QrCard(uiState: PairInviteUiState) {
     Box(
         modifier = Modifier
             .size(320.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.md))
             .background(Color.White)
-            .padding(16.dp),
+            .padding(LettaDimens.Space.lg),
         contentAlignment = Alignment.Center,
     ) {
         val matrix = uiState.matrix
@@ -130,7 +131,7 @@ private fun QrCard(uiState: PairInviteUiState) {
 private fun InviteFooter(uiState: PairInviteUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         val suggested = uiState.suggestedName
         if (!suggested.isNullOrBlank()) {
@@ -147,7 +148,7 @@ private fun InviteFooter(uiState: PairInviteUiState) {
         if (uiState.error != null && uiState.matrix != null) {
             // A stale-but-still-shown QR plus a fresh error from a failed
             // regenerate attempt — surface both rather than hiding the code.
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Text(
                 text = uiState.error,
                 style = MaterialTheme.typography.bodySmall,

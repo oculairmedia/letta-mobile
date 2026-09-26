@@ -60,6 +60,10 @@ sealed interface AppServerCommandRetryClass {
             // Aborting / approval / tool-result are effectful and non-idempotent.
             is AppServerCommand.AbortMessage -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ExternalToolCallResponse -> AmbiguousMutation(dedupKey = null)
+            // letta-mobile-qygvv.6: removing an item twice is a no-op (success=false), so the item
+            // id dedupes it. A replayed resume could release items a later abort parked.
+            is AppServerCommand.RemoveQueueItem -> AmbiguousMutation(dedupKey = command.itemId)
+            is AppServerCommand.ResumeQueue -> AmbiguousMutation(dedupKey = null)
             // Absolute values, but device state is shared by every client on the runtime: a
             // replay could overwrite a change another client made after this one.
             is AppServerCommand.ChangeDeviceState -> AmbiguousMutation(dedupKey = null)
@@ -83,6 +87,14 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.ListModels -> SafeRead
             is AppServerCommand.SkillEnable -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.SkillDisable -> AmbiguousMutation(dedupKey = null)
+
+            // Provider connect + model switch (letta-mobile-w4q4p): the listing is a
+            // read; connect/disconnect write the provider store and update_model
+            // rewrites agent/conversation model settings, so none replay blindly.
+            is AppServerCommand.ListConnectProviders -> SafeRead
+            is AppServerCommand.ConnectProvider -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.DisconnectProvider -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.UpdateModel -> AmbiguousMutation(dedupKey = null)
 
             // Cron scheduling (lgns8.8): reads replay safely; schedule
             // mutations and manual triggers are ambiguous after disconnect.

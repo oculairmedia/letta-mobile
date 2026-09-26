@@ -36,6 +36,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import com.letta.mobile.ui.theme.LettaDimens
 
 val DesktopMermaidDiagramRenderer = MermaidDiagramRenderer { source, modifier ->
     DesktopMermaidDiagram(source, modifier)
@@ -78,7 +79,7 @@ private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier)
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.sm),
         color = colors.surfaceVariant,
         shape = MaterialTheme.shapes.small,
     ) {
@@ -87,7 +88,7 @@ private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier)
             when (val current = result) {
                 DesktopMermaidRenderResult.Loading -> Text(
                     text = "Rendering diagram...",
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
+                    modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.lg),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 is DesktopMermaidRenderResult.Rendered -> MermaidImage(current.png, source)
@@ -102,10 +103,10 @@ private fun MermaidHeader() {
     // No copy affordance here: the message-level "Copy response" pill floats at
     // the same top-right corner and already includes the mermaid fence source,
     // so a second glyph read as a confusing duplicate.
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md)) {
         Text(
             text = "mermaid",
-            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+            modifier = Modifier.weight(1f).padding(vertical = LettaDimens.Space.md),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -148,7 +149,7 @@ private fun MermaidImage(png: ByteArray, source: String) {
     }
 }
 
-private val MermaidCanvasPadding: Dp = 12.dp
+private val MermaidCanvasPadding: Dp = LettaDimens.Space.md
 
 /**
  * Floor keeps single-node diagrams from collapsing. The ceiling keeps tall
@@ -172,7 +173,7 @@ private fun MermaidSourceFallback(source: String, reason: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(12.dp),
+            .padding(LettaDimens.Space.md),
     ) {
         Text(
             text = "Mermaid render failed: $reason",
@@ -181,7 +182,7 @@ private fun MermaidSourceFallback(source: String, reason: String) {
         )
         Text(
             text = source,
-            modifier = Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()),
+            modifier = Modifier.padding(top = LettaDimens.Space.sm).horizontalScroll(rememberScrollState()),
             color = MaterialTheme.colorScheme.onErrorContainer,
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
         )

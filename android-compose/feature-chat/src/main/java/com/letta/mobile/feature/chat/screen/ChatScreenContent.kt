@@ -55,6 +55,7 @@ import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableMap
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal fun shouldShowStarterPromptsForNoConversation(state: ChatUiState): Boolean =
     state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()
@@ -176,19 +177,20 @@ private fun ChatContentMessageArea(
     appearance: ChatContentAppearance,
     a2uiStackHeightDp: Dp,
 ) {
+    val listBottomPadding = chatListBottomPadding(
+        composerPadding = appearance.bottomPadding,
+        a2uiShown = state.a2uiSurfaces.isNotEmpty(),
+        a2uiStackHeight = a2uiStackHeightDp,
+    )
     LocalChatPagingPresentation.current?.let { paging ->
         key(paging) {
-            PagedChatMessageList(paging, state, callbacks, appearance.copy(
-                bottomPadding = appearance.bottomPadding + a2uiStackHeightDp,
-            ))
+            PagedChatMessageList(paging, state, callbacks, appearance.copy(bottomPadding = listBottomPadding))
         }
         return
     }
     val hasMessagesOrStreaming = state.messages.isNotEmpty() || state.isStreaming
     if (!hasMessagesOrStreaming) return
 
-    val listBottomPadding = appearance.bottomPadding +
-        if (state.a2uiSurfaces.isNotEmpty()) a2uiStackHeightDp else 0.dp
     ChatMessageList(
         state = state,
         renderItems = renderItems,
@@ -293,7 +295,7 @@ internal fun DismissibleA2uiSurface(
                         imageVector = LettaIcons.Delete,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm)
                     )
                 },
                 onClick = {
@@ -344,14 +346,14 @@ internal fun GoalStatusCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
         shape = MaterialTheme.shapes.large,
-        tonalElevation = 3.dp,
+        tonalElevation = LettaDimens.Space.xs,
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             GoalStatusCardHeader(goal = goal, loading = loading, onRefresh = callbacks.onRefresh)
             GoalStatusCardDetails(goal = goal)
@@ -403,7 +405,7 @@ private fun GoalStatusCardActions(
 ) {
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         if (goal.status == "complete") {
             TextButton(onClick = callbacks.onClear) { Text("Clear") }
@@ -457,3 +459,11 @@ internal fun A2uiDebugOverlay(
         }
     }
 }
+
+/**
+ * letta-mobile-jqiu3: the list's bottom reserve. The A2UI stack's last measured height outlives the
+ * stack itself, so it is reserved only while surfaces are shown; otherwise it would stay behind as
+ * an empty band above the composer.
+ */
+internal fun chatListBottomPadding(composerPadding: Dp, a2uiShown: Boolean, a2uiStackHeight: Dp): Dp =
+    composerPadding + if (a2uiShown) a2uiStackHeight else 0.dp

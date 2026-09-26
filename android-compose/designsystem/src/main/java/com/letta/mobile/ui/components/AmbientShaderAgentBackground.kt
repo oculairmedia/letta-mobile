@@ -89,6 +89,11 @@ fun AmbientShaderAgentBackground(
      * survive every agent palette.
      */
     identitySeed: Color? = null,
+    /**
+     * The composer's measured height, read at draw time: the glow stays above a composer taller
+     * than the tenth of the screen it assumes (see AmbientMotion.bandAboveComposer).
+     */
+    composerHeight: () -> androidx.compose.ui.unit.Dp = { androidx.compose.ui.unit.Dp.Unspecified },
     content: @Composable BoxScope.() -> Unit,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
@@ -189,6 +194,7 @@ fun AmbientShaderAgentBackground(
                 agitation = agitation,
                 envelope = envelope.asState(),
                 streamActivityPulse = streamActivityPulse,
+                composerHeight = composerHeight,
                 modifier = Modifier.matchParentSize(),
             )
         }
@@ -204,6 +210,7 @@ private fun AmbientCanvas(
     agitation: Float,
     envelope: State<Float>,
     streamActivityPulse: Long,
+    composerHeight: () -> androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
     val motion = rememberAmbientMotion(animate, speed, streamActivityPulse)
@@ -218,6 +225,12 @@ private fun AmbientCanvas(
             shader.setFloatUniform("uEnvelope", envelope.value)
             shader.setFloatUniform("uStreamEnergy", motion.streamEnergy)
             shader.setFloatUniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
+            val composer = composerHeight()
+            val band = AmbientMotion.bandAboveComposer(
+                if (composer == androidx.compose.ui.unit.Dp.Unspecified || size.height <= 0f) 0f else composer.toPx() / size.height,
+            )
+            shader.setFloatUniform("uBandTop", band.top)
+            shader.setFloatUniform("uBandPeak", band.peak)
             shader.setFloatUniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
             drawRect(brush = shaderBrush)
         }

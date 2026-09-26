@@ -27,7 +27,7 @@ import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
-import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
+import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
@@ -259,7 +259,7 @@ private fun List<DesktopConversationSummary>.applyArchiveFilterNewestFirst(
  */
 internal data class BuildMentionablesParams(
     val railAgents: List<Pair<String, String>>,
-    val memoryState: DesktopMemorySurfaceState,
+    val memoryState: MemoryParityControllerState,
 )
 
 internal fun buildMentionables(params: BuildMentionablesParams): List<Mentionable> = buildList {
@@ -363,6 +363,7 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
     add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
     add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
     add(ComposerCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
+    add(ComposerCommand("providers", "Open providers & models") { onNavigate(DesktopDestination.Providers) })
     add(ComposerCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
     params.agentSlashCommands.forEach { cmd ->
         add(
@@ -507,6 +508,8 @@ internal fun createDesktopChatDetailPaneActions(
             }
         },
         onOpenAgent = params.onOpenAgent,
+        queue = desktopQueuedSendActions(chatController),
+        queueControls = chatController::canonicalSendQueue,
     )
 }
 

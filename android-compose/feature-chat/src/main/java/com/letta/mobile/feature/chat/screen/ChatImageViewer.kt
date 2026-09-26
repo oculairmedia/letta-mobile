@@ -80,12 +80,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.max
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal const val MinImageScale = 1f
 internal const val DoubleTapImageScale = 2.5f
 internal const val MaxImageScale = 5f
 internal const val SwipeDismissThresholdPx = 160f
-internal val ChatImageViewerControlsPadding = 12.dp
+internal val ChatImageViewerControlsPadding = LettaDimens.Space.md
 
 internal val ChatImageViewerScaleKey = SemanticsPropertyKey<Float>("ChatImageViewerScale")
 internal var SemanticsPropertyReceiver.chatImageViewerScale by ChatImageViewerScaleKey
@@ -275,9 +276,9 @@ private fun ChatImageViewerContent(
                     color = Color.White,
                     modifier = Modifier
                         .background(Color.Black.copy(alpha = 0.45f), MaterialTheme.shapes.small)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     ViewerActionButton(
                         icon = LettaIcons.Share,
                         contentDescription = shareImageDescription,
@@ -334,7 +335,7 @@ private fun ViewerActionButton(
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(48.dp)
+            .size(LettaDimens.Orb.railSlotWidth)
             .background(Color.Black.copy(alpha = 0.45f), MaterialTheme.shapes.small)
             .semantics { this.contentDescription = contentDescription },
     ) {
@@ -457,7 +458,7 @@ private fun ZoomableAttachmentImage(
         } else {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 Text(
                     text = unavailableText,

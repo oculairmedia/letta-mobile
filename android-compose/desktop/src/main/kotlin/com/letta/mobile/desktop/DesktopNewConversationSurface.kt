@@ -1,58 +1,25 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Agent
-import org.jetbrains.jewel.ui.component.TextField as JewelTextField
-import com.letta.mobile.ui.chat.AgentOrb
-import androidx.compose.ui.graphics.vector.ImageVector
+import com.letta.mobile.ui.search.LettaSearchAction
+import com.letta.mobile.ui.search.LettaSearchConfig
+import com.letta.mobile.ui.search.LettaSearchLeading
+import com.letta.mobile.ui.search.LettaSearchPopover
+import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.ui.search.LettaSearchSection
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
 
@@ -134,62 +101,63 @@ internal fun DesktopNewConversationSurface(
     directory: List<NewConversationAgentRow>,
     actions: DesktopNewConversationActions,
 ) {
-    var query by remember { mutableStateOf(TextFieldValue("")) }
-    val filtered = remember(directory, query.text) { filterAgentDirectory(directory, query.text) }
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(directory, query) { filterAgentDirectory(directory, query) }
     val sections = remember(filtered) { groupAgentDirectory(filtered) }
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = actions.onDismiss,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier
-                .widthIn(min = 520.dp, max = 640.dp)
-                .heightIn(max = 640.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
+    // Same LettaSearch module as the header, expressed as a popover with a
+    // title, a "To:" prefix, pinned create actions and a recents strip. The
+    // appearance this replaces is reproduced by flags, not by a second
+    // implementation: one field, one row layout, one empty state.
+    LettaSearchPopover(
+        query = query,
+        onQueryChange = { query = it },
+        sections = sections.map { (letter, rows) ->
+            LettaSearchSection(title = letter, rows = rows.map(NewConversationAgentRow::toSearchRow))
+        },
+        onRowSelected = { row -> actions.onAgentSelected(row.id) },
+        onDismiss = actions.onDismiss,
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            handleDirectoryKey(event, filtered, actions)
+        },
+        config = LettaSearchConfig(
+            title = "New conversation",
+            fieldPrefix = "To:",
+            placeholder = "Search or create an agent",
+            recents = recents.map(NewConversationAgentRow::toSearchRow),
+            recentsTitle = "Recent",
+            actions = buildList {
+                add(
+                    LettaSearchAction(
+                        id = "create-agent",
+                        labelForQuery = { "Create new agent" },
+                        icon = Icons.Outlined.Add,
+                        onInvoke = { actions.onCreateNewAgent() },
+                    ),
                 )
-                // Hoisted here (not on the field) so Escape/Enter still work
-                // after a click moves focus off the To: field.
-                .onPreviewKeyEvent { event -> handleDirectoryKey(event, filtered, actions) },
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 8.dp,
-        ) {
-            Column {
-                NewConversationHeader(
-                    query = query,
-                    onQueryChange = { query = it },
-                    focusRequester = focusRequester,
-                )
-                DirectoryDivider()
-                DirectoryActionRow(icon = Icons.Outlined.Add, text = "Create new agent", onClick = actions.onCreateNewAgent)
                 actions.onNewCanvas?.let { onNewCanvas ->
-                    DirectoryActionRow(icon = Lucide.Palette, text = "New canvas", onClick = onNewCanvas)
+                    add(
+                        LettaSearchAction(
+                            id = "new-canvas",
+                            labelForQuery = { "New canvas" },
+                            icon = Lucide.Palette,
+                            onInvoke = { onNewCanvas() },
+                        ),
+                    )
                 }
-                DirectoryDivider()
-                NewConversationDirectoryList(
-                    queryText = query.text,
-                    recents = recents,
-                    sections = sections,
-                    onAgentSelected = actions.onAgentSelected,
-                )
-            }
-        }
-    }
+            },
+            emptyText = { "No agents match \"$it\"" },
+        ),
+    )
 }
+
+/** The directory row as a search row: the orb carries the agent id, so it draws the live mascot. */
+private fun NewConversationAgentRow.toSearchRow(): LettaSearchRow = LettaSearchRow(
+    id = id,
+    label = name,
+    sublabel = subtitle,
+    leading = LettaSearchLeading.Orb(orbIndex = orbIndex, agentId = id),
+)
 
 /** Escape dismisses; Enter opens the top filtered match. */
 private fun handleDirectoryKey(
@@ -208,209 +176,5 @@ private fun handleDirectoryKey(
             filtered.isNotEmpty()
         }
         else -> false
-    }
-}
-
-@Composable
-private fun NewConversationHeader(
-    query: TextFieldValue,
-    onQueryChange: (TextFieldValue) -> Unit,
-    focusRequester: FocusRequester,
-) {
-    Text(
-        text = "New conversation",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(start = 16.dp, top = 14.dp, end = 16.dp),
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = "To:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        JewelTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            placeholder = { Text("Type an agent name") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester),
-        )
-    }
-}
-
-@Composable
-private fun NewConversationDirectoryList(
-    queryText: String,
-    recents: List<NewConversationAgentRow>,
-    sections: List<Pair<String, List<NewConversationAgentRow>>>,
-    onAgentSelected: (String) -> Unit,
-) {
-    val searching = queryText.isNotBlank()
-    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
-        if (!searching && recents.isNotEmpty()) {
-            item(key = "recents") { RecentsRow(recents, onAgentSelected) }
-        }
-        if (sections.isEmpty()) {
-            item(key = "empty") {
-                Text(
-                    text = "No agents match \"$queryText\"",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(20.dp),
-                )
-            }
-        }
-        sections.forEach { (letter, rows) ->
-            item(key = "letter-$letter") {
-                Text(
-                    text = letter,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
-                )
-            }
-            items(rows, key = { "agent-${it.id}" }) { row ->
-                AgentDirectoryRow(row = row, onClick = { onAgentSelected(row.id) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun DirectoryDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 1.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant),
-    )
-}
-
-/** An action at the top of the directory (Grok Bot's "Create new Bot" / "Create group chat" rows). */
-@Composable
-private fun DirectoryActionRow(icon: ImageVector, text: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
-}
-
-@Composable
-private fun RecentsRow(
-    recents: List<NewConversationAgentRow>,
-    onAgentSelected: (String) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "RECENT",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
-        )
-        val recentsScroll = rememberScrollState()
-        // Without this the strip clipped an avatar in half at the pane edge and
-        // read as a broken layout rather than a scrollable row.
-        val fadeStart by animateFloatAsState(
-            targetValue = if (recentsScroll.canScrollBackward) 1f else 0f,
-            animationSpec = tween(durationMillis = 180),
-            label = "recentsFadeStart",
-        )
-        val fadeEnd by animateFloatAsState(
-            targetValue = if (recentsScroll.canScrollForward) 1f else 0f,
-            animationSpec = tween(durationMillis = 180),
-            label = "recentsFadeEnd",
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalFadingEdges(
-                    startFadeAlpha = fadeStart,
-                    endFadeAlpha = fadeEnd,
-                    fadeLength = 28.dp,
-                )
-                .horizontalScroll(recentsScroll)
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            recents.forEach { row ->
-                Column(
-                    modifier = Modifier
-                        .clickable(onClick = { onAgentSelected(row.id) })
-                        .padding(horizontal = 6.dp, vertical = 6.dp)
-                        .width(64.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    AgentOrb(agentId = row.id, index = row.orbIndex, size = 44.dp, cornerRadius = 12.dp)
-                    Text(
-                        text = row.name,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AgentDirectoryRow(row: NewConversationAgentRow, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        AgentOrb(agentId = row.id, index = row.orbIndex, size = 34.dp, cornerRadius = 9.dp)
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = row.name,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            row.subtitle?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
     }
 }

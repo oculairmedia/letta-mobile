@@ -57,6 +57,8 @@ include(":avatar:core")
 include(":avatar:renderer-rive")
 include(":sharedLogic")
 include(":sharedUI")
+// DrawBox, vendored from upstream v2.1.0 so the canvas can be fixed at the source (drawbox/VENDORED.md).
+include(":drawbox")
 include(":designsystem")
 include(":feature-chat")
 include(":feature-editagent")

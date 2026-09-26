@@ -169,6 +169,8 @@ internal class AdminChatViewModel @Inject constructor(
     /** App-wide run state; this screen publishes its conversation here for the lists and the mascots. */
     private val runRegistry: com.letta.mobile.data.presence.ConversationRunRegistry =
         com.letta.mobile.data.presence.ConversationRunRegistry(),
+    /** letta-mobile-w4q4p: conversation-scoped model switch; null keeps the agent-update path. */
+    private val modelControl: com.letta.mobile.feature.chat.coordination.ChatModelControl? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -253,9 +255,8 @@ internal class AdminChatViewModel @Inject constructor(
         get() = routeArgs.explicitNewChat
     /**
      * lgns8.10.4.1: the chat screen's real question is "is this backend served
-     * by a frame channel?" (Iroh **or** shim WS) — not "is this the shim?".
-     * The detector answers both separately now; the old `activeIsShimBackend`
-     * returned true for Iroh, which is exactly the inversion this bead fixes.
+     * by a frame channel?" — not "is this the shim?". Since g70jb.4 only Iroh
+     * is; a leftover shim-era config classifies as REST.
      */
     private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
         .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveUsesChannelTransport())
@@ -315,6 +316,8 @@ internal class AdminChatViewModel @Inject constructor(
     private var currentSendPipeline: AdminChatSendPipeline? = null
     private var replacingSendRuntime = false
     private var runtimeCollectorStarted = false
+    /** letta-mobile-ztuog: resumed and not since paused; a replacement send pipeline inherits the selection. */
+    private var screenSelected = false
     private var pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
 
     private val sendPipeline: AdminChatSendPipeline
@@ -327,23 +330,7 @@ internal class AdminChatViewModel @Inject constructor(
                 currentSendPipeline = createSendPipeline()
                 if (runtimes != null) viewModelScope.launch {
                     try {
-                        runtimes.collect { next ->
-                            if (next !== selectedRuntime) {
-                                replacingSendRuntime = true
-                                retireSelectedGeneration(
-                                    stopPresentation = ::stopTimelineObserver,
-                                    pipeline = pipelineLifetime,
-                                    owner = selectedSendOwner,
-                                    runtime = selectedRuntime,
-                                )
-                                pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
-                                selectedRuntime = next
-                                selectedSendOwner = next?.let(::newSendOwner)
-                                currentSendPipeline = createSendPipeline()
-                                replacingSendRuntime = false
-                                chatConversationCoordinator.activeConversationId?.let(::startTimelineObserver)
-                            }
-                        }
+                        runtimes.collect { next -> if (next !== selectedRuntime) replaceSendRuntime(next) }
                     } finally {
                         replacingSendRuntime = true
                         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
@@ -356,6 +343,26 @@ internal class AdminChatViewModel @Inject constructor(
             }
             return checkNotNull(currentSendPipeline)
         }
+
+    /** Retires the current send generation and builds the next one on [next]. */
+    private suspend fun replaceSendRuntime(next: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime?) {
+        replacingSendRuntime = true
+        retireSelectedGeneration(
+            stopPresentation = ::stopTimelineObserver,
+            pipeline = pipelineLifetime,
+            owner = selectedSendOwner,
+            runtime = selectedRuntime,
+        )
+        pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
+        selectedRuntime = next
+        selectedSendOwner = next?.let(::newSendOwner)
+        val pipeline = createSendPipeline()
+        currentSendPipeline = pipeline
+        // letta-mobile-ztuog: the replacement coordinator inherits the on-screen selection.
+        if (screenSelected) pipeline.wsChatSendCoordinator.selectForEvents()
+        replacingSendRuntime = false
+        chatConversationCoordinator.activeConversationId?.let(::startTimelineObserver)
+    }
 
     private fun newSendOwner(runtime: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime) =
         com.letta.mobile.feature.chat.coordination.SelectedChatSendOwner(
@@ -383,6 +390,7 @@ internal class AdminChatViewModel @Inject constructor(
             uiState = _uiState,
             composerController = composerController,
             chatBannerController = chatBannerController,
+            submitApproval = chatApprovalController::submitApproval,
             // lgns8.10.4.1: config truth, resolved once in ShimBackendDetector.
             // The inline iroh:// URL sniff that used to live here is gone.
             backendKind = { backendKind.value },
@@ -405,6 +413,8 @@ internal class AdminChatViewModel @Inject constructor(
             settingsRepository = settingsRepository,
             activeAgent = activeAgent,
             bannerController = chatBannerController,
+            modelControl = modelControl,
+            conversationId = { conversationId?.value },
         )
     }
 
@@ -579,7 +589,19 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun refreshModels() = modelCoordinator.refreshModels()
 
-    fun updateActiveAgentModel(handle: String) = modelCoordinator.updateActiveAgentModel(handle)
+    fun updateActiveAgentModel(
+        handle: String,
+        effort: com.letta.mobile.feature.chat.coordination.EffortSelection =
+            com.letta.mobile.feature.chat.coordination.EffortSelection.Keep,
+    ) = modelCoordinator.updateActiveAgentModel(
+        com.letta.mobile.feature.chat.coordination.ModelPick(
+            com.letta.mobile.data.repository.modelcontrol.ModelHandle(handle.trim()),
+            effort,
+        ),
+    )
+
+    fun reasoningEffortsFor(handle: String?): List<String> =
+        modelCoordinator.reasoningEffortsFor(handle?.let { com.letta.mobile.data.repository.modelcontrol.ModelHandle(it) })
 
     fun refreshAvailableAgents() {
         viewModelScope.launch {
@@ -1013,9 +1035,20 @@ internal class AdminChatViewModel @Inject constructor(
     val canSendMessages: Boolean
         get() = ChatSessionReducer.canSend(_sessionState.value)
 
-    fun onScreenPaused() = screenLifecycleCoordinator.onScreenPaused()
+    fun onScreenPaused() {
+        // Pausing (backgrounding, or another chat covering this one) does not detach: only
+        // another chat's resume does, so a backgrounded chat keeps receiving its own frames.
+        screenSelected = false
+        screenLifecycleCoordinator.onScreenPaused()
+    }
 
-    fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
+    fun onScreenResumed() {
+        // letta-mobile-ztuog: the chat on screen owns the event selection; every other agent's
+        // coordinator stops receiving frames as soon as its in-flight turns settle.
+        screenSelected = true
+        sendPipeline.wsChatSendCoordinator.selectForEvents()
+        screenLifecycleCoordinator.onScreenResumed()
+    }
 
     override fun onCleared() {
         publishedRunKey?.let(runPhases::clear)
@@ -1055,6 +1088,28 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
     }
 
+    // --- Send queue (letta-mobile-1n5py) ---
+    /** True when a message sent during a turn is queued behind it (the Iroh route). */
+    val canQueueWhileStreaming: Boolean
+        get() = composerCoordinator.canQueueWhileStreaming()
+
+    /** letta-mobile-1n5py: the queued-sends panel's controls; Send now and Resume start a new turn. */
+    val queuedSendActions: com.letta.mobile.ui.chat.QueuedSendActions by lazy(LazyThreadSafetyMode.NONE) {
+        com.letta.mobile.ui.chat.QueuedSendActions(
+            onCancel = { id -> if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.sendQueue.cancel(id) },
+            onSendNow = { id -> startQueuedTurn { sendNow(id) } },
+            onResume = {
+                uiState.value.sendQueue.items.firstOrNull()?.conversationId?.let { id -> startQueuedTurn { resume(id) } }
+            },
+        )
+    }
+
+    private fun startQueuedTurn(action: com.letta.mobile.data.chat.send.ChatSendQueueControls.() -> Unit) {
+        if (replacingSendRuntime) return
+        composerCoordinator.beginQueuedTurn()
+        sendPipeline.wsChatSendCoordinator.sendQueue.action()
+    }
+
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
 
@@ -1065,12 +1120,6 @@ internal class AdminChatViewModel @Inject constructor(
     // Keep startup after all backing fields and lazy delegates: Main.immediate can
     // resolve a cached route and start its observer before this constructor returns.
     init {
-        viewModelScope.launch {
-            shimBackendDetector.refreshActive()
-            settingsRepository.activeConfigChanges.collect { config ->
-                shimBackendDetector.refresh(config)
-            }
-        }
         transportCoordinator.startObserving()
         goalCoordinator.startObserving()
         slashCommandsCoordinator.loadSlashCommands()

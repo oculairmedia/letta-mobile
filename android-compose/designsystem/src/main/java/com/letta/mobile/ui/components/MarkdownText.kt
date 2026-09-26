@@ -58,6 +58,7 @@ import com.letta.mobile.ui.text.PreparedRichInlineItem
 import com.letta.mobile.ui.text.RichInlineAtomKind
 import com.letta.mobile.ui.text.RichInlineItem
 import com.letta.mobile.ui.text.prepareRichInlineItems
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun MarkdownText(
@@ -555,11 +556,11 @@ private fun MarkdownTextRaw(
             // Editorial breathing room: generous spacing between list items,
             // paragraphs, and blocks so prose feels loose and magazine-like.
             padding = markdownPadding(
-                block = 8.dp,
-                list = 8.dp,
-                listItemBottom = 8.dp,
+                block = LettaDimens.Space.sm,
+                list = LettaDimens.Space.sm,
+                listItemBottom = LettaDimens.Space.sm,
                 listItemTop = 0.dp,
-                indentList = 12.dp,
+                indentList = LettaDimens.Space.md,
             ),
             colors = markdownColor(
                 text = textColor,
@@ -646,16 +647,16 @@ private fun CodeFenceWithHeader(
     var expanded by remember(content) { mutableStateOf(false) }
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs),
     ) {
         Column {
             if (language.isNotEmpty() || codeText.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 12.dp, end = 4.dp),
+                        .padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -682,7 +683,7 @@ private fun CodeFenceWithHeader(
                         Icon(
                             imageVector = LettaIcons.Copy,
                             contentDescription = "Copy code",
-                            modifier = Modifier.padding(4.dp),
+                            modifier = Modifier.padding(LettaDimens.Space.xs),
                         )
                     }
                 }
@@ -724,7 +725,7 @@ private fun CodeFenceBody(
                     Modifier
                 }
             )
-            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            .padding(start = LettaDimens.Space.md, end = LettaDimens.Space.md, bottom = LettaDimens.Space.md),
         contentAlignment = Alignment.TopCenter,
     ) {
         // Our own highlighter, not the library's: it never flips to plain text while a

@@ -27,6 +27,13 @@ interface ViewerHandle {
      * receiving. Default: no.
      */
     fun receivesAgentEvents(): Boolean = false
+
+    /**
+     * Whether this connection may receive device-wide `conversation_updated` pushes, which name
+     * conversations: the peer must be allowed to read EVERY conversation (a peer bounded to the one it
+     * is viewing must not learn other conversation ids). Evaluated at send time. Default: no.
+     */
+    fun receivesConversationEvents(): Boolean = false
 }
 
 /** Opaque ownership token for one canonical endpoint connection generation. */

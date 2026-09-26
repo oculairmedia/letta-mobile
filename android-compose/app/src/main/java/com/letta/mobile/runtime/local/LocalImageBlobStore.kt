@@ -39,7 +39,24 @@ class LocalImageBlobStore(
                 output.write(bytes)
                 output.fd.sync()
             }
-            check(tmp.renameTo(blobFile)) { "Atomic blob publication failed" }
+            try {
+                java.nio.file.Files.move(
+                    tmp.toPath(),
+                    blobFile.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                )
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                // tmp is staged in blobsDirectory, so this is unreachable on a
+                // normal filesystem. Kept for the exotic case only: a real I/O
+                // failure must still propagate, or a partial copy gets published
+                // under its content-addressed name and dedupe serves it forever.
+                java.nio.file.Files.move(
+                    tmp.toPath(),
+                    blobFile.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                )
+            }
         } finally {
             tmp.delete()
         }

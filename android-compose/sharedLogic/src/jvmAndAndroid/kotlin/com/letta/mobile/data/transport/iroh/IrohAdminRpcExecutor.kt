@@ -67,6 +67,8 @@ internal class IrohAdminRpcExecutor(
     private suspend fun executeTracked(call: TrackedCall): AppServerInboundFrame.AdminRpcResponse {
         return try {
             call.execute()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             retryAfter(call, error)
         }
@@ -119,6 +121,8 @@ internal class IrohAdminRpcExecutor(
     fun millisSinceLastProofOfLife(): Long = currentRetryState().millisSinceLastStream()
     fun youngInFlightAdminRpcCount(graceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS): Int =
         currentRetryState().youngInFlightAdminRpcCount(graceMs)
+    fun pathEvidence(windowMs: Long, graceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS): AdminRpcPathEvidence =
+        currentRetryState().pathEvidence(windowMs, graceMs)
     fun clear() = retryStates.clear()
 
     private data class ReadyHandle(val handle: IrohConnectionHandle, val generation: Long)
@@ -156,10 +160,17 @@ internal class IrohAdminRpcExecutor(
         @Volatile private var lastProofOfLifeMs = System.currentTimeMillis()
         private val inFlightStartByToken = ConcurrentHashMap<Long, Long>()
         private val nextInFlightToken = AtomicLong(0L)
+        private val timeoutStreak = AdminRpcTimeoutStreak()
 
         suspend fun recordFailure(): Int = mutex.withLock { ++consecutiveFailures }
         suspend fun reset() = mutex.withLock { consecutiveFailures = 0 }
-        fun recordProofOfLife() { lastProofOfLifeMs = System.currentTimeMillis() }
+        /** Any answer (stream frame or admin_rpc) also breaks a request-timeout streak. */
+        fun recordProofOfLife() {
+            lastProofOfLifeMs = System.currentTimeMillis()
+            timeoutStreak.reset()
+        }
+        /** qygvv.22: a connection-class failure on a nominally alive connection. */
+        fun recordIsolatedFailure() = timeoutStreak.record()
         fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastProofOfLifeMs
         fun beginAdminRpc(): Long = nextInFlightToken.incrementAndGet().also { inFlightStartByToken[it] = System.currentTimeMillis() }
         fun endAdminRpc(token: Long) { inFlightStartByToken.remove(token) }
@@ -167,6 +178,12 @@ internal class IrohAdminRpcExecutor(
             val now = System.currentTimeMillis()
             return inFlightStartByToken.values.count { now - it in 0 until graceMs }
         }
+        fun pathEvidence(windowMs: Long, graceMs: Long): AdminRpcPathEvidence = AdminRpcPathEvidence(
+            youngInFlight = youngInFlightAdminRpcCount(graceMs),
+            oldestInFlightAgeMs = inFlightStartByToken.values.minOrNull()?.let { System.currentTimeMillis() - it },
+            recentRequestTimeouts = timeoutStreak.countWithin(windowMs),
+            proofOfLifeAgeMs = millisSinceLastStream(),
+        )
     }
 
     private fun Throwable.description(): String = message ?: toString()
@@ -178,6 +195,7 @@ internal class IrohAdminRpcExecutor(
             if (!isRetryableConnectionFailure(error)) return RetryEligibility.Rejected
             if (!call.request.method.isReadOnlyAdminRpcMethod()) return RetryEligibility.Rejected
             if (call.handle.isConnectionAlive) {
+                call.retryState.recordIsolatedFailure()
                 Telemetry.event("IrohTransport", "admin_rpc.request_isolated", "method" to call.request.method, "path" to call.request.path, "error" to error.description(), "class" to error::class.simpleName)
                 return RetryEligibility.Rejected
             }
@@ -202,7 +220,7 @@ internal class IrohAdminRpcExecutor(
         internal const val ADMIN_RPC_FAILURE_THRESHOLD = 3
         internal const val STREAM_IDLE_THRESHOLD_MS = 30_000L
         private val READ_ONLY_ADMIN_RPC_METHODS = setOf(
-            "message.list", "message.get", "conversation.list", "conversation.get", "agent.get", "agent.list", "agent.count", "agent.context", "tool.get", "tool.list", "block.get", "block.list", "block.list_agent", "skill.get", "skill.list", "skill.list_agent", "slash_command.list", "slash_command.list_agent", "schedule.get", "schedule.list", "project.get", "project.list", "project.beadsRemoteStatus", "cron.list", "cron.get", "subagent.list", "subagent.todos", "health.check", "model.list", "goal.get",
+            "message.list", "message.get", "conversation.list", "conversation.get", "agent.get", "agent.list", "agent.count", "agent.context", "tool.get", "tool.list", "block.get", "block.list", "block.list_agent", "skill.get", "skill.list", "skill.list_agent", "slash_command.list", "slash_command.list_agent", "schedule.get", "schedule.list", "project.get", "project.list", "project.beadsRemoteStatus", "cron.list", "cron.get", "subagent.list", "subagent.todos", "health.check", "model.list", "model.exposure.get", "provider.list", "goal.get",
         )
     }
 }

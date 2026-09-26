@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import com.letta.mobile.ui.theme.LettaDimens
 
 private const val DEFAULT_AGENT_NAME = "New agent"
 
@@ -70,13 +71,13 @@ internal fun NewAgentDialog(params: NewAgentDialogParams) {
     ) {
         Surface(
             modifier = Modifier.width(420.dp).clickable(enabled = false) {},
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.lg),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(LettaDimens.Space.xl),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
             ) {
                 Text(
                     text = "New agent",
@@ -171,19 +172,19 @@ private fun NewAgentModelTrigger(label: String, onOpen: () -> Unit) {
     Surface(
         onClick = onOpen,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             Icon(
                 Icons.Outlined.KeyboardArrowDown,
                 null,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -233,7 +234,7 @@ private fun NewAgentDialogActions(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md, Alignment.End),
     ) {
         DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
         DesktopDefaultButton(onClick = onCreate) {

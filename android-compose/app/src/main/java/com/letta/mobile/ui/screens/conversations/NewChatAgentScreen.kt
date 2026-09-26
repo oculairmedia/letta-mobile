@@ -45,6 +45,7 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,16 +75,16 @@ internal fun NewChatAgentScreen(
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xl),
                 placeholder = { Text("Type an agent name or model") },
                 leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                 singleLine = true,
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(LettaDimens.Radius.lg),
             )
             NewChatAgentBody(
                 agents = agents,
@@ -142,15 +143,15 @@ private fun NewChatAgentList(
     onAgentSelected: (Agent) -> Unit,
 ) {
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        contentPadding = PaddingValues(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.xs),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         item {
             Text(
                 text = "Agents",
                 style = MaterialTheme.typography.sectionTitle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
             )
         }
         items(agents, key = { it.id.value }) { agent ->
@@ -170,17 +171,17 @@ private fun NewChatAgentRow(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
-            AgentAvatar(agentId = agent.id.value, name = agent.name, size = 48.dp)
+            AgentAvatar(agentId = agent.id.value, name = agent.name, size = LettaDimens.Orb.railSlotWidth)
             NewChatAgentDetails(
                 agent = agent,
                 modifier = Modifier.weight(1f),

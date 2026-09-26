@@ -3,6 +3,11 @@ package com.letta.mobile.data.local
 import androidx.room.withTransaction
 import com.letta.mobile.data.timeline.*
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference
+import com.letta.mobile.data.timeline.snapshot.TimelineImageBodyWriter
+import java.util.Base64
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
@@ -54,7 +59,50 @@ class RoomTimelineBoundedStore(
         }
     }
 
-    private inner class Session(val scope: ByteArray, val writable: Boolean) : TimelineStoreTransaction {
+    private inner class Session(val scope: ByteArray, val writable: Boolean) : TimelineStoreTransaction, TimelineImageBodyWriter {
+        override suspend fun persistImage(base64: String): StoredImageBodyReference {
+            checkOpen()
+            check(writable) { "Read-only snapshot" }
+            require(base64.length <= ((MAX_IMAGE_BYTES + 2) / 3) * 4) { "Image exceeds budget" }
+            currentCoroutineContext().ensureActive()
+            val bytes = Base64.getDecoder().decode(base64)
+            require(bytes.size in 1..MAX_IMAGE_BYTES)
+            require(Base64.getEncoder().encodeToString(bytes) == base64) { "Non-canonical image base64" }
+            val hash = checksum(bytes)
+            val reference = StoredImageBodyReference(hash, bytes.size.toLong())
+            val pointer = "image-sha256:$hash"
+            if (dao.blob(scope, pointer) == null) {
+                write()
+                persist(bytes, pointer)
+            } else {
+                check(resolveImage(reference) != null) { "Existing image body is corrupt" }
+            }
+            return reference
+        }
+
+        override suspend fun resolveImage(reference: StoredImageBodyReference): String? {
+            checkOpen()
+            if (reference.provenance != "canonical-inline-v1" ||
+                reference.decodedBytes !in 1..MAX_IMAGE_BYTES.toLong() ||
+                !reference.sha256.matches(Regex("[0-9a-f]{64}"))) return null
+            val pointer = "image-sha256:${reference.sha256}"
+            val blob = dao.blob(scope, pointer) ?: return null
+            if (blob.bytes != reference.decodedBytes || blob.checksum != reference.sha256) return null
+            val bytes = ByteArray(reference.decodedBytes.toInt())
+            var offset = 0
+            while (offset < bytes.size) {
+                currentCoroutineContext().ensureActive()
+                // Validate each chunk without swallowing cancellation or database failures.
+                val chunk = dao.chunk(scope, pointer, offset.toLong() / CHUNK_BYTES) ?: return null
+                val count = minOf(CHUNK_BYTES, bytes.size - offset)
+                if (chunk.payload.size != count || checksum(chunk.payload) != chunk.checksum) return null
+                chunk.payload.copyInto(bytes, offset)
+                offset += count
+            }
+            if (checksum(bytes) != reference.sha256) return null
+            currentCoroutineContext().ensureActive()
+            return Base64.getEncoder().encodeToString(bytes)
+        }
         val dao = database.ledger()
         var open = true
         var changed = false
@@ -159,11 +207,11 @@ class RoomTimelineBoundedStore(
             stagedIdentities += identity
         }
 
-        suspend fun persist(value: ByteArray): LedgerBlob {
-            val pointer = UUID.randomUUID().toString()
+        suspend fun persist(value: ByteArray, pointer: String = UUID.randomUUID().toString()): LedgerBlob {
             val digest = MessageDigest.getInstance("SHA-256")
             var offset = 0
             while (offset < value.size) {
+                currentCoroutineContext().ensureActive()
                 val chunk = value.copyOfRange(offset, minOf(value.size, offset + CHUNK_BYTES))
                 digest.update(chunk)
                 dao.chunk(LedgerChunk(scope, pointer, offset.toLong() / CHUNK_BYTES, chunk, checksum(chunk)))
@@ -219,6 +267,7 @@ class RoomTimelineBoundedStore(
     }
 
     companion object {
+        const val MAX_IMAGE_BYTES = 8 * 1024 * 1024
         const val CHUNK_BYTES = 64 * 1024
         const val MAX_BODY_READ = 2 * 1024 * 1024
     }

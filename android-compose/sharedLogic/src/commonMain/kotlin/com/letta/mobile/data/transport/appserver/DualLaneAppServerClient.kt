@@ -32,6 +32,8 @@ class DualLaneAppServerClient(
     override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = runtime.changeDeviceState(command)
     override suspend fun sync(command: AppServerCommand.Sync) = runtime.sync(command)
     override suspend fun abort(command: AppServerCommand.AbortMessage) = runtime.abort(command)
+    override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue) = runtime.resumeQueue(command)
+    override suspend fun removeQueueItem(command: AppServerCommand.RemoveQueueItem) = runtime.removeQueueItem(command)
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
         runtime.sendExternalToolResponse(command)
 
@@ -56,6 +58,12 @@ class DualLaneAppServerClient(
         runtime.conversationCompact(command)
     override suspend fun listModels(command: AppServerCommand.ListModels) = admin.listModels(command)
     override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = runtime.skillEnable(command)
+    override suspend fun listConnectProviders(command: AppServerCommand.ListConnectProviders) =
+        admin.listConnectProviders(command)
+    override suspend fun connectProvider(command: AppServerCommand.ConnectProvider) = runtime.connectProvider(command)
+    override suspend fun disconnectProvider(command: AppServerCommand.DisconnectProvider) =
+        runtime.disconnectProvider(command)
+    override suspend fun updateModel(command: AppServerCommand.UpdateModel) = runtime.updateModel(command)
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = runtime.skillDisable(command)
     override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile) = runtime.writeMemoryFile(command)
     override suspend fun cronList(command: AppServerCommand.CronList) = admin.cronList(command)

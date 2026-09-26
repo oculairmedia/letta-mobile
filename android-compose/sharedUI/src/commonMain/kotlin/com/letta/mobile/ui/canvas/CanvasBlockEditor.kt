@@ -11,11 +11,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
+import io.github.linreal.cascade.editor.action.FocusBlock
 import io.github.linreal.cascade.editor.core.Block
 import io.github.linreal.cascade.editor.serialization.loadFromJson
 import io.github.linreal.cascade.editor.serialization.toJson
@@ -51,6 +55,7 @@ import kotlinx.coroutines.launch
  * document arriving through the session (another peer, the agent, a checkpoint restore) reloads
  * the editor.
  */
+@OptIn(ExperimentalCascadePreviewApi::class)
 @Composable
 fun CanvasBlockEditor(
     session: CanvasSession,
@@ -65,6 +70,8 @@ fun CanvasBlockEditor(
     onToolbar: ((NoteToolbar?) -> Unit)? = null,
     /** How this document's text is set: size, family, colour, alignment. */
     style: CanvasTextStyle? = null,
+    /** Sets the text in the middle of the space, top to bottom, as a shape's label is. */
+    centerVertically: Boolean = false,
 ) {
     val stateHolder = rememberEditorState(initialBlocks = listOf(Block.paragraph("")))
     val textStates = remember { BlockTextStates() }
@@ -85,12 +92,16 @@ fun CanvasBlockEditor(
     }
 
     // Writes the editor's document to the session when it differs from what was last written.
+    // Each write is one undo step: typing is coalesced into a write per pause, which is the
+    // granularity a person expects undo to move in.
+    val recorder = LocalCanvasDocumentRecorder.current
     suspend fun persist() {
         val current = runCatching { stateHolder.toJson(textStates, spanStates) }.getOrNull() ?: return
         if (current == lastEditorJson) return
         lastEditorJson = current
         lastStoredJson = current
-        runCatching { session.setDocument(documentId, current, actorId) }
+        val write: suspend () -> Unit = { runCatching { session.setDocument(documentId, current, actorId) } }
+        if (recorder == null) write() else recorder.recording("typing", write)
     }
 
     LaunchedEffect(session.canvasId, documentId) {
@@ -119,20 +130,76 @@ fun CanvasBlockEditor(
         }
         else -> ToolbarSlot.Default()
     }
-    CascadeEditor(
-        stateHolder = stateHolder,
-        textStates = textStates,
-        spanStates = spanStates,
-        registry = rememberCanvasBlockRegistry(),
-        theme = theme,
+    // Take the caret when the board asks for this document: a shape just drawn, "Edit text". The
+    // last block, so a label that already says something is added to rather than typed over.
+    val focusRequest = LocalCanvasFocusRequest.current
+    val wantsFocus = active && focusRequest != null && focusRequest.documentId == documentId
+    LaunchedEffect(wantsFocus) {
+        if (!wantsFocus) return@LaunchedEffect
+        stateHolder.state.blocks.lastOrNull()?.let { stateHolder.dispatch(FocusBlock(it.id)) }
+        focusRequest?.documentId = null
+    }
+    val registry = rememberCanvasBlockRegistry()
+    val editor: @Composable (Modifier) -> Unit = { editorModifier ->
+        CascadeEditor(
+            stateHolder = stateHolder,
+            textStates = textStates,
+            spanStates = spanStates,
+            registry = registry,
+            theme = theme,
+            modifier = editorModifier,
+            toolbar = toolbar,
+            config = CascadeEditorConfig(
+                blockSelectionEnabled = active,
+                blockDraggingEnabled = active,
+                // Cascade sets its placeholder at the start of the line whatever the alignment,
+                // so in a centred label it sat apart from the caret; the caret is enough there.
+                emptyDocumentPlaceholderEnabled = !centerVertically,
+            ),
+        )
+    }
+    if (!centerVertically) {
+        editor(modifier)
+        return
+    }
+    VerticallyCentred(
         modifier = modifier,
-        toolbar = toolbar,
-        config = CascadeEditorConfig(
-            blockSelectionEnabled = active,
-            blockDraggingEnabled = active,
-            emptyDocumentPlaceholderEnabled = true,
-        ),
+        measure = {
+            CascadeDocumentPreview(
+                blocks = stateHolder.state.blocks,
+                registry = registry,
+                theme = theme,
+                config = CascadeDocumentPreviewConfig.Default,
+            )
+        },
+        content = { editor(Modifier) },
     )
+}
+
+/**
+ * [content] at the height [measure] takes, in the middle of the space.
+ *
+ * The editor is a lazy list that fills whatever height it is given, so it cannot be centred by
+ * wrapping it: it has no height of its own to centre. The same blocks laid out read-only do, so
+ * they are measured (never placed) and the editor is given exactly that height, plus a little for
+ * the caret row, in the middle.
+ */
+@Composable
+private fun VerticallyCentred(
+    modifier: Modifier,
+    measure: @Composable () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    SubcomposeLayout(modifier) { constraints ->
+        val loose = constraints.copy(minHeight = 0)
+        val contentHeight = subcompose("measure", measure).maxOfOrNull { it.measure(loose).height } ?: 0
+        val height = (contentHeight + CENTRED_SLACK.roundToPx()).coerceAtMost(constraints.maxHeight)
+        val width = constraints.maxWidth
+        val placeables = subcompose("content", content).map { it.measure(Constraints.fixed(width, height)) }
+        layout(width, constraints.maxHeight) {
+            placeables.forEach { it.place(0, (constraints.maxHeight - height) / 2) }
+        }
+    }
 }
 
 /**
@@ -213,4 +280,7 @@ internal fun CascadeEditorTheme.applyStyle(style: CanvasTextStyle): CascadeEdito
 }
 
 private const val PERSIST_INTERVAL_MS = 750L
+
+/** What the editor's rows need beyond the read-only layout of the same text. */
+private val CENTRED_SLACK = 4.dp
 private const val DARK_LUMINANCE_THRESHOLD = 0.5f

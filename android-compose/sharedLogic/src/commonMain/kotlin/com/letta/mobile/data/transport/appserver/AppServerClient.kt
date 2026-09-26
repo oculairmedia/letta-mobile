@@ -71,6 +71,14 @@ interface AppServerClient {
 
     suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse
 
+    /** letta-mobile-qygvv.6: releases parked queue items. Requires `request_id` to correlate the response. */
+    suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse =
+        throw UnsupportedOperationException("resume_queue is not supported by this client")
+
+    /** letta-mobile-qygvv.6: removes one queued input by queue item id. */
+    suspend fun removeQueueItem(command: AppServerCommand.RemoveQueueItem): AppServerInboundFrame.RemoveQueueItemResponse =
+        throw UnsupportedOperationException("remove_queue_item is not supported by this client")
+
     suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse)
 
     // Runtime-native admin operations (lgns8.7). Defaults throw so existing
@@ -118,6 +126,22 @@ interface AppServerClient {
 
     suspend fun skillEnable(command: AppServerCommand.SkillEnable): AppServerInboundFrame.SkillEnableResponse =
         throw UnsupportedOperationException("skill_enable is not supported by this client")
+
+    suspend fun listConnectProviders(
+        command: AppServerCommand.ListConnectProviders,
+    ): AppServerInboundFrame.ListConnectProvidersResponse =
+        throw UnsupportedOperationException("list_connect_providers is not supported by this client")
+
+    suspend fun connectProvider(command: AppServerCommand.ConnectProvider): AppServerInboundFrame.ConnectProviderResponse =
+        throw UnsupportedOperationException("connect_provider is not supported by this client")
+
+    suspend fun disconnectProvider(
+        command: AppServerCommand.DisconnectProvider,
+    ): AppServerInboundFrame.DisconnectProviderResponse =
+        throw UnsupportedOperationException("disconnect_provider is not supported by this client")
+
+    suspend fun updateModel(command: AppServerCommand.UpdateModel): AppServerInboundFrame.UpdateModelResponse =
+        throw UnsupportedOperationException("update_model is not supported by this client")
 
     suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         throw UnsupportedOperationException("skill_disable is not supported by this client")
@@ -299,6 +323,18 @@ class DefaultAppServerClient(
         )
     }
 
+    override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse {
+        val requestId = requireNotNull(command.requestId) {
+            "resume_queue requires request_id when using response correlation."
+        }
+        return registry.request(requestId, { it as? AppServerInboundFrame.ResumeQueueResponse }) { transport.sendControl(command) }
+    }
+
+    override suspend fun removeQueueItem(
+        command: AppServerCommand.RemoveQueueItem,
+    ): AppServerInboundFrame.RemoveQueueItemResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.RemoveQueueItemResponse }) { transport.sendControl(command) }
+
     override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
         registry.request(
             requestId = command.requestId,
@@ -352,6 +388,22 @@ class DefaultAppServerClient(
 
     override suspend fun skillEnable(command: AppServerCommand.SkillEnable): AppServerInboundFrame.SkillEnableResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SkillEnableResponse }) { transport.sendControl(command) }
+
+    override suspend fun listConnectProviders(
+        command: AppServerCommand.ListConnectProviders,
+    ): AppServerInboundFrame.ListConnectProvidersResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ListConnectProvidersResponse }) { transport.sendControl(command) }
+
+    override suspend fun connectProvider(command: AppServerCommand.ConnectProvider): AppServerInboundFrame.ConnectProviderResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConnectProviderResponse }) { transport.sendControl(command) }
+
+    override suspend fun disconnectProvider(
+        command: AppServerCommand.DisconnectProvider,
+    ): AppServerInboundFrame.DisconnectProviderResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.DisconnectProviderResponse }) { transport.sendControl(command) }
+
+    override suspend fun updateModel(command: AppServerCommand.UpdateModel): AppServerInboundFrame.UpdateModelResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.UpdateModelResponse }) { transport.sendControl(command) }
 
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SkillDisableResponse }) { transport.sendControl(command) }

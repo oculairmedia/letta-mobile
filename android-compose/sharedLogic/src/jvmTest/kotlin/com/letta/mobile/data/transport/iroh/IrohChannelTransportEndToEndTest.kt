@@ -304,7 +304,8 @@ class IrohChannelTransportEndToEndTest {
             }
 
             assertTrue(transport.send("agent", "conversation", "second", "otid-2", null, false))
-            withTimeout(2.seconds) {
+            // letta-mobile-1n5py: the dispatcher first waits out a lease release (2 s grace).
+            withTimeout(5.seconds) {
                 while (frames.none { it is ServerFrame.TurnDone && it.status == "failed" }) delay(10.milliseconds)
             }
 

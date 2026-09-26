@@ -3,10 +3,12 @@ package com.letta.mobile.ui.canvas
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
+import io.ak1.drawbox.domain.model.TextAlignment
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.State
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
+import androidx.compose.ui.graphics.Color
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
 
@@ -22,19 +24,11 @@ object CanvasControlsBridge {
     ): ControlsBarState {
         val selectedDrawables = state.elements.filter { it.id in state.selectedIds }
         val selectedShapes = selectedDrawables.filterIsInstance<Element.Shape>()
-        val isClosedShapeMode = state.mode == Mode.RECTANGLE ||
-            state.mode == Mode.CIRCLE ||
-            state.mode == Mode.TRIANGLE
+        val isClosedShapeMode = state.mode.isClosedShape()
         val showFill = selectedShapes.isNotEmpty() || isClosedShapeMode
         val currentFillColor = selectedShapes.firstOrNull()?.fillColor ?: state.currentItemFillColor
         val currentStrokeEnabled = selectedShapes.firstOrNull()?.strokeEnabled ?: state.currentItemStrokeEnabled
-
-        val currentShapeColor = when (val first = selectedDrawables.firstOrNull()) {
-            is Element.Shape -> first.strokeColor
-            is Element.Path -> first.strokeColor
-            is Element.Text -> first.color
-            else -> state.strokeColor
-        }
+        val currentShapeColor = resolveStrokeColor(selectedDrawables, state.strokeColor)
 
         return ControlsBarState(
             currentMode = state.mode,
@@ -57,16 +51,51 @@ object CanvasControlsBridge {
         val shape = selected.filterIsInstance<Element.Shape>().firstOrNull()
         val path = selected.filterIsInstance<Element.Path>().firstOrNull()
         val text = selected.filterIsInstance<Element.Text>().firstOrNull()
-        val hasRectangle = selected.any { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
+        val textProps = textPropertyRows(selected, text, state)
         return CanvasProperties(
             selectionCount = selected.size,
             strokeWidth = shape?.strokeWidth ?: path?.strokeWidth ?: state.strokeWidth,
             opacity = path?.alpha ?: text?.opacity ?: state.opacity,
             strokeStyle = shape?.strokeStyle ?: state.currentItemStrokeStyle,
             cornerRadius = shape?.cornerRadius ?: state.currentItemCornerRadius,
-            showCornerRadius = hasRectangle || (selected.isEmpty() && state.mode == Mode.RECTANGLE),
+            showCornerRadius = hasRectangle(selected) || (selected.isEmpty() && state.mode == Mode.RECTANGLE),
+            fontSize = textProps.fontSize,
+            fontFamily = textProps.fontFamily,
+            textAlignment = textProps.textAlignment,
+            showFontSize = textProps.showFontSize,
         )
     }
+
+    private data class CanvasTextProperties(
+        val fontSize: Float,
+        val fontFamily: String,
+        val textAlignment: TextAlignment,
+        val showFontSize: Boolean,
+    )
+
+    private fun textPropertyRows(selected: List<Element>, text: Element.Text?, state: State): CanvasTextProperties {
+        val show = text != null || (selected.isEmpty() && state.mode == Mode.TEXT)
+        return CanvasTextProperties(
+            fontSize = text?.fontSize ?: state.currentItemFontSize,
+            fontFamily = text?.fontFamilyKey ?: state.currentItemFontFamilyKey,
+            textAlignment = text?.alignment ?: state.currentItemTextAlignment,
+            showFontSize = show,
+        )
+    }
+
+    private fun hasRectangle(selected: List<Element>): Boolean =
+        selected.any { it is Element.Shape && it.shapeType == ShapeType.RECTANGLE }
+
+    private fun Mode.isClosedShape(): Boolean =
+        this == Mode.RECTANGLE || this == Mode.CIRCLE || this == Mode.TRIANGLE
+
+    private fun resolveStrokeColor(selected: List<Element>, fallback: Color): Color =
+        when (val first = selected.firstOrNull()) {
+            is Element.Shape -> first.strokeColor
+            is Element.Path -> first.strokeColor
+            is Element.Text -> first.color
+            else -> fallback
+        }
 
     fun dispatchIntent(
         controller: DrawBoxController,
@@ -77,19 +106,21 @@ object CanvasControlsBridge {
             ControlsBarIntent.Undo -> controller.undo()
             ControlsBarIntent.Redo -> controller.redo()
             is ControlsBarIntent.SelectMode -> controller.setMode(intent.mode)
-            is ControlsBarIntent.SetStrokeColor -> {
-                if (hasSelection) controller.setSelectionColor(intent.color)
-                else controller.setColor(intent.color)
-            }
-            is ControlsBarIntent.SetStrokeEnabled -> {
-                if (hasSelection) controller.setSelectionStrokeEnabled(intent.enabled)
-                else controller.setStrokeEnabled(intent.enabled)
-            }
-            is ControlsBarIntent.SetFillColor -> {
-                if (hasSelection) controller.setSelectionFillColor(intent.color)
-                else controller.setFillColor(intent.color)
-            }
+            is ControlsBarIntent.SetStrokeColor ->
+                applyTarget(hasSelection, { controller.setSelectionColor(intent.color) }, { controller.setColor(intent.color) })
+            is ControlsBarIntent.SetStrokeEnabled ->
+                applyTarget(hasSelection, { controller.setSelectionStrokeEnabled(intent.enabled) }, { controller.setStrokeEnabled(intent.enabled) })
+            is ControlsBarIntent.SetFillColor ->
+                applyTarget(hasSelection, { controller.setSelectionFillColor(intent.color) }, { controller.setFillColor(intent.color) })
         }
+    }
+
+    private inline fun applyTarget(
+        hasSelection: Boolean,
+        onSelection: () -> Unit,
+        onTool: () -> Unit,
+    ) {
+        if (hasSelection) onSelection() else onTool()
     }
 
     /**
@@ -105,32 +136,39 @@ object CanvasControlsBridge {
     ) {
         val hasSelection = state.selectedIds.isNotEmpty()
         when (intent) {
-            is CanvasPropertyIntent.SetStrokeWidth -> {
-                if (hasSelection) controller.setSelectionStrokeWidth(intent.width)
-                else controller.setStrokeWidth(intent.width)
-            }
-            is CanvasPropertyIntent.SetStrokeStyle -> {
-                if (hasSelection) controller.setSelectionStrokeStyle(intent.style)
-                else controller.setStrokeStyle(intent.style)
-            }
-            is CanvasPropertyIntent.SetCornerRadius -> {
-                if (hasSelection) controller.setSelectionCornerRadius(intent.radius)
-                else controller.setCornerRadius(intent.radius)
-            }
-            is CanvasPropertyIntent.SetOpacity -> {
-                controller.setOpacity(intent.opacity)
-                if (!hasSelection) return
-                state.elements
-                    .filter { it.id in state.selectedIds }
-                    .forEach { element ->
-                        when (element) {
-                            is Element.Path -> controller.onIntent(Intent.UpdateElement(element.copy(alpha = intent.opacity)))
-                            is Element.Text -> controller.onIntent(Intent.UpdateElement(element.copy(opacity = intent.opacity)))
-                            else -> Unit
-                        }
-                    }
-            }
+            is CanvasPropertyIntent.SetFontSize ->
+                applyTarget(hasSelection, { controller.setSelectionFontSize(intent.size) }, { controller.setFontSize(intent.size) })
+            is CanvasPropertyIntent.SetFontFamily ->
+                applyTarget(hasSelection, { controller.setSelectionFontFamily(intent.key) }, { controller.setFontFamily(intent.key) })
+            is CanvasPropertyIntent.SetTextAlignment ->
+                applyTarget(hasSelection, { controller.setSelectionTextAlignment(intent.alignment) }, { controller.setTextAlignment(intent.alignment) })
+            is CanvasPropertyIntent.SetStrokeWidth ->
+                applyTarget(hasSelection, { controller.setSelectionStrokeWidth(intent.width) }, { controller.setStrokeWidth(intent.width) })
+            is CanvasPropertyIntent.SetStrokeStyle ->
+                applyTarget(hasSelection, { controller.setSelectionStrokeStyle(intent.style) }, { controller.setStrokeStyle(intent.style) })
+            is CanvasPropertyIntent.SetCornerRadius ->
+                applyTarget(hasSelection, { controller.setSelectionCornerRadius(intent.radius) }, { controller.setCornerRadius(intent.radius) })
+            is CanvasPropertyIntent.SetOpacity -> applyOpacity(controller, intent.opacity, state, hasSelection)
         }
+    }
+
+    private fun applyOpacity(
+        controller: DrawBoxController,
+        opacity: Float,
+        state: State,
+        hasSelection: Boolean,
+    ) {
+        controller.setOpacity(opacity)
+        if (!hasSelection) return
+        state.elements
+            .filter { it.id in state.selectedIds }
+            .forEach { element ->
+                when (element) {
+                    is Element.Path -> controller.onIntent(Intent.UpdateElement(element.copy(alpha = opacity)))
+                    is Element.Text -> controller.onIntent(Intent.UpdateElement(element.copy(opacity = opacity)))
+                    else -> Unit
+                }
+            }
     }
 }
 
@@ -142,6 +180,14 @@ data class CanvasProperties(
     val strokeStyle: StrokeStyle,
     val cornerRadius: Float,
     val showCornerRadius: Boolean,
+    /** The size the selected text is set in, or the size the next text will be placed at. */
+    val fontSize: Float,
+    /** The face that text is set in: `sans`, `serif` or `mono`. */
+    val fontFamily: String,
+    /** The edge that text is set against. */
+    val textAlignment: TextAlignment,
+    /** Whether the size of the type is worth offering: text is selected, or about to be placed. */
+    val showFontSize: Boolean,
 )
 
 /**
@@ -153,4 +199,13 @@ sealed interface CanvasPropertyIntent {
     data class SetOpacity(val opacity: Float) : CanvasPropertyIntent
     data class SetStrokeStyle(val style: StrokeStyle) : CanvasPropertyIntent
     data class SetCornerRadius(val radius: Float) : CanvasPropertyIntent
+
+    /** The size of the type: of the selected text, or of the next text placed. */
+    data class SetFontSize(val size: Float) : CanvasPropertyIntent
+
+    /** The face the type is set in: `sans`, `serif` or `mono`. */
+    data class SetFontFamily(val key: String) : CanvasPropertyIntent
+
+    /** Which edge the lines are set against. */
+    data class SetTextAlignment(val alignment: TextAlignment) : CanvasPropertyIntent
 }

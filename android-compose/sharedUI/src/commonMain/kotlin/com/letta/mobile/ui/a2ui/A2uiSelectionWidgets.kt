@@ -50,6 +50,7 @@ import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import kotlinx.serialization.json.JsonPrimitive
+import com.letta.mobile.ui.theme.LettaDimens
 
 
 @Composable
@@ -167,7 +168,7 @@ internal fun A2uiTabs(
         modifier = modifier
             .fillMaxWidth()
             .testTag(A2uiTestTags.TABS),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         PrimaryTabRow(selectedTabIndex = selectedIndex) {
             items.forEachIndexed { index, item ->
@@ -224,7 +225,7 @@ internal fun A2uiAccordion(
             .fillMaxWidth()
             .animateContentSize()
             .testTag(A2uiTestTags.ACCORDION),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         items.forEach { item ->
             val expandedState = rememberA2uiLocalBooleanState("expanded_${item.key}", item.defaultOpen)
@@ -243,7 +244,7 @@ internal fun A2uiAccordion(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { expandedState.value = !expandedState.value }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -260,7 +261,7 @@ internal fun A2uiAccordion(
                         )
                     }
                     AnimatedVisibility(visible = expandedState.value) {
-                        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                        Column(modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, bottom = LettaDimens.Space.lg)) {
                             val child = surface.components[item.childId]
                             if (child == null) {
                                 A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
@@ -399,11 +400,11 @@ internal fun A2uiSlider(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             label?.let {
@@ -473,7 +474,7 @@ internal fun A2uiStepper(
         modifier = modifier
             .fillMaxWidth()
             .testTag(A2uiTestTags.STEPPER),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         label?.let {
@@ -482,7 +483,7 @@ internal fun A2uiStepper(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (surfaceSubmitting) {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
@@ -526,12 +527,12 @@ internal fun A2uiLinearProgress(
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         label?.let {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -590,7 +591,7 @@ internal fun A2uiCircularProgress(
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         label?.let {
             Text(
@@ -601,7 +602,7 @@ internal fun A2uiCircularProgress(
         }
         if (path != null && progress != null) {
             Box(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(LettaDimens.Orb.railSlotWidth),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(

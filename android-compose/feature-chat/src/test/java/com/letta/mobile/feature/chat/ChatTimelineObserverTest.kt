@@ -424,6 +424,43 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `a2ui only terminal assistant clears thinking without restoring stale rows`() = runTest {
+        var a2uiStartCount: Int? = 1
+        var clearCount = 0
+        val harness = Harness(
+            scope = backgroundScope,
+            a2uiThinkingStartMessageCount = { a2uiStartCount },
+            clearA2uiThinkingOnResponse = {
+                a2uiStartCount = null
+                clearCount++
+            },
+        )
+        val flow = harness.seedTimeline("conv-1", listOf(confirmed("user-1", "approved")))
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        assertTrue(harness.uiState.value.isStreaming)
+
+        flow.value = Timeline(
+            "conv-1",
+            events = persistentListOf(
+                confirmed("user-1", "approved"),
+                confirmed(
+                    "assistant-2",
+                    "<a2ui-json>[{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"s1\",\"catalogId\":\"basic\"}}]</a2ui-json>",
+                    TimelineMessageType.ASSISTANT,
+                ),
+            ),
+        )
+        runCurrent()
+
+        assertEquals(1, clearCount)
+        assertFalse(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.isAgentTyping)
+        assertEquals(listOf("user-1"), harness.uiState.value.messages.map { it.id })
+    }
+
+    @Test
     fun `a2ui thinking stays active during streamed reasoning frames`() = runTest {
         var a2uiStartCount: Int? = 1
         var clearCount = 0

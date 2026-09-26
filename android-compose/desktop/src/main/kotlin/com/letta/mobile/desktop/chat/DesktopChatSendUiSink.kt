@@ -50,9 +50,23 @@ internal class DesktopChatSendUiSink(
         // falling back to the selection keeps the indicator attached to something real rather than
         // starting a turn the UI cannot locate.
         beginTurn(conversationId ?: surface.selectedConversationId())
+        releaseComposer()
     }
 
-    override fun onSendQueued(conversationId: String) = beginTurn(conversationId)
+    /**
+     * letta-mobile-1n5py: the running turn goes on; the message waits in the coordinator's queue.
+     * The send itself is resolved, so the composer takes the next one (which queues too).
+     */
+    override fun onSendQueued(conversationId: String) {
+        beginTurn(conversationId)
+        releaseComposer()
+    }
+
+    /**
+     * letta-mobile-1n5py: once the shared coordinator has taken a send (dispatched or queued) it
+     * owns what happens to the next one, so the composer is not held for the whole turn any more.
+     */
+    private fun releaseComposer() = surface.settleSend(failed = false)
 
     override fun onSendFailed(message: String) {
         endTurn(failed = true)

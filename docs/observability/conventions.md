@@ -90,6 +90,7 @@ in-app inspector.
 | `Perf`               | app/performance/DebugPerformanceMonitor.kt | debug instrumentation enabled state |
 | `Jank`               | app/performance/DebugPerformanceMonitor.kt | frame jank warnings |
 | `StrictMode`         | app/performance/DebugPerformanceMonitor.kt | StrictMode violations |
+| `Input`              | app/debug/TouchDispatchDiagnostics.kt     | debug-only touch dispatch, root pointer consumption, drawer + swipe-up gesture transitions (letta-mobile-erx7m) |
 
 `AdminChatViewModel.kt` now emits telemetry under `AdminChatVM`. Raw
 `Log.*` tags in that file still use `AdminChatViewModel`; these are not

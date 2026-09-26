@@ -70,10 +70,11 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 // letta-mobile-awbf.1: composer sizing now references the design system tokens
 internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_SIZE
-private val ChatComposerActionTargetSize = 48.dp
+private val ChatComposerActionTargetSize = LettaDimens.Orb.railSlotWidth
 private val ChatComposerAttachIconSize = LettaSpacing.COMPOSER_ATTACH_ICON_SIZE
 internal val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 // letta-mobile-6237v.2: padded up to 24.dp from LettaSpacing.XS (6.dp) so
@@ -81,8 +82,8 @@ internal val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 // When the keyboard slides up (IME open), the bar animates back down to
 // ChatComposerInputCompactVerticalPadding so the typing surface reclaims
 // the space — the bar's previous compact state, restored live.
-private val ChatComposerInputVerticalPadding = 24.dp
-private val ChatComposerInputCompactVerticalPadding = 12.dp
+private val ChatComposerInputVerticalPadding = LettaDimens.Space.xl
+private val ChatComposerInputCompactVerticalPadding = LettaDimens.Space.md
 private const val ChatComposerImeInsetForCompactPaddingPx = 96
 private val ChatComposerInputItemSpacing = LettaSpacing.XS
 
@@ -109,7 +110,18 @@ private data class ChatComposerUiModel(
     val canSendMessages: Boolean,
     val slashCommands: ImmutableList<SlashCommand>,
     val availableTools: List<Tool>,
-)
+    /** letta-mobile-1n5py: a send during a turn is queued behind it rather than refused. */
+    val canQueueWhileStreaming: Boolean = false,
+) {
+    val hasSendableContent: Boolean get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
+
+    /**
+     * The action button stops the run only when there is nothing to queue: with a draft in the
+     * field during a turn it sends (queues) instead, and Stop returns once the field is empty.
+     */
+    val actionStops: Boolean
+        get() = isStreaming && (isCancelling || !canQueueWhileStreaming || !hasSendableContent)
+}
 
 private data class ChatComposerCallbacks(
     val onTextChange: (String) -> Unit,
@@ -162,6 +174,7 @@ internal fun ChatComposer(
     companionStatus: (@Composable () -> Unit)? = null,
     /** The companion mascot was tapped: open the agent's pane. */
     onCompanionClick: (() -> Unit)? = null,
+    canQueueWhileStreaming: Boolean = false,
 ) {
     val model = ChatComposerUiModel(
         agentId = agentId,
@@ -172,6 +185,7 @@ internal fun ChatComposer(
         canSendMessages = canSendMessages,
         slashCommands = slashCommands,
         availableTools = availableTools,
+        canQueueWhileStreaming = canQueueWhileStreaming,
     )
     val callbacks = ChatComposerCallbacks(
         onTextChange = onTextChange,
@@ -246,7 +260,21 @@ private fun ChatComposerContent(
             onPreviewAttachment = { previewAttachment = it },
         )
 
-        Box(Modifier.fillMaxWidth().mascotGazeTarget(MascotGazeSurface.INPUT)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                // letta-mobile-swup: swipe-up on the prompt card to expand
+                // into the canvas surface. Hybrid velocity/distance commit
+                // (see SwipeUpToCanvasModifier). Disabled while the IME is
+                // open so the gesture does not fight the keyboard, and
+                // while the agent is streaming so a swipe mid-turn does
+                // not abandon the active run.
+                .swipeUpToCanvas(
+                    enabled = !keyboardOpen && !model.isStreaming,
+                    onTrigger = callbacks.onOpenCanvas,
+                )
+                .mascotGazeTarget(MascotGazeSurface.INPUT),
+        ) {
             ChatComposerInput(
                 state = ChatComposerInputState(
                     model = model,
@@ -323,7 +351,7 @@ private fun ChatComposerContextRows(
         ToolAffordanceRow(
             tools = model.availableTools,
             onToolSelected = onToolSelected,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         )
     }
 
@@ -333,7 +361,7 @@ private fun ChatComposerContextRows(
             commands = slashCommands,
             onSelected = callbacks.onSlashCommandSelected,
             onUninstall = callbacks.onSlashCommandUninstall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         )
     }
 
@@ -366,8 +394,8 @@ private fun ChatComposerInput(
     onOpenActions: () -> Unit,
 ) {
     val model = state.model
-    val hasSendableContent = model.inputText.isNotBlank() || model.pendingAttachments.isNotEmpty()
-    val canSend = !model.isStreaming && model.canSendMessages && hasSendableContent
+    val stops = model.actionStops
+    val canSend = (!model.isStreaming || model.canQueueWhileStreaming) && model.canSendMessages && model.hasSendableContent
     // letta-mobile-6237v.2: bar grows 50% taller at rest, then animates back
     // to its compact previous state when the IME slides up — typing surface
     // reclaims the padding. Driven off ime visibility rather than focus so it
@@ -389,19 +417,19 @@ private fun ChatComposerInput(
         placeholder = stringResource(R.string.screen_chat_input_hint),
         sendContentDescription = stringResource(R.string.action_send_message),
         enabled = model.canSendMessages,
-        canSendOverride = if (model.isStreaming) true else canSend,
-        actionIcon = if (model.isStreaming) LettaIcons.Close else LettaIcons.Send,
+        canSendOverride = if (stops) true else canSend,
+        actionIcon = if (stops) LettaIcons.Close else LettaIcons.Send,
         actionContentDescription = when {
             model.isCancelling -> stringResource(R.string.action_stopping_run)
-            model.isStreaming -> stringResource(R.string.action_stop_run)
+            stops -> stringResource(R.string.action_stop_run)
             else -> stringResource(R.string.action_send_message)
         },
-        actionContainerColor = if (model.isStreaming) MaterialTheme.colorScheme.errorContainer else null,
-        actionContentColor = if (model.isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
-        actionSizeFraction = if (model.isStreaming) 0.7f else 1f,
+        actionContainerColor = if (stops) MaterialTheme.colorScheme.errorContainer else null,
+        actionContentColor = if (stops) MaterialTheme.colorScheme.onErrorContainer else null,
+        actionSizeFraction = if (stops) 0.7f else 1f,
         // Stop pulsing once a stop is pending: the button is now "stopping…",
         // and a second press is the local force-clear escape hatch.
-        actionPulse = model.isStreaming && !model.isCancelling,
+        actionPulse = stops && !model.isCancelling,
         actionVisible = state.showAction || state.voice.enabled,
         hasStagedContent = model.pendingAttachments.isNotEmpty(),
         customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),
@@ -418,7 +446,7 @@ private fun ChatComposerInput(
             )
         },
         onSend = { text ->
-            if (model.isStreaming) callbacks.onStop() else callbacks.onSend(text)
+            if (stops) callbacks.onStop() else callbacks.onSend(text)
         },
     )
 }
@@ -522,8 +550,8 @@ private fun SlashCommandSuggestionRow(
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        contentPadding = PaddingValues(vertical = LettaDimens.Space.xs),
     ) {
         items(items = commands, key = { it.command }) { command ->
             var menuOpen by remember(command.command) { mutableStateOf(false) }
@@ -547,7 +575,7 @@ private fun SlashCommandSuggestionRow(
                         onClick = { onSelected(command) },
                         onLongClick = { if (command.installed) menuOpen = true },
                     ),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(LettaDimens.Radius.sm),
                     color = containerColor,
                     contentColor = contentColor,
                     border = androidx.compose.foundation.BorderStroke(
@@ -557,13 +585,13 @@ private fun SlashCommandSuggestionRow(
                 ) {
                     androidx.compose.foundation.layout.Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                        modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
                     ) {
                         Icon(
                             imageVector = if (command.installed) LettaIcons.Check else LettaIcons.Add,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(LettaDimens.Control.icon),
                         )
                         androidx.compose.material3.Text(
                             text = command.command,
@@ -602,8 +630,8 @@ private fun AttachmentStrip(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         itemsIndexed(
             items = attachments,
@@ -642,7 +670,7 @@ private fun AttachmentThumbnail(
             modifier = Modifier
                 .size(64.dp)
                 .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.sm),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             if (imageBitmap != null) {
@@ -665,7 +693,7 @@ private fun AttachmentThumbnail(
         // Remove button overlay (top-right)
         Surface(
             modifier = Modifier
-                .size(20.dp)
+                .size(LettaDimens.Control.iconButtonSm)
                 .align(Alignment.TopEnd)
                 .clip(CircleShape),
             color = MaterialTheme.colorScheme.errorContainer,
@@ -674,13 +702,13 @@ private fun AttachmentThumbnail(
             IconButton(
                 onClick = onRemove,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(LettaDimens.Control.iconButtonSm)
                     .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_REMOVE_BUTTON),
             ) {
                 Icon(
                     LettaIcons.Close,
                     contentDescription = stringResource(R.string.action_remove_attachment),
-                    modifier = Modifier.size(12.dp),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                 )
             }
         }
@@ -702,13 +730,13 @@ private fun AttachmentPreviewDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f))
-                .padding(24.dp)
+                .padding(LettaDimens.Space.xl)
                 .testTag(ChatComposerTestTags.ATTACHMENT_PREVIEW_DIALOG),
             contentAlignment = Alignment.Center,
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(LettaDimens.Radius.md),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 if (imageBitmap != null) {
@@ -729,7 +757,7 @@ private fun AttachmentPreviewDialog(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp),
+                    .padding(LettaDimens.Space.sm),
             ) {
                 Icon(
                     imageVector = LettaIcons.Close,

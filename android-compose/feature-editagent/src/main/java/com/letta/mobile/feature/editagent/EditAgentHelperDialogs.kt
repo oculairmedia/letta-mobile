@@ -30,6 +30,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -43,7 +44,7 @@ internal fun MemoryBlockItem(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         modifier = if (block.readOnly) {
             Modifier.fillMaxWidth()
         } else {
@@ -91,7 +92,7 @@ internal fun MemoryBlockItem(
         )
         if (block.isTemplate || block.readOnly) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (block.isTemplate) {
@@ -224,7 +225,7 @@ internal fun CloneAgentDialog(
             onClone(cloneName.ifBlank { null }, overrideExistingTools, stripMessages)
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             Text(
                 text = stringResource(R.string.screen_settings_clone_dialog_helper),
                 style = MaterialTheme.typography.bodyMedium,
@@ -288,10 +289,10 @@ internal fun ToolDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
+                Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(tool.name, style = MaterialTheme.typography.titleMedium)
             }
             tool.description?.let { desc ->

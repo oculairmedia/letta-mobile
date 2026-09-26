@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.home.FleetBarSpark
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The fleet dashboard: counters plus a sortable agent table.
@@ -73,7 +74,7 @@ private fun FleetStatTiles(summary: FleetSummary) {
     // tallest one and footers pin to a common bottom edge — mixed tile
     // heights made the strip look broken.
     Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
     ) {
         FleetStatTile(
@@ -118,7 +119,7 @@ private fun FleetStatTile(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.large)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
     ) {
         Text(
             text = label.uppercase(),
@@ -126,7 +127,7 @@ private fun FleetStatTile(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(LettaDimens.Space.sm))
         Text(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
@@ -136,10 +137,10 @@ private fun FleetStatTile(
         // Footer pins to the shared bottom edge across all tiles.
         Spacer(Modifier.weight(1f))
         if (series != null) {
-            FleetBarSpark(series, Modifier.fillMaxWidth().height(26.dp))
+            FleetBarSpark(series, Modifier.fillMaxWidth().height(LettaDimens.Space.xl))
         }
         if (caption != null) {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(LettaDimens.Space.xs))
             Text(
                 text = caption,
                 style = MaterialTheme.typography.labelSmall,
@@ -153,7 +154,7 @@ private fun FleetStatTile(
 private fun FleetTableHeader(sort: FleetSort, onSortKeySelected: (FleetSortKey) -> Unit) {
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SortHeaderCell(FleetSortKey.Agent, sort, onSortKeySelected, Modifier.weight(1f))
@@ -203,12 +204,12 @@ private fun SortHeaderCell(
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .clickable { onSortKeySelected(key) }
-            .padding(vertical = 3.dp, horizontal = 2.dp),
+            .padding(vertical = LettaDimens.Space.xs, horizontal = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (alignEnd) {
-            Arrangement.spacedBy(3.dp, Alignment.End)
+            Arrangement.spacedBy(LettaDimens.Space.xs, Alignment.End)
         } else {
-            Arrangement.spacedBy(3.dp)
+            Arrangement.spacedBy(LettaDimens.Space.xs)
         },
     ) {
         Text(
@@ -239,7 +240,7 @@ private fun RowHairline() {
         modifier = Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
     )
 }
 
@@ -255,7 +256,7 @@ private fun FleetAgentRow(
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.small)
                 .clickable(onClick = onClick)
-                .padding(vertical = 8.dp, horizontal = 2.dp),
+                .padding(vertical = LettaDimens.Space.sm, horizontal = LettaDimens.Space.hair),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FleetAgentIdentity(agent = agent, orbIndex = orbIndex, modifier = Modifier.weight(1f))
@@ -280,7 +281,7 @@ private fun FleetAgentRow(
             ) {
                 FleetBarSpark(
                     values = agent.activityByHour,
-                    modifier = Modifier.width(60.dp).height(18.dp),
+                    modifier = Modifier.width(60.dp).height(LettaDimens.Space.lg),
                 )
             }
         }
@@ -297,9 +298,9 @@ private fun FleetAgentIdentity(
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        AgentOrb(agentId = agent.agentId, index = orbIndex, size = 22.dp, cornerRadius = 6.dp)
+        AgentOrb(agentId = agent.agentId, index = orbIndex, size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm)
         Text(
             text = agent.name,
             // An unresolved name is the raw backend id; render it as the
@@ -329,7 +330,7 @@ private fun FleetAgentIdentity(
 private fun RunningDot() {
     Box(
         modifier = Modifier
-            .size(7.dp)
+            .size(LettaDimens.Space.sm)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.tertiary),
     )

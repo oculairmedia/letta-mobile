@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.chat.render.ChatTransport
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 
 /**
@@ -57,19 +58,19 @@ internal fun ChatTransportChip(
     Box(
         modifier = modifier
             .semantics { contentDescription = description }
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .background(container)
-            .padding(PaddingValues(horizontal = 6.dp, vertical = 2.dp)),
+            .padding(PaddingValues(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair)),
         contentAlignment = Alignment.Center,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Box(
                 modifier = Modifier
-                    .size(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                    .size(LettaDimens.Space.sm)
+                    .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                     .background(content),
             )
             Text(

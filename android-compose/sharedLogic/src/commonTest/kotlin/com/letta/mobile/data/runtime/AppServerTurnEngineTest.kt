@@ -264,14 +264,15 @@ class AppServerTurnEngineTest {
             runCurrent()
             expectNoEvents()
 
+            // letta-mobile-qygvv.26: the turn went on, so round 1's stop_reason goes out at the boundary.
             client.emit(streamDelta(messageType = "client_tool_end", runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
 
             client.emit(streamDelta(messageType = "assistant_message", runId = "run-2"))
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             client.emit(streamDelta(messageType = "usage_statistics", runId = "run-2"))
-            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             assertEquals("usage_statistics", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
@@ -351,8 +352,8 @@ class AppServerTurnEngineTest {
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
-            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             assertEquals("usage_statistics", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
             awaitComplete()
@@ -360,7 +361,7 @@ class AppServerTurnEngineTest {
     }
 
     @Test
-    fun multipleStopReasonsUseLastAtTail() = runTest {
+    fun requiresApprovalStopReasonReachesClientAtRoundBoundary() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(client = client)
 
@@ -373,6 +374,7 @@ class AppServerTurnEngineTest {
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
+            assertEquals("requires_approval", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).body.jsonDeltaString("stop_reason"))
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1", stopReason = "end_turn"))
@@ -386,7 +388,7 @@ class AppServerTurnEngineTest {
     }
 
     @Test
-    fun multipleUsageFramesUseFirstAtTail() = runTest {
+    fun everyUsageFrameReachesTailInServerOrder() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(client = client)
 
@@ -400,10 +402,9 @@ class AppServerTurnEngineTest {
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            assertEquals("11", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).body.jsonDeltaString("total_tokens"))
+            assertEquals("22", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).body.jsonDeltaString("total_tokens"))
             assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
-            val usage = assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
-            assertEquals("usage_statistics", usage.messageType)
-            assertEquals("11", usage.body.jsonDeltaString("total_tokens"))
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
             awaitComplete()
@@ -425,8 +426,8 @@ class AppServerTurnEngineTest {
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "error_message", runId = "run-1"))
-            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             assertEquals("usage_statistics", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val failed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Failed, failed.status)
             awaitComplete()
@@ -592,11 +593,12 @@ class AppServerTurnEngineTest {
             )
             runCurrent()
 
-            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
-            assertEquals(runtime, approvalInput.runtime)
-            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
-            assertEquals("approval-1", approval.requestId)
-            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            // letta-mobile-qygvv.13: the server already approved the tool under
+            // Unrestricted; the delta is informational, so no approval_response is sent.
+            assertTrue(
+                client.sentCommands.none { (it as? AppServerCommand.Input)?.payload is AppServerInputPayload.ApprovalResponse },
+                "no redundant approval_response for an unrestricted approval_request_message",
+            )
             // Approval card suppressed; tool-call announcement surfaces so the
             // Skill tool chip renders live (toolchip-live fix).
             val toolCall = assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
@@ -1020,6 +1022,38 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun releasedTelemetryKeepsWatchdogTimeoutAsReleaseReason() = runTest {
+        // letta-mobile-qygvv.1 regression: the input-acceptance refactor made the
+        // post-join step return "normal_completion", which overwrote the reason
+        // the collector had already recorded. A watchdog release must still say
+        // so, otherwise the orphan-abort path (qygvv.3) never sees it.
+        com.letta.mobile.util.Telemetry.clear()
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            turnIdleTimeoutMs = 300,
+            nowMs = { testScheduler.currentTime },
+        )
+        val payloads = MutableStateFlow<List<RuntimeEventPayload>>(emptyList())
+        val job = launch {
+            engine.runTurn(command).collect { draft -> payloads.update { it + draft.payload } }
+        }
+        runCurrent()
+        assertTrue(client.sentCommands.any { it is AppServerCommand.Input })
+
+        advanceTimeBy(300L * 4)
+        runCurrent()
+        job.join()
+
+        val failed = payloads.value.filterIsInstance<RuntimeEventPayload.RunLifecycleChanged>().last()
+        assertEquals(RuntimeRunStatus.Failed, failed.status)
+        val released = com.letta.mobile.util.Telemetry.snapshot().first {
+            it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
+        }
+        assertEquals("watchdog_timeout", released.attrs["releaseReason"])
+    }
+
+    @Test
     fun supersededRunIdFramesAreDroppedAfterMidTurnReassignment() = runTest {
         // lgns8.22.4: after the lease promotes from run-1 → run-2, a late
         // run-1 terminal must not complete the turn.
@@ -1196,8 +1230,10 @@ class AppServerTurnEngineTest {
             listOf("agent-1", "agent-2"),
             client.runtimeStartCommands.map { it.agentId },
         )
+        // letta-mobile-qygvv.1: each user-message input also draws a request_id
+        // (for input_accepted), so the second runtime_start gets the third id.
         assertEquals(
-            listOf("runtime-start-1", "runtime-start-2"),
+            listOf("runtime-start-1", "runtime-start-3"),
             client.runtimeStartCommands.map { it.requestId },
         )
     }

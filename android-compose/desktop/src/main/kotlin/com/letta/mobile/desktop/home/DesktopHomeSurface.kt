@@ -52,6 +52,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.desktop.formatRelativeTimestamp
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Read-only inputs for [DesktopHomeSurface]. */
 @Immutable
@@ -124,7 +125,7 @@ fun DesktopHomeSurface(
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp, vertical = 20.dp),
+                .padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xl),
         ) {
             A2uiSurfaceRenderer(
                 surface = documentSurface,
@@ -138,9 +139,9 @@ fun DesktopHomeSurface(
         modifier = modifier
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 20.dp),
+            .padding(horizontal = LettaDimens.Space.xxl),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        contentPadding = PaddingValues(vertical = LettaDimens.Space.xl),
     ) {
         item { HomeHeader(state.overview.summary) }
         item {
@@ -173,7 +174,7 @@ fun DesktopHomeSurface(
 
 @Composable
 private fun HomeHeader(summary: FleetSummary) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Text(
             text = "Home",
             style = MaterialTheme.typography.headlineSmall,
@@ -200,7 +201,7 @@ internal fun HomeSectionLabel(text: String) {
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+        modifier = Modifier.padding(top = LettaDimens.Space.md, bottom = LettaDimens.Space.hair),
     )
 }
 
@@ -210,7 +211,7 @@ internal fun HomeEmptyLine(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = 16.dp),
+        modifier = Modifier.padding(vertical = LettaDimens.Space.lg),
     )
 }
 
@@ -232,14 +233,14 @@ private fun HomeComposer(placeholder: String, onSubmit: (String) -> Unit) {
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
             verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             HomeComposerField(
                 text = draft,
@@ -268,8 +269,8 @@ private fun HomeComposerField(
         value = text,
         onValueChange = onTextChanged,
         modifier = modifier
-            .heightIn(min = 28.dp, max = 120.dp)
-            .padding(vertical = 4.dp)
+            .heightIn(min = LettaDimens.Control.fieldHeight, max = 120.dp)
+            .padding(vertical = LettaDimens.Space.xs)
             .onPreviewKeyEvent { event ->
                 val isSend = event.type == KeyEventType.KeyDown &&
                     (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
@@ -300,7 +301,7 @@ private fun HomeComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
     Surface(
         onClick = onSend,
         enabled = canSend,
-        modifier = Modifier.size(34.dp),
+        modifier = Modifier.size(LettaDimens.Control.iconButtonLg),
         shape = CircleShape,
         color = if (canSend) {
             MaterialTheme.colorScheme.primary
@@ -310,14 +311,14 @@ private fun HomeComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
         contentColor = if (canSend) {
             MaterialTheme.colorScheme.onPrimary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled)
         },
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = Icons.Outlined.ArrowUpward,
                 contentDescription = "Send message",
-                modifier = Modifier.size(17.dp),
+                modifier = Modifier.size(LettaDimens.Control.iconButtonLg),
             )
         }
     }
@@ -333,16 +334,16 @@ private fun RecentConversationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.md))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 9.dp),
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        AgentOrb(agentId = agentId, index = orbIndex, size = 26.dp, cornerRadius = 7.dp)
+        AgentOrb(agentId = agentId, index = orbIndex, size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm)
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
         ) {
             Text(
                 text = conversation.title,
@@ -376,7 +377,7 @@ private fun RecentConversationRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             textAlign = TextAlign.End,
-            modifier = Modifier.width(48.dp),
+            modifier = Modifier.width(LettaDimens.Orb.railSlotWidth),
         )
     }
 }

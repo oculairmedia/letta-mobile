@@ -64,4 +64,16 @@ class AmbientShaderSourceTest {
         assertContains(AMBIENT_GLOW_SHADER_SOURCE, "towardTintHue(clamp(palRaw(t), 0.0, 1.0), uColor.rgb, uPalettePull)")
         assertTrue(AmbientMotion.PALETTE_HUE_PULL in 0f..1f, "pull is a fraction")
     }
+
+    @Test
+    fun theBandIsSetByTheHostAndTheirBandsFitWhatCoversTheirBottomEdge() {
+        // A shared constant here once moved the phone's glow entirely behind its opaque composer.
+        assertContains(AMBIENT_GLOW_SHADER_SOURCE, "uniform float uBandTop;")
+        assertContains(AMBIENT_GLOW_SHADER_SOURCE, "uniform float uBandPeak;")
+        listOf(AmbientMotion.PANE_EDGE_BAND, AmbientMotion.ABOVE_COMPOSER_BAND).forEach { band ->
+            kotlin.test.assertTrue(band.top < band.peak, "$band")
+        }
+        // The phone's composer covers about the bottom tenth; its glow must peak above it.
+        kotlin.test.assertTrue(AmbientMotion.ABOVE_COMPOSER_BAND.peak <= 0.90f)
+    }
 }

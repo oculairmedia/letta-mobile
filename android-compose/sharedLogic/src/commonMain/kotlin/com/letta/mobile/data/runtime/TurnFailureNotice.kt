@@ -143,11 +143,17 @@ object TurnFailureNotices {
             "The run ended on an unresolved tool call, so this turn produced no reply."
         "aborted" ->
             "This turn was interrupted before the assistant replied."
+        CONNECTION_LOST_KIND ->
+            "The connection to the agent host dropped during this turn, so it ended here. " +
+                "Send again to retry."
         CANCELLED_KIND -> CANCELLED_MESSAGE
         else -> GENERIC_MESSAGE
     }
 
     const val CANCELLED_KIND: String = "cancelled"
+
+    /** letta-mobile-qygvv.16: the transport session carrying the turn was lost mid-turn. */
+    const val CONNECTION_LOST_KIND: String = "connection_lost"
     private const val OTHER_KIND = "other"
 
     /** Families [terminalReasonKind] can produce. Keep in sync with it. */
@@ -161,6 +167,7 @@ object TurnFailureNotices {
         "timeout",
         "provider_error",
         "aborted",
+        CONNECTION_LOST_KIND,
         CANCELLED_KIND,
         OTHER_KIND,
     )

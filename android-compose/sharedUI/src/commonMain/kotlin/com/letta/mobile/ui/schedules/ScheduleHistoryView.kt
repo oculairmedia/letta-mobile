@@ -26,12 +26,13 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.HistorySummary
 import com.letta.mobile.data.schedules.ScheduleReliability
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun HistoryView(summary: HistorySummary) {
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.xxl),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         item { StatsCard(summary) }
         item {
@@ -74,7 +75,7 @@ private fun ReliabilityRow(rel: ScheduleReliability) {
                 color = if (ok) MaterialTheme.customColors.successColor else MaterialTheme.customColors.runningColor,
             )
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(LettaDimens.Space.sm))
         ReliabilityStrip(rel.squares)
     }
 }
@@ -84,7 +85,7 @@ fun StatsCard(summary: HistorySummary) {
     Row(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(vertical = 18.dp),
+            .padding(vertical = LettaDimens.Space.lg),
     ) {
         StatCell("${summary.totalRuns}", "runs · 30d", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
         StatCell(
@@ -99,7 +100,7 @@ fun StatsCard(summary: HistorySummary) {
 
 @Composable
 fun StatCell(value: String, label: String, valueColor: Color, modifier: Modifier) {
-    Column(modifier.padding(horizontal = 18.dp)) {
+    Column(modifier.padding(horizontal = LettaDimens.Space.lg)) {
         Text(
             value,
             style = MaterialTheme.typography.headlineSmall,
@@ -112,10 +113,10 @@ fun StatCell(value: String, label: String, valueColor: Color, modifier: Modifier
 
 @Composable
 fun ReliabilityStrip(squares: List<Boolean?>, count: Int = 12) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         val padded = (squares.takeLast(count) + List(count) { null }).take(count)
         padded.forEach { ok ->
-            Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).background(reliabilitySquareColor(ok)))
+            Box(Modifier.size(LettaDimens.Control.icon).clip(RoundedCornerShape(LettaDimens.Radius.sm)).background(reliabilitySquareColor(ok)))
         }
     }
 }

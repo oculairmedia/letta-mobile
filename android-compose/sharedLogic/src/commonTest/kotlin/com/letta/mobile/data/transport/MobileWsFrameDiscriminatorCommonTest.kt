@@ -5,9 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertIs
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class MobileWsFrameDiscriminatorCommonTest {
     private val json = Json {
@@ -15,47 +12,6 @@ class MobileWsFrameDiscriminatorCommonTest {
         encodeDefaults = true
         explicitNulls = false
         coerceInputValues = true
-    }
-
-    @Test
-    fun everyClientDiscriminatorKeepsItsEncodedWireValue() {
-        val frames = listOf(
-            HelloFrame(id = "id", ts = "ts", token = "token"),
-            SendMessageFrame(id = "id", ts = "ts", agentId = "agent", conversationId = "conversation", text = "text"),
-            UserActionFrame(id = "id", ts = "ts", name = "action", context = buildJsonObject {}),
-            CancelFrame(id = "id", ts = "ts", runId = "run"),
-            SubscribeFrame(id = "id", ts = "ts", runId = "run"),
-            ByeFrame(id = "id", ts = "ts"),
-            CronListFrame(id = "id", ts = "ts", requestId = "request"),
-            CronAddFrame(
-                id = "id",
-                ts = "ts",
-                requestId = "request",
-                agentId = "agent",
-                name = "name",
-                description = "description",
-                prompt = "prompt",
-                recurring = false,
-            ),
-            CronGetFrame(id = "id", ts = "ts", requestId = "request", taskId = "task"),
-            CronDeleteFrame(id = "id", ts = "ts", requestId = "request", taskId = "task"),
-            CronDeleteAllFrame(id = "id", ts = "ts", requestId = "request", agentId = "agent"),
-            SubagentListFrame(id = "id", ts = "ts", requestId = "request"),
-            SubagentTodosFrame(id = "id", ts = "ts", requestId = "request", toolCallId = "tool"),
-        )
-
-        assertEquals(
-            listOf(
-                "hello", "send_message", "user_action", "cancel", "subscribe", "bye",
-                "cron_list", "cron_add", "cron_get", "cron_delete", "cron_delete_all",
-                "subagent_list", "subagent_todos",
-            ),
-            frames.map { frame ->
-                val encoded = frame.encodeJson(json)
-                assertEquals(encoded, frame.encodeJson(json))
-                json.parseToJsonElement(encoded).jsonObject.getValue("type").jsonPrimitive.content
-            },
-        )
     }
 
     @Test

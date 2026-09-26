@@ -54,6 +54,7 @@ import io.github.linreal.cascade.editor.richtext.StyleStatus
 import io.github.linreal.cascade.editor.state.BlockSpanStates
 import io.github.linreal.cascade.editor.state.BlockTextStates
 import io.github.linreal.cascade.editor.state.EditorStateHolder
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The block editor's controls, hoisted out of the note card to a bar at the foot of the board:
@@ -72,34 +73,50 @@ fun CanvasFormattingBar(
     val focusedType = toolbar.holder.state.focusedBlock?.type
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        tonalElevation = 2.dp,
-        shadowElevation = 6.dp,
+        tonalElevation = LettaDimens.Space.hair,
+        shadowElevation = LettaDimens.Space.sm,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BlockButtons.forEach { button ->
-                    val active = focusedType != null && button.matches(focusedType)
-                    BarButton(button.icon, button.label, active) { toolbar.apply(button) }
-                }
+        val blockButtons: @Composable () -> Unit = {
+            BlockButtons.forEach { button ->
+                val active = focusedType != null && button.matches(focusedType)
+                BarButton(button.icon, button.label, active) { toolbar.apply(button) }
             }
+        }
+        val styleButtons: @Composable () -> Unit = {
+            FormattingButtons.forEach { (style, icon, label) ->
+                val active = formatting.styleStatusOf(style) != StyleStatus.Absent
+                BarButton(icon, label, active, enabled = formatting.canFormat) { toolbar.actions.toggleStyle(style) }
+            }
+        }
+        if (LocalCanvasCompact.current) {
+            // A phone keeps it to one row above the keyboard, the way Obsidian does: the inline
+            // styles first, since they are what a caret in a sentence reaches for.
             Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FormattingButtons.forEach { (style, icon, label) ->
-                    val active = formatting.styleStatusOf(style) != StyleStatus.Absent
-                    BarButton(icon, label, active, enabled = formatting.canFormat) { toolbar.actions.toggleStyle(style) }
-                }
+                styleButtons()
+                BarDivider()
+                blockButtons()
+            }
+        } else {
+            Column(
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { blockButtons() }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { styleButtons() }
             }
         }
     }
@@ -113,18 +130,17 @@ private fun BarButton(icon: ImageVector, label: String, active: Boolean, enabled
         modifier = Modifier.size(BUTTON).semantics { contentDescription = label },
         colors = if (active) IconButtonDefaults.filledTonalIconButtonColors() else IconButtonDefaults.iconButtonColors(),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
-@Suppress("unused")
 @Composable
 private fun BarDivider() {
     Box(
         modifier = Modifier
-            .padding(horizontal = 2.dp)
+            .padding(horizontal = LettaDimens.Space.hair)
             .width(1.dp)
-            .height(22.dp)
+            .height(LettaDimens.Space.xl)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
     )
 }
@@ -188,4 +204,4 @@ private val FormattingButtons = listOf(
     FormattingButton(SpanStyle.InlineCode, Lucide.Code, "Inline code"),
 )
 
-private val BUTTON = 34.dp
+private val BUTTON = LettaDimens.Space.xxl

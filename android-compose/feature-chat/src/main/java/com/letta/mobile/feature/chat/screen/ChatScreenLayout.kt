@@ -52,6 +52,8 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.chat.QueuedSendsPanel
 
 /**
  * Feature flag: when false, the tool-affordance chip strip above the
@@ -79,6 +81,8 @@ internal data class ChatScreenLayoutParams(
     val floatingBannerMessage: String,
     val onFloatingBannerMessageChange: (String) -> Unit,
     val streamingRevealPulse: () -> Unit,
+    /** The composer's height each time it is measured, for whatever draws behind it. */
+    val onComposerMeasured: (Dp) -> Unit = {},
 )
 
 @Composable
@@ -106,7 +110,7 @@ internal fun ChatScreenLayout(
                 haptic = haptic,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = params.contentPadding.calculateTopPadding() + 8.dp, end = 8.dp),
+                    .padding(top = params.contentPadding.calculateTopPadding() + LettaDimens.Space.sm, end = LettaDimens.Space.sm),
             ),
         )
         ChatScreenComposerColumn(
@@ -479,7 +483,7 @@ private fun ChatScreenThinkingTokenSection(
         reducedMotion = reducedMotion,
         reserveSpace = thinkingTokenActive,
         // Beside the mascot companion: no leading inset, the row already places it.
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(end = 16.dp, top = 4.dp, bottom = 4.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(end = LettaDimens.Space.lg, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs),
     )
 }
 
@@ -520,41 +524,51 @@ private fun ChatScreenComposerInputSection(
         onPicked = { viewModel.addAttachment(it) },
         onError = { viewModel.reportComposerError(it) },
         limits = viewModel.attachmentLimits,
+        pendingCount = composerState.pendingAttachments.size,
     )
     val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
-    ChatComposer(
-        agentId = viewModel.agentId.value,
-        // The thinking indicator sits beside the mascot companion, in its row (letta-mobile-8jtf3).
-        companionStatus = { ChatScreenThinkingTokenSection(state, reducedMotion) },
-        onCompanionClick = navigation.onOpenAgentPane,
-        inputText = composerState.inputText,
-        pendingAttachments = composerState.pendingAttachments,
-        isStreaming = state.isStreaming,
-        isCancelling = state.isCancellingRun,
-        canSendMessages = viewModel.canSendMessages,
-        onTextChange = { newText ->
-            if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
-                navigation.onBugCommand?.invoke()
-            }
-        },
-        onSend = {
-            if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
-                navigation.onBugCommand?.invoke()
-            }
-        },
-        onStop = { viewModel.interruptRun() },
-        onRemoveAttachment = { viewModel.removeAttachment(it) },
-        onAttachImage = launchPicker,
-        slashCommands = composerState.slashCommands,
-        onSlashCommandSelected = viewModel::selectSlashCommand,
-        onSlashCommandUninstall = viewModel::uninstallSlashCommand,
-        availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
-            activeAgent?.tools.orEmpty()
-        } else {
-            emptyList()
-        },
-        onOpenCanvas = navigation.onOpenCanvas,
-    )
+    Column {
+        // letta-mobile-1n5py: messages sent during the turn wait here, above the field.
+        QueuedSendsPanel(
+            queue = state.sendQueue,
+            actions = viewModel.queuedSendActions,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+        )
+        ChatComposer(
+            agentId = viewModel.agentId.value,
+            canQueueWhileStreaming = viewModel.canQueueWhileStreaming,
+            // The thinking indicator sits beside the mascot companion, in its row (letta-mobile-8jtf3).
+            companionStatus = { ChatScreenThinkingTokenSection(state, reducedMotion) },
+            onCompanionClick = navigation.onOpenAgentPane,
+            inputText = composerState.inputText,
+            pendingAttachments = composerState.pendingAttachments,
+            isStreaming = state.isStreaming,
+            isCancelling = state.isCancellingRun,
+            canSendMessages = viewModel.canSendMessages,
+            onTextChange = { newText ->
+                if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
+                    navigation.onBugCommand?.invoke()
+                }
+            },
+            onSend = {
+                if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
+                    navigation.onBugCommand?.invoke()
+                }
+            },
+            onStop = { viewModel.interruptRun() },
+            onRemoveAttachment = { viewModel.removeAttachment(it) },
+            onAttachImage = launchPicker,
+            slashCommands = composerState.slashCommands,
+            onSlashCommandSelected = viewModel::selectSlashCommand,
+            onSlashCommandUninstall = viewModel::uninstallSlashCommand,
+            availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
+                activeAgent?.tools.orEmpty()
+            } else {
+                emptyList()
+            },
+            onOpenCanvas = navigation.onOpenCanvas,
+        )
+    }
 }
 
 @Composable

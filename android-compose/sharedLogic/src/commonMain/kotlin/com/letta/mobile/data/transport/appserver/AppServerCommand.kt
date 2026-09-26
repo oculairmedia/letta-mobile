@@ -87,6 +87,31 @@ sealed interface AppServerCommand {
         @SerialName("run_id") val runId: String? = null,
     ) : AppServerCommand
 
+    /**
+     * letta-mobile-qygvv.6: releases queue items parked by an `abort_message` (upstream 0.32+,
+     * `queue-update-protocol.d.ts`). The server answers with `resume_queue_response` only when
+     * [requestId] is set.
+     */
+    @Serializable
+    @SerialName("resume_queue")
+    data class ResumeQueue(
+        val runtime: AppServerRuntimeScope,
+        @SerialName("request_id") val requestId: String? = null,
+    ) : AppServerCommand
+
+    /**
+     * letta-mobile-qygvv.6: drops one queued input without stopping the active turn (upstream
+     * 0.32+, `task-control-protocol.d.ts`). [itemId] is the queue item's `id`, not its
+     * `client_message_id`; the server then emits an `update_queue` removal `cancelled`.
+     */
+    @Serializable
+    @SerialName("remove_queue_item")
+    data class RemoveQueueItem(
+        @SerialName("request_id") val requestId: String,
+        val runtime: AppServerRuntimeScope,
+        @SerialName("item_id") val itemId: String,
+    ) : AppServerCommand
+
     @Serializable
     @SerialName("external_tool_call_response")
     data class ExternalToolCallResponse(
@@ -209,6 +234,53 @@ sealed interface AppServerCommand {
     data class SkillDisable(
         @SerialName("request_id") val requestId: String,
         val name: String,
+    ) : AppServerCommand
+
+    // Provider connect + model switch (letta-mobile-w4q4p). `target` has no
+    // default on purpose: encodeDefaults=false would drop it, and upstream
+    // requires it — callers pass APP_SERVER_PROVIDER_TARGET_LOCAL.
+
+    @Serializable
+    @SerialName("list_connect_providers")
+    data class ListConnectProviders(
+        @SerialName("request_id") val requestId: String,
+        val target: String,
+    ) : AppServerCommand
+
+    /** Carries provider credentials in [fields]; [toString] never prints their values. */
+    @Serializable
+    @SerialName("connect_provider")
+    data class ConnectProvider(
+        @SerialName("request_id") val requestId: String,
+        val target: String,
+        @SerialName("provider_id") val providerId: String,
+        @SerialName("auth_method_id") val authMethodId: String? = null,
+        val fields: Map<String, String>,
+        @SerialName("provider_name") val providerName: String? = null,
+        /** `ConnectProviderOAuthConfig` token bundle; opaque here. */
+        @SerialName("oauth_config") val oauthConfig: JsonObject? = null,
+    ) : AppServerCommand {
+        override fun toString(): String =
+            "ConnectProvider(requestId=$requestId, target=$target, providerId=$providerId, " +
+                "authMethodId=$authMethodId, fieldKeys=${fields.keys.sorted()}, providerName=$providerName, " +
+                "oauthConfig=${if (oauthConfig == null) "null" else "<redacted>"})"
+    }
+
+    @Serializable
+    @SerialName("disconnect_provider")
+    data class DisconnectProvider(
+        @SerialName("request_id") val requestId: String,
+        val target: String,
+        @SerialName("provider_id") val providerId: String,
+        @SerialName("provider_name") val providerName: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("update_model")
+    data class UpdateModel(
+        @SerialName("request_id") val requestId: String,
+        val runtime: AppServerConversationRuntimeScope,
+        val payload: AppServerUpdateModelPayload,
     ) : AppServerCommand
 
     // Native cron scheduling (lgns8.8): replaces the legacy mobile-WS cron

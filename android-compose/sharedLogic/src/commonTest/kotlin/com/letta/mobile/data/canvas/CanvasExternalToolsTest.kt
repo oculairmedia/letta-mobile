@@ -15,6 +15,7 @@ import kotlinx.serialization.json.put
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -45,7 +46,6 @@ class CanvasExternalToolsTest {
                 "canvas.get_scene",
                 "canvas.replace_scene",
                 "canvas.apply_ops",
-                "canvas.export_svg",
                 "canvas.list",
             ),
             advertised,
@@ -101,7 +101,7 @@ class CanvasExternalToolsTest {
         sessions.register(session)
 
         val replaceTool = CanvasReplaceSceneTool(store, sessions)
-        val newSceneJson = "{\"bgColor\":-1,\"elements\":[{\"id\":\"1\"}]}"
+        val newSceneJson = (CanvasSceneValidator.scene(CanvasSceneSchema.sceneExample.toString()) as CanvasSceneCheck.Valid).json
 
         val replaceResult = replaceTool.invoke(
             buildJsonObject {
@@ -118,13 +118,19 @@ class CanvasExternalToolsTest {
         // Verify active session received the update
         val currentDoc = session.document.value
         assertNotNull(currentDoc)
-        assertEquals(newSceneJson, currentDoc.sceneJson)
+        assertEquals(
+            json.parseToJsonElement(newSceneJson),
+            json.parseToJsonElement(CanvasOpProjector.stripMetadataForDrawBox(currentDoc.sceneJson)),
+        )
         assertEquals(2L, currentDoc.revision)
 
         // Verify persisted store received the update
         val persistedDoc = store.get(canvasId)
         assertNotNull(persistedDoc)
-        assertEquals(newSceneJson, persistedDoc.sceneJson)
+        assertEquals(
+            json.parseToJsonElement(newSceneJson),
+            json.parseToJsonElement(CanvasOpProjector.stripMetadataForDrawBox(persistedDoc.sceneJson)),
+        )
         assertEquals(2L, persistedDoc.revision)
     }
 
@@ -147,7 +153,7 @@ class CanvasExternalToolsTest {
                 opId = "op-1",
                 actorId = "agent-x",
                 lamport = 1L,
-                sceneJson = "{\"elements\":[{\"id\":\"circle\"}]}",
+                sceneJson = CanvasSceneSchema.sceneExample.toString(),
             )
         )
         val opsJsonElement = json.parseToJsonElement(json.encodeToString<List<CanvasOp>>(ops))
@@ -170,9 +176,98 @@ class CanvasExternalToolsTest {
         // stale element op arriving later loses against it instead of finding unstamped content
         // to overwrite. What DrawBox is handed is still exactly the scene the agent sent.
         assertEquals(
-            "{\"elements\":[{\"id\":\"circle\"}]}",
-            CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson),
+            json.parseToJsonElement(CanvasSceneValidator.scene(CanvasSceneSchema.sceneExample.toString()).let { (it as CanvasSceneCheck.Valid).json }),
+            json.parseToJsonElement(CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)),
         )
+    }
+
+    @Test
+    fun applyOpsRefusesUnrenderableDocumentsAndElementsWithoutCommitting() = runTest {
+        val canvasId = CanvasId("canvas-validation")
+        store.upsert(openDocument(canvasId))
+        val tool = CanvasApplyOpsTool(store, sessions)
+        val unrecognized = """{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"x"}]}]}"""
+        val cases = listOf(
+            CanvasOp.SetDocumentOp("doc-unrecognized", "agent-1", 1L, "note-1", unrecognized),
+            CanvasOp.SetDocumentOp("doc-malformed", "agent-1", 1L, "note-1", "{"),
+            CanvasOp.AddElementOp("element-bad", "agent-1", 1L, "bad-1", """{"id":"bad-1","type":"unknown"}"""),
+        )
+
+        for (op in cases) {
+            val result = tool.invoke(
+                buildJsonObject {
+                    put("canvas_id", canvasId.value)
+                    put("ops", json.parseToJsonElement(json.encodeToString<List<CanvasOp>>(listOf(op))))
+                },
+                agentId = "agent-1",
+            )
+            assertIs<ExternalToolResult.Error>(result)
+            assertEquals(1L, store.get(canvasId)?.revision)
+            assertFalse(store.get(canvasId)?.sceneJson.orEmpty().contains("_documents"))
+        }
+    }
+
+    @Test
+    fun applyOpsAcceptsCascadeDocumentsIncludingEmptyDocuments() = runTest {
+        val canvasId = CanvasId("canvas-documents")
+        store.upsert(openDocument(canvasId))
+        val tool = CanvasApplyOpsTool(store, sessions)
+        val cascade = """{"version":2,"blocks":[{"id":"p1","content":{"text":"x"}}]}"""
+        val empty = """{"version":2,"blocks":[]}"""
+
+        for ((index, documentJson) in listOf(cascade, empty).withIndex()) {
+            val result = tool.invoke(
+                buildJsonObject {
+                    put("canvas_id", canvasId.value)
+                    put("ops", json.parseToJsonElement(json.encodeToString<List<CanvasOp>>(listOf(
+                        CanvasOp.SetDocumentOp("doc-$index", "agent-1", index + 1L, "note-$index", documentJson),
+                    ))))
+                },
+                agentId = "agent-1",
+            )
+            assertIs<ExternalToolResult.Success>(result)
+        }
+        assertEquals(3L, store.get(canvasId)?.revision)
+        assertEquals(empty, CanvasOpProjector.documentsOf(store.get(canvasId)?.sceneJson.orEmpty()).single { it.id == "note-1" }.json)
+    }
+
+    @Test
+    fun applyOpsRefusesAnEntireBatchWhenOneDocumentIsUnrenderable() = runTest {
+        val canvasId = CanvasId("canvas-batch-validation")
+        store.upsert(openDocument(canvasId))
+        val batch = CanvasOp.BatchOp(
+            "batch", "agent-1", 1L,
+            listOf(
+                CanvasOp.SetDocumentOp("good", "agent-1", 1L, "note-good", """{"version":2,"blocks":[]}"""),
+                CanvasOp.SetDocumentOp("bad", "agent-1", 1L, "note-bad", """{"type":"doc"}"""),
+            ),
+        )
+        val result = CanvasApplyOpsTool(store, sessions).invoke(
+            buildJsonObject {
+                put("canvas_id", canvasId.value)
+                put("ops", json.parseToJsonElement(json.encodeToString<List<CanvasOp>>(listOf(batch))))
+            },
+            agentId = "agent-1",
+        )
+
+        assertIs<ExternalToolResult.Error>(result)
+        assertEquals(1L, store.get(canvasId)?.revision)
+        assertEquals("{}", store.get(canvasId)?.sceneJson)
+    }
+
+    @Test
+    fun remoteReplayStillAcceptsHistoricalUnrenderableDocuments() = runTest {
+        val session = CanvasSession.create(
+            store,
+            CanvasCreateOptions(canvasId = CanvasId("canvas-replay"), initialSceneJson = "{}", agentId = "remote"),
+        )
+        val updated = session.applyOps(
+            listOf(CanvasOp.SetDocumentOp("old", "remote", 1L, "note", """{"type":"doc"}""")),
+            isRemote = true,
+        )
+
+        assertEquals(2L, updated.revision)
+        assertEquals("""{"type":"doc"}""", CanvasOpProjector.documentsOf(updated.sceneJson).single().json)
     }
 
     @Test
@@ -188,11 +283,11 @@ class CanvasExternalToolsTest {
         )
         store.upsert(doc1)
 
+        // Not offered, and plain about it when called anyway: no plausible empty SVG (qsq7v).
         val exportSvgTool = CanvasExportSvgTool(store, sessions)
         val svgResult = exportSvgTool.invoke(buildJsonObject { put("canvas_id", "canvas-svg-1") }, agentId = "agent-1")
-        assertIs<ExternalToolResult.Success>(svgResult)
-        val svg = json.decodeFromString<CanvasExportSvgResult>(svgResult.content)
-        assertTrue(svg.svg.contains("<svg"))
+        assertIs<ExternalToolResult.Error>(svgResult)
+        assertTrue(svgResult.error.contains("not implemented"))
 
         val listTool = CanvasListTool(store, sessions)
         val listResult = listTool.invoke(buildJsonObject { put("conversation_id", "conv-list-1") }, agentId = "agent-1")
@@ -319,10 +414,10 @@ class CanvasExternalToolsTest {
 
         // Both calls read revision 1 and park; only then may either of them write.
         val first = async {
-            replaceTool.invoke(buildJsonObject { put("canvas_id", canvasId.value); put("scene_json", "{\"a\":1}") }, agentId = "agent-1")
+            replaceTool.invoke(buildJsonObject { put("canvas_id", canvasId.value); put("scene_json", CanvasSceneSchema.sceneExample.toString()) }, agentId = "agent-1")
         }
         val second = async {
-            replaceTool.invoke(buildJsonObject { put("canvas_id", canvasId.value); put("scene_json", "{\"b\":2}") }, agentId = "agent-1")
+            replaceTool.invoke(buildJsonObject { put("canvas_id", canvasId.value); put("scene_json", CanvasSceneSchema.sceneExample.toString()) }, agentId = "agent-1")
         }
         runCurrent()
         assertEquals(2, racingStore.parkedReads, "both calls must hold the same snapshot before the race")
@@ -352,9 +447,9 @@ class CanvasExternalToolsTest {
                         actorId = "impostor",
                         lamport = 1L,
                         elementId = "e1",
-                        elementJson = """{"id":"e1","type":"rect"}""",
+                        elementJson = CanvasSceneSchema.shape.example.toString(),
                     ),
-                    CanvasOp.SetBackgroundOp(opId = "bg-1", actorId = "impostor", lamport = 2L, colorHex = "#ffffff"),
+                    CanvasOp.SetBackgroundOp(opId = "bg-1", actorId = "impostor", lamport = 2L, colorHex = "#ffffffff"),
                 ),
             ),
         )

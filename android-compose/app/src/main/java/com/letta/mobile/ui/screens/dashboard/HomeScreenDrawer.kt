@@ -29,6 +29,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.material3.DrawerState
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class HomeScreenDrawerParams(
     val state: DashboardUiState,
@@ -46,14 +47,14 @@ internal fun HomeScreenDrawerContent(
         Text(
             text = "Letta",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xl),
         )
 
         var previousGroup: DashboardShortcut.Group? = null
         DashboardShortcut.entries.forEach { shortcut ->
             if (previousGroup != null && shortcut.group != previousGroup) {
                 HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 28.dp),
+                    modifier = Modifier.padding(vertical = LettaDimens.Space.sm, horizontal = LettaDimens.Space.xxl),
                 )
             }
             previousGroup = shortcut.group
@@ -83,10 +84,10 @@ private fun HomeDrawerShortcutRow(
 
     Row(
         modifier = Modifier
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = LettaDimens.Space.md)
             .fillMaxWidth()
             .height(56.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(LettaDimens.Radius.lg))
             .combinedClickable(
                 onClick = {
                     params.scope.launch { params.drawerState.close() }
@@ -105,7 +106,7 @@ private fun HomeDrawerShortcutRow(
                     )
                 },
             )
-            .padding(start = 16.dp, end = 24.dp),
+            .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.xl),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -113,7 +114,7 @@ private fun HomeDrawerShortcutRow(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.md))
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,

@@ -71,6 +71,7 @@ import com.letta.mobile.ui.tags.TagDrillInEntityType
 import com.letta.mobile.ui.tags.TagDrillInSource
 import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.ui.theme.LettaDimens
 
 private const val CUSTOM_TOOL_TYPE = "custom"
 
@@ -129,7 +130,7 @@ fun ToolDetailScreen(
             is UiState.Loading -> ShimmerCard(
                 modifier = Modifier
                     .padding(paddingValues)
-                    .padding(16.dp),
+                    .padding(LettaDimens.Space.lg),
             )
             is UiState.Error -> ErrorContent(
                 message = state.message,
@@ -252,8 +253,8 @@ private fun ToolDetailContent(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(LettaDimens.Space.lg),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         item {
             ToolDetailHeader(
@@ -404,7 +405,7 @@ private fun ToolDetailHeader(
     CardGroup(modifier = modifier) {
         item(
             headlineContent = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = LettaIcons.Tool,
@@ -414,18 +415,18 @@ private fun ToolDetailHeader(
                                 .size(LettaIconSizing.Toolbar)
                                 .optionalSharedElement("tool_icon_${tool.id}"),
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(LettaDimens.Space.md))
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                         ) {
                             Text(
                                 text = tool.name,
                                 style = MaterialTheme.typography.headlineSmall,
                             )
                             FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                             ) {
                                 StatusChip(
                                     status = if (isEditableTool(tool)) {
@@ -454,8 +455,8 @@ private fun ToolDetailHeader(
                     )
                     if (tool.tags.isNotEmpty()) {
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             tool.tags.forEach { tag ->
                                 AssistChip(
@@ -727,7 +728,7 @@ private fun ToolDetailHeaderPreview() {
         ToolDetailHeader(
             tool = previewDetailTool(),
             onTagClick = {},
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
     }
 }
@@ -744,7 +745,7 @@ private fun ToolDetailHeaderEditablePreview() {
                 sourceType = "python",
             ),
             onTagClick = {},
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
     }
 }
@@ -773,7 +774,7 @@ private fun ToolCodeSectionPreview() {
             content = "def my_tool(arg: str) -> str:\n    \"\"\"Describe what this tool does.\"\"\"\n    return f\"Result: {arg}\"\n",
             initiallyExpanded = true,
             onCopy = {},
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
         )
     }
 }

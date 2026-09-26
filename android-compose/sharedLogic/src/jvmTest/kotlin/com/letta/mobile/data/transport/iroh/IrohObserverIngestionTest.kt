@@ -23,6 +23,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -193,6 +194,57 @@ class IrohObserverIngestionTest {
                 "observer must NOT emit frames the engine owns for the active turn's conversation; " +
                     "got ${frames.filterIsInstance<ServerFrame.AssistantMessage>().map { it.content }}",
             )
+        } finally {
+            collector.cancel()
+            runCatching { transport.cancel("conv-local") }
+            transport.disconnect()
+        }
+    }
+
+    // ============ (c) ENGINE-OWNED TERMINAL FALLBACK keeps the stop reason ==
+    @Test
+    fun observerTerminalFallbackEmitsStopReasonBeforeTurnDone() = runBlocking {
+        // The controller completes on the idle loop status, so its fanned-out
+        // stop_reason reaches the phone BEFORE the local engine's settle fires and
+        // the observer claims the engine-owned terminal. The stop reason must be
+        // published ahead of that TurnDone, or the turn retires with an empty
+        // stop reason and the engine's own late tail is dropped as unmatched.
+        val engine = AppServerTurnEngine(client = BlockingInputClient(conversationId = "conv-local"))
+        val stream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+        val transport = connectedTransport(stream, engine = engine)
+        val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
+        val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+        try {
+            withTimeout(2.seconds) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds) }
+            delay(100.milliseconds)
+
+            assertTrue(transport.send("agent-1", "conv-local", "hi", "otid-local", null, false))
+            withTimeout(2.seconds) { while (!engine.isBusy("agent-1", "conv-local")) delay(10.milliseconds) }
+            assertTrue(transport.hasActiveChatTurn("conv-local"))
+
+            stream.emit(streamDelta("agent-1", "conv-local", 20, stopReasonDelta("end_turn")))
+            withTimeout(5.seconds) { while (frames.none { it is ServerFrame.TurnDone }) delay(20.milliseconds) }
+            // A second copy of the terminal must not publish or retire the local
+            // turn again (with no local turn left it is plain passive-observer
+            // traffic under the synthetic observer turn id).
+            stream.emit(streamDelta("agent-1", "conv-local", 21, stopReasonDelta("end_turn")))
+            delay(200.milliseconds)
+
+            val localTurnId = frames.filterIsInstance<ServerFrame.TurnStarted>().single().turnId
+            val ending = frames.filter {
+                (it is ServerFrame.StopReason && it.turnId == localTurnId) ||
+                    (it is ServerFrame.TurnDone && it.turnId == localTurnId)
+            }
+            assertEquals(
+                listOf("StopReason", "TurnDone"),
+                ending.map { it::class.simpleName },
+                "stop reason precedes the terminal; got ${frames.map { it::class.simpleName }}",
+            )
+            val stop = ending[0] as ServerFrame.StopReason
+            val done = ending[1] as ServerFrame.TurnDone
+            assertEquals("end_turn", stop.stopReason)
+            assertEquals("completed", done.status)
+            assertFalse(transport.hasActiveChatTurn("conv-local"), "turn retired by the observer terminal")
         } finally {
             collector.cancel()
             runCatching { transport.cancel("conv-local") }

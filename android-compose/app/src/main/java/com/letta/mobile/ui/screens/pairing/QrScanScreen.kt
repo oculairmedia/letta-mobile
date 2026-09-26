@@ -52,6 +52,7 @@ import ca.oculair.meridian.R
 import com.letta.mobile.data.controller.node.iroh.PairQrEnvelope
 import com.letta.mobile.ui.icons.LettaIcons
 import java.util.concurrent.Executors
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Client-mode QR scanner screen (letta-mobile-g2d2i). Requests CAMERA at
@@ -188,18 +189,18 @@ private fun ScanStatusOverlay(uiState: ScanUiState, onScanAgain: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
+            .padding(LettaDimens.Space.xl),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
             modifier = Modifier
                 .background(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(LettaDimens.Radius.lg),
                 )
-                .padding(16.dp),
+                .padding(LettaDimens.Space.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             when (status) {
                 ScanStatus.VALID -> Text(
@@ -230,9 +231,9 @@ private fun PermissionDeniedContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
+            .padding(LettaDimens.Space.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Icon(
             imageVector = LettaIcons.Camera,

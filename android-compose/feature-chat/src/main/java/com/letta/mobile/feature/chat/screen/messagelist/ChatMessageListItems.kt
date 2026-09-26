@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.screen.ChatMessageItem
@@ -31,6 +32,7 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun MeasuredChatRenderItem(
@@ -151,7 +153,8 @@ internal fun RenderChatMessage(
             message = message,
             modifier = modifier
                 .then(highlightModifier)
-                .padding(top = rowPadding.topDp.dp, bottom = rowPadding.bottomDp.dp),
+                .padding(top = rowPadding.topDp.dp, bottom = rowPadding.bottomDp.dp)
+                .testTag(ChatTimelineRowTestTags.Surface),
         )
     } else {
         ChatMessageItem(
@@ -171,9 +174,18 @@ internal fun RenderChatMessage(
             onAttachmentImageTap = callbacks.onAttachmentImageTap,
             modifier = modifier
                 .then(highlightModifier)
-                .padding(top = rowPadding.topDp.dp, bottom = rowPadding.bottomDp.dp),
+                .padding(top = rowPadding.topDp.dp, bottom = rowPadding.bottomDp.dp)
+                .testTag(ChatTimelineRowTestTags.Surface),
         )
     }
+}
+
+/**
+ * letta-mobile-jqiu3: the drawn surface of one timeline message row, i.e. the row without its
+ * leading step spacing. Spacing contracts measure gaps between these surfaces.
+ */
+internal object ChatTimelineRowTestTags {
+    const val Surface = "chat-timeline-row-surface"
 }
 
 /** Vertical item padding (in dp) applied by [RenderChatMessage] to one row. */
@@ -228,7 +240,7 @@ private fun DebugMessageCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
         Column(modifier = Modifier.padding(LettaSpacing.CARD_GAP)) {

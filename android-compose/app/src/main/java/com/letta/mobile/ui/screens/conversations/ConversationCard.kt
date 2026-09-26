@@ -57,6 +57,7 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.theme.LettaDimens
 
 data class ConversationCardCallbacks(
     val onClick: () -> Unit,
@@ -167,10 +168,10 @@ fun ConversationCard(
 private fun conversationCardTitle(display: ConversationDisplay): String =
     display.conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
 
-private val ConversationCardShape = RoundedCornerShape(12.dp)
+private val ConversationCardShape = RoundedCornerShape(LettaDimens.Radius.md)
 
 @OptIn(ExperimentalFoundationApi::class)
-private val ConversationCardMascotSize = 44.dp
+private val ConversationCardMascotSize = LettaDimens.Orb.railSlotHeight
 
 @Composable
 private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
@@ -194,8 +195,8 @@ private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
 @Composable
 private fun ConversationCardRow(params: ConversationCardSurfaceParams) {
     Row(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AgentAvatar(
@@ -205,7 +206,7 @@ private fun ConversationCardRow(params: ConversationCardSurfaceParams) {
         )
         Column(modifier = Modifier.weight(1f)) {
             ConversationCardTitleRow(params)
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
             ConversationCardStatusRow(params)
         }
     }
@@ -227,7 +228,7 @@ private fun ConversationCardTitleRow(params: ConversationCardSurfaceParams) {
                 style = MaterialTheme.typography.listItemMetadata,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                modifier = Modifier.padding(start = 8.dp),
+                modifier = Modifier.padding(start = LettaDimens.Space.sm),
             )
         }
     }
@@ -237,7 +238,7 @@ private fun ConversationCardTitleRow(params: ConversationCardSurfaceParams) {
 private fun ConversationCardStatusRow(params: ConversationCardSurfaceParams) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         conversationStatus(params.display)?.let { status ->
             Icon(

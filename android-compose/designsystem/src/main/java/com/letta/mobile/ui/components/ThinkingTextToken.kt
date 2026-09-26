@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 const val THINKING_TEXT_TOKEN_TEST_TAG = "thinking-text-token"
 
@@ -66,7 +67,7 @@ fun ThinkingTextToken(
     reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(),
     modifier: Modifier = Modifier,
     /** Around the text; the default is the standalone strip's inset. Beside a mascot the caller drops the start. */
-    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
 ) {
     val restingOrigin = TransformOrigin(pivotFractionX = 0f, pivotFractionY = 1f)
     AnimatedVisibility(
@@ -136,8 +137,8 @@ fun ThinkingTextToken(
     }
 }
 
-private val ThinkingTextTokenReservedHeight = 32.dp
-private val ThinkingTextTokenTextMinHeight = 24.dp
+private val ThinkingTextTokenReservedHeight = LettaDimens.Space.xxl
+private val ThinkingTextTokenTextMinHeight = LettaDimens.Space.xl
 
 private const val SWEEP_BAND_PX = 800f
 private const val SWEEP_TRAVEL_PX = 2_400f

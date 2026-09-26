@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
+import com.letta.mobile.data.runtime.INPUT_QUEUED_REASON
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -14,7 +15,7 @@ import java.util.UUID
 /**
  * Shared payload -> [ServerFrame] projection used by BOTH the initiator send
  * path ([IrohChannelTransport.emitDraft]) and the passive OBSERVER ingestion
- * loop ([IrohChannelTransport.ingestObserverFrame]).
+ * loop ([IrohObserverIngestor.ingestObserverFrame]).
  *
  * Extracting it guarantees the observer produces byte-identical frame shapes
  * to the initiator — the ONLY difference between the two paths is who supplies
@@ -165,8 +166,21 @@ object RuntimeEventServerFrameMapper {
             ),
             turnDone(context, "cancelled"),
         )
-        RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
+        RuntimeRunStatus.Running -> listOfNotNull(queuedFrame(payload, context))
+        RuntimeRunStatus.Started -> emptyList()
     }
+
+    /**
+     * letta-mobile-1n5py.1: the engine reports an input parked in the App Server's queue as Running
+     * with [INPUT_QUEUED_REASON]; the phone shows it as "queued on server" until the turn starts.
+     */
+    private fun queuedFrame(payload: RuntimeEventPayload.RunLifecycleChanged, context: Context): ServerFrame.TurnQueued? =
+        ServerFrame.TurnQueued(
+            id = "turn_queued-${UUID.randomUUID()}",
+            ts = nowIso(),
+            turnId = context.turnId,
+            conversationId = context.conversationId,
+        ).takeIf { payload.reason == INPUT_QUEUED_REASON }
 
     private fun turnDone(context: Context, status: String): ServerFrame.TurnDone =
         ServerFrame.TurnDone(

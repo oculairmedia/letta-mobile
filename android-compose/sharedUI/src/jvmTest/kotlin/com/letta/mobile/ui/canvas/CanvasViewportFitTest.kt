@@ -2,8 +2,11 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
+import io.ak1.drawbox.domain.model.Viewport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -15,7 +18,7 @@ class CanvasViewportFitTest {
     @Test
     fun fitScalesAndCentresTheContentInsideTheBoard() {
         val content = Rect(100f, 200f, 1700f, 1000f)
-        val fit = CanvasViewportFit.fit(content, boardWidth = 800f, boardHeight = 600f)
+        val fit = CanvasViewportFit.fit(content, Size(800f, 600f))
         val topLeft = screen(fit, Offset(content.left, content.top))
         val bottomRight = screen(fit, Offset(content.right, content.bottom))
         assertTrue(topLeft.x >= 0f && topLeft.y >= 0f, "$topLeft")
@@ -27,8 +30,8 @@ class CanvasViewportFitTest {
 
     @Test
     fun fitNeverZoomsBeyondTheLimits() {
-        assertEquals(CanvasViewportFit.MAX_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 1f, 1f), 1000f, 1000f).scale)
-        assertEquals(CanvasViewportFit.MIN_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 100000f, 100000f), 100f, 100f).scale)
+        assertEquals(CanvasViewportFit.MAX_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 1f, 1f), Size(1000f, 1000f)).scale)
+        assertEquals(CanvasViewportFit.MIN_SCALE, CanvasViewportFit.fit(Rect(0f, 0f, 100000f, 100000f), Size(100f, 100f)).scale)
     }
 
     @Test
@@ -36,5 +39,42 @@ class CanvasViewportFitTest {
         assertNull(CanvasViewportFit.contentBounds(emptyList(), emptyList()))
         val note = CanvasSceneDocument(id = "n", json = "", frame = CanvasDocumentFrame(500f, 600f, 300f, 200f))
         assertEquals(Rect(500f, 600f, 800f, 800f), CanvasViewportFit.contentBounds(emptyList(), listOf(note)))
+    }
+
+    @Test
+    fun panToShowCentresTheTargetAtTheCurrentZoom() {
+        val viewport = Viewport(offset = Offset(-100f, 50f), scale = 2f)
+        val target = Rect(300f, 300f, 400f, 360f)
+        val pan = CanvasViewportFit.panToShow(target, viewport, IntSize(800, 600), centre = true)!!
+        val centre = viewport.panBy(pan).worldToScreen(target.center)
+        assertEquals(400f, centre.x, 0.01f)
+        assertEquals(300f, centre.y, 0.01f)
+    }
+
+    @Test
+    fun panToShowLeavesAVisibleTargetAloneUnlessAskedToCentre() {
+        val target = Rect(10f, 10f, 110f, 110f)
+        assertNull(CanvasViewportFit.panToShow(target, Viewport(), IntSize(800, 600), centre = false))
+        assertTrue(CanvasViewportFit.panToShow(target, Viewport(), IntSize(800, 600), centre = true) != null)
+        val offBoard = Rect(750f, 10f, 900f, 110f)
+        assertTrue(CanvasViewportFit.panToShow(offBoard, Viewport(), IntSize(800, 600), centre = false) != null)
+        assertNull(CanvasViewportFit.panToShow(target, Viewport(), IntSize.Zero, centre = true))
+    }
+
+    @Test
+    fun panIntoBandLiftsANoteCoveredByTheKeyboardJustClearOfIt() {
+        val band = Rect(0f, 80f, 400f, 380f)
+        val note = Rect(50f, 500f, 250f, 700f)
+        val pan = CanvasViewportFit.panIntoBand(note, Viewport(), band)!!
+        assertEquals(Offset(0f, -320f), pan)
+        assertNull(CanvasViewportFit.panIntoBand(note, Viewport().panBy(pan), band))
+    }
+
+    @Test
+    fun panIntoBandShowsTheTopOfANoteTallerThanTheBand() {
+        val band = Rect(0f, 80f, 400f, 380f)
+        val tall = Rect(50f, 500f, 250f, 1500f)
+        assertEquals(Offset(0f, -420f), CanvasViewportFit.panIntoBand(tall, Viewport(), band))
+        assertNull(CanvasViewportFit.panIntoBand(Rect(10f, 100f, 90f, 200f), Viewport(), band))
     }
 }

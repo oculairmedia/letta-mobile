@@ -72,6 +72,7 @@ import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemMetadataMonospace
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,7 +132,7 @@ fun IdentityListScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadIdentities() },
@@ -159,8 +160,8 @@ fun IdentityListScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             itemsIndexed(filteredIdentities, key = { _, it -> it.id }) { index, identity ->
                                 StaggeredListItem(index = index) {
@@ -302,7 +303,7 @@ private fun IdentityCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -310,7 +311,7 @@ private fun IdentityCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(identity.name, style = MaterialTheme.typography.listItemHeadline)
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                     Text(
                         text = identity.identifierKey,
                         style = MaterialTheme.typography.listItemMetadataMonospace,
@@ -322,8 +323,8 @@ private fun IdentityCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
                 AssistChip(onClick = {}, label = { Text(identity.identityType) })
                 if (identity.properties.isNotEmpty()) {
                     AssistChip(onClick = {}, label = { Text(pluralStringResource(R.plurals.screen_identities_properties_chip, identity.properties.size, identity.properties.size)) })
@@ -384,7 +385,7 @@ private fun IdentityDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             CardGroup {
                 item(
                     headlineContent = { Text(stringResource(R.string.screen_identities_identifier_label, "")) },
@@ -489,7 +490,7 @@ private fun IdentityDetailDialog(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 TextButton(onClick = onAttachAgent) {
                     Text(stringResource(R.string.screen_identities_attach_agent_action))
                 }

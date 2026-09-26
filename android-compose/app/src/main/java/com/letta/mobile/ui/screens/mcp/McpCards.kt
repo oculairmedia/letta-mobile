@@ -56,6 +56,7 @@ import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 internal fun PhoneBridgeCard(
@@ -66,13 +67,13 @@ internal fun PhoneBridgeCard(
         modifier = modifier
             .fillMaxWidth()
             .expressiveContentSize(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = stringResource(R.string.screen_mcp_connect_phone_title),
@@ -100,16 +101,16 @@ internal fun ToolCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(LettaDimens.Space.lg),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(LettaIcons.Tool, null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
+                Icon(LettaIcons.Tool, null, modifier = Modifier.size(LettaDimens.Control.icon))
+                Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(
                     text = tool.name,
                     style = MaterialTheme.typography.listItemHeadline,
@@ -118,7 +119,7 @@ internal fun ToolCard(
             }
 
             tool.description?.let { description ->
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.listItemSupporting,
@@ -129,7 +130,7 @@ internal fun ToolCard(
             }
 
             tool.toolType?.let { toolType ->
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 AssistChip(
                     onClick = {},
                     label = { Text(toolType, style = MaterialTheme.typography.labelSmall) },
@@ -137,7 +138,7 @@ internal fun ToolCard(
             }
 
             parent?.let {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 AssistChip(
                     onClick = { onNavigateToServerTools(it.serverId.value) },
                     label = {
@@ -169,14 +170,14 @@ internal fun ServerCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
         colors = LettaCardDefaults.listCardColors(),
         onClick = { expanded = !expanded },
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(LettaDimens.Space.lg),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -190,7 +191,7 @@ internal fun ServerCard(
                             style = MaterialTheme.typography.listItemHeadline,
                         )
                         server.effectiveServerType()?.let { serverType ->
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                             AssistChip(
                                 onClick = {},
                                 label = { Text(text = serverType, style = MaterialTheme.typography.labelSmall) },
@@ -199,7 +200,7 @@ internal fun ServerCard(
                     }
 
                     server.effectiveServerUrl()?.let { url ->
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Text(
                             text = url,
                             style = MaterialTheme.typography.listItemSupporting,
@@ -210,14 +211,14 @@ internal fun ServerCard(
                     }
 
                     server.effectiveCommand()?.let { command ->
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = stringResource(R.string.screen_mcp_server_command),
                                 style = MaterialTheme.typography.listItemMetadata,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
                             Text(
                                 text = command,
                                 style = MaterialTheme.typography.listItemSupporting,
@@ -228,7 +229,7 @@ internal fun ServerCard(
                     }
 
                     server.effectiveArgs().takeIf { it.isNotEmpty() }?.let { args ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = args.joinToString(" "),
                             style = MaterialTheme.typography.listItemSupporting,
@@ -239,7 +240,7 @@ internal fun ServerCard(
                     }
 
                     serverActivityText(server)?.let { activityText ->
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Text(
                             text = activityText,
                             style = MaterialTheme.typography.listItemMetadata,
@@ -248,7 +249,7 @@ internal fun ServerCard(
                     }
 
                     server.effectiveAuthHeader()?.let { authHeader ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_auth_header, authHeader),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -257,7 +258,7 @@ internal fun ServerCard(
                     }
 
                     server.effectiveAuthToken()?.let {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_token_present),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -266,7 +267,7 @@ internal fun ServerCard(
                     }
 
                     server.effectiveCustomHeaders()?.takeIf { it.isNotEmpty() }?.let { headers ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_custom_headers_count, headers.size),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -275,7 +276,7 @@ internal fun ServerCard(
                     }
 
                     server.effectiveEnv()?.takeIf { it.isNotEmpty() }?.let { env ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_env_count, env.size),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -284,7 +285,7 @@ internal fun ServerCard(
                     }
 
                     server.organizationId?.let { organizationId ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_organization, organizationId),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -295,7 +296,7 @@ internal fun ServerCard(
                     }
 
                     server.createdById?.let { createdById ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_created_by, createdById),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -306,7 +307,7 @@ internal fun ServerCard(
                     }
 
                     server.lastUpdatedById?.let { lastUpdatedById ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_updated_by, lastUpdatedById),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -317,7 +318,7 @@ internal fun ServerCard(
                     }
 
                     if (server.metadata.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_metadata_count, server.metadata.size),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -326,7 +327,7 @@ internal fun ServerCard(
                     }
 
                     if (tools.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Text(
                             text = pluralStringResource(R.plurals.screen_mcp_server_tools_count, tools.size, tools.size),
                             style = MaterialTheme.typography.listItemMetadata,
@@ -349,7 +350,7 @@ internal fun ServerCard(
                         },
                     )
                     checkState?.message?.let { message ->
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.hair))
                         Text(
                             text = message,
                             style = MaterialTheme.typography.listItemSupporting,
@@ -366,16 +367,16 @@ internal fun ServerCard(
             }
 
             if (expanded && tools.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 HorizontalDivider()
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 Text(
                     text = stringResource(R.string.screen_mcp_server_discovered_tools),
                     style = MaterialTheme.typography.dialogSectionHeading,
                 )
                 tools.forEach { tool ->
                     Row(
-                        modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                        modifier = Modifier.padding(start = LettaDimens.Space.sm, top = LettaDimens.Space.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(

@@ -21,6 +21,8 @@ data class NativeReadTiers(
     val agentMetadata: AgentMetadataSidecar? = null,
     /** Pushes `agent_updated` to connected clients after agent writes; null sends nothing. */
     val agentChanges: AgentChangeNotifier? = null,
+    /** Pushes `conversation_updated` to connected clients after conversation writes; null sends nothing. */
+    val conversationChanges: ConversationChangeNotifier? = null,
 )
 
 object AdminRpcRegistry {
@@ -108,6 +110,14 @@ object AdminRpcRegistry {
         skillsListing: SkillsListingSource? = null,
         /** See [NativeReadTiers.agentChanges]. */
         agentChanges: AgentChangeNotifier? = null,
+        /** See [NativeReadTiers.conversationChanges]. */
+        conversationChanges: ConversationChangeNotifier? = null,
+        /**
+         * letta-mobile-w4q4p: JSON file holding the model exposure decisions
+         * (`model.exposure.*`, filters `model.list`). Null keeps them in memory
+         * for the router's lifetime (tests, stub CLI).
+         */
+        modelExposureFile: String? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -120,7 +130,7 @@ object AdminRpcRegistry {
         val agentMetadata = localBackendDir
             ?.takeIf { it.isNotBlank() }
             ?.let { AgentMetadataSidecar.inLocalBackend(java.io.File(it)) }
-        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata, agentChanges)
+        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata, agentChanges, conversationChanges)
 
         HealthAdminHandlers.register(router, controller)
         AgentAdminHandlers.register(router, controller, tiers)
@@ -130,7 +140,7 @@ object AdminRpcRegistry {
         RunAdminHandlers.register(router, localBackendStore)
         ArchiveAdminHandlers.register(router)
         IdentityAdminHandlers.register(router)
-        ModelAdminHandlers.register(router, nativeClient)
+        ModelAdminHandlers.register(router, nativeClient, modelExposureStore(modelExposureFile))
         ScheduleAdminHandlers.register(router, nativeClient)
         ToolAdminHandlers.register(router, localBackendStore, nativeClient)
         McpAdminHandlers.register(router)
@@ -163,4 +173,9 @@ object AdminRpcRegistry {
     }
 
     val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos")
+
+    private fun modelExposureStore(path: String?): ModelExposureStore =
+        path?.takeIf { it.isNotBlank() }
+            ?.let { FileModelExposureStore(java.io.File(it)) }
+            ?: InMemoryModelExposureStore()
 }

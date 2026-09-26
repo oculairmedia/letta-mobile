@@ -87,7 +87,10 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         imageViewerState = imageViewerState,
         onImageViewerStateChange = { imageViewerState = it },
         bottomPaddingDp = bottomPaddingDp,
-        onComposerHeightChange = { composerHeightDp = it },
+        onComposerHeightChange = {
+            composerHeightDp = it
+            params.onComposerMeasured(it)
+        },
         contentCallbacks = contentCallbacks,
         toolRunDetails = toolRunDetails,
         onToolRunDetailsChange = { toolRunDetails = it },

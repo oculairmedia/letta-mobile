@@ -115,23 +115,14 @@ internal data class ChatMessageListRenderItemBodyParams(
     val showTimestamp: Boolean,
 )
 
+/** One run as the list renders it, whichever shape - lone reply or grouped block - carried it. */
 @Immutable
-internal data class ChatMessageListRenderSingleItemParams(
-    val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem.Single,
-    val context: ChatMessageListLazyContext,
-    val chatDimens: com.letta.mobile.ui.theme.ChatDimens,
-    val isStreamingRenderItem: Boolean,
-    val showTimestamp: Boolean,
-)
-
-@Immutable
-internal data class ChatMessageListRenderRunBlockItemParams(
-    val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock,
-    val context: ChatMessageListLazyContext,
-    val chatDimens: com.letta.mobile.ui.theme.ChatDimens,
-    val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
-    val isStreamingRenderItem: Boolean,
-    val showTimestamp: Boolean,
+internal data class ChatMessageListRenderRunParams(
+    val runId: String,
+    val messages: List<com.letta.mobile.data.model.UiMessage>,
+    val topPadding: androidx.compose.ui.unit.Dp,
+    val highlighted: Boolean,
+    val body: ChatMessageListRenderItemBodyParams,
 )
 
 internal data class ChatMessageListPinchIndicatorEffectParams(

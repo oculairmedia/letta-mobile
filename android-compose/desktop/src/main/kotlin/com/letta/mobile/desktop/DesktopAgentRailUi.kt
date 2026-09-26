@@ -15,10 +15,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +64,7 @@ import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Fade length for the rail's scroll edges — proportionate to the rail's own
@@ -74,7 +73,7 @@ import com.letta.mobile.ui.chat.AgentOrb
  * reading column. Shared by both rail modes (collapsed orb list, expanded
  * library roster) so they match.
  */
-private val RailFadeLength = 32.dp
+private val RailFadeLength = LettaDimens.Space.xxl
 
 /**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
@@ -134,7 +133,7 @@ private fun ThinkingRing(
     )
     val primary = MaterialTheme.colorScheme.primary
     Canvas(modifier = modifier.size(diameter)) {
-        val strokeWidth = 2.dp.toPx()
+        val strokeWidth = LettaDimens.Space.hair.toPx()
         val radius = (size.minDimension - strokeWidth) / 2f
         // Faint full track so the indicator reads as a ring, not a flying dash.
         drawCircle(
@@ -236,9 +235,9 @@ internal fun DesktopAgentRail(
             .width(width)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.background)
-            .padding(vertical = 15.dp),
+            .padding(vertical = LettaDimens.Space.lg),
         horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         // Home is fleet-wide, so it sits at the top of the rail - always, in both
         // rail modes - and not in the per-agent sidebar, whose header is then
@@ -253,7 +252,10 @@ internal fun DesktopAgentRail(
                 ),
             )
         }
-        Spacer(Modifier.height(4.dp))
+        // No extra spacer under Home: the column's own 8.dp arrangement is the
+        // whole gap. A Spacer here is an item in its own right, so the
+        // arrangement applied on both sides of it and Home sat 20.dp clear of
+        // the first orb — visibly detached from the list it heads.
         // Then the orbs, with the plus pinned at the bottom (Grok Bot layout). There is no separate
         // search trigger: the plus menu's "New chat" opens the agent picker, which searches.
         Column(modifier = Modifier.weight(1f)) {
@@ -370,7 +372,7 @@ private fun ColumnScope.ExpandedAgentLibrary(
                     text = "No agents match \"${query.text.trim()}\"",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
                 )
             }
         }
@@ -402,17 +404,17 @@ private fun LibrarySearchField(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = LettaDimens.Space.md)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(LettaDimens.Radius.sm))
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Icon(
             imageVector = Icons.Outlined.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
         )
         JewelTextField(
             value = query,
@@ -435,9 +437,9 @@ private fun SpaceHeader(space: AgentRailSpace, focus: DesktopAgentRailFocus) {
     val working = focus.thinkingAgentId != null &&
         space.groups.any { focus.thinkingAgentId in it.agentIds }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = space.name.uppercase(),
@@ -449,7 +451,7 @@ private fun SpaceHeader(space: AgentRailSpace, focus: DesktopAgentRailFocus) {
         if (working) {
             Box(
                 modifier = Modifier
-                    .size(6.dp)
+                    .size(LettaDimens.Space.sm)
                     .background(MaterialTheme.colorScheme.primary, CircleShape),
             )
         }
@@ -472,16 +474,16 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
             .background(
                 if (flags.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Box(contentAlignment = Alignment.Center) {
             // A live mascot shows thinking itself; the ring is for the gradient orb only.
             if (flags.thinking && target.identity == null) {
-                ThinkingRing(diameter = 32.dp)
+                ThinkingRing(diameter = LettaDimens.Orb.md)
             }
-            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = 40.dp, cornerRadius = 10.dp)
+            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
         }
         Text(
             text = params.group.name,
@@ -531,11 +533,10 @@ private fun ColumnScope.AgentRailOrbList(
                 bottomFadeLength = RailFadeLength,
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        // Each 30dp orb already sits in a 34dp slot (2dp slack top and bottom),
-        // so this spacing is ON TOP of that: 4dp here is an 8dp gap between
-        // adjacent orbs. The slot itself stays 34dp — the thinking ring is
-        // exactly that size, so shrinking the slot would crowd it.
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        // Each 40dp orb (Orb.lg) already sits in a 44dp slot (Orb.railSlotHeight,
+        // 2dp slack top and bottom), so this spacing is ON TOP of that.
+        // Sized to fit the slot so it doesn't crowd neighbouring orbs.
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
             AgentRailOrb(
@@ -557,7 +558,7 @@ private fun NewSessionButton(onNewSession: () -> Unit) {
     DesktopTooltip(text = "New") {
         Box(
             modifier = Modifier
-                .size(28.dp)
+                .size(LettaDimens.Control.iconButton)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .clickable(onClick = onNewSession),
@@ -567,7 +568,7 @@ private fun NewSessionButton(onNewSession: () -> Unit) {
                 imageVector = Icons.Outlined.Add,
                 contentDescription = "New",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }
@@ -647,21 +648,21 @@ private fun AgentRailOrbContent(
 ) {
     Box(
         // Square slot for a square tile (it was 46x34 for the old 30 dp orbs).
-        modifier = Modifier.size(width = 48.dp, height = 44.dp),
+        modifier = Modifier.size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight),
         contentAlignment = Alignment.Center,
     ) {
         if (flags.selected) {
             SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
         }
         if (flags.thinking && target.identity == null) {
-            // Concentric with the 30dp orb (2dp gap) and sized to fit the
+            // Concentric with the orb and sized to fit the
             // slot so it doesn't crowd neighbouring orbs.
-            ThinkingRing(diameter = 34.dp)
+            ThinkingRing(diameter = LettaDimens.Orb.md)
         }
         RailAgentTile(
             target = target,
             initial = params.group.name.firstOrNull()?.uppercase() ?: "?",
-            size = 40.dp,
+            size = LettaDimens.Orb.lg,
             onClick = { params.onAgentSelected(target.agentId) },
         )
         // No member-count chip on stacked orbs: PM groups aggregate hundreds
@@ -676,7 +677,7 @@ private fun RailAgentTile(
     target: AgentRailOrbTarget,
     initial: String,
     size: androidx.compose.ui.unit.Dp,
-    cornerRadius: androidx.compose.ui.unit.Dp = 7.dp,
+    cornerRadius: androidx.compose.ui.unit.Dp = LettaDimens.Radius.sm,
     onClick: (() -> Unit)? = null,
 ) {
     AgentOrb(index = target.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick, agentId = target.agentId) {
@@ -688,8 +689,8 @@ private fun RailAgentTile(
 private fun SelectedAgentRailMarker(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(width = 3.dp, height = 28.dp)
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+            .size(width = LettaDimens.Space.xs, height = LettaDimens.Control.iconButton)
+            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(LettaDimens.Radius.sm)),
     )
 }
 
@@ -708,7 +709,7 @@ private fun RailActionIcon(model: RailActionIconModel) {
     DesktopTooltip(text = model.description) {
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(LettaDimens.Control.iconButtonLg)
                 .clip(CircleShape)
                 .background(if (model.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
                 .clickable(onClick = model.onClick),
@@ -719,7 +720,7 @@ private fun RailActionIcon(model: RailActionIconModel) {
                 contentDescription = model.description,
                 tint = model.tint.takeIf { it != Color.Unspecified }
                     ?: if (model.selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }

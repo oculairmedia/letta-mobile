@@ -9,6 +9,8 @@ import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.BlockIrohSource
 import com.letta.mobile.data.repository.api.BlockRemoteSource
+import com.letta.mobile.data.repository.api.AgentBlockTarget
+import com.letta.mobile.data.repository.api.IAgentBlockWriteRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.session.BackendScopedCache
 
@@ -23,7 +25,7 @@ import com.letta.mobile.data.session.BackendScopedCache
 open class CachedBlockRepository(
     private val remote: BlockRemoteSource,
     private val irohBlockSource: BlockIrohSource? = null,
-) : IBlockRepository, BackendScopedCache {
+) : IBlockRepository, IAgentBlockWriteRepository, BackendScopedCache {
     override suspend fun clearForBackendSwitch() = Unit
 
     override suspend fun getBlocks(agentId: String): List<Block> =
@@ -55,6 +57,9 @@ open class CachedBlockRepository(
             iroh = { it.updateAgentBlock(agentId, blockLabel, params) },
             http = { remote.updateAgentBlock(agentId, blockLabel, params) },
         )
+
+    override suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block =
+        updateAgentBlock(target.agentId, target.label, params)
 
     override suspend fun updateGlobalBlock(
         blockId: String,

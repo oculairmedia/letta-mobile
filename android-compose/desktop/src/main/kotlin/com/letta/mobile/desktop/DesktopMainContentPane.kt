@@ -26,6 +26,7 @@ import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.ui.components.LettaSidePane
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class DesktopMainContentInputs(
     val editingAgentId: String?,
@@ -60,64 +61,84 @@ internal fun DesktopMainContentPane(
     modifier: Modifier = Modifier,
 ) {
     val editing = inputs.editingAgentId
+    val canvas = inputs.activeCanvasSession
     // The editor is a panel beside the chat, not a page: the conversation stays in view.
     androidx.compose.foundation.layout.Row(modifier = modifier) {
-    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-        if (inputs.selectedDestination == DesktopDestination.Conversations) {
-            ChatDetailPane(
-                state = inputs.chatDetailState,
-                actions = actions.chatDetailActions,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (!inputs.showBackgroundTasks && inputs.subagentRepository != null) {
-                DesktopBackgroundTasksToggle(
-                    runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
-                    onClick = actions.onShowBackgroundTasks,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 12.dp, end = 16.dp),
-                )
-            }
-        } else {
-            DestinationContent(
-                destination = inputs.selectedDestination,
-                inputs = inputs.destinationInputs,
-                actions = actions.destinationActions,
-                modifier = Modifier.fillMaxSize(),
-            )
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            MainDestination(inputs, actions)
+        }
+        when {
+            editing != null -> EditAgentSidePane(editing, inputs, actions)
+            canvas != null -> CanvasSidePane(canvas, actions)
         }
     }
-    if (editing != null) {
-        LettaSidePane(title = "Edit agent", onClose = actions.onEditAgentClose, initialWidth = 460.dp) {
-            DesktopEditAgentSurface(
-                agentId = editing,
-                modelOptions = inputs.modelOptions,
-                agentRepository = inputs.agentRepository,
-                blockApi = inputs.blockApi,
-                settings = inputs.secureSettingsStore,
-                scope = inputs.chatScope,
-                onSaved = actions.onEditAgentSaved,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    } else if (inputs.activeCanvasSession != null) {
-        val canvasDocument by inputs.activeCanvasSession.document.collectAsState()
-        LettaSidePane(
-            title = canvasDocument?.title ?: "Canvas",
-            onClose = actions.onCloseCanvas,
-            initialWidth = 540.dp,
-            // The board's own title pill (with its back arrow) is the header: a full pane
-            // header above it only pushed the board down.
-            showHeader = false,
-        ) {
-            CanvasWorkspace(
-                session = inputs.activeCanvasSession,
-                presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
-                onNavigateBack = actions.onCloseCanvas,
-                onShareToChat = actions.onShareCanvasToChat,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+}
+
+/** The conversation (with the background-tasks toggle over it) or whichever destination is chosen. */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
+    inputs: DesktopMainContentInputs,
+    actions: DesktopMainContentActions,
+) {
+    if (inputs.selectedDestination != DesktopDestination.Conversations) {
+        DestinationContent(
+            destination = inputs.selectedDestination,
+            inputs = inputs.destinationInputs,
+            actions = actions.destinationActions,
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
     }
+    ChatDetailPane(
+        state = inputs.chatDetailState,
+        actions = actions.chatDetailActions,
+        modifier = Modifier.fillMaxSize(),
+    )
+    if (!inputs.showBackgroundTasks && inputs.subagentRepository != null) {
+        DesktopBackgroundTasksToggle(
+            runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
+            onClick = actions.onShowBackgroundTasks,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = LettaDimens.Space.md, end = LettaDimens.Space.lg),
+        )
+    }
+}
+
+@Composable
+private fun EditAgentSidePane(agentId: String, inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
+    LettaSidePane(title = "Edit agent", onClose = actions.onEditAgentClose, initialWidth = 460.dp) {
+        DesktopEditAgentSurface(
+            agentId = agentId,
+            modelOptions = inputs.modelOptions,
+            agentRepository = inputs.agentRepository,
+            blockApi = inputs.blockApi,
+            settings = inputs.secureSettingsStore,
+            scope = inputs.chatScope,
+            onSaved = actions.onEditAgentSaved,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun CanvasSidePane(session: CanvasSession, actions: DesktopMainContentActions) {
+    val canvasDocument by session.document.collectAsState()
+    LettaSidePane(
+        title = canvasDocument?.title ?: "Canvas",
+        onClose = actions.onCloseCanvas,
+        initialWidth = 540.dp,
+        // The board's own title pill (with its back arrow) is the header: a full pane
+        // header above it only pushed the board down.
+        showHeader = false,
+    ) {
+        CanvasWorkspace(
+            session = session,
+            presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
+            assets = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.assets,
+            onNavigateBack = actions.onCloseCanvas,
+            onShareToChat = actions.onShareCanvasToChat,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }

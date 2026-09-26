@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.GoalStatus
 import com.letta.mobile.data.model.MessageContentPart
@@ -41,6 +42,8 @@ internal class AdminChatComposerCoordinator(
     private val messageRepository: IMessageRepository,
     private val slashCommandRepository: ISlashCommandRepository,
     private val isStreaming: () -> Boolean,
+    private val pendingUserInput: () -> PendingUserInput? = { null },
+    private val submitUserInput: (PendingUserInput, String) -> Unit = { _, _ -> },
     private val projectContextAvailable: Boolean,
     private val nowMs: () -> Long = { System.currentTimeMillis() },
 ) {
@@ -117,12 +120,16 @@ internal class AdminChatComposerCoordinator(
                 ChatComposerEffect.OpenBugReport
             }
             null -> {
-                if (uiState.value.isCancellingRun) {
+                val pending = pendingUserInput()
+                if (pending != null && trimmed.isNotBlank()) {
+                    submitUserInput(pending, pending.encodeAnswer(trimmed))
+                    composerController.clearText()
+                } else if (uiState.value.isCancellingRun) {
                     // letta-mobile-lgns8.19: sends are REJECTED (not queued)
                     // while a stop is in flight — matching the existing
                     // "no free-form steering during an active run" convention.
                     composerController.setError(STOPPING_SEND_BLOCKED_MESSAGE)
-                } else if (isStreaming()) {
+                } else if (isStreaming() && !canQueueWhileStreaming()) {
                     composerController.setError(
                         "Letta does not support free-form steering during an active run yet. Stop the run before sending another message."
                     )
@@ -132,6 +139,17 @@ internal class AdminChatComposerCoordinator(
                 null
             }
         }
+    }
+
+    internal data class PendingUserInput(
+        val requestId: String,
+        val toolCallId: String,
+        val arguments: String?,
+        val question: String,
+    ) {
+        fun encodeAnswer(answer: String): String = AskUserQuestion.encodeAnswerReason(
+            AskUserQuestion.buildUpdatedInput(arguments, mapOf(question to listOf(answer))),
+        )
     }
 
     fun sendMessage(text: String) {
@@ -157,7 +175,40 @@ internal class AdminChatComposerCoordinator(
         }
 
         val payload = composerController.payloadForSend(text) ?: return
-        sendMessagePayload(payload.text, payload.attachments)
+        if (isStreaming() && canQueueWhileStreaming()) {
+            queueMessagePayload(payload)
+        } else {
+            sendMessagePayload(payload.text, payload.attachments)
+        }
+    }
+
+    /**
+     * letta-mobile-1n5py: the Iroh route queues a message sent during a turn instead of refusing
+     * it. The other routes still have no queue, so they keep the "stop first" rule.
+     */
+    fun canQueueWhileStreaming(): Boolean {
+        val context = chatSendContext()
+        return !context.isLocalRuntime && context.backendKind == BackendKind.IROH
+    }
+
+    /**
+     * The turn ahead keeps running, so none of the new-turn bookkeeping below applies: its cancel
+     * watcher, banners and send epoch belong to it until its terminal.
+     */
+    private fun queueMessagePayload(payload: ComposerSendPayload) {
+        chatSendStrategySelector.send(payload.text, payload.attachments, chatSendContext())
+    }
+
+    /**
+     * letta-mobile-1n5py: a queued message is about to become a new turn outside [sendMessage]
+     * (Send now, Resume). Retire the previous turn's cancel watcher first, or its ghost-resume
+     * guard would read the new turn's first frames as the stopped turn's tail and clear them.
+     */
+    fun beginQueuedTurn() {
+        sendEpoch += 1
+        cancelWatchJob?.cancel()
+        cancelWatchJob = null
+        chatBannerController.clearCancelling()
     }
 
     fun rerunMessage(message: UiMessage) {
@@ -331,7 +382,6 @@ internal class AdminChatComposerCoordinator(
     private fun cancelTransportLabel(context: ChatSendContext): String = when {
         context.isLocalRuntime -> "localRuntime"
         context.backendKind == BackendKind.IROH -> "iroh"
-        context.backendKind == BackendKind.SHIM_WS -> "shim"
         else -> "appServer"
     }
 

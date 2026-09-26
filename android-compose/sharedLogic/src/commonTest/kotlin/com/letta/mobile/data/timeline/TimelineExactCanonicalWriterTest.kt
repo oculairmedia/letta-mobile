@@ -1,7 +1,12 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ErrorMessage
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -10,10 +15,165 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TimelineExactCanonicalWriterTest {
+    @Test fun alternatingNativeTurnHasIdenticalLiveAndColdCanonicalShape() = runTest {
+        val store = InMemoryTimelineStore()
+        fun engine() = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val liveEngine = engine()
+        val selection = assertIs<TimelineEngineOpen.Opened>(liveEngine.open(scope)).selection
+        val fence = liveEngine.beginLive(selection)
+        val messages = buildList<com.letta.mobile.data.model.LettaMessage> {
+            add(com.letta.mobile.data.model.UserMessage(id = "ui-msg-9170340",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("Run four commands"), date = "2026-01-01T00:00:00Z"))
+            repeat(4) { index ->
+                add(com.letta.mobile.data.model.ToolCallMessage(
+                    id = "ui-msg-${9170341 + index * 2}",
+                    toolCall = com.letta.mobile.data.model.ToolCall(id = "call-$index",
+                        name = if (index % 2 == 0) "exec_command" else "write_stdin", arguments = "{}"),
+                    date = "2026-01-01T00:00:0${index * 2 + 1}Z"))
+                add(com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "ui-msg-${9170342 + index * 2}", toolCallId = "call-$index",
+                    toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("result-$index"),
+                    date = "2026-01-01T00:00:0${index * 2 + 2}Z"))
+            }
+            add(AssistantMessage(id = "ui-msg-9170349",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("Done"), date = "2026-01-01T00:00:09Z"))
+        }
+        messages.forEach { assertTrue(liveEngine.ingest(fence, TimelineStreamFrame.Message(it))) }
+        assertTrue(liveEngine.ingest(fence, TimelineStreamFrame.Done))
+        val live = kotlin.test.assertNotNull(liveEngine.live.value).block.events
+        // Exercise sync's durable writer, not a hand-seeded StoredTimelineEvent page.
+        messages.chunked(3).forEach { page ->
+            assertEquals(TimelineEnginePageOutcome.Applied, reconcile(liveEngine, selection, *page.map(::record).toTypedArray()))
+        }
+        val cold = engine()
+        val coldSelection = assertIs<TimelineEngineOpen.Opened>(cold.open(scope)).selection
+        val page = cold.preparePage(coldSelection, TimelineReadPosition.Tail, 32, null,
+            DefaultTimelineSettledProjectionAdapter)
+        val reopened = page.projectionInput.records.mapNotNull { it.event }
+        assertEquals(live.map { it.messageType }, reopened.map { it.messageType },
+            "Cold canonical rows must have the live shape, including attached rather than standalone returns")
+        assertEquals(live.map { it.copy(position = 0.0) }, reopened,
+            "Durable ordering lives in TimelinePageKey; decoded canonical facts must match live")
+        val liveItems = com.letta.mobile.data.chat.projection.buildChatRenderModel(
+            messages = live.mapNotNull { com.letta.mobile.data.chat.projection.timelineEventToUiMessage(it) },
+            mode = com.letta.mobile.data.chat.projection.ChatDisplayMode.Interactive).renderItems
+        val reopenedItems = page.records.mapNotNull {
+            (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item
+        }
+        fun normalized(items: List<com.letta.mobile.data.chat.projection.ChatRenderItem>) =
+            items.map { item ->
+                val identity = when (item) {
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.Single -> item.message.id
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item.runId
+                }
+                identity to when (item) {
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.Single -> item.copy(keyOverride = null)
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item
+                }
+            }.sortedBy { it.first }
+        assertEquals(liveItems.size, reopenedItems.size,
+            "Parity must retain duplicate render identities rather than overwriting them")
+        assertEquals(normalized(liveItems), normalized(reopenedItems),
+            "Live and reopened render items must have the same identity multiplicity and content")
+    }
+
+    @Test fun reasoningLiveSettleAndReconcileHaveOneCanonicalRowPerIdentity() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        val thought = ReasoningMessage(
+            id = "cm-stream-thought", reasoning = "Inspect the current state", runId = "local-run-1967",
+            date = "2026-01-01T00:00:01Z",
+        )
+        val reply = AssistantMessage(
+            id = "cm-stream-reply", contentRaw = kotlinx.serialization.json.JsonPrimitive("The state is current"),
+            runId = "local-run-1967", date = "2026-01-01T00:00:02Z",
+        )
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(thought)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+
+        val settledThought = thought.copy(id = "server-thought", runId = null)
+        val settledReply = reply.copy(id = "server-reply", runId = null)
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(settledThought), record(settledReply)))
+        val publication = kotlin.test.assertNotNull(engine.live.value)
+        assertEquals(TimelineMessageId("server-thought"), publication.aliases["cm-stream-thought"])
+        assertEquals(TimelineMessageId("server-reply"), publication.aliases["cm-stream-reply"])
+
+        val reopened = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val reopenedSelection = assertIs<TimelineEngineOpen.Opened>(reopened.open(scope)).selection
+        val settled = reopened.preparePage(reopenedSelection, TimelineReadPosition.Tail, 16, null).projectionInput.records
+            .mapNotNull { it.event }
+        assertEquals(listOf(TimelineMessageType.REASONING, TimelineMessageType.ASSISTANT), settled.map { it.messageType })
+        assertEquals(listOf("Inspect the current state", "The state is current"), settled.map { it.content })
+    }
+
+    @Test fun equalTextReasoningRowsEachAdoptOneDistinctSettledIdentity() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val fence = engine.beginLive(selection)
+        val live = listOf("cm-stream-thought-1", "cm-stream-thought-2").map { id ->
+            ReasoningMessage(id = id, reasoning = "Check both inputs", runId = "local-run-1967", date = "2026-01-01T00:00:01Z")
+        }
+        live.forEach { assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(it))) }
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
+        val settled = listOf(
+            ReasoningMessage(id = "server-thought-1", reasoning = "Check both inputs", runId = null, date = "2026-01-01T00:00:01Z"),
+            ReasoningMessage(id = "server-thought-2", reasoning = "Check both inputs", runId = null, date = "2026-01-01T00:00:02Z"),
+        )
+        // A custom transport may return newest first; adoption still follows chronological order.
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *settled.reversed().map(::record).toTypedArray()))
+        val publication = kotlin.test.assertNotNull(engine.live.value)
+        assertEquals(
+            listOf(TimelineMessageId("server-thought-1"), TimelineMessageId("server-thought-2")),
+            live.map { publication.aliases.getValue(it.id) },
+        )
+        val reopened = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val reopenedSelection = assertIs<TimelineEngineOpen.Opened>(reopened.open(scope)).selection
+        val rows = reopened.preparePage(reopenedSelection, TimelineReadPosition.Tail, 16, null).projectionInput.records
+            .mapNotNull { it.event }.filter { it.messageType == TimelineMessageType.REASONING }
+        assertEquals(listOf("server-thought-1", "server-thought-2"), rows.map { it.serverId })
+        assertEquals(listOf("Check both inputs", "Check both inputs"), rows.map { it.content })
+    }
+
+    @Test fun historicalErrorStaysHistoricalAndLatestErrorRemainsVisible() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val records = listOf(
+            ErrorMessage(id = "old-error", messageField = "old failure", runId = "local-run-1957", date = "2026-01-01T00:00:01Z"),
+            UserMessage(id = "later-user", contentRaw = kotlinx.serialization.json.JsonPrimitive("try again"), otid = "later-otid", date = "2026-01-01T00:00:02Z"),
+            ReasoningMessage(id = "later-thought", reasoning = "Check the retry", runId = "local-run-1967", date = "2026-01-01T00:00:03Z"),
+            AssistantMessage(id = "later-answer", contentRaw = kotlinx.serialization.json.JsonPrimitive("completed"), runId = "local-run-1967", date = "2026-01-01T00:00:04Z"),
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *records.map(::record).toTypedArray()))
+        val page = engine.preparePage(selection, TimelineReadPosition.Tail, 16, null)
+        val events = page.projectionInput.records.mapNotNull { it.event }
+        assertEquals(listOf(TimelineMessageType.ERROR, TimelineMessageType.USER, TimelineMessageType.REASONING, TimelineMessageType.ASSISTANT), events.map { it.messageType })
+        assertEquals("completed", events.last().content)
+        val errors = page.records.mapNotNull { (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item }
+            .flatMap { item -> when (item) { is com.letta.mobile.data.chat.projection.ChatRenderItem.Single -> listOf(item.message); is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item.messages.map { it.first } } }
+            .filter { it.isError }
+        assertEquals(listOf("old failure"), errors.map { it.content })
+
+        val latest = ErrorMessage(id = "latest-error", messageField = "latest failure", runId = "local-run-1968", date = "2026-01-01T00:00:05Z")
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(latest)))
+        val latestPage = engine.preparePage(selection, TimelineReadPosition.Tail, 16, null)
+        val latestError = latestPage.records.mapNotNull { (it.preparedPresentation as? TimelineSettledPresentation.Render)?.item }
+            .flatMap { item -> when (item) { is com.letta.mobile.data.chat.projection.ChatRenderItem.Single -> listOf(item.message); is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item.messages.map { it.first } } }
+            .last { it.isError }
+        assertEquals("latest failure", latestError.content)
+        assertTrue(latestError.isError)
+    }
+
     @Test fun assistantAliasRequiresSharedSegmentProvenanceNotTextOrRun() = runTest {
         val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
@@ -535,6 +695,72 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(1L, store.current.revision)
     }
 
+    @Test fun returnBeforeCallAcrossPagesFoldsExactBodyIntoOwner() = runTest {
+        val store = InMemoryTimelineStore()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-1", toolCallId = "call-1",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("exact result"),
+            date = "2026-01-01T00:00:00Z",
+        )
+        val call = com.letta.mobile.data.model.ToolCallMessage(
+            id = "call-owner", date = "2026-01-01T00:00:01Z",
+            toolCall = com.letta.mobile.data.model.ToolCall(id = "call-1", name = "Bash", arguments = "{}"),
+        )
+        store.transaction(scope) { writer.merge(this, record(returned)); nextRevision() }
+        assertEquals(0, store.rows.size, "an ownerless return must not become a standalone canonical row")
+        store.transaction(scope) { writer.merge(this, record(call)); nextRevision() }
+
+        val persisted = TimelineSnapshotCodec.json.decodeFromString(
+            com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+            store.rows.values.single().body.decodeToString(),
+        ).toConfirmedTimelineEvent()
+        assertEquals("exact result", persisted.toolReturnContentByCallId["call-1"])
+        store.read(scope) { assertEquals(TimelineMessageId("call-owner"), toolCall("call-1")?.owner) }
+    }
+
+    @Test fun oversizedDeferredReturnFailsBeforeEvidenceIsPersisted() = runTest {
+        val store = InMemoryTimelineStore()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-large", toolCallId = "call-large",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("x".repeat(70_000)),
+            date = "2026-01-01T00:00:00Z",
+        )
+
+        val failure = assertFailsWith<TimelineMergeUnavailable> {
+            store.transaction(scope) { writer.merge(this, record(returned)) }
+        }
+
+        assertEquals("deferred_tool_return_budget", failure.reason)
+        store.read(scope) {
+            assertNull(toolCall("call-large"))
+            assertNull(evidence("tool-return/deferred/call-large", 64 * 1024))
+        }
+    }
+
+    @Test fun indexedOwnerBodyOver64KiBIsReadInBoundedChunks() = runTest {
+        val store = InMemoryTimelineStore()
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        val call = kotlin.test.assertNotNull(message("x".repeat(70_000)).toTimelineEvent(0.0)).copy(
+            serverId = "call-owner", otid = "call-owner", messageType = TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(com.letta.mobile.data.model.ToolCall(id = "call-1", name = "Bash")).toTimelinePersistentList(),
+        )
+        store.transaction(scope) { writer.mergeEvent(this, call); nextRevision() }
+        store.bodyReads = 0
+        val returned = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "return-1", toolCallId = "call-1",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("done"), date = "2026-01-01T00:00:01Z",
+        )
+        store.transaction(scope) { writer.merge(this, record(returned)); nextRevision() }
+        assertTrue(store.bodyReads >= 2, "owner body larger than 64 KiB must be read in bounded chunks")
+        val persisted = TimelineSnapshotCodec.json.decodeFromString(
+            com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(),
+            store.rows.values.single().body.decodeToString(),
+        ).toConfirmedTimelineEvent()
+        assertEquals("done", persisted.toolReturnContentByCallId["call-1"])
+    }
+
     @Test fun historicalCorrectionReadsOneBodyAmong28kRows() = runTest {
         val store = InMemoryTimelineStore()
         val writer = TimelineExactCanonicalWriter(scope, 100_000)
@@ -981,6 +1207,41 @@ class TimelineExactCanonicalWriterTest {
     private fun pendingFixture(): Pair<CanonicalPendingLocalStore, (Int, String) -> CanonicalPendingLocalStore.Record> {
         val store = CanonicalPendingLocalStore(InMemoryTimelineStore())
         return store to { n, at -> CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at) }
+    }
+
+    @Test fun openRetiresLostSentEchoAndKeepsOneFailedRowStableAcrossReopens() = runTest {
+        val store = InMemoryTimelineStore()
+        val pending = CanonicalPendingLocalStore(store)
+        val stale = CanonicalPendingLocalStore.Record("stale-otid", "not sent", emptyList(), "2020-01-01T00:00:00Z")
+        pending.save(scope, stale)
+        pending.mark(scope, stale.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        val session = CanonicalTimelineSession(store, PageTransport({ }), scope, enabled = true)
+        assertIs<TimelineEngineOpen.Opened>(session.open())
+        assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Failed), session.pending.value.map { it.delivery })
+        assertEquals(listOf(true), session.pending.value.map { it.toRenderItem().message.isSendFailed })
+        assertIs<TimelineEngineOpen.Opened>(session.open())
+        assertEquals(listOf("stale-otid"), session.pending.value.map { it.otid })
+        assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Failed), session.pending.value.map { it.delivery })
+    }
+
+    @Test fun userEchoRetiresOnlyMatchingOtidAndEqualTextEchoesBothSurvive() = runTest {
+        val store = InMemoryTimelineStore()
+        val pending = CanonicalPendingLocalStore(store)
+        val first = CanonicalPendingLocalStore.Record("otid-1", "same text", emptyList(), sentAt)
+        val second = CanonicalPendingLocalStore.Record("otid-2", "same text", emptyList(), sentAt)
+        pending.save(scope, first)
+        pending.save(scope, second)
+        val writer = TimelineExactCanonicalWriter(scope, 100_000)
+        fun echo(id: String, otid: String) = UserMessage(id = id, contentRaw = kotlinx.serialization.json.JsonPrimitive("same text"), otid = otid, date = sentAt)
+        store.transaction(scope) { writer.merge(this, record(echo("server-1", first.otid))) }
+        assertEquals(listOf(second.otid), pending.load(scope).map { it.otid })
+        store.transaction(scope) { writer.merge(this, record(echo("server-2", second.otid))) }
+        assertEquals(emptyList(), pending.load(scope))
+        val engine = CanonicalTimelineEngine(store, writer, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val rows = engine.preparePage(selection, TimelineReadPosition.Tail, 16, null).projectionInput.records.mapNotNull { it.event }
+        assertEquals(listOf("server-1", "server-2"), rows.map { it.serverId })
+        assertEquals(listOf("same text", "same text"), rows.map { it.content })
     }
 
     @Test fun theNewestFailureSurvivesWhateverOrderOutcomesArriveIn() = runTest {

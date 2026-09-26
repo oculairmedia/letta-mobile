@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import com.letta.mobile.ui.mascot.MascotAvatar
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Gradient agent identity orbs, matching the Penpot "App Mockups v2" desktop
@@ -58,7 +59,7 @@ fun AgentOrb(
     index: Int,
     size: Dp,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 7.dp,
+    cornerRadius: Dp = LettaDimens.Radius.sm,
     onClick: (() -> Unit)? = null,
     /** The agent this orb stands for; with a known mascot identity the orb is the live mascot. */
     agentId: String? = null,

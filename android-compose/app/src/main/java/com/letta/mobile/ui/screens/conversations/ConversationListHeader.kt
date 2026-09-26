@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The row above the list: where the conversations come from on the left, and on the right the
@@ -45,7 +46,7 @@ internal fun ConversationListHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 24.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+            .padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.lg, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -73,9 +74,9 @@ private fun ConversationFilterMenu(
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
             Row(
-                modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                modifier = Modifier.padding(start = LettaDimens.Space.md, end = LettaDimens.Space.sm, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.sm),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 Text(stringResource(filter.labelRes), style = MaterialTheme.typography.labelLarge)
                 Icon(LettaIcons.ChevronDown, contentDescription = null, modifier = Modifier.size(LettaIconSizing.Inline))

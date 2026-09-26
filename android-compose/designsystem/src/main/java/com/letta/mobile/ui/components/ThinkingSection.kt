@@ -31,6 +31,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun ThinkingSection(
@@ -49,12 +50,12 @@ fun ThinkingSection(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize()
-            .padding(vertical = 4.dp)
+            .padding(vertical = LettaDimens.Space.xs)
     ) {
         Row(
-            modifier = Modifier.clickable { isExpanded = !isExpanded }.padding(vertical = 4.dp),
+            modifier = Modifier.clickable { isExpanded = !isExpanded }.padding(vertical = LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Text(
                 text = if (inProgress) "Thinking\u2026" else "Show thinking",
@@ -76,16 +77,16 @@ fun ThinkingSection(
             val lineColor = MaterialTheme.colorScheme.outlineVariant
             Column(
                 modifier = Modifier
-                    .padding(top = 8.dp, bottom = 4.dp, start = 8.dp)
+                    .padding(top = LettaDimens.Space.sm, bottom = LettaDimens.Space.xs, start = LettaDimens.Space.sm)
                     .drawBehind {
                         drawLine(
                             color = lineColor,
                             start = Offset(0f, 0f),
                             end = Offset(0f, size.height),
-                            strokeWidth = 2.dp.toPx(),
+                            strokeWidth = LettaDimens.Space.hair.toPx(),
                         )
                     }
-                    .padding(start = 12.dp)
+                    .padding(start = LettaDimens.Space.md)
             ) {
                 MarkdownText(
                     text = thinkingText,

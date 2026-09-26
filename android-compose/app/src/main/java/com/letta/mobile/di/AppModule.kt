@@ -9,7 +9,7 @@ import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.CanvasExternalTools
+import com.letta.mobile.data.canvas.relayTopicOf
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.health.IServerHealthRepository
@@ -83,8 +83,6 @@ import com.letta.mobile.data.timeline.MessageApiTimelineTransport
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-import com.letta.mobile.data.transport.DataStoreRunCursorStore
-import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
@@ -118,16 +116,12 @@ abstract class AppModule {
 
         @Provides
         @Singleton
+        // Only device actions are this phone's to answer. canvas.* is the Iroh host's: it offers them
+        // on every runtime it serves, backed by the relay's log (letta-mobile-aknkw), and ignores
+        // any tools an app sends with runtime_start, so a copy here never reached a runtime.
         fun provideAndroidExternalToolRegistry(
             runner: DeviceActionCommandRunner,
-            canvasStore: CanvasDocumentStore,
-            canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
-        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(
-            buildList {
-                add(DeviceActionExternalTool(runner))
-                addAll(CanvasExternalTools.all(canvasStore, canvasSessions))
-            }
-        )
+        ): ExternalToolRegistry = ExternalToolRegistry.hostTools(listOf(DeviceActionExternalTool(runner)))
 
         /** One registry per process here, but owned by the graph so it dies with it. */
         @Provides
@@ -135,15 +129,62 @@ abstract class AppModule {
         fun provideCanvasSessionRegistry(): com.letta.mobile.data.canvas.CanvasSessionRegistry =
             com.letta.mobile.data.canvas.CanvasSessionRegistry()
 
+        /**
+         * Shares canvases through the Iroh host every session graph connects to (attached by
+         * SessionChannelTransportFactory). Edits are queued durably in the app's files until the
+         * host acknowledges them; without a host every canvas reports itself local-only.
+         */
+        /**
+         * Where the app's canvases keep their images (and any other large things put on a board),
+         * by their hash. One store for the boards and the relay, so an image placed on a board is
+         * the one sent to the host, and one fetched from the host is the one the board draws.
+         */
         @Provides
         @Singleton
-        fun provideCanvasSyncTransport(): com.letta.mobile.data.canvas.CanvasSyncTransport =
-            com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport()
+        fun provideCanvasAssetStore(
+            @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
+        ): com.letta.mobile.data.storage.AssetStore =
+            com.letta.mobile.data.storage.FileAssetStore(java.io.File(context.filesDir, "canvas-assets"))
 
         @Provides
         @Singleton
-        fun provideCanvasPresenceTransport(): com.letta.mobile.data.canvas.CanvasPresenceTransport =
-            com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport()
+        fun provideCanvasRelayClient(
+            @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
+            opLog: com.letta.mobile.data.canvas.CanvasOpLog,
+            documents: com.letta.mobile.data.canvas.CanvasDocumentStore,
+            assets: com.letta.mobile.data.storage.AssetStore,
+        ): com.letta.mobile.data.canvas.CanvasRelayClient = com.letta.mobile.data.canvas.CanvasRelayClient(
+            opLog = opLog,
+            delivery = com.letta.mobile.data.canvas.FileCanvasDeliveryStore(java.io.File(context.filesDir, "canvas-delivery.json")),
+            topicOf = { id -> documents.relayTopicOf(id) },
+            assets = assets,
+            // Ops for a board that is not open (the agent drawing while the person is in chat)
+            // go straight into the stored canvas (letta-mobile-qygvv.23).
+            closedBoard = com.letta.mobile.data.canvas.StoreCanvasClosedBoardApplier(documents, opLog),
+        )
+
+        @Provides
+        @Singleton
+        @Suppress("NoDetachedCoroutineLifecycle") // Process lifetime, like the canvas op log.
+        fun provideIrohCanvasRelayClient(
+            relay: com.letta.mobile.data.canvas.CanvasRelayClient,
+        ): com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient =
+            com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient(
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO),
+                relay,
+            )
+
+        @Provides
+        @Singleton
+        fun provideCanvasSyncTransport(
+            relay: com.letta.mobile.data.canvas.CanvasRelayClient,
+        ): com.letta.mobile.data.canvas.CanvasSyncTransport = relay
+
+        @Provides
+        @Singleton
+        fun provideCanvasPresenceTransport(
+            relay: com.letta.mobile.data.canvas.CanvasRelayClient,
+        ): com.letta.mobile.data.canvas.CanvasPresenceTransport = relay
 
         // letta-mobile-qfa81 (P4 row 13): approval submission routed over
         // admin_rpc when the active backend is iroh://. Injected into
@@ -275,11 +316,6 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindChannelTransport(impl: SessionScopedChannelTransport): IChannelTransport
-
-    // letta-mobile-2rkdj — persisted run cursor map for reconnect resume.
-    @Binds
-    @Singleton
-    abstract fun bindRunCursorStore(impl: DataStoreRunCursorStore): RunCursorStore
 
     @Binds
     @Singleton

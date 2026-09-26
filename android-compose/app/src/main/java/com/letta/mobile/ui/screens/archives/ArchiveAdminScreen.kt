@@ -60,6 +60,7 @@ import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +123,7 @@ fun ArchiveAdminScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = viewModel::loadArchives,
@@ -147,8 +148,8 @@ fun ArchiveAdminScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             items(filtered, key = { it.id }) { archive ->
                                 ArchiveCard(
@@ -285,7 +286,7 @@ private fun ArchiveCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -294,7 +295,7 @@ private fun ArchiveCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(archive.name, style = MaterialTheme.typography.titleMedium)
                     archive.description?.takeIf { it.isNotBlank() }?.let {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -302,8 +303,8 @@ private fun ArchiveCard(
                     Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 archive.vectorDbProvider?.let { AssistChip(onClick = {}, label = { Text(it) }) }
                 archive.embeddingConfig?.embeddingModel?.let { AssistChip(onClick = {}, label = { Text(it) }) }
             }
@@ -352,7 +353,7 @@ private fun ArchiveDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             CardGroup {
                 item(
                     headlineContent = { Text(stringResource(R.string.screen_archives_id_label, "")) },
@@ -426,7 +427,7 @@ private fun ArchiveDetailDialog(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 TextButton(onClick = onAttachAgent) {
                     Text(stringResource(R.string.screen_archives_attach_action))
                 }
@@ -460,7 +461,7 @@ private fun AgentPickerDialog(
         if (agents.isEmpty()) {
             Text(text = emptyMessage, style = MaterialTheme.typography.bodyMedium)
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                 items(agents, key = { it.id.value }) { agent ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -566,8 +567,8 @@ private fun ArchiveCardPreview() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             ArchiveCard(
                 archive = previewArchive,

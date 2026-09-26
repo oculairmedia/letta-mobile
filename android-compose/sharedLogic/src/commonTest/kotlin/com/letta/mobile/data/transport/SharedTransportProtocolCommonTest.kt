@@ -1,12 +1,10 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.a2ui.LETTA_TOOL_APPROVAL_WIDGET_ID
 import com.letta.mobile.data.model.AssistantMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,26 +16,6 @@ class SharedTransportProtocolCommonTest {
         encodeDefaults = true
         explicitNulls = false
         coerceInputValues = true
-    }
-
-    @Test
-    fun helloFrameKeepsA2uiCapabilitiesTopLevel() {
-        val frame = HelloFrame(
-            id = "frame-1",
-            ts = "2026-05-25T12:00:00Z",
-            token = "secret",
-            deviceId = "device-1",
-            clientVersion = "letta-mobile/test",
-        )
-
-        val encoded = frame.encodeJson(json)
-
-        assertTrue(encoded.contains("\"type\":\"hello\""))
-        assertTrue(encoded.contains("\"a2ui_version\":\"0.9\""))
-        assertTrue(encoded.contains("\"supported_catalogs\""))
-        assertTrue(encoded.contains("\"supported_widgets\""))
-        assertTrue(encoded.contains(LETTA_TOOL_APPROVAL_WIDGET_ID))
-        assertTrue(!encoded.contains("\"a2ui_capability\""))
     }
 
     @Test

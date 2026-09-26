@@ -10,12 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,7 +28,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -43,8 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.Offset
@@ -60,11 +55,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.desktopshell.TabPickerItem
-import com.letta.mobile.data.desktopshell.TabPickerSearch
 import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * What the tab strip can do to a conversation. Grouped rather than passed as
@@ -78,9 +72,6 @@ internal data class DesktopConversationTabActions(
     val onReorder: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
     /** Browser-style "+": a new conversation with the agent of the active tab. Null hides it. */
     val onNewConversation: (() -> Unit)? = null,
-    /** The chevron's picker: this agent's conversations and canvases, most recent first. */
-    val pickerItems: List<TabPickerItem> = emptyList(),
-    val onOpenPickerItem: (TabPickerItem) -> Unit = {},
 )
 
 @Immutable
@@ -91,9 +82,9 @@ internal data class DesktopConversationTab(
 )
 
 /** Horizontal gap between tabs. */
-private val TabSpacing = 4.dp
+private val TabSpacing = LettaDimens.Space.xs
 
-private val TabControlSize = 26.dp
+private val TabControlSize = LettaDimens.Space.xl
 private val PickerWidth = 300.dp
 private val PickerMaxHeight = 360.dp
 
@@ -332,81 +323,16 @@ internal fun DesktopConversationTabRow(
             onClick = onNew,
             modifier = Modifier.size(TabControlSize).semantics { contentDescription = "New conversation tab" },
         ) {
-            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-        }
-    }
-    if (actions.pickerItems.isNotEmpty()) {
-        DesktopTabStripPicker(items = actions.pickerItems, onOpen = actions.onOpenPickerItem)
-    }
-    }
-}
-
-/**
- * The chevron beside the "+": a menu of this agent's conversations and canvases with a search
- * field at the top, so a tab for anything the agent owns is a few keystrokes away instead of a
- * trip through the sidebar. Filtering is [TabPickerSearch]'s.
- */
-@Composable
-private fun DesktopTabStripPicker(items: List<TabPickerItem>, onOpen: (TabPickerItem) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    val focus = remember { FocusRequester() }
-    Box {
-        IconButton(
-            onClick = { open = true },
-            modifier = Modifier.size(TabControlSize).semantics { contentDescription = "Open conversation or canvas" },
-        ) {
-            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false; query = "" }) {
-            LaunchedEffect(open) { if (open) runCatching { focus.requestFocus() } }
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                placeholder = { Text("Search conversations and canvases") },
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                textStyle = MaterialTheme.typography.bodySmall,
-                modifier = Modifier
-                    .width(PickerWidth)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .focusRequester(focus)
-                    .semantics { contentDescription = "Search tabs" },
+            // Explicit tint: the title bar's LocalContentColor is a dimmed
+            // chrome role, and inheriting it made this all but invisible.
+            Icon(
+                Icons.Outlined.Add,
+                contentDescription = null,
+                modifier = Modifier.size(LettaDimens.Control.icon),
+                tint = MaterialTheme.colorScheme.onSurface,
             )
-            val shown = remember(items, query) { TabPickerSearch.filter(items, query) }
-            // A plain scrolling column, not a LazyColumn: DropdownMenu sizes its content by
-            // intrinsic width, which lazy layouts refuse to answer.
-            Column(modifier = Modifier.width(PickerWidth).heightIn(max = PickerMaxHeight).verticalScroll(rememberScrollState())) {
-                shown.forEach { item ->
-                    Surface(
-                        onClick = { open = false; query = ""; onOpen(item) },
-                        color = Color.Transparent,
-                        modifier = Modifier.fillMaxWidth().semantics {
-                            contentDescription = "Open ${item.kind.name.lowercase()} ${item.title}"
-                        },
-                    ) {
-                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                            Text(item.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                item.subtitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-                if (shown.isEmpty()) {
-                    Text(
-                        "Nothing matches",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
         }
+    }
     }
 }
 
@@ -429,9 +355,9 @@ private fun DesktopConversationTabItem(
         modifier = modifier
             .fillMaxHeight()
             .widthIn(min = 132.dp, max = 220.dp)
-            .padding(top = 4.dp)
-            .then(if (dragging) Modifier.shadow(4.dp, RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)) else Modifier),
-        shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
+            .padding(top = LettaDimens.Space.xs)
+            .then(if (dragging) Modifier.shadow(LettaDimens.Space.xs, RoundedCornerShape(topStart = LettaDimens.Space.sm, topEnd = LettaDimens.Space.sm)) else Modifier),
+        shape = RoundedCornerShape(topStart = LettaDimens.Space.sm, topEnd = LettaDimens.Space.sm),
         color = when {
             active -> MaterialTheme.colorScheme.background
             hovered -> MaterialTheme.colorScheme.surfaceContainer
@@ -466,9 +392,10 @@ private fun DesktopConversationTabLabel(
 ) {
     // One line, browser-thin: the title, then the agent in the quieter colour.
     Row(
-        modifier = modifier.padding(start = 12.dp, end = 30.dp),
+        // end clears the close button's 20.dp slot plus a little breathing room.
+        modifier = modifier.padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xl),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = tab.title,
@@ -500,14 +427,18 @@ private fun DesktopConversationTabCloseButton(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 20/13 rather than 28/14: the hover circle is a hit target around a glyph,
+    // not a button in its own right, and at 28dp it read as a large empty disc
+    // with a small cross adrift in it.
     IconButton(
         onClick = onClose,
-        modifier = modifier.size(28.dp),
+        modifier = modifier.size(LettaDimens.Control.iconButtonSm),
     ) {
         Icon(
             imageVector = Icons.Outlined.Close,
             contentDescription = "Close $title tab",
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
+            tint = MaterialTheme.colorScheme.onSurface,
         )
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,7 +16,9 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.singleWindowApplication
 import com.letta.mobile.desktop.initializeDesktopLifecycleMainThread
+import com.letta.mobile.desktop.input.InstallTabletPen
 import com.letta.mobile.ui.canvas.CanvasSamples
+import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 
 /**
@@ -28,12 +31,20 @@ fun main() {
         title = "Meridian Canvas Workspace (Debug)",
         state = androidx.compose.ui.window.WindowState(width = 1280.dp, height = 820.dp),
     ) {
+        // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
+        val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
+        InstallTabletPen(window, penRegistry)
+        CompositionLocalProvider(
+            LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
+            com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
+        ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
                     initialJson = CanvasSamples.buildCycleJson,
                 )
             }
+        }
         }
     }
 }
@@ -57,6 +68,13 @@ internal fun CanvasDebugWindow(
         title = "Meridian Canvas Workspace (Debug)",
         state = rememberWindowState(width = 1280.dp, height = 820.dp),
     ) {
+        // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
+        val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
+        InstallTabletPen(window, penRegistry)
+        CompositionLocalProvider(
+            LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
+            com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
+        ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
@@ -67,6 +85,7 @@ internal fun CanvasDebugWindow(
                     },
                 )
             }
+        }
         }
     }
 }

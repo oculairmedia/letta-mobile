@@ -10,6 +10,8 @@ import com.letta.mobile.avatar.core.GazePose
 import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * One live mascot for one agent, kept for the life of the process: the renderer's scene (owned
@@ -88,11 +90,22 @@ abstract class MascotEntry(
     /** Releases the renderer's scene. */
     abstract fun dispose()
 
-    /** Loads once, from whichever surface first draws this agent (its own lifecycle, no ad hoc scope). */
+    /**
+     * Loads once, from whichever surface first draws this agent (its own lifecycle, no ad hoc scope).
+     *
+     * First loads are admitted a couple at a time. Every load and every rendered
+     * frame share ONE renderer thread, and a surface that shows many unseen
+     * agents at once (a search panel, a roster) otherwise queues all of its
+     * loads the moment it composes — ahead of the frame work for the mascots
+     * already on screen. The whole screen then stalls behind the burst and the
+     * tail of the queue appears never to arrive. Throughput is unchanged (the
+     * renderer is serial either way); what this buys is that rendering keeps
+     * getting slices while the backlog drains.
+     */
     suspend fun ensureLoaded() {
         if (loaded) return
         loaded = true
-        load()
+        firstLoadGate.withPermit { load() }
     }
 
     /** Feeds the director the agent's presence; see [applyPresence]. */
@@ -164,6 +177,12 @@ abstract class MascotEntry(
  * into it ([MascotEntry.retarget]). Null from [create] means the renderer is unavailable and the
  * caller draws its fallback.
  */
+/**
+ * How many first loads may be in flight at once, process-wide. Two rather than
+ * one so a stalled load cannot block every other agent behind it.
+ */
+private val firstLoadGate = Semaphore(permits = 2)
+
 class MascotEntries<E : MascotEntry>(
     private val create: (identity: MascotIdentity) -> E?,
 ) {

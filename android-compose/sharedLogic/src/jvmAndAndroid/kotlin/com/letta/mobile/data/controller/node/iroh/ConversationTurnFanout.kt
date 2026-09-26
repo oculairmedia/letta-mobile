@@ -4,9 +4,9 @@ import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.canonicalToolCalls
 import com.letta.mobile.data.transport.iroh.canonicalToolReturn
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
-import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.util.Telemetry
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
@@ -137,8 +137,31 @@ internal class ConversationTurnFanout(
      */
     private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
     private val observerWrites: ObserverWriteQueue? = null,
+    /**
+     * letta-mobile-qygvv.3: queue for the INITIATOR's writes. The initiator's connection owns
+     * it, while [observerWrites] may be node-owned so a turn that outlives its initiator still
+     * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
+     */
+    private val initiatorWrites: ObserverWriteQueue? = observerWrites,
 ) {
     private val openToolCalls = OpenToolCallTracker()
+    private val toolProjection = RelayedToolProjection()
+
+    /** letta-mobile-qygvv.28: a delta that ends a run already reached the viewers. */
+    private var terminalDeltaRelayed = false
+
+    /**
+     * letta-mobile-qygvv.3: the initiator's connection is gone but the turn keeps running
+     * (see [NodeTurnHost]). Frames still go to every other viewer and are still tracked for
+     * the initiator's redial parking; only writes to the dead initiator handle stop.
+     */
+    @Volatile
+    private var initiatorDetached = false
+
+    /** Stop delivering to the initiator handle; the turn and its other viewers carry on. */
+    fun detachInitiator() {
+        initiatorDetached = true
+    }
     private val cumulativeText = CumulativeStreamText()
     private val broadcastToolSignatures = mutableSetOf<String>()
     private var terminalWritten = false
@@ -164,7 +187,7 @@ internal class ConversationTurnFanout(
      * (so the caller can flip its terminalWritten guard). Mirrors the pre-fanout
      * `writeDraftAsStreamDelta` EXACTLY on the delta-body it produces.
      */
-    suspend fun onDraft(payload: RuntimeEventPayload): Boolean {
+    suspend fun onDraft(payload: RuntimeEventPayload, runId: RunId? = null): Boolean {
         return when (payload) {
             is RuntimeEventPayload.RemoteStreamFrame -> emitRawFrameBody(
                 payload.body,
@@ -175,59 +198,51 @@ internal class ConversationTurnFanout(
                 StreamTextFrameSource.CumulativeSnapshot,
             )
             is RuntimeEventPayload.ToolCallObserved -> {
-                val delta = buildJsonObject {
-                    put("message_type", "tool_call_message")
-                    put("tool_call", buildJsonObject {
-                        put("tool_call_id", payload.toolCallId.value)
-                        put("name", payload.toolName.value)
-                        put("arguments", payload.argumentsJson ?: "{}")
-                    })
-                }
-                openToolCalls.observe(delta.toString())
-                broadcastToolDeltaIfNew(delta)
+                toolProjection.toolCall(payload, runId)?.let { broadcastToolDelta(it) }
                 false
             }
             is RuntimeEventPayload.ToolReturnObserved -> {
-                val delta = buildJsonObject {
-                    put("message_type", "tool_return_message")
-                    put("tool_call_id", payload.toolCallId.value)
-                    put("status", if (payload.status == ToolExecutionStatus.Failed) "error" else "success")
-                    put("tool_return", payload.body)
-                }
-                openToolCalls.observe(delta.toString())
-                broadcastToolDeltaIfNew(delta)
+                toolProjection.toolReturn(payload, runId)?.let { broadcastToolDelta(it) }
                 false
             }
-            is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
-                RuntimeRunStatus.Completed -> {
-                    broadcastDeltaBody(buildJsonObject {
-                        put("message_type", "stop_reason")
-                        put("stop_reason", payload.reason ?: "end_turn")
-                    })
-                    terminalWritten = true
-                    true
-                }
-                RuntimeRunStatus.Failed -> {
-                    broadcastDeltaBody(buildJsonObject {
-                        put("message_type", "error_message")
-                        put("message", payload.reason ?: "turn failed")
-                    })
-                    terminalWritten = true
-                    true
-                }
-                RuntimeRunStatus.Cancelled -> {
-                    broadcastDeltaBody(buildJsonObject {
-                        put("message_type", "error_message")
-                        put("message", payload.reason ?: "turn cancelled")
-                        put("status", "cancelled")
-                    })
-                    terminalWritten = true
-                    true
-                }
-                else -> false
-            }
+            is RuntimeEventPayload.RunLifecycleChanged -> emitLifecycleTerminal(payload, runId)
             else -> false
         }
+    }
+
+    /**
+     * letta-mobile-qygvv.28: the terminal delta for an engine lifecycle the App Server's own frames
+     * did not deliver. It carries the run id, and a cancel stays a cancel (`stop_reason
+     * cancelled`, with the reason as its message) instead of reading as a failure on the phone. A
+     * completion whose real `stop_reason` already went out gets no second one.
+     */
+    private suspend fun emitLifecycleTerminal(payload: RuntimeEventPayload.RunLifecycleChanged, runId: RunId?): Boolean {
+        val shape = relayedTerminalShape(payload) ?: return false
+        val alreadyCompleted = shape == RelayedTerminalShape.Completion && terminalDeltaRelayed
+        if (!alreadyCompleted) relayedTerminalDelta(payload, runId)?.let { broadcastDeltaBody(it) }
+        terminalWritten = true
+        return true
+    }
+
+    /**
+     * letta-mobile-qygvv.28: relay one App Server `stream_delta` [raw] frame the engine consumed
+     * (its terminal `error_message`, the `stop_reason` after it), shaped like any relayed delta.
+     */
+    suspend fun relayServerDelta(raw: JsonObject) {
+        emitRawFrameBody(raw.toString(), StreamTextFrameSource.AppServerDelta)
+    }
+
+    /** The turn's terminal went out from the App Server's own frames. */
+    fun markTerminalWritten() {
+        terminalWritten = true
+    }
+
+    /** Whether a delta that ends a run (stop_reason, error_message, terminal loop_error) went out. */
+    val anyTerminalDeltaRelayed: Boolean get() = terminalDeltaRelayed
+
+    private suspend fun broadcastToolDelta(delta: JsonObject) {
+        openToolCalls.observe(delta.toString())
+        broadcastToolDeltaIfNew(delta)
     }
 
     /**
@@ -252,6 +267,7 @@ internal class ConversationTurnFanout(
             return false
         }
         val tagged = tagStreamDeltaForOptimisticDedup(delta)
+        toolProjection.noteRelayed(tagged)
         broadcastToolDeltaIfNew(tagged)
         return deltaIsTerminal(tagged)
     }
@@ -316,6 +332,7 @@ internal class ConversationTurnFanout(
      * terminal, and parking must not capture it for redial of the owning turn.
      */
     suspend fun emitInitiatorOnlyBusyRejection(message: String) {
+        if (initiatorDetached) return
         val viewer = initiatorViewer ?: return
         val delta = buildJsonObject {
             put("message_type", "error_message")
@@ -326,6 +343,32 @@ internal class ConversationTurnFanout(
             put("iroh_rejection", INITIATOR_BUSY_REJECTION)
         }
         writeToViewerIsolated(viewer, delta, isInitiator = true)
+    }
+
+    /**
+     * letta-mobile-qygvv.12: write one non-delta App Server frame (`update_loop_status`,
+     * `turn_finished`, `update_queue`) to the INITIATOR only, on the same ordered chain as its
+     * deltas, so it lands after every delta already queued. [drain] waits for it to reach the wire.
+     * Observers are left alone: their ingest reconciles through message.list.
+     */
+    suspend fun writeInitiatorProtocolFrame(type: String, fields: JsonObject, drain: Boolean = false) {
+        if (initiatorDetached) return
+        val viewer = initiatorViewer ?: return
+        val queue = initiatorWrites
+        if (queue == null) {
+            writeProtocolFrameTo(viewer, type, fields)
+            return
+        }
+        queue.enqueue(viewer) { writeProtocolFrameTo(viewer, type, fields) }
+        if (drain) queue.drain(viewer)
+    }
+
+    private suspend fun writeProtocolFrameTo(viewer: ViewerHandle, type: String, fields: JsonObject) {
+        if (viewer is IrohViewerHandle) {
+            viewer.writeProtocolFrame(type, runtime, fields)
+        } else {
+            viewer.writeFrame(protocolFrame(type, runtime, fields, eventSeq = null).toString())
+        }
     }
 
     /**
@@ -389,6 +432,7 @@ internal class ConversationTurnFanout(
      * is recorded ONCE here (not per-viewer).
      */
     private suspend fun broadcastDeltaBody(delta: JsonObject) {
+        if (deltaEndsRun(delta)) terminalDeltaRelayed = true
         // Initiator-only redial parking (q71yi): record the untagged-equivalent
         // delta JSON once, matching the pre-fanout writeStreamDelta which tracked
         // the delta it was handed. Never runs per-observer.
@@ -469,7 +513,7 @@ internal class ConversationTurnFanout(
         // reaches the wire before the turn completes; that is now explicit, and
         // costs one join per TURN instead of one per frame (a median turn is
         // ~5,500 frames).
-        val queue = observerWrites
+        val queue = initiatorWrites
         initiatorWrite.forEach { viewer ->
             if (queue == null) {
                 writeToViewerIsolated(viewer, delta, isInitiator = true)
@@ -492,12 +536,19 @@ internal class ConversationTurnFanout(
         viewers: Set<ViewerHandle>,
     ): Pair<List<ViewerHandle>, List<ViewerHandle>> {
         val initiatorId = initiatorViewer?.connectionId
+        val detached = initiatorDetached
         val initiators = mutableListOf<ViewerHandle>()
         val observers = mutableListOf<ViewerHandle>()
         viewers.forEach { viewer ->
-            val isInitiator = viewer === initiatorViewer ||
-                (initiatorId != null && viewer.connectionId == initiatorId)
-            if (isInitiator) initiators += viewer else observers += viewer
+            when {
+                // letta-mobile-qygvv.3: the dead initiator handle gets nothing more. A NEW
+                // handle from the same peer (its redial) is an ordinary observer.
+                detached && viewer === initiatorViewer -> Unit
+                detached -> observers += viewer
+                viewer === initiatorViewer || (initiatorId != null && viewer.connectionId == initiatorId) ->
+                    initiators += viewer
+                else -> observers += viewer
+            }
         }
         return initiators to observers
     }

@@ -40,6 +40,7 @@ import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class CreateAgentFormState(
     val name: String = "",
@@ -233,7 +234,7 @@ private fun CreateAgentDialogForm(
 ) {
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         OutlinedTextField(
             value = formState.name,
@@ -501,7 +502,7 @@ private fun CreateAgentRemoteToolsSection(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(LettaIcons.Add, contentDescription = null)
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
         Text(stringResource(R.string.screen_agents_create_select_tools))
     }
 }
@@ -529,8 +530,8 @@ private fun LocalLettaCodeReadinessCard(
         ),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 text = if (readiness.ready) "Local LettaCode is ready" else "Finish Local LettaCode setup",
@@ -571,7 +572,7 @@ internal fun ImportAgentDialog(
             onImport(overrideName.ifBlank { null }, overrideExistingTools, stripMessages)
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             Text(
                 text = stringResource(R.string.screen_agents_import_helper),
                 style = MaterialTheme.typography.bodyMedium,

@@ -112,7 +112,7 @@ sealed interface ServerFrame {
      * [UserActionAck], this is UX-facing: it tells mobile whether the
      * action was matched to a tool approval, injected as chat input,
      * recorded for later, rejected, or failed. [frameId] correlates to
-     * the outbound [UserActionFrame.id].
+     * the outbound `user_action` frame id.
      */
     @Serializable
     data class UserActionOutcome(
@@ -197,6 +197,21 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
+     * letta-mobile-1n5py.1: this device's input was accepted but parked in the App Server's queue
+     * behind another client's turn (the engine's `Running` lifecycle with the queued reason). The
+     * turn it belongs to has not started; its own frames follow once the server dequeues it.
+     */
+    @Serializable
+    data class TurnQueued(
+        override val v: Int = 1,
+        val type: String = "turn_queued",
+        override val id: String,
+        override val ts: String,
+        @SerialName("turn_id") val turnId: String,
+        @SerialName("conversation_id") val conversationId: String,
+    ) : ServerFrame
+
+    /**
      * Spec §4.7: bare-envelope shape — the inner field is `stop_reason`
      * (NOT `reason`), matching the SSE/REST emit and the existing
      * Kotlin [com.letta.mobile.data.model.StopReasonMessage]. The WS
@@ -237,7 +252,7 @@ sealed interface ServerFrame {
 
     /**
      * Spec §2.2 + §4.2: `id` always carries the `cm-stream-` prefix.
-     * `otid` echoes the client's [SendMessageFrame.otid] when present
+     * `otid` echoes the client's `send_message` `otid` when present
      * so mobile's `dedupeOptimisticContentTwins` can collapse the
      * stream-vs-disk twins on reconcile.
      *
@@ -378,7 +393,7 @@ sealed interface ServerFrame {
     /**
      * letta-mobile-2rkdj — Spec §11/§3.4: a single replayed (or
      * live-tailed) entry from a Run's `frames.jsonl`, emitted in
-     * response to a [com.letta.mobile.data.transport.SubscribeFrame].
+     * response to a `subscribe` request.
      *
      * `seq` is the cursor value to persist; on next reconnect, pass
      * `cursor: seq` to resume after this frame.
@@ -524,6 +539,23 @@ sealed interface ServerFrame {
         val at: String = "",
     ) : ServerFrame
 
+    /**
+     * letta-mobile-lks7m: Meridian's device-wide push after a conversation write (created, updated,
+     * archived, restored) from any client, so conversation lists follow other devices without a
+     * restart. [agentId] is the owning agent when the host knew it.
+     */
+    @Serializable
+    data class ConversationUpdated(
+        override val v: Int = 1,
+        val type: String = "conversation_updated",
+        override val id: String,
+        override val ts: String,
+        @SerialName("conversation_id") val conversationId: String,
+        @SerialName("agent_id") val agentId: String? = null,
+        val reason: String = "",
+        val at: String = "",
+    ) : ServerFrame
+
     // ─── Subagent server frames (letta-mobile-73o2h.3) ──────────────
     //
     // `request_id` echoes the client's outbound request so the repo
@@ -532,7 +564,7 @@ sealed interface ServerFrame {
     // SubagentRepository treats that as broadcast-only.
 
     /**
-     * Response to [SubagentListFrame] (§13.2). `subagents` carries the
+     * Response to a `subagent_list` request (§13.2). `subagents` carries the
      * full enumeration (active-only unless the request set `all`).
      */
     @Serializable
@@ -548,7 +580,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * Response to [SubagentTodosFrame] (§13.3). `subagent` is the matched
+     * Response to a `subagent_todos` request (§13.3). `subagent` is the matched
      * registry entry; `todos` is the latest TodoWrite snapshot. `found`
      * / `todosFound` degrade gracefully when the subagent or its todos
      * could not be resolved.

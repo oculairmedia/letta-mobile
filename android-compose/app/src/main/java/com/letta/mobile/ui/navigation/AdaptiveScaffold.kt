@@ -44,6 +44,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlin.reflect.KClass
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun AdaptiveScaffold(
@@ -66,7 +67,11 @@ fun AdaptiveScaffold(
     } else {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
-        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination)
+        // Screens that lay themselves out edge to edge, drawing behind the system bars and insetting
+        // only their own controls: the chat, and the canvas (its board and the note opened full
+        // screen). Padding them here boxed the board in between two bars of scaffold colour.
+        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination) ||
+            currentDestination?.hasRoute(CanvasRoute::class) == true
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
@@ -107,7 +112,7 @@ private fun LettaNavigationRail(
     NavigationRail(
         modifier = modifier.fillMaxHeight(),
         containerColor = MaterialTheme.colorScheme.surface,
-        header = { Spacer(Modifier.width(8.dp)) },
+        header = { Spacer(Modifier.width(LettaDimens.Space.sm)) },
     ) {
         Spacer(Modifier.weight(1f))
         visibleDestinations.forEach { destination ->

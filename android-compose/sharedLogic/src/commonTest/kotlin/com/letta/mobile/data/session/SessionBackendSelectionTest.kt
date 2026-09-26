@@ -46,13 +46,13 @@ class SessionBackendSelectionTest {
             serverUrl = "http://localhost:8283",
         )
 
-        assertEquals(SessionBackendBinding.RemoteHttpOrWs, config.sessionBackendBinding())
+        assertEquals(SessionBackendBinding.RemoteHttp, config.sessionBackendBinding())
         assertEquals(SessionBackendBinding.Iroh, config.sessionBackendBinding(forceIroh = true))
     }
 
     @Test
-    fun nullConfigBindsRemoteHttpOrWs() {
-        assertEquals(SessionBackendBinding.RemoteHttpOrWs, null.sessionBackendBinding())
+    fun nullConfigBindsRemoteHttp() {
+        assertEquals(SessionBackendBinding.RemoteHttp, null.sessionBackendBinding())
     }
 }
 

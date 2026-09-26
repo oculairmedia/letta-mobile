@@ -60,6 +60,7 @@ import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import kotlin.math.PI
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Realtime lookdev for the ambient agent-status shader, hosted as a SECOND
@@ -214,10 +215,11 @@ private fun LookdevRoot() {
     val state = remember { LookdevState() }
 
     // Recompile on every source change; keep the last good effect on errors.
-    var builder by remember { mutableStateOf<RuntimeShaderBuilder?>(null) }
+    var builder by remember { mutableStateOf<CompiledShader?>(null) }
     LaunchedEffect(state.source) {
-        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(state.source)) }
-            .onSuccess { builder = it; state.compileError = null }
+        val source = state.source
+        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(source)) }
+            .onSuccess { builder = CompiledShader(it, source); state.compileError = null }
             .onFailure { state.compileError = it.message }
     }
 
@@ -271,16 +273,16 @@ private fun LookdevRoot() {
 @Composable
 private fun Chip(label: String, selected: Boolean = false, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(5.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = LettaDimens.Alpha.hairline),
         modifier = Modifier.clickable(onClick = onClick),
     ) {
         Text(
             text = label,
-            fontSize = 10.sp,
+            fontSize = LettaDimens.Type.micro,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
         )
     }
 }
@@ -292,8 +294,8 @@ private fun ControlsColumn(state: LookdevState) {
             .width(360.dp)
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(LettaDimens.Space.md),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             "Variants — drop .sksl files into desktop/lookdev-shaders/ (live)",
@@ -305,7 +307,7 @@ private fun ControlsColumn(state: LookdevState) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             items(state.variants, key = { it.name }) { variant ->
                 Chip(
                     label = variant.name,
@@ -316,7 +318,7 @@ private fun ControlsColumn(state: LookdevState) {
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             Chip("proposed") {
                 state.selectedVariant = null
                 state.source = PROPOSED_DESKTOP_SKSL
@@ -330,7 +332,7 @@ private fun ControlsColumn(state: LookdevState) {
             }
         }
         Text("Status presets", style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             AmbientMotionStatus.entries.forEach { status ->
                 Chip(status.name.lowercase()) {
                     val spec = AmbientMotion.spec(status)
@@ -347,7 +349,7 @@ private fun ControlsColumn(state: LookdevState) {
         LabeledSlider("overlay scale (uScale)", state.scale, 0.25f..3f) { state.scale = it }
 
         Text("Tint", style = MaterialTheme.typography.labelSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             listOf(
                 Color(0xFF3FE0C0), // teal (running)
                 Color(0xFFE0457B), // pink identity
@@ -357,8 +359,8 @@ private fun ControlsColumn(state: LookdevState) {
             ).forEach { color ->
                 Box(
                     Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .size(LettaDimens.Control.iconButton)
+                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
                         .background(color)
                         .clickable { state.tint = color },
                 )
@@ -376,7 +378,7 @@ private fun ControlsColumn(state: LookdevState) {
         OutlinedTextField(
             value = state.source,
             onValueChange = { state.source = it },
-            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+            textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = LettaDimens.Type.caption),
             modifier = Modifier.fillMaxWidth().heightIn(min = 420.dp),
         )
     }
@@ -385,7 +387,7 @@ private fun ControlsColumn(state: LookdevState) {
 @Composable
 private fun PreviewPane(
     state: LookdevState,
-    builder: () -> RuntimeShaderBuilder?,
+    builder: () -> CompiledShader?,
     phase: () -> Float,
 ) {
     val paint = remember { SkiaPaint() }
@@ -400,22 +402,27 @@ private fun PreviewPane(
         // Painting the shader last made the lookdev overstate text tinting, so
         // opacity picked here would have read differently in the shipped chat.
         Canvas(Modifier.fillMaxSize()) {
-            val active = builder() ?: return@Canvas
+            val compiled = builder() ?: return@Canvas
+            val active = compiled.builder
             active.uniform("uSize", size.width, size.height)
             active.uniform("uTime", phase())
             active.uniform("uAgitation", state.agitation)
             active.uniform("uEnvelope", state.envelope)
-            if (state.source.contains("uniform float uPalettePull")) {
+            if (compiled.declares("uPalettePull")) {
                 active.uniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
             }
-            if (state.source.contains("uniform float uStreamEnergy")) {
+            if (compiled.declares("uBandTop") && compiled.declares("uBandPeak")) {
+                active.uniform("uBandTop", AmbientMotion.PANE_EDGE_BAND.top)
+                active.uniform("uBandPeak", AmbientMotion.PANE_EDGE_BAND.peak)
+            }
+            if (compiled.declares("uStreamEnergy")) {
                 active.uniform("uStreamEnergy", 0f)
             }
             active.uniform("uColor", state.tint.red, state.tint.green, state.tint.blue, state.alpha)
-            if (state.source.contains("uniform float uInvert")) {
+            if (compiled.declares("uInvert")) {
                 active.uniform("uInvert", state.invert)
             }
-            if (state.source.contains("uniform float uScale")) {
+            if (compiled.declares("uScale")) {
                 active.uniform("uScale", state.scale)
             }
             val frameShader = active.makeShader(null)
@@ -425,7 +432,7 @@ private fun PreviewPane(
             frameShader.close()
         }
         // Fake chat content so glow strength is judged against readability.
-        Column(Modifier.fillMaxSize().padding(40.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column(Modifier.fillMaxSize().padding(LettaDimens.Orb.lg), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
             repeat(8) { index ->
                 Text(
                     text = if (index % 3 == 2) {
@@ -434,7 +441,7 @@ private fun PreviewPane(
                         "Assistant narration line $index — glow must never wash this out while streaming."
                     },
                     color = Color(0xFFB8C2C4),
-                    fontSize = 14.sp,
+                    fontSize = LettaDimens.Type.caption,
                 )
             }
         }
@@ -449,9 +456,18 @@ private fun LabeledSlider(
     onChange: (Float) -> Unit,
 ) {
     Column {
-        Text("$label = ${"%.2f".format(value)}", fontSize = 10.sp)
+        Text("$label = ${"%.2f".format(value)}", fontSize = LettaDimens.Type.micro)
         Slider(value = value, onValueChange = onChange, valueRange = range)
     }
 }
 
 private const val BaseRate = (2 * PI).toFloat() * 1000f / AmbientMotion.BASE_PERIOD_MILLIS
+
+/**
+ * A compiled effect with the source it was compiled from. Uniforms are bound against that source,
+ * not the editor's: after a failed edit the preview keeps the last good effect, and binding a
+ * uniform only the newer text declares aborts the preview.
+ */
+private class CompiledShader(val builder: RuntimeShaderBuilder, private val source: String) {
+    fun declares(uniform: String): Boolean = source.contains("uniform float $uniform")
+}

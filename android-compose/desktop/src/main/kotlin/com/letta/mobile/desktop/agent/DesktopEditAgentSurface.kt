@@ -65,6 +65,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
+import com.letta.mobile.ui.theme.LettaDimens
 
 private val ToneOptions = listOf("Concise", "Friendly", "Technical", "Mentor", "Playful", "Formal")
 private val VoiceOptions = listOf("Caring", "Neutral", "Warm", "Energetic", "Calm", "Direct")
@@ -257,22 +258,22 @@ internal fun DesktopEditAgentSurface(
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 40.dp, top = 4.dp, end = 40.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+                .padding(start = LettaDimens.Orb.lg, top = LettaDimens.Space.xs, end = LettaDimens.Orb.lg, bottom = LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             // No header of its own: the hosting side pane draws the title and close.
             if (loading) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                     com.letta.mobile.ui.mascot.MascotLoading(agentId)
                     Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 Column(
                     modifier = Modifier.widthIn(max = 980.dp).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
                 ) {
             // Avatar + Name
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg), verticalAlignment = Alignment.Top) {
                 EditorAvatarTile(agentId, identity, loadedIdentity, onChange = { identity = it })
                 LabeledSection("Name", accent, Modifier.weight(1f)) {
                     DesktopTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
@@ -297,7 +298,7 @@ internal fun DesktopEditAgentSurface(
 
             // Tone
             LabeledSection("Tone", accent) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     ToneOptions.forEach { option ->
                         SelectChip(text = option, selected = tone == option) {
                             tone = if (tone == option) null else option
@@ -319,7 +320,7 @@ internal fun DesktopEditAgentSurface(
 
             // Interests
             LabeledSection("Interests", accent) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     interests.forEach { interest ->
                         InterestChip(text = interest) { interests.remove(interest) }
                     }
@@ -343,11 +344,11 @@ internal fun DesktopEditAgentSurface(
             }
 
             // Voice + Default model (side by side)
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
                 LabeledSection("Voice", accent, Modifier.weight(1f)) {
                     DropdownSelector(
                         leading = {
-                            Icon(Icons.Outlined.PlayArrow, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Outlined.PlayArrow, null, modifier = Modifier.size(LettaDimens.Control.icon), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         },
                         label = voice,
                         options = VoiceOptions,
@@ -367,7 +368,7 @@ internal fun DesktopEditAgentSurface(
             }
 
                     error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(LettaDimens.Space.sm))
                 }
             }
         }
@@ -378,7 +379,7 @@ internal fun DesktopEditAgentSurface(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 40.dp, vertical = 14.dp),
+                .padding(horizontal = LettaDimens.Orb.lg, vertical = LettaDimens.Space.lg),
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -401,7 +402,7 @@ private fun LabeledSection(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         SectionLabel(label, accent)
         content()
     }
@@ -421,7 +422,7 @@ private fun SectionLabel(text: String, accent: Color) {
 private fun SelectChip(text: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
     ) {
@@ -429,7 +430,7 @@ private fun SelectChip(text: String, selected: Boolean, onClick: () -> Unit) {
             text = text,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         )
     }
 }
@@ -438,20 +439,20 @@ private fun SelectChip(text: String, selected: Boolean, onClick: () -> Unit) {
 private fun InterestChip(text: String, onRemove: () -> Unit) {
     Surface(
         onClick = onRemove,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text, style = MaterialTheme.typography.labelLarge)
             Icon(
                 Icons.Outlined.Add,
                 contentDescription = "Remove $text",
-                modifier = Modifier.size(13.dp).rotate(45f),
+                modifier = Modifier.size(LettaDimens.Control.iconSm).rotate(45f),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -471,18 +472,18 @@ private fun DropdownSelector(
         Surface(
             onClick = { open = true },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.md),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leading?.invoke()
                 Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(LettaDimens.Control.icon), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (open) {

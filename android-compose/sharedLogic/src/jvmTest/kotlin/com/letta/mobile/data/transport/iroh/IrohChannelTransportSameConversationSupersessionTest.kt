@@ -36,7 +36,8 @@ import kotlin.time.Duration.Companion.seconds
  * Sequence under test:
  * 1. First turn starts and streams input on (agent-1, conv-1).
  * 2. Second send arrives for the SAME conversation while the first is in-flight.
- * 3. Atomic registration rejects the second send as busy without displacing turn #1.
+ * 3. Atomic registration declines the second send (letta-mobile-1n5py: `send` returns false and
+ *    publishes nothing, so the coordinator queues it) without displacing turn #1.
  * 4. Turn #1 ownership, active job reachability, cancellation targeting, and liveness
  *    are preserved until turn #1 settles.
  */
@@ -80,12 +81,12 @@ class IrohChannelTransportSameConversationSupersessionTest {
         try {
             delay(150.milliseconds)
             val firstTurn = startFirstTurn(transport, client, frames)
-            val secondTurnId = rejectSecondTurn(transport, frames)
+            declineSecondTurn(transport, frames)
 
             assertFirstTurnOwnershipIsPreserved(transport, firstTurn.id)
             cancelConversation(transport, client, firstTurn.id)
             completeFirstTurn(client, frames, firstTurn)
-            assertFinalState(transport, frames, firstTurn.id, secondTurnId)
+            assertFinalState(transport, frames, firstTurn.id)
         } finally {
             collector.cancel()
             transport.disconnect()
@@ -118,20 +119,17 @@ class IrohChannelTransportSameConversationSupersessionTest {
         return RunningTurn(started.turnId, started.runId, job)
     }
 
-    private suspend fun rejectSecondTurn(
+    private suspend fun declineSecondTurn(
         transport: IrohChannelTransport,
         frames: List<ServerFrame>,
-    ): String {
-        transport.send(AGENT, CONV_1, "second-message", "otid-2", null, false)
-        withTimeout(3.seconds) {
-            while (frames.none { it is ServerFrame.Error && it.code == "iroh_turn_engine_busy" }) delay(10.milliseconds)
-        }
-        withTimeout(3.seconds) {
-            while (frames.none { it is ServerFrame.TurnDone && it.status == "failed" }) delay(10.milliseconds)
-        }
-        val busyError = frames.filterIsInstance<ServerFrame.Error>().single { it.code == "iroh_turn_engine_busy" }
+    ) {
+        val framesBefore = frames.size
+        assertFalse(
+            transport.send(AGENT, CONV_1, "second-message", "otid-2", null, false),
+            "a send into a busy conversation is declined so the caller can queue it",
+        )
         delay(50.milliseconds)
-        return assertNotNull(busyError.turnId, "busy rejection must identify turn #2")
+        assertEquals(framesBefore, frames.size, "a declined send publishes no error or terminal")
     }
 
     private fun assertFirstTurnOwnershipIsPreserved(transport: IrohChannelTransport, firstTurnId: String) {
@@ -182,19 +180,15 @@ class IrohChannelTransportSameConversationSupersessionTest {
         transport: IrohChannelTransport,
         frames: List<ServerFrame>,
         firstTurnId: String,
-        secondTurnId: String,
     ) {
         assertEquals(0, transport.turnRegistry().activeTurnsCount(), "activeTurns map must be empty after all turns complete")
         assertEquals(0, transport.turnRegistry().activeSendJobsCount(), "activeSendJobs map must be empty after all turns complete")
         assertFalse(transport.hasActiveChatTurn(CONV_1), "hasActiveChatTurn must be false after completion")
 
         val turnDoneFrames = frames.filterIsInstance<ServerFrame.TurnDone>()
-        val doneForTurn1 = turnDoneFrames.filter { it.turnId == firstTurnId }
-        val doneForTurn2 = turnDoneFrames.filter { it.turnId == secondTurnId }
-
-        assertEquals(1, doneForTurn1.size, "turn #1 must receive exactly 1 terminal frame")
-        assertEquals(1, doneForTurn2.size, "turn #2 must receive exactly 1 terminal frame (its busy rejection)")
-        assertEquals("failed", doneForTurn2.single().status)
+        assertEquals(1, turnDoneFrames.count { it.turnId == firstTurnId }, "turn #1 must receive exactly 1 terminal frame")
+        assertEquals(1, turnDoneFrames.size, "the declined send never produced a turn of its own")
+        assertTrue(frames.none { it is ServerFrame.Error && it.code == "iroh_turn_engine_busy" })
     }
 
     private fun IrohChannelTransport.activeTurnId(conversationId: String): String? =

@@ -197,9 +197,12 @@ class DesktopChatInteractionUiTest {
 
         onNodeWithContentDescription("Attach").assertExists()
         onNodeWithText("Model").assertExists()
-        onNodeWithText("Unrestricted").assertExists()
-        onNodeWithText("Medium").assertExists()
-        onNodeWithTag("composer-controls-secondary").assertExists()
+        // The safety / effort / context chips are hidden while the composer
+        // chrome is reworked (ShowComposerStatusChips). Narrow layout keeps the
+        // primary row only, so the secondary row is not composed at all.
+        onNodeWithText("Unrestricted").assertDoesNotExist()
+        onNodeWithText("Medium").assertDoesNotExist()
+        onNodeWithTag("composer-controls-secondary").assertDoesNotExist()
         onNodeWithTag("composer-send").assertExists().assertIsEnabled().performClick()
         runOnIdle { assertEquals(1, sends) }
     }

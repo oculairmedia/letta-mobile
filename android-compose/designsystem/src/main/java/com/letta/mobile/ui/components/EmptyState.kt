@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun EmptyState(
@@ -33,7 +34,7 @@ fun EmptyState(
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
         Text(
             text = message,
             style = MaterialTheme.typography.bodyLarge,
@@ -41,14 +42,14 @@ fun EmptyState(
             textAlign = TextAlign.Center
         )
         if (actionLabel != null && onAction != null) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
             Button(
                 onClick = onAction,
                 contentPadding = if (actionIcon != null) ButtonDefaults.ButtonWithIconContentPadding else ButtonDefaults.ContentPadding,
             ) {
                 if (actionIcon != null) {
                     Icon(actionIcon, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 }
                 Text(actionLabel)
             }

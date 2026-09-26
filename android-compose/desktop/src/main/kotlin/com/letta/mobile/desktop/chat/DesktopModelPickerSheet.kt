@@ -48,6 +48,7 @@ import com.letta.mobile.data.model.ModelBadge
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.ModelOption
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import com.letta.mobile.ui.theme.LettaDimens
 
 private val AccentTeal = Color(0xFF00BFA5)
 
@@ -100,22 +101,22 @@ internal fun DesktopModelPickerSheet(
                     indication = null,
                     onClick = {},
                 ),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.lg),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 8.dp,
+            shadowElevation = LettaDimens.Space.sm,
         ) {
             Column {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.lg),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(LettaDimens.Control.icon),
                     )
                     JewelTextField(
                         value = query,
@@ -137,7 +138,7 @@ internal fun DesktopModelPickerSheet(
                                 text = "No models match \"${query.text}\"",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(20.dp),
+                                modifier = Modifier.padding(LettaDimens.Space.xl),
                             )
                         }
                     }
@@ -167,20 +168,20 @@ internal fun DesktopModelPickerSheet(
                         .background(MaterialTheme.colorScheme.outlineVariant),
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (onEditModels != null) {
                         Row(
                             modifier = Modifier.clickable(onClick = onEditModels),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Settings,
                                 contentDescription = null,
                                 tint = AccentTeal,
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(LettaDimens.Control.icon),
                             )
                             Text(
                                 text = "Edit models…",
@@ -209,7 +210,7 @@ private fun ProviderHeader(provider: String) {
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs),
     )
 }
 
@@ -224,9 +225,9 @@ private fun ModelRow(
             .fillMaxWidth()
             .background(if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 11.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         Text(
             text = option.displayName,
@@ -247,14 +248,14 @@ private fun ModelRow(
         option.badge?.let { ModelBadgePill(it) }
         if (selected) {
             Box(
-                modifier = Modifier.size(20.dp).background(AccentTeal, CircleShape),
+                modifier = Modifier.size(LettaDimens.Control.iconButtonSm).background(AccentTeal, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Check,
                     contentDescription = "Selected",
                     tint = Color.White,
-                    modifier = Modifier.size(13.dp),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                 )
             }
         }
@@ -269,8 +270,8 @@ private fun ModelBadgePill(badge: ModelBadge) {
     }
     Box(
         modifier = Modifier
-            .border(1.dp, AccentTeal.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .border(1.dp, AccentTeal.copy(alpha = 0.55f), RoundedCornerShape(LettaDimens.Radius.sm))
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
     ) {
         Text(
             text = label,

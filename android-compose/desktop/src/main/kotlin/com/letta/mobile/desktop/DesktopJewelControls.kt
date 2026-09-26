@@ -41,6 +41,7 @@ import org.jetbrains.jewel.ui.component.Text as JewelText
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.font.FontWeight
+import com.letta.mobile.ui.theme.LettaDimens
 
 // Snappy: 450ms read as "the tooltip is broken" on quick hovers.
 private const val TooltipShowDelayMs = 150
@@ -80,11 +81,11 @@ internal fun DesktopTooltipArea(
     content: @Composable () -> Unit,
 ) {
     val placement = when (position) {
-        DesktopTooltipPosition.Cursor -> TooltipPlacement.CursorPoint(offset = DpOffset(12.dp, 12.dp))
+        DesktopTooltipPosition.Cursor -> TooltipPlacement.CursorPoint(offset = DpOffset(LettaDimens.Space.md, LettaDimens.Space.md))
         DesktopTooltipPosition.BelowAnchor -> TooltipPlacement.ComponentRect(
             anchor = Alignment.BottomCenter,
             alignment = Alignment.TopCenter,
-            offset = DpOffset(0.dp, 8.dp),
+            offset = DpOffset(0.dp, LettaDimens.Space.sm),
         )
     }
     TooltipArea(
@@ -124,26 +125,26 @@ internal fun DesktopRichTooltip(
 private fun DesktopTooltipSurface(text: String, timeLabel: String? = null, body: String? = null) {
     val rich = timeLabel != null || !body.isNullOrBlank()
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 6.dp,
+        shadowElevation = LettaDimens.Space.sm,
     ) {
         if (!rich) {
             Text(
                 text = text,
-                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
                 style = MaterialTheme.typography.labelMedium,
             )
         } else {
             Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp).widthIn(max = 320.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm).widthIn(max = 320.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 ) {
                     Text(
                         text = text,
@@ -280,7 +281,7 @@ internal fun DesktopButtonContent(
 ) {
     val contentColor = JewelLocalContentColor.current
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {

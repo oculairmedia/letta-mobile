@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import io.ak1.drawbox.domain.model.ResizeHandle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.composables.icons.lucide.GripVertical
@@ -51,10 +52,12 @@ import com.composables.icons.lucide.Maximize2
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
+import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.canvas.CanvasSession
 import io.ak1.drawbox.domain.model.Viewport
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The canvas's block documents as elements on the board, one card per document, placed in the
@@ -89,6 +92,15 @@ fun CanvasNotesLayer(
     /** Dragging a selected card moves the whole selection; the host owns that gesture. */
     onGroupDrag: ((Offset) -> Unit)? = null,
     onGroupDragEnd: (() -> Unit)? = null,
+    /** True while the eraser tool is held: a press on a card removes it instead of selecting it. */
+    eraseMode: Boolean = false,
+    onErase: (String) -> Unit = {},
+    /**
+     * A card's frame while it is being dragged or resized, before the move is committed; null
+     * when the gesture ends. Lets chrome anchored to a note (its menu, its quick-create targets)
+     * follow the card instead of trailing at the committed position.
+     */
+    onLiveFrame: (id: String, frame: CanvasDocumentFrame?) -> Unit = { _, _ -> },
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         documents.forEachIndexed { index, document ->
@@ -103,6 +115,9 @@ fun CanvasNotesLayer(
                 onActivate = { onActivate(document.id) },
                 onExpand = { onExpand(document.id) },
                 onToolbar = onToolbar,
+                eraseMode = eraseMode,
+                onErase = { onErase(document.id) },
+                onLiveFrame = { frame -> onLiveFrame(document.id, frame) },
                 selection = NoteSelection(
                     selected = selected,
                     groupOffset = if (selected) groupOffset else Offset.Zero,
@@ -136,11 +151,20 @@ private fun CanvasNoteCard(
     onExpand: () -> Unit,
     onToolbar: ((NoteToolbar?) -> Unit)?,
     selection: NoteSelection,
+    eraseMode: Boolean = false,
+    onErase: () -> Unit = {},
+    onLiveFrame: (CanvasDocumentFrame?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    val recorder = LocalCanvasDocumentRecorder.current
     val density = LocalDensity.current
     var frame by remember(document.id) { mutableStateOf(document.frame ?: defaultFrame) }
     var gestureActive by remember(document.id) { mutableStateOf(false) }
+    // The frame a resize started from. A text element has no card to hold its type, so dragging
+    // it bigger has to make the text bigger — otherwise the box grows and the words stay put,
+    // which reads as a bug rather than a scale.
+    var resizeStartFrame by remember(document.id) { mutableStateOf<CanvasDocumentFrame?>(null) }
+    LaunchedEffect(frame, gestureActive) { onLiveFrame(if (gestureActive) frame else null) }
     LaunchedEffect(document.frame) {
         if (!gestureActive) frame = document.frame ?: defaultFrame
     }
@@ -148,10 +172,25 @@ private fun CanvasNoteCard(
     val screenTopLeft = viewport.worldToScreen(Offset(frame.x + selection.groupOffset.x, frame.y + selection.groupOffset.y))
     val scale = viewport.scale
     val tint = parseHexColor(document.color)
-    // A "plain" note (transparent colour) is text sitting on the board: no card until it is active.
+    // A "plain" note (transparent colour) is text sitting on the board, and stays that way even
+    // while you work in it: the translucent slab that used to appear on activation read as a
+    // half-loaded card. Selection is said by the chrome now, which is what the shapes use.
     val plain = tint != null && tint.alpha == 0f
+    // A shape's label is the shape's text, not a thing of its own: it sits centred in the shape
+    // the way Miro sets it, and the shape carries the selection handles and the moving.
+    val isLabel = plain && CanvasShapeLabels.shapeIdOf(document.id) != null
+    val textStyle = if (isLabel) {
+        (document.style ?: CanvasTextStyle()).let { if (it.align == null) it.copy(align = "center") else it }
+    } else {
+        document.style
+    }
+    val textModifier = if (isLabel) {
+        Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.xs)
+    } else {
+        Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs)
+    }
     val cardColor = when {
-        plain -> if (active) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f) else Color.Transparent
+        plain -> Color.Transparent
         else -> tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
     }
     val onCard = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurfaceVariant
@@ -163,26 +202,84 @@ private fun CanvasNoteCard(
     fun commit() {
         gestureActive = false
         val committed = frame
-        scope.launch { runCatching { session.moveDocument(document.id, committed) } }
+        val started = resizeStartFrame
+        resizeStartFrame = null
+        // Scale the type by however much the box grew, height being what type is measured by.
+        val scaledStyle = computeScaledStyle(plain, started, committed, document.style)
+        scope.launch {
+            recorder.recordingOrJust("moving a note") {
+                // One commit, not two. A frame op followed by a style op can half-succeed, leaving
+                // a box that grew with type that did not - and the second op runs even when the
+                // first has already failed.
+                runCatching {
+                    session.setDocument(document.id, document.json, frame = committed, style = scaledStyle)
+                }
+            }
+        }
     }
 
-    Surface(
+    if (isLabel && !active) {
+        // Not being typed into, a shape's text is only shown: drawn and never hit, so a press
+        // anywhere in the shape reaches the shape - to pick it up, drag it or double-click into
+        // its text - instead of landing on a card in front of it.
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(screenTopLeft.x.roundToInt(), screenTopLeft.y.roundToInt()) }
+                .size(width = widthDp, height = heightDp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
+                .semantics { contentDescription = "Note ${document.id}" },
+            contentAlignment = Alignment.Center,
+        ) {
+            CanvasBlockPreview(
+                json = document.json,
+                style = textStyle,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs),
+            )
+        }
+        return
+    }
+
+    // The card and its selection chrome share one placed, scaled box, and the box carries the
+    // chrome's margin on every side: the chrome sits OUTSIDE the card, and a handle hanging past
+    // its parent's bounds is drawn but never hit, which is how the handles came to look draggable
+    // without being draggable.
+    // In the card's own (zoomed) units, so the margin is one size on screen like the chrome in it.
+    val chromeInset = canvasSelectionStyle().chromeInset() / (if (scale <= 0f) 1f else scale)
+    val insetPx = with(density) { chromeInset.toPx() } * scale
+    Box(
         modifier = Modifier
-            .offset { IntOffset(screenTopLeft.x.roundToInt(), screenTopLeft.y.roundToInt()) }
-            .size(width = widthDp, height = heightDp)
+            .offset {
+                IntOffset(
+                    (screenTopLeft.x - insetPx).roundToInt(),
+                    (screenTopLeft.y - insetPx).roundToInt(),
+                )
+            }
+            .size(width = widthDp + chromeInset * 2, height = heightDp + chromeInset * 2)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0f)
-            }
+            },
+    ) {
+    Surface(
+        modifier = Modifier
+            .padding(chromeInset)
+            .size(width = widthDp, height = heightDp)
             .semantics { contentDescription = "Note ${document.id}" }
             // Taps and drags on the card belong to the note, never to the drawing beneath it; a
             // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
             // the active note.
-            .pointerInput(document.id) {
+            // eraseMode is a key, not just a capture: a pointerInput block keeps the values it
+            // was created with, so keying on the id alone left this handler believing the eraser
+            // was never active.
+            .pointerInput(document.id, eraseMode) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
+                    if (eraseMode) onErase() else selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                     } while (event.changes.any { it.pressed })
@@ -191,15 +288,21 @@ private fun CanvasNoteCard(
             .pointerInput(document.id) { detectTapGestures(onTap = {}) },
         shape = RoundedCornerShape(NOTE_CORNER),
         color = cardColor,
+        // Selection is drawn by CanvasSelectionChrome, the same chrome a shape gets. The card's
+        // own border is only the resting outline of a coloured note.
         border = when {
-            active || selection.selected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            active || selection.selected -> null
             plain -> null
-            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+            else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         },
+        // Text on the board is text, not a card, so it never casts one - active or not. A
+        // transparent surface with an elevation does not simply skip the shadow: Compose draws
+        // the shadow body anyway, and a grey slab appeared behind the words the moment they were
+        // edited.
         shadowElevation = when {
-            plain && !active -> 0.dp
-            active -> 8.dp
-            else -> 4.dp
+            plain -> 0.dp
+            active -> LettaDimens.Space.sm
+            else -> LettaDimens.Space.xs
         },
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -210,21 +313,31 @@ private fun CanvasNoteCard(
             val onMove: (Offset) -> Unit = if (groupDrag != null) groupDrag else { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }
             val onMoveEnd: () -> Unit = if (groupDragEnd != null) groupDragEnd else ::commit
             if (!plain) NoteHandleBar(
+                title = document.title,
                 cardColor = cardColor,
                 onCard = onCard,
                 onDragStart = { if (groupDrag == null) gestureActive = true },
                 onDrag = onMove,
                 onDragEnd = onMoveEnd,
                 onExpand = onExpand,
-                onRemove = { scope.launch { runCatching { session.removeDocument(document.id) } } },
+                onRemove = {
+                    scope.launch {
+                        recorder.recordingOrJust("deleting a note") {
+                            runCatching { session.removeDocument(document.id) }
+                        }
+                    }
+                },
             )
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = if (isLabel) Alignment.Center else Alignment.TopStart,
+            ) {
                 if (expanded) {
                     CanvasBlockPreview(
                         json = document.json,
                         onLightSurface = tint != null && !plain,
-                        style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) 18.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                        style = textStyle,
+                        modifier = textModifier,
                     )
                 } else {
                     CanvasBlockEditor(
@@ -234,11 +347,12 @@ private fun CanvasNoteCard(
                         active = active,
                         onLightSurface = tint != null && !plain,
                         onToolbar = onToolbar,
-                        style = document.style,
-                        modifier = Modifier.fillMaxSize().padding(start = if (plain) 18.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+                        style = textStyle,
+                        centerVertically = isLabel,
+                        modifier = textModifier,
                     )
                 }
-                if (plain && active) {
+                if (plain && active && !isLabel) {
                     TextMoveGrip(
                         modifier = Modifier.align(Alignment.TopStart),
                         onDragStart = { if (groupDrag == null) gestureActive = true },
@@ -246,18 +360,25 @@ private fun CanvasNoteCard(
                         onDragEnd = onMoveEnd,
                     )
                 }
-                NoteResizeHandle(
-                    modifier = Modifier.align(Alignment.BottomEnd),
-                    onDragStart = { gestureActive = true },
-                    onDrag = { delta ->
-                        frame = frame.copy(
-                            width = (frame.width + delta.x).coerceAtLeast(NOTE_MIN_SIZE),
-                            height = (frame.height + delta.y).coerceAtLeast(NOTE_MIN_SIZE),
-                        )
-                    },
-                    onDragEnd = ::commit,
-                )
             }
+        }
+    }
+
+        // The same chrome a selected shape gets — outline, eight handles, and resize — over the
+        // card and reaching outside it, so the outer half of each handle can still be grabbed.
+        if ((active || selection.selected) && !isLabel) {
+            CanvasSelectionChrome(
+                style = canvasSelectionStyle(),
+                scale = scale,
+                contentWidth = widthDp,
+                contentHeight = heightDp,
+                onResize = { handle, delta ->
+                    if (resizeStartFrame == null) resizeStartFrame = frame
+                    gestureActive = true
+                    frame = frame.resizedBy(handle, delta)
+                },
+                onResizeEnd = ::commit,
+            )
         }
     }
 }
@@ -281,6 +402,7 @@ private fun Modifier.dragHandle(onDragStart: () -> Unit, onDrag: (Offset) -> Uni
 
 @Composable
 private fun NoteHandleBar(
+    title: String?,
     cardColor: Color,
     onCard: Color,
     onDragStart: () -> Unit,
@@ -295,28 +417,30 @@ private fun NoteHandleBar(
             .height(HANDLE_HEIGHT)
             .background(onCard.copy(alpha = 0.08f))
             .dragHandle(onDragStart, onDrag, onDragEnd)
-            .padding(start = 8.dp, end = 2.dp),
+            .padding(start = LettaDimens.Space.sm, end = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Lucide.GripVertical,
             contentDescription = "Move note",
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             tint = onCard,
         )
-        Spacer(modifier = Modifier.size(6.dp))
+        Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
         Text(
-            text = "Note",
+            text = title?.takeIf { it.isNotBlank() } ?: "Note",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = onCard,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onExpand, modifier = Modifier.size(HANDLE_HEIGHT)) {
             Icon(
                 imageVector = Lucide.Maximize2,
                 contentDescription = "Open note",
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = onCard,
             )
         }
@@ -324,7 +448,7 @@ private fun NoteHandleBar(
             Icon(
                 imageVector = Lucide.X,
                 contentDescription = "Remove note",
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = onCard,
             )
         }
@@ -341,7 +465,7 @@ private fun TextMoveGrip(
 ) {
     Box(
         modifier = modifier
-            .size(18.dp)
+            .size(LettaDimens.Control.icon)
             .dragHandle(onDragStart, onDrag, onDragEnd)
             .semantics { contentDescription = "Move text" },
         contentAlignment = Alignment.Center,
@@ -349,32 +473,8 @@ private fun TextMoveGrip(
         Icon(
             imageVector = Lucide.GripVertical,
             contentDescription = null,
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun NoteResizeHandle(
-    modifier: Modifier,
-    onDragStart: () -> Unit,
-    onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
-) {
-    Box(
-        modifier = modifier
-            .size(18.dp)
-            .dragHandle(onDragStart, onDrag, onDragEnd)
-            .semantics { contentDescription = "Resize note" },
-        contentAlignment = Alignment.BottomEnd,
-    ) {
-        Box(
-            modifier = Modifier
-                .padding(4.dp)
-                .size(8.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
         )
     }
 }
@@ -386,6 +486,29 @@ internal fun defaultNoteFrame(index: Int): CanvasDocumentFrame = CanvasDocumentF
     width = NOTE_DEFAULT_WIDTH,
     height = NOTE_DEFAULT_HEIGHT,
 )
+
+/**
+ * [wanted], moved clear of anything already sitting at that spot.
+ *
+ * Every new note is placed at the middle of the board, so the second one lands exactly on top of
+ * the first: it hides it and takes every click meant for it. The note underneath cannot be typed
+ * in, ticked or picked up, which reads as that note being broken rather than covered.
+ */
+internal fun clearOfExisting(
+    wanted: CanvasDocumentFrame,
+    taken: List<CanvasDocumentFrame>,
+): CanvasDocumentFrame {
+    var frame = wanted
+    var moves = 0
+    while (moves < MAX_CASCADE && taken.any { it.sharesOrigin(frame) }) {
+        frame = frame.copy(x = frame.x + NOTE_STAGGER, y = frame.y + NOTE_STAGGER)
+        moves++
+    }
+    return frame
+}
+
+private fun CanvasDocumentFrame.sharesOrigin(other: CanvasDocumentFrame): Boolean =
+    x == other.x && y == other.y
 
 /** A frame for a new note centred on [worldCenter]. */
 internal fun newNoteFrame(worldCenter: Offset): CanvasDocumentFrame = CanvasDocumentFrame(
@@ -411,7 +534,86 @@ internal const val NOTE_DEFAULT_HEIGHT = 240f
 private const val TEXT_DEFAULT_WIDTH = 360f
 private const val TEXT_DEFAULT_HEIGHT = 120f
 private const val NOTE_DEFAULT_ORIGIN = 80f
-private const val NOTE_STAGGER = 40f
+// Far enough that the note underneath keeps its first line clear of the new note's corner handle,
+// whose grab area is a shape handle's (see canvasSelectionStyle), not just the handle drawn.
+private const val NOTE_STAGGER = 64f
+
+/** How far a new note will cascade before it is left to overlap: a board can be crowded. */
+private const val MAX_CASCADE = 24
 private const val NOTE_MIN_SIZE = 140f
-private val NOTE_CORNER = 12.dp
-private val HANDLE_HEIGHT = 28.dp
+private val NOTE_CORNER = LettaDimens.Radius.md
+private val HANDLE_HEIGHT = LettaDimens.Control.iconButton
+
+/**
+ * This frame after dragging [handle] by [delta], in world units.
+ *
+ * A side handle moves one edge, a corner moves two. An edge being dragged past its opposite is
+ * clamped at [NOTE_MIN_SIZE] rather than inverting the frame, which is what a shape does too.
+ */
+internal fun CanvasDocumentFrame.resizedBy(handle: ResizeHandle, delta: Offset): CanvasDocumentFrame {
+    val (newX, newWidth) = resizeHorizontal(x, width, handle, delta.x)
+    val (newY, newHeight) = resizeVertical(y, height, handle, delta.y)
+    return copy(x = newX, y = newY, width = newWidth, height = newHeight)
+}
+
+private fun resizeHorizontal(x: Float, width: Float, handle: ResizeHandle, dx: Float): Pair<Float, Float> = when {
+    handle.movesLeft -> {
+        val clamped = dx.coerceAtMost(width - NOTE_MIN_SIZE)
+        (x + clamped) to (width - clamped)
+    }
+    handle.movesRight -> x to (width + dx).coerceAtLeast(NOTE_MIN_SIZE)
+    else -> x to width
+}
+
+private fun resizeVertical(y: Float, height: Float, handle: ResizeHandle, dy: Float): Pair<Float, Float> = when {
+    handle.movesTop -> {
+        val clamped = dy.coerceAtMost(height - NOTE_MIN_SIZE)
+        (y + clamped) to (height - clamped)
+    }
+    handle.movesBottom -> y to (height + dy).coerceAtLeast(NOTE_MIN_SIZE)
+    else -> y to height
+}
+
+private val ResizeHandle.movesLeft: Boolean
+    get() = when (this) {
+        ResizeHandle.TopLeft, ResizeHandle.Left, ResizeHandle.BottomLeft -> true
+        else -> false
+    }
+
+private val ResizeHandle.movesRight: Boolean
+    get() = when (this) {
+        ResizeHandle.TopRight, ResizeHandle.Right, ResizeHandle.BottomRight -> true
+        else -> false
+    }
+
+private val ResizeHandle.movesTop: Boolean
+    get() = when (this) {
+        ResizeHandle.TopLeft, ResizeHandle.Top, ResizeHandle.TopRight -> true
+        else -> false
+    }
+
+private val ResizeHandle.movesBottom: Boolean
+    get() = when (this) {
+        ResizeHandle.BottomLeft, ResizeHandle.Bottom, ResizeHandle.BottomRight -> true
+        else -> false
+    }
+
+/** Type may be scaled this far by dragging a text element's box, and no further. */
+private const val MIN_FONT_SCALE = 0.4f
+private const val MAX_FONT_SCALE = 8f
+
+private fun computeScaledStyle(
+    plain: Boolean,
+    started: CanvasDocumentFrame?,
+    committed: CanvasDocumentFrame,
+    currentStyle: CanvasTextStyle?,
+): CanvasTextStyle? {
+    if (!plain) return null
+    if (started == null) return null
+    if (started.height <= 0f) return null
+    val factor = committed.height / started.height
+    if (factor == 1f) return null
+    val style = currentStyle ?: CanvasTextStyle()
+    val baseScale = style.fontScale ?: 1f
+    return style.copy(fontScale = (baseScale * factor).coerceIn(MIN_FONT_SCALE, MAX_FONT_SCALE))
+}

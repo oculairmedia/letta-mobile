@@ -62,6 +62,7 @@ import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.motion.StaggeredListItem
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,7 +107,7 @@ fun ScheduleListScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadData() },
@@ -163,7 +164,7 @@ private fun ScheduleListContent(
             agents = state.agents,
             selectedAgentId = state.selectedAgentId,
             onAgentSelected = onAgentSelected,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         )
 
         if (state.cronMode) {
@@ -180,8 +181,8 @@ private fun ScheduleListContent(
                 )
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(LettaDimens.Space.lg),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 ) {
                     items(crons, key = { it.id }) { cron ->
                         CronScheduleCard(cron = cron)
@@ -208,8 +209,8 @@ private fun ScheduleListContent(
             )
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(LettaDimens.Space.lg),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
                 itemsIndexed(state.displayItems, key = { _, item -> item.schedule.id }) { index, item ->
                     StaggeredListItem(index = index) {
@@ -239,7 +240,7 @@ private fun AgentSelector(
             text = stringResource(R.string.common_agents),
             style = MaterialTheme.typography.labelLarge,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
         OutlinedButton(
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth(),
@@ -281,7 +282,7 @@ private fun ScheduleCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -294,7 +295,7 @@ private fun ScheduleCard(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                     Text(
                         text = item.timing.label(),
                         style = MaterialTheme.typography.bodySmall,
@@ -319,7 +320,7 @@ private fun CronScheduleCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Text(
                 text = cron.name?.takeIf { it.isNotBlank() }
                     ?: cron.prompt?.takeIf { it.isNotBlank() }
@@ -329,7 +330,7 @@ private fun CronScheduleCard(
                 overflow = TextOverflow.Ellipsis,
             )
             cron.description?.takeIf { it.isNotBlank() }?.let { desc ->
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 Text(
                     text = desc,
                     style = MaterialTheme.typography.bodySmall,
@@ -338,7 +339,7 @@ private fun CronScheduleCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
             Text(
                 text = stringResource(
                     R.string.screen_schedules_recurring_label,

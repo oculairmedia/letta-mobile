@@ -57,7 +57,16 @@ class IrohNodeEndpoint(
     private val authPolicy: IrohAuthPolicy,
     /** Optional pairing service (d6e8g.5); shared across every accepted connection. */
     private val pairingService: IrohPairingService? = null,
+    /**
+     * Relays shared canvases between the apps connected here. When set, the endpoint also
+     * accepts the canvas ALPNs, from peers with an authenticated App Server connection only.
+     */
+    private val canvasRelay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay? = null,
 ) {
+    /** Live App Server connections by peer id, to gate that peer's canvas connections. */
+    private val appServerConnections =
+        java.util.concurrent.ConcurrentHashMap<String, MutableSet<IrohNodeConnection>>()
+
     // d6e8g.3: ONE verifier across every connection this endpoint accepts, so
     // per-NodeId auth-failure rate limiting survives redials.
     private val authVerifier = IrohBearerAuthVerifier(authPolicy)
@@ -75,12 +84,31 @@ class IrohNodeEndpoint(
     private val connectionRegistry = ConnectionRegistry()
 
     /**
+     * letta-mobile-qygvv.3: ONE node-owned home for every connection's live turns, a child of
+     * the endpoint scope and of no connection, so a peer dropping mid-turn detaches its turn
+     * instead of cancelling the server turn under it.
+     *
+     * One host per endpoint generation: [start] creates it and [shutdown] stops its turns, so
+     * detached turns never outlive the endpoint and a restarted endpoint gets a live host.
+     */
+    private var turnHost: NodeTurnHost? = null
+
+    /**
      * Delivers device-wide `agent_updated` frames to every live connection allowed to read agents
      * ([IrohPeerCapabilities.CHAT_READ], the `agent.list` capability), on its stream channel.
      */
     fun agentChangeTarget(): AgentChangeTarget = AgentChangeTarget { frame ->
         val result = connectionRegistry.broadcast(frame) { it.receivesAgentEvents() }
         Telemetry.event("IrohNode", "agent_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
+    }
+
+    /**
+     * Delivers device-wide `conversation_updated` frames to every live connection allowed to read
+     * every conversation (see [ViewerHandle.receivesConversationEvents]), on its stream channel.
+     */
+    fun conversationChangeTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
+        val result = connectionRegistry.broadcast(frame) { it.receivesConversationEvents() }
+        Telemetry.event("IrohNode", "conversation_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
     }
 
     /**
@@ -135,7 +163,7 @@ class IrohNodeEndpoint(
                 },
                 bindAddr = bindAddr,
                 secretKey = resolveSecretKeyStore().loadOrCreate(),
-                alpns = listOf(alpn),
+                alpns = listOf(alpn) + canvasRelay?.alpns.orEmpty(),
                 relayMode = relayMode,
             )
         ).also { ep ->
@@ -202,6 +230,8 @@ class IrohNodeEndpoint(
     fun start(controller: AppServerController) {
         val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
         require(acceptJob == null) { "IrohNodeEndpoint already started" }
+        val host = NodeTurnHost.childOf(scope)
+        turnHost = host
 
         acceptJob = scope.launch(irohExceptionHandler) {
             while (isActive) {
@@ -228,7 +258,7 @@ class IrohNodeEndpoint(
                     // client handshake (peer died mid-connect) can never block
                     // the accept loop for other clients — the exact wedge that
                     // made every subsequent dial time out.
-                    launch { serveIncoming(incoming, controller) }
+                    launch { serveIncoming(incoming, controller, host) }
                 } catch (_: TimeoutCancellationException) {
                     continue
                 } catch (e: CancellationException) {
@@ -244,9 +274,10 @@ class IrohNodeEndpoint(
     }
 
     /** Handshake and serve one accepted connection; failures are logged, never thrown into the accept loop. */
-    private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController) {
+    private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController, turnHost: NodeTurnHost) {
         try {
             val accepting = incoming.accept()
+            val peerAlpn = accepting.alpn()
             val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
             val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
             Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
@@ -255,7 +286,12 @@ class IrohNodeEndpoint(
                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                 return
             }
-            IrohNodeConnection(
+            val relay = canvasRelay
+            if (relay != null && relay.handles(peerAlpn)) {
+                serveCanvas(relay, peerAlpn, connection, remoteId)
+                return
+            }
+            val nodeConnection = IrohNodeConnection(
                 connection = connection,
                 controller = controller,
                 adminRpcRouter = adminRpcRouter,
@@ -264,7 +300,17 @@ class IrohNodeEndpoint(
                 pairingService = pairingService,
                 remoteEndpointId = remoteId,
                 connectionRegistry = connectionRegistry,
-            ).serve()
+                turnHost = turnHost,
+            )
+            val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
+                java.util.concurrent.ConcurrentHashMap.newKeySet()
+            }
+            peerConnections.add(nodeConnection)
+            try {
+                nodeConnection.serve()
+            } finally {
+                peerConnections.remove(nodeConnection)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -277,12 +323,35 @@ class IrohNodeEndpoint(
         }
     }
 
+    /**
+     * A canvas connection is served only for a peer that is signed in on the App Server here: the
+     * canvas protocols carry no credentials of their own, and the apps open them once their App
+     * Server connection is ready.
+     */
+    private fun serveCanvas(
+        relay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay,
+        alpn: ByteArray,
+        connection: computer.iroh.Connection,
+        remoteId: String,
+    ) {
+        val authenticated = appServerConnections[remoteId].orEmpty().any { it.isAuthenticated }
+        if (!authenticated) {
+            Telemetry.event("IrohNode", "canvas.rejected", "remoteEndpointId" to remoteId, "reason" to "not_authenticated")
+            runCatching { connection.close(4401L, "not_authenticated".encodeToByteArray()) }
+            return
+        }
+        Telemetry.event("IrohNode", "canvas.accepted", "remoteEndpointId" to remoteId, "alpn" to alpn.decodeToString())
+        relay.accept(alpn, connection, origin = remoteId, hostNodeId = nodeIdHex())
+    }
+
     private fun isPeerAllowed(remoteId: String): Boolean =
         authPolicy.allowedPeerIds.isEmpty() || remoteId in authPolicy.allowedPeerIds
 
     suspend fun shutdown() {
         acceptJob?.cancel()
         acceptJob = null
+        turnHost?.shutdown()
+        turnHost = null
 
         endpoint?.let {
             runCatching { it.shutdown() }

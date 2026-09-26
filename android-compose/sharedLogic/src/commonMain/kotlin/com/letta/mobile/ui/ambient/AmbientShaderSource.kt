@@ -36,6 +36,11 @@ uniform float uAgitation;
 uniform float uEnvelope;
 uniform float uStreamEnergy;
 uniform float uPalettePull;
+// Where the glow starts fading in and where it reaches full strength, as fractions of
+// canvas height. Set per host (AmbientMotion.band), because what sits at the bottom of the
+// canvas differs: a phone's opaque composer covers its bottom tenth, a desktop pane does not.
+uniform float uBandTop;
+uniform float uBandPeak;
 uniform vec4 uColor;
 
 // Every frequency below is an integer multiple of F, so the whole field is periodic
@@ -44,13 +49,6 @@ uniform vec4 uColor;
 // frame's advance no longer changes it, which is the judder that appeared only after
 // hours of continuous animation. See AmbientMotion.PHASE_WRAP_TURNS.
 const float F = 1.0 / 1024.0;
-// Where the glow starts fading in, as a fraction of canvas height. The glow creeps up from
-// the bottom EDGE of the pane - it is light leaking in from below, not a band parked at
-// mid-window - so it starts low and is strongest at the very edge. This is the one number
-// to move when it reads too tall.
-const float BAND_TOP = 0.90;
-// Where the band reaches full strength: the edge itself.
-const float BAND_PEAK = 0.995;
 /** Overall strength of the glow. The one knob for "too intense" / "too faint". */
 const float BAND_OPACITY = 0.14;
 const float TAU = 6.28318;
@@ -160,12 +158,12 @@ half4 ambientColor(float2 fragCoord) {
     float3 rgb = mix(lit, fieldColor, season);
 
     float energy = clamp(wsum * (0.8 + 0.2 * uAgitation), 0.0, 1.4);
-    // Alpha curve narrowed to the BAND_TOP..BAND_PEAK strip so the visible glow
+    // Alpha curve narrowed to the uBandTop..uBandPeak strip so the visible glow
     // occupies less vertical real estate — a thin glow rising from the pane's
     // bottom edge instead of a broad mid-screen band.
     // Shortening the band also dims it, because the ramp now has less height to climb.
     // The amplitude comes up to keep the same presence in less space.
-    float aRaw = energy * smoothstep(BAND_TOP, BAND_PEAK, uv.y) *
+    float aRaw = energy * smoothstep(uBandTop, uBandPeak, uv.y) *
         (BAND_OPACITY + scan * 0.020 * uStreamEnergy);
     float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.78);
     alpha = max(alpha + dither(fragCoord), 0.0);

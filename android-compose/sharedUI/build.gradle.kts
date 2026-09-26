@@ -76,9 +76,22 @@ kotlin {
                 // Block document editor for canvas notes (letta-mobile-4i2z9.7): Notion-style blocks,
                 // JSON round trip, undo; Android/JVM/iOS/wasm. MIT.
                 implementation("io.github.linreal:cascade-editor:1.9.2")
-                // DrawBox canvas editor (P0)
-                implementation(libs.drawbox)
-                implementation(libs.drawbox.ui)
+                // DrawBox canvas editor, vendored (drawbox/VENDORED.md). api: the canvas's public
+                // surface takes a DrawBoxController, and hosts and tests build one.
+                api(project(":drawbox"))
+                // Connector geometry only (letta-mobile-4i2z9.21). Kuiver's EdgePathFactory is a
+                // pure function of two points, so it computes where a connector runs while DrawBox
+                // keeps owning the element, its selection, undo and eraser. Its graph layout and
+                // renderer are deliberately unused here.
+                implementation(libs.kuiver)
+                // Colour picking (anyColorPicker, Apache-2.0): HSL/RGB/CMYK/LAB/Okhsl pickers with
+                // zero-drift conversions, published for android and jvm like everything else here.
+                // Replaces three hand-rolled sliders that only spoke HSL and drifted on round trip.
+                implementation(libs.colorpicker)
+                // Picking images for a canvas: the system photo picker (several at once) on
+                // Android, a file dialog on desktop. The same library the hosts already use.
+                implementation(libs.filekit.core)
+                implementation(libs.filekit.dialogs.compose)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
             }
@@ -87,6 +100,13 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
+            }
+        }
+
+        androidMain {
+            dependencies {
+                // Turning picked photos upright before they go on a canvas.
+                implementation(libs.androidx.exifinterface)
             }
         }
 

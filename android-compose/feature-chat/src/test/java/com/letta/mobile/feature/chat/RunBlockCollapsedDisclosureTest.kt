@@ -7,7 +7,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -90,6 +92,10 @@ class RunBlockCollapsedDisclosureTest {
         // the run summary row; the per-call detail is one tap further, in the sheet the
         // screen mounts from the groups this row hands back.
         composeRule.onNodeWithTag(ToolRunSummaryTestTags.Row).assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(
+                androidx.compose.ui.semantics.SemanticsProperties.StateDescription,
+                "1 command, 0 failed, 0 awaiting approval, settled",
+            ))
         composeRule.onNodeWithTag("run-row-reasoning-1").assertIsDisplayed()
         composeRule.onNodeWithText("Bash(collapse-check)").assertDoesNotExist()
         composeRule.onNodeWithTag(ToolRunSummaryTestTags.Row).performClick()

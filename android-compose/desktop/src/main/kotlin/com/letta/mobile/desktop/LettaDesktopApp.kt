@@ -73,6 +73,7 @@ import java.time.Instant
 import dev.nucleusframework.application.NucleusApplicationScope
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
+import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 
 /** Application-scoped inputs the desktop shell composes over. */
 internal data class DesktopAppShellBindings(
@@ -142,6 +143,7 @@ internal fun LettaDesktopApp(
     val railPrefs = rememberDesktopRailPrefs(secureSettingsStore)
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val canvasDocuments by canvasShell.library.documents.collectAsState()
+    val archivedCanvasIds by canvasShell.library.archived.collectAsState()
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
@@ -153,9 +155,7 @@ internal fun LettaDesktopApp(
         bootstrap.irohAgentDirectorySlot.value = irohAgentDirectory
     }
     rememberAndPublishGraphChannelTransport(
-        activeConfig = activeConfig,
         irohTransport = irohTransport,
-        chatScope = chatScope,
         publish = bootstrap.publishChannelTransport,
     )
     val chatController = rememberDesktopChatController(
@@ -200,14 +200,11 @@ internal fun LettaDesktopApp(
     var agentSlashCommands by remember(httpApis.slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
     val subagents = rememberSubagentRegistry(
         request = SubagentRegistryRequest(
-            activeConfig = activeConfig,
-            irohMode = irohMode,
             parentScope = subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId),
             irohTransport = irohTransport,
             graphSubagentRepository = sessionGraph.subagentRepository
                 as? com.letta.mobile.data.repository.SubagentRepository,
         ),
-        chatScope = chatScope,
     )
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents
@@ -365,6 +362,13 @@ internal fun LettaDesktopApp(
     // Also used by the header chrome's collapsed-sidebar overflow menu
     // (letta-mobile-3arhe.1), hence declared at the top level rather than
     // nested inside the BoxWithConstraints below.
+    // Header unified search: one query across conversations, agents and canvases.
+    // "Filter to this agent" starts ON, which is the constrained behaviour the
+    // tab picker had; unticking it widens the search to everything.
+    var searchQuery by remember { mutableStateOf("") }
+    var searchScopeId by remember { mutableStateOf(DesktopUnifiedSearch.ALL) }
+    var searchFilterToAgent by remember { mutableStateOf(true) }
+
     fun openNewChatForFocusedAgent() {
         editAgentId = null
         selectedDestination = DesktopDestination.Conversations
@@ -424,7 +428,7 @@ internal fun LettaDesktopApp(
         )
     }
     val mentionables = remember(railAgents, memoryState) {
-        buildMentionables(BuildMentionablesParams(railAgents, memoryState))
+        buildMentionables(BuildMentionablesParams(railAgents, memoryState.parity))
     }
     val paletteItems = remember(chatState.conversations, railAgents, workPlayMode) {
         buildPaletteItems(chatState.conversations, railAgents, workPlayMode)
@@ -719,8 +723,14 @@ internal fun LettaDesktopApp(
                             archiveFilter = archiveFilter,
                             selectedDestination = selectedDestination,
                             mode = workPlayMode,
-                            canvases = canvasDocuments,
+                            // The sidebar's Active / Archived / All applies to canvases as to chats.
+                            canvases = com.letta.mobile.data.canvas.CanvasLibrary.filter(
+                                canvasDocuments,
+                                archivedCanvasIds,
+                                archiveFilter.toCanvasArchiveFilter(),
+                            ),
                             activeCanvasId = canvasShell.activeSession?.canvasId,
+                            archivedCanvasIds = archivedCanvasIds,
                         ),
                         actions = DesktopAgentSidebarActions(
                             onArchiveFilterChange = chatController::setArchiveFilter,
@@ -737,6 +747,7 @@ internal fun LettaDesktopApp(
                             onEditAgent = { editAgentId = selectedAgentId },
                             onOpenCanvas = canvasShell::open,
                             onNewCanvas = { canvasShell.createNew(selectedAgentId) },
+                            onArchiveCanvas = canvasShell.library::setArchived,
                         ),
                     )
                     RailDivider()
@@ -808,7 +819,6 @@ internal fun LettaDesktopApp(
                                 ),
                                 channelLibraryState = channelLibraryState,
                                 toolLibraryState = toolLibraryState,
-                                blockApi = blockApi,
                                 skills = DestinationSkillsInputs(
                                     skills = skillsPanel.all,
                                     installedSkillNames = skillsPanel.installedNames,
@@ -880,10 +890,7 @@ internal fun LettaDesktopApp(
                                     onSubmitPrompt = ::submitHomePrompt,
                                     onA2uiAction = ::dispatchA2uiAction,
                                 ),
-                                memory = DestinationMemoryActions(
-                                    onRefresh = libraries.memory::reload,
-                                    onAgentSelected = libraries.memory::selectAgent,
-                                ),
+                                memory = libraries.memory,
                                 schedules = destinationScheduleActions(
                                     ScheduleWiringDeps(
                                         schedules = libraries.schedules,
@@ -999,6 +1006,10 @@ internal fun LettaDesktopApp(
                     editAgentId = null
                     selectedDestination = lensNavTarget(workPlayMode, lensDestination).first
                 },
+                onSettings = {
+                    editAgentId = null
+                    selectedDestination = DesktopDestination.Settings
+                },
             ),
             conversationTabs = conversationTabs,
             activeConversationId = chatState.selectedConversationId,
@@ -1008,58 +1019,59 @@ internal fun LettaDesktopApp(
             // Browser-style "+" and picker on the strip: a new chat with the focused agent, and
             // that agent's conversations and canvases, most recent first, behind a search field.
             onNewConversationTab = ::openNewChatForFocusedAgent,
-            tabPickerItems = remember(chatState.conversations, canvasDocuments, selectedAgentId) {
-                desktopTabPickerItems(chatState.conversations, canvasDocuments, selectedAgentId)
-            },
-            onOpenTabPickerItem = { openTabPickerItem(it, selectConversationTab, canvasShell::open) },
+            search = DesktopHeaderSearch(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                sections = remember(
+                    searchQuery,
+                    searchScopeId,
+                    searchFilterToAgent,
+                    chatState.conversations,
+                    rosterAgents,
+                    canvasDocuments,
+                    selectedAgentId,
+                    avatarStyleByAgentId,
+                ) {
+                    DesktopUnifiedSearch.sections(
+                        query = searchQuery,
+                        conversations = chatState.conversations,
+                        agents = rosterAgents,
+                        canvases = canvasDocuments,
+                        avatarStyleByAgentId = avatarStyleByAgentId,
+                        agentId = selectedAgentId,
+                        filterToAgent = searchFilterToAgent,
+                        scopeId = searchScopeId,
+                    )
+                },
+                onRowSelected = { row ->
+                    searchQuery = ""
+                    DesktopUnifiedSearch.parseRowId(row.id)?.let { (kind, id) ->
+                        when (kind) {
+                            DesktopUnifiedSearch.CONVERSATIONS -> selectConversationTab(id)
+                            DesktopUnifiedSearch.AGENTS -> openAgent(id)
+                            DesktopUnifiedSearch.CANVASES ->
+                                canvasShell.open(com.letta.mobile.data.canvas.CanvasId(id))
+                        }
+                    }
+                },
+                onDismiss = { searchQuery = "" },
+                config = com.letta.mobile.ui.search.LettaSearchConfig(
+                    placeholder = "Search agents, conversations, canvases",
+                    // The header field is always present; stealing focus on
+                    // every recomposition would fight the composer for the caret.
+                    autoFocus = false,
+                    scopes = DesktopUnifiedSearch.scopes,
+                    selectedScopeId = searchScopeId,
+                    onScopeSelected = { searchScopeId = it },
+                    toggle = com.letta.mobile.ui.search.LettaSearchToggle(
+                        label = "Filter to this agent",
+                        checked = searchFilterToAgent,
+                        onCheckedChange = { searchFilterToAgent = it },
+                    ),
+                ),
+            ),
         )
         SideEffect { onHeaderChromeChange(headerChrome) }
-    }
-}
-
-/**
- * What the tab strip's picker offers for [agentId]: its conversations, then its canvases, each
- * most recent first. Every conversation and canvas when no agent is focused.
- */
-internal fun desktopTabPickerItems(
-    conversations: List<com.letta.mobile.data.chat.runtime.ChatConversationSummary>,
-    canvases: List<com.letta.mobile.data.canvas.CanvasDocument>,
-    agentId: String?,
-): List<com.letta.mobile.data.desktopshell.TabPickerItem> {
-    val chats = conversations
-        .filter { agentId == null || it.agentId == agentId }
-        .sortedByDescending { conversationRecency(it.updatedAtLabel) }
-        .map {
-            com.letta.mobile.data.desktopshell.TabPickerItem(
-                id = it.id,
-                title = it.displayTitle(),
-                subtitle = it.agentName,
-                kind = com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION,
-            )
-        }
-    val boards = canvases
-        .filter { agentId == null || it.agentId == null || it.agentId == agentId }
-        .sortedByDescending { it.updatedAtEpochMs }
-        .map {
-            com.letta.mobile.data.desktopshell.TabPickerItem(
-                id = it.id.value,
-                title = it.title,
-                subtitle = "Canvas",
-                kind = com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS,
-            )
-        }
-    return chats + boards
-}
-
-/** Opens what the tab strip's picker chose: a conversation in its tab, or a canvas in the pane. */
-private fun openTabPickerItem(
-    item: com.letta.mobile.data.desktopshell.TabPickerItem,
-    onConversation: (String) -> Unit,
-    onCanvas: (com.letta.mobile.data.canvas.CanvasId) -> Unit,
-) {
-    when (item.kind) {
-        com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CONVERSATION -> onConversation(item.id)
-        com.letta.mobile.data.desktopshell.TabPickerItem.Kind.CANVAS -> onCanvas(com.letta.mobile.data.canvas.CanvasId(item.id))
     }
 }
 

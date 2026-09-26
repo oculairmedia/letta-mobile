@@ -66,6 +66,7 @@ import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,7 +180,7 @@ private fun GroupAdminContent(
     onDelete: (Group) -> Unit,
 ) {
     when (uiState) {
-        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
         is UiState.Error -> ErrorContent(
             message = uiState.message,
             onRetry = viewModel::loadGroups,
@@ -204,8 +205,8 @@ private fun GroupAdminContent(
                     )
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(LettaDimens.Space.lg),
+                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                     ) {
                         items(filtered, key = { it.id }) { group ->
                             GroupCard(
@@ -373,7 +374,7 @@ private fun GroupCard(
         modifier = Modifier.fillMaxWidth(),
         colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -386,15 +387,15 @@ private fun GroupCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                     Text(group.id.value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { showContextMenu = true }) {
                     Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 AssistChip(onClick = {}, label = { Text(group.managerType) })
                 AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_groups_agents_chip, group.agentIds.size)) })
                 if (group.hidden == true) {
@@ -446,7 +447,7 @@ private fun GroupDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             item {
                 CardGroup {
                     item(
@@ -518,7 +519,7 @@ private fun GroupDetailDialog(
                 }
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     TextButton(onClick = onEdit) { Text(stringResource(R.string.screen_groups_edit_title)) }
                     TextButton(onClick = onSendMessage) { Text(stringResource(R.string.action_send_message)) }
                     TextButton(onClick = onResetMessages) { Text(stringResource(R.string.action_reset_messages), color = MaterialTheme.colorScheme.error) }
@@ -554,8 +555,8 @@ private fun GroupMessageCard(message: LettaMessage) {
         colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Text(message.messageType, style = MaterialTheme.typography.labelMedium)
             Text(

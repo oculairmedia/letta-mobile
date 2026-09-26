@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.theme.LettaDimens
 
 // letta-mobile-58qlr: soft gradient fading edges at the top and bottom of the
 // chat message list, replacing the harsh scroll-clip line.
@@ -196,7 +197,7 @@ internal fun ChatFadingEdgesBox(
     modifier: Modifier = Modifier,
     scrimColor: Color = targetColor,
     topPadding: Dp = 0.dp,
-    topFadeLength: Dp = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength,
+    topFadeLength: Dp = if (topPadding > 0.dp) topPadding + LettaDimens.Space.lg else ChatFadeEdgeLength,
     bottomFadeLength: Dp = ChatFadeEdgeLength,
     // letta-mobile-58qlr.1: when true, the BOTTOM fade is suppressed regardless
     // of scroll state. The caller sets this while pinned to the newest edge so

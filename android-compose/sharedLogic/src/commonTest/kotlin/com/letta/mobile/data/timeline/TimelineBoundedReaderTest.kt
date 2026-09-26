@@ -156,6 +156,44 @@ class TimelineBoundedReaderTest {
         kotlin.test.assertIs<TimelineSettledProjection.Deferred>(record.copy(body = bytes.copyOf(7)).projectBounded(scope))
     }
 
+    @Test fun deferredBoundaryCannotDistinguishContinuationFromDifferentRun() = runTest {
+        // Both are valid canonical bodies. The run identity follows content in stored JSON,
+        // and no run evidence is present in metadata or in the bounded deferred preview.
+        val bodies = listOf("run-a", "run-b").map { runId ->
+            val event = com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent(
+                position = 1.0, otid = "otid", content = "x".repeat(3 * 1024 * 1024),
+                serverId = "id-1", messageType = "assistant_message",
+                dateIso = "2026-01-01T00:00:00Z", runId = runId,
+            )
+            com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.encodeToString(
+                com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), event,
+            ).encodeToByteArray()
+        }
+        assertEquals(bodies[0].size, bodies[1].size)
+        val boundary = row(1, bodies[0].size.toLong()).copy(contentType = canonicalType)
+        val pages = bodies.map { bytes ->
+            val store = Store(listOf(boundary)).apply { payload = bytes }
+            val page = TimelineBoundedReader(store).preview(
+                scope, TimelineReadPosition.Before(key(2)), TimelinePageBudget(1, 2L * 1024 * 1024),
+            )
+            assertEquals(0, store.bodyReads)
+            val record = TimelineSettledRecord(
+                boundary.key, boundary.contentType, page.bodies.single(), page.metadata.revision, boundary.body,
+            )
+            assertEquals(TimelineSettledPresentation.Defer, record.presentation())
+            page
+        }
+        assertEquals(pages[0].metadata, pages[1].metadata)
+        kotlin.test.assertContentEquals(pages[0].bodies.single(), pages[1].bodies.single())
+        // A resident run-a continues in the first history, but not in the second.
+        val decodedRuns = bodies.map { bytes ->
+            com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec.json.decodeFromString(
+                com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), bytes.decodeToString(),
+            ).runId
+        }
+        assertEquals(listOf("run-a", "run-b"), decodedRuns)
+    }
+
     @Test fun opaqueProtocolRecordDoesNotBreakSettledProjection() {
         val metadata = row(1, 3)
         val bytes = byteArrayOf(0, 1, 2)

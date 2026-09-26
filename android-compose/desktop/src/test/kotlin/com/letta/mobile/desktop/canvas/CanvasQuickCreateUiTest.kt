@@ -1,0 +1,161 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
+package com.letta.mobile.desktop.canvas
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.rightClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.runComposeUiTest
+import com.letta.mobile.data.canvas.CanvasCreateOptions
+import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.ui.canvas.CanvasWorkspace
+import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.Intent
+import io.ak1.drawbox.domain.model.Mode
+import io.ak1.drawbox.domain.model.ShapeType
+import io.ak1.drawbox.domain.model.bounds
+import io.ak1.drawbox.domain.usecase.UseCase
+import io.ak1.drawbox.presentation.reducer.Reducer
+import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
+import kotlinx.coroutines.runBlocking
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+/** Miro's quick-create targets: one press adds a joined, empty copy beside the selection. */
+class CanvasQuickCreateUiTest {
+
+    private fun session(): CanvasSession = runBlocking {
+        CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = ""))
+    }
+
+    @Test
+    fun theTargetAddsAJoinedShapeAndTakesTyping() = runComposeUiTest {
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session(), controller = controller) }
+        controller.onIntent(
+            Intent.AddElement(
+                Element.Shape(
+                    id = "a", shapeType = ShapeType.RECTANGLE,
+                    points = listOf(Offset(200f, 200f), Offset(360f, 300f)),
+                    strokeColor = Color.Black, strokeWidth = 2f, text = "First",
+                ),
+            ),
+        )
+        controller.setMode(Mode.SELECT)
+        controller.selectAt(Offset(200f, 250f), 4f)
+        waitForIdle()
+
+        onNodeWithContentDescription("Add to the right").performClick()
+        fun rects() = controller.state.value.elements.filterIsInstance<Element.Shape>().filter { it.shapeType == ShapeType.RECTANGLE }
+        waitUntil(timeoutMillis = 5000) { rects().size == 2 }
+        val next = rects().first { it.id != "a" }
+        assertEquals("", next.text, "the new shape starts empty")
+        assertEquals(160f, next.bounds().width, 1f, "the same size as the one it came from")
+        assertTrue(next.bounds().left > 360f, "to the right of it, got ${next.bounds()}")
+        assertEquals(250f, next.bounds().center.y, 1f, "level with it")
+
+        val arrow = controller.state.value.elements.filterIsInstance<Element.Shape>().single { it.shapeType == ShapeType.ARROW }
+        assertEquals("a", arrow.startBinding, "the arrow is bound to the first shape")
+        assertEquals(next.id, arrow.endBinding, "and to the new one")
+
+        // The new shape is selected with the caret in it.
+        assertEquals(setOf(next.id), controller.state.value.selectedIds)
+        waitUntil(timeoutMillis = 5000) { onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
+        onAllNodes(isFocused() and hasSetTextAction())[0].performTextInput("Second")
+        waitUntil(timeoutMillis = 5000) { rects().first { it.id == next.id }.text == "Second" }
+    }
+
+    @Test
+    fun anArrowPulledOutOfATargetMakesThePickedShapeWhereItIsLetGo() = runComposeUiTest {
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session(), controller = controller) }
+        controller.onIntent(
+            Intent.AddElement(
+                Element.Shape(
+                    id = "a", shapeType = ShapeType.RECTANGLE,
+                    points = listOf(Offset(200f, 200f), Offset(360f, 300f)),
+                    strokeColor = Color.Black, strokeWidth = 2f, text = "First",
+                ),
+            ),
+        )
+        controller.setMode(Mode.SELECT)
+        controller.selectAt(Offset(200f, 250f), 4f)
+        waitForIdle()
+
+        onNodeWithContentDescription("Add to the right").performTouchInput {
+            down(center)
+            repeat(10) { moveBy(Offset(30f, 12f)) }
+            up()
+        }
+        waitUntil(timeoutMillis = 5000) { onAllNodes(androidx.compose.ui.test.hasText("Circle")).fetchSemanticsNodes().isNotEmpty() }
+        onNodeWithText("Circle").performClick()
+
+        fun circles() = controller.state.value.elements.filterIsInstance<Element.Shape>().filter { it.shapeType == ShapeType.CIRCLE }
+        waitUntil(timeoutMillis = 5000) { circles().size == 1 }
+        val circle = circles().single()
+        assertTrue(circle.bounds().center.x > 400f, "out where the arrow was let go, got ${circle.bounds()}")
+        val arrow = controller.state.value.elements.filterIsInstance<Element.Shape>().single { it.shapeType == ShapeType.ARROW }
+        assertEquals("a", arrow.startBinding, "the arrow is bound to the shape it came out of")
+        assertEquals(circle.id, arrow.endBinding, "and to the new one")
+    }
+
+    @Test
+    fun noTargetsWithoutASingleShapeSelected() = runComposeUiTest {
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session(), controller = controller) }
+        waitForIdle()
+        onNodeWithContentDescription("Add to the right").assertDoesNotExist()
+    }
+
+    @Test
+    fun aNoteQuickCreatesTheNextNote() = runComposeUiTest {
+        val session = session()
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session, controller = controller) }
+
+        onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(300f, 300f)) }
+        onNodeWithText("Note").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        val first = session.documents().single()
+
+        onNodeWithContentDescription("Add below").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
+        val second = session.documents().first { it.id != first.id }
+        assertEquals(first.color, second.color, "the same kind of note")
+        assertTrue(second.frame!!.y > first.frame!!.y + first.frame!!.height, "below the first")
+        waitUntil(timeoutMillis = 5000) {
+            controller.state.value.elements.any { it is Element.Shape && it.shapeType == ShapeType.ARROW }
+        }
+    }
+
+    @Test
+    fun theTargetsFollowANoteWhileItIsDragged() = runComposeUiTest {
+        val session = session()
+        setContent { CanvasWorkspace(session = session) }
+        onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(500f, 400f)) }
+        onNodeWithText("Note").performClick()
+        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
+        val id = session.documents().single().id
+
+        onNodeWithContentDescription("Move note").performMouseInput {
+            moveTo(center); press(); moveTo(center + Offset(60f, 40f)); moveTo(center + Offset(200f, 100f))
+        }
+        waitForIdle()
+        // Mid-drag, before anything is committed: the target hugs the card where it is now.
+        val card = onNodeWithContentDescription("Note $id").fetchSemanticsNode().boundsInRoot
+        val right = onNodeWithContentDescription("Add to the right").fetchSemanticsNode().boundsInRoot
+        assertTrue(right.left > card.right && right.left - card.right < 40f, "the right target should sit just off the card at ${card.right}, it is at ${right.left}")
+        assertEquals(card.center.y, right.center.y, 1f)
+        onNodeWithContentDescription("Move note").performMouseInput { release() }
+    }
+}

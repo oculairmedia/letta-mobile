@@ -10,6 +10,8 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.CopyOnWriteArrayList
@@ -131,7 +133,8 @@ class IrohObserverIngestorTest {
         ingestor.ingestObserverFrame(ObserverFrameRequest(streamFrame, 1L))
         assertTrue(emittedFrames.isEmpty(), "Engine-owned non-terminal delta must not be emitted by observer")
 
-        // 2. Terminal TurnDone frame for engine-owned conversation -> claims terminal and publishes
+        // 2. Terminal TurnDone frame for engine-owned conversation -> once the engine's grace window
+        // passes with no engine terminal, claims terminal and publishes
         val terminalDelta = streamDelta(
             agentId = "agent-1",
             conversationId = "conv-1",
@@ -139,10 +142,104 @@ class IrohObserverIngestorTest {
             delta = """{"message_type": "stop_reason", "stop_reason": "end_turn"}""",
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(terminalDelta, 1L))
-        assertEquals(1, emittedFrames.size)
-        assertTrue(emittedFrames[0] is ServerFrame.TurnDone)
-        assertEquals("completed", (emittedFrames[0] as ServerFrame.TurnDone).status)
+        advanceTimeBy(IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS - 1)
+        runCurrent()
+        assertTrue(emittedFrames.isEmpty(), "The engine keeps its terminal for the whole grace window")
+        assertFalse(activeTurn.hasTerminal)
+        advanceTimeBy(2)
+        runCurrent()
+        // The turn's ending (stop reason) is published ahead of the terminal so
+        // the coordinator records it before the turn retires.
+        assertEquals(2, emittedFrames.size, "got ${emittedFrames.map { it::class.simpleName }}")
+        val stop = assertIs<ServerFrame.StopReason>(emittedFrames[0])
+        assertEquals("end_turn", stop.stopReason)
+        assertEquals("turn-1", stop.turnId)
+        assertTrue(emittedFrames[1] is ServerFrame.TurnDone)
+        assertEquals("completed", (emittedFrames[1] as ServerFrame.TurnDone).status)
         assertTrue(activeTurn.hasTerminal)
+    }
+
+    private fun engineOwnedTurn(registry: IrohTurnRegistry): IrohActiveTurn =
+        assertIs<IrohTryStartResult.Started>(
+            registry.tryStart(
+                IrohTurnRequest(
+                    IrohTurnToken(IrohConversationId("conv-1"), 1L, IrohTurnId("turn-1")),
+                    IrohRunId("local-run-55"),
+                    IrohAgentId("agent-1"),
+                ),
+            ),
+        ).turn
+
+    private fun observerIngestor(registry: IrohTurnRegistry, emitted: MutableList<ServerFrame>) = IrohObserverIngestor(
+        scope = testScope,
+        turnRegistry = registry,
+        connectionGeneration = { 1L },
+        emitBoth = { emitted.add(it) },
+        adminRpc = { _, _, _ -> error("unexpected") },
+        recordFrameOwnership = { _, _ -> },
+    )
+
+    private val stopReasonDelta = """{"message_type": "stop_reason", "stop_reason": "end_turn"}"""
+
+    /**
+     * Device capture 2026-09-24 (local-run-55): the wrapper's fanned-out stop_reason reached the
+     * observer before the engine had projected any of the reply. The observer used to claim the
+     * terminal at once, so every assistant delta followed TurnDone as a retired turn's tail. The
+     * observer now waits, and the engine's own terminal inside the window wins.
+     */
+    @Test
+    fun observerStopReasonAheadOfEngineReplyLeavesTheTerminalToTheEngine() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val registry = IrohTurnRegistry()
+        val turn = engineOwnedTurn(registry)
+        val ingestor = observerIngestor(registry, emitted)
+
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamDelta("agent-1", "conv-1", 1L, stopReasonDelta), 1L))
+        runCurrent()
+        assertTrue(emitted.isEmpty(), "got ${emitted.map { it::class.simpleName }}")
+
+        // The engine now projects the reply and publishes its own ending, inside the window.
+        advanceTimeBy(20)
+        repeat(4) { part ->
+            emitted.add(
+                ServerFrame.AssistantMessage(
+                    id = "ui-msg-9173262", conversationId = "conv-1", turnId = "turn-1",
+                    runId = "local-run-55", content = "part $part",
+                ),
+            )
+        }
+        val publication = IrohTerminalPublication(turn, IrohTerminalStatus("completed"), IrohTerminalSource.Engine)
+        assertTrue(registry.claimTerminal(publication))
+        emitted.add(ServerFrame.StopReason(turnId = "turn-1", runId = "local-run-55", stopReason = "end_turn"))
+        emitted.add(ServerFrame.TurnDone(id = "done", ts = "", turnId = "turn-1", runId = "local-run-55", status = "completed"))
+        assertTrue(registry.retireClaimed(publication))
+
+        advanceTimeBy(IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS * 2)
+        runCurrent()
+
+        assertEquals(
+            listOf("AssistantMessage", "AssistantMessage", "AssistantMessage", "AssistantMessage", "StopReason", "TurnDone"),
+            emitted.map { it::class.simpleName },
+        )
+        assertEquals(1, emitted.count { it is ServerFrame.TurnDone })
+        assertEquals(IrohTerminalSource.Engine, turn.terminalSource)
+    }
+
+    @Test
+    fun observerStopReasonStandsInWhenTheEngineNeverEndsTheTurn() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val registry = IrohTurnRegistry()
+        val turn = engineOwnedTurn(registry)
+        val ingestor = observerIngestor(registry, emitted)
+
+        // Repeated stop reasons schedule one fallback, not one per frame.
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamDelta("agent-1", "conv-1", 1L, stopReasonDelta), 1L))
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamDelta("agent-1", "conv-1", 2L, stopReasonDelta), 1L))
+        advanceTimeBy(IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS + 1)
+        runCurrent()
+
+        assertEquals(listOf("StopReason", "TurnDone"), emitted.map { it::class.simpleName })
+        assertEquals(IrohTerminalSource.Observer, turn.terminalSource)
     }
 
     @Test
@@ -195,6 +292,30 @@ class IrohObserverIngestorTest {
     }
 
     @Test
+    fun meridianConversationUpdatedPushIsRepublishedForTheConversationLists() = testScope.runTest {
+        val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = IrohObserverIngestor(
+            scope = testScope,
+            turnRegistry = IrohTurnRegistry(),
+            connectionGeneration = { 1L },
+            emitBoth = { emittedFrames.add(it) },
+            adminRpc = { _, _, _ -> error("unexpected") },
+            recordFrameOwnership = { _, _ -> error("a conversation push is not a turn frame") },
+        )
+        // Exactly what ConversationChangeNotifier writes, as the Iroh transport decodes it off the stream.
+        val wire = """{"v":1,"type":"conversation_updated","id":"conversation-updated-1","ts":"2026-09-25T21:00:00Z","conversation_id":"conv-9","agent_id":"agent-7","reason":"created","at":"2026-09-25T21:00:00Z"}"""
+        val received = AppServerProtocol.decodeFrame(wire, AppServerChannel.Stream)
+        assertIs<AppServerInboundFrame.Unknown>(received.frame)
+
+        ingestor.ingestObserverFrame(ObserverFrameRequest(received, 1L))
+
+        val pushed = assertIs<ServerFrame.ConversationUpdated>(emittedFrames.single())
+        assertEquals("conv-9", pushed.conversationId)
+        assertEquals("agent-7", pushed.agentId)
+        assertEquals("created", pushed.reason)
+    }
+
+    @Test
     fun otherUnknownStreamFramesStayIgnored() = testScope.runTest {
         val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
         val ingestor = IrohObserverIngestor(
@@ -232,6 +353,8 @@ class IrohObserverIngestorTest {
                 ObserverFrameRequest(streamDelta(StreamDeltaSpec("parent", "conv-parent", index + 1L, delta, "child-1")), 1L),
             )
         }
+        advanceTimeBy(IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS + 1)
+        runCurrent()
 
         assertTrue(emitted.isEmpty(), "child trajectory must not append any parent timeline frame")
     }

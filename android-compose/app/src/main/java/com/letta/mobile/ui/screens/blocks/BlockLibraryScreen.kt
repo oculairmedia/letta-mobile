@@ -72,6 +72,7 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,7 +160,7 @@ fun BlockLibraryScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(LettaDimens.Space.lg))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadBlocks() },
@@ -199,8 +200,8 @@ fun BlockLibraryScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(LettaDimens.Space.lg),
+                            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                         ) {
                             items(filteredBlocks, key = { it.id.value }) { block ->
                                 BlockLibraryCard(
@@ -345,7 +346,7 @@ private fun BlockLibraryCard(
             ),
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -357,7 +358,7 @@ private fun BlockLibraryCard(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     block.description?.takeIf { it.isNotBlank() }?.let { description ->
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                         Text(
                             text = description,
                             style = MaterialTheme.typography.bodySmall,
@@ -377,10 +378,10 @@ private fun BlockLibraryCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 block.limit?.let { limit ->
                     AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_blocks_limit_chip, limit)) })
@@ -394,10 +395,10 @@ private fun BlockLibraryCard(
             }
 
             if (agents.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaDimens.Space.xs))
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                 ) {
                     agents.forEach { agent ->
                         AssistChip(
@@ -434,7 +435,7 @@ private fun BlockDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 block.description?.takeIf { it.isNotBlank() }?.let { description ->
                     Text(description, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -516,7 +517,7 @@ private fun BlockEditorDialog(
         confirmEnabled = value.isNotBlank() && (!labelEnabled || label.isNotBlank()),
         onConfirm = { onConfirm(label.trim(), value, description, limit.toIntOrNull()) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             if (!labelEnabled) {
                 Text(
                     text = stringResource(R.string.screen_blocks_global_edit_notice),
@@ -585,7 +586,7 @@ private fun AgentMultiSelectDialog(
             )
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
                 modifier = Modifier.heightIn(max = 360.dp),
             ) {
                 items(agents, key = { it.id.value }) { agent ->
@@ -604,7 +605,7 @@ private fun AgentMultiSelectDialog(
                                 checked = isChecked,
                                 onCheckedChange = null,
                             )
-                            Spacer(modifier = Modifier.size(8.dp))
+                            Spacer(modifier = Modifier.size(LettaDimens.Space.sm))
                             Text(
                                 text = agent.name,
                                 style = MaterialTheme.typography.bodyMedium,
@@ -650,8 +651,8 @@ private fun BlockLibraryCardPreview() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             BlockLibraryCard(
                 block = previewBlock(),

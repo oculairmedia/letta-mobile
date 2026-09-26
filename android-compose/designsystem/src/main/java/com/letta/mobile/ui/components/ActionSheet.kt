@@ -34,6 +34,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.theme.LettaElevationTokens
 import com.letta.mobile.ui.theme.LettaShapeTokens
+import com.letta.mobile.ui.theme.LettaDimens
 
 
 /**
@@ -66,15 +67,15 @@ fun ActionSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
+                .padding(bottom = LettaDimens.Space.xxl),
         ) {
             if (title != null) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
                 )
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = LettaDimens.Space.sm))
             }
             content()
         }
@@ -122,7 +123,7 @@ fun ActionSheetItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         shape = RoundedCornerShape(corner),
         color = LettaCardDefaults.listContainerColor,
         tonalElevation = elevation,

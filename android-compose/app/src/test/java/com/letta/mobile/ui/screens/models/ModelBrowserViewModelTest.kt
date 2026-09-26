@@ -35,7 +35,10 @@ class ModelBrowserViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeRepo = FakeModelRepo()
-        viewModel = ModelBrowserViewModel(fakeRepo)
+        viewModel = ModelBrowserViewModel(
+            fakeRepo,
+            com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository { _, _ -> kotlinx.serialization.json.JsonArray(emptyList()) },
+        )
     }
 
     @After

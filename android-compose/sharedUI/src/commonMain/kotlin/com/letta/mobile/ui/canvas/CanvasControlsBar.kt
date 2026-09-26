@@ -40,6 +40,7 @@ import com.composables.icons.lucide.Undo2
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The tool rail down the left of the board, the way Concepts and Miro keep their tools: pointer
@@ -70,14 +71,14 @@ fun CanvasControlsBar(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
-        tonalElevation = 2.dp,
-        shadowElevation = 6.dp,
+        tonalElevation = LettaDimens.Space.hair,
+        shadowElevation = LettaDimens.Space.sm,
     ) {
         Column(
-            modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             PointerModes.forEach { (mode, label) ->
@@ -91,9 +92,6 @@ fun CanvasControlsBar(
                     dispatch(ControlsBarIntent.SelectMode(mode))
                 }
             }
-            if (onAddText != null) {
-                ControlButton(Control(Lucide.Type, "Text"), onClick = onAddText)
-            }
             if (onAddNote != null) {
                 ControlButton(Control(Lucide.StickyNote, "Add note"), onClick = onAddNote)
             }
@@ -102,11 +100,22 @@ fun CanvasControlsBar(
             // for every colour and property, targeting the selection or else the current tool.
             CanvasPropertyControl(
                 state = state,
-                properties = properties ?: CanvasProperties(0, 4f, 1f, io.ak1.drawbox.domain.model.StrokeStyle.SOLID, 0f, false),
+                properties = properties ?: CanvasProperties(
+                    selectionCount = 0,
+                    strokeWidth = 4f,
+                    opacity = 1f,
+                    strokeStyle = io.ak1.drawbox.domain.model.StrokeStyle.SOLID,
+                    cornerRadius = 0f,
+                    showCornerRadius = false,
+                    fontSize = DEFAULT_FONT_SIZE,
+                    fontFamily = io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SANS,
+                    textAlignment = io.ak1.drawbox.domain.model.TextAlignment.LEFT,
+                    showFontSize = false,
+                ),
                 dispatch = dispatch,
                 dispatchProperty = dispatchProperty,
                 label = "Stroke color",
-                beside = true,
+                placement = PropertyPopoverPlacement.BESIDE,
                 modifier = Modifier.size(BUTTON_SIZE),
             )
             RailDivider()
@@ -121,7 +130,7 @@ fun CanvasControlsBar(
  * appearance in one value the rail can build per tool, rather than a widening parameter list that
  * every call site has to read positionally.
  */
-private data class Control(
+internal data class Control(
     val icon: ImageVector,
     val label: String,
     val selected: Boolean = false,
@@ -129,18 +138,18 @@ private data class Control(
 )
 
 @Composable
-private fun ControlButton(control: Control, onClick: () -> Unit) {
+internal fun ControlButton(control: Control, size: androidx.compose.ui.unit.Dp = BUTTON_SIZE, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
         enabled = control.enabled,
-        modifier = Modifier.size(BUTTON_SIZE).semantics { contentDescription = control.label },
+        modifier = Modifier.size(size).semantics { contentDescription = control.label },
         colors = if (control.selected) {
             IconButtonDefaults.filledIconButtonColors()
         } else {
             IconButtonDefaults.iconButtonColors()
         },
     ) {
-        Icon(imageVector = control.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(imageVector = control.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
@@ -148,9 +157,9 @@ private fun ControlButton(control: Control, onClick: () -> Unit) {
 private fun RailDivider() {
     Box(
         modifier = Modifier
-            .padding(vertical = 3.dp)
+            .padding(vertical = LettaDimens.Space.xs)
             .height(1.dp)
-            .width(22.dp)
+            .width(LettaDimens.Space.xl)
             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
     )
 }
@@ -169,13 +178,17 @@ internal val DrawingModes: List<Pair<Mode, String>> = listOf(
     Mode.RECTANGLE to "Rectangle",
     Mode.CIRCLE to "Circle",
     Mode.TRIANGLE to "Triangle",
+    // The board's own text element: DrawBox places it, measures it, wraps it and edits it, so
+    // text is a thing on the drawing like every other thing rather than a note pretending to be
+    // one. See CanvasWorkspace for the editor this mode asks for.
+    Mode.TEXT to "Text",
     Mode.ERASER to "Eraser",
 )
 
 /** Every drawing mode the rail offers, for callers that iterate them regardless of group. */
 internal val CanvasModes: List<Pair<Mode, String>> = PointerModes + DrawingModes
 
-private fun iconFor(mode: Mode): ImageVector = when (mode) {
+internal fun iconFor(mode: Mode): ImageVector = when (mode) {
     Mode.SELECT -> Lucide.MousePointer
     Mode.PAN -> Lucide.Hand
     Mode.PEN -> Lucide.Pencil
@@ -189,4 +202,7 @@ private fun iconFor(mode: Mode): ImageVector = when (mode) {
     else -> Lucide.Pencil
 }
 
-private val BUTTON_SIZE = 38.dp
+private val BUTTON_SIZE = LettaDimens.Control.actionButton
+
+/** DrawBox's own starting size for text, for a bar with no state to read yet. */
+private const val DEFAULT_FONT_SIZE = 24f

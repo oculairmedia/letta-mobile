@@ -9,6 +9,8 @@ data class DesktopBootstrapState(
     val config: LettaConfig,
     val sessionGraphId: Long,
     val featureReadiness: List<DesktopFeatureReadiness>,
+    /** letta-mobile-w4q4p: admin RPC to the connected host for Providers & Models. */
+    val modelControlRpc: com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker? = null,
 )
 
 data class DesktopFeatureReadiness(
@@ -51,6 +53,10 @@ enum class DesktopDestination(
         label = "Channels",
         summary = "Shared channel state shows live backend transport, delivery, and A2UI capability status.",
     ),
+    Providers(
+        label = "Providers & Models",
+        summary = "Connect App Server model providers and choose which models the pickers show.",
+    ),
     Conversations(
         label = "Conversations",
         summary = "Desktop chat uses a persistent conversation list, shared render models, and a JVM Compose detail pane.",
@@ -66,6 +72,7 @@ fun defaultDesktopBootstrapState(
     config: LettaConfig = defaultDesktopLettaConfig(),
 ) = DesktopBootstrapState(
     config = config,
+    modelControlRpc = dataBindings.modelControlRpc,
     sessionGraphId = dataBindings.sessionGraphProvider.current.id,
     featureReadiness = listOf(
         DesktopFeatureReadiness(

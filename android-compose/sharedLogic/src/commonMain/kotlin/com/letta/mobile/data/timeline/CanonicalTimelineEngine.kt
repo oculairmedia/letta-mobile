@@ -6,6 +6,8 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.toStoredTimelineEvent
 import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEvent
+import com.letta.mobile.data.timeline.snapshot.toConfirmedTimelineEventWithImageBodies
+import com.letta.mobile.data.timeline.snapshot.TimelineImageBodyReader
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,19 +89,13 @@ class CanonicalTimelineEngine(
         ) return@withLock false
         val previous = checkNotNull(liveReduction)
         val next = when (frame) {
-            is TimelineStreamFrame.Message -> {
-                val output = reduceStreamFrame(TimelineReducerInput(previous.timeline, frame.message,
-                    previous.pendingToolReturnsByCallId, agentId = fence.selection.scope.agentId))
-                previous.copy(timeline = output.next, pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId)
-            }
+            is TimelineStreamFrame.Message -> previous.reduceLive(frame.message, fence.selection.scope.agentId)
             TimelineStreamFrame.Heartbeat -> return@withLock true
             TimelineStreamFrame.Done -> previous
             is TimelineStreamFrame.RawEvent -> error("Raw events must be decoded by the transport before ingest")
         }
         val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
-        val returnedId = ((frame as? TimelineStreamFrame.Message)?.message as? com.letta.mobile.data.model.ToolReturnMessage)
-            ?.toolReturn?.toolCallId?.takeIf { it.isNotBlank() }
-        val nextReturns = if (returnedId == null) liveReturns else liveReturns + returnedId
+        val nextReturns = liveReturns + listOfNotNull((frame as? TimelineStreamFrame.Message)?.message?.returnedCallId())
         // The overlay is a bounded resident view of a turn, not its record: a turn long enough to
         // exceed the budget is legal, and the durable rows still arrive through reconcile. Outgrowing
         // the budget therefore stops the overlay growing - it must never fail the turn, and it used
@@ -122,6 +118,38 @@ class CanonicalTimelineEngine(
         mutableLive.value = TimelineLivePublication(fence, TimelineLiveBlock(emptyList(), terminal, events), revision)
         true
     }
+
+    /**
+     * Folds a settled turn's late tail into its overlay without reopening the turn.
+     *
+     * A transport can deliver a reply's last deltas after its terminal; dropping them left the
+     * overlay short of the stored reply, so content adoption failed and the positional fallback
+     * had to guess. The settlement revision and aliases are kept: this is the same turn, only now
+     * complete. False when no settled overlay of [fence] is resident to take it.
+     */
+    suspend fun ingestSettledTail(fence: TimelineLiveFence, message: com.letta.mobile.data.model.LettaMessage): Boolean =
+        mutex.withLock { foldSettledTail(fence, message) }
+
+    private fun foldSettledTail(fence: TimelineLiveFence, message: com.letta.mobile.data.model.LettaMessage): Boolean {
+        val current = settledOverlayOf(fence) ?: return false
+        val previous = liveReduction ?: return false
+        val next = previous.reduceLive(message, fence.selection.scope.agentId)
+        val events = next.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+        val nextReturns = liveReturns + listOfNotNull(message.returnedCallId())
+        if (overflowReason(events, nextReturns) != null) return true
+        liveReduction = next
+        liveReturns = nextReturns
+        mutableLive.value = current.copy(block = current.block.copy(events = events))
+        return true
+    }
+
+    /** The resident settled overlay of [fence] for the current selection, if there is one. */
+    private fun settledOverlayOf(fence: TimelineLiveFence): TimelineLivePublication? =
+        mutableLive.value?.takeIf {
+            liveFence === fence && fence.selection === mutablePublication.value.selection &&
+                it.fence === fence && it.settlementRevision != null
+        }
+
 
     /** Names the budget a frame would outgrow, or null when the overlay can still carry it. */
     private fun overflowReason(events: List<TimelineEvent.Confirmed>, returns: Set<String>): String? {
@@ -211,12 +239,15 @@ class CanonicalTimelineEngine(
         val event: TimelineEvent.Confirmed,
         val identity: TimelineMessageId,
         val isNew: Boolean,
+        val orderDate: String,
+        val orderOtid: String,
     )
 
     private fun adoptCommittedIdentities(committed: List<CommittedRow>) {
         val live = mutableLive.value ?: return
         if (live.settlementRevision == null) return
-        val adopted = live.adoptionsFrom(committed)
+        val ordered = committed.sortedWith(compareBy({ it.orderDate }, { it.orderOtid }))
+        val adopted = live.adoptionsFrom(ordered)
         if (adopted.isEmpty()) return
         mutableLive.value = live.copy(aliases = live.aliases + adopted)
     }
@@ -229,6 +260,9 @@ class CanonicalTimelineEngine(
         val adopted = linkedMapOf<String, TimelineMessageId>()
         val unpaired = mutableListOf<TimelineEvent.Confirmed>()
         for (event in block.events) {
+            // The ledger may name the row exactly as the stream did (0.32.17 message.list returns
+            // the streamed ui-msg ids). That row is this event; it must never be offered to the
+            // positional fallback as someone else's.
             when (val claim = event.claimAdoption(unclaimed, aliases)) {
                 is Adoption.Alias -> adopted[claim.streamedId] = claim.identity
                 Adoption.AlreadyNamed -> Unit
@@ -262,21 +296,24 @@ class CanonicalTimelineEngine(
             it.isNew && it.event.messageType == TimelineMessageType.ASSISTANT && it.identity !in taken
         }
         if (candidates.isEmpty()) return emptyMap()
-        return unpaired.zip(candidates)
+        // A page can append an EARLIER turn's rows too (its own repair never ran), so this turn's
+        // replies are the newest candidates: align the two lists at their newest ends.
+        val count = minOf(unpaired.size, candidates.size)
+        return unpaired.takeLast(count).zip(candidates.takeLast(count))
             .filter { (event, row) -> row.identity.value != event.serverId }
             .associate { (event, row) -> event.serverId to row.identity }
     }
 
     /**
      * What names the same message on both sides of the boundary. A tool call and its return are
-     * named by the call, which the stream and the ledger agree on exactly. An assistant reply has
-     * no shared id at all - the stream and the server each derive an otid from their own name - so
-     * its content is the only thing left to match on.
+     * named by the call, which the stream and the ledger agree on exactly. Assistant replies and
+     * reasoning frames have no shared id: the stream and server each derive their otid from their
+     * own name, so exact turn-local content is the remaining adoption evidence.
      */
     private fun TimelineEvent.Confirmed.adoptionKey(): String? = when (messageType) {
         TimelineMessageType.TOOL_CALL -> toolCalls.firstNotNullOfOrNull { it.effectiveId.takeIf(String::isNotBlank) }
         TimelineMessageType.TOOL_RETURN -> toolReturnContentByCallId.keys.firstOrNull { it.isNotBlank() }
-        TimelineMessageType.ASSISTANT -> content.takeIf { it.isNotBlank() }
+        TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING -> content.takeIf { it.isNotBlank() }
         else -> null
     }
 
@@ -299,13 +336,27 @@ class CanonicalTimelineEngine(
         aliases: Map<String, TimelineMessageId>,
     ): Adoption? {
         if (serverId in aliases) return Adoption.AlreadyNamed
+        // The ledger may name the row exactly as the stream did (0.32.17 message.list returns the
+        // streamed ui-msg ids). That row is this event; it must never be offered to the positional
+        // fallback as someone else's.
+        if (unclaimed.removeFirstMatching { it.identity.value == serverId && it.event.messageType == messageType }) {
+            return Adoption.AlreadyNamed
+        }
+        val match = contentMatch(unclaimed) ?: return null
+        return if (match.identity.value == serverId) Adoption.AlreadyNamed
+        else Adoption.Alias(serverId, match.identity)
+    }
+
+    /** The committed row with this event's type and adoption key, consumed when it is a reply. */
+    private fun TimelineEvent.Confirmed.contentMatch(unclaimed: MutableList<CommittedRow>): CommittedRow? {
         val key = adoptionKey() ?: return null
         val match = unclaimed.firstOrNull {
             it.event.messageType == messageType && it.event.adoptionKey() == key
         } ?: return null
-        if (messageType == TimelineMessageType.ASSISTANT) unclaimed.remove(match)
-        return if (match.identity.value == serverId) Adoption.AlreadyNamed
-        else Adoption.Alias(serverId, match.identity)
+        if (messageType == TimelineMessageType.ASSISTANT || messageType == TimelineMessageType.REASONING) {
+            unclaimed.remove(match)
+        }
+        return match
     }
 
     /**
@@ -452,7 +503,13 @@ class CanonicalTimelineEngine(
                 // After the merge: a tool call's stored key is its group owner, which the tool
                 // index only knows once this record has been written.
                 if (writer is TimelineExactCanonicalWriter && event != null) {
-                    committed += CommittedRow(event, writer.canonicalEventIdentity(this, event), isNew = !existed)
+                    committed += CommittedRow(
+                        event = event,
+                        identity = writer.canonicalEventIdentity(this, event),
+                        isNew = !existed,
+                        orderDate = record.message.date.orEmpty(),
+                        orderOtid = record.message.otid ?: record.message.id,
+                    )
                 }
             }
             currentCoroutineContext().ensureActive()
@@ -489,7 +546,7 @@ class CanonicalTimelineEngine(
         position: TimelineReadPosition,
         maxRows: Int,
         ownAgentId: String?,
-        adapter: TimelineSettledProjectionAdapter,
+        adapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
     ): TimelinePreparedPage = mutex.withLock {
         check(selection === mutablePublication.value.selection) { "Stale selection" }
         require(maxRows > 0)
@@ -497,16 +554,43 @@ class CanonicalTimelineEngine(
             val page = TimelineBoundedReader(store).run {
                 preview(position, budget.copy(maxMetadataRows = minOf(maxRows, budget.maxMetadataRows)))
             }
+            // Separate decoded-image budget; metadata and adjacent run context never resolve blobs.
+            var imageBytesRemaining = 16L * 1024 * 1024
+            val imageReader = this as? TimelineImageBodyReader
+            val boundedImages = object : TimelineImageBodyReader {
+                override suspend fun resolveImage(reference: com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference): String? {
+                    if (reference.decodedBytes !in 1..imageBytesRemaining) return null
+                    imageBytesRemaining -= reference.decodedBytes
+                    return imageReader?.resolveImage(reference)
+                }
+            }
             val records = page.metadata.rows.zip(page.bodies) { metadata, body ->
                 TimelineSettledRecord(metadata.key, metadata.contentType, body, page.metadata.revision, metadata.body)
             }.map { record ->
-                val presentation = record.presentationWithAdapter(ownAgentId, adapter)
-                val prepared = if (presentation is TimelineSettledPresentation.Render &&
-                    isSuppressed(record.key.identity, record.revision, presentation.event)
-                ) TimelineSettledPresentation.Drop else presentation
-                record.copy(preparedPresentation = prepared)
+                val event = if (record.contentType == TIMELINE_EVENT_CONTENT_TYPE && !record.isPreview) {
+                    val decoded = adapter.decode(record)
+                    if (decoded.attachments.any { it.base64.isEmpty() }) {
+                        val stored = TimelineSnapshotCodec.json.decodeFromString(
+                            StoredTimelineEvent.serializer(), record.body.decodeToString(),
+                        )
+                        if (stored.attachments.any { it.bodyReference != null }) decoded.copy(
+                            attachments = stored.toConfirmedTimelineEventWithImageBodies(boundedImages).attachments,
+                        ) else decoded
+                    } else decoded
+                } else null
+                val excluded = record.contentType != TIMELINE_EVENT_CONTENT_TYPE ||
+                    (event != null && (event.isSyntheticSkillEnvelope() ||
+                        isSuppressed(record.key.identity, record.revision, event)))
+                TimelineProjectionRecord(record, event, excluded)
             }
-            TimelinePreparedPage(page.metadata, records)
+            val remaining = minOf(budget.maxDecodedBodyBytes, TimelineBoundedReader.MAX_PAGE_BODY_BYTES) -
+                page.bodies.sumOf { it.size.toLong() }
+            val input = TimelinePageProjectionInput(
+                TimelineProjectionContext(selection.scope, ownAgentId), records,
+                runEnvelope(page.metadata, records, remaining, adapter),
+            )
+            val prepared = input.project(adapter)
+            TimelinePreparedPage(page.metadata, input.aggregatePreparedRuns(prepared), input)
         }
     }
 

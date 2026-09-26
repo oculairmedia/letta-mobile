@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Upper-case section label used by sidebars and lists ("PINNED", "CANVASES"). */
 @Composable
@@ -28,7 +29,7 @@ fun LettaSectionLabel(text: String, modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
         fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(top = 10.dp, start = 4.dp, bottom = 2.dp),
+        modifier = modifier.padding(top = LettaDimens.Space.md, start = LettaDimens.Space.xs, bottom = LettaDimens.Space.hair),
     )
 }
 
@@ -39,7 +40,7 @@ fun LettaEmptyHint(text: String, modifier: Modifier = Modifier) {
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = 4.dp, top = 2.dp),
+        modifier = modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.hair),
     )
 }
 
@@ -57,6 +58,8 @@ fun LettaListRow(
     spec: LettaListRowSpec,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Drawn where the icon goes, instead of it: a row that swaps its icon for an action on hover. */
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val (title, icon, trailing, selected) = spec
     val background = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
@@ -66,16 +69,18 @@ fun LettaListRow(
             .clip(MaterialTheme.shapes.small)
             .background(background)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        if (icon != null) {
+        if (leading != null) {
+            leading()
+        } else if (icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
         Text(

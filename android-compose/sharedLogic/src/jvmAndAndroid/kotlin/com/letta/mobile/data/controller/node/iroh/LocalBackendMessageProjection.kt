@@ -392,7 +392,9 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("date", withTypeOffset(ctx.created, "tool_call_message"))
             put("name", name)
             put("message_type", "tool_call_message")
-            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            // A source assistant row can fan out to several independent invocations.
+            // Sharing its otid makes the canonical writer alias those calls together.
+            put("otid", JsonPrimitive(if (callId.isNotEmpty()) "toolcall-$callId" else "${ctx.id}:tool:$i:call"))
             put("sender_id", JsonNull)
             put("step_id", JsonNull)
             put("is_err", JsonNull)

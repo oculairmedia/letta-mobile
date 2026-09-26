@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.background
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +57,7 @@ import com.letta.mobile.data.canvas.CanvasTextStyle
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The board's one property control, in the way Concepts keeps a single master control that
@@ -67,7 +71,8 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
  * [ControlsBarIntent]s (colour, outline) and [CanvasPropertyIntent]s (width, opacity, dash,
  * radius) for [CanvasControlsBridge] to apply to the selection or the tool.
  *
- * [beside] places the popover to the right of the opener (for the tool rail) rather than below it.
+ * [placement] puts the popover below the opener, to its right (for the tool rail), or above it
+ * (for the phone's bottom tool bar).
  */
 @Composable
 fun CanvasPropertyControl(
@@ -77,8 +82,10 @@ fun CanvasPropertyControl(
     dispatchProperty: (CanvasPropertyIntent) -> Unit,
     modifier: Modifier = Modifier,
     note: NoteBarActions? = null,
+    /** The selected shape's text: offered as a Text target beside stroke and fill. */
+    shapeText: ShapeTextActions? = null,
     label: String = "Properties",
-    beside: Boolean = false,
+    placement: PropertyPopoverPlacement = PropertyPopoverPlacement.BELOW,
 ) {
     var open by remember { mutableStateOf(false) }
     val swatch = when {
@@ -91,7 +98,7 @@ fun CanvasPropertyControl(
             modifier = Modifier
                 .size(OPENER_SIZE)
                 .background(swatch, CircleShape)
-                .border(2.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
+                .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f), CircleShape)
                 .semantics { contentDescription = label }
                 .clickable { open = !open },
             contentAlignment = Alignment.Center,
@@ -104,10 +111,18 @@ fun CanvasPropertyControl(
             )
         }
         if (open) {
-            val besideOffset = with(androidx.compose.ui.platform.LocalDensity.current) { IntOffset((OPENER_SIZE + 12.dp).roundToPx(), 0) }
+            val gap = with(androidx.compose.ui.platform.LocalDensity.current) { (OPENER_SIZE + LettaDimens.Space.md).roundToPx() }
             Popup(
-                alignment = if (beside) Alignment.TopStart else Alignment.TopCenter,
-                offset = if (beside) besideOffset else IntOffset.Zero,
+                alignment = when (placement) {
+                    PropertyPopoverPlacement.BELOW -> Alignment.TopCenter
+                    PropertyPopoverPlacement.BESIDE -> Alignment.TopStart
+                    PropertyPopoverPlacement.ABOVE -> Alignment.BottomCenter
+                },
+                offset = when (placement) {
+                    PropertyPopoverPlacement.BELOW -> IntOffset(0, gap)
+                    PropertyPopoverPlacement.BESIDE -> IntOffset(gap, 0)
+                    PropertyPopoverPlacement.ABOVE -> IntOffset(0, -gap)
+                },
                 onDismissRequest = { open = false },
                 properties = PopupProperties(focusable = true),
             ) {
@@ -117,12 +132,16 @@ fun CanvasPropertyControl(
                     dispatch = dispatch,
                     dispatchProperty = dispatchProperty,
                     note = note,
+                    shapeText = shapeText,
                     onClose = { open = false },
                 )
             }
         }
     }
 }
+
+/** Where [CanvasPropertyControl] opens its panel relative to the opener. */
+enum class PropertyPopoverPlacement { BELOW, BESIDE, ABOVE }
 
 /** Which colour of the target the embedded picker edits. */
 private enum class ColorTarget(val label: String, val glyph: ImageVector) {
@@ -139,6 +158,7 @@ private fun CanvasPropertyPanel(
     dispatch: (ControlsBarIntent) -> Unit,
     dispatchProperty: (CanvasPropertyIntent) -> Unit,
     note: NoteBarActions?,
+    shapeText: ShapeTextActions?,
     onClose: () -> Unit,
 ) {
     val targets = when {
@@ -146,25 +166,36 @@ private fun CanvasPropertyPanel(
         note == null -> listOf(ColorTarget.STROKE)
         note.plain -> listOf(ColorTarget.TEXT)
         else -> listOf(ColorTarget.TEXT, ColorTarget.CARD)
-    }
+    } + if (note == null && shapeText != null) listOf(ColorTarget.TEXT) else emptyList()
+    // The Text target is the note's text, else the selected shape's.
+    val textOwner = note
     var target by remember(targets) { mutableStateOf(targets.first()) }
     val recent = rememberRecentColors()
-    val style = note?.style ?: CanvasTextStyle()
+    // On a phone the panel opens short - the colours and the one size you reach for - and the rest
+    // waits behind "More options", so it never covers the thing being edited.
+    val compact = LocalCanvasCompact.current
+    var more by remember { mutableStateOf(false) }
+    val full = !compact || more
+    val style = textOwner?.style ?: CanvasTextStyle()
     val current = when (target) {
         ColorTarget.STROKE -> state.strokeColor
         ColorTarget.FILL -> state.fillColor ?: Color.Transparent
-        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: note?.defaultTextColor ?: Color.Black
+        ColorTarget.TEXT -> shapeText?.color ?: parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
         ColorTarget.CARD -> note?.color ?: Color.Transparent
     }
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 8.dp,
+        shadowElevation = LettaDimens.Space.sm,
         modifier = Modifier.semantics { contentDescription = "Property panel" },
     ) {
         Column(
-            modifier = Modifier.width(PANEL_WIDTH).verticalScroll(rememberScrollState()).padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .width(if (compact) COMPACT_PANEL_WIDTH else PANEL_WIDTH)
+                .heightIn(max = if (compact) COMPACT_PANEL_MAX_HEIGHT else androidx.compose.ui.unit.Dp.Infinity)
+                .verticalScroll(rememberScrollState())
+                .padding(if (compact) LettaDimens.Space.sm else LettaDimens.Space.md),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -178,18 +209,18 @@ private fun CanvasPropertyPanel(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onClose, modifier = Modifier.size(26.dp).semantics { contentDescription = "Close properties" }) {
-                    Icon(Lucide.X, contentDescription = null, modifier = Modifier.size(14.dp))
+                IconButton(onClick = onClose, modifier = Modifier.size(LettaDimens.Control.iconButton).semantics { contentDescription = "Close properties" }) {
+                    Icon(Lucide.X, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
                 }
             }
 
             // Colour: pick which colour of the target, then the one picker edits it.
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
                 targets.forEach { t ->
                     val color = when (t) {
                         ColorTarget.STROKE -> state.strokeColor
                         ColorTarget.FILL -> state.fillColor ?: Color.Transparent
-                        ColorTarget.TEXT -> parseHexColor(style.textColor) ?: note?.defaultTextColor ?: Color.Black
+                        ColorTarget.TEXT -> shapeText?.color ?: parseHexColor(style.textColor) ?: textOwner?.defaultTextColor ?: Color.Black
                         ColorTarget.CARD -> note?.color ?: Color.Transparent
                     }
                     TargetChip(target = t, color = color, selected = t == target) { target = t }
@@ -214,18 +245,51 @@ private fun CanvasPropertyPanel(
                     when (target) {
                         ColorTarget.STROKE -> dispatch(ControlsBarIntent.SetStrokeColor(color))
                         ColorTarget.FILL -> dispatch(ControlsBarIntent.SetFillColor(color))
-                        ColorTarget.TEXT -> note?.onStyle(style.copy(textColor = color.toHex()))
+                        ColorTarget.TEXT -> if (shapeText != null) shapeText.onColor(color) else textOwner?.onStyle(style.copy(textColor = color.toHex()))
                         ColorTarget.CARD -> note?.onColor(color)
                     }
                     if (done) recent.remember(color)
                 },
                 flat = true,
+                showCustom = full,
             )
 
-            if (note == null) {
-                DrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
-            } else {
-                NoteProperties(note = note, style = style)
+            when {
+                // A shape with text: the settings below follow the chosen colour target, like tabs,
+                // so the panel is the shape's or its text's and never both at once.
+                note == null && full && target == ColorTarget.TEXT && shapeText != null -> ShapeTextProperties(shapeText)
+                note == null && full -> DrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
+                note == null -> ShortDrawingProperties(properties = properties, dispatchProperty = dispatchProperty)
+                full -> NoteProperties(note = note, style = style)
+            }
+            if (!full) {
+                TextButton(onClick = { more = true }, modifier = Modifier.semantics { contentDescription = "More options" }) {
+                    Text("More options", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+/** The phone's short form: the size you reach for most, nothing else. */
+@Composable
+private fun ShortDrawingProperties(properties: CanvasProperties, dispatchProperty: (CanvasPropertyIntent) -> Unit) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (properties.showFontSize) {
+            FontSizes.forEach { (label, size) ->
+                Chip(label = label, description = "Text size $label", selected = properties.fontSize == size) {
+                    dispatchProperty(CanvasPropertyIntent.SetFontSize(size))
+                }
+            }
+        } else {
+            StrokeWidths.forEach { (label, width) ->
+                Chip(label = label, description = "Width $label", selected = properties.strokeWidth == width) {
+                    dispatchProperty(CanvasPropertyIntent.SetStrokeWidth(width))
+                }
             }
         }
     }
@@ -233,8 +297,36 @@ private fun CanvasPropertyPanel(
 
 @Composable
 private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (CanvasPropertyIntent) -> Unit) {
+    // Text is set in a size, not drawn in a stroke width, so this is offered to text alone - for
+    // the selected text, or for the next piece the text tool places.
+    if (properties.showFontSize) {
+        SectionLabel("Text size")
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            FontSizes.forEach { (label, size) ->
+                Chip(label = label, description = "Text size $label", selected = properties.fontSize == size) {
+                    dispatchProperty(CanvasPropertyIntent.SetFontSize(size))
+                }
+            }
+        }
+        SectionLabel("Font")
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            FontFamilies.forEach { (label, key) ->
+                Chip(label = label, description = "Font $label", selected = properties.fontFamily == key) {
+                    dispatchProperty(CanvasPropertyIntent.SetFontFamily(key))
+                }
+            }
+        }
+        SectionLabel("Alignment")
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
+            TextAlignments.forEach { (label, alignment) ->
+                Chip(label = label, description = "Align $label", selected = properties.textAlignment == alignment) {
+                    dispatchProperty(CanvasPropertyIntent.SetTextAlignment(alignment))
+                }
+            }
+        }
+    }
     SectionLabel("Stroke width")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
         StrokeWidths.forEach { (label, width) ->
             Chip(label = label, description = "Width $label", selected = properties.strokeWidth == width) {
                 dispatchProperty(CanvasPropertyIntent.SetStrokeWidth(width))
@@ -248,7 +340,7 @@ private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (C
         onChange = { dispatchProperty(CanvasPropertyIntent.SetOpacity(it)) },
     )
     SectionLabel("Stroke style")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         StrokeStyles.forEach { (label, style) ->
             Chip(label = label, description = "Stroke $label", selected = properties.strokeStyle == style) {
                 dispatchProperty(CanvasPropertyIntent.SetStrokeStyle(style))
@@ -265,10 +357,50 @@ private fun DrawingProperties(properties: CanvasProperties, dispatchProperty: (C
     }
 }
 
+/** What the Text target of a selected shape shows and sets: the shape's own text settings. */
+class ShapeTextActions(
+    val color: Color,
+    val onColor: (Color) -> Unit,
+    val fontSize: Float,
+    val onFontSize: (Float) -> Unit,
+    val fontFamily: String,
+    val onFontFamily: (String) -> Unit,
+    val alignment: io.ak1.drawbox.domain.model.TextAlignment,
+    val onAlignment: (io.ak1.drawbox.domain.model.TextAlignment) -> Unit,
+)
+
+@Composable
+private fun ShapeTextProperties(text: ShapeTextActions) {
+    SectionLabel("Text size")
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        FontSizes.forEach { (label, size) ->
+            Chip(label = label, description = "Text size $label", selected = text.fontSize == size) { text.onFontSize(size) }
+        }
+    }
+    SectionLabel("Font")
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        FontFamilies.forEach { (label, key) ->
+            Chip(label = label, description = "Font $label", selected = text.fontFamily == key) { text.onFontFamily(key) }
+        }
+    }
+    SectionLabel("Alignment")
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        Toggle("Align start", Lucide.AlignLeft, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.LEFT) {
+            text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.LEFT)
+        }
+        Toggle("Align center", Lucide.AlignCenter, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.CENTER) {
+            text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.CENTER)
+        }
+        Toggle("Align end", Lucide.AlignRight, selected = text.alignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT) {
+            text.onAlignment(io.ak1.drawbox.domain.model.TextAlignment.RIGHT)
+        }
+    }
+}
+
 @Composable
 private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
     SectionLabel("Size")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         TextSizes.forEach { (label, scale) ->
             Chip(label = label, description = "Size $label", selected = (style.fontScale ?: 1f) == scale) {
                 note.onStyle(style.copy(fontScale = scale))
@@ -276,7 +408,7 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
         }
     }
     SectionLabel("Font")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         TextFamilies.forEach { (label, key) ->
             Chip(label = label, description = "Font $label", selected = (style.fontFamily ?: "sans") == key) {
                 note.onStyle(style.copy(fontFamily = key))
@@ -284,7 +416,7 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
         }
     }
     SectionLabel("Alignment")
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         Toggle("Align start", Lucide.AlignLeft, selected = (style.align ?: "start") == "start") { note.onStyle(style.copy(align = "start")) }
         Toggle("Align center", Lucide.AlignCenter, selected = style.align == "center") { note.onStyle(style.copy(align = "center")) }
         Toggle("Align end", Lucide.AlignRight, selected = style.align == "end") { note.onStyle(style.copy(align = "end")) }
@@ -295,25 +427,25 @@ private fun NoteProperties(note: NoteBarActions, style: CanvasTextStyle) {
 private fun TargetChip(target: ColorTarget, color: Color, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         modifier = Modifier.height(CHIP_HEIGHT).semantics { contentDescription = "Target ${target.label}" },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             Box(
                 modifier = Modifier
-                    .size(14.dp)
+                    .size(LettaDimens.Control.icon)
                     .background(color, CircleShape)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                if (color.alpha == 0f) Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(10.dp), tint = MaterialTheme.colorScheme.outline)
+                if (color.alpha == 0f) Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = MaterialTheme.colorScheme.outline)
             }
-            Icon(target.glyph, contentDescription = null, modifier = Modifier.size(13.dp))
+            Icon(target.glyph, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
         }
     }
 }
@@ -322,11 +454,11 @@ private fun TargetChip(target: ColorTarget, color: Color, selected: Boolean, onC
 private fun Chip(label: String, description: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
         modifier = Modifier.height(CHIP_HEIGHT).semantics { contentDescription = description },
     ) {
-        Box(modifier = Modifier.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.padding(horizontal = LettaDimens.Space.sm), contentAlignment = Alignment.Center) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -344,7 +476,7 @@ private fun Toggle(label: String, icon: ImageVector, selected: Boolean, onClick:
         modifier = Modifier.size(CHIP_HEIGHT).semantics { contentDescription = label },
         colors = if (selected) IconButtonDefaults.filledTonalIconButtonColors() else IconButtonDefaults.iconButtonColors(),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 
@@ -360,11 +492,34 @@ private fun LabelledSlider(label: String, value: Float, range: ClosedFloatingPoi
         value = value.coerceIn(range),
         onValueChange = onChange,
         valueRange = range,
-        modifier = Modifier.fillMaxWidth().height(24.dp).semantics { contentDescription = label },
+        modifier = Modifier.fillMaxWidth().height(LettaDimens.Space.xl).semantics { contentDescription = label },
     )
 }
 
 /** Stroke widths as the control labels them, in world units. */
+/** The sizes text is offered in, in points, small to large. */
+internal val FontSizes: List<Pair<String, Float>> = listOf(
+    "S" to 16f,
+    "M" to 24f,
+    "L" to 36f,
+    "XL" to 56f,
+    "XXL" to 80f,
+)
+
+/** The faces text can be set in, as DrawBox names them. */
+internal val FontFamilies: List<Pair<String, String>> = listOf(
+    "Sans" to io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SANS,
+    "Serif" to io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SERIF,
+    "Mono" to io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.MONO,
+)
+
+/** Which edge the lines are set against. */
+internal val TextAlignments: List<Pair<String, io.ak1.drawbox.domain.model.TextAlignment>> = listOf(
+    "left" to io.ak1.drawbox.domain.model.TextAlignment.LEFT,
+    "center" to io.ak1.drawbox.domain.model.TextAlignment.CENTER,
+    "right" to io.ak1.drawbox.domain.model.TextAlignment.RIGHT,
+)
+
 internal val StrokeWidths: List<Pair<String, Float>> = listOf("Thin" to 2f, "Medium" to 4f, "Thick" to 8f, "Bold" to 14f)
 
 /** Stroke styles as the control labels them. */
@@ -375,6 +530,12 @@ internal val StrokeStyles: List<Pair<String, StrokeStyle>> = listOf(
 )
 
 private const val MAX_CORNER_RADIUS = 64f
-private val OPENER_SIZE = 22.dp
-private val CHIP_HEIGHT = 28.dp
+private val OPENER_SIZE = LettaDimens.Space.xl
+private val CHIP_HEIGHT = LettaDimens.Control.fieldHeight
 private val PANEL_WIDTH = 280.dp
+
+/** Narrow enough to sit on a 360dp phone with room either side. */
+private val COMPACT_PANEL_WIDTH = 296.dp
+
+/** Short enough to leave the element it edits in view. */
+private val COMPACT_PANEL_MAX_HEIGHT = 320.dp

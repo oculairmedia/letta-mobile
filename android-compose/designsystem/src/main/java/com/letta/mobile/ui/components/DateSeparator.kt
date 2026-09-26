@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun DateSeparator(
@@ -21,7 +22,7 @@ fun DateSeparator(
 ) {
     val label = formatRelativeDate(date)
     Box(
-        modifier = modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
@@ -30,7 +31,7 @@ fun DateSeparator(
         ) {
             Text(
                 text = label,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

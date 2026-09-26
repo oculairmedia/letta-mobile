@@ -26,6 +26,7 @@ import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.MascotAvatar
 import com.letta.mobile.ui.mascot.MascotPicker
 import com.letta.mobile.ui.mascot.MascotShapeGlyph
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The agent's mascot identity: the live tile (or the flat silhouette until the renderer has it)
@@ -44,7 +45,7 @@ internal fun EditAgentAvatarCard(
             headlineContent = {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     MascotAvatar(
@@ -101,9 +102,9 @@ private fun EditAgentAvatarPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = LettaDimens.Space.xl)
                 .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             MascotPicker(
                 identity = identity ?: MascotIdentity.DEFAULT,
@@ -114,7 +115,7 @@ private fun EditAgentAvatarPickerSheet(
             )
             TextButton(
                 onClick = onDismiss,
-                modifier = Modifier.align(Alignment.End).padding(bottom = 8.dp),
+                modifier = Modifier.align(Alignment.End).padding(bottom = LettaDimens.Space.sm),
             ) {
                 Text(stringResource(R.string.screen_agent_edit_avatar_done))
             }
@@ -122,4 +123,4 @@ private fun EditAgentAvatarPickerSheet(
     }
 }
 
-private val AvatarTileSize = 48.dp
+private val AvatarTileSize = LettaDimens.Orb.railSlotWidth

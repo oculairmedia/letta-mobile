@@ -156,11 +156,7 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
             stepApi = stepApi,
             toolApi = toolApi,
         ),
-        channelTransportFactory = SessionChannelTransportFactory(
-            appContext = appContext,
-            runCursorStore = com.letta.mobile.data.transport.RunCursorStore.inMemory(),
-            conversationCursorStore = com.letta.mobile.data.timeline.NoOpConversationCursorStore,
-        ),
+        channelTransportFactory = SessionChannelTransportFactory(appContext = appContext),
         settingsRepository = settingsRepository,
         localRuntimeOptions = localRuntimeOptions,
         cursorFactory = cursorFactory,

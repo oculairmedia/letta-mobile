@@ -7,6 +7,8 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -92,7 +94,34 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
 }
 
 private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: NavHostController) {
-    composable<CanvasRoute> { backStackEntry ->
+    // letta-mobile-swup: slide-up "card lifts" transition. Forward plays
+    // slideInVertically (canvas rises from the bottom edge where the
+    // prompt card lives); back plays slideOutVertically in reverse so the
+    // canvas appears to collapse back into the card. Fades sit underneath
+    // so the chat fades out gently under the rising canvas instead of
+    // popping. ~280ms is the "Meridian" tween for medium surface changes
+    // — long enough to read the lift, short enough not to feel like a
+    // separate navigation event.
+    composable<CanvasRoute>(
+        enterTransition = {
+            slideInVertically(
+                animationSpec = tween(280),
+                initialOffsetY = { it },
+            ) + fadeIn(animationSpec = tween(140))
+        },
+        exitTransition = {
+            fadeOut(animationSpec = tween(140))
+        },
+        popEnterTransition = {
+            fadeIn(animationSpec = tween(140))
+        },
+        popExitTransition = {
+            slideOutVertically(
+                animationSpec = tween(280),
+                targetOffsetY = { it },
+            ) + fadeOut(animationSpec = tween(140))
+        },
+    ) { backStackEntry ->
         val route = backStackEntry.toRoute<CanvasRoute>()
         val coroutineScope = rememberCoroutineScope()
         val shareRecipient = route.shareRecipient

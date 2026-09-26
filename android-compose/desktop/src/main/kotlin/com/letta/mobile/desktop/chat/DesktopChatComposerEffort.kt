@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.composer.ComposerEffort
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Composer effort chip + popover (Penpot "Effort popover"): an OPTIONS section
@@ -89,12 +90,12 @@ private fun EffortPopover(
     ) {
         Surface(
             modifier = Modifier.width(230.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(LettaDimens.Radius.md),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 8.dp,
+            shadowElevation = LettaDimens.Space.sm,
         ) {
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(vertical = LettaDimens.Space.sm)) {
                 EffortThinkingSection(
                     thinking = state.thinking,
                     onThinkingChange = actions.onThinkingChange,
@@ -103,7 +104,7 @@ private fun EffortPopover(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
                 )
                 EffortLevelsSection(
                     effort = state.effort,
@@ -123,7 +124,7 @@ private fun EffortThinkingSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -161,7 +162,7 @@ private fun EffortLevelRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -176,7 +177,7 @@ private fun EffortLevelRow(
                 imageVector = Icons.Outlined.Check,
                 contentDescription = "Selected",
                 tint = Color(0xFF00BFA5),
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
     }
@@ -189,7 +190,7 @@ internal fun EffortSectionHeader(text: String) {
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.xs),
     )
 }
 
@@ -202,20 +203,20 @@ internal fun ComposerActionChip(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (leadingIcon != null) {
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    modifier = Modifier.size(13.dp),
+                    modifier = Modifier.size(LettaDimens.Control.iconSm),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -223,7 +224,7 @@ internal fun ComposerActionChip(
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

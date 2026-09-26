@@ -20,6 +20,7 @@ import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.ui.chat.MentionPopup
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** Read-only composer inputs (text, attachments, model catalog, autocomplete sources). */
 internal data class ComposerBarState(
@@ -62,9 +63,9 @@ internal fun ComposerBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 28.dp, top = 4.dp, end = 28.dp, bottom = 20.dp),
+            .padding(start = LettaDimens.Space.xxl, top = LettaDimens.Space.xs, end = LettaDimens.Space.xxl, bottom = LettaDimens.Space.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         ComposerCommandSuggestions(
             matchedCommands = autocomplete.matchedCommands,
@@ -144,4 +145,4 @@ private fun ComposerMentionSuggestions(
 internal val ComposerCompanionSlot = 108.dp
 
 /** Breathing room between the mascot and the box's edge. */
-private val ComposerCompanionGap = 16.dp
+private val ComposerCompanionGap = LettaDimens.Space.lg

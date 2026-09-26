@@ -52,7 +52,7 @@ class AdminRestServiceInjectionTest {
     /** Every method the retired admin REST adapter used to own, by handler. */
     private val formerAdminRestMethods: Set<String> =
         RunAdminHandlers.METHODS + ArchiveAdminHandlers.METHODS + IdentityAdminHandlers.METHODS +
-            ModelAdminHandlers.CONSTANT_CATALOG_METHODS + ScheduleAdminHandlers.METHODS +
+            ModelAdminHandlers.FORMER_ADMIN_REST_METHODS + ScheduleAdminHandlers.METHODS +
             ToolAdminHandlers.METHODS + McpAdminHandlers.METHODS + setOf("agent.context")
 
     @Test

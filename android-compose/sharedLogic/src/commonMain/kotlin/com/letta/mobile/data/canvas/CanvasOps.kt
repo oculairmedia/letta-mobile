@@ -77,6 +77,24 @@ sealed interface CanvasOp {
         val binding: CanvasArrowBinding,
     ) : CanvasOp
 
+    /**
+     * Marks a block document as the label OWNED by [shapeId], or releases it when [shapeId] is
+     * null.
+     *
+     * Ownership is recorded rather than inferred from the document's id. A board can hold a
+     * perfectly ordinary note called `label-report`, and treating the name as proof of ownership
+     * means the label reconciler deletes it the moment no shape by that name exists.
+     */
+    @Serializable
+    @SerialName("set_label_owner")
+    data class SetLabelOwnerOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val documentId: String,
+        val shapeId: String?,
+    ) : CanvasOp
+
     /** Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins. */
     @Serializable
     @SerialName("set_background_pattern")
@@ -91,7 +109,7 @@ sealed interface CanvasOp {
      * Upserts a block document (a Cascade editor JSON document) attached to the canvas. Documents
      * live on the board beside the drawing, keyed by [documentId]; last writer wins per document.
      * A null [frame] keeps the document where it already is, a null [color] keeps its colour and a
-     * null [style] keeps how its text is set.
+     * null [style] keeps how its text is set and a null [title] keeps its title (an empty one clears it).
      */
     @Serializable
     @SerialName("set_document")
@@ -104,6 +122,7 @@ sealed interface CanvasOp {
         val frame: CanvasDocumentFrame? = null,
         val color: String? = null,
         val style: CanvasTextStyle? = null,
+        val title: String? = null,
     ) : CanvasOp
 
     @Serializable
@@ -138,9 +157,31 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
     is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId)
     is CanvasOp.SetArrowBindingOp -> copy(actorId = actorId)
+    is CanvasOp.SetLabelOwnerOp -> copy(actorId = actorId)
     is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
     is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })
+}
+
+/**
+ * The same operation with a fresh identity and [lamport].
+ *
+ * An inverse is built when a change happens and applied whenever the person presses undo, so it
+ * cannot carry the clock it was born with: the scene has moved on, and last-writer-wins would
+ * discard a stale op without a word. It is stamped at the moment it is applied instead.
+ */
+fun CanvasOp.withStamp(opId: String, lamport: Long): CanvasOp = when (this) {
+    is CanvasOp.ReplaceSceneOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.AddElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.UpdateElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.RemoveElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetBackgroundOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetBackgroundPatternOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetArrowBindingOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetLabelOwnerOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetDocumentOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.RemoveDocumentOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.BatchOp -> copy(opId = opId, lamport = lamport, ops = ops.map { it.withStamp(opId, lamport) })
 }
 
 /**
@@ -172,6 +213,12 @@ data class CanvasGetSceneResult(
     @SerialName("scene_json")
     val sceneJson: String,
     val revision: Long,
+    /** The canvas read, so a call that named none learns which it got. */
+    @SerialName("canvas_id")
+    val canvasId: String? = null,
+    /** The element format in a line ([CanvasSceneSchema.hint]). */
+    @SerialName("schema_hint")
+    val schemaHint: String? = null,
 )
 
 @Serializable
@@ -186,6 +233,8 @@ data class CanvasReplaceSceneArgs(
 data class CanvasReplaceSceneResult(
     val ok: Boolean,
     val revision: Long,
+    @SerialName("canvas_id")
+    val canvasId: String? = null,
 )
 
 @Serializable
@@ -199,6 +248,8 @@ data class CanvasApplyOpsArgs(
 data class CanvasApplyOpsResult(
     val ok: Boolean,
     val revision: Long,
+    @SerialName("canvas_id")
+    val canvasId: String? = null,
 )
 
 @Serializable
@@ -223,4 +274,17 @@ data class CanvasListArgs(
 @Serializable
 data class CanvasListResult(
     val ids: List<String>,
+    /** The same canvases with what an agent needs to pick one; [CanvasListEntry.current] is the caller's own conversation's. */
+    val canvases: List<CanvasListEntry> = emptyList(),
+)
+
+@Serializable
+data class CanvasListEntry(
+    @SerialName("canvas_id")
+    val canvasId: String,
+    val title: String? = null,
+    @SerialName("conversation_id")
+    val conversationId: String? = null,
+    /** This is the canvas of the conversation the call came from: the one tools use when given no canvas_id. */
+    val current: Boolean = false,
 )

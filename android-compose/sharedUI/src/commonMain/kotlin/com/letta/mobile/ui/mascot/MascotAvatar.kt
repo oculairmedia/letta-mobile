@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -39,6 +41,7 @@ import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * What a platform contributes to draw a live mascot: the per-agent entry (renderer scene +
@@ -67,6 +70,12 @@ interface MascotHost {
      */
     @Composable
     fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean)
+
+    /**
+     * Captured stills by identity (see [MascotStills]). With them, a mascot that is not moving is an
+     * image and brings up no renderer scene at all; null keeps the paused-scene still.
+     */
+    val stills: MascotStills? get() = null
 }
 
 /** No renderer: every mascot draws its fallback. Platforms provide a real host at their root. */
@@ -242,6 +251,19 @@ private fun MascotStill(
     modifier: Modifier = Modifier,
 ) {
     val host = LocalMascotHost.current
+    val stills = host.stills
+    if (stills != null) {
+        // The identity's captured still: an image, no scene. Empty for the moment the one capture
+        // of a new identity takes; after that, and on every later launch, it is simply there.
+        val image = stills.get(identity)
+        LaunchedEffect(stills, identity) { stills.ensure(identity) }
+        if (image != null) {
+            Image(image, contentDescription = null, modifier = modifier.requiredSize(size), contentScale = ContentScale.Fit)
+        } else {
+            Box(modifier.requiredSize(size))
+        }
+        return
+    }
     val registry = LocalMascotRegistry.current
     val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
@@ -296,7 +318,7 @@ fun MascotAvatar(
     agentId: String?,
     size: Dp,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = 7.dp,
+    cornerRadius: Dp = LettaDimens.Radius.sm,
     onClick: (() -> Unit)? = null,
     overscale: Float = MASCOT_TILE_OVERSCALE,
     live: Boolean = mascotAtWork(agentId),

@@ -180,6 +180,38 @@ class ChatSendCoordinatorCleanupTest {
         assertTrue(timeline.clearedActiveConversations.isEmpty())
     }
 
+    // letta-mobile-qygvv.16: the transport ends a turn its lost session carried with a
+    // connection_lost error and a failed terminal. The coordinator must retire the turn on it.
+    @Test
+    fun sessionLossTerminalAfterTransientDisconnectClearsPresence() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val recorded = mutableListOf<WsTimelineEvent>()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(sendResults = mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+            recordRuntimeEvent = { event, _ -> recorded += event },
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 0, reason = "connection lost", willReconnect = true))
+        assertTrue(ui.isStreaming(), "a transient disconnect alone keeps the turn")
+        val kind = TurnFailureNotices.CONNECTION_LOST_KIND
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(kind, TurnFailureNotices.messageFor(kind), "conv-1", "turn-1", "run-1"),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+        advanceUntilIdle()
+
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        assertEquals(1, recorded.count { it is WsTimelineEvent.TurnDone })
+        assertEquals(TurnFailureNotices.messageFor(kind), ui.currentError())
+    }
+
     @Test
     fun terminalDisconnectWithActiveTurnCleansActiveRunTurnAndObservedAssistantRuns() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
@@ -465,6 +497,52 @@ class ChatSendCoordinatorCleanupTest {
         // The matching terminal finishes the current turn: presence cleared.
         assertFalse(ui.isStreaming())
         assertFalse(ui.isAgentTyping())
+        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+    }
+
+    // The observer fallback can claim the terminal before the engine's own settle
+    // flushes: the engine's stop/usage tail then lands on an already-retired turn.
+    // It must still reach the timeline projection (so the run folds with its stop
+    // reason and usage) without re-opening or re-settling the retired turn.
+    @Test
+    fun retiredTurnStopAndUsageTailIsForwardedToRuntimeEvents() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val recorded = mutableListOf<Pair<WsTimelineEvent, String?>>()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+            recordRuntimeEvent = { event, conversationId -> recorded += event to conversationId },
+        )
+
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
+        advanceUntilIdle()
+        val visualCompletionsAtRetire = ui.visualCompletions
+        assertFalse(ui.isStreaming())
+
+        val stop = WsTimelineEvent.StopReason(turnId = "turn-1", runId = "run-1", stopReason = "end_turn")
+        val usage = WsTimelineEvent.UsageStatistics(
+            turnId = "turn-1",
+            runId = "run-1",
+            promptTokens = 10L,
+            completionTokens = 5L,
+            totalTokens = 15L,
+            cachedInputTokens = 0L,
+            reasoningTokens = 0L,
+        )
+        coordinator.handleEvent(stop)
+        coordinator.handleEvent(usage)
+        advanceUntilIdle()
+
+        assertTrue(recorded.contains(stop to "conv-1"), "retired-turn stop reason reaches the runtime events; got $recorded")
+        assertTrue(recorded.contains(usage to "conv-1"), "retired-turn usage reaches the runtime events; got $recorded")
+        // The retired turn is not re-opened or re-settled.
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        assertEquals(visualCompletionsAtRetire, ui.visualCompletions)
         assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
     }
 
@@ -788,6 +866,100 @@ class ChatSendCoordinatorCleanupTest {
             assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
             assertFalse(ui.isStreaming())
         }
+
+    /**
+     * Frame order captured on device 2026-09-24 (local-conv-496): the last assistant delta of a
+     * turn reaches the coordinator after its stop reason and TurnDone. It must not relight presence.
+     */
+    @Test
+    fun lateAssistantDeltaAfterTurnDoneDoesNotRelatchPresence() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+        val (head, tail) = listOf("Hello", " there").map { content ->
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "ui-msg-9173252", contentRaw = JsonPrimitive(content), runId = "local-run-50"),
+                conversationId = "conv-1", turnId = "turn-1", agentId = AGENT_ID,
+            )
+        }
+
+        coordinator.send("hi").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "iroh-run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "local-run-50"))
+        coordinator.handleEvent(head)
+        assertTrue(ui.isStreaming())
+        coordinator.handleEvent(WsTimelineEvent.StopReason("turn-1", "local-run-50", "end_turn"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-50", BridgeTurnStatus.Completed))
+        advanceUntilIdle()
+        assertFalse(ui.isStreaming())
+
+        coordinator.handleEvent(tail)
+        coordinator.handleEvent(WsTimelineEvent.UsageStatistics("turn-1", "local-run-50", 1, 2, 3, 0, 0))
+        advanceUntilIdle()
+
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        // The tail still reaches the timeline, which decides what it is worth.
+        assertEquals(2, timeline.ingestedMessages.filterIsInstance<AssistantMessage>().count { it.id == "ui-msg-9173252" })
+
+        // A tail frame without a turn id is still recognised by its settled run.
+        coordinator.handleEvent(tail.copy(turnId = null))
+        advanceUntilIdle()
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+    }
+
+    // letta-mobile-1n5py.1: another device already runs conv-1, so the wrapper bounces this send.
+    // It must wait and go again on that turn's terminal, never surface an error.
+    @Test
+    fun otherClientBusyRejectionHoldsTheSendAndRetriesItOnTheirTerminal() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(sendResults = mutableListOf(true, true))
+        val coordinator = coordinator(timeline = timeline, ui = ui, transport = transport, scope = backgroundScope)
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.Error("iroh_turn_engine_busy", "An App Server turn is already active for agent-1/conv-1.", "conv-1", "turn-1", "run-1"),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+
+        val held = coordinator.sendQueue.state.value.getValue(QueueConversationId("conv-1"))
+        assertTrue(held.heldByOtherClient, "the send waits for the other device's turn")
+        assertEquals(listOf("hello"), held.items.map { it.text })
+        assertNull(ui.currentError(), "a busy bounce is never shown as an error")
+        assertTrue(timeline.failedLocals.isEmpty(), "the row is not marked failed")
+        assertEquals(1, transport.sentTexts.size)
+
+        // The other device's turn ends: a terminal that carries no send of this device.
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-other", "run-other", BridgeTurnStatus.Completed))
+
+        assertEquals(listOf("hello", "hello"), transport.sentTexts)
+        assertEquals(1, timeline.externalLocals.map { it.otid }.distinct().size, "the retry reuses the otid and its row")
+        assertNull(coordinator.sendQueue.state.value[QueueConversationId("conv-1")])
+    }
+
+    @Test
+    fun sendQueuedOnTheServerShowsUntilItsOwnTurnStreams() = runTest(UnconfinedTestDispatcher()) {
+        val coordinator = coordinator(timeline = RecordingTimelineWriter(), ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnQueued(turnId = "turn-1", conversationId = "conv-1"))
+
+        val queued = coordinator.sendQueue.state.value.getValue(QueueConversationId("conv-1")).queuedOnServer
+        assertEquals("hello", queued?.text)
+
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(id = "message-1", contentRaw = JsonPrimitive("hi"), runId = "run-1"),
+                conversationId = "conv-1",
+                turnId = "turn-1",
+            ),
+        )
+        assertNull(coordinator.sendQueue.state.value[QueueConversationId("conv-1")], "its own turn started")
+    }
 
     private fun coordinator(
         timeline: RecordingTimelineWriter,

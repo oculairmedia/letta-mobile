@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Renders a contiguous run of assistant messages sharing a `runId` as a
@@ -104,7 +106,7 @@ internal fun RunBlock(
         modifier = modifier
             .fillMaxWidth(),
     ) {
-        if (activity.isActive || showCompletedDisclosure) {
+        AnimatedRunHeader(visible = activity.isActive || showCompletedDisclosure, reducedMotion = reducedMotion) {
             RunActivityDisclosure(
                 activity = activity,
                 collapsed = effectiveCollapsed,
@@ -128,10 +130,12 @@ internal fun RunBlock(
             return@Column
         }
 
+        val bodyLift by animatedRunBodyLift(latestCompletedDisclosure, reducedMotion)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (latestCompletedDisclosure) Modifier.offset(y = (-22).dp) else Modifier),
+                // letta-mobile-jqiu3: lift via layout so the lifted distance leaves no band below.
+                .pullUp { -bodyLift },
         ) {
             // Timeline gutter â€” drawn behind the rows so the vertical rule
             // passes through every dot. Sized via the same Column so its
@@ -377,13 +381,13 @@ private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowMod
     // (DefaultStepDotCenterY = 17.dp). Anything heavier than 7.dp vertical
     // padding pushes the text below the dot.
     Surface(
-        modifier = rowModifier.padding(vertical = 7.dp),
+        modifier = rowModifier.padding(vertical = LettaDimens.Space.sm),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.md),
     ) {
         Text(
             text = message.content,
-            modifier = Modifier.padding(horizontal = 12.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
             style = MaterialTheme.typography.bodyMedium,
         )
     }

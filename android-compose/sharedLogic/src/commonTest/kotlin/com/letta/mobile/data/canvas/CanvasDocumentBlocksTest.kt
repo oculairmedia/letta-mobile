@@ -53,6 +53,43 @@ class CanvasDocumentBlocksTest {
         assertTrue(CanvasOpProjector.stripMetadataForDrawBox(replaced).contains("_documents").not(), "DrawBox never sees the documents")
     }
 
+    /**
+     * A label is only a label because the scene says which shape owns it. Carrying the documents
+     * through a replace but not that record left every label as an ordinary note belonging to
+     * nothing: it sat where the old shape had been, and nothing would ever move or remove it.
+     */
+    @Test
+    fun replaceSceneKeepsLabelOwnershipUnlessItBringsItsOwn() {
+        val owned = CanvasOpProjector.project(
+            CanvasOpProjector.project("", listOf(set("label-rect-1", "{\"words\":true}", lamport = 1))),
+            listOf(
+                CanvasOp.SetLabelOwnerOp(
+                    opId = "o",
+                    actorId = "local_user",
+                    lamport = 2,
+                    documentId = "label-rect-1",
+                    shapeId = "rect-1",
+                ),
+            ),
+        )
+        assertEquals(mapOf("label-rect-1" to "rect-1"), CanvasOpProjector.labelOwnersOf(owned))
+
+        val replaced = CanvasOpProjector.project(
+            owned,
+            listOf(CanvasOp.ReplaceSceneOp(opId = "r", actorId = "agent", lamport = 3, sceneJson = """{"bgColor":"#000000ff","elements":[]}""")),
+        )
+
+        assertEquals(
+            mapOf("label-rect-1" to "rect-1"),
+            CanvasOpProjector.labelOwnersOf(replaced),
+            "an agent redraw left the label owned by nothing",
+        )
+        assertTrue(
+            CanvasOpProjector.stripMetadataForDrawBox(replaced).contains("_labelOwners").not(),
+            "DrawBox never sees the ownership record",
+        )
+    }
+
     @Test
     fun aWriteWithoutAFrameKeepsWhereTheNoteWasAndARemovalDropsIt() {
         val placed = CanvasDocumentFrame(x = 10f, y = 20f, width = 300f, height = 200f)
@@ -102,6 +139,26 @@ class CanvasDocumentBlocksTest {
         session.restyleDocument("t", big)
         assertEquals(big, session.documents().single().style)
         assertNull(session.setDocument("t", "", style = big), "an unchanged style is not written again")
+    }
+
+    @Test
+    fun aNoteKeepsItsTitleAcrossWritesUntilRenamedOrCleared() = runTest {
+        fun titled(title: String?, lamport: Long) = CanvasOp.SetDocumentOp(
+            opId = "t$lamport", actorId = "a", lamport = lamport, documentId = "n", documentJson = "{}", title = title,
+        )
+        val s1 = CanvasOpProjector.project("", listOf(titled("Plan", 1)))
+        assertEquals("Plan", CanvasOpProjector.documentsOf(s1).single().title)
+        val s2 = CanvasOpProjector.project(s1, listOf(set("n", "{\"v\":2}", lamport = 2)))
+        assertEquals("Plan", CanvasOpProjector.documentsOf(s2).single().title, "typing must not rename the note")
+        val s3 = CanvasOpProjector.project(s2, listOf(titled("", 3)))
+        assertNull(CanvasOpProjector.documentsOf(s3).single().title, "an empty title clears it")
+
+        val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("c5")))
+        session.setDocument("n", "")
+        assertNull(session.retitleDocument("missing", "x"))
+        session.retitleDocument("n", "Groceries")
+        assertEquals("Groceries", session.documents().single().title)
+        assertNull(session.retitleDocument("n", "Groceries"), "an unchanged title is not written again")
     }
 
     @Test

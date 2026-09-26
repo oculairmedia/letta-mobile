@@ -15,7 +15,8 @@ import java.util.Base64
  * Evidence (admin-shim `server.ts`, `@letta-ai/letta-code` 0.29.12 host):
  *  - `GET /v1/tools` / `/v1/tools/{id}` -> `BUILTIN_TOOL_DEFINITIONS.map(vanillaTool)`,
  *    a hard-coded 14-entry list of client-side letta-code tools. No store read.
- *  - `GET /v1/providers` -> a single `vanillaProvider` built from `LMSTUDIO_BASE_URL`.
+ *  - `GET /v1/providers` -> formerly a constant here; now live `list_connect_providers`
+ *    ([ProviderAdminHandlers], letta-mobile-w4q4p).
  *  - `GET /v1/models/embedding` -> a single hard-coded embedding descriptor.
  *  - `GET /v1/folders|/v1/groups|/v1/identities|/v1/jobs|/v1/archives|/v1/mcp-servers`
  *    -> `stubList` — literally `json(res, 200, [])`. The letta-code local backend
@@ -126,32 +127,6 @@ internal object NativeAdminCatalogs {
 
     private fun vanillaToolId(name: String): String = "tool-" + base64UrlIdHash("tool:$name")
 
-    /** Port of `handleProviders`: one `lmstudio-local` BYOK provider off `LMSTUDIO_BASE_URL`. */
-    fun providerCatalog(lmstudioBaseUrl: String): JsonArray = buildJsonArray {
-        add(
-            buildJsonObject {
-                put("id", "provider-" + base64UrlIdHash("provider:$LMSTUDIO_PROVIDER_NAME"))
-                put("name", LMSTUDIO_PROVIDER_NAME)
-                put("provider_type", "openai")
-                put("provider_category", "byok")
-                put("api_key", JsonNull)
-                put("base_url", lmstudioBaseUrl)
-                put("access_key", JsonNull)
-                put("region", JsonNull)
-                put("api_version", JsonNull)
-                put("organization_id", CANNED_ORG_ID)
-                // admin-shim stamps `new Date().toISOString()` here; a constant
-                // catalog has no real sync time, and mobile does not render these
-                // two fields, so the controller emits null rather than inventing
-                // a moving timestamp that would defeat response caching.
-                put("updated_at", JsonNull)
-                put("last_synced", JsonNull)
-                put("api_key_enc", "placeholder")
-                put("access_key_enc", JsonNull)
-            },
-        )
-    }
-
     /** Port of the hard-coded `GET /v1/models/embedding` body. */
     fun embeddingModelCatalog(): JsonArray = buildJsonArray {
         add(
@@ -179,9 +154,7 @@ internal object NativeAdminCatalogs {
             .lowercase()
 
     private const val ID_HASH_CHARS = 24
-    private const val LMSTUDIO_PROVIDER_NAME = "lmstudio-local"
     private const val CANNED_USER_ID = "user-00000000-0000-4000-8000-000000000000"
-    private const val CANNED_ORG_ID = "org-00000000-0000-4000-8000-000000000000"
 
     /** Registers a set of methods that answer with a constant empty list. */
     fun registerEmptyByContract(router: AdminRpcRouter, methods: Set<String>) {

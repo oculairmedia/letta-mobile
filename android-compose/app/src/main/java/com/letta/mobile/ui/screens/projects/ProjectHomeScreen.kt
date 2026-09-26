@@ -82,6 +82,7 @@ import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.isExpandedWidth
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.theme.LettaDimens
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,7 +165,7 @@ fun ProjectHomeScreen(
                         autoFocus = false,
                         isAppBarCollapsed = isAppBarCollapsed,
                         titleContent = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) {
                                 Text(stringResource(R.string.screen_projects_title))
                                 if (activeBackendLabel != null && onNavigateToBackendSwitcher != null) {
                                     AssistChip(
@@ -341,7 +342,7 @@ fun ProjectHomeScreen(
                     confirmEnabled = state.data.newProjectDraft.isReadyToSubmit() && !state.data.isSubmittingManualCreate,
                     onConfirm = viewModel::submitManualProjectCreation,
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                         OutlinedTextField(
                             value = state.data.newProjectDraft.name,
                             onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(name = it)) },
@@ -393,7 +394,7 @@ fun ProjectHomeScreen(
                         draft = state.data.projectSettingsDraft,
                         knownProjectPaths = pathSuggestions.toSet(),
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
                         Text(
                             text = state.data.projectSettingsDraft.projectName,
                             style = MaterialTheme.typography.titleMedium,
@@ -428,8 +429,8 @@ fun ProjectHomeScreen(
                             ) {
                                 FlowRow(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                                 ) {
                                     pathSuggestions.forEach { suggestion ->
                                         SuggestionChip(
@@ -610,12 +611,12 @@ private fun ProjectActionSheetHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             beadsStatus?.let { status ->
                 AssistChip(
@@ -668,8 +669,8 @@ private fun ProjectTileMetaRow(
     // semantic while blending with the active Material seed color.
     androidx.compose.foundation.layout.FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         StatusBadge(
             text = statusLabel,
@@ -687,7 +688,7 @@ private fun ProjectTileMetaRow(
             Icon(
                 imageVector = LettaIcons.Pin,
                 contentDescription = "Pinned project",
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaDimens.Control.icon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -701,14 +702,14 @@ private fun StatusBadge(
     contentColor: Color,
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = containerColor,
         contentColor = contentColor,
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -773,8 +774,8 @@ private fun ProjectTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -789,11 +790,11 @@ private fun ProjectTile(
                     .copy(alpha = 0.16f)
                     .compositeOver(MaterialTheme.colorScheme.surfaceContainerHighest)
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(LettaDimens.Radius.md),
                     color = avatarBg,
                 ) {
                     Box(
-                        modifier = Modifier.size(44.dp),
+                        modifier = Modifier.size(LettaDimens.Orb.railSlotHeight),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -807,7 +808,7 @@ private fun ProjectTile(
 
                 IconButton(
                     onClick = onOpenActions,
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(LettaDimens.Orb.railSlotHeight),
                 ) {
                     Icon(
                         imageVector = LettaIcons.Menu,
@@ -817,7 +818,7 @@ private fun ProjectTile(
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 Text(
                     text = project.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -842,7 +843,7 @@ private fun ProjectTile(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                 project.filesystemPath?.let { path ->
                     Text(
                         text = path,
@@ -931,8 +932,8 @@ private data class PreviewMetaRowSpec(
 private fun ProjectStatusBadgePreview() {
     LettaPreviewFrame {
         Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             listOf(
                 PreviewStatusBadgeSpec(
@@ -966,8 +967,8 @@ private fun ProjectStatusBadgePreview() {
 private fun ProjectTileMetaRowPreview() {
     LettaPreviewFrame {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(LettaDimens.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             listOf(
                 PreviewMetaRowSpec(

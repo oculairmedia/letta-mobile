@@ -289,6 +289,78 @@
       "reconnect": "capability_gated",
       "idempotency": "request_id_correlated",
       "capability": "meridian_admin_rpc_extension"
+    },
+    {
+      "type": "list_connect_providers",
+      "direction": "client_to_server",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "safe_read",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
+    },
+    {
+      "type": "list_connect_providers_response",
+      "direction": "server_to_client",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "safe_read",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
+    },
+    {
+      "type": "connect_provider",
+      "direction": "client_to_server",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "ambiguous_mutation",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
+    },
+    {
+      "type": "connect_provider_response",
+      "direction": "server_to_client",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "ambiguous_mutation",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
+    },
+    {
+      "type": "disconnect_provider",
+      "direction": "client_to_server",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "ambiguous_mutation",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
+    },
+    {
+      "type": "disconnect_provider_response",
+      "direction": "server_to_client",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "ambiguous_mutation",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
+    },
+    {
+      "type": "update_model",
+      "direction": "client_to_server",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "ambiguous_mutation",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
+    },
+    {
+      "type": "update_model_response",
+      "direction": "server_to_client",
+      "channel": "control",
+      "owner": "native_admin",
+      "reconnect": "ambiguous_mutation",
+      "idempotency": "request_id_correlated",
+      "capability": "models_providers"
     }
   ]
 }

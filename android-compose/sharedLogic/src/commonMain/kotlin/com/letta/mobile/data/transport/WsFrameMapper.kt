@@ -100,6 +100,8 @@ object WsFrameMapper {
         is ServerFrame.CronsUpdated,
         is ServerFrame.GoalsUpdated,
         is ServerFrame.AgentUpdated,
+        // letta-mobile-lks7m: conversation pushes drive the conversation lists, not the timeline.
+        is ServerFrame.ConversationUpdated,
         // letta-mobile-73o2h: active-subagent registry frames are
         // routing-only — they drive the SubagentRepository state machine
         // (active-bar), not the chat timeline. Same treatment as crons.
@@ -108,10 +110,12 @@ object WsFrameMapper {
         is ServerFrame.SubagentsUpdated,
         // letta-mobile-2rkdj: subscribe envelopes are routing-only —
         // SubscribeFrameMessage's inner BridgeFrame is re-routed
-        // through the live handler in ChannelTransport, and
+        // through the transport's live handler, and
         // SubscribeDone is metadata for cursor cleanup.
         is ServerFrame.SubscribeFrameMessage,
         is ServerFrame.SubscribeDone,
+        // letta-mobile-1n5py.1: queue state for the send coordinator, not timeline content.
+        is ServerFrame.TurnQueued,
         is ServerFrame.Unknown -> null
     }
 

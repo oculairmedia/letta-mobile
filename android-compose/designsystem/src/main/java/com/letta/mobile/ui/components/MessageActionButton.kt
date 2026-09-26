@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
 fun MessageActionButton(
@@ -26,7 +27,7 @@ fun MessageActionButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        contentPadding = PaddingValues(horizontal = LettaDimens.Space.sm, vertical = 0.dp),
     ) {
         Icon(
             imageVector = icon,
@@ -34,7 +35,7 @@ fun MessageActionButton(
             modifier = Modifier.size(LettaIconSizing.Inline),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,

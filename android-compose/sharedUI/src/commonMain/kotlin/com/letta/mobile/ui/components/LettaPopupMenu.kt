@@ -12,6 +12,11 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import com.letta.mobile.ui.theme.LettaDimens
 
 /** One row of a [LettaPopupMenu]. */
 @Immutable
@@ -27,6 +32,14 @@ data class LettaMenuItem(
  * [LettaMenuItem]s on `surfaceContainerHigh`, anchored to whatever it is composed inside.
  *
  * Every menu goes through here so they all look the same and a design change is one edit.
+ *
+ * A chosen item runs just after the menu closes, on a scope that does not belong to the menu.
+ *
+ * Both halves are necessary. The wait keeps screen-replacing work (opening the canvas, navigating
+ * away) off the frame that tears the popup's own scene layer down. And the scope has to outlive
+ * the popup, because callers dismiss by removing it - `if (menuOpen) { LettaPopupMenu(...) }` -
+ * so an effect owned by this composable is cancelled before it can run, and every menu item in
+ * the app silently does nothing.
  */
 @Composable
 fun LettaPopupMenu(
@@ -35,6 +48,7 @@ fun LettaPopupMenu(
     items: List<LettaMenuItem>,
     modifier: Modifier = Modifier,
 ) {
+    val actionScope = LocalMenuActionScope.current
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
@@ -57,17 +71,43 @@ fun LettaPopupMenu(
                             imageVector = icon,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(LettaDimens.Control.icon),
                         )
                     }
                 },
                 enabled = item.enabled,
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+                contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.hair),
                 onClick = {
                     onDismiss()
-                    item.onClick()
+                    val action = item.onClick
+                    if (actionScope == null) {
+                        action()
+                    } else {
+                        actionScope.launch {
+                            // A frame boundary, not a guess at one. A fixed delay says nothing
+                            // about whether Compose has applied the dismissal and torn the
+                            // popup's scene layer down - and on a slow frame the action would
+                            // replace the screen before it had, which is the failure this
+                            // deferral exists to avoid.
+                            withFrameNanos { }
+                            action()
+                        }
+                    }
                 },
             )
         }
     }
 }
+
+/**
+ * A scope that outlives a popup, for running what a menu item chose.
+ *
+ * The popup is usually removed from the composition by its own dismiss handler, so anything owned
+ * by it - a `LaunchedEffect`, a `rememberCoroutineScope` - dies before the action can run. A host
+ * provides a scope that lives as long as its window; without one the action runs immediately,
+ * which is correct, just without the frame of daylight between dismissal and a screen-replacing
+ * action.
+ */
+val LocalMenuActionScope = compositionLocalOf<CoroutineScope?> { null }
+
+

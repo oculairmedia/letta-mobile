@@ -44,6 +44,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
+import com.letta.mobile.ui.theme.LettaDimens
 
 data class TimelineViewParams(
     val defs: List<ScheduleDef>,
@@ -84,7 +85,7 @@ fun TimelineView(params: TimelineViewParams) {
         params.now.toLocalDateTime(params.zone).let { (it.hour * 60 + it.minute) / 1440f }
     }
     val laneLabelWidth = 200.dp
-    Column(Modifier.fillMaxSize().padding(start = 28.dp, end = 28.dp)) {
+    Column(Modifier.fillMaxSize().padding(start = LettaDimens.Space.xxl, end = LettaDimens.Space.xxl)) {
         TimelineDayHeader(days = days, today = params.today, laneLabelWidth = laneLabelWidth)
         LazyColumn(Modifier.weight(1f)) {
             items(items = timeline.lanes, key = { it.scheduleId }) { lane ->
@@ -107,7 +108,7 @@ fun TimelineView(params: TimelineViewParams) {
 
 @Composable
 private fun TimelineDayHeader(days: List<LocalDate>, today: LocalDate, laneLabelWidth: Dp) {
-    Row(Modifier.fillMaxWidth().padding(start = laneLabelWidth, bottom = 8.dp)) {
+    Row(Modifier.fillMaxWidth().padding(start = laneLabelWidth, bottom = LettaDimens.Space.sm)) {
         days.forEach { date ->
             TimelineDayHeaderCell(date = date, isToday = date == today)
         }
@@ -123,11 +124,11 @@ private fun RowScope.TimelineDayHeaderCell(date: LocalDate, isToday: Boolean) {
             color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (isToday) {
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(LettaDimens.Space.hair))
             Box(
                 Modifier.clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.primary)
-                    .padding(horizontal = 7.dp, vertical = 1.dp),
+                    .padding(horizontal = LettaDimens.Space.sm, vertical = 1.dp),
             ) {
                 Text("now", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary)
             }
@@ -140,10 +141,10 @@ private fun TimelineLaneRow(params: TimelineLaneRowParams) {
     val highFreq = params.lane.ticks.size > 7 * WEEK_GRID_MAX_PER_DAY
     Row(
         Modifier.fillMaxWidth().height(56.dp).clickable { params.onLaneClick(params.lane.scheduleId) }
-            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.width(params.laneLabelWidth).padding(end = 12.dp)) {
+        Column(Modifier.width(params.laneLabelWidth).padding(end = LettaDimens.Space.md)) {
             Text(
                 params.lane.scheduleName,
                 style = MaterialTheme.typography.bodyMedium,
@@ -184,7 +185,7 @@ fun TimelineDayCell(
 ) {
     val isToday = params.date == params.today
     Box(
-        modifier.fillMaxHeight().border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+        modifier.fillMaxHeight().border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
         contentAlignment = Alignment.Center,
     ) {
         if (params.highFreq && params.ticks.isNotEmpty()) {
@@ -202,10 +203,10 @@ fun TimelineDayCell(
 private fun TimelineHighFreqBar(date: LocalDate, today: LocalDate, nowFrac: Float) {
     val success = MaterialTheme.customColors.successColor
     val upcoming = MaterialTheme.colorScheme.outline
-    Row(Modifier.fillMaxWidth(0.86f).height(14.dp).clip(RoundedCornerShape(3.dp))) {
+    Row(Modifier.fillMaxWidth(0.86f).height(LettaDimens.Space.lg).clip(RoundedCornerShape(LettaDimens.Radius.sm))) {
         when {
             date < today -> Box(Modifier.fillMaxSize().background(success))
-            date > today -> Box(Modifier.fillMaxSize().border(1.dp, upcoming, RoundedCornerShape(3.dp)))
+            date > today -> Box(Modifier.fillMaxSize().border(1.dp, upcoming, RoundedCornerShape(LettaDimens.Radius.sm)))
             else -> {
                 val frac = nowFrac.coerceIn(0.02f, 0.98f)
                 Box(Modifier.weight(frac).fillMaxHeight().background(success))
@@ -217,16 +218,16 @@ private fun TimelineHighFreqBar(date: LocalDate, today: LocalDate, nowFrac: Floa
 
 @Composable
 private fun TimelineTickMarks(ticks: List<TimelineTick>) {
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
         ticks.take(6).forEach { tick ->
             val past = tick.status == RunStatus.Done || tick.status == RunStatus.Failed
             Box(
-                Modifier.size(width = 6.dp, height = 18.dp).clip(RoundedCornerShape(2.dp))
+                Modifier.size(width = LettaDimens.Space.sm, height = LettaDimens.Control.icon).clip(RoundedCornerShape(LettaDimens.Radius.sm))
                     .background(if (past) statusColor(tick.status) else Color.Transparent)
                     .border(
                         1.dp,
                         statusColor(tick.status).copy(alpha = if (past) 1f else 0.6f),
-                        RoundedCornerShape(2.dp),
+                        RoundedCornerShape(LettaDimens.Radius.sm),
                     ),
             )
         }
@@ -238,7 +239,7 @@ private fun TimelineNowLine(nowFrac: Float) {
     val clamped = nowFrac.coerceIn(0.01f, 0.99f)
     Row(Modifier.fillMaxSize()) {
         Spacer(Modifier.weight(clamped))
-        Box(Modifier.width(2.dp).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
+        Box(Modifier.width(LettaDimens.Space.hair).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
         Spacer(Modifier.weight(1f - clamped))
     }
 }
@@ -246,15 +247,15 @@ private fun TimelineNowLine(nowFrac: Float) {
 @Composable
 fun TimelineLegend() {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.md),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         LegendItem(MaterialTheme.customColors.successColor, "success", filled = true)
         LegendItem(MaterialTheme.colorScheme.error, "failed", filled = true)
         LegendItem(MaterialTheme.colorScheme.outline, "upcoming", filled = false)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(width = 2.dp, height = 14.dp).background(MaterialTheme.colorScheme.primary))
-            Spacer(Modifier.width(5.dp))
+            Box(Modifier.size(width = LettaDimens.Space.hair, height = LettaDimens.Control.iconSm).background(MaterialTheme.colorScheme.primary))
+            Spacer(Modifier.width(LettaDimens.Space.xs))
             Text("now", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -264,11 +265,11 @@ fun TimelineLegend() {
 fun LegendItem(color: Color, label: String, filled: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(10.dp).clip(RoundedCornerShape(2.dp))
+            Modifier.size(LettaDimens.Control.iconSm).clip(RoundedCornerShape(LettaDimens.Radius.sm))
                 .background(if (filled) color else Color.Transparent)
-                .border(1.dp, color, RoundedCornerShape(2.dp)),
+                .border(1.dp, color, RoundedCornerShape(LettaDimens.Radius.sm)),
         )
-        Spacer(Modifier.width(5.dp))
+        Spacer(Modifier.width(LettaDimens.Space.xs))
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

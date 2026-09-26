@@ -43,6 +43,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import com.letta.mobile.ui.theme.LettaDimens
 
 private const val MCP_TYPE_STDIO = "stdio"
 private const val MCP_TYPE_SSE = "sse"
@@ -114,7 +115,7 @@ internal fun ServerFormDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             CardGroup {
                 item(

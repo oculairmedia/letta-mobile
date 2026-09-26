@@ -52,6 +52,7 @@ import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Dev-mode telemetry inspector.
@@ -148,7 +149,7 @@ private fun TimelineDumpToggleRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -194,7 +195,7 @@ private fun TelemetryEventList(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
             ) {
                 // Use itemsIndexed with an index suffix: multiple telemetry
                 // events can fire in the same millisecond with the same
@@ -227,22 +228,22 @@ private fun TelemetryEventRow(ev: Telemetry.Event) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(bgColor, RoundedCornerShape(4.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .background(bgColor, RoundedCornerShape(LettaDimens.Radius.sm))
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
                 formatTime(ev.timestampMs),
-                fontSize = 11.sp,
+                fontSize = LettaDimens.Type.caption,
                 fontFamily = LettaCodeFont,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 "${ev.tag}/${ev.name}",
-                fontSize = 13.sp,
+                fontSize = LettaDimens.Type.caption,
                 fontFamily = LettaCodeFont,
                 fontWeight = FontWeight.Medium,
                 color = levelColor,
@@ -252,7 +253,7 @@ private fun TelemetryEventRow(ev: Telemetry.Event) {
             if (duration != null) {
                 Text(
                     "${duration}ms",
-                    fontSize = 12.sp,
+                    fontSize = LettaDimens.Type.caption,
                     fontFamily = LettaCodeFont,
                     fontWeight = FontWeight.Bold,
                     color = durationColor(duration),
@@ -262,7 +263,7 @@ private fun TelemetryEventRow(ev: Telemetry.Event) {
         if (ev.attrs.isNotEmpty()) {
             Text(
                 ev.attrs.entries.joinToString("  ") { (k, v) -> "$k=$v" },
-                fontSize = 11.sp,
+                fontSize = LettaDimens.Type.caption,
                 fontFamily = LettaCodeFont,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -270,7 +271,7 @@ private fun TelemetryEventRow(ev: Telemetry.Event) {
         ev.throwable?.let { t ->
             Text(
                 "${t.javaClass.simpleName}: ${t.message ?: ""}",
-                fontSize = 11.sp,
+                fontSize = LettaDimens.Type.caption,
                 fontFamily = LettaCodeFont,
                 color = MaterialTheme.colorScheme.error,
             )

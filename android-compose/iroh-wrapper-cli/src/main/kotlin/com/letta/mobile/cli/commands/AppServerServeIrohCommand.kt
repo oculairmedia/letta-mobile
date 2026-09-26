@@ -104,6 +104,9 @@ fun buildProductionAdminRouter(
     eventScope: CoroutineScope? = null,
     /** Pushes `agent_updated` to connected clients after agent writes. */
     agentChanges: com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier? = null,
+    conversationChanges: com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier? = null,
+    /** letta-mobile-w4q4p: persisted model exposure decisions; null keeps them in memory. */
+    modelExposureFile: String? = null,
 ): AdminRpcRouter {
     val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
@@ -150,6 +153,8 @@ fun buildProductionAdminRouter(
         localBackendDir = localBackendDir,
         skillsListing = skillsCatalog.asListingSource(),
         agentChanges = agentChanges,
+        conversationChanges = conversationChanges,
+        modelExposureFile = modelExposureFile,
     )
 }
 
@@ -200,6 +205,28 @@ class AppServerServeIrohCommand : CliktCommand(
             "DIRECTLY (lgns8.9), bypassing the lettashim /api reverse-proxy splice. " +
             "Server-side localhost only.",
     ).default("http://127.0.0.1:3099")
+
+    private val canvasOpsDir by option(
+        "--canvas-ops-dir",
+        envvar = "LETTA_CANVAS_OPS_DIR",
+        help = "Directory for the op log of the canvases this host relays between apps " +
+            "(default ~/.letta/canvas-relay/topics): each conversation's canvas binding and op log. " +
+            "Apps that were offline catch up from it.",
+    )
+
+    private val canvasAssetsDir by option(
+        "--canvas-assets-dir",
+        envvar = "LETTA_CANVAS_ASSETS_DIR",
+        help = "Directory for the assets (images, files) apps put on shared canvases " +
+            "(default ~/.letta/canvas-relay/assets), kept by their hash and served to the other apps.",
+    )
+
+    private val modelExposureFile by option(
+        "--model-exposure-file",
+        envvar = "LETTA_MODEL_EXPOSURE_FILE",
+        help = "JSON file holding which App Server models are exposed to app model pickers " +
+            "(model.exposure.*; default: model-exposure.json next to host-canvases.json).",
+    )
 
     private val pairingStoreFile by option(
         "--pairing-store-file",
@@ -387,6 +414,8 @@ class AppServerServeIrohCommand : CliktCommand(
 
             println("[iroh-app-server] Starting Iroh endpoint...")
             
+            val canvasRelay = startCanvasRelay(scope)
+
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
                 scope = scope,
@@ -394,6 +423,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 secretKeyPath = irohSecretKeyPath,
                 authPolicy = authPolicy,
                 pairingService = pairingService,
+                canvasRelay = canvasRelay,
             )
             irohEndpoint = endpoint
             endpoint.create()
@@ -416,6 +446,7 @@ class AppServerServeIrohCommand : CliktCommand(
             // LettaShim admin base / HTTP subagent discovery.
             // One notifier for the whole host: agent handlers feed it, the endpoint delivers it.
             val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
+            val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
             val adminRpcRouter = buildProductionAdminRouter(
                 controller = controller,
                 pairingService = pairingService,
@@ -426,9 +457,12 @@ class AppServerServeIrohCommand : CliktCommand(
                 localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
                 eventScope = scope,
                 agentChanges = agentChanges,
+                conversationChanges = conversationChanges,
+                modelExposureFile = resolvedModelExposureFile(),
             )
             endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             agentChanges.attach(endpoint.agentChangeTarget())
+            conversationChanges.attach(endpoint.conversationChangeTarget())
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
                     "(methods: ${adminRpcRouter.methodCount}, " +
@@ -689,7 +723,42 @@ class AppServerServeIrohCommand : CliktCommand(
             identityDir = a2aIdentityDir,
             addressStore = a2aAddressBook,
             localBackendDir = localBackendDir,
+            hostTools = hostCanvasTools,
         )
+
+    /**
+     * The canvas relay every app connected here shares boards through, and the canvas.* tools the
+     * agents this host serves get, answered from the relay's log (letta-mobile-aknkw): they work on
+     * every runtime the host starts, app connected or not. Called in [run] before the controller is
+     * built, so its registry carries the tools.
+     */
+    private fun startCanvasRelay(scope: CoroutineScope): com.letta.mobile.data.transport.iroh.IrohCanvasRelay {
+        val home = System.getProperty("user.home") ?: "."
+        val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "topics")
+        val canvasAssets = canvasAssetsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "assets")
+        val canvasStore = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps)
+        val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
+            scope = scope,
+            store = canvasStore,
+            assets = com.letta.mobile.data.storage.FileAssetStore(canvasAssets.toFile()),
+        )
+        val canvasDirectory = canvasOps.resolveSibling("host-canvases.json")
+        hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(
+            com.letta.mobile.data.canvas.HostCanvasBackend(
+                relay = canvasRelay.host,
+                store = canvasStore,
+                directory = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory),
+            ),
+        )
+        println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
+        return canvasRelay
+    }
+
+    private fun resolvedModelExposureFile(): String =
+        com.letta.mobile.data.controller.node.iroh.FileModelExposureStore.resolvePath(modelExposureFile, canvasOpsDir)
+
+    /** The host's canvas.* tools, set by [startCanvasRelay]. */
+    private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()
 
     /**
      * Mint one connection generation: a fresh WS transport + client on a job
@@ -918,10 +987,12 @@ internal fun isRealNetworkInterface(iface: java.net.NetworkInterface): Boolean {
  * invocation.
  *
  * Behavior:
- *  - `binary` blank OR equals a sentinel => [ExternalToolRegistry.factoryDefault]
- *    (advertises nothing; matches the pre-1vuec behavior).
+ *  - `binary` blank OR equals a sentinel => [ExternalToolRegistry.hostTools] of
+ *    [hostTools] alone (nothing else; with none, the pre-1vuec behavior).
  *  - `binary` non-blank => registry advertises the Iroh agent-message tool
- *    with `agentMessaging` capability enabled.
+ *    with `agentMessaging` capability enabled, and [hostTools].
+ *  - [hostTools] (the host's canvas.* tools, letta-mobile-aknkw) are advertised either way:
+ *    they need no binary, only the canvas relay this host runs.
  *
  * The agent-message tool uses `identityDir` and `addressStore` only when
  * non-null — the underlying CLI falls back to its own defaults
@@ -932,9 +1003,10 @@ internal fun buildProductionExternalToolRegistryForTesting(
     identityDir: String?,
     addressStore: String?,
     localBackendDir: String? = null,
+    hostTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList(),
 ): ExternalToolRegistry {
     if (binary.isBlank()) {
-        return ExternalToolRegistry.factoryDefault()
+        return ExternalToolRegistry.hostTools(hostTools)
     }
     val capabilities = RemoteCapabilities(agentMessaging = true)
     val tool = CustomIrohMessagingTool(
@@ -949,6 +1021,7 @@ internal fun buildProductionExternalToolRegistryForTesting(
         capabilities = capabilities,
         customIrohMessagingTool = tool,
         agentDiscoveryTool = discovery,
+        hostTools = hostTools,
     )
 }
 

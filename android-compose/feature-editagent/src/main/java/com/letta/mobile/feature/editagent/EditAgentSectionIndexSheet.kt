@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class SectionIndexEntry(
     val anchorKey: String,
@@ -54,7 +55,7 @@ private fun SectionIndexSheetContent(onSelect: (anchorKey: String) -> Unit) {
             text = stringResource(R.string.screen_agent_edit_jump_to_section),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
         )
         sectionIndexEntries().forEach { entry ->
             SectionIndexSheetRow(
@@ -62,7 +63,7 @@ private fun SectionIndexSheetContent(onSelect: (anchorKey: String) -> Unit) {
                 onSelect = onSelect,
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
     }
 }
 

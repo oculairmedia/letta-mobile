@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -92,44 +93,25 @@ class DesktopAppServerChatGatewayBuilder(
                     DesktopAppServerReadinessProbe(
                         connectionState = transport.connectionState,
                         client = client,
-                        expectation = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-                            localDesktopAppServerExpectation
-                        } else {
-                            DesktopAppServerReadinessExpectation()
-                        },
+                        expectation = readinessExpectationFor(lettaConfig),
                     ),
                 )
             }
             if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
                 localClientLease = DesktopLocalAppServerClientRegistry.shared.install(client)
             }
-            // Iroh turns run on the wrapper; client-local preflight would be a
-            // duplicate typed-command path (Android dial already uses None).
             val router = AppServerRuntimeEventRouter()
             eventRouter = router
             val turnEngine = buildDesktopAppServerTurnEngine(
                 client = client,
                 scope = controllerScope,
-                externalToolRegistry = ExternalToolRegistry.hostTools(
-                    CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions)
-                ),
+                externalToolRegistry = desktopCanvasToolRegistry(isIroh, canvasSessions),
                 config = DesktopAppServerEngineConfig(
                     eventRouter = router,
-                    turnContextPreflight = if (isIroh) {
-                        TurnContextPreflight.None
-                    } else {
-                        AppServerContextWindowPreflight(client)
-                    },
+                    turnContextPreflight = turnContextPreflightFor(isIroh, client),
                 ),
             )
-            val adminGateway: DesktopAdminChatGateway = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-                DesktopLocalBackendAdminGateway(appServerClient = client)
-            } else {
-                DesktopLettaHttpChatGateway(
-                    config = lettaConfig,
-                    httpClient = createDesktopLettaHttpClient(),
-                )
-            }
+            val adminGateway = adminGatewayFor(lettaConfig, client)
             DesktopHybridAppServerChatGateway(
                 turnEngine = turnEngine,
                 client = client,
@@ -151,6 +133,20 @@ class DesktopAppServerChatGatewayBuilder(
             throw error
         }
     }
+
+    private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =
+        if (lettaConfig.mode == LettaConfig.Mode.LOCAL) localDesktopAppServerExpectation else DesktopAppServerReadinessExpectation()
+
+    /** Iroh turns run on the wrapper; client-local preflight would be a duplicate typed-command path. */
+    private fun turnContextPreflightFor(isIroh: Boolean, client: DefaultAppServerClient): TurnContextPreflight =
+        if (isIroh) TurnContextPreflight.None else AppServerContextWindowPreflight(client)
+
+    private fun adminGatewayFor(lettaConfig: LettaConfig, client: DefaultAppServerClient): DesktopAdminChatGateway =
+        if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+            DesktopLocalBackendAdminGateway(appServerClient = client)
+        } else {
+            DesktopLettaHttpChatGateway(config = lettaConfig, httpClient = createDesktopLettaHttpClient())
+        }
 
     /**
      * iroh://<ticket> — bind a local iroh endpoint, dial the backend over QUIC,
@@ -221,6 +217,17 @@ internal data class DesktopAppServerEngineConfig(
     val turnContextPreflight: TurnContextPreflight? = null,
 )
 
+/**
+ * The desktop's own canvas.* tools, for an App Server it reaches directly. On Iroh the host answers
+ * canvas.* for every runtime it serves (letta-mobile-aknkw), so the desktop offers none there.
+ */
+internal fun desktopCanvasToolRegistry(
+    isIroh: Boolean,
+    canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
+): ExternalToolRegistry = ExternalToolRegistry.hostTools(
+    if (isIroh) emptyList() else CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions),
+)
+
 internal fun buildDesktopAppServerTurnEngine(
     client: AppServerClient,
     scope: CoroutineScope,
@@ -241,7 +248,7 @@ internal fun buildDesktopAppServerTurnEngine(
         turnContextPreflight = config.turnContextPreflight ?: AppServerContextWindowPreflight(client),
         eventRouter = router,
         externalToolRegistry = externalToolRegistry,
-    )
+    ).also { engine -> engine.answerApprovalReplaysFrom(router, scope) }
 }
 
 /**

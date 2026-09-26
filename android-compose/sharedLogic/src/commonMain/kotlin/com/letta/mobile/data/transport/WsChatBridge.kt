@@ -3,6 +3,8 @@ package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
@@ -48,7 +50,7 @@ import kotlinx.coroutines.flow.emptyFlow
 class WsChatBridge(
     private val transport: IChannelTransport,
 ) {
-    /** Re-export the connection state without forcing callers to know about ChannelTransport. */
+    /** Re-export the connection state without forcing callers to know about the transport. */
     val state: StateFlow<ChannelTransportState> = transport.state
 
     val connection: Flow<WsConnectionState> = transport.state.map { it.toConnectionState() }
@@ -75,9 +77,16 @@ class WsChatBridge(
         .map { it.toConnectionState() }
         .first()
 
-    /** High-level event stream tailored for chat consumers. */
+    /**
+     * High-level event stream tailored for chat consumers.
+     *
+     * letta-mobile-qygvv.11: every collector gets its own subscription (and so
+     * one copy of each frame), but the frame -> event projection is memoized on
+     * the published [TransportFrameEvent], so it runs once per frame no matter
+     * how many coordinators collect.
+     */
     val events: Flow<WsTimelineEvent> = merge(
-        transport.frameEvents.mapNotNull { it.toTimelineEvent() },
+        transport.frameEvents.mapNotNull { it.timelineEvent },
         // Surface terminal disconnects as their own event so the
         // ViewModel can show a banner / re-enable retry without
         // having to re-implement a state-collector.
@@ -93,6 +102,12 @@ class WsChatBridge(
                 )
             },
     )
+
+    /**
+     * letta-mobile-ztuog: agent-keyed views of [events]. Chat coordinators subscribe here, never
+     * to [events] directly, so a frame reaches only the coordinator of the agent it belongs to.
+     */
+    val agentScopes: AgentEventScopes = AgentEventScopes(events)
 
     /** A2UI frame stream, kept separate from text/tool timeline events. */
     val a2uiEvents: Flow<A2uiFrameEvent> = transport.events.mapNotNull { frame ->
@@ -130,6 +145,7 @@ class WsChatBridge(
         } else {
             buildContentParts(text, attachments).toJsonArray()
         }
+        agentScopes.learnSend(AgentId(agentId), ConversationId(conversationId))
         return transport.send(
             agentId = agentId,
             conversationId = conversationId,
@@ -274,6 +290,15 @@ sealed interface WsTimelineEvent {
         val status: String,
     ) : WsTimelineEvent
 
+    /**
+     * letta-mobile-1n5py.1: this device's send [turnId] waits in the App Server's queue behind
+     * another client's turn. It has not started; its own frames follow the dequeue.
+     */
+    data class TurnQueued(
+        val turnId: String,
+        val conversationId: String,
+    ) : WsTimelineEvent
+
     data class Error(
         val code: String,
         val message: String,
@@ -335,7 +360,8 @@ sealed interface BridgeTurnStatus {
     }
 }
 
-private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
+/** Runs once per [TransportFrameEvent] via its memoized [TransportFrameEvent.timelineEvent]. */
+internal fun TransportFrameEvent.projectTimelineEvent(): WsTimelineEvent? {
     val event = frame.toTimelineEvent(isReplay)
     com.letta.mobile.util.Telemetry.event(
         "IrohGate", "gate2.bridgeEvent",
@@ -349,6 +375,7 @@ private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
 private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEvent? = when (this) {
     is ServerFrame.TurnStarted -> turnStartedEvent(isReplay)
     is ServerFrame.TurnDone,
+    is ServerFrame.TurnQueued,
     is ServerFrame.StopReason,
     is ServerFrame.UsageStatistics,
     is ServerFrame.SubscribeDone,
@@ -367,7 +394,7 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     // Welcome carries connection metadata, not chat content; surface via state.
     // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
     // Cron frames (letta-mobile-d52f.1) are observed directly off
-    // ChannelTransport.events by the cron repository — not chat content.
+    // IChannelTransport.events by the cron repository — not chat content.
     is ServerFrame.Welcome,
     is ServerFrame.A2ui,
     is ServerFrame.A2uiCapabilities,
@@ -383,6 +410,8 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.SubagentListResponse,
     is ServerFrame.SubagentTodosResponse,
     is ServerFrame.SubagentsUpdated,
+    // letta-mobile-lks7m: conversation pushes route to the conversation lists, not chat content.
+    is ServerFrame.ConversationUpdated,
     // letta-mobile-2rkdj: subscribe wrappers don't surface to chat
     // directly — the inner BridgeFrame is unwrapped and re-routed
     // through the normal handler upstream of this mapper, so by the
@@ -411,6 +440,7 @@ private fun ServerFrame.turnLifecycleEvent(): WsTimelineEvent? = when (this) {
         lossy = lossy,
         dropCount = dropCount,
     )
+    is ServerFrame.TurnQueued -> WsTimelineEvent.TurnQueued(turnId = turnId, conversationId = conversationId)
     is ServerFrame.StopReason -> WsTimelineEvent.StopReason(
         turnId = turnId.orEmpty(), runId = runId.orEmpty(), stopReason = stopReason,
     )

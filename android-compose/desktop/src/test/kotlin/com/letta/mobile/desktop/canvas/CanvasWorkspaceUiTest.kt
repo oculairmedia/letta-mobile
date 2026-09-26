@@ -103,19 +103,34 @@ class CanvasWorkspaceUiTest {
         waitUntil(timeoutMillis = 5000) { controller.state.value.bgColor == androidx.compose.ui.graphics.Color(0xFFF7F3EA) }
     }
 
-    @Test
-    fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
+    private data class WorkspaceHarness(
+        val session: com.letta.mobile.data.canvas.CanvasSession,
+        val controller: io.ak1.drawbox.presentation.viewmodel.DrawBoxController,
+    )
+
+    private fun androidx.compose.ui.test.ComposeUiTest.withWorkspace(
+        title: String = "Notes Board",
+        initialSceneJson: String = "",
+    ): WorkspaceHarness {
         val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
-                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = "Notes Board", initialSceneJson = ""),
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(title = title, initialSceneJson = initialSceneJson),
             )
         }
-
+        val controller = io.ak1.drawbox.presentation.viewmodel.DrawBoxController(
+            io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
+        )
         setContent {
-            CanvasWorkspace(session = session)
+            CanvasWorkspace(session = session, controller = controller)
         }
+        return WorkspaceHarness(session, controller)
+    }
+
+    @Test
+    fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
+        val (session, controller) = withWorkspace("Notes Board")
 
         onAllNodesWithContentDescription("Note ", substring = true).assertCountEquals(0)
         // Zoom in first: placing and moving notes writes the session, and that must never reload
@@ -150,43 +165,52 @@ class CanvasWorkspaceUiTest {
         onNodeWithContentDescription("Close note editor").performClick()
         onAllNodesWithContentDescription("Note editor").assertCountEquals(0)
 
-        // The Text tool places a plain (transparent) block document; the active note's formatting
-        // controls sit at the foot of the board, not inside the card, with every block kind.
-        onNodeWithContentDescription("Text").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().size == 2 }
-        val text = session.documents().first { it.id.startsWith("text-") }
-        kotlin.test.assertEquals("#00000000", text.color)
-        waitUntil(timeoutMillis = 5000) {
-            onAllNodesWithContentDescription("Bold").fetchSemanticsNodes().isNotEmpty()
-        }
-        onNodeWithContentDescription("To-do").performClick()
-        waitUntil(timeoutMillis = 5000) {
-            session.documents().first { it.id == text.id }.json.contains("\"todo\"")
-        }
+        // A shape's text: double-clicking a shape types into the shape itself.
+        verifyShapeLabelWorkflow(controller, session, note.id)
+    }
 
-        // A text element has no note chrome, and its bar sets size, family, alignment and colour,
-        // all of which persist with the document.
-        // The one "Move note" grip on the board belongs to the sticky note placed above.
-        onAllNodesWithContentDescription("Move note").assertCountEquals(1)
-        onNodeWithContentDescription("Move text").assertExists()
+    private fun androidx.compose.ui.test.ComposeUiTest.verifyShapeLabelWorkflow(
+        controller: io.ak1.drawbox.presentation.viewmodel.DrawBoxController,
+        session: com.letta.mobile.data.canvas.CanvasSession,
+        noteId: String,
+    ) {
+        controller.importPath(
+            """{"bgColor":"#ffffffff","elements":[{"id":"rect-1","type":"Shape","zIndex":1,
+            "points":["40.0,40.0","240.0,160.0"],"strokeColor":"#000000ff","strokeWidth":4.0,
+            "shapeType":"RECTANGLE","modifiedAt":1}]}""",
+        )
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 1 }
+        onNodeWithContentDescription("Select").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.mode == io.ak1.drawbox.domain.model.Mode.SELECT }
+        val centre = controller.state.value.viewport.worldToScreen(androidx.compose.ui.geometry.Offset(140f, 100f))
+        onNodeWithContentDescription("Canvas board").performMouseInput { doubleClick(centre) }
+
+        // The shape's text is the shape's own: no document is made for it, and it is typed in place.
+        waitUntil(timeoutMillis = 5000) { onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
+        onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction())[0].performTextInput("Launch")
+        fun rect() = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().single()
+        waitUntil(timeoutMillis = 5000) { rect().text == "Launch" }
+        kotlin.test.assertEquals(listOf(noteId), session.documents().map { it.id }, "shape text is not a document")
+        kotlin.test.assertEquals(setOf("rect-1"), controller.state.value.selectedIds)
+
+        // Its panel carries a Text target: size, family, alignment and colour land on the shape.
         onNodeWithContentDescription("Properties").performClick()
         onAllNodesWithContentDescription("Target card").assertCountEquals(0)
-        onNodeWithContentDescription("Size L").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontScale == 1.4f }
+        onNodeWithContentDescription("Target text").performClick()
+        onNodeWithContentDescription("Text size L").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().fontSize == 36f }
         onNodeWithContentDescription("Font Serif").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.fontFamily == "serif" }
-        onNodeWithContentDescription("Align center").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.align == "center" }
+        waitUntil(timeoutMillis = 5000) { rect().fontFamilyKey == io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.SERIF }
+        onNodeWithContentDescription("Align end").performClick()
+        waitUntil(timeoutMillis = 5000) { rect().textAlignment == io.ak1.drawbox.domain.model.TextAlignment.RIGHT }
         onNodeWithContentDescription("Color blue").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().first { it.id == text.id }.style?.textColor == "#3b82f6" }
-        val styled = session.documents().first { it.id == text.id }.style!!
-        kotlin.test.assertEquals(1.4f, styled.fontScale, "colour must not reset the size")
+        waitUntil(timeoutMillis = 5000) { rect().textColor == androidx.compose.ui.graphics.Color(0xFF3B82F6) }
+        kotlin.test.assertEquals(androidx.compose.ui.graphics.Color.Black, rect().strokeColor, "the text colour is not the outline")
         onNodeWithContentDescription("Close properties").performClick()
 
-        // The active note's bar deletes it.
-        onNodeWithContentDescription("Delete note").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().none { it.id == text.id } }
-        onAllNodesWithContentDescription("Delete note").assertCountEquals(0)
+        // Deleting the shape takes its text with it: there is nothing else to clean up.
+        onNodeWithContentDescription("Delete selection").performClick()
+        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.isEmpty() }
     }
 
     @Test

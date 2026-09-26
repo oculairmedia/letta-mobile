@@ -53,6 +53,7 @@ import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.ui.theme.LettaDimens
 /**
  * Streaming-aware markdown renderer with a stable committed-prefix path.
  *
@@ -645,7 +646,7 @@ private fun StreamingMarkdownTable(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = LettaDimens.Space.xs)
             .border(1.dp, outlineColor),
     ) {
         key("header") {
@@ -718,8 +719,8 @@ private fun StreamingMarkdownTableRow(
                 modifier = Modifier
                     .weight(columnWeight)
                     .fillMaxHeight()
-                    .border(0.5.dp, outlineColor)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .border(LettaDimens.Stroke.hairline, outlineColor)
+                    .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
             )
         }
     }
