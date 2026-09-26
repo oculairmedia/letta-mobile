@@ -24,17 +24,13 @@ import kotlinx.serialization.json.JsonObject
  */
 interface System1DecisionEngine {
     /** Full assessment: guard + route + triage + interaction in one forward pass. */
-    suspend fun evaluate(
-        text: String,
-        previousDraft: String? = null,
-        context: Map<String, String>? = null,
-    ): System1Assessment
+    suspend fun evaluate(request: System1EvaluateRequest): System1Assessment
 
     /** Safety preflight alone — cheaper when routing signals are not needed. */
-    suspend fun guard(text: String): System1GuardReport?
+    suspend fun guard(request: System1EvaluateRequest): System1GuardReport?
 
     /** Semantic turn-taking signals alone, for the interactive composer. */
-    suspend fun interaction(text: String, previousDraft: String? = null): System1InteractionReport?
+    suspend fun interaction(request: System1EvaluateRequest): System1InteractionReport?
 
     /** Whether the service answered a health probe. */
     suspend fun isAvailable(): Boolean
@@ -83,34 +79,21 @@ class System1Client(
 
     private val root = config.baseUrl.trimEnd('/')
 
-    override suspend fun evaluate(
-        text: String,
-        previousDraft: String?,
-        context: Map<String, String>?,
-    ): System1Assessment {
+    override suspend fun evaluate(request: System1EvaluateRequest): System1Assessment {
         if (!config.enabled) return System1Assessment.unavailable("System 1 disabled")
-        if (text.isBlank()) return System1Assessment.unavailable("empty input")
-        val body = json.encodeToString(
-            System1EvaluateRequest.serializer(),
-            System1EvaluateRequest(text, previousDraft, context),
-        )
-        val raw = postOrNull("/v1/system1/evaluate", body)
+        if (request.text.isBlank()) return System1Assessment.unavailable("empty input")
+        val body = json.encodeToString(System1EvaluateRequest.serializer(), request)
+        val raw = postOrNull(Section.Evaluate, body)
             ?: return System1Assessment.unavailable("System 1 unreachable or over budget")
         return decodeOrNull(System1Assessment.serializer(), raw)
             ?: System1Assessment.unavailable("System 1 response was not decodable")
     }
 
-    override suspend fun guard(text: String): System1GuardReport? =
-        section(Section.Guard, System1GuardReport.serializer(), System1EvaluateRequest(text, null, null))
+    override suspend fun guard(request: System1EvaluateRequest): System1GuardReport? =
+        section(Section.Guard, System1GuardReport.serializer(), request)
 
-    override suspend fun interaction(
-        text: String,
-        previousDraft: String?,
-    ): System1InteractionReport? = section(
-        endpoint = Section.Interaction,
-        serializer = System1InteractionReport.serializer(),
-        request = System1EvaluateRequest(text, previousDraft, null),
-    )
+    override suspend fun interaction(request: System1EvaluateRequest): System1InteractionReport? =
+        section(Section.Interaction, System1InteractionReport.serializer(), request)
 
     override suspend fun isAvailable(): Boolean {
         if (!config.enabled) return false
@@ -124,6 +107,7 @@ class System1Client(
     }
 
     private enum class Section(val path: String, val field: String) {
+        Evaluate("/v1/system1/evaluate", ""),
         Guard("/v1/system1/guard", "guard"),
         Interaction("/v1/system1/interaction", "interaction"),
     }
@@ -136,16 +120,16 @@ class System1Client(
     ): T? {
         if (!config.enabled || request.text.isBlank()) return null
         val body = json.encodeToString(System1EvaluateRequest.serializer(), request)
-        val raw = postOrNull(endpoint.path, body) ?: return null
+        val raw = postOrNull(endpoint, body) ?: return null
         val element = decodeOrNull(JsonElement.serializer(), raw)
         val section = (element as? JsonObject)?.get(endpoint.field) ?: return null
         return runCatchingNonCancellation { json.decodeFromJsonElement(serializer, section) }
     }
 
-    private suspend fun postOrNull(path: String, body: String): String? =
+    private suspend fun postOrNull(endpoint: Section, body: String): String? =
         withTimeoutOrNull(config.timeoutMs) {
             runCatchingNonCancellation {
-                val response = httpClient.post("$root$path") {
+                val response = httpClient.post("$root${endpoint.path}") {
                     contentType(ContentType.Application.Json)
                     setBody(body)
                 }

@@ -109,11 +109,12 @@ def create_app(
     app.state.device = device
     app.state.warmup = warmup
 
-    register_endpoints(app)
+    register_utility_endpoints(app)
+    register_assessment_endpoints(app)
     return app
 
 
-def register_endpoints(app: FastAPI) -> None:
+def register_utility_endpoints(app: FastAPI) -> None:
     @app.get("/health")
     async def health() -> JSONResponse:
         rt = _state.get("runtime")
@@ -130,6 +131,18 @@ def register_endpoints(app: FastAPI) -> None:
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @app.get("/v1/system1/questions")
+    async def questions() -> Dict[str, Any]:
+        """The question sets this service evaluates, for debugging and docs."""
+        return {
+            "guard": question_set("guard"),
+            "route": question_set("route"),
+            "triage": question_set("triage"),
+            "interaction": interaction_questions(),
+        }
+
+
+def register_assessment_endpoints(app: FastAPI) -> None:
     async def _run(req: EvaluateRequest, name: str) -> Dict[str, Any]:
         state = unified_state(req.text, req.conversation, req.previous_draft, req.context)
         return await run_in_threadpool(runtime().evaluate, state, question_set(name))
@@ -187,17 +200,6 @@ def register_endpoints(app: FastAPI) -> None:
             "model": result.get("model", "laya-rl-agent"),
             "input_tokens": result.get("usage", {}).get("input_tokens", 0),
         }
-
-    @app.get("/v1/system1/questions")
-    async def questions() -> Dict[str, Any]:
-        """The question sets this service evaluates, for debugging and docs."""
-        return {
-            "guard": question_set("guard"),
-            "route": question_set("route"),
-            "triage": question_set("triage"),
-            "interaction": interaction_questions(),
-        }
-
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

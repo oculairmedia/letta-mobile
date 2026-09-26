@@ -43,7 +43,7 @@ class System1TurnInterceptor(
             return Decision.Proceed(command, System1Assessment.unavailable("not a user message"))
         }
 
-        val assessment = engine.evaluate(input.text)
+        val assessment = engine.evaluate(System1EvaluateRequest(input.text))
         emitTelemetry(assessment)
 
         // An unavailable assessment is not a clearance: blocking on a fallback
