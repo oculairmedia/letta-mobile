@@ -87,9 +87,13 @@ data class StreamTextMergeResult(
  *     confirmed.otid != null && confirmed.otid == existing.otid
  * is a reliable shape signal: true on a cumulative stream, false on an
  * incremental stream. The reducer derives this once per frame and passes it
- * here. EQUAL / CUMULATIVE are gated on (isCumulativeStream || canUseSnapshotMerge)
+ * here. EQUAL stays gated on (isCumulativeStream || canUseSnapshotMerge)
  * — true on EITHER an explicit ordering signal (seq ids on both sides) OR a
- * stream-shape signal (stable otid confirms the upstream is cumulative). The
+ * stream-shape signal (stable otid confirms the upstream is cumulative). A
+ * strictly longer body that already starts with the accumulated text is always
+ * CUMULATIVE: that chunk is a snapshot of the reply, and appending it stacks
+ * copies. An identical chunk is not — an incremental token can repeat the
+ * accumulator and must still append (wucn). The
  * seq-gated branches below (STALE, SUFFIX_DUPLICATE, SNAPSHOT_CONFLICT) remain
  * gated on canUseSnapshotMerge only, because those can DROP text and need the
  * full ordering signal.
@@ -133,17 +137,12 @@ fun mergeStreamText(
     } else 0
     val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
         (overlapLen.toDouble() / maxMatch.toDouble() >= 0.75)
-    // letta-mobile-bn008 + letta-mobile-wucn: EQUAL and CUMULATIVE are
-    // structurally unambiguous (a frame identical to the accumulated text, or
-    // one that already CONTAINS it as a prefix, is never a legitimate forward
-    // token on a cumulative stream — appending it stacks snapshots and produces
-    // staircase garble ("Hey" + "HeyHey." -> "HeyHeyHey.")).
-    //
-    // gate must be derived from a *stream-shape* signal, not from per-frame
-    // seq-id availability. Original bn008 fix ungated EQUAL/CUMULATIVE entirely
-    // and broke the wucn counterexample (an incremental SSE stream whose 5th
-    // fragment is byte-identical to the accumulator — that fragment IS a
-    // forward token and must APPEND). The two gates are now OR'd:
+    // letta-mobile-bn008 + letta-mobile-wucn: an identical frame is only dropped
+    // when the stream is known to be cumulative. Ungating EQUAL broke wucn: an
+    // incremental token can be byte-identical to the accumulator and must APPEND.
+    // A strictly longer frame that already starts with the accumulator is not
+    // that token — it is a snapshot, and appending it is the staircase. That
+    // replace is not gated. The EQUAL gates are OR'd:
     //   canUseSnapshotMerge  -> the existing seq-id ordering signal (drop-text
     //                           branches stay gated on this alone below)
     //   isCumulativeStream   -> the upstream-derived stable-otid stream-shape
@@ -156,8 +155,14 @@ fun mergeStreamText(
     val branch = when {
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
         incoming == existing && cumulativeShapeAccepted -> StreamTextMergeBranch.EQUAL
-        existing.isNotEmpty() && incoming.startsWith(existing) && cumulativeShapeAccepted ->
-            StreamTextMergeBranch.CUMULATIVE
+        // Longer text that already contains the reply so far is a snapshot.
+        // This does not require the cumulative-stream flag: App Server frames
+        // often arrive without one, and appending them is the staircase
+        // ("…555" + "…5555 returned"). Identical text stays APPEND unless a
+        // cumulative signal is present, so a repeated incremental token is kept.
+        existing.isNotEmpty() &&
+            incoming.length > existing.length &&
+            incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
         canUseSnapshotMerge && !forwardIncrement && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
         canUseSnapshotMerge && !forwardIncrement && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
         // letta-mobile-mvcr4: near-overlap forward snapshot -> coalesce

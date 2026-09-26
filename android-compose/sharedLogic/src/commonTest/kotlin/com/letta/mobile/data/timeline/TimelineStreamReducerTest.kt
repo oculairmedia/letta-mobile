@@ -532,17 +532,17 @@ class TimelineStreamReducerTest {
             garbleRisk = false,
         )
 
-        // 4. Neither gate (wucn counterexample: incremental stream, otid
-        //    absent on subsequent frames, no seq ids — must APPEND even when
-        //    `incoming.startsWith(existing)` is true).
+        // 4. Neither gate, but the incoming body already contains the reply and
+        //    is longer. That is a snapshot, not a new token, so it replaces.
+        //    Identical text (below) still APPENDs: that is the wucn token.
         mergeStreamText(
             existing = "Hello",
             incoming = "Hello world",
             canUseSnapshotMerge = false,
             isCumulativeStream = false,
         ) shouldBe StreamTextMergeResult(
-            text = "HelloHello world",
-            branch = StreamTextMergeBranch.APPEND,
+            text = "Hello world",
+            branch = StreamTextMergeBranch.CUMULATIVE,
             garbleRisk = false,
         )
 

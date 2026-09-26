@@ -43,7 +43,14 @@ internal class CumulativeStreamText {
     ): String {
         if (frame.isReplay) return existing.ifEmpty { frame.chunk }
         return when (source) {
-            StreamTextFrameSource.AppServerDelta -> existing + frame.chunk
+            StreamTextFrameSource.AppServerDelta -> when {
+                // A longer chunk that already contains the text so far is a snapshot
+                // of the reply, not a new token. Appending it stacks copies.
+                existing.isNotEmpty() &&
+                    frame.chunk.length > existing.length &&
+                    frame.chunk.startsWith(existing) -> frame.chunk
+                else -> existing + frame.chunk
+            }
             StreamTextFrameSource.CumulativeSnapshot -> frame.chunk
         }
     }
