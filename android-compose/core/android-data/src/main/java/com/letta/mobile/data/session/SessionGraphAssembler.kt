@@ -206,6 +206,8 @@ class SessionGraphAssembler @Inject constructor(
                 localConversationSource = localConversationSource,
                 settingsRepository = request.settingsRepository,
                 irohConversationListSource = irohConversationListSource,
+                // letta-mobile-xj85j: the in-chat picker follows other devices' changes too.
+                transport = request.channelTransport,
             ),
         )
     }

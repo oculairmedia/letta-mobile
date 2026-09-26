@@ -12,6 +12,7 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.BackendScopedCache
+import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
@@ -77,9 +78,30 @@ open class CachedAllConversationsRepository(
             }
         }
         transport?.let { channelTransport ->
-            repositoryScope.launch { observeConversationUpdates(channelTransport) { refreshAfterPush("push") } }
+            repositoryScope.launch { observeConversationUpdates(channelTransport) { frame -> applyPush(frame) } }
             repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterPush("reconnect") } }
         }
+    }
+
+    /**
+     * A push names ONE conversation, so only that row is refetched and replaced in place (or added,
+     * when new): a full refresh would drop every page past the first and jump a scrolled list. Only
+     * when the targeted fetch is unavailable or fails does the whole list re-read.
+     */
+    private suspend fun applyPush(frame: ServerFrame.ConversationUpdated) {
+        if (!hasLoadedAtLeastOnce) return
+        val source = irohConversationListSource?.takeIf { it.shouldUseIroh() }
+        val fresh = source?.let {
+            try {
+                it.getConversation(ConversationId(frame.conversationId))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                Telemetry.event(TAG, "conversation_updated.refetch_failed", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+                null
+            }
+        }
+        if (fresh != null) handleOptimisticUpdate(fresh) else refreshAfterPush("push")
     }
 
     /** Only a list that has loaded is refreshed: an unopened list loads fresh when first shown. */
@@ -192,6 +214,7 @@ open class CachedAllConversationsRepository(
 
     companion object {
         internal const val PAGE_SIZE = 50
+        private const val ARCHIVE_STATUS_ALL = "all"
         private const val TAG = "AllConversationsRepo"
     }
 
@@ -223,6 +246,9 @@ open class CachedAllConversationsRepository(
                 agentId = null,
                 limit = PAGE_SIZE,
                 after = after,
+                // The list screen filters archived rows itself (its Archived tab), so it needs them;
+                // the server's default is active-only, which emptied that tab on every refresh.
+                archiveStatus = ARCHIVE_STATUS_ALL,
                 order = "desc",
                 orderBy = "last_message_at",
             )
