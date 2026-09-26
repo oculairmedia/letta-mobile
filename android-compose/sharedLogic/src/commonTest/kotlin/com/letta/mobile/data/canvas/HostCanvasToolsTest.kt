@@ -62,6 +62,70 @@ class HostCanvasToolsTest {
     }
 
     @Test
+    fun previewIsGatedOnRendererAndDoesNotPublishCandidate() = runTest {
+        val store = InMemoryCanvasRelayStore()
+        val rendered = mutableListOf<Pair<String, CanvasPreviewViewport>>()
+        val renderer = CanvasPreviewRenderer { scene, viewport ->
+            rendered += scene to viewport
+            CanvasPreviewRender("png", emptyList(), emptyList())
+        }
+        val backend = HostCanvasBackend(CanvasRelayHost(store, hostId = { "host-preview" }), store, InMemoryHostCanvasDirectory())
+        val registry = ExternalToolRegistry.hostTools(HostCanvasTools.all(backend, renderer))
+        val names = registry.advertisedToolsCommandGroups()!!.flatMap { it.tools.map { tool -> tool.name } }
+        assertEquals(CanvasToolContract.withPreview.map { it.name }.toSet(), names.toSet())
+        val viewport = buildJsonObject {
+            put("width_px", 393)
+            put("height_px", 852)
+            put("density", 3.0)
+        }
+        val candidate = buildJsonObject {
+            viewport.forEach { (key, value) -> put(key, value) }
+            put("ops", JsonArray(listOf(json.encodeToJsonElement<CanvasOp>(addText("preview", "candidate")))))
+        }
+        val result = json.decodeFromString<CanvasPreviewResult>(
+            assertIs<ExternalToolResult.Success>(registry.invoke(CanvasToolContract.RENDER_PREVIEW, candidate,
+                agentId = "agent-1", conversationId = "conv-1")).content,
+        )
+        assertTrue(result.candidate)
+        assertEquals(0L, result.revision)
+        assertEquals(393, result.viewport.widthPx)
+        assertTrue("candidate" in rendered.single().first)
+        val topic = CanvasRelayProtocol.conversationTopic("conv-1")
+        assertTrue(store.readAfter(topic, 0L).isEmpty())
+        val published = registry.invoke(CanvasToolContract.RENDER_PREVIEW, viewport,
+            agentId = "agent-1", conversationId = "conv-1")
+        assertEquals(false, json.decodeFromString<CanvasPreviewResult>(assertIs<ExternalToolResult.Success>(published).content).candidate)
+        assertTrue("candidate" !in rendered.last().first)
+        val invalid = buildJsonObject {
+            candidate.forEach { (key, value) -> put(key, value) }
+            put("width_px", 0)
+        }
+        assertTrue("width_px" in assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+            invalid, agentId = "agent-1", conversationId = "conv-1")).error)
+        val malformed = buildJsonObject {
+            viewport.forEach { (key, value) -> put(key, value) }
+            put("scene_json", "not a scene")
+        }
+        assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+            malformed, agentId = "agent-1", conversationId = "conv-1"))
+        assertEquals(2, rendered.size, "invalid candidates never reach the renderer")
+        registry.invoke(CanvasToolContract.APPLY_OPS, ops(addText("published", "on board")),
+            agentId = "agent-1", conversationId = "conv-1").content()
+        val committed = json.decodeFromString<CanvasPreviewResult>(assertIs<ExternalToolResult.Success>(
+            registry.invoke(CanvasToolContract.RENDER_PREVIEW, viewport, agentId = "agent-1", conversationId = "conv-1"),
+        ).content)
+        assertEquals(1L, committed.revision)
+        assertTrue("on board" in rendered.last().first)
+        val forbidden = buildJsonObject {
+            viewport.forEach { (key, value) -> put(key, value) }
+            put("canvas_id", result.canvasId)
+        }
+        assertTrue("cannot read" in assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+            forbidden, agentId = "agent-2", conversationId = "conv-2")).error)
+        assertEquals(3, rendered.size)
+    }
+
+    @Test
     fun anAgentOnTheHostDrawsOnTheBoardBothAppsShow() = runTest {
         val host = Host()
         val phone = TestApp("phone", backgroundScope).open("conv-1", agentId = "agent-1")
