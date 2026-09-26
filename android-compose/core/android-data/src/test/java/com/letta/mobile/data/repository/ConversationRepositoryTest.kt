@@ -428,6 +428,34 @@ class ConversationRepositoryTest {
     }
 
     @Test
+    fun `conversation_updated refetch failure leaves loaded list unchanged`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                AppServerInboundFrame.AdminRpcResponse("req", success = false, error = "RPC failed")
+            }
+        }
+        val cached = TestData.conversation(id = "existing", agentId = "a1")
+        database.conversationDao().upsert(ConversationEntity.fromConversation(cached, cachedAtEpochMs = 10L))
+        val pushed = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = backgroundScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(conversationPush("missing", agentId = "a1"))
+        runCurrent()
+
+        assertEquals(1, transport.adminRpcCalls.size)
+        assertEquals(listOf("existing"), pushed.getConversations("a1").first().map { it.id.value })
+    }
+
+    @Test
     fun `conversation_updated push for an agent never loaded here fetches nothing`() = runTest {
         val settings = irohSettings()
         val transport = FakeChannelTransport().apply {

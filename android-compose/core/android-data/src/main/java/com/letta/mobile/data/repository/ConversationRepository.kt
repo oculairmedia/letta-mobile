@@ -83,14 +83,7 @@ open class ConversationRepository(
         val source = irohConversationListSource?.takeIf { it.shouldUseIroh() } ?: return
         val namedAgent = frame.agentId?.takeIf { it.isNotBlank() }?.let(::AgentId)
         if (namedAgent != null && !hasLoadedAgent(namedAgent)) return
-        val fresh = try {
-            source.getConversation(ConversationId(frame.conversationId))
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            Log.w(TAG, "conversation_updated refetch failed", e)
-            return
-        }
+        val fresh = refetchPushedConversation(source, frame.conversationId) ?: return
         if (!hasLoadedAgent(fresh.agentId)) return
         conversationDao.get().upsert(ConversationEntity.fromConversation(fresh))
         val current = getCachedConversations(fresh.agentId)
@@ -99,6 +92,18 @@ open class ConversationRepository(
             fresh.agentId,
             if (index >= 0) current.toMutableList().apply { this[index] = fresh } else listOf(fresh) + current,
         )
+    }
+
+    private suspend fun refetchPushedConversation(
+        source: IrohAdminRpcConversationListSource,
+        conversationId: String,
+    ): Conversation? = try {
+        source.getConversation(ConversationId(conversationId))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (e: Exception) {
+        Log.w(TAG, "conversation_updated refetch failed", e)
+        null
     }
 
     /** Whether this agent's list is held here, in memory or on disk (the memory copy may still be loading). */
