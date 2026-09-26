@@ -16,9 +16,10 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.BackendScopedCache
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.IChannelTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -27,9 +28,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import dagger.Lazy
-
-internal fun defaultConversationRepositoryScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 // letta-mobile-g2ff0: conversationDao is dagger.Lazy<ConversationDao> so Room init
 // happens lazily on the first dao.get() call (inside repositoryScope.launch
@@ -40,10 +38,16 @@ open class ConversationRepository(
     private val conversationApi: ConversationApi,
     private val agentRepository: IAgentRepository,
     private val conversationDao: Lazy<ConversationDao>,
-    repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
+    repositoryScope: CoroutineScope,
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
     private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+    /**
+     * letta-mobile-xj85j: when given, an agent's loaded conversation list follows Meridian's
+     * `conversation_updated` pushes, so the in-chat picker and drawer show a conversation another
+     * device created or changed without reopening.
+     */
+    transport: IChannelTransport? = null,
 ) : IConversationRepository, BackendScopedCache {
     private val _conversationsByAgent = MutableStateFlow<Map<AgentId, List<Conversation>>>(emptyMap())
     private val refreshMutex = Mutex()
@@ -59,11 +63,52 @@ open class ConversationRepository(
                 conversationDao.get().getAllRefreshStatesOnce().forEach { state ->
                     lastRefreshAtMillisByAgent[AgentId(state.agentId)] = state.lastRefreshAtMillis
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load cached conversations", e)
             }
         }
+        transport?.let { channelTransport ->
+            repositoryScope.launch { observeConversationUpdates(channelTransport) { frame -> applyPush(frame) } }
+        }
     }
+
+    /**
+     * Refetches the ONE conversation a push names and upserts it into its agent's cached list; the
+     * Room-backed [getConversations] flow then re-emits in place. Agents whose list was never loaded
+     * here are skipped (they load fresh when opened), and a failed fetch waits for the next refresh.
+     */
+    private suspend fun applyPush(frame: ServerFrame.ConversationUpdated) {
+        val source = irohConversationListSource?.takeIf { it.shouldUseIroh() } ?: return
+        val namedAgent = frame.agentId?.takeIf { it.isNotBlank() }?.let(::AgentId)
+        if (namedAgent != null && !hasLoadedAgent(namedAgent)) return
+        val fresh = refetchPushedConversation(source, frame.conversationId) ?: return
+        if (!hasLoadedAgent(fresh.agentId)) return
+        conversationDao.get().upsert(ConversationEntity.fromConversation(fresh))
+        val current = getCachedConversations(fresh.agentId)
+        val index = current.indexOfFirst { it.id == fresh.id }
+        updateMemoryCache(
+            fresh.agentId,
+            if (index >= 0) current.toMutableList().apply { this[index] = fresh } else listOf(fresh) + current,
+        )
+    }
+
+    private suspend fun refetchPushedConversation(
+        source: IrohAdminRpcConversationListSource,
+        conversationId: String,
+    ): Conversation? = try {
+        source.getConversation(ConversationId(conversationId))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (e: Exception) {
+        Log.w(TAG, "conversation_updated refetch failed", e)
+        null
+    }
+
+    /** Whether this agent's list is held here, in memory or on disk (the memory copy may still be loading). */
+    private suspend fun hasLoadedAgent(agentId: AgentId): Boolean =
+        agentId in lastRefreshAtMillisByAgent || snapshotForAgent(agentId).isNotEmpty()
 
     override fun getConversations(agentId: AgentId): Flow<List<Conversation>> {
         return conversationDao.get().observeForAgent(agentId.value).map { rows ->
@@ -145,6 +190,8 @@ open class ConversationRepository(
                 conversationApi.getConversation(id)
             }
             fetched.also { conversation -> upsertCachedConversation(conversation) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             conversationDao.get().getByIdOnce(id.value)?.toConversation() ?: throw e
         }
@@ -214,11 +261,14 @@ open class ConversationRepository(
     override suspend fun setConversationArchived(id: ConversationId, agentId: AgentId, archived: Boolean) {
         val snapshot = snapshotForAgent(agentId)
         val conversationIndex = snapshot.indexOfFirst { it.id == id }
-        if (conversationIndex < 0) return
-
+        // The write must reach the server whether or not this agent's list is cached here: the
+        // all-conversations screen archives rows whose agent list was never opened, and returning
+        // early left those archived only on screen until the next refresh brought them back.
         val optimisticList = snapshot.toMutableList()
-        optimisticList[conversationIndex] = snapshot[conversationIndex].copy(archived = archived)
-        writeAgentConversations(agentId, optimisticList, System.currentTimeMillis())
+        if (conversationIndex >= 0) {
+            optimisticList[conversationIndex] = snapshot[conversationIndex].copy(archived = archived)
+            writeAgentConversations(agentId, optimisticList, System.currentTimeMillis())
+        }
 
         try {
             val irohSource = irohConversationListSource
@@ -227,13 +277,15 @@ open class ConversationRepository(
             } else {
                 conversationApi.updateConversation(id, ConversationUpdateParams(archived = archived))
             }
-            writeAgentConversations(
-                agentId = agentId,
-                conversations = optimisticList.map { if (it.id == updated.id) updated else it },
-                refreshedAtMillis = System.currentTimeMillis(),
-            )
+            if (conversationIndex >= 0) {
+                writeAgentConversations(
+                    agentId = agentId,
+                    conversations = optimisticList.map { if (it.id == updated.id) updated else it },
+                    refreshedAtMillis = System.currentTimeMillis(),
+                )
+            }
         } catch (e: Exception) {
-            writeAgentConversations(agentId, snapshot, System.currentTimeMillis())
+            if (conversationIndex >= 0) writeAgentConversations(agentId, snapshot, System.currentTimeMillis())
             throw e
         }
     }
