@@ -20,7 +20,8 @@ Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/let
 
 ## Module layout
 
-Everything under [`android-compose/`](android-compose/).
+App modules live under [`android-compose/`](android-compose/); repository-level tooling and
+architecture docs live in [`scripts/`](scripts/) and [`docs/`](docs/).
 
 | Path | Purpose |
 |---|---|
@@ -29,18 +30,22 @@ Everything under [`android-compose/`](android-compose/).
 | `feature-editagent/` | Agent editor |
 | `core/android-data/` | Repositories, Room database, data sources |
 | `core/runtime/` | Turn engine, runtime event fanout |
-| `core/ids/` `core/schemas/` | Shared identifiers and wire schemas |
-| `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
-| `sharedLogic/` | **KMP shared module.** Platform-neutral domain/transport plus shared Android/Desktop A2UI UI (UI moves to `sharedUI/` in Phase 3) |
-| `sharedUI/` | **KMP Compose UI** (android + jvm). Scaffold in Phase 3a; hosts shared composables after Phase 3b |
+| `core/ids/` | Shared identifiers; wire schemas are source packages, not a `:core:schemas` Gradle module |
+| `designsystem/` | Reusable Compose UI, theming, and dialogs |
+| `sharedLogic/` | KMP domain, repositories, timeline, and transport logic |
+| `sharedUI/` | KMP Compose UI shared by Android and desktop, including A2UI rendering |
 | `desktop/` | Compose Desktop entry point, OS lock, installer |
-| `cli/` `appserver-cli/` | JVM command-line tooling, contract probes |
-| `architecture-tests/` | Module-boundary and parity gates |
-| `native/` `perf/` `macrobenchmark/` `baselineprofile/` | Native libs (mermaid renderer), perf infra |
+| `web/` | Browser WASM client |
+| `avatar/core/` `avatar/renderer-rive/` | Avatar models and Rive rendering |
+| `cli/` `appserver-cli/` `iroh-wrapper-cli/` | JVM tooling, contract probes, Iroh server wrapper |
+| `quality/detekt-rules/` `architecture-tests/` | Static-analysis rules and module-boundary tests |
+| `drawbox/` `native/` `perf/` `macrobenchmark/` `baselineprofile/` | Canvas, native libs, and performance infrastructure |
 
-The cardinal rule: **feature logic lives in `sharedLogic/commonMain`; platform modules only bind.**
-Any behavior duplicated across `app/` and `desktop/` is drift — the `shared-multiplatform` required
-CI check (`sharedLogic:allTests` + `desktop:test`) backstops this.
+The cardinal rule: **portable feature logic lives in `sharedLogic/commonMain`; shared
+Compose UI lives in `sharedUI`; platform modules provide host-specific bindings.** The
+required `shared-multiplatform` check runs bounded `:sharedLogic:jvmTest`, native
+compilation, wrapper/CLI tasks, and browser tests rather than `:sharedLogic:allTests`
+or `:desktop:test`. Desktop tests run in `test` when the desktop module changes.
 
 ## Runnable entry points
 
@@ -82,18 +87,18 @@ opening a PR.**
 
 - `test` — module unit tests, policy scripts
 - `build-apk-pass` — Android APK build (stable aggregator of the `build-apk` matrix)
-- `shared-multiplatform` — `:sharedLogic:allTests` + `:desktop:test`
+- `shared-multiplatform` — bounded `:sharedLogic:jvmTest`, host-native compilation, wrapper/CLI verification, and browser tests; desktop tests are additive in `test` when desktop changes
 - `perf-gate` — perf-budget benchmarks
-- `codecov` — coverage upload
 
+Coverage uploads run on `main` via `codecov.yml`, not as a required PR check.
 **Advisory only** (cannot block merge): `detekt`, `qodana`, CodeScene Code Health Review, `Advisory AGENTS.md policy`.
 
 ## Releases
 
 Versioning is **tag-driven**. `vX.Y.Z` is the single source of truth for `versionName` and
 `versionCode`. CI builds on tag push and creates a GitHub Release. Each release ships a
-signed Android APK (embedded runtime included) and Windows desktop installers (`.exe` + `.msi`).
-Pre-release suffix: `v0.2.0-rc.1`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full
+signed Android APK (embedded runtime included), Windows desktop installers (`.exe` + `.msi`),
+and a Linux Iroh wrapper distribution. Pre-release suffix: `v0.2.0-rc.1`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full
 release flow.
 
 ## Development notes
