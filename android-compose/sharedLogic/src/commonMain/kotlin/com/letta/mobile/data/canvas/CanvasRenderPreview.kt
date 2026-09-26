@@ -20,26 +20,35 @@ data class CanvasPreviewViewport(
     val fitToContent: Boolean = true,
 ) {
     companion object {
-        fun parse(input: JsonObject): CanvasPreviewViewport {
-            fun number(key: String): Double? = (input[key] as? JsonPrimitive)?.doubleOrNull
-            val width = (input["width_px"] as? JsonPrimitive)?.intOrNull
-            val height = (input["height_px"] as? JsonPrimitive)?.intOrNull
-            val density = number("density")
-            require(width != null && width in 1..4096 && height != null && height in 1..4096) {
-                "width_px and height_px must be integers from 1 to 4096"
-            }
-            require(density != null && density.isFinite() && density in 0.5..8.0) { "density must be from 0.5 to 8" }
-            val fontScale = number("font_scale") ?: 1.0
-            val zoom = number("zoom") ?: 1.0
-            val x = number("camera_x") ?: 0.0
-            val y = number("camera_y") ?: 0.0
-            require(fontScale.isFinite() && fontScale in 0.5..4.0) { "font_scale must be from 0.5 to 4" }
-            require(zoom.isFinite() && zoom in 0.05..4.0) { "zoom must be from 0.05 to 4" }
-            require(x.isFinite() && y.isFinite() && x in -100000.0..100000.0 && y in -100000.0..100000.0) {
-                "camera offset must be finite and within 100000 pixels"
-            }
-            val fit = (input["fit_to_content"] as? JsonPrimitive)?.booleanOrNull ?: true
-            return CanvasPreviewViewport(width, height, density, fontScale, zoom, x, y, fit)
+        fun parse(input: JsonObject): CanvasPreviewViewport = CanvasPreviewViewport(
+            widthPx = input.requiredInt("width_px", 1..4096),
+            heightPx = input.requiredInt("height_px", 1..4096),
+            density = input.requiredNumber("density", 0.5..8.0),
+            fontScale = input.optionalNumber("font_scale", 1.0, 0.5..4.0),
+            zoom = input.optionalNumber("zoom", 1.0, 0.05..4.0),
+            cameraX = input.optionalNumber("camera_x", 0.0, -100000.0..100000.0),
+            cameraY = input.optionalNumber("camera_y", 0.0, -100000.0..100000.0),
+            fitToContent = input.optionalBoolean("fit_to_content", true),
+        )
+
+        private fun JsonObject.requiredInt(key: String, range: IntRange): Int {
+            val value = (this[key] as? JsonPrimitive)?.intOrNull
+            require(value != null && value in range) { "$key must be an integer from ${range.first} to ${range.last}" }
+            return value
+        }
+
+        private fun JsonObject.requiredNumber(key: String, range: ClosedFloatingPointRange<Double>): Double {
+            val value = (this[key] as? JsonPrimitive)?.doubleOrNull
+            require(value != null && value.isFinite() && value in range) { "$key must be from ${range.start} to ${range.endInclusive}" }
+            return value
+        }
+
+        private fun JsonObject.optionalNumber(key: String, default: Double, range: ClosedFloatingPointRange<Double>): Double =
+            if (key in this) requiredNumber(key, range) else default
+
+        private fun JsonObject.optionalBoolean(key: String, default: Boolean): Boolean {
+            if (key !in this) return default
+            return requireNotNull((this[key] as? JsonPrimitive)?.booleanOrNull) { "$key must be a boolean" }
         }
     }
 }
