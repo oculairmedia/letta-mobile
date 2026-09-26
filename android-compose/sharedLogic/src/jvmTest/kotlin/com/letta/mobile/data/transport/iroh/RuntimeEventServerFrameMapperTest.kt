@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.runtime.INPUT_QUEUED_REASON
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -84,6 +85,18 @@ class RuntimeEventServerFrameMapperTest {
         val turnDone = assertIs<ServerFrame.TurnDone>(frames[1])
         assertEquals("cancelled", turnDone.status)
         assertEquals(2, frames.size)
+    }
+
+    @Test
+    fun queuedRunningLifecycle_mapsToTurnQueued() {
+        // letta-mobile-1n5py.1: the input waits in the App Server queue behind another client.
+        val frames = RuntimeEventServerFrameMapper.map(
+            RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Running, reason = INPUT_QUEUED_REASON),
+            context,
+        )
+        val queued = assertIs<ServerFrame.TurnQueued>(frames.single())
+        assertEquals("turn-1", queued.turnId)
+        assertEquals("conv-1", queued.conversationId)
     }
 
     @Test

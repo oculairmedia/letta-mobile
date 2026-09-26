@@ -174,7 +174,10 @@ class CanvasAclTest {
             id = docId,
             title = "Tool Protected",
             revision = 1L,
-            sceneJson = """{"bgColor":-1,"elements":[]}""",
+            // Schema-valid scenes throughout: canvas.replace_scene validates at the agent write
+            // boundary (letta-mobile-le0z3), so a numeric bgColor is refused before the ACL is
+            // consulted and every assertion below would then pass for the wrong reason.
+            sceneJson = """{"bgColor":"#ffffffff","elements":[]}""",
             acl = acl,
         )
         store.upsert(doc)
@@ -187,7 +190,7 @@ class CanvasAclTest {
         val unauthorizedReplace = replaceTool.invoke(
             buildJsonObject {
                 put("canvas_id", docId.value)
-                put("scene_json", """{"bgColor":-1,"elements":[]}""")
+                put("scene_json", """{"bgColor":"#ffffffff","elements":[]}""")
             },
             agentId = "intruder-agent",
         )
@@ -212,7 +215,7 @@ class CanvasAclTest {
         val readonlyWrite = replaceTool.invoke(
             buildJsonObject {
                 put("canvas_id", docId.value)
-                put("scene_json", """{"bgColor":-1,"elements":[]}""")
+                put("scene_json", """{"bgColor":"#ffffffff","elements":[]}""")
             },
             agentId = "readonly-agent",
         )
@@ -222,7 +225,7 @@ class CanvasAclTest {
         val allowedWrite = replaceTool.invoke(
             buildJsonObject {
                 put("canvas_id", docId.value)
-                put("scene_json", """{"bgColor":-999,"elements":[]}""")
+                put("scene_json", """{"bgColor":"#ff0000ff","elements":[]}""")
             },
             agentId = "allowed-agent",
         )

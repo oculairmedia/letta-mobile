@@ -166,6 +166,64 @@ class QueuedSendDriverTest {
         assertTrue(rig.queue.isPaused(QueueConversationId("conv-2")))
     }
 
+    @Test
+    fun aSendHeldForAnotherClientWaitsForTheirTerminal() = runTest {
+        val rig = rig(busy = false)
+        rig.holdForOtherClient("a")
+        advanceTimeBy(HOLD_INITIAL_MS - 1)
+        runCurrent()
+        assertTrue(rig.turns.dispatched.isEmpty(), "a held send waits; it is never failed")
+        assertTrue(rig.queue.queueFor(CONV).heldByOtherClient)
+
+        rig.foreignTerminal()
+        assertEquals(listOf("a"), rig.turns.dispatched)
+        assertFalse(rig.queue.queueFor(CONV).heldByOtherClient)
+    }
+
+    @Test
+    fun aHeldSendRetriesOnTheBackstopWithBackoff() = runTest {
+        val rig = rig(busy = false)
+        rig.holdForOtherClient("a")
+        advanceTimeBy(HOLD_INITIAL_MS + 1)
+        runCurrent()
+        assertEquals(listOf("a"), rig.turns.dispatched, "no terminal seen: the backstop retries")
+
+        // Bounced again: the next retry waits twice as long.
+        rig.turns.busy = false
+        rig.holdForOtherClient("a")
+        advanceTimeBy(HOLD_INITIAL_MS + 1)
+        runCurrent()
+        assertEquals(1, rig.turns.dispatched.size)
+        advanceTimeBy(HOLD_INITIAL_MS)
+        runCurrent()
+        assertEquals(listOf("a", "a"), rig.turns.dispatched)
+    }
+
+    @Test
+    fun newSendsQueueBehindAHeldOneAndKeepTheirOrder() = runTest {
+        val rig = rig(busy = false)
+        rig.holdForOtherClient("a")
+        rig.enqueue("b")
+        runCurrent()
+        assertTrue(rig.turns.dispatched.isEmpty(), "nothing jumps a send held for another client")
+        assertEquals(listOf("a", "b"), rig.queuedTexts())
+
+        rig.foreignTerminal()
+        rig.finishTurn()
+        assertEquals(listOf("a", "b"), rig.turns.dispatched)
+    }
+
+    @Test
+    fun sendNowOnAHeldSendTriesAtOnce() = runTest {
+        val rig = rig(busy = false)
+        rig.holdForOtherClient("a")
+
+        rig.driver.sendNow(QueuedSendId("otid-a"))
+        runCurrent()
+
+        assertEquals(listOf("a"), rig.turns.dispatched)
+    }
+
     private class ScriptedTurns(var busy: Boolean) : QueuedSendTurns {
         private val lock = Mutex()
         var accept = true
@@ -209,17 +267,33 @@ class QueuedSendDriverTest {
         }
 
         fun queuedTexts() = queue.queueFor(CONV).items.map { it.text }
+
+        /** The wrapper bounced [text]'s send off another client's turn. */
+        suspend fun holdForOtherClient(text: String) {
+            turns.serialized { driver.holdForOtherClientLocked(QueuedChatSend(QueuedSendId("otid-$text"), CONV, text)) }
+        }
+
+        /** A terminal this device does not own reached the coordinator. */
+        suspend fun foreignTerminal() {
+            turns.serialized { driver.onForeignTerminalLocked() }
+            scope.runCurrent()
+        }
     }
 
     private fun TestScope.rig(busy: Boolean): Rig {
         val queue = ChatSendQueue()
         val turns = ScriptedTurns(busy)
         val driverScope: CoroutineScope = backgroundScope
-        return Rig(this, queue, turns, QueuedSendDriver(driverScope, queue, turns, QueuedSendDriver.DrainRetry(delayMs = RETRY_DELAY_MS)))
+        return Rig(this, queue, turns, QueuedSendDriver(
+            driverScope, queue, turns,
+            QueuedSendDriver.DrainRetry(delayMs = RETRY_DELAY_MS),
+            OtherClientHold.Backoff(initialMs = HOLD_INITIAL_MS, maxMs = HOLD_INITIAL_MS * 4),
+        ))
     }
 
     private companion object {
         val CONV = QueueConversationId("conv-1")
         const val RETRY_DELAY_MS = 50L
+        const val HOLD_INITIAL_MS = 1_000L
     }
 }

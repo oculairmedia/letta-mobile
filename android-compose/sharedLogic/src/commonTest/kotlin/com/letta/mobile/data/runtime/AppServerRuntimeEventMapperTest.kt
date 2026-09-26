@@ -47,6 +47,7 @@ class AppServerRuntimeEventMapperTest {
                         put("message_type", "stop_reason")
                         put("run_id", "run-1")
                         put("stop_reason", "cancelled")
+                        put("message", "App Server loop idle after abort")
                     },
                 ),
             ),
@@ -57,6 +58,8 @@ class AppServerRuntimeEventMapperTest {
         val payload = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts[1].payload)
         assertEquals(RuntimeRunStatus.Cancelled, payload.status)
         assertEquals("run-1", drafts[1].runId?.value)
+        // letta-mobile-qygvv.28: the Iroh node relays a cancel's reason as the stop_reason's message.
+        assertEquals("App Server loop idle after abort", payload.reason)
     }
 
     @Test

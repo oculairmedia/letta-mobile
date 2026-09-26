@@ -36,16 +36,24 @@ object QueuedSendsPanelTestTags {
     const val CANCEL = "queued_send_cancel_"
     const val SEND_NOW = "queued_send_now_"
     const val RESUME = "queued_sends_resume"
+    const val ON_SERVER = "queued_send_on_server"
 }
 
 /** The label on a queued message: where it stands in line. */
 fun queuedSendLabel(position: Int): String = "Queued · $position"
 
-/** The panel's header: how many wait, and whether a Stop is holding them. */
+/** letta-mobile-1n5py.1: the label on a sent message the App Server parked behind another client. */
+const val QUEUED_ON_SERVER_LABEL = "Queued on server · another client's turn"
+
+/** The panel's header: how many wait, and what holds them (a Stop, or another device's turn). */
 fun queuedSendsHeader(queue: ConversationSendQueue): String {
-    val count = queue.items.size
+    val count = queue.items.size + if (queue.queuedOnServer != null) 1 else 0
     val noun = if (count == 1) "message" else "messages"
-    return if (queue.paused) "Queue paused · $count $noun" else "$count $noun queued"
+    return when {
+        queue.paused -> "Queue paused · $count $noun"
+        queue.heldByOtherClient -> "Waiting for another device · $count $noun"
+        else -> "$count $noun queued"
+    }
 }
 
 /**
@@ -68,6 +76,7 @@ fun QueuedSendsPanel(
     ) {
         Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
             QueuedSendsHeader(queue, actions.onResume)
+            queue.queuedOnServer?.let { QueuedOnServerRow(it) }
             queue.items.forEachIndexed { index, item -> QueuedSendRow(item, position = index + 1, actions) }
         }
     }
@@ -87,6 +96,24 @@ private fun QueuedSendsHeader(queue: ConversationSendQueue, onResume: () -> Unit
                 Text("Resume")
             }
         }
+    }
+}
+
+/** letta-mobile-1n5py.1: already sent; the server runs it once the other client's turn ends. */
+@Composable
+private fun QueuedOnServerRow(item: QueuedChatSend) {
+    Column(modifier = Modifier.fillMaxWidth().testTag(QueuedSendsPanelTestTags.ON_SERVER)) {
+        Text(
+            text = QUEUED_ON_SERVER_LABEL,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+        Text(
+            text = item.previewText(),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

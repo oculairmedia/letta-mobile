@@ -152,7 +152,11 @@ private suspend fun executeReplaceScene(
     val sceneJson = input["scene_json"]?.jsonPrimitive?.contentOrNull
         ?: return ExternalToolResult.Error("Missing required parameter: scene_json")
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
-        val revision = commitSceneUpdate(context.store, activeSession, doc, sceneJson, callerId)
+        val checkedScene = when (val checked = CanvasSceneValidator.scene(sceneJson)) {
+            is CanvasSceneCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
+            is CanvasSceneCheck.Valid -> checked.json
+        }
+        val revision = commitSceneUpdate(context.store, activeSession, doc, checkedScene, callerId)
             ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
             canvasJson.encodeToString(CanvasReplaceSceneResult(ok = true, revision = revision))
@@ -180,12 +184,33 @@ private suspend fun executeApplyOps(
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
         // The caller has already passed the write check; every op it sends is its own, whatever
         // actor the input named, so the log, the broadcast and scene provenance all carry it.
-        val ops = suppliedOps.map { it.withActor(callerId) }
+        val callerOps = suppliedOps.map { it.withActor(callerId) }
+        val ops = when (val checked = CanvasSceneValidator.ops(callerOps)) {
+            is CanvasOpsCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
+            is CanvasOpsCheck.Valid -> checked.ops
+        }
         val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
             ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
             canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
         )
+    }
+}
+
+/**
+ * A `dry_run` call's answer, checked against the canvas and written nowhere; null when the call
+ * did not ask for one, or cannot be checked (the write path then reports what is missing).
+ */
+private suspend fun dryRun(
+    context: CanvasToolContext,
+    input: JsonObject,
+    opsOf: (JsonObject) -> List<CanvasOp>?,
+): ExternalToolResult? {
+    if (!CanvasDryRun.requested(input)) return null
+    val ops = opsOf(input) ?: return null
+    return when (val lookup = findCanvasDocument(context, input)) {
+        is CanvasLookupResult.Error -> lookup.result
+        is CanvasLookupResult.Found -> CanvasAppDryRun.answer(lookup.doc, ops, context.resolveCallerId())
     }
 }
 
@@ -302,7 +327,7 @@ class CanvasReplaceSceneTool(
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to replace scene") { context ->
-            executeReplaceScene(context, input)
+            dryRun(context, input, CanvasAppDryRun::replaceScene) ?: executeReplaceScene(context, input)
         }
 
     companion object {
@@ -324,7 +349,7 @@ class CanvasApplyOpsTool(
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to apply ops") { context ->
-            executeApplyOps(context, input)
+            dryRun(context, input, CanvasAppDryRun::applyOps) ?: executeApplyOps(context, input)
         }
 
     companion object {

@@ -54,6 +54,17 @@ object CanvasToolContract {
             "(created on first use); only name one to reach a different canvas from canvas.list.",
     )
 
+    /** Checks a write without making it (letta-mobile-qygvv.30). */
+    private val dryRunParam = ToolParam(
+        CanvasDryRun.PARAM,
+        type = "boolean",
+        description = "true to check the write without publishing it: the result says valid true/false and lists " +
+            "each problem (op_index, invariant, detail). Nothing is published either way.",
+    )
+
+    private const val DRY_RUN_HINT =
+        "Pass dry_run: true to check a batch against the current board first without publishing it. "
+
     val create = CanvasToolDefinition(
         CREATE,
         "Create a new canvas document. Returns the created canvas_id. The conversation you are in already " +
@@ -72,7 +83,8 @@ object CanvasToolContract {
         REPLACE_SCENE,
         "Replace the whole drawing of a canvas (block-document notes are kept). With no canvas_id, draws on the " +
             "canvas of the conversation you are in. A scene the apps cannot draw is refused with the reason and " +
-            "nothing is published. " + CanvasSceneSchema.description,
+            "nothing is published; so is one that leaves the board inconsistent (a note label whose shape the new " +
+            "scene drops, an arrow bound to a shape it drops). " + DRY_RUN_HINT + CanvasSceneSchema.description,
         objectSchema(
             canvasIdParam,
             ToolParam(
@@ -81,6 +93,7 @@ object CanvasToolContract {
                 description = "The scene as a JSON string: {\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}, " +
                     "elements of type Shape, Text, Path or Image as this tool's description sets out.",
             ),
+            dryRunParam,
         ),
     )
 
@@ -95,7 +108,12 @@ object CanvasToolContract {
             "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
             "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}) and " +
             "remove_document {documentId} takes it off. opId, actorId and lamport are filled in by the host. " +
-            "Ops whose elements the apps cannot draw are refused with the reason and none of the batch is published. " +
+            "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
+            "drawn or the board it leaves is inconsistent (update_element/remove_element/remove_document of an id " +
+            "that is not there, add_element of an id that is, a note label whose shape is gone, an arrow bound to a " +
+            "missing shape or note, a documentJson without a \"blocks\" array, a scene over the size limits) the " +
+            "whole batch is refused, naming each op by index and the rule it breaks, and nothing is published. " +
+            DRY_RUN_HINT +
             CanvasSceneSchema.description,
         objectSchema(
             canvasIdParam,
@@ -107,6 +125,7 @@ object CanvasToolContract {
                     "\"elementJson\":\"{\\\"type\\\":\\\"Shape\\\",...}\"}].",
                 items = buildJsonObject { put("type", "object") },
             ),
+            dryRunParam,
         ),
     )
 

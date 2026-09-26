@@ -11,31 +11,15 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 internal object BridgeParityFixtures {
     private const val DIR = "appserver/bridge-parity"
 
-    /** The turn tail buffer drops/inverts usage_statistics and stop_reason. */
-    private const val TAIL_BUFFER = "letta-mobile-qygvv.26"
-
-    /** Auto-approved tool calls reach the phone with double-encoded arguments. */
-    private const val TOOL_PROJECTION = "letta-mobile-qygvv.27"
-
-    /** Failed/Cancelled terminals are re-synthesized as bare error_message deltas. */
-    private const val TERMINAL_RESYNTHESIS = "letta-mobile-qygvv.28"
-
-    /** An idle loop status between rounds ends a multi-round turn early. */
-    private const val IDLE_BETWEEN_ROUNDS = "letta-mobile-qygvv.29"
-
-    private val tailOrder = mapOf(GateCheck.TailOrder to TAIL_BUFFER)
-    private val multiRunTail = mapOf(GateCheck.RunTailsReachPhone to TAIL_BUFFER)
-
-    val THINKING = ParityFixture("$DIR/thinking-turn.jsonl", "cm-parity-thinking-1", divergences = tailOrder)
+    val THINKING = ParityFixture("$DIR/thinking-turn.jsonl", "cm-parity-thinking-1")
 
     /** letta-mobile-1n5py: an input queued behind another viewer's turn, then dequeued and run. */
-    val QUEUED = ParityFixture("$DIR/queued-turn.jsonl", "cm-parity-queued-1", divergences = tailOrder)
+    val QUEUED = ParityFixture("$DIR/queued-turn.jsonl", "cm-parity-queued-1")
 
     /** An always-ask tool: the server sends control_request can_use_tool, the Unrestricted engine allows it. */
     val TOOL_CALL_AUTO_ALLOWED = ParityFixture(
         "$DIR/tool-call-auto-allowed.jsonl",
         "cm-parity-tool-allow-1",
-        divergences = multiRunTail + (GateCheck.ToolArgumentsAreObjects to TOOL_PROJECTION),
     )
 
     /** Strict mode: the user denies the control_request; the tool returns an error and the agent replies. */
@@ -43,39 +27,28 @@ internal object BridgeParityFixtures {
         "$DIR/approval-denied.jsonl",
         "cm-parity-denied-1",
         EngineSetup(permissionMode = AppServerPermissionMode.Strict, driver = DenyApprovalsDriver),
-        divergences = multiRunTail,
     )
 
     /** A host (canvas.*) tool: external_tool_call_request, the client's response, then the reply. */
     val EXTERNAL_TOOL = ParityFixture(
         "$DIR/external-tool-round-trip.jsonl",
         "cm-parity-external-tool-1",
-        divergences = multiRunTail + (GateCheck.ToolArgumentsAreObjects to TOOL_PROJECTION),
     )
 
     /** An LLM 400: loop_error, error_message, stop_reason error, turn_finished, terminal loop_error last. */
-    val LOOP_ERROR = ParityFixture(
-        "$DIR/loop-error-terminal.jsonl",
-        "cm-parity-loop-error-1",
-        divergences = listOf(GateCheck.TerminalRunId, GateCheck.FrameKinds, GateCheck.RunTailsReachPhone)
-            .associateWith { TERMINAL_RESYNTHESIS },
-    )
+    val LOOP_ERROR = ParityFixture("$DIR/loop-error-terminal.jsonl", "cm-parity-loop-error-1")
 
     /** The user cancels mid-turn; the other viewer's parked input is released with resume_queue. */
     val ABORT_THEN_RESUME = ParityFixture(
         "$DIR/abort-then-resume-queue.jsonl",
         "cm-parity-abort-1",
         EngineSetup(driver = AbortMidTurnDriver),
-        divergences = listOf(GateCheck.TerminalStatus, GateCheck.TerminalRunId).associateWith { TERMINAL_RESYNTHESIS },
     )
 
     /** tool -> assistant -> tool -> assistant over three runs, the loop idling between rounds. */
     val MULTI_ROUND = ParityFixture(
         "$DIR/multi-round-agentic.jsonl",
         "cm-parity-multi-round-1",
-        divergences = multiRunTail + tailOrder +
-            (GateCheck.ToolArgumentsAreObjects to TOOL_PROJECTION) +
-            listOf(GateCheck.DirectMatchesRecording, GateCheck.TerminalOrder).associateWith { IDLE_BETWEEN_ROUNDS },
     )
 
     /** Every complete recorded turn, in the order the gate runs them. */

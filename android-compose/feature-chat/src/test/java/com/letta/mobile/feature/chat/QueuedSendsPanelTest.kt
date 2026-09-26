@@ -9,6 +9,7 @@ import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedChatSend
 import com.letta.mobile.data.chat.send.QueuedSendId
+import com.letta.mobile.ui.chat.QUEUED_ON_SERVER_LABEL
 import com.letta.mobile.ui.chat.QueuedSendActions
 import com.letta.mobile.ui.chat.QueuedSendsPanel
 import com.letta.mobile.ui.chat.QueuedSendsPanelTestTags
@@ -80,6 +81,24 @@ class QueuedSendsPanelTest {
         composeRule.onNodeWithTag(QueuedSendsPanelTestTags.RESUME).performClick()
 
         assertEquals(1, resumed)
+    }
+
+    @Test
+    fun `a send parked on the server behind another client shows as queued on server`() {
+        render(ConversationSendQueue(queuedOnServer = send("s", "sent from phone")))
+
+        composeRule.onNodeWithText("1 message queued").assertIsDisplayed()
+        composeRule.onNodeWithTag(QueuedSendsPanelTestTags.ON_SERVER).assertIsDisplayed()
+        composeRule.onNodeWithText(QUEUED_ON_SERVER_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText("sent from phone").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a queue waiting on another device says so`() {
+        render(ConversationSendQueue(items = listOf(send("a", "first")), heldByOtherClient = true))
+
+        composeRule.onNodeWithText("Waiting for another device · 1 message").assertIsDisplayed()
+        composeRule.onNodeWithText("Queued · 1").assertIsDisplayed()
     }
 
     @Test

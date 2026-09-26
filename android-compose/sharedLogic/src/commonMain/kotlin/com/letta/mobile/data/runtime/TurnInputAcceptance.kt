@@ -207,6 +207,9 @@ internal enum class QueueRemovalDisposition {
 internal class QueuedInputTracker(val clientMessageId: String?) {
     private val state = atomic(PENDING)
 
+    /** letta-mobile-1n5py.1 (qygvv.9 second race): released once `input_accepted` is resolved. */
+    val acknowledgement = InputAcknowledgementLatch()
+
     val isQueued: Boolean get() = state.value == QUEUED
 
     fun isWatchdogPaused(isConnectionSuperseded: Boolean): Boolean =
@@ -320,11 +323,15 @@ internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boole
  * wait. A `stream_delta` is not start evidence: while this input is pending or
  * queued it may belong to the turn ahead (review of PR #1661). Servers that
  * answer `queued` (0.32+) also send `update_queue.removed`.
+ *
+ * letta-mobile-1n5py.1 (qygvv.9 race 2): a terminal that beats this input's ack first waits for it.
  */
-internal fun observeQueueProgress(
+internal suspend fun observeQueueProgress(
     received: AppServerReceivedFrame,
     lease: LeaseRef,
+    ownership: RunOwnership,
 ): QueueRemovalDisposition? {
+    lease.queuedInput.acknowledgement.awaitBefore(received, ownership)
     val removal = (received.frame as? AppServerInboundFrame.UpdateQueue)?.let(lease.queuedInput::removalIn)
     if (removal == QueueRemovalDisposition.Dequeued && lease.queuedInput.markStarted()) {
         leaveQueued(lease, "update_queue")
@@ -340,7 +347,23 @@ internal class TurnInputSender(
     /** letta-mobile-qygvv.6: records a user input before it is sent, so its queue item is recognised. */
     private val noteSentInput: (TurnRuntimeKey, String?, TurnCommand) -> Unit = { _, _, _ -> },
 ) {
+    /**
+     * Sends [command]'s input. letta-mobile-1n5py.1: the lease's acknowledgement latch opens only
+     * once this returns (after [enterQueued]), so a terminal the collector held for the ack sees the
+     * Queued state and is recognised as the turn ahead's.
+     */
     suspend fun sendInput(
+        command: TurnCommand,
+        scope: AppServerRuntimeScope,
+        lease: LeaseRef,
+        emit: suspend (RuntimeEventDraft) -> Unit,
+    ): InputAcceptance.Failure? = try {
+        sendAndAwaitAcceptance(command, scope, lease, emit)
+    } finally {
+        lease.queuedInput.acknowledgement.release()
+    }
+
+    private suspend fun sendAndAwaitAcceptance(
         command: TurnCommand,
         scope: AppServerRuntimeScope,
         lease: LeaseRef,

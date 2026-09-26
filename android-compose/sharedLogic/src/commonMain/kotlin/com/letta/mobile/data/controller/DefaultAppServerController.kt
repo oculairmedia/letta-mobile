@@ -21,6 +21,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.ConversationId
@@ -33,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -125,6 +127,13 @@ class DefaultAppServerController(
 
     override val cancelledQueuedInputs: Flow<CancelledQueuedInput>
         get() = turnEngine.cancelledQueuedInputs
+
+    /** letta-mobile-qygvv.28: a passive read of the client's frames, like the queue observer's. */
+    override fun observeRuntimeFrames(runtime: AppServerRuntimeScope): Flow<AppServerReceivedFrame> =
+        client.events.filter { received ->
+            val scope = received.frame.runtime
+            scope != null && scope.agentId == runtime.agentId && scope.conversationId == runtime.conversationId
+        }
 
     /**
      * lgns8.17(d): standing answerer for `external_tool_call_request` frames that
