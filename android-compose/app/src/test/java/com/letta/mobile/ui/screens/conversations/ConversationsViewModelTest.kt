@@ -23,6 +23,7 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogEntry
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -601,7 +602,10 @@ class ConversationsViewModelTest {
 
     private class FakeConversationRepository(
         agentRepository: AgentRepository,
-    ) : ConversationRepository(FakeConversationApi(), agentRepository, mockk(relaxed = true)) {
+    ) : ConversationRepository(
+        FakeConversationApi(), agentRepository, mockk(relaxed = true),
+        repositoryScope = CoroutineScope(Dispatchers.Main),
+    ) {
         val deletedConversationIds = mutableListOf<String>()
         val archivedUpdates = mutableListOf<Pair<String, Boolean>>()
         var createFailure: Throwable? = null

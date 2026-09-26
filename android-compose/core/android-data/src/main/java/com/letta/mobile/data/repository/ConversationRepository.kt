@@ -20,8 +20,6 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -30,9 +28,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import dagger.Lazy
-
-internal fun defaultConversationRepositoryScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 // letta-mobile-g2ff0: conversationDao is dagger.Lazy<ConversationDao> so Room init
 // happens lazily on the first dao.get() call (inside repositoryScope.launch
@@ -43,7 +38,7 @@ open class ConversationRepository(
     private val conversationApi: ConversationApi,
     private val agentRepository: IAgentRepository,
     private val conversationDao: Lazy<ConversationDao>,
-    repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
+    repositoryScope: CoroutineScope,
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
     private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
@@ -68,6 +63,8 @@ open class ConversationRepository(
                 conversationDao.get().getAllRefreshStatesOnce().forEach { state ->
                     lastRefreshAtMillisByAgent[AgentId(state.agentId)] = state.lastRefreshAtMillis
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load cached conversations", e)
             }
@@ -188,6 +185,8 @@ open class ConversationRepository(
                 conversationApi.getConversation(id)
             }
             fetched.also { conversation -> upsertCachedConversation(conversation) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             conversationDao.get().getByIdOnce(id.value)?.toConversation() ?: throw e
         }

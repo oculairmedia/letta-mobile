@@ -14,6 +14,7 @@ import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.testutil.armedConversationApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -289,6 +290,8 @@ class AllConversationsRepositoryTest {
         try {
             repository.refreshIfStale(maxAgeMs = -1)
             fail("Expected stale refresh to throw")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             // Expected.
         }

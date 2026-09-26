@@ -17,7 +17,12 @@ import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.testutil.FakeSettingsRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -49,20 +54,25 @@ class ConversationRepositoryTest {
     private lateinit var fakeApi: FakeConversationApi
     private lateinit var repository: ConversationRepository
     private lateinit var database: LettaDatabase
+    private lateinit var repositoryScope: CoroutineScope
 
     @Before
     fun setup() {
+        repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val context = ApplicationProvider.getApplicationContext<Context>()
         database = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java)
             .allowMainThreadQueries()
             .build()
         fakeApi = FakeConversationApi()
         val agentRepository = FakeAgentRepository()
-        repository = ConversationRepository(fakeApi, agentRepository, lazyOf(database.conversationDao()))
+        repository = ConversationRepository(
+            fakeApi, agentRepository, lazyOf(database.conversationDao()), repositoryScope = repositoryScope,
+        )
     }
 
     @After
     fun tearDown() {
+        repositoryScope.cancel()
         database.close()
     }
 
@@ -156,6 +166,8 @@ class ConversationRepositoryTest {
         try {
             repository.refreshConversationsIfStale("a1", maxAgeMs = -1)
             fail("Expected stale refresh to throw")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             // Expected.
         }
@@ -187,6 +199,7 @@ class ConversationRepositoryTest {
             fakeApi,
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
             localConversationSource = localSource,
             settingsRepository = settingsRepository,
         )
@@ -224,6 +237,8 @@ class ConversationRepositoryTest {
 
         try {
             repository.deleteConversation("1", "a1")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {}
 
         val result = repository.getConversations("a1").first()
@@ -249,6 +264,8 @@ class ConversationRepositoryTest {
 
         try {
             repository.updateConversation("1", "a1", "Updated")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {}
 
         val result = repository.getConversations("a1").first()
@@ -283,6 +300,7 @@ class ConversationRepositoryTest {
             httpThatThrows,
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
             settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
@@ -309,6 +327,7 @@ class ConversationRepositoryTest {
             fakeApi,
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
             settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
