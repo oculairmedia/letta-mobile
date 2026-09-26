@@ -67,8 +67,12 @@ class HostCanvasBatchValidationTest {
     fun removingTheShapeAndItsLabelTogetherIsAccepted() = runTest {
         val host = Host()
         host.apply(labelledBox(box1, label1)).content()
+        val before = host.loggedCount()
 
         host.apply(listOf(box1.remove(), label1.remove())).content()
+
+        assertEquals(before + 2, host.loggedCount())
+        assertEquals(emptyList(), CanvasOpProjector.documentsOf(logScene(host)))
     }
 
     @Test
