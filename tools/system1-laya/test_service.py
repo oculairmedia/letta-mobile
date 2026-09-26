@@ -77,6 +77,18 @@ def main() -> int:
     r.check("health reports ok", health.get("status") == "ok", str(health))
     print()
 
+    check_signals(base, r)
+    check_dispositions(base, r)
+    check_passthrough_and_latency(base, r)
+
+    total = r.passed + len(r.failed)
+    print(f"{r.passed}/{total} passed")
+    if r.failed:
+        print("failed: " + ", ".join(r.failed))
+    return 1 if r.failed else 0
+
+
+def check_signals(base: str, r: Results) -> None:
     print("guard: adversarial prompt")
     guard = post(base, "/v1/system1/guard", {"text": ADVERSARIAL})["guard"]
     print("  ", json.dumps(guard))
@@ -133,6 +145,7 @@ def main() -> int:
     )
     print()
 
+def check_dispositions(base: str, r: Results) -> None:
     print("evaluate: dispositions")
     adversarial = post(base, "/v1/system1/evaluate", {"text": ADVERSARIAL})
     print("  adversarial:", adversarial["disposition"], "-", adversarial["reason"])
@@ -159,6 +172,7 @@ def main() -> int:
     )
     print()
 
+def check_passthrough_and_latency(base: str, r: Results) -> None:
     print("predict: raw passthrough")
     raw = post(
         base,
@@ -196,11 +210,6 @@ def main() -> int:
     )
     print()
 
-    total = r.passed + len(r.failed)
-    print(f"{r.passed}/{total} passed")
-    if r.failed:
-        print("failed: " + ", ".join(r.failed))
-    return 1 if r.failed else 0
 
 
 if __name__ == "__main__":

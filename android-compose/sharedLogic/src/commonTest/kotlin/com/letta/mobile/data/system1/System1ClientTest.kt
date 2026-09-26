@@ -75,7 +75,7 @@ class System1ClientTest {
     """.trimIndent()
 
     /** Tests opt in explicitly; the production default is disabled. */
-    private val enabled = System1Client.Config(enabled = true)
+    private val enabled = System1Client.Config(enabled = true, timeoutMs = 5_000L)
 
     private fun client(
         config: System1Client.Config = enabled,
@@ -236,6 +236,24 @@ class System1ClientTest {
 
         assertFalse(report.expectsResponse)
         assertEquals("acknowledge_only", report.interactionMode)
+    }
+
+    @Test
+    fun section_endpoints_keep_paths_and_request_fields() = realTimeTest {
+        val seen = mutableListOf<Pair<String, String>>()
+        val client = client { request ->
+            seen += request.url.encodedPath to (request.body as io.ktor.http.content.TextContent).text
+            respond("{}", HttpStatusCode.OK)
+        }
+
+        assertNull(client.guard("guard text"))
+        assertNull(client.interaction("new draft", "old draft"))
+
+        assertEquals("/v1/system1/guard", seen[0].first)
+        assertTrue(seen[0].second.contains("guard text"))
+        assertEquals("/v1/system1/interaction", seen[1].first)
+        assertTrue(seen[1].second.contains("new draft"))
+        assertTrue(seen[1].second.contains("old draft"))
     }
 
     @Test

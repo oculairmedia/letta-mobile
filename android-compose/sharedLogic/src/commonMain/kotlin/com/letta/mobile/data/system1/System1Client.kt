@@ -101,17 +101,15 @@ class System1Client(
     }
 
     override suspend fun guard(text: String): System1GuardReport? =
-        section("/v1/system1/guard", "guard", System1GuardReport.serializer(), text, null)
+        section(Section.Guard, System1GuardReport.serializer(), System1EvaluateRequest(text, null, null))
 
     override suspend fun interaction(
         text: String,
         previousDraft: String?,
     ): System1InteractionReport? = section(
-        path = "/v1/system1/interaction",
-        field = "interaction",
+        endpoint = Section.Interaction,
         serializer = System1InteractionReport.serializer(),
-        text = text,
-        previousDraft = previousDraft,
+        request = System1EvaluateRequest(text, previousDraft, null),
     )
 
     override suspend fun isAvailable(): Boolean {
@@ -125,22 +123,22 @@ class System1Client(
         return raw.contains("\"ok\"")
     }
 
+    private enum class Section(val path: String, val field: String) {
+        Guard("/v1/system1/guard", "guard"),
+        Interaction("/v1/system1/interaction", "interaction"),
+    }
+
     /** Single-set endpoints wrap their report in a named field; unwrap it. */
     private suspend fun <T> section(
-        path: String,
-        field: String,
+        endpoint: Section,
         serializer: KSerializer<T>,
-        text: String,
-        previousDraft: String?,
+        request: System1EvaluateRequest,
     ): T? {
-        if (!config.enabled || text.isBlank()) return null
-        val body = json.encodeToString(
-            System1EvaluateRequest.serializer(),
-            System1EvaluateRequest(text, previousDraft, null),
-        )
-        val raw = postOrNull(path, body) ?: return null
+        if (!config.enabled || request.text.isBlank()) return null
+        val body = json.encodeToString(System1EvaluateRequest.serializer(), request)
+        val raw = postOrNull(endpoint.path, body) ?: return null
         val element = decodeOrNull(JsonElement.serializer(), raw)
-        val section = (element as? JsonObject)?.get(field) ?: return null
+        val section = (element as? JsonObject)?.get(endpoint.field) ?: return null
         return runCatchingNonCancellation { json.decodeFromJsonElement(serializer, section) }
     }
 

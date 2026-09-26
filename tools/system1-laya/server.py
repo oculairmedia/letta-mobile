@@ -109,6 +109,11 @@ def create_app(
     app.state.device = device
     app.state.warmup = warmup
 
+    register_endpoints(app)
+    return app
+
+
+def register_endpoints(app: FastAPI) -> None:
     @app.get("/health")
     async def health() -> JSONResponse:
         rt = _state.get("runtime")
@@ -193,7 +198,6 @@ def create_app(
             "interaction": interaction_questions(),
         }
 
-    return app
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

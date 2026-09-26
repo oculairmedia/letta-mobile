@@ -182,6 +182,19 @@ def decide(
     opinion, so a cheap-looking prompt can never fast-track past a jailbreak
     signal.
     """
+    safety = _safety_verdict(guard, thresholds)
+    if safety is not None:
+        return safety
+
+    if _can_fast_track(route, thresholds):
+        return {
+            "disposition": FAST_TRACK,
+            "reason": "trivial request with no tool or sensitivity signal",
+        }
+    return {"disposition": ALLOW, "reason": "no System 1 objection"}
+
+
+def _safety_verdict(guard: Dict[str, Any], thresholds: Thresholds) -> Optional[Dict[str, str]]:
     if guard["jailbreak_prob"] >= thresholds.jailbreak_block:
         return {"disposition": BLOCK, "reason": "jailbreak probability above block threshold"}
     if guard["injection_prob"] >= thresholds.injection_block:
@@ -201,17 +214,13 @@ def decide(
     if guard["harm_severity"] >= thresholds.harm_warn:
         return {"disposition": WARN, "reason": "elevated harm severity"}
 
-    if (
-        route["difficulty"] <= thresholds.fast_track_difficulty
-        and not route["needs_tools"]
-        and not route["is_sensitive"]
-    ):
-        return {
-            "disposition": FAST_TRACK,
-            "reason": "trivial request with no tool or sensitivity signal",
-        }
+    return None
 
-    return {"disposition": ALLOW, "reason": "no System 1 objection"}
+
+def _can_fast_track(route: Dict[str, Any], thresholds: Thresholds) -> bool:
+    if route["difficulty"] > thresholds.fast_track_difficulty:
+        return False
+    return not route["needs_tools"] and not route["is_sensitive"]
 
 
 class System1Runtime:

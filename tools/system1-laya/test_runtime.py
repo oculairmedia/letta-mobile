@@ -39,14 +39,14 @@ def _choice(c):
     return {"type": "choice", "choice": c, "probabilities": {c: 1.0}, "confidence": 1.0}
 
 
-def _guard(jailbreak=0.0, injection=0.0, sensitive=0.0, harm=0.0, topic="coding"):
+def _guard(jailbreak=0.0, injection=0.0, sensitive=0.0, harm=0.0):
     return guard_report(
         {
             "jailbreak": _noul(jailbreak),
             "prompt_injection": _noul(injection),
             "sensitive_data": _noul(sensitive),
             "harm_severity": _score(harm),
-            "topic": _choice(topic),
+            "topic": _choice("coding"),
         }
     )
 
