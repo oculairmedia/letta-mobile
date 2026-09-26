@@ -46,6 +46,9 @@ object CanvasBatchValidator {
 
     private fun shapeViolation(index: Int, op: CanvasOp, check: CanvasOpsCheck.Invalid) = CanvasBatchViolation(
         index.toString(), CanvasBatchSteps.describe(op),
-        CanvasStateViolation(CanvasStateInvariant.ELEMENT_SHAPE, CanvasBatchSteps.subjectOf(op), check.message),
+        CanvasStateViolation(
+            if (op is CanvasOp.SetDocumentOp) CanvasStateInvariant.DOCUMENT_DECODES else CanvasStateInvariant.ELEMENT_SHAPE,
+            CanvasBatchSteps.subjectOf(op), check.message,
+        ),
     )
 }
