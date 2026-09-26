@@ -32,6 +32,7 @@ object HostCanvasTools {
             val sceneJson = HostCanvasToolInputs.sceneJson(input) ?: return@HostCanvasTool missing("scene_json")
             withCanvas(backend, caller, input) { entry ->
                 val replace = CanvasOp.ReplaceSceneOp(opId = "", actorId = caller.agentId, lamport = 0L, sceneJson = sceneJson)
+                if (CanvasDryRun.requested(input)) return@withCanvas dryRun(backend, caller, entry, listOf(replace))
                 published(backend.publish(caller, entry, listOf(replace))) { CanvasReplaceSceneResult(ok = true, revision = it, canvasId = entry.canvasId) }
             }
         },
@@ -39,6 +40,7 @@ object HostCanvasTools {
             val opsJson = input["ops"] ?: return@HostCanvasTool missing("ops")
             val ops = HostCanvasToolInputs.ops(opsJson)
             withCanvas(backend, caller, input) { entry ->
+                if (CanvasDryRun.requested(input)) return@withCanvas dryRun(backend, caller, entry, ops)
                 published(backend.publish(caller, entry, ops)) { CanvasApplyOpsResult(ok = true, revision = it, canvasId = entry.canvasId) }
             }
         },
@@ -107,6 +109,17 @@ object HostCanvasTools {
             is HostCanvasAccess.Denied -> ExternalToolResult.Error(access.reason)
             null -> ExternalToolResult.Error(NO_DEFAULT_CANVAS)
         }
+    }
+
+    /** A `dry_run` call: the batch checked against the canvas as it is now, and nothing published. */
+    private suspend fun dryRun(
+        backend: HostCanvasBackend,
+        caller: HostCanvasCaller,
+        entry: HostCanvasEntry,
+        ops: List<CanvasOp>,
+    ): ExternalToolResult = when (val checked = backend.check(caller, entry, ops)) {
+        is HostCanvasCheck.Denied -> ExternalToolResult.Error(checked.reason)
+        is HostCanvasCheck.Checked -> success(CanvasDryRun.result(checked.result, checked.revision, entry.canvasId))
     }
 
     private inline fun <reified T> published(outcome: HostCanvasPublish, result: (Long) -> T): ExternalToolResult =

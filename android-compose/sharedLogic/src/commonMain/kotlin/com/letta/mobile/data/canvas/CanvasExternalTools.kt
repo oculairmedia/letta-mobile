@@ -197,6 +197,23 @@ private suspend fun executeApplyOps(
     }
 }
 
+/**
+ * A `dry_run` call's answer, checked against the canvas and written nowhere; null when the call
+ * did not ask for one, or cannot be checked (the write path then reports what is missing).
+ */
+private suspend fun dryRun(
+    context: CanvasToolContext,
+    input: JsonObject,
+    opsOf: (JsonObject) -> List<CanvasOp>?,
+): ExternalToolResult? {
+    if (!CanvasDryRun.requested(input)) return null
+    val ops = opsOf(input) ?: return null
+    return when (val lookup = findCanvasDocument(context, input)) {
+        is CanvasLookupResult.Error -> lookup.result
+        is CanvasLookupResult.Found -> CanvasAppDryRun.answer(lookup.doc, ops, context.resolveCallerId())
+    }
+}
+
 private suspend fun executeListCanvases(
     context: CanvasToolContext,
     input: JsonObject,
@@ -310,7 +327,7 @@ class CanvasReplaceSceneTool(
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to replace scene") { context ->
-            executeReplaceScene(context, input)
+            dryRun(context, input, CanvasAppDryRun::replaceScene) ?: executeReplaceScene(context, input)
         }
 
     companion object {
@@ -332,7 +349,7 @@ class CanvasApplyOpsTool(
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to apply ops") { context ->
-            executeApplyOps(context, input)
+            dryRun(context, input, CanvasAppDryRun::applyOps) ?: executeApplyOps(context, input)
         }
 
     companion object {
