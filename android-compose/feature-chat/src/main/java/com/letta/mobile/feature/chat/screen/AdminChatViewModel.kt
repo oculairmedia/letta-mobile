@@ -574,6 +574,11 @@ internal class AdminChatViewModel @Inject constructor(
             .map { agents -> agents.find { it.id == agentId } },
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    /** Per-conversation switches leave the agent model unchanged. */
+    val conversationModelSelections: StateFlow<Map<String, String>> by lazy {
+        modelCoordinator.conversationSelections
+    }
+
     val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)
 

@@ -14,6 +14,7 @@ import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -34,6 +35,9 @@ internal class AdminChatModelCoordinator(
     private val modelControl: ChatModelControl? = null,
     private val conversationId: () -> String? = { null },
 ) {
+    val conversationSelections: StateFlow<Map<String, String>> =
+        modelControl?.conversationSelections ?: MutableStateFlow(emptyMap())
+
     private val localRuntimeModelSwitchMetadataKeys: Set<String> = LocalAgentRuntimeMetadata.bindingKeys + setOf(
         LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY,
         LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY,

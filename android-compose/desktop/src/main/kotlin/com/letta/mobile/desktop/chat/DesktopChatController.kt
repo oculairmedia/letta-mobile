@@ -21,6 +21,7 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.data.repository.observeConversationUpdates
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -433,7 +434,7 @@ class DesktopChatController(
 
     // Per-conversation model overrides set this session (the picker). The
     // effective composer model otherwise comes from the conversation's agent.
-    private var conversationModelById: Map<String, String> = emptyMap()
+    private val conversationModels = ConversationModelSelections()
 
     private val gatewayExtras: ChatGatewayExtras?
         get() = gateway as? ChatGatewayExtras
@@ -681,16 +682,44 @@ class DesktopChatController(
     fun setConversationModel(model: String) {
         if (closed) return
         val conversationId = _state.value.selectedConversationId ?: return
-        conversationModelById = conversationModelById + (conversationId to model)
+        val previousOverride = conversationModels[conversationId]
+        val previousLabel = _state.value.composerModelLabel
+        conversationModels.record(conversationId, model)
         _state.update { it.copy(composerModelLabel = model) }
-        val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
         scope.launch {
-            runCatching { gatewayExtras?.setConversationModel(conversationId, transportModel) }
-                .onFailure { t ->
-                    _state.update {
-                        it.copy(errorMessage = t.message ?: "Could not change model")
-                    }
-                }
+            applyConversationModel(conversationId, model, previousOverride, previousLabel)
+        }
+    }
+
+    private suspend fun applyConversationModel(
+        conversationId: String,
+        model: String,
+        previousOverride: String?,
+        previousLabel: String,
+    ) {
+        try {
+            val extras = gatewayExtras ?: error("This backend cannot change a conversation's model")
+            val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
+            extras.setConversationModel(conversationId, transportModel)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            rollbackConversationModel(conversationId, model, previousOverride, previousLabel)
+            _state.update { it.copy(errorMessage = t.message ?: "Could not change model") }
+        }
+    }
+
+    private fun rollbackConversationModel(
+        conversationId: String,
+        model: String,
+        previousOverride: String?,
+        previousLabel: String,
+    ) {
+        // An earlier failed request must not undo a newer pick.
+        if (conversationModels[conversationId] != model) return
+        conversationModels.record(conversationId, previousOverride)
+        if (_state.value.selectedConversationId == conversationId) {
+            _state.update { it.copy(composerModelLabel = previousLabel) }
         }
     }
 
@@ -726,14 +755,14 @@ class DesktopChatController(
 
     private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
         scope.launch {
-            val override = conversationModelById[conversationId]
-            val label = when {
-                !override.isNullOrBlank() -> override
-                !agentId.isNullOrBlank() ->
-                    runCatching { agentByIdProvider(setOf(agentId)) }
-                        .getOrNull()?.get(agentId)?.model?.takeIf { it.isNotBlank() } ?: "Auto"
-                else -> "Auto"
+            val agentModel = if (conversationModels[conversationId] == null && !agentId.isNullOrBlank()) {
+                runCatching { agentByIdProvider(setOf(agentId)) }.getOrNull()?.get(agentId)?.model
+            } else {
+                null
             }
+            // letta-mobile-okvyf: read the override AFTER the agent lookup, so a pick
+            // made while the lookup was in flight is not overwritten by the agent model.
+            val label = conversationModels.effectiveModel(conversationId, agentModel) ?: "Auto"
             if (!closed && _state.value.selectedConversationId == conversationId) {
                 _state.update { it.copy(composerModelLabel = label) }
             }

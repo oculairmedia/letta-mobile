@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -64,8 +65,7 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
     val favoriteAgentId by viewModel.favoriteAgentId.collectAsStateWithLifecycle()
     val activeBackendLabel by viewModel.activeBackendLabel.collectAsStateWithLifecycle()
     val availableModels by viewModel.llmModels.collectAsStateWithLifecycle()
-    val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
-    val activeAgentModel = remember(activeAgent) { activeAgent?.model }
+    val activeAgentModel = rememberSelectedConversationModel(viewModel)
     val projectBindings = viewModel.projectBindings
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val drawerConversationRepo = params.conversationRepository
@@ -119,4 +119,17 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
         pinnedAgentIds = pinnedAgentIds,
         activeBackendLabel = activeBackendLabel,
     )
+}
+
+@Composable
+private fun rememberSelectedConversationModel(viewModel: AdminChatViewModel): String? {
+    val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
+    val selections by viewModel.conversationModelSelections.collectAsStateWithLifecycle()
+    val conversationId = viewModel.conversationId?.value
+    return remember(activeAgent, selections, conversationId) {
+        ConversationModelSelections.resolve(
+            conversationOverride = conversationId?.let(selections::get),
+            agentModel = activeAgent?.model,
+        )
+    }
 }
