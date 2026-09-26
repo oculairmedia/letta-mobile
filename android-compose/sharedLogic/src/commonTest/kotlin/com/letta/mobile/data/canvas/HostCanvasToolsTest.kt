@@ -102,6 +102,19 @@ class HostCanvasToolsTest {
         }
         assertTrue("width_px" in assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
             invalid, agentId = "agent-1", conversationId = "conv-1")).error)
+        listOf(
+            "zoom" to JsonPrimitive("invalid"),
+            "font_scale" to JsonPrimitive("invalid"),
+            "camera_x" to JsonArray(emptyList()),
+            "fit_to_content" to JsonArray(emptyList()),
+        ).forEach { (key, value) ->
+            val bad = buildJsonObject {
+                viewport.forEach { (name, setting) -> put(name, setting) }
+                put(key, value)
+            }
+            assertTrue(key in assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+                bad, agentId = "agent-1", conversationId = "conv-1")).error)
+        }
         val malformed = buildJsonObject {
             viewport.forEach { (key, value) -> put(key, value) }
             put("scene_json", "not a scene")
