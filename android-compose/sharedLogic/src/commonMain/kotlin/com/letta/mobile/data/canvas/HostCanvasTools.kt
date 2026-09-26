@@ -23,7 +23,7 @@ private val hostCanvasJson = Json {
  * refused before anything is read, and nothing in the input can name a different caller.
  */
 object HostCanvasTools {
-    fun all(backend: HostCanvasBackend): List<HostExternalTool> = listOf(
+    fun all(backend: HostCanvasBackend, renderer: CanvasPreviewRenderer? = null): List<HostExternalTool> = listOf(
         HostCanvasTool(CanvasToolContract.create, "Failed to create canvas") { caller, input -> create(backend, caller, input) },
         HostCanvasTool(CanvasToolContract.getScene, "Failed to get scene") { caller, input ->
             withCanvas(backend, caller, input) { entry -> getScene(backend, entry) }
@@ -45,7 +45,43 @@ object HostCanvasTools {
             }
         },
         HostCanvasTool(CanvasToolContract.list, "Failed to list canvases") { caller, input -> list(backend, caller, input) },
-    )
+    ) + listOfNotNull(renderer?.let { previewRenderer ->
+        HostCanvasTool(CanvasToolContract.renderPreview, "Failed to render preview") { caller, input ->
+            withCanvas(backend, caller, input) { entry -> preview(backend, previewRenderer, caller, entry, input) }
+        }
+    })
+
+    private suspend fun preview(
+        backend: HostCanvasBackend,
+        renderer: CanvasPreviewRenderer,
+        caller: HostCanvasCaller,
+        entry: HostCanvasEntry,
+        input: JsonObject,
+    ): ExternalToolResult {
+        val viewport = CanvasPreviewViewport.parse(input)
+        val sceneInput = HostCanvasToolInputs.sceneJson(input)
+        val opsInput = input["ops"]
+        require(sceneInput == null || opsInput == null) { "Specify scene_json or ops, not both" }
+        val candidate = sceneInput != null || opsInput != null
+        val scene = if (candidate) {
+            val ops = if (sceneInput != null) {
+                listOf(CanvasOp.ReplaceSceneOp(opId = "", actorId = caller.agentId, lamport = 0L, sceneJson = sceneInput))
+            } else {
+                HostCanvasToolInputs.ops(requireNotNull(opsInput))
+            }
+            when (val check = backend.check(caller, entry, ops)) {
+                is HostCanvasCheck.Denied -> return ExternalToolResult.Error(check.reason)
+                is HostCanvasCheck.Checked -> when (val result = check.result) {
+                    is CanvasBatchCheck.Invalid -> return ExternalToolResult.Error(result.message)
+                    is CanvasBatchCheck.Valid -> HostCanvasScene(result.sceneJson, check.revision, 0L)
+                }
+            }
+        } else {
+            backend.scene(entry)
+        }
+        return success(CanvasPreviewResult(entry.canvasId, scene.revision, candidate, viewport,
+            renderer.render(scene.sceneJson, viewport)))
+    }
 
     private suspend fun getScene(backend: HostCanvasBackend, entry: HostCanvasEntry): ExternalToolResult {
         val scene = backend.scene(entry)
