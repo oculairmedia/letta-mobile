@@ -8,40 +8,33 @@ This directory contains the production Letta Mobile Android app.
 | --- | --- | --- |
 | `app` | Screens, navigation, Hilt wiring, Android entrypoints | `:app:testRootDebugUnitTest` (required `test` job) |
 | `core/android-data` | Android data bindings, Ktor wiring, Room, mappers | `:core:android-data:testDebugUnitTest` (required `test` job) |
-| `sharedLogic` | Platform-neutral repositories/timeline/transport plus shared Android/Desktop A2UI renderer | `:sharedLogic:allTests` (required `shared-multiplatform`) |
+| `sharedLogic` | Platform-neutral repositories, timeline, and transport | `:sharedLogic:jvmTest` plus host-native compile (required `shared-multiplatform`) |
 | `designsystem` | Android Compose components, theme, and dialogs | `:designsystem:testDebugUnitTest` (additive on path change) |
 | `feature-chat` | Chat UI + ViewModels (admin chat stack) | `:feature-chat:testDebugUnitTest` (additive on path change) |
 | `feature-editagent` | Agent editor feature module | `:feature-editagent:testDebugUnitTest` (additive on path change) |
-| `desktop` | Compose Desktop host (Windows) | `:desktop:test` (required `shared-multiplatform`) |
-| `cli` / `appserver-cli` | JVM tooling / probe CLIs | covered in `shared-multiplatform` / additive `cli` tests |
+| `sharedUI` | Shared Android/Desktop Compose chat and A2UI rendering | covered by host builds |
+| `desktop` | Compose Desktop host (Windows) | `:desktop:test` (additive in `test` when desktop changes) |
+| `cli` / `appserver-cli` / `iroh-wrapper-cli` | JVM tooling, probes, and Iroh server wrapper | wrapper/CLI tasks in `shared-multiplatform`; additive `cli` tests |
 
-**Ownership rule:** feature *logic* lives in `sharedLogic/commonMain`. `app/` and `desktop/` add host binding only (see root `AGENTS.md`).
+**Ownership rule:** portable feature *logic* lives in `sharedLogic/commonMain`, shared
+Compose UI in `sharedUI`, and host-specific integration in `app/` and `desktop/`
+(see root `AGENTS.md`).
 
-## Chat architecture boundary
+## Chat architecture
 
-The codebase intentionally has two chat layers:
+Chat is split by responsibility, not by two separate client implementations:
 
-- `AdminChatViewModel` in `app/` is the active app-facing chat stack.
-  - Route owner: `AgentChatRoute`
-  - UI owner: `AgentScaffold` + `ChatScreen`
-  - Backend behavior:
-    - standard vanilla Letta server flow for normal agent chat
-    - embedded bot gateway flow for project-scoped chat when `projectIdentifier` is present
-- `LettaChatClient` in `chat/` is a separate LettaBot chat primitive.
-  - Status: reusable lower-level client, not wired into app navigation today
-  - Current production usage: test-only in this repo
+- `:feature-chat` contains the chat feature UI and presentation state.
+- `:sharedUI` hosts Compose chat components shared by Android and desktop.
+- `:sharedLogic` owns portable conversation/message repositories, the timeline
+  reducer, and transport behavior used by both clients.
+- `:app` wires Android navigation, lifecycle, and dependency injection; `:desktop`
+  supplies the desktop host bindings.
 
-This split is intentional, not accidental duplication. Shared primitives remain below both paths:
-
-- `ConversationRepository`
-- `MessageRepository`
-
-When changing chat behavior, decide first whether the change belongs to:
-
-1. the admin app route/UI (`AdminChatViewModel`), or
-2. the reusable LettaBot client primitive (`LettaChatClient`)
-
-Do not assume changes to one path automatically belong in the other.
+For chat changes, put timeline/state and transport logic in `sharedLogic`, reusable
+Compose presentation in `sharedUI`, feature-specific UI in `feature-chat`, and
+Android-only integration in `app`. There is no `:chat` Gradle module or separate
+`LettaChatClient` in this tree.
 
 ## Prerequisites
 
@@ -131,116 +124,38 @@ System-access smoke compile:
 
 ## Release process
 
-Use this flow when building and publishing an Android APK release.
+Releases are driven by annotated `vX.Y.Z` tags on `main`; do not hand-edit
+`versionName` or `versionCode`. `app/build.gradle.kts` derives `versionName` from
+the tag in release CI and computes `versionCode` as `MAJOR * 10000 + MINOR * 100 + PATCH`.
+Untagged builds use `git describe`; an explicit `-PversionNameOverride` is available
+for one-off builds, not the normal release path.
 
-### 1. Pick the release version
+1. Confirm the chosen tag is unused, `main` is current, and required CI checks
+   pass on the commit to release. Keep local uncommitted changes out of the tag.
+2. Create and push an annotated tag at that `main` commit (replace the example
+   version with the next release version):
 
-- The public GitHub release line currently uses `v0.1.x` tags.
-- Check existing releases before picking a new tag:
+   ```bash
+   git fetch origin
+   git tag -a vX.Y.Z origin/main -m "release: X.Y.Z"
+   git push origin vX.Y.Z
+   ```
 
-```bash
-gh release list --limit 20
-git tag --list "v0.1.*"
-```
+3. Watch the tag-triggered [release workflow](../.github/workflows/release.yml).
+   It uses repository signing secrets to build a signed play-release APK with
+   the embedded runtime, verifies the runtime is present, builds Windows EXE/MSI
+   installers and the Linux Iroh wrapper distribution, then publishes a GitHub
+   Release with generated notes and the artifacts. Do not separately upload a
+   locally built APK or create a second release.
+4. Verify the workflow succeeded and inspect the release and attached assets:
 
-- Create a new tag instead of overwriting an existing release.
-- Keep the Android app's internal `versionName` / `versionCode` in `app/build.gradle.kts` aligned intentionally; the public GitHub tag and internal Android version do not have to match automatically.
+   ```bash
+   gh run list --workflow release.yml --limit 5
+   gh release view vX.Y.Z --json tagName,url,assets
+   ```
 
-### 2. Prepare signing inputs
-
-Release builds use the `release` signing config in `app/build.gradle.kts`.
-
-Provide signing credentials in one of two ways:
-
-1. `android-compose/keystore.properties` (preferred for local release work)
-2. Environment variables (`SIGNING_STORE_FILE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`)
-
-Expected `keystore.properties` shape:
-
-```properties
-storeFile=../letta-release.jks
-storePassword=...
-keyAlias=...
-keyPassword=...
-```
-
-Notes:
-
-- `storeFile` is resolved from the `app` module, so paths should be relative to `android-compose/app/`.
-- `keystore.properties` and `*.jks` are gitignored; keep them local.
-- If you create a temporary keystore for a one-off build, treat that APK as non-production-signing output.
-
-### 3. Build the release APK locally
-
-Run all commands from `android-compose/`.
-
-Recommended sequential flow:
-
-```bash
-./gradlew --stop
-pkill -f kotlin-daemon 2>/dev/null || true
-./gradlew cleanKotlinIC
-./gradlew :app:assemblePlayRelease
-```
-
-Expected output:
-
-```text
-app/build/outputs/apk/play/release/app-play-release.apk
-```
-
-Useful checks after the build:
-
-```bash
-ls app/build/outputs/apk/play/release
-stat app/build/outputs/apk/play/release/app-play-release.apk
-```
-
-### 4. CI release build behavior
-
-GitHub Actions already knows how to build a release APK in `.github/workflows/android.yml`:
-
-- decodes `SIGNING_KEYSTORE_BASE64`
-- sets `SIGNING_*` env vars
-- runs `./gradlew :app:assemblePlayRelease --build-cache`
-- uploads `android-compose/app/build/outputs/apk/play/release/*.apk` as an artifact
-
-If local release builds fail, compare your setup with the workflow first.
-
-### 5. Publish the GitHub release
-
-After the APK is built and you have chosen a new tag:
-
-```bash
-gh release create v0.1.2 \
-  "android-compose/app/build/outputs/apk/play/release/app-play-release.apk#letta-mobile-v0.1.2-play-release.apk" \
-  --target main \
-  --title "v0.1.2" \
-  --notes "## Summary
-- short release summary
-
-## Artifact
-- letta-mobile-v0.1.2-play-release.apk"
-```
-
-Verify the published release:
-
-```bash
-gh release view v0.1.2 --json tagName,name,url,assets
-```
-
-### 6. Release checklist
-
-Use this checklist every time:
-
-1. Confirm `main` is clean and up to date.
-2. Pick a new GitHub release tag; do not reuse an existing one.
-3. Confirm signing inputs are present.
-4. Run the sequential release build flow.
-5. Verify `app/build/outputs/apk/play/release/app-play-release.apk` exists.
-6. Publish the GitHub release and upload the APK.
-7. Verify the release URL and asset.
-8. Document whether the APK was signed with the production key or a temporary local key.
+For local signing or test builds, keep keystores and credentials out of git;
+local APKs are not substitutes for the CI-produced release artifacts.
 
 ## Recommended verification flow
 
