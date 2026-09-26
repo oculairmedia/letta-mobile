@@ -89,6 +89,28 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `replayed tool call with a different run id does not append a second row`() {
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "toolcall-edit-1",
+                runId = "run-real",
+                toolCalls = listOf(ToolCall(toolCallId = "call-edit-1", name = "Edit", arguments = "{\"path\":\"a\"}")),
+            ),
+        ).next
+        val replay = reduce(
+            prev = seeded,
+            frame = ToolCallMessage(
+                id = "letta-msg-replay-9",
+                runId = "desktop-stream-run-conv",
+                toolCalls = listOf(ToolCall(toolCallId = "call-edit-1", name = "Edit", arguments = "{\"path\":\"a\"}")),
+            ),
+        )
+
+        replay.next.events.size shouldBe 1
+        (replay.next.events.single() as TimelineEvent.Confirmed).serverId shouldBe "toolcall-edit-1"
+    }
+
+    @Test
     fun `tool return image attaches to matching tool call attachments`() {
         val seeded = reduce(
             frame = ToolCallMessage(

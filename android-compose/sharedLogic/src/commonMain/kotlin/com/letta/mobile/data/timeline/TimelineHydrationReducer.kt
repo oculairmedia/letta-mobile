@@ -183,10 +183,11 @@ object TimelineHydrationReducer {
         // content but a different server message id and a non-colliding otid
         // (e.g. when a run is replayed on cold start after a rebuild). otid
         // dedup alone keeps both rows, producing a doubled bubble in the UI.
-        // Also collapse by semantic identity key (type:run_id:content), the
-        // same key the stream reducer uses to dedupe a hydrate-then-stream
-        // re-delivery. Empty keys (no run_id / user / tool_return) fall back to
-        // otid-only behaviour so distinct messages are never merged.
+        // Also collapse by semantic identity key, the same key the stream
+        // reducer uses to dedupe a hydrate-then-stream re-delivery. Tool calls
+        // key on call id across runs. Assistant/error keys still need a run id.
+        // Empty keys (user / tool_return / tool calls with no call id) fall
+        // back to otid-only behaviour so distinct messages are never merged.
         val seenSemantic = HashSet<String>()
         val deduped = events.filter { event ->
             val otidNovel = seenOtids.add(event.otid)
@@ -384,6 +385,15 @@ internal fun TimelineEvent.identityKeys(): Set<String> {
 }
 
 private fun TimelineEvent.Confirmed.semanticIdentityKeyOrNull(): String? {
+    if (messageType == TimelineMessageType.TOOL_CALL) {
+        val callIds = toolCalls.map { it.effectiveId }.filter { it.isNotBlank() }.sorted()
+        if (callIds.isNotEmpty()) {
+            // Call id is the invocation, not the run. A replay often arrives under
+            // a new server id and a synthetic run id; keying on the run kept both
+            // rows and the list showed the same Edit/Bash step again.
+            return "semantic:TOOL_CALL:callIds:${callIds.joinToString(",")}"
+        }
+    }
     val stableRunId = runId?.takeIf { it.isNotBlank() } ?: return null
     return when (messageType) {
         // letta-mobile-zog19: TOOL_CALL deliberately does NOT belong in this
@@ -400,14 +410,8 @@ private fun TimelineEvent.Confirmed.semanticIdentityKeyOrNull(): String? {
         // tool_call_message and once as an approval_request_message. Their
         // server ids and rendered content can differ, but the call id is the
         // canonical invocation identity used by the matching tool return.
-        TimelineMessageType.TOOL_CALL -> toolCalls
-            .map { it.effectiveId }
-            .filter { it.isNotBlank() }
-            .takeIf { it.isNotEmpty() }
-            ?.sorted()
-            ?.joinToString(",")
-            ?.let { "semantic:${messageType.name}:$stableRunId:callIds:$it" }
-            ?: "semantic:${messageType.name}:$stableRunId:${content.trim()}"
+        TimelineMessageType.TOOL_CALL ->
+            "semantic:${messageType.name}:$stableRunId:${content.trim()}"
         TimelineMessageType.USER,
         TimelineMessageType.TOOL_RETURN,
         TimelineMessageType.SYSTEM,
