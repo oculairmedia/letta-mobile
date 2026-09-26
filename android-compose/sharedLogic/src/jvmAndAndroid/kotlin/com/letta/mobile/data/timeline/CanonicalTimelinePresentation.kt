@@ -118,12 +118,13 @@ class CanonicalTimelinePresentation private constructor(
 
     // Durability alone is not presentation: retain live until the settled ledger is at the turn's revision.
     private val liveProjection: Flow<List<ChatRenderItem>> = combine(
-        owner.session.live, owner.session.pending, resident, residentOtids, residentServerIds,
-    ) { publication, pending, presented, settledOtids, settledServerIds ->
-        cacheStreamedAliases(publication)
+        combine(owner.session.live, owner.session.settling) { live, settling -> settling + listOfNotNull(live) },
+        owner.session.pending, resident, residentOtids, residentServerIds,
+    ) { publications, pending, presented, settledOtids, settledServerIds ->
+        publications.forEach(::cacheStreamedAliases)
         // One logical event stays on screen once. Sends converge by otid; server-originated
         // reasoning and assistant frames converge by server id even when storage remaps the row key.
-        val events = publication?.overlayEvents(presented).orEmpty()
+        val events = publications.flatMap { it.overlayEvents(presented) }
             .filterNot { event ->
                 (event.otid.isNotBlank() && event.otid in settledOtids) ||
                     event.serverId in settledServerIds
@@ -132,12 +133,10 @@ class CanonicalTimelinePresentation private constructor(
         // the moment settlement is acknowledged. Remember the otids this turn echoed so the local
         // bubble cannot reappear in the gap between the overlay draining and that write landing.
         //
-        // An otid is remembered only while the turn that echoed it is still the resident one. Once
-        // a different turn's overlay replaces it with the echo still not durable (its repair never
-        // committed), the overlay's copy of the prompt is gone; hiding the local bubble as well
-        // made the user's prompt vanish from the timeline.
-        publication?.let { current ->
-            echoedOtids.values.removeAll { it !== current.fence }
+        // Keep each echo only while its turn's overlay is retained.
+        val fences = publications.mapTo(mutableSetOf()) { it.fence }
+        echoedOtids.values.removeAll { it !in fences }
+        publications.forEach { current ->
             current.block.events.forEach { if (it.otid.isNotBlank()) echoedOtids[it.otid] = current.fence }
         }
         echoedOtids.keys.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
@@ -180,8 +179,10 @@ class CanonicalTimelinePresentation private constructor(
         resident.value = presented
         residentOtids.value = residents.mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
         residentServerIds.value = residents.mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) }
-        val fence = owner.session.live.value?.fence ?: return
-        scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
+        val fences = owner.session.settling.value.map { it.fence } + listOfNotNull(owner.session.live.value?.fence)
+        fences.forEach { fence ->
+            scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
+        }
     }
 
     suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk {
