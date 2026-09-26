@@ -58,6 +58,14 @@ object CanvasSceneValidator {
             ?: CanvasSceneCheck.Invalid(listOfNotNull(checked.problem))
     }
 
+    /** A document must have the Cascade `blocks` array that the renderers traverse; it may be empty. */
+    fun document(documentId: String, documentJson: String): CanvasSceneCheck =
+        if (CanvasDocumentText.isRecognizedDocument(documentJson)) {
+            CanvasSceneCheck.Valid(documentJson)
+        } else {
+            CanvasSceneCheck.Invalid(listOf(CanvasElementProblem(documentId, "is not a Cascade document with a \"blocks\" array", CanvasSceneSchema.shape)))
+        }
+
     fun ops(ops: List<CanvasOp>): CanvasOpsCheck {
         val problems = mutableListOf<CanvasElementProblem>()
         val checked = ops.map { checkOp(it, problems) }
@@ -68,8 +76,35 @@ object CanvasSceneValidator {
         is CanvasOp.ReplaceSceneOp -> scene(op.sceneJson).orRecord(problems, op) { op.copy(sceneJson = it) }
         is CanvasOp.AddElementOp -> element(op.elementId, op.elementJson).orRecord(problems, op) { op.copy(elementJson = it) }
         is CanvasOp.UpdateElementOp -> element(op.elementId, op.elementJson).orRecord(problems, op) { op.copy(elementJson = it) }
+        is CanvasOp.SetDocumentOp -> document(op.documentId, op.documentJson).orRecord(problems, op) { op.copy(documentJson = it) }
+        is CanvasOp.SetBackgroundOp -> background(op).orRecord(problems, op) { op.copy(colorHex = it) }
+        is CanvasOp.SetArrowBindingOp -> references(
+            op.elementId,
+            *listOfNotNull(op.binding.start?.documentId, op.binding.end?.documentId).toTypedArray(),
+        ).orRecord(problems, op) { op }
+        is CanvasOp.SetLabelOwnerOp -> references(
+            op.documentId,
+            *listOfNotNull(op.shapeId).toTypedArray(),
+        ).orRecord(problems, op) { op }
+        is CanvasOp.SetBackgroundPatternOp -> op // Typed DTO decoding constrains this payload; it is not rendered as scene JSON.
+        is CanvasOp.RemoveElementOp -> op // Removing an absent element is an intentional idempotent operation.
+        is CanvasOp.RemoveDocumentOp -> op // Removing an absent document is an intentional idempotent operation.
         is CanvasOp.BatchOp -> op.copy(ops = op.ops.map { checkOp(it, problems) })
-        else -> op
+    }
+
+    private fun background(op: CanvasOp.SetBackgroundOp): CanvasSceneCheck {
+        val normalized = CanvasSceneColors.background(JsonPrimitive(op.colorHex))
+        return if (normalized is JsonPrimitive && normalized.isString) {
+            CanvasSceneCheck.Valid(normalized.content)
+        } else {
+            CanvasSceneCheck.Invalid(listOf(CanvasElementProblem(null, "bgColor is not a colour \"#rrggbbaa\"", CanvasSceneSchema.shape)))
+        }
+    }
+
+    private fun references(vararg ids: String?): CanvasSceneCheck {
+        val blank = ids.firstOrNull { it.isNullOrBlank() }
+        return if (blank == null) CanvasSceneCheck.Valid("")
+        else CanvasSceneCheck.Invalid(listOf(CanvasElementProblem(null, "has a blank id reference", CanvasSceneSchema.shape)))
     }
 
     private inline fun CanvasSceneCheck.orRecord(

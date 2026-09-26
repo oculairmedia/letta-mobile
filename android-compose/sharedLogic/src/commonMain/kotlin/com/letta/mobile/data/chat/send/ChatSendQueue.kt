@@ -33,8 +33,18 @@ data class QueuedChatSend(
 data class ConversationSendQueue(
     val items: List<QueuedChatSend> = emptyList(),
     val paused: Boolean = false,
+    /**
+     * letta-mobile-1n5py.1: another client (a second device) runs this conversation's turn, and
+     * the head bounced off it. The queue waits for that turn to end instead of failing.
+     */
+    val heldByOtherClient: Boolean = false,
+    /**
+     * letta-mobile-1n5py.1: this device's send already went out, and the App Server parked it in
+     * its own queue behind another client's turn. Shown, not run: it leaves once it starts.
+     */
+    val queuedOnServer: QueuedChatSend? = null,
 ) {
-    val isEmpty: Boolean get() = items.isEmpty()
+    val isEmpty: Boolean get() = items.isEmpty() && queuedOnServer == null
 
     /** 1-based run position of [id], or null when it is not queued here. */
     fun positionOf(id: QueuedSendId): Int? = items.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.plus(1)
@@ -93,7 +103,7 @@ class ChatSendQueue {
     fun takeNext(conversationId: QueueConversationId): QueuedChatSend? {
         var taken: QueuedChatSend? = null
         updateQueue(conversationId) { queue ->
-            taken = queue.items.firstOrNull()?.takeUnless { queue.paused }
+            taken = queue.items.firstOrNull()?.takeUnless { queue.paused || queue.heldByOtherClient }
             if (taken == null) queue else queue.copy(items = queue.items.drop(1))
         }
         return taken
@@ -122,6 +132,37 @@ class ChatSendQueue {
     }
 
     fun isPaused(conversationId: QueueConversationId): Boolean = queueFor(conversationId).paused
+
+    /** letta-mobile-1n5py.1: [item] bounced off another client's turn; it waits at the head. */
+    fun holdForOtherClient(item: QueuedChatSend) {
+        updateQueue(item.conversationId) { queue ->
+            val items = if (queue.positionOf(item.id) != null) queue.items else listOf(item) + queue.items
+            queue.copy(items = items, heldByOtherClient = true)
+        }
+    }
+
+    /** Ends an other-client hold; returns true when [conversationId] was held. */
+    fun releaseOtherClientHold(conversationId: QueueConversationId): Boolean {
+        if (!queueFor(conversationId).heldByOtherClient) return false
+        updateQueue(conversationId) { it.copy(heldByOtherClient = false) }
+        return true
+    }
+
+    /** Conversations waiting for another client's turn to end. */
+    fun heldConversations(): List<QueueConversationId> =
+        _state.value.filterValues { it.heldByOtherClient }.keys.toList()
+
+    /** letta-mobile-1n5py.1: [item] was sent and now waits in the App Server's queue. */
+    fun markQueuedOnServer(item: QueuedChatSend) {
+        updateQueue(item.conversationId) { it.copy(queuedOnServer = item) }
+    }
+
+    /** [conversationId]'s server-queued send started or ended; returns true when one was shown. */
+    fun clearQueuedOnServer(conversationId: QueueConversationId): Boolean {
+        if (queueFor(conversationId).queuedOnServer == null) return false
+        updateQueue(conversationId) { it.copy(queuedOnServer = null) }
+        return true
+    }
 
     /** An emptied queue drops its entry, so a later pause cannot latch onto nothing. */
     private fun updateQueue(

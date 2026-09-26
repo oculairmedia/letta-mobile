@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -55,6 +56,14 @@ interface AppServerController {
      */
     val cancelledQueuedInputs: Flow<CancelledQueuedInput>
         get() = emptyFlow()
+
+    /**
+     * letta-mobile-qygvv.28: every App Server frame scoped to [runtime], as it arrives, for a relay
+     * that must pass on the server's own terminal and queue frames (the Iroh node). The turn
+     * engine consumes those into its lifecycle, so they never appear in [runTurn]. Collecting
+     * subscribes; null when this controller cannot observe raw frames.
+     */
+    fun observeRuntimeFrames(runtime: AppServerRuntimeScope): Flow<AppServerReceivedFrame>? = null
 
     /**
      * Starts a runtime for the given agent and conversation.

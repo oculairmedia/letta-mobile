@@ -23,6 +23,13 @@ interface AppStartupActions {
     suspend fun installDebugPerformanceMonitor(application: Application)
     suspend fun scheduleChannelHeartbeat()
     suspend fun prewarmDatabase()
+
+    /**
+     * Builds the settings repository (and, transitively, the Keystore-backed
+     * EncryptedSharedPreferences behind it) off the main thread so the first
+     * composition finds the singleton already constructed (letta-mobile-wyo3p).
+     */
+    suspend fun prewarmSettings()
 }
 
 @Singleton
@@ -51,6 +58,16 @@ class DefaultAppStartupActions @Inject constructor(
 
     override suspend fun scheduleChannelHeartbeat() {
         channelHeartbeatScheduler.schedule()
+    }
+
+    override suspend fun prewarmSettings() {
+        // letta-mobile-wyo3p: MasterKey + EncryptedSharedPreferences creation costs
+        // ~100-200 ms (Keystore binder + Tink init). MainActivity used to build it
+        // synchronously during injection; resolving it here on IO lets the Activity
+        // reach first composition in parallel.
+        withContext(Dispatchers.IO) {
+            settingsRepository.get()
+        }
     }
 
     override suspend fun prewarmDatabase() {

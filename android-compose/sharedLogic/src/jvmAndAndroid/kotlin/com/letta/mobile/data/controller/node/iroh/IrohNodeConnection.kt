@@ -928,7 +928,7 @@ class IrohNodeConnection(
                 tracker = tracker ?: TurnFrameTracker(),
                 parkedTerminals = parkedTerminals,
             ) {
-                relayTurn(controller, command, turn.protocol) { error -> handleInputFailure(error, turn) }
+                relayTurn(controller, command, turn.protocol.onHost(turnHost)) { handleInputFailure(it, turn) }
             },
         )
     }

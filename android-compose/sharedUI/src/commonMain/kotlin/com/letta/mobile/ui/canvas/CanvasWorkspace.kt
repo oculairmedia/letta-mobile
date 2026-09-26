@@ -61,7 +61,7 @@ import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
-import com.letta.mobile.data.canvas.CanvasSceneRenderGuard
+import com.letta.mobile.data.canvas.CanvasSceneStateGuard
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import io.ak1.drawbox.DrawBox
@@ -226,6 +226,9 @@ fun CanvasWorkspace(
     // Notes being dragged or resized, by id, at their live (uncommitted) frame.
     val liveNoteFrames = remember { androidx.compose.runtime.mutableStateMapOf<String, CanvasDocumentFrame>() }
     var expandedNoteId by remember { mutableStateOf<String?>(null) }
+    // What the board draws of each projected scene: a scene that breaks the board's rules keeps
+    // the last one that drew, and is reported, rather than crashing or blanking it (qygvv.30).
+    val sceneGuard = remember(session) { CanvasSceneStateGuard(session?.canvasId?.value) }
 
     // Load initial JSON diagram or session document & observe external session updates (Card I2.3 & I3.3)
     LaunchedEffect(session, initialJson) {
@@ -246,8 +249,9 @@ fun CanvasWorkspace(
                 val (clean, parsed) = withContext(Dispatchers.Default) {
                     val stripped = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
                     // Elements DrawBox cannot read are dropped (and reported) first: one of them
-                    // would otherwise fail the whole scene and open an empty board.
-                    val drawable = CanvasSceneRenderGuard.renderable(stripped, session.canvasId.value)
+                    // would otherwise fail the whole scene and open an empty board. A scene that
+                    // breaks the board's state rules is reported too (sceneGuard).
+                    val drawable = sceneGuard.drawable(sessionJson)
                     stripped to if (sessionJson.isBlank()) null else CanvasImageAssets.parse(drawable, assets)
                 }
                 // Known even for an empty canvas, or the first note placed on it would read as
@@ -291,7 +295,7 @@ fun CanvasWorkspace(
                     val (result, parsedExternal) = withContext(Dispatchers.Default) {
                         val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params) ?: return@withContext null
                         val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }
-                            ?.let { json -> CanvasImageAssets.parse(CanvasSceneRenderGuard.renderable(json, session.canvasId.value), assets) }
+                            ?.let { CanvasImageAssets.parse(sceneGuard.drawable(doc?.sceneJson.orEmpty()), assets) }
                         evaluated to payload
                     } ?: return@collect
                     lastImportedRev = result.newImportedRev

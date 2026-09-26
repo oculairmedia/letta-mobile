@@ -909,6 +909,58 @@ class ChatSendCoordinatorCleanupTest {
         assertFalse(ui.isAgentTyping())
     }
 
+    // letta-mobile-1n5py.1: another device already runs conv-1, so the wrapper bounces this send.
+    // It must wait and go again on that turn's terminal, never surface an error.
+    @Test
+    fun otherClientBusyRejectionHoldsTheSendAndRetriesItOnTheirTerminal() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(sendResults = mutableListOf(true, true))
+        val coordinator = coordinator(timeline = timeline, ui = ui, transport = transport, scope = backgroundScope)
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.Error("iroh_turn_engine_busy", "An App Server turn is already active for agent-1/conv-1.", "conv-1", "turn-1", "run-1"),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
+
+        val held = coordinator.sendQueue.state.value.getValue(QueueConversationId("conv-1"))
+        assertTrue(held.heldByOtherClient, "the send waits for the other device's turn")
+        assertEquals(listOf("hello"), held.items.map { it.text })
+        assertNull(ui.currentError(), "a busy bounce is never shown as an error")
+        assertTrue(timeline.failedLocals.isEmpty(), "the row is not marked failed")
+        assertEquals(1, transport.sentTexts.size)
+
+        // The other device's turn ends: a terminal that carries no send of this device.
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-other", "run-other", BridgeTurnStatus.Completed))
+
+        assertEquals(listOf("hello", "hello"), transport.sentTexts)
+        assertEquals(1, timeline.externalLocals.map { it.otid }.distinct().size, "the retry reuses the otid and its row")
+        assertNull(coordinator.sendQueue.state.value[QueueConversationId("conv-1")])
+    }
+
+    @Test
+    fun sendQueuedOnTheServerShowsUntilItsOwnTurnStreams() = runTest(UnconfinedTestDispatcher()) {
+        val coordinator = coordinator(timeline = RecordingTimelineWriter(), ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnQueued(turnId = "turn-1", conversationId = "conv-1"))
+
+        val queued = coordinator.sendQueue.state.value.getValue(QueueConversationId("conv-1")).queuedOnServer
+        assertEquals("hello", queued?.text)
+
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(id = "message-1", contentRaw = JsonPrimitive("hi"), runId = "run-1"),
+                conversationId = "conv-1",
+                turnId = "turn-1",
+            ),
+        )
+        assertNull(coordinator.sendQueue.state.value[QueueConversationId("conv-1")], "its own turn started")
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,

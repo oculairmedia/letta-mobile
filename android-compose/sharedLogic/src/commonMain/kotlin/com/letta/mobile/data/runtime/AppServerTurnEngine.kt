@@ -1047,7 +1047,7 @@ class AppServerTurnEngine(
         if (ownership == RunOwnership.Foreign) return
         context.idleWatchdog.markFrame()
         queueHygiene.observeTurnFrame(received.frame)
-        val queueRemoval = observeQueueProgress(received, context.lease)
+        val queueRemoval = observeQueueProgress(received, context.lease, ownership)
         // Review of PR #1661: a queued lease must not adopt the turn ahead of it. The gate runs
         // first so it records the run ids seen while queued even for frames held below.
         if (context.queuedFrames.skip(received, context.lease.current?.runId, ownership)) return

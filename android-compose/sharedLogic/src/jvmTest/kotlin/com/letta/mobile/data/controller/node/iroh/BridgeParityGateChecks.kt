@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import kotlinx.coroutines.test.TestScope
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -63,6 +64,12 @@ internal enum class GateCheck(val verify: (ParityRuns) -> String?) {
     /** Per run, usage_statistics before stop_reason, as the App Server sends them. */
     TailOrder(::tailOrder),
     ToolArgumentsAreObjects(::toolArgumentsAreObjects),
+
+    /** One tool_call_message and at most one tool_return_message per call, the return being the real result (qygvv.27). */
+    OneToolRowPerCall(::oneToolRowPerCall),
+
+    /** The queue updates the App Server sends after turn_finished (paused, then resumed) reach the phone (qygvv.28). */
+    QueueAfterTurn(::queueAfterTurn),
 }
 
 private fun mismatch(what: String, expected: Any?, actual: Any?): String? =
@@ -120,11 +127,12 @@ internal val NODE_ONLY_KINDS = mapOf(
     "resume_queue_response" to "the App Server's reply to the node's own resume_queue",
 )
 
-/** Kinds the node's engine re-projects before relaying, and the kind the phone gets instead. */
+/**
+ * Kinds the node's engine re-projects before relaying, and the kind the phone gets instead.
+ * `client_tool_start` / `client_tool_end` reach the phone as themselves (qygvv.27).
+ */
 internal val PROJECTED_KINDS = mapOf(
     "approval_request_message" to "tool_call_message", // auto-allowed: the card is suppressed, the call is not
-    "client_tool_start" to "tool_call_message",
-    "client_tool_end" to "tool_return_message",
 )
 
 private fun frameKinds(runs: ParityRuns): String? {
@@ -164,3 +172,37 @@ private fun toolArgumentsAreObjects(runs: ParityRuns): String? {
     }
     return if (bad.isEmpty()) null else "tool arguments that are not a JSON object: $bad"
 }
+
+private fun WireFrame.toolCallId(): String? {
+    val delta = json["delta"] as? JsonObject ?: return null
+    return ((delta["tool_call"] as? JsonObject)?.parityString("tool_call_id")) ?: delta.parityString("tool_call_id")
+}
+
+private fun oneToolRowPerCall(runs: ParityRuns): String? {
+    val repeated = listOf("tool_call_message", "tool_return_message").flatMap { kind ->
+        runs.phone.filter { it.kind == kind }.groupingBy { it.toolCallId() }.eachCount()
+            .filterValues { it > 1 }.keys.map { "$kind x$it" }
+    }
+    val lifecycleReturns = runs.phone.filter { frame ->
+        frame.kind == "tool_return_message" &&
+            ((frame.json["delta"] as? JsonObject)?.parityString("tool_return") ?: "").contains("\"client_tool_end\"")
+    }
+    return when {
+        repeated.isNotEmpty() -> "tool rows repeated per call: $repeated"
+        lifecycleReturns.isNotEmpty() -> "tool_return_message carrying a lifecycle frame: ${lifecycleReturns.map { it.json }}"
+        else -> null
+    }
+}
+
+/** Queue sizes of the `update_queue` frames after the last `turn_finished`, in order. */
+private fun List<JsonObject>.queueSizesAfterTurn(): List<Int> {
+    val finished = indexOfLast { it.parityString("type") == "turn_finished" }
+    return drop(finished + 1).filter { it.parityString("type") == "update_queue" }
+        .map { (it["queue"] as? JsonArray)?.size ?: 0 }
+}
+
+private fun queueAfterTurn(runs: ParityRuns): String? = mismatch(
+    "update_queue sizes after turn_finished",
+    runs.recording.parsedFrames.queueSizesAfterTurn(),
+    runs.phone.map { it.json }.queueSizesAfterTurn(),
+)

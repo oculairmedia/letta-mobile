@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.GoalStatus
 import com.letta.mobile.data.model.MessageContentPart
@@ -41,6 +42,8 @@ internal class AdminChatComposerCoordinator(
     private val messageRepository: IMessageRepository,
     private val slashCommandRepository: ISlashCommandRepository,
     private val isStreaming: () -> Boolean,
+    private val pendingUserInput: () -> PendingUserInput? = { null },
+    private val submitUserInput: (PendingUserInput, String) -> Unit = { _, _ -> },
     private val projectContextAvailable: Boolean,
     private val nowMs: () -> Long = { System.currentTimeMillis() },
 ) {
@@ -117,7 +120,11 @@ internal class AdminChatComposerCoordinator(
                 ChatComposerEffect.OpenBugReport
             }
             null -> {
-                if (uiState.value.isCancellingRun) {
+                val pending = pendingUserInput()
+                if (pending != null && trimmed.isNotBlank()) {
+                    submitUserInput(pending, pending.encodeAnswer(trimmed))
+                    composerController.clearText()
+                } else if (uiState.value.isCancellingRun) {
                     // letta-mobile-lgns8.19: sends are REJECTED (not queued)
                     // while a stop is in flight — matching the existing
                     // "no free-form steering during an active run" convention.
@@ -132,6 +139,17 @@ internal class AdminChatComposerCoordinator(
                 null
             }
         }
+    }
+
+    internal data class PendingUserInput(
+        val requestId: String,
+        val toolCallId: String,
+        val arguments: String?,
+        val question: String,
+    ) {
+        fun encodeAnswer(answer: String): String = AskUserQuestion.encodeAnswerReason(
+            AskUserQuestion.buildUpdatedInput(arguments, mapOf(question to listOf(answer))),
+        )
     }
 
     fun sendMessage(text: String) {

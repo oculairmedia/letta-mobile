@@ -32,6 +32,8 @@ private enum class QueueEvent(val wireName: String) {
     SendNow("queue.sendNow"),
     Dispatched("queue.dispatched"),
     DrainDeferred("queue.drainDeferred"),
+    HeldByOtherClient("queue.heldByOtherClient"),
+    OtherClientReleased("queue.otherClientReleased"),
 }
 
 /**
@@ -51,12 +53,16 @@ internal class QueuedSendDriver(
     private val queue: ChatSendQueue,
     private val turns: QueuedSendTurns,
     private val retry: DrainRetry = DrainRetry(),
+    otherClientBackoff: OtherClientHold.Backoff = OtherClientHold.Backoff(),
 ) {
     /** How long a drain keeps retrying a conversation whose turn has not retired yet. */
     data class DrainRetry(val delayMs: Long = DRAIN_RETRY_DELAY_MS, val attempts: Int = DRAIN_RETRY_ATTEMPTS)
 
     private val drainLock = SynchronizedObject()
     private val drains = HashMap<QueueConversationId, Job>()
+    private val otherClientHold = OtherClientHold(scope, otherClientBackoff) { conversationId ->
+        turns.serialized { releaseOtherClientHoldLocked(conversationId) }
+    }
 
     /** Queues [item] (caller holds the turn lock); returns its 1-based position. */
     suspend fun enqueueLocked(item: QueuedChatSend): Int {
@@ -69,7 +75,30 @@ internal class QueuedSendDriver(
 
     /** The conversation's turn reached its terminal (caller holds the turn lock). */
     suspend fun onTurnFinishedLocked(conversationId: QueueConversationId) {
+        otherClientHold.reset(conversationId)
         if (queue.hasItems(conversationId)) drainLocked(conversationId)
+    }
+
+    /**
+     * letta-mobile-1n5py.1: [item] bounced off another client's turn in its conversation (caller
+     * holds the turn lock). It waits at the head for that turn's end, never failing.
+     */
+    fun holdForOtherClientLocked(item: QueuedChatSend) {
+        queue.holdForOtherClient(item)
+        report(QueueEvent.HeldByOtherClient, item.conversationId, item.id)
+        otherClientHold.schedule(item.conversationId)
+    }
+
+    /** A terminal this device does not own: another client's turn may have ended, so try again. */
+    suspend fun onForeignTerminalLocked() {
+        queue.heldConversations().forEach { releaseOtherClientHoldLocked(it) }
+    }
+
+    private suspend fun releaseOtherClientHoldLocked(conversationId: QueueConversationId) {
+        otherClientHold.cancel(conversationId)
+        if (!queue.releaseOtherClientHold(conversationId)) return
+        report(QueueEvent.OtherClientReleased, conversationId)
+        drainLocked(conversationId)
     }
 
     /** A user Stop: hold what is queued. */
@@ -102,6 +131,7 @@ internal class QueuedSendDriver(
         val conversationId = queue.conversationOf(id) ?: return@serialized false
         queue.promote(id)
         queue.resume(conversationId)
+        queue.releaseOtherClientHold(conversationId)
         report(QueueEvent.SendNow, conversationId, id)
         // An aborted turn drains from its own terminal; without one, drain now.
         if (!abortRunningTurn(conversationId)) drainLocked(conversationId)

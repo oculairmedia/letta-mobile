@@ -136,7 +136,9 @@ internal suspend fun TestScope.bridgeRun(recording: AppServerRecording, fixture:
     val driver = fixture.setup.driver
     val command = turnCommandFor(recording.runtime, fixture.clientMessageId)
     val phone = FakePhoneLink(recording.runtime, fixture.clientMessageId, PHONE_REQUEST_ID, backgroundScope)
-    val controller = controllerRunning { turn -> nodeEngine.runTurn(turn).onEach { driver.onDraft(nodeEngine, turn, it) } }
+    val controller = controllerRunning(upstream.events) { turn ->
+        nodeEngine.runTurn(turn).onEach { driver.onDraft(nodeEngine, turn, it) }
+    }
     val relay = launch { phone.relay(controller, command) }
     runCurrent()
     driver.midTurn(nodeEngine, command)
