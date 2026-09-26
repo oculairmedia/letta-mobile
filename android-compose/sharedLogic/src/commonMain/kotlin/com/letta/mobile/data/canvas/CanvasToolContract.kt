@@ -37,6 +37,7 @@ object CanvasToolContract {
     const val APPLY_OPS = "canvas.apply_ops"
     const val EXPORT_SVG = "canvas.export_svg"
     const val LIST = "canvas.list"
+    const val RENDER_PREVIEW = "canvas.render_preview"
 
     /**
      * What export_svg answers until a real exporter runs where the tools do (letta-mobile-qsq7v).
@@ -129,6 +130,28 @@ object CanvasToolContract {
         ),
     )
 
+    val renderPreview = CanvasToolDefinition(
+        RENDER_PREVIEW,
+        "Render a proposed scene or ops without publishing, or the current published revision, using the mobile " +
+            "Compose canvas renderer. Returns an image and measured layout diagnostics only when a renderer is available. " +
+            "A structural dry_run is not a visual preview. Specify exactly one of scene_json or ops, or neither " +
+            "for the current revision. Camera offset is in screen pixels; fit_to_content defaults to true.",
+        objectSchema(
+            canvasIdParam,
+            ToolParam("scene_json", description = "Proposed DrawBox scene as a JSON string; not published."),
+            ToolParam("ops", type = "array", description = "Proposed canvas operations; not published.",
+                items = buildJsonObject { put("type", "object") }),
+            ToolParam("width_px", type = "integer", required = true),
+            ToolParam("height_px", type = "integer", required = true),
+            ToolParam("density", type = "number", required = true),
+            ToolParam("font_scale", type = "number"),
+            ToolParam("zoom", type = "number"),
+            ToolParam("camera_x", type = "number"),
+            ToolParam("camera_y", type = "number"),
+            ToolParam("fit_to_content", type = "boolean"),
+        ),
+    )
+
     val exportSvg = CanvasToolDefinition(
         EXPORT_SVG,
         "Export the SVG representation of a canvas (with no canvas_id, the conversation's canvas).",
@@ -147,7 +170,9 @@ object CanvasToolContract {
      * The tools offered to agents. [exportSvg] is not among them until it renders the real canvas: a
      * tool that always fails only costs an agent turns (see ExternalToolRegistry.factoryDefault).
      */
+    // Only advertise preview when a mobile renderer bridge is actually connected.
     val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, list)
+    val withPreview: List<CanvasToolDefinition> = all + renderPreview
 
     /** An object of [params]; the [ToolParam.required] ones are listed as required. */
     private fun objectSchema(vararg params: ToolParam): JsonObject = buildJsonObject {
