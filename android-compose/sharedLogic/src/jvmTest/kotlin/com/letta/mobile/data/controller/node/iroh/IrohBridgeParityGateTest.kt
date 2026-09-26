@@ -42,6 +42,10 @@ class IrohBridgeParityGateTest {
 
     @Test fun toolCallArgumentsReachThePhoneAsJsonObjects() = runTest { assertGate(GateCheck.ToolArgumentsAreObjects) }
 
+    @Test fun eachToolCallReachesThePhoneAsOneCallAndOneReturn() = runTest { assertGate(GateCheck.OneToolRowPerCall) }
+
+    @Test fun queueUpdatesAfterTurnFinishedReachThePhone() = runTest { assertGate(GateCheck.QueueAfterTurn) }
+
     /**
      * letta-mobile-1n5py / qygvv.4: an input the App Server queued reaches the phone as queued, and
      * the `update_queue` that dequeues it is relayed, so the phone's lease leaves its queued wait.

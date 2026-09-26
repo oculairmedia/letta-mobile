@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
@@ -15,6 +16,7 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -80,10 +82,19 @@ internal fun turnCommandFor(runtime: AppServerRuntimeScope, clientMessageId: Str
     input = TurnInput.UserMessage(localMessageId = clientMessageId, text = "<redacted>"),
 )
 
-/** A controller whose turns come from [runTurn]; every other call is the shared fake. */
-internal fun controllerRunning(turns: (TurnCommand) -> Flow<RuntimeEventDraft>): AppServerController =
+/**
+ * A controller whose turns come from [runTurn]; every other call is the shared fake. [frames] is
+ * what [AppServerController.observeRuntimeFrames] reads (the App Server the turns run against).
+ */
+internal fun controllerRunning(
+    frames: Flow<AppServerReceivedFrame>? = null,
+    turns: (TurnCommand) -> Flow<RuntimeEventDraft>,
+): AppServerController =
     object : AppServerController by FakeAppServerController() {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = turns(command)
+
+        override fun observeRuntimeFrames(runtime: AppServerRuntimeScope): Flow<AppServerReceivedFrame>? =
+            frames?.filter { it.frame.runtime?.conversationId == runtime.conversationId }
     }
 
 /**

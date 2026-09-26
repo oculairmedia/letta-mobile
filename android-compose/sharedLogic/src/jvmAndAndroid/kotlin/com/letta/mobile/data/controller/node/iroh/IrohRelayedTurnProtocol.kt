@@ -15,6 +15,9 @@ import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -83,7 +86,7 @@ private const val LOOP_PROCESSING = "PROCESSING_API_RESPONSE"
  * initiator only; observers keep reconciling through message.list.
  */
 internal class IrohRelayedTurnProtocol(
-    private val runtime: AppServerRuntimeScope,
+    val runtime: AppServerRuntimeScope,
     private val requestId: String?,
     private val clientMessageId: String?,
     val fanout: ConversationTurnFanout,
@@ -97,6 +100,13 @@ internal class IrohRelayedTurnProtocol(
     private var announcedRunId: String? = null
     private var upstreamStopReason: String? = null
     private var finished = false
+    private var idleForwarded = false
+
+    /**
+     * letta-mobile-qygvv.28: where the post-turn queue relay runs (the node's turn host), so the
+     * initiator's connection is not held for it. Null runs it before [relayTurn] returns (tests).
+     */
+    var postTurnScope: CoroutineScope? = null
 
     /** Installed around the engine's collect so the engine's acceptance reaches [acknowledge]. */
     val listener = TurnInputAcknowledgementListener { ack -> acknowledge(ack) }
@@ -233,6 +243,39 @@ internal class IrohRelayedTurnProtocol(
         fanout.writeInitiatorProtocolFrame("update_queue", fields)
     }
 
+    /**
+     * letta-mobile-qygvv.28: pass on one App Server frame of the turn's tail (`update_loop_status`,
+     * `update_queue`) as the server sent it, re-enveloped for the initiator.
+     */
+    suspend fun forwardServerFrame(frame: TapFrame) {
+        val type = frame.type ?: return
+        if (type == TapFrame.UPDATE_LOOP_STATUS && frame.loopStatus == TurnBoundaryGate.LOOP_WAITING_ON_INPUT) {
+            idleForwarded = true
+        }
+        fanout.writeInitiatorProtocolFrame(type, JsonObject(frame.raw.filterKeys { it !in ENVELOPE_KEYS }))
+    }
+
+    /**
+     * letta-mobile-qygvv.28: end the turn with the App Server's own [turnFinished], after the idle
+     * loop status (synthesized only when the server's tail did not carry one).
+     */
+    suspend fun finishWithServerFrame(turnFinished: TapFrame) {
+        if (finished) return
+        finished = true
+        if (!idleForwarded) {
+            fanout.writeInitiatorProtocolFrame("update_loop_status", loopStatusFields(TurnBoundaryGate.LOOP_WAITING_ON_INPUT))
+        }
+        val fields = JsonObject(turnFinished.raw.filterKeys { it !in ENVELOPE_KEYS })
+        fanout.writeInitiatorProtocolFrame("turn_finished", fields, drain = true)
+        Telemetry.event(
+            "IrohNode", "turn.finished_relayed",
+            "conversationId" to runtime.conversationId,
+            "stopReason" to ((fields["stop_reason"] as? JsonPrimitive)?.contentOrNull ?: ""),
+            "runId" to (runId ?: "<none>"),
+            "source" to "app_server",
+        )
+    }
+
     private suspend fun writeControlSafely(frame: String) {
         try {
             writeControl(frame)
@@ -269,27 +312,73 @@ internal class IrohRelayedTurnProtocol(
  * an input that never got its ack is answered `accepted:false` (busy rejection, input failure).
  *
  * letta-mobile-qygvv.18: the terminal is written only once the engine's flow has ended (see
- * [OrderedTurnRelay]), so `turn_finished` is the last frame the initiator gets for the turn.
+ * [OrderedTurnRelay]), so `turn_finished` is the last frame of the turn itself.
+ *
+ * letta-mobile-qygvv.28: the App Server's own tail (its terminal delta, idle loop status and
+ * `turn_finished`) is relayed from a [ServerFrameTap] opened before the input goes out, and after
+ * the turn the conversation's queue updates keep reaching the initiator. That post-turn relay runs
+ * on the protocol's [IrohRelayedTurnProtocol.postTurnScope] when set (the node's turn host),
+ * otherwise before this returns.
  */
 internal suspend fun relayTurn(
     controller: AppServerController,
     command: TurnCommand,
     protocol: IrohRelayedTurnProtocol,
     onFailure: suspend (Throwable) -> Unit,
-) {
-    val relay = OrderedTurnRelay(protocol.fanout, protocol)
-    val collected = runCatching {
-        withContext(protocol.listener) {
-            controller.runTurn(command).collect { draft -> relay.relay(draft) }
+) = coroutineScope {
+    val postTurnScope = protocol.postTurnScope
+    val tap = ServerFrameTap.open(controller.observeRuntimeFrames(protocol.runtime), postTurnScope ?: this)
+    var tapHandedOff = false
+    try {
+        val relay = OrderedTurnRelay(protocol.fanout, protocol, tap)
+        val collected = runCatching {
+            withContext(protocol.listener) {
+                controller.runTurn(command).collect { draft -> relay.relay(draft) }
+            }
+        }
+        val released = runCatching { relay.releaseHeldTerminal() }
+        val error = collected.exceptionOrNull() ?: released.exceptionOrNull()
+        if (error == null) {
+            tapHandedOff = relayQueueAfterTurn(tap, protocol, postTurnScope)
+            return@coroutineScope
+        }
+        if (error !is CancellationException) {
+            runCatching { withContext(NonCancellable) { protocol.rejectInput(error.message ?: error.toString()) } }
+        }
+        onFailure(error)
+    } finally {
+        if (!tapHandedOff) tap?.close()
+    }
+}
+
+/** Returns true when the post-turn relay took over closing [tap]. */
+private suspend fun relayQueueAfterTurn(
+    tap: ServerFrameTap?,
+    protocol: IrohRelayedTurnProtocol,
+    postTurnScope: CoroutineScope?,
+): Boolean {
+    tap ?: return false
+    val relayQueue: suspend () -> Unit = {
+        try {
+            tap.relayQueueAfterTurn(POST_TURN_QUEUE_WINDOW_MS) { frame -> protocol.forwardServerFrame(frame) }
+        } finally {
+            tap.close()
         }
     }
-    val released = runCatching { relay.releaseHeldTerminal() }
-    val error = collected.exceptionOrNull() ?: released.exceptionOrNull() ?: return
-    if (error !is CancellationException) {
-        runCatching { withContext(NonCancellable) { protocol.rejectInput(error.message ?: error.toString()) } }
+    if (postTurnScope == null) {
+        relayQueue()
+    } else {
+        postTurnScope.launch { relayQueue() }
     }
-    onFailure(error)
+    return true
 }
+
+/** Runs this turn's post-turn queue relay on [host], not on the initiator's connection. */
+internal fun IrohRelayedTurnProtocol.onHost(host: NodeTurnHost): IrohRelayedTurnProtocol =
+    apply { postTurnScope = host.scope }
+
+/** How long after `turn_finished` the conversation's queue updates are still relayed. */
+private const val POST_TURN_QUEUE_WINDOW_MS = 5_000L
 
 internal suspend fun relayDraft(
     fanout: ConversationTurnFanout,
@@ -311,7 +400,7 @@ internal suspend fun relayDraft(
     if (fanout.isFailureOrCancelLifecycle(payload)) {
         fanout.flushOpenToolCalls()
     }
-    fanout.onDraft(payload)
+    fanout.onDraft(payload, draft.runId)
     protocol.afterDraft(draft)
 }
 
