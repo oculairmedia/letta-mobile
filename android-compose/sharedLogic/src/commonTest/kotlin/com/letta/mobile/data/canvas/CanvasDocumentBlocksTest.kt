@@ -177,6 +177,30 @@ class CanvasDocumentBlocksTest {
     }
 
     @Test
+    fun movingAfterAConcurrentEditPreservesTheLatestBodyAndRecordsOnlyTheFrame() = runTest {
+        val session = CanvasSession.create(
+            InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("move-race")),
+        )
+        val initial = CanvasDocumentFrame(x = 1f, y = 2f, width = 320f, height = 240f)
+        val moved = initial.copy(x = 99f)
+        val updatedBody = """{"version":2,"blocks":[{"type":{"typeId":"paragraph"},"content":{"kind":"text","text":"fixed"}}]}"""
+        session.setDocument("n", """{"blocks":[{"type":{"typeId":"heading"}}]}""", frame = initial)
+        val staleCard = session.documents().single()
+        session.setDocument("n", updatedBody)
+        val beforeMove = session.documents()
+
+        session.moveDocument(staleCard.id, moved)
+
+        val afterMove = session.documents()
+        assertEquals(updatedBody, afterMove.single().json, "a stale card must not restore its old blocks")
+        assertEquals(moved, afterMove.single().frame)
+        val step = CanvasDocumentUndo.stepBetween(beforeMove, afterMove)
+        assertEquals(updatedBody, (step?.undo?.single() as CanvasOp.SetDocumentOp).documentJson)
+        assertEquals(updatedBody, (step.redo.single() as CanvasOp.SetDocumentOp).documentJson)
+        assertNull(session.moveDocument("n", moved), "an unchanged frame adds no history")
+    }
+
+    @Test
     fun drawingsCompareByContentNotByTextSoAnAutosaveIsNotAnExternalChange() {
         val exported = """{"bgColor":"#000000ff","elements":[{"id":"b","type":"Text"},{"id":"a","type":"Text"}]}"""
         val stored = """{"elements":[{"type":"Text","id":"a"},{"type":"Text","id":"b"}],"bgColor":"#000000ff"}"""

@@ -354,14 +354,26 @@ class CanvasSession(
         return setDocument(documentId, existing.json, actorId, color = colorHex)
     }
 
-    /** Moves or resizes a block document on the board; a no-op for a document that is not there. */
+    /** Moves or resizes a block document without replacing text edited since the drag began. */
     suspend fun moveDocument(
         documentId: String,
         frame: CanvasDocumentFrame,
         actorId: String = LOCAL_USER_ACTOR_ID,
-    ): CanvasDocument? {
-        val existing = documents().firstOrNull { it.id == documentId } ?: return null
-        return setDocument(documentId, existing.json, actorId, frame)
+        style: CanvasTextStyle? = null,
+    ): CanvasDocument? = mutex.withLock {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return@withLock null
+        if (existing.frame == frame && (style == null || existing.style == style)) return@withLock null
+        applyLocalLocked(
+            CanvasOp.SetDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = documentId,
+                documentJson = existing.json,
+                frame = frame,
+                style = style,
+            ),
+        )
     }
 
     /** Connector ends bound to block documents, by connector element id. */
@@ -456,7 +468,7 @@ class CanvasSession(
     suspend fun moveDocuments(
         frames: Map<String, CanvasDocumentFrame>,
         actorId: String = LOCAL_USER_ACTOR_ID,
-    ): CanvasDocument? {
+    ): CanvasDocument? = mutex.withLock {
         val existing = documents().associateBy { it.id }
         val ops = frames.mapNotNull { (id, frame) ->
             val doc = existing[id] ?: return@mapNotNull null
@@ -470,8 +482,8 @@ class CanvasSession(
                 frame = frame,
             )
         }
-        if (ops.isEmpty()) return null
-        return applyLocal(
+        if (ops.isEmpty()) return@withLock null
+        applyLocalLocked(
             CanvasOp.BatchOp(
                 opId = CanvasOpDiffer.generateOpId("batch"),
                 actorId = actorId,
