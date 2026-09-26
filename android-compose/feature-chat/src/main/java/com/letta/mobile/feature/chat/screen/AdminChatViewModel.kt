@@ -567,13 +567,10 @@ internal class AdminChatViewModel @Inject constructor(
             .map { agents -> agents.find { it.id == agentId } },
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    /**
-     * letta-mobile-okvyf: models applied to individual conversations by the Iroh
-     * `model.update` switch. That switch leaves [activeAgent]'s model unchanged, so
-     * the picker renders this conversation's entry before falling back to the agent.
-     */
-    val conversationModelSelections: StateFlow<Map<String, String>> =
-        modelControl?.conversationSelections ?: MutableStateFlow(emptyMap())
+    /** Per-conversation switches leave the agent model unchanged. */
+    val conversationModelSelections: StateFlow<Map<String, String>> by lazy {
+        modelCoordinator.conversationSelections
+    }
 
     val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)

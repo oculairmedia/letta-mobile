@@ -106,6 +106,7 @@ class AgentScaffoldHiltTest {
         every { viewModel.chatFontScale } returns fontScaleFlow
         every { viewModel.availableAgents } returns availableAgentsFlow
         every { viewModel.activeAgent } returns MutableStateFlow<Agent?>(null)
+        every { viewModel.conversationModelSelections } returns MutableStateFlow(emptyMap())
         every { viewModel.favoriteAgentId } returns MutableStateFlow<String?>(null)
         every { viewModel.pinnedAgentIds } returns MutableStateFlow(emptySet())
         every { viewModel.activeBackendLabel } returns MutableStateFlow<String?>("letta.test")

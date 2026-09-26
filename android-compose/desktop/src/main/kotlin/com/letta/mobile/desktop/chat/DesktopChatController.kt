@@ -686,26 +686,40 @@ class DesktopChatController(
         val previousLabel = _state.value.composerModelLabel
         conversationModels.record(conversationId, model)
         _state.update { it.copy(composerModelLabel = model) }
-        val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
         scope.launch {
-            try {
-                val extras = gatewayExtras ?: error("This backend cannot change a conversation's model")
-                extras.setConversationModel(conversationId, transportModel)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                // letta-mobile-okvyf: roll the optimistic pick back so the picker
-                // and composer never claim a model the server did not apply.
-                if (conversationModels[conversationId] == model) {
-                    conversationModels.record(conversationId, previousOverride)
-                    if (_state.value.selectedConversationId == conversationId) {
-                        _state.update { it.copy(composerModelLabel = previousLabel) }
-                    }
-                }
-                _state.update {
-                    it.copy(errorMessage = t.message ?: "Could not change model")
-                }
-            }
+            applyConversationModel(conversationId, model, previousOverride, previousLabel)
+        }
+    }
+
+    private suspend fun applyConversationModel(
+        conversationId: String,
+        model: String,
+        previousOverride: String?,
+        previousLabel: String,
+    ) {
+        try {
+            val extras = gatewayExtras ?: error("This backend cannot change a conversation's model")
+            val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
+            extras.setConversationModel(conversationId, transportModel)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            rollbackConversationModel(conversationId, model, previousOverride, previousLabel)
+            _state.update { it.copy(errorMessage = t.message ?: "Could not change model") }
+        }
+    }
+
+    private fun rollbackConversationModel(
+        conversationId: String,
+        model: String,
+        previousOverride: String?,
+        previousLabel: String,
+    ) {
+        // An earlier failed request must not undo a newer pick.
+        if (conversationModels[conversationId] != model) return
+        conversationModels.record(conversationId, previousOverride)
+        if (_state.value.selectedConversationId == conversationId) {
+            _state.update { it.copy(composerModelLabel = previousLabel) }
         }
     }
 

@@ -65,8 +65,7 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
     val favoriteAgentId by viewModel.favoriteAgentId.collectAsStateWithLifecycle()
     val activeBackendLabel by viewModel.activeBackendLabel.collectAsStateWithLifecycle()
     val availableModels by viewModel.llmModels.collectAsStateWithLifecycle()
-    val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
-    val conversationModelSelections by viewModel.conversationModelSelections.collectAsStateWithLifecycle()
+    val activeAgentModel = rememberSelectedConversationModel(viewModel)
     val projectBindings = viewModel.projectBindings
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val drawerConversationRepo = params.conversationRepository
@@ -78,13 +77,6 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
     val agentId = viewModel.agentId
     val agentIdValue = agentId.value
     val conversationId = viewModel.conversationId?.value
-    // letta-mobile-okvyf: a per-conversation switch leaves agent.model alone.
-    val activeAgentModel = remember(activeAgent, conversationModelSelections, conversationId) {
-        ConversationModelSelections.resolve(
-            conversationOverride = conversationId?.let(conversationModelSelections::get),
-            agentModel = activeAgent?.model,
-        )
-    }
     val projectContext = viewModel.projectContext
     val screenTitle = projectContext?.name ?: agentName.ifBlank { stringResource(R.string.screen_chat_title) }
     val switchableAgents = remember(availableAgents, agentId, agentName, favoriteAgentId, pinnedAgentIds) {
@@ -127,4 +119,17 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
         pinnedAgentIds = pinnedAgentIds,
         activeBackendLabel = activeBackendLabel,
     )
+}
+
+@Composable
+private fun rememberSelectedConversationModel(viewModel: AdminChatViewModel): String? {
+    val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
+    val selections by viewModel.conversationModelSelections.collectAsStateWithLifecycle()
+    val conversationId = viewModel.conversationId?.value
+    return remember(activeAgent, selections, conversationId) {
+        ConversationModelSelections.resolve(
+            conversationOverride = conversationId?.let(selections::get),
+            agentModel = activeAgent?.model,
+        )
+    }
 }
