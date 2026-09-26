@@ -16,6 +16,12 @@ interface MemoryBlockContentPort {
 
     /** Writes and commits the block (MemFS-backed on the App Server). */
     suspend fun save(ref: MemoryBlockRef, value: String): Block
+
+    /** bfooy.5: creates and commits a new block under [agentId]; fails if [label] exists. */
+    suspend fun create(agentId: String, label: String, value: String): Block
+
+    /** bfooy.5: deletes the block and commits the deletion. */
+    suspend fun delete(ref: MemoryBlockRef)
 }
 
 /**
@@ -35,11 +41,19 @@ class SessionGraphMemoryBlockPort(
         return blocks.pick(ref) ?: throw NoSuchElementException("Memory block ${ref.label} was not found")
     }
 
-    override suspend fun save(ref: MemoryBlockRef, value: String): Block {
-        val writer = graph().blockRepository as? IAgentBlockWriteRepository
+    override suspend fun save(ref: MemoryBlockRef, value: String): Block =
+        writer().writeAgentBlock(ref.target(), BlockUpdateParams(value = value))
+
+    override suspend fun create(agentId: String, label: String, value: String): Block =
+        writer().createAgentBlock(AgentBlockTarget(agentId, label), value)
+
+    override suspend fun delete(ref: MemoryBlockRef) = writer().deleteAgentBlock(ref.target())
+
+    private fun writer(): IAgentBlockWriteRepository =
+        graph().blockRepository as? IAgentBlockWriteRepository
             ?: throw UnsupportedOperationException("Memory blocks cannot be edited on this backend.")
-        return writer.writeAgentBlock(AgentBlockTarget(ref.agentId, ref.label), BlockUpdateParams(value = value))
-    }
+
+    private fun MemoryBlockRef.target() = AgentBlockTarget(agentId, label)
 
     private fun graph(): SessionRepositoryGraph = sessionGraphProvider.current
 

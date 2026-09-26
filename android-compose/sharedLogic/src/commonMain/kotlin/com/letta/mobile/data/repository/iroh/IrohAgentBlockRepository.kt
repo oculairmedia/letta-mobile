@@ -16,6 +16,12 @@ class IrohAgentBlockRepository(
     override suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block =
         directory().updateAgentBlock(target, params)
 
+    override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =
+        directory().createAgentBlock(target, value)
+
+    override suspend fun deleteAgentBlock(target: AgentBlockTarget) =
+        directory().deleteAgentBlock(target)
+
     private fun directory(): IrohAdminRpcAgentDirectory =
         directoryProvider() ?: error("Iroh admin RPC directory is unavailable for memory blocks")
 }

@@ -494,6 +494,21 @@ sealed interface AppServerInboundFrame {
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
     @Serializable
+    @SerialName("delete_memory_file_response")
+    data class DeleteMemoryFileResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("agent_id") val agentId: String? = null,
+        val path: String? = null,
+        val committed: Boolean = false,
+        @SerialName("commit_sha") val commitSha: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "delete_memory_file_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
     @SerialName("cron_add_response")
     data class CronAddResponse(
         @SerialName("request_id") override val requestId: String,

@@ -150,6 +150,10 @@ interface AppServerClient {
     suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile): AppServerInboundFrame.WriteMemoryFileResponse =
         throw UnsupportedOperationException("WriteMemoryFile is not supported by this client")
 
+    /** bfooy.5: native owner of agent memory-block deletes (`block.delete_agent`). */
+    suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile): AppServerInboundFrame.DeleteMemoryFileResponse =
+        throw UnsupportedOperationException("DeleteMemoryFile is not supported by this client")
+
     suspend fun cronList(command: AppServerCommand.CronList): AppServerInboundFrame.CronListResponse =
         throw UnsupportedOperationException("CronList is not supported by this client")
 
@@ -410,6 +414,9 @@ class DefaultAppServerClient(
 
     override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile): AppServerInboundFrame.WriteMemoryFileResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.WriteMemoryFileResponse }) { transport.sendControl(command) }
+
+    override suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile): AppServerInboundFrame.DeleteMemoryFileResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.DeleteMemoryFileResponse }) { transport.sendControl(command) }
 
     override suspend fun cronList(command: AppServerCommand.CronList): AppServerInboundFrame.CronListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.CronListResponse }) { transport.sendControl(command) }

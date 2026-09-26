@@ -208,6 +208,9 @@ class ShimOffParityGateTest {
         override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile) =
             AppServerInboundFrame.WriteMemoryFileResponse(command.requestId, true, command.agentId, command.path)
 
+        override suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile) =
+            AppServerInboundFrame.DeleteMemoryFileResponse(command.requestId, true, command.agentId, command.path, committed = true)
+
         override suspend fun cronRuns(command: AppServerCommand.CronRuns) =
             AppServerInboundFrame.CronRunsResponse(command.requestId, true)
 
@@ -348,6 +351,8 @@ class ShimOffParityGateTest {
         }
         // native opt-ins / skill path installs
         if (method == "skill.install") put("skill_path", "/skills/demo")
+        // bfooy.5: a create must target a label the fixture store does not hold.
+        if (method == "block.create_agent") put("label", "gate-new-block")
         if (method == "approval.submit") {
             put(
                 "payload",

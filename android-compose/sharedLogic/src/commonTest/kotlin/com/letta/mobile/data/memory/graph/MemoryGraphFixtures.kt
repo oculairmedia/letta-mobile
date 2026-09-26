@@ -140,4 +140,22 @@ internal class FakeMemoryBlockPort(
         values[ref.label] = value
         return Block(id = BlockId(ref.blockId), label = ref.label, value = value)
     }
+
+    val creates = mutableListOf<Triple<String, String, String>>()
+    val deletes = mutableListOf<MemoryBlockRef>()
+    var failCreateWith: Throwable? = null
+    var failDeleteWith: Throwable? = null
+
+    override suspend fun create(agentId: String, label: String, value: String): Block {
+        failCreateWith?.let { throw it }
+        creates += Triple(agentId, label, value)
+        values[label] = value
+        return Block(id = BlockId("block-$label"), label = label, value = value)
+    }
+
+    override suspend fun delete(ref: MemoryBlockRef) {
+        failDeleteWith?.let { throw it }
+        deletes += ref
+        values.remove(ref.label)
+    }
 }
