@@ -11,15 +11,22 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
+import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.testutil.FakeSettingsRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -47,20 +54,25 @@ class ConversationRepositoryTest {
     private lateinit var fakeApi: FakeConversationApi
     private lateinit var repository: ConversationRepository
     private lateinit var database: LettaDatabase
+    private lateinit var repositoryScope: CoroutineScope
 
     @Before
     fun setup() {
+        repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val context = ApplicationProvider.getApplicationContext<Context>()
         database = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java)
             .allowMainThreadQueries()
             .build()
         fakeApi = FakeConversationApi()
         val agentRepository = FakeAgentRepository()
-        repository = ConversationRepository(fakeApi, agentRepository, lazyOf(database.conversationDao()))
+        repository = ConversationRepository(
+            fakeApi, agentRepository, lazyOf(database.conversationDao()), repositoryScope = repositoryScope,
+        )
     }
 
     @After
     fun tearDown() {
+        repositoryScope.cancel()
         database.close()
     }
 
@@ -154,6 +166,8 @@ class ConversationRepositoryTest {
         try {
             repository.refreshConversationsIfStale("a1", maxAgeMs = -1)
             fail("Expected stale refresh to throw")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             // Expected.
         }
@@ -185,6 +199,7 @@ class ConversationRepositoryTest {
             fakeApi,
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
             localConversationSource = localSource,
             settingsRepository = settingsRepository,
         )
@@ -222,6 +237,8 @@ class ConversationRepositoryTest {
 
         try {
             repository.deleteConversation("1", "a1")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {}
 
         val result = repository.getConversations("a1").first()
@@ -247,6 +264,8 @@ class ConversationRepositoryTest {
 
         try {
             repository.updateConversation("1", "a1", "Updated")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {}
 
         val result = repository.getConversations("a1").first()
@@ -281,6 +300,7 @@ class ConversationRepositoryTest {
             httpThatThrows,
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
             settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
@@ -307,6 +327,7 @@ class ConversationRepositoryTest {
             fakeApi,
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
             settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
@@ -359,6 +380,111 @@ class ConversationRepositoryTest {
 
         assertTrue(result.first().archived == true)
     }
+
+    // The all-conversations screen archives rows whose agent list was never opened; the write must
+    // still reach the server, or the row only looks archived until the next refresh.
+    @Test
+    fun `setConversationArchived reaches the server when the agent list is not cached`() = runTest {
+        fakeApi.conversations.add(TestData.conversation(id = "1", agentId = "a1", summary = "Old").copy(archived = false))
+
+        repository.setConversationArchived("1", "a1", true)
+
+        assertTrue(fakeApi.calls.any { it.startsWith("updateConversation") })
+    }
+
+    // letta-mobile-xj85j: a conversation another device creates lands in a loaded agent list.
+    @Test
+    fun `conversation_updated push upserts the conversation into a loaded agent list`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, path, _ ->
+                assertEquals("conversation.get", method)
+                assertEquals("/v1/conversations/from-phone", path)
+                AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req",
+                    success = true,
+                    result = Json.parseToJsonElement("""{"id":"from-phone","agent_id":"a1","summary":"From phone"}"""),
+                )
+            }
+        }
+        database.conversationDao().upsert(
+            ConversationEntity.fromConversation(TestData.conversation(id = "1", agentId = "a1"), cachedAtEpochMs = 10L),
+        )
+        val pushed = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = backgroundScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(conversationPush("from-phone", agentId = "a1"))
+
+        val listed = pushed.getConversations("a1").first { rows -> rows.any { it.id.value == "from-phone" } }
+        assertEquals(setOf("1", "from-phone"), listed.map { it.id.value }.toSet())
+    }
+
+    @Test
+    fun `conversation_updated refetch failure leaves loaded list unchanged`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                AppServerInboundFrame.AdminRpcResponse("req", success = false, error = "RPC failed")
+            }
+        }
+        val cached = TestData.conversation(id = "existing", agentId = "a1")
+        database.conversationDao().upsert(ConversationEntity.fromConversation(cached, cachedAtEpochMs = 10L))
+        val pushed = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = backgroundScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(conversationPush("missing", agentId = "a1"))
+        runCurrent()
+
+        assertEquals(1, transport.adminRpcCalls.size)
+        assertEquals(listOf("existing"), pushed.getConversations("a1").first().map { it.id.value })
+    }
+
+    @Test
+    fun `conversation_updated push for an agent never loaded here fetches nothing`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ -> fail("unexpected $method"); error("unreachable") }
+        }
+        ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = backgroundScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(conversationPush("elsewhere", agentId = "a-unloaded"))
+        runCurrent()
+
+        assertTrue(transport.adminRpcCalls.isEmpty())
+    }
+
+    private fun conversationPush(conversationId: String, agentId: String?) = ServerFrame.ConversationUpdated(
+        id = "conversation-updated-$conversationId",
+        ts = "2026-09-25T21:00:00Z",
+        conversationId = conversationId,
+        agentId = agentId,
+        reason = "created",
+    )
 
     @Test
     fun `cancelConversation delegates to api`() = runTest {
