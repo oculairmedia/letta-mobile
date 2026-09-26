@@ -45,6 +45,9 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         "assistant_message" to 40L,
     )
 
+    /** Milliseconds between consecutive parts of one assistant message; see [datedByPart]. */
+    private val partStrideMs = 10L
+
     /**
      * Faithful port of translate.ts `localMessageToConversationMessages`.
      * One LocalMessage projects to one or more wire messages. Wire field sets
@@ -304,7 +307,21 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     /** Emit the pending grouped-text run (if any) as an assistant_message before a tool part. */
     private fun flushPendingText(out: MutableList<JsonObject>, ctx: ProjCtx, acc: TextAccumulator) {
         val run = acc.take() ?: return
-        out += buildAssistantText(ctx, out.isEmpty(), run.first, run.second)
+        out += datedByPart(ctx, run.first, buildAssistantText(ctx, out.isEmpty(), run.first, run.second))
+    }
+
+    /**
+     * Dates an assistant part's wire frame in part order (letta-mobile-iyj4s). The settled ledger
+     * orders a turn by date, so the per-type offset alone put a reply after the tool calls that
+     * followed it in the same message, while the live stream showed it where the model wrote it.
+     * Each part gets a [partStrideMs] slot; the type offset only orders the frames one part
+     * emits (a native tool part's call before its return).
+     */
+    private fun datedByPart(ctx: ProjCtx, partIndex: Int, frame: JsonObject): JsonObject {
+        val type = frame["message_type"]?.stringOrNull() ?: return frame
+        val created = runCatching { Instant.parse(ctx.created).toEpochMilli() }.getOrNull() ?: return frame
+        val offset = partIndex * partStrideMs + (typeOffsetMs[type] ?: 0L) / partStrideMs
+        return JsonObject(frame + ("date" to JsonPrimitive(support.isoMillis(created + offset))))
     }
 
     /**
@@ -337,20 +354,27 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             }
             val projected = projectAssistantPart(ctx, i, part, type) ?: continue
             flushPendingText(out, ctx, acc)
-            out += projected
+            out += projected.map { datedByPart(ctx, i, it) }
         }
         flushPendingText(out, ctx, acc)
         return out
     }
 
-    /** assistant_message wire object for a run of grouped text parts. */
+    /**
+     * assistant_message wire object for a run of grouped text parts.
+     *
+     * A run that follows another part of the same source message is named by the message id and
+     * its part index, and so is its otid (letta-mobile-iyj4s): sharing the source otid with the
+     * reasoning part ahead of it made the canonical writer fold the two onto one row.
+     */
     private fun buildAssistantText(ctx: ProjCtx, isFirst: Boolean, startIndex: Int, text: String): JsonObject =
         buildJsonObject {
-            put("id", if (isFirst) (ctx.id ?: "") else "${ctx.id}:assistant:$startIndex")
+            val partId = "${ctx.id}:assistant:$startIndex"
+            put("id", if (isFirst) (ctx.id ?: "") else partId)
             put("date", withTypeOffset(ctx.created, "assistant_message"))
             put("name", JsonNull)
             put("message_type", "assistant_message")
-            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("otid", if (isFirst) ctx.id?.let { JsonPrimitive(it) } ?: JsonNull else JsonPrimitive(partId))
             put("sender_id", JsonNull)
             put("step_id", JsonNull)
             put("is_err", JsonNull)
@@ -359,15 +383,19 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("content", text)
         }
 
-    /** reasoning_message wire object for a `reasoning` part. */
+    /**
+     * reasoning_message wire object for a `reasoning` part. Its otid is its own part id, never the
+     * source message's, so the reply text of the same message stays a separate row.
+     */
     private fun buildReasoning(ctx: ProjCtx, i: Int, part: JsonObject): JsonObject {
         val signature = (part["providerMetadata"] as? JsonObject)?.get("signature")?.stringOrNull()
+        val partId = "${ctx.id}:reasoning:$i"
         return buildJsonObject {
-            put("id", "${ctx.id}:reasoning:$i")
+            put("id", partId)
             put("date", withTypeOffset(ctx.created, "reasoning_message"))
             put("name", JsonNull)
             put("message_type", "reasoning_message")
-            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("otid", partId)
             put("sender_id", JsonNull)
             put("step_id", JsonNull)
             put("is_err", JsonNull)
