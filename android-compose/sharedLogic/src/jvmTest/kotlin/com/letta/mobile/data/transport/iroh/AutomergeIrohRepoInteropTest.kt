@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -244,6 +245,7 @@ class AutomergeIrohRepoInteropTest {
                 acceptor.accept(transport.transport).get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 accepted.complete(transport)
             } catch (error: Throwable) {
+                if (error is CancellationException) throw error
                 accepted.completeExceptionally(error)
             }
         }
