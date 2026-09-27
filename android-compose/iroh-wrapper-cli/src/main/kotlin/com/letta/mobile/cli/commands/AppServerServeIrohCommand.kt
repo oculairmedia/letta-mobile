@@ -27,6 +27,10 @@ import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
+import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
+import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.transport.iroh.AutomergeIrohRepoProtocol
 import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -158,6 +162,20 @@ fun buildProductionAdminRouter(
     )
 }
 
+internal fun parseNotebookPeers(directory: String?, ids: String?): Set<String>? {
+    require((directory == null) == (ids == null)) {
+        "Notebook sync requires both --notebook-dir and --notebook-peer-ids"
+    }
+    if (directory == null) return null
+    require(directory.isNotBlank()) { "Notebook directory must not be blank" }
+    val peers = requireNotNull(ids).split(',').map(String::trim).filter(String::isNotEmpty).toSet()
+    require(peers.isNotEmpty()) { "Notebook sync requires at least one authorized peer" }
+    require(peers.all { it.matches(Regex("[0-9a-f]{64}")) }) {
+        "Notebook peers must be lowercase 64-character Iroh endpoint IDs"
+    }
+    return peers
+}
+
 class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
 ) {
@@ -197,6 +215,18 @@ class AppServerServeIrohCommand : CliktCommand(
         envvar = "LETTA_IROH_ALLOWED_PEER_IDS",
         help = "Optional comma-separated allowlist of remote EndpointIds (64 hex chars).",
     ).default("")
+
+    private val notebookDir by option(
+        "--notebook-dir",
+        envvar = "LETTA_NOTEBOOK_DIR",
+        help = "Durable notebook directory. Notebook sync is disabled unless this and --notebook-peer-ids are set.",
+    )
+
+    private val notebookPeerIds by option(
+        "--notebook-peer-ids",
+        envvar = "LETTA_NOTEBOOK_PEER_IDS",
+        help = "Comma-separated Iroh endpoint IDs authorized for notebook sync (independent of App Server auth).",
+    )
 
     private val vibesyncBaseUrl by option(
         "--vibesync-base-url",
@@ -394,6 +424,8 @@ class AppServerServeIrohCommand : CliktCommand(
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         var irohEndpoint: IrohNodeEndpoint? = null
+        var notebookStore: NotebookLocalStore? = null
+        var notebookProtocol: AutomergeIrohRepoProtocol? = null
         var ownedServer: com.letta.mobile.cli.appserver.OwnedAppServerProcess? = null
 
         runWithLifecycleCleanup(
@@ -401,6 +433,8 @@ class AppServerServeIrohCommand : CliktCommand(
             cleanup = {
                 println("\n[iroh-app-server] Shutting down...")
                 runCatching { irohEndpoint?.shutdown() }
+                runCatching { notebookProtocol?.close() }
+                runCatching { notebookStore?.close() }
                 runCatching { ownedServer?.close() }
                 scope.cancel()
             },
@@ -415,6 +449,18 @@ class AppServerServeIrohCommand : CliktCommand(
             println("[iroh-app-server] Starting Iroh endpoint...")
             
             val canvasRelay = startCanvasRelay(scope)
+            val notebookPeers = parseNotebookPeers(notebookDir, notebookPeerIds)
+            if (notebookPeers != null) {
+                val keyFile = requireNotNull(irohSecretKeyPath) {
+                    "Notebook sync requires --iroh-secret-key-file for stable peer identity"
+                }
+                val peerId = IrohNodeIdentity.nodeIdHexFromSecretBytes(FileIrohSecretKeyStore(keyFile).loadOrCreate())
+                val store = NotebookLocalStore(java.nio.file.Path.of(requireNotNull(notebookDir)), peerId)
+                notebookStore = store
+                notebookProtocol = AutomergeIrohRepoProtocol(store.repo, notebookPeers, scope) { remote, alpn ->
+                    checkNotNull(irohEndpoint) { "Iroh endpoint not started" }.connect(remote, alpn)
+                }
+            }
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
@@ -424,6 +470,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 authPolicy = authPolicy,
                 pairingService = pairingService,
                 canvasRelay = canvasRelay,
+                protocolHandlers = listOfNotNull(notebookProtocol),
             )
             irohEndpoint = endpoint
             endpoint.create()
