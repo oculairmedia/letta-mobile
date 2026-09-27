@@ -8,6 +8,8 @@ import kotlin.test.assertTrue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertFailsWith
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 class NotebookLocalStoreTest {
     private fun projectedNote(title: String, body: String) =
@@ -176,6 +178,27 @@ class NotebookLocalStoreTest {
         store.close()
         assertFailsWith<IllegalStateException> { store.startPolling(10) }
         store.close()
+    }
+
+    @Test
+    fun granularBoardRetainsMetadataAcrossRestart() {
+        val directory = Files.createTempDirectory("notebook-granular-")
+        val id = NotebookLocalStore(directory, "granular-peer").use { store ->
+            val id = store.create("Board")
+            store.setBoard(id, """{"schema":"notebook-board/1","elements":[{"id":"a","extra":42},{"id":"b"}],"documents":{"note":"body"}}""")
+            store.putBoardElement(id, Json.parseToJsonElement("""{"id":"a","color":"red"}""").jsonObject)
+            val board = Json.parseToJsonElement(store.read(id)!!.sceneJson).jsonObject
+            assertEquals(2, (board["elements"] as kotlinx.serialization.json.JsonArray).size)
+            assertTrue(!board["elements"].toString().contains("extra"))
+            assertTrue(board["elements"].toString().contains("red"))
+            store.removeBoardElement(id, "b")
+            id
+        }
+        NotebookLocalStore(directory, "granular-peer").use { store ->
+            val board = Json.parseToJsonElement(store.read(id)!!.sceneJson).jsonObject
+            assertEquals(1, (board["elements"] as kotlinx.serialization.json.JsonArray).size)
+            assertTrue(board["documents"].toString().contains("body"))
+        }
     }
 
     @Test

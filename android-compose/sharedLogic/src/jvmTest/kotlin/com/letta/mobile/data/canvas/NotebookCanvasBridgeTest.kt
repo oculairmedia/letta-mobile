@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlin.test.assertTrue
 
 class NotebookCanvasBridgeTest {
     @Test
@@ -20,6 +21,9 @@ class NotebookCanvasBridgeTest {
             assertEquals(NotebookCanvasImportResult.ALREADY_IMPORTED, bridge.import(source, target))
             assertEquals(Json.parseToJsonElement(scene), Json.parseToJsonElement(assertNotNull(bridge.drawableScene(target))))
             assertEquals("Legacy", store.read(target)?.title)
+            val board = Json.parseToJsonElement(store.read(target)!!.sceneJson).jsonObject
+            assertTrue(board["elements"].toString().contains("image-1"))
+            assertTrue(board["documents"].toString().contains("note-body"))
             assertEquals(scene, source.sceneJson)
             target
         }
