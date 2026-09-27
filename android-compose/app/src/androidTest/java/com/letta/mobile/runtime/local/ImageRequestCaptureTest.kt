@@ -6,15 +6,6 @@ import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.*
-import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
-import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
-import com.letta.mobile.runtime.actions.MobileActionRegistry
-import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
-import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
-import com.letta.mobile.runtime.mobileactions.AndroidProviderReadTool
-import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
-import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
-import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
@@ -58,23 +49,6 @@ class ImageRequestCaptureTest {
     private val bridgesToStop = mutableListOf<LettaCodeNodeBridge>()
     private val json = Json { ignoreUnknownKeys = true }
 
-    private fun networkBridge(): LocalAndroidNetworkBridge {
-        val sensor = AndroidDeviceSensorSnapshotProvider(context)
-        val hardware = AndroidDeviceHardwareControlProvider(context)
-        val actions = MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink())
-        val intents = MobileIntentActionTool(context)
-        return LocalAndroidNetworkBridge(
-            sensorSnapshotProvider = sensor,
-            mobileActionRegistry = actions,
-            mobileIntentActionTool = intents,
-            hardwareControlProvider = hardware,
-            deviceActionCommandRunner = DeviceActionCommandRunner(
-                DeviceSensorReadTool(sensor), actions, intents, DeviceHardwareControlTool(hardware),
-                AndroidProviderReadTool(context),
-            ),
-        )
-    }
-
     @After
     fun stopBridges() = runBlocking {
         bridgesToStop.forEach { bridge -> bridge.stop() }
@@ -102,7 +76,7 @@ class ImageRequestCaptureTest {
                 nodeBridge = nodeBridge,
                 runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
                 localBackendStore = LettaCodeLocalBackendStore(context),
-                androidNetworkBridge = networkBridge(),
+                androidNetworkBridge = networkBridge(context),
                 onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
                     override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
                         error("on-device bridge must not start when a custom provider is configured")
