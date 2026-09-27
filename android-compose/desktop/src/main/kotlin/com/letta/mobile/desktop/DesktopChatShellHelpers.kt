@@ -394,7 +394,7 @@ internal fun conversationRecency(label: String): java.time.Instant =
 
 internal data class OpenDesktopCanvasParams(
     val scope: CoroutineScope,
-    val store: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val store: com.letta.mobile.data.canvas.CanvasDocumentStore,
     val conversationId: String?,
     val agentId: String?,
     val agentName: String,
@@ -426,7 +426,7 @@ internal data class DesktopComposerCommandsParams(
     val selectedAgentId: String?,
     val selectedAgentName: String,
     val selectedDestination: DesktopDestination,
-    val canvasStore: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val canvasStore: com.letta.mobile.data.canvas.CanvasDocumentStore,
     val chatScope: CoroutineScope,
     val onNavigate: (DesktopDestination) -> Unit,
     val onCreateAgent: () -> Unit,

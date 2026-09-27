@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -99,6 +100,8 @@ class IrohChannelTransport(
     private val observerTerminalGraceMs: Long = IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS,
     // letta-mobile-qygvv.16: how long a turn whose session closed has to publish its own terminal.
     private val sessionLossTerminalGraceMs: Long = IrohSessionLossCutOff.SESSION_LOSS_TERMINAL_GRACE_MS,
+    // Process-owned store shared with canvas/document APIs; transport never closes or polls it.
+    private val notebookStore: NotebookLocalStore? = null,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
@@ -179,17 +182,26 @@ class IrohChannelTransport(
 
     private var explicitConfig: IrohConnectConfig? = null
 
+    private val notebookHandlerFactory: ((computer.iroh.Endpoint, CoroutineScope) -> NotebookEndpointSession)? =
+        notebookPeers?.invoke()?.takeIf { it.isNotEmpty() }?.let { peers ->
+            when {
+                notebookStore != null -> { endpoint, notebookScope ->
+                    NotebookEndpointSession(notebookStore, endpoint, peers, notebookScope)
+                }
+                notebookDirectory != null -> { endpoint, notebookScope ->
+                    NotebookEndpointSession(notebookDirectory, endpoint, peers, notebookScope)
+                }
+                else -> null
+            }
+        }
+
     private val irohDialer = IrohDialer(
         scope = scope,
         secretKeyStore = secretKeyStore,
         onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
         onCloseResources = ::handleCloseResources,
         externalToolRegistry = externalToolRegistry,
-        notebookHandlerFactory = notebookDirectory?.let { directory ->
-            notebookPeers?.invoke()?.let { peers ->
-                { endpoint, notebookScope -> NotebookEndpointSession(directory, endpoint, peers, notebookScope) }
-            }
-        },
+        notebookHandlerFactory = notebookHandlerFactory,
     )
 
     // Explicit type: this field and `livenessProbe` reference each other through
@@ -202,7 +214,7 @@ class IrohChannelTransport(
     )
 
     init {
-        if (notebookDirectory != null && notebookPeers != null) {
+        if (notebookHandlerFactory != null) {
             scope.launch {
                 try {
                     irohDialer.startNotebook()

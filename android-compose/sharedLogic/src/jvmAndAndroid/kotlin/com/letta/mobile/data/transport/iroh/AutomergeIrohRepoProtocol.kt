@@ -196,17 +196,24 @@ object NotebookPeerProvisioning {
     }
 }
 
-/** Session-owned store and handler; the caller's Iroh endpoint supplies identity and outbound dialing. */
-class NotebookEndpointSession(
-    directory: Path,
+/** Sync handler for a store owned by the caller, using the host endpoint for identity and dialing. */
+class NotebookEndpointSession private constructor(
+    private val store: NotebookLocalStore,
     endpoint: Endpoint,
     peers: Set<String>,
     scope: CoroutineScope,
+    private val ownsStore: Boolean,
 ) : IrohNodeProtocolHandler, AutoCloseable {
-    private val store = NotebookLocalStore(directory, IrohDiagnostics.endpointIdHex(endpoint.addr().id()))
+    constructor(store: NotebookLocalStore, endpoint: Endpoint, peers: Set<String>, scope: CoroutineScope) :
+        this(store, endpoint, peers, scope, false)
+
+    /** Compatibility constructor for sessions that own their own store and projection poller. */
+    constructor(directory: Path, endpoint: Endpoint, peers: Set<String>, scope: CoroutineScope) :
+        this(NotebookLocalStore(directory, IrohDiagnostics.endpointIdHex(endpoint.addr().id())), endpoint, peers, scope, true)
+
     private val protocol = AutomergeIrohRepoProtocol(store.repo, peers, scope, endpoint::connect)
     init {
-        store.startPolling(1_000)
+        if (ownsStore) store.startPolling(1_000)
     }
     override val alpn: ByteArray get() = protocol.alpn
     override fun authorize(remoteEndpointId: String): Boolean = protocol.authorize(remoteEndpointId)
@@ -215,7 +222,7 @@ class NotebookEndpointSession(
 
     override fun close() {
         protocol.close()
-        store.close()
+        if (ownsStore) store.close()
     }
 }
 

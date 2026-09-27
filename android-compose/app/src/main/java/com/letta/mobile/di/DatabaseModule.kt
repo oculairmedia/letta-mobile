@@ -15,9 +15,10 @@ import com.letta.mobile.data.local.ConfirmedTimelineSnapshotDao
 import com.letta.mobile.data.local.RoomConfirmedTimelineStore
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
+import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
+import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.local.CanvasDocumentDao
 import com.letta.mobile.data.local.CanvasOpDao
-import com.letta.mobile.data.local.RoomCanvasDocumentStore
 import com.letta.mobile.data.local.RoomCanvasOpLog
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.PendingLocalStore
@@ -157,9 +158,21 @@ object DatabaseModule {
     }
 
     @Provides
-    fun provideCanvasDocumentStore(dao: CanvasDocumentDao): CanvasDocumentStore {
-        return RoomCanvasDocumentStore(dao)
+    @Singleton
+    fun provideNotebookLocalStore(@ApplicationContext context: Context): NotebookLocalStore {
+        val prefs = context.getSharedPreferences("notebook-identity", Context.MODE_PRIVATE)
+        val peerId = prefs.getString("peer-id", null) ?: java.util.UUID.randomUUID().toString().also { id ->
+            check(prefs.edit().putString("peer-id", id).commit()) { "Cannot persist notebook peer identity" }
+        }
+        val directory = context.filesDir.toPath().resolve("notebooks/documents")
+        java.nio.file.Files.createDirectories(directory)
+        return NotebookLocalStore(directory, peerId)
     }
+
+    @Provides
+    @Singleton
+    fun provideCanvasDocumentStore(notebooks: NotebookLocalStore): CanvasDocumentStore =
+        NotebookCanvasDocumentStore(notebooks)
 
     @Provides
     fun provideCanvasOpDao(database: LettaDatabase): CanvasOpDao {

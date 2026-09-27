@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.openDesktopCanvasSession
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +27,7 @@ internal data class DesktopCanvasOwner(
  * and call the open/create/close verbs instead of each writing the session state themselves.
  */
 internal class DesktopCanvasShell(
-    val store: DesktopCanvasDocumentStore,
+    val store: CanvasDocumentStore,
     val library: DesktopCanvasLibrary,
     private val scope: CoroutineScope,
     sessionState: MutableState<CanvasSession?>,
@@ -56,7 +57,7 @@ internal class DesktopCanvasShell(
 
 @Composable
 internal fun rememberDesktopCanvasShell(scope: CoroutineScope): DesktopCanvasShell {
-    val store = remember { DesktopCanvasDocumentStore() }
+    val store = remember { DesktopNotebookCanvasStore.documents }
     val library = rememberDesktopCanvasLibrary(store, scope)
     val sessionState = remember { mutableStateOf<CanvasSession?>(null) }
     val shell = remember(store, library, scope) { DesktopCanvasShell(store, library, scope, sessionState) }

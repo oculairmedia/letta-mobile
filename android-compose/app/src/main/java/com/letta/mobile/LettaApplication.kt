@@ -68,6 +68,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         if (isRobolectricRuntime()) {
             return
         }
+        deps.notebookLocalStore.startPolling(1_000)
         appStartupCoordinator.start(this)
     }
 

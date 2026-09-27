@@ -1,6 +1,10 @@
 package com.letta.mobile.data.canvas
 
 import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.channels.FileChannel
+import java.nio.channels.OverlappingFileLockException
+import java.nio.file.StandardOpenOption.CREATE
+import java.nio.file.StandardOpenOption.WRITE
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
@@ -34,7 +38,22 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
     @Serializable
     private data class DocumentIndex(val ids: List<String>)
 
+    private val canvasLockFile = directory.resolve("notebook-canvas.lock")
     private val projection = NotebookFilesystemProjection(directory.resolve("projection"))
+
+    /** Serialize canvas claims and CAS across instances and processes using this repository. */
+    internal fun <T> withCanvasLock(action: () -> T): T {
+        require(!Files.isSymbolicLink(canvasLockFile)) { "Canvas lock must not be a symlink" }
+        FileChannel.open(canvasLockFile, CREATE, WRITE).use { channel ->
+            while (true) {
+                try {
+                    channel.lock().use { return action() }
+                } catch (_: OverlappingFileLockException) {
+                    Thread.sleep(10)
+                }
+            }
+        }
+    }
     private val indexFile = directory.resolve("notebook-documents.json")
     private val poller = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "notebook-projection-poller").apply { isDaemon = true }
@@ -305,6 +324,90 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
             })
         }
         return JsonObject(root + ("elements" to JsonArray(legacy + values))).toString()
+    }
+
+    /** Canvas metadata and board live in the same Automerge transaction; notebook items are untouched. */
+    internal fun canvasDocument(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
+        canvasFrom(document)
+    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+
+    private fun canvasFrom(read: Read): CanvasDocument? {
+        val metadata = (read.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
+            ?: return null
+        val doc = Json.decodeFromString<CanvasDocument>(metadata)
+        val board = Json.parseToJsonElement(boardFrom(read)).jsonObject
+        val scene = JsonObject(board.filterKeys { it != "schema" }).toString()
+        val base = (read.get(ObjectId.ROOT, "canvasSceneBase").orElse(null) as? AmValue.Str)?.value
+        return doc.copy(sceneJson = if (base == "" && scene == "{\"elements\":[]}") "" else scene)
+    }
+
+    internal fun writeCanvas(id: DocumentId, doc: CanvasDocument, expectedRevision: Long?): Boolean {
+        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
+        return handle.withDocument { document ->
+            document.startTransaction().use { tx ->
+                val current = canvasFrom(tx)
+                if (expectedRevision != null && current?.revision != expectedRevision) return@withDocument false
+                if (current != null && current.id != doc.id) error("Notebook belongs to another canvas")
+                val base = (tx.get(ObjectId.ROOT, "canvasSceneBase").orElse(null) as? AmValue.Str)?.value
+                val incoming = sceneBoard(doc.sceneJson)
+                if (base == null || current?.sceneJson != doc.sceneJson) {
+                    if (base == null) writeBoard(tx, incoming.toString())
+                    else mergeCanvasBoard(tx, sceneBoard(base), incoming)
+                }
+                tx.set(ObjectId.ROOT, "canvasMetadata", Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = "")))
+                tx.set(ObjectId.ROOT, "canvasSceneBase", doc.sceneJson)
+                tx.set(ObjectId.ROOT, "title", doc.title)
+                tx.commit()
+                true
+            }
+        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    private fun sceneBoard(scene: String): JsonObject {
+        val root = if (scene.isBlank()) JsonObject(mapOf("elements" to JsonArray(emptyList())))
+            else Json.parseToJsonElement(scene).jsonObject
+        require(root["elements"] is JsonArray) { "Canvas scene needs elements" }
+        return JsonObject(root + ("schema" to JsonPrimitive("notebook-board/1")))
+    }
+
+    private fun mergeCanvasBoard(tx: Transaction, base: JsonObject, incoming: JsonObject) {
+        val current = Json.parseToJsonElement(boardFrom(tx)).jsonObject
+        val old = (base["elements"] as JsonArray).mapNotNull { (it as? JsonObject)?.let { obj ->
+            (obj["id"] as? JsonPrimitive)?.content?.let { key -> key to obj }
+        } }.toMap()
+        val next = (incoming["elements"] as JsonArray).mapNotNull { (it as? JsonObject)?.let { obj ->
+            (obj["id"] as? JsonPrimitive)?.content?.let { key -> key to obj }
+        } }.toMap()
+        // Only replace elements changed by this canvas write; unrelated notebook edits survive.
+        (old.keys + next.keys).forEach { key ->
+            if (old[key] != next[key]) {
+                if (next[key] == null) removeElement(tx, key) else putElement(tx, key, next.getValue(key))
+            }
+        }
+        val envelope = current.toMutableMap()
+        (base.keys + incoming.keys).filter { it != "elements" && it != "schema" }.forEach { key ->
+            if (base[key] != incoming[key]) {
+                if (key in incoming) envelope[key] = incoming.getValue(key) else envelope.remove(key)
+            }
+        }
+        tx.set(ObjectId.ROOT, "board", JsonObject(envelope).toString())
+    }
+
+    private fun putElement(tx: Transaction, key: String, value: JsonObject) {
+        val elements = boardElements(tx)
+        val map = (tx.get(elements, key).orElse(null) as? AmValue.Map)?.id ?: tx.set(elements, key, ObjectType.MAP)
+        tx.keys(map).orElseThrow().filter { it !in value }.forEach { tx.delete(map, it) }
+        value.forEach { (field, fieldValue) -> tx.set(map, field, fieldValue.toString()) }
+        val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)
+        if (tombstones != null && tx.get(tombstones.id, key).isPresent) tx.delete(tombstones.id, key)
+    }
+
+    private fun removeElement(tx: Transaction, key: String) {
+        val elements = boardElements(tx)
+        if (tx.get(elements, key).isPresent) tx.delete(elements, key)
+        val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)?.id
+            ?: tx.set(ObjectId.ROOT, "boardTombstones", ObjectType.MAP)
+        tx.set(tombstones, key, true)
     }
 
     fun setBoard(id: DocumentId, boardJson: String) {

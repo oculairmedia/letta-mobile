@@ -29,6 +29,7 @@ class SessionChannelTransportFactory @Inject constructor(
     private val externalToolRegistry: ExternalToolRegistry? = null,
     /** Shares canvases through the Iroh host; attached to each Iroh transport this makes. */
     private val canvasClient: com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient? = null,
+    private val notebookStore: com.letta.mobile.data.canvas.NotebookLocalStore? = null,
 ) {
     fun create(
         scope: CoroutineScope,
@@ -56,7 +57,7 @@ class SessionChannelTransportFactory @Inject constructor(
                         java.io.File(appContext.filesDir, "iroh-client-identity.key").path,
                     ),
                     externalToolRegistry = externalToolRegistry,
-                    notebookDirectory = appContext.filesDir.toPath().resolve("notebooks/documents"),
+                    notebookStore = notebookStore,
                     notebookPeers = {
                         NotebookPeerProvisioning.read(appContext.filesDir.toPath().resolve("notebooks/peers.json"))
                     },
