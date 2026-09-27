@@ -98,7 +98,7 @@ class IrohChannelTransportEndToEndTest {
         val resultPeer = CompletableDeferred<String>()
         val server = IrohNodeEndpoint(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("other-app-server-peer")),
             protocolHandlers = listOf(createHandler(resultPeer)),
         )
         val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))

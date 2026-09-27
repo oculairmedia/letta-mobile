@@ -297,6 +297,11 @@ class IrohNodeEndpoint(
             val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
             val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
             Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
+            val handler = protocolHandlers.firstOrNull { it.alpn.contentEquals(peerAlpn) }
+            if (handler != null) {
+                serveProtocol(handler, connection, remoteId)
+                return
+            }
             if (!isPeerAllowed(remoteId)) {
                 Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
@@ -330,11 +335,6 @@ class IrohNodeEndpoint(
         controller: AppServerController,
         turnHost: NodeTurnHost,
     ) {
-        val handler = protocolHandlers.firstOrNull { it.alpn.contentEquals(accepted.peerAlpn) }
-        if (handler != null) {
-            serveProtocol(handler, accepted.connection, accepted.remoteId)
-            return
-        }
         val relay = canvasRelay
         if (relay != null && relay.handles(accepted.peerAlpn)) {
             serveCanvas(relay, accepted.peerAlpn, accepted.connection, accepted.remoteId)
