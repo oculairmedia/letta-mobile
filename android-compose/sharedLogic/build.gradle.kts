@@ -127,6 +127,8 @@ kotlin {
                 // CIO engine for the admin-proxy PATCH path: HttpURLConnection
                 // cannot send PATCH (JDK ProtocolException).
                 implementation(libs.ktor.client.cio)
+                // Peer-owned notebook documents persist locally on both JVM and Android.
+                implementation(libs.automerge)
             }
         }
 
@@ -140,6 +142,9 @@ kotlin {
                 // Iroh AAR: brings the JVM iroh classes transitively + the
                 // Android-only IrohAndroid class (JNI entry point).
                 implementation(libs.iroh.android)
+                // The Java automerge artifact has no Android .so files; its matching
+                // native libraries ship separately in the upstream Android AAR.
+                implementation("org.automerge:androidnative:0.0.9")
             }
         }
 
@@ -160,12 +165,6 @@ kotlin {
         getByName("jvmTest") {
             dependsOn(jvmAndAndroidTest)
             dependencies {
-                // Architecture characterization for the Meridian federation
-                // decision. Automerge Java 0.0.9 includes the Samod repository
-                // runtime and a generic Transport bridge, letting it run over
-                // the Iroh endpoint we already own instead of adding a second
-                // native mesh endpoint.
-                implementation(libs.automerge)
                 implementation(libs.ktor.client.cio)
                 implementation(libs.zxing.javase)
                 implementation(libs.ktor.server.core)

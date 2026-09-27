@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,29 +31,43 @@ internal fun CanvasHistoryDialog(
     checkpoints: List<CanvasCheckpoint>,
     onDismiss: () -> Unit,
     onRestore: (CanvasCheckpoint) -> Unit,
+    compact: Boolean = false,
 ) {
     if (!show) return
+    if (compact) {
+        ModalBottomSheet(onDismissRequest = onDismiss) {
+            Column(modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md)) {
+                Text("Revision History", style = MaterialTheme.typography.titleMedium)
+                CanvasHistoryContent(checkpoints, onRestore)
+            }
+        }
+        return
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Revision History", style = MaterialTheme.typography.titleMedium) },
-        text = {
-            if (checkpoints.isEmpty()) {
-                Text("No revision checkpoints recorded yet.", style = MaterialTheme.typography.bodyMedium)
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().height(300.dp),
-                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                ) {
-                    items(checkpoints) { cp ->
-                        CanvasHistoryCard(cp = cp, onRestore = { onRestore(cp) })
-                    }
-                }
-            }
-        },
+        text = { CanvasHistoryContent(checkpoints, onRestore) },
         confirmButton = {
             Button(onClick = onDismiss) { Text("Close") }
         },
     )
+}
+
+@Composable
+private fun CanvasHistoryContent(
+    checkpoints: List<CanvasCheckpoint>,
+    onRestore: (CanvasCheckpoint) -> Unit,
+) {
+    if (checkpoints.isEmpty()) {
+        Text("No revision checkpoints recorded yet.", style = MaterialTheme.typography.bodyMedium)
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().height(300.dp),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        ) {
+            items(checkpoints) { cp -> CanvasHistoryCard(cp = cp, onRestore = { onRestore(cp) }) }
+        }
+    }
 }
 
 @Composable

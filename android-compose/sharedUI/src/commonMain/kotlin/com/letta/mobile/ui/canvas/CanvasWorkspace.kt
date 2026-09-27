@@ -1408,6 +1408,7 @@ fun CanvasWorkspace(
                 show = showHistoryDialog && session != null,
                 checkpoints = checkpoints,
                 onDismiss = { showHistoryDialog = false },
+                compact = compact,
                 onRestore = { cp ->
                     val s = session ?: return@CanvasHistoryDialog
                     coroutineScope.launch {
