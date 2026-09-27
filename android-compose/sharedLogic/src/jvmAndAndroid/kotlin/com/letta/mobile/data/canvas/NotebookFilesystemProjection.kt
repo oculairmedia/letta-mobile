@@ -30,6 +30,14 @@ internal class NotebookFilesystemProjection(private val root: Path) {
         val baseline: Path = folder.resolve(".baseline.json")
     }
 
+    fun hasBaseline(id: DocumentId): Boolean {
+        val key = digest(id.getBytes().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') })
+        val folder = root.resolve(key)
+        if (!Files.exists(folder, NOFOLLOW_LINKS)) return false
+        require(Files.isDirectory(folder, NOFOLLOW_LINKS)) { "Not a safe projection directory: $folder" }
+        return safeRead(folder.resolve(".baseline.json")) != null
+    }
+
     fun project(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
         SyncSession(store, id, allowImport = false).execute()
 

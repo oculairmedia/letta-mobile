@@ -244,6 +244,9 @@ class AutomergeIrohRepoInteropTest {
                 closeables += transport
                 acceptor.accept(transport.transport).get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 accepted.complete(transport)
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                accepted.completeExceptionally(error)
+                throw error
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 accepted.completeExceptionally(error)

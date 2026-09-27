@@ -1,6 +1,18 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
+import computer.iroh.Connection
+import computer.iroh.Endpoint
+import computer.iroh.EndpointOptions
+import computer.iroh.RelayMode
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import org.junit.Assume.assumeTrue
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -41,7 +53,7 @@ class IrohDialerTest {
             secretKeyStore = FakeSecretKeyStore(),
             onConnectionLost = { _, _ -> },
             onCloseResources = {},
-            bindEndpoint = { throw RuntimeException("mock bind failed") },
+            bindEndpoint = { _, _ -> throw RuntimeException("mock bind failed") },
         )
 
         val config = IrohConnectConfig(
@@ -66,7 +78,7 @@ class IrohDialerTest {
             secretKeyStore = FakeSecretKeyStore(),
             onConnectionLost = { _, _ -> },
             onCloseResources = { reason -> closeReason = reason },
-            bindEndpoint = { throw RuntimeException("mock bind failed") },
+            bindEndpoint = { _, _ -> throw RuntimeException("mock bind failed") },
         )
 
         val config = IrohConnectConfig(
@@ -81,6 +93,44 @@ class IrohDialerTest {
         }
 
         assertEquals("dial_failed", closeReason)
+    }
+
+    @Test
+    fun inboundNotebookUsesIndependentPolicyAndStopsOnClose(): Unit = runBlocking {
+        assumeTrue("Live Iroh requires -DrunIrohLiveE2E=true", System.getProperty("runIrohLiveE2E") == "true")
+        val allowed = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val denied = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled(), alpns = listOf(AUTOMERGE_REPO_ALPN)))
+        val accepted = CompletableDeferred<String>()
+        val deniedId = IrohDiagnostics.endpointIdHex(denied.addr().id())
+        val allowedId = IrohDiagnostics.endpointIdHex(allowed.addr().id())
+        val rejected = CompletableDeferred<Unit>()
+        val handler = object : IrohNodeProtocolHandler, AutoCloseable {
+            override val alpn = AUTOMERGE_REPO_ALPN
+            override fun authorize(remoteEndpointId: String): Boolean {
+                if (remoteEndpointId == deniedId) rejected.complete(Unit)
+                return remoteEndpointId == allowedId
+            }
+            override suspend fun accept(connection: Connection, remoteEndpointId: String) {
+                accepted.complete(remoteEndpointId)
+            }
+            override fun close() = Unit
+        }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val inbound = IrohDialer.InboundNotebook(client, handler, scope)
+        try {
+            inbound.start()
+            denied.connect(client.addr(), AUTOMERGE_REPO_ALPN).close(0L, ByteArray(0))
+            withTimeout(15_000) { rejected.await() }
+            allowed.connect(client.addr(), AUTOMERGE_REPO_ALPN).close(0L, ByteArray(0))
+            assertEquals(allowedId, withTimeout(15_000) { accepted.await() })
+            inbound.close()
+            assertFailsWith<IllegalStateException> { inbound.start() }
+        } finally {
+            inbound.close()
+            scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+            listOf(allowed, denied, client).forEach { it.shutdown(); it.close() }
+        }
     }
 
     private class FakeSecretKeyStore(private val key: ByteArray = ByteArray(32)) : com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore {
