@@ -262,12 +262,18 @@ internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFacto
             append("\n\nA crash log was written to:\n")
             append(DesktopCrashReporter.crashLogPath())
         }
-        runCatching {
-            JOptionPane.showMessageDialog(window, message, "Letta Desktop", JOptionPane.ERROR_MESSAGE)
+        crashShutdown.request {
+            runCatching {
+                JOptionPane.showMessageDialog(window, message, "Letta Desktop", JOptionPane.ERROR_MESSAGE)
+            }
         }
-        exitProcess(1)
     }
 }
+
+private val crashShutdown = DesktopCrashShutdown(
+    dispatch = { action -> java.awt.EventQueue.invokeLater { action() } },
+    terminate = { exitProcess(1) },
+)
 
 /** How many frames this session has lost to the disposed-layer race. */
 private val recoverableRenderFrames = java.util.concurrent.atomic.AtomicLong(0)

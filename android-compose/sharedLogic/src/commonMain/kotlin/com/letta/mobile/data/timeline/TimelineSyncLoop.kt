@@ -831,17 +831,23 @@ class TimelineSyncLoop(
     }
 
     suspend fun closeAndJoin() {
-        persistRequests.close()
-        eventQueue.close()
-        streamSubscriberJob?.cancel(CancellationException("TimelineSyncLoop draining"))
         withContext(NonCancellable) {
-            streamSubscriberJob?.join()
-            eventProcessorJob.join()
-            timelineProcessor.closeAndJoin()
-            persistJob.join()
-            flushSnapshotNow(prune = true)
+            try {
+                persistRequests.close()
+                // Late producers must observe cancellation, not report a send failure back to
+                // this same closed queue. Buffered events still drain before the receiver ends.
+                eventQueue.close(CancellationException("TimelineSyncLoop draining"))
+                streamSubscriberJob?.cancel(CancellationException("TimelineSyncLoop draining"))
+                streamSubscriberJob?.join()
+                eventProcessorJob.join()
+                outboundSendProcessor.stopAndJoin()
+                timelineProcessor.closeAndJoin()
+                persistJob.join()
+                flushSnapshotNow(prune = true)
+            } finally {
+                close()
+            }
         }
-        close()
     }
 
     @Volatile
