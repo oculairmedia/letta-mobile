@@ -26,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -60,7 +61,7 @@ internal class IrohDialer(
             var notebook: InboundNotebook? = null
             try {
                 if (notebookHandlerFactory != null) {
-                    val notebookScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
+                    val notebookScope = scope + SupervisorJob(scope.coroutineContext[Job])
                     try {
                         notebook = notebookHandlerFactory.invoke(localEndpoint, notebookScope)?.let { handler ->
                             try {
