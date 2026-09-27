@@ -10,6 +10,9 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertFailsWith
 
 class NotebookLocalStoreTest {
+    private fun projectedNote(title: String, body: String) =
+        "---\nschema: notebook/1\ntitle: \"$title\"\n---\n$body"
+
     @Test
     fun independentDocumentsReloadWithLocalEditsAndItems() {
         val directory = Files.createTempDirectory("notebook-store-test-")
@@ -72,13 +75,13 @@ class NotebookLocalStoreTest {
             stream.findFirst().orElseThrow().resolve("note.md")
         }
         NotebookLocalStore(directory, "poll-peer").use { store ->
-            Files.writeString(note, "---\ntitle: Note\n---\n\nExternal")
+            Files.writeString(note, projectedNote("Note", "\nExternal"))
             assertEquals(NotebookProjectionResult.IMPORTED, store.pollProjections()[id])
-            assertEquals("---\ntitle: Note\n---\n\nExternal", store.read(id)?.markdown)
+            assertEquals("\nExternal", store.read(id)?.markdown)
             store.insertMarkdown(id, 0, "Local ")
-            Files.writeString(note, "---\ntitle: Note\n---\n\nOther")
+            Files.writeString(note, projectedNote("Note", "\nOther"))
             assertEquals(NotebookProjectionResult.CONFLICT, store.pollProjections()[id])
-            assertEquals("---\ntitle: Note\n---\n\nOther", Files.readString(note))
+            assertEquals(projectedNote("Note", "\nOther"), Files.readString(note))
             assertTrue(store.read(id)!!.markdown.startsWith("Local "))
         }
     }
@@ -97,9 +100,67 @@ class NotebookLocalStoreTest {
             }
             assertTrue(exported.await(5, TimeUnit.SECONDS))
             val folder = Files.list(directory.resolve("projection")).use { it.findFirst().orElseThrow() }
-            Files.writeString(folder.resolve("note.md"), "---\ntitle: Auto\n---\n\nExternal")
+            Files.writeString(folder.resolve("note.md"), projectedNote("Auto", "\nExternal"))
             assertTrue(imported.await(5, TimeUnit.SECONDS))
             assertTrue(assertNotNull(store.read(id)).markdown.endsWith("External"))
+        }
+    }
+
+    @Test
+    fun malformedDocumentDoesNotStopPollingOtherDocuments() {
+        val directory = Files.createTempDirectory("notebook-malformed-")
+        NotebookLocalStore(directory, "malformed-peer").use { store ->
+            val bad = store.create("Bad")
+            val good = store.create("Good")
+            store.project(bad)
+            store.project(good)
+            val folders = Files.list(directory.resolve("projection")).use { it.toList() }
+            val badFolder = folders.first { Files.readString(it.resolve("note.md")).contains("Bad") }
+            val goodFolder = folders.first { it != badFolder }
+            Files.writeString(badFolder.resolve("note.md"), "---\nbroken")
+            Files.writeString(goodFolder.resolve("note.md"), projectedNote("Good", "Updated"))
+            val results = store.pollProjections()
+            assertEquals(NotebookProjectionResult.ERROR, results[bad])
+            assertEquals(NotebookProjectionResult.IMPORTED, results[good])
+            val seen = CountDownLatch(2)
+            store.startPolling(20) { id, result ->
+                if (id == bad && result == NotebookProjectionResult.ERROR) seen.countDown()
+            }
+            assertTrue(seen.await(5, TimeUnit.SECONDS))
+            assertEquals("Updated", store.read(good)?.markdown)
+        }
+    }
+
+    @Test
+    fun externalTitleAndVersionedBoardImport() {
+        val directory = Files.createTempDirectory("notebook-board-import-")
+        NotebookLocalStore(directory, "board-import-peer").use { store ->
+            val id = store.create("Original")
+            assertEquals(NotebookProjectionResult.EXPORTED, store.project(id))
+            val folder = Files.list(directory.resolve("projection")).use { it.findFirst().orElseThrow() }
+            Files.writeString(folder.resolve("note.md"), projectedNote("Renamed", "Body"))
+            Files.writeString(folder.resolve("board.yaml"), "schema: notebook-board/1\nboardVersion: 1\nboard: |-\n  {\"schema\":\"notebook-board/1\",\"elements\":[1]}\n")
+            assertEquals(NotebookProjectionResult.IMPORTED, store.reconcile(id))
+            assertEquals("Renamed", store.read(id)?.title)
+            assertEquals("Body", store.read(id)?.markdown)
+            assertTrue(store.read(id)!!.sceneJson.contains("[1]"))
+            Files.writeString(folder.resolve("board.yaml"), "schema: notebook-board/2\nboardVersion: 2\nboard: |-\n  {}\n")
+            assertEquals(NotebookProjectionResult.ERROR, store.reconcile(id))
+            assertTrue(store.read(id)!!.sceneJson.contains("[1]"))
+        }
+    }
+
+    @Test
+    fun deletedProjectionConflictsWithoutRestoringIt() {
+        val directory = Files.createTempDirectory("notebook-deletion-")
+        NotebookLocalStore(directory, "deletion-peer").use { store ->
+            val id = store.create("Note")
+            store.project(id)
+            val folder = Files.list(directory.resolve("projection")).use { it.findFirst().orElseThrow() }
+            val note = folder.resolve("note.md")
+            Files.delete(note)
+            assertEquals(NotebookProjectionResult.CONFLICT, store.reconcile(id))
+            assertTrue(!Files.exists(note))
         }
     }
 
@@ -140,12 +201,12 @@ class NotebookLocalStoreTest {
             val projection = directory.resolve("projection")
             val folder = Files.list(projection).use { it.findFirst().orElseThrow() }
             val note = folder.resolve("note.md")
-            assertEquals("---\ntitle: Note\n---\n\nInitial", Files.readString(note))
-            Files.writeString(note, "---\ntitle: Note\n---\n\nExternal")
+            assertEquals(projectedNote("Note", "---\ntitle: Note\n---\n\nInitial"), Files.readString(note))
+            Files.writeString(note, projectedNote("Note", "\nExternal"))
             assertEquals(NotebookProjectionResult.IMPORTED, store.reconcile(id))
             assertTrue(assertNotNull(store.read(id)).markdown.endsWith("External"))
             store.insertMarkdown(id, 0, "Local ")
-            Files.writeString(note, "---\ntitle: Note\n---\n\nOther external")
+            Files.writeString(note, projectedNote("Note", "\nOther external"))
             assertEquals(NotebookProjectionResult.CONFLICT, store.reconcile(id))
             assertTrue(assertNotNull(store.read(id)).markdown.startsWith("Local "))
         }

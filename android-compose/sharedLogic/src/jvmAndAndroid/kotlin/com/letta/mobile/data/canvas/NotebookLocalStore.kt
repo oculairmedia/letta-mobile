@@ -45,8 +45,9 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
     /** Reconcile previously projected documents; new documents are exported by startPolling. */
     @Synchronized
     fun pollProjections(): Map<DocumentId, NotebookProjectionResult> = listDocuments()
-        .filter { projection.hasBaseline(it) }
-        .associateWith { reconcile(it) }
+        .associateWith { id -> projectionResult { if (projection.hasBaseline(id)) reconcile(id) else null } }
+        .filterValues { it != null }
+        .mapValues { it.value!! }
 
     /** Opt-in lifecycle polling; report conflicts to the caller rather than overwriting either side. */
     @Synchronized
@@ -55,10 +56,12 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         check(!closed) { "Notebook store is closed" }
         check(polling == null) { "Projection polling already started" }
         polling = poller.scheduleWithFixedDelay({
-            listDocuments().forEach { id ->
-                val result = if (projection.hasBaseline(id)) reconcile(id) else project(id)
-                onResult(id, result)
-            }
+            try {
+                listDocuments().forEach { id ->
+                    val result = projectionResult { if (projection.hasBaseline(id)) reconcile(id) else project(id) }
+                    try { onResult(id, result!!) } catch (_: Exception) { /* A callback must not stop future polls. */ }
+                }
+            } catch (_: Exception) { /* Index errors are retried on the next poll. */ }
         }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS)
     }
 
@@ -102,26 +105,40 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
 
     /** Poll for external edits; returns a conflict without changing either copy if both changed. */
     @Synchronized
-    fun reconcile(id: DocumentId): NotebookProjectionResult = projection.reconcile(this, id)
+    fun reconcile(id: DocumentId): NotebookProjectionResult = projectionResult { projection.reconcile(this, id) }!!
 
     /** Write current notebook state to its filesystem representation. */
     @Synchronized
-    fun project(id: DocumentId): NotebookProjectionResult = projection.project(this, id)
+    fun project(id: DocumentId): NotebookProjectionResult = projectionResult { projection.project(this, id) }!!
 
-data class NotebookContent(
-    val title: String,
-    val markdown: String,
-    val board: String,
-)
+    data class NotebookContent(
+        val title: String,
+        val markdown: String,
+        val board: String,
+    )
 
-    internal fun replaceProjection(id: DocumentId, content: NotebookContent) {
-        mutate(id) { tx ->
-            val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-            val previous = tx.text(textId).orElseThrow()
-            tx.spliceText(textId, 0, previous.length.toLong(), content.markdown)
-            tx.set(ObjectId.ROOT, "title", content.title)
-            tx.set(ObjectId.ROOT, "board", content.board)
-        }
+    private fun projectionResult(block: () -> NotebookProjectionResult?): NotebookProjectionResult? =
+        try { block() } catch (_: Exception) { NotebookProjectionResult.ERROR }
+
+    internal fun replaceProjection(id: DocumentId, expected: NotebookDocument, content: NotebookContent): Boolean {
+        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
+        return handle.withDocument { document ->
+            document.startTransaction().use { tx ->
+                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+                val previous = tx.text(textId).orElseThrow()
+                val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
+                val currentBoard = (tx.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
+                if (previous != expected.markdown || currentTitle != expected.title || currentBoard != expected.sceneJson) {
+                    return@withDocument false
+                }
+                tx.spliceText(textId, 0, previous.length.toLong(), content.markdown)
+                tx.set(ObjectId.ROOT, "title", content.title)
+                tx.set(ObjectId.ROOT, "board", content.board)
+                tx.commit()
+                true
+            }
+        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
     }
 
     val repo: Repo = Repo.load(
