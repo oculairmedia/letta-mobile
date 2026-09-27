@@ -84,6 +84,26 @@ class NotebookLocalStoreTest {
     }
 
     @Test
+    fun pollingExportsNewDocumentsBeforeImportingExternalEdits() {
+        val directory = Files.createTempDirectory("notebook-auto-projection-")
+        NotebookLocalStore(directory, "auto-peer").use { store ->
+            val id = store.create("Auto")
+            store.insertMarkdown(id, 0, "---\ntitle: Auto\n---\n\nInitial")
+            val exported = CountDownLatch(1)
+            val imported = CountDownLatch(1)
+            store.startPolling(25) { _, result ->
+                if (result == NotebookProjectionResult.EXPORTED) exported.countDown()
+                if (result == NotebookProjectionResult.IMPORTED) imported.countDown()
+            }
+            assertTrue(exported.await(5, TimeUnit.SECONDS))
+            val folder = Files.list(directory.resolve("projection")).use { it.findFirst().orElseThrow() }
+            Files.writeString(folder.resolve("note.md"), "---\ntitle: Auto\n---\n\nExternal")
+            assertTrue(imported.await(5, TimeUnit.SECONDS))
+            assertTrue(assertNotNull(store.read(id)).markdown.endsWith("External"))
+        }
+    }
+
+    @Test
     fun pollingStopsOnClose() {
         val directory = Files.createTempDirectory("notebook-poll-close-")
         val store = NotebookLocalStore(directory, "close-peer")

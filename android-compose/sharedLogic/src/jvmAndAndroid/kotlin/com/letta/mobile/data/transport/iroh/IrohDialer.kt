@@ -22,6 +22,7 @@ import computer.iroh.RelayMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -40,7 +41,7 @@ internal class IrohDialer(
     private val onCloseResources: (reason: String) -> Unit = {},
     private val externalToolRegistry: ExternalToolRegistry? = null,
     // Create a fresh handler for each session; its peer policy is independent of App Server auth.
-    private val notebookHandlerFactory: ((Endpoint) -> IrohNodeProtocolHandler)? = null,
+    private val notebookHandlerFactory: ((Endpoint, CoroutineScope) -> IrohNodeProtocolHandler?)? = null,
     private val bindEndpoint: suspend (ByteArray, List<ByteArray>) -> Endpoint = { secretKey, alpns ->
         Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey, alpns = alpns))
     },
@@ -58,9 +59,21 @@ internal class IrohDialer(
             var transport: IrohAppServerTransport? = null
             var notebook: InboundNotebook? = null
             try {
-                notebook = notebookHandlerFactory?.invoke(localEndpoint)?.let { handler ->
-                    require(handler.alpn.contentEquals(AUTOMERGE_REPO_ALPN)) { "Unexpected notebook ALPN" }
-                    InboundNotebook(localEndpoint, handler, scope).also { it.start() }
+                if (notebookHandlerFactory != null) {
+                    val notebookScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
+                    try {
+                        notebook = notebookHandlerFactory.invoke(localEndpoint, notebookScope)?.let { handler ->
+                            try {
+                                require(handler.alpn.contentEquals(AUTOMERGE_REPO_ALPN)) { "Unexpected notebook ALPN" }
+                                InboundNotebook(localEndpoint, handler, notebookScope).also { it.start() }
+                            } catch (error: Throwable) {
+                                (handler as? AutoCloseable)?.close()
+                                throw error
+                            }
+                        }
+                    } finally {
+                        if (notebook == null) notebookScope.coroutineContext[Job]?.cancel()
+                    }
                 }
                 val dialedHandle = AtomicReference<IrohConnectionHandle?>(null)
                 val irohTransport = createTransport(localEndpoint, ticket, dialedHandle)
@@ -229,6 +242,7 @@ internal class IrohDialer(
             servingJobs.forEach { it.cancel() }
             connections.forEach { runCatching { it.close(0L, "closed".encodeToByteArray()) } }
             connections.clear()
+            parentScope.coroutineContext[Job]?.cancel()
             (handler as? AutoCloseable)?.close()
         }
     }

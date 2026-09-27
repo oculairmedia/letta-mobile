@@ -42,7 +42,7 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         DocumentId.fromBytes(key.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
     }
 
-    /** Reconcile only previously projected local documents, leaving unprojected docs untouched. */
+    /** Reconcile previously projected documents; new documents are exported by startPolling. */
     @Synchronized
     fun pollProjections(): Map<DocumentId, NotebookProjectionResult> = listDocuments()
         .filter { projection.hasBaseline(it) }
@@ -55,7 +55,10 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         check(!closed) { "Notebook store is closed" }
         check(polling == null) { "Projection polling already started" }
         polling = poller.scheduleWithFixedDelay({
-            pollProjections().forEach { (id, result) -> onResult(id, result) }
+            listDocuments().forEach { id ->
+                val result = if (projection.hasBaseline(id)) reconcile(id) else project(id)
+                onResult(id, result)
+            }
         }, intervalMillis, intervalMillis, TimeUnit.MILLISECONDS)
     }
 

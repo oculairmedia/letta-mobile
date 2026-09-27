@@ -76,6 +76,8 @@ class IrohChannelTransport(
     // bind to a paired peer).
     private val secretKeyStore: IrohSecretKeyStore = EphemeralIrohSecretKeyStore(),
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    private val notebookDirectory: java.nio.file.Path? = null,
+    private val notebookPeers: (() -> Set<String>?)? = null,
     private val testDialer: (suspend (IrohConnectConfig) -> IrohConnectionHandle)? = null,
     // Bounded window (ms) to await the server's own terminal after an abort
     // before synthesizing a cancelled terminal. Overridable so tests need not
@@ -183,6 +185,11 @@ class IrohChannelTransport(
         onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
         onCloseResources = ::handleCloseResources,
         externalToolRegistry = externalToolRegistry,
+        notebookHandlerFactory = notebookDirectory?.let { directory ->
+            notebookPeers?.invoke()?.let { peers ->
+                { endpoint, notebookScope -> NotebookEndpointSession(directory, endpoint, peers, notebookScope) }
+            }
+        },
     )
 
     // Explicit type: this field and `livenessProbe` reference each other through

@@ -5,6 +5,7 @@ import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
+import java.nio.file.Files
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,6 +94,20 @@ class IrohDialerTest {
         }
 
         assertEquals("dial_failed", closeReason)
+    }
+
+    @Test
+    fun notebookPeersAreExplicitAndInvalidFilesFailClosed() {
+        val root = Files.createTempDirectory("notebook-peers-")
+        val file = root.resolve("peers.json")
+        val peer = "a".repeat(64)
+        assertEquals(null, NotebookPeerProvisioning.read(file))
+        Files.writeString(file, """{"peerIds":["$peer"]}""")
+        assertEquals(setOf(peer), NotebookPeerProvisioning.read(file))
+        Files.writeString(file, """{"peerIds":["$peer","$peer"]}""")
+        assertFailsWith<IllegalArgumentException> { NotebookPeerProvisioning.read(file) }
+        Files.writeString(file, """{"peerIds":["${"A".repeat(64)}"]}""")
+        assertFailsWith<IllegalArgumentException> { NotebookPeerProvisioning.read(file) }
     }
 
     @Test
