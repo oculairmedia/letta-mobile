@@ -27,6 +27,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -47,6 +50,51 @@ internal class IrohDialer(
         Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey, alpns = alpns))
     },
 ) {
+    private val endpointMutex = Mutex()
+    private var hostEndpoint: Endpoint? = null
+    private var hostNotebook: InboundNotebook? = null
+
+    /** Bind once for the host lifetime, independently of App Server readiness. */
+    suspend fun startNotebook(): Endpoint? {
+        if (notebookHandlerFactory == null) return null
+        return endpointMutex.withLock {
+            hostEndpoint?.let { return@withLock it }
+            check(scope.isActive) { "Iroh host scope is closed" }
+            val endpoint = bindLocalEndpoint(secretKeyStore.loadOrCreate())
+            var notebook: InboundNotebook? = null
+            try {
+                val notebookScope = scope + SupervisorJob(scope.coroutineContext[Job])
+                try {
+                    notebook = notebookHandlerFactory.invoke(endpoint, notebookScope)?.let { handler ->
+                        try {
+                            require(handler.alpn.contentEquals(AUTOMERGE_REPO_ALPN)) { "Unexpected notebook ALPN" }
+                            InboundNotebook(endpoint, handler, notebookScope).also { it.start() }
+                        } catch (error: Throwable) {
+                            (handler as? AutoCloseable)?.close()
+                            throw error
+                        }
+                    }
+                } finally {
+                    if (notebook == null) notebookScope.coroutineContext[Job]?.cancel()
+                }
+                check(scope.isActive) { "Iroh host scope is closed" }
+                hostNotebook = notebook
+                hostEndpoint = endpoint
+                scope.coroutineContext[Job]?.invokeOnCompletion {
+                    notebook?.close()
+                    runCatching { runBlocking { endpoint.shutdown() } }
+                    runCatching { endpoint.close() }
+                }
+                endpoint
+            } catch (error: Throwable) {
+                notebook?.close()
+                endpoint.shutdown()
+                endpoint.close()
+                throw error
+            }
+        }
+    }
+
     suspend fun dial(
         config: IrohConnectConfig,
         effectiveUrlOverride: String? = null,
@@ -54,28 +102,11 @@ internal class IrohDialer(
     ): IrohConnectionHandle {
         val ticket = extractTicket(config, effectiveUrlOverride)
         onConnecting()
-        val secretKey = secretKeyStore.loadOrCreate()
         return runCatching {
-            val localEndpoint = bindLocalEndpoint(secretKey)
+            val sharedEndpoint = startNotebook()
+            val localEndpoint = sharedEndpoint ?: bindLocalEndpoint(secretKeyStore.loadOrCreate())
             var transport: IrohAppServerTransport? = null
-            var notebook: InboundNotebook? = null
             try {
-                if (notebookHandlerFactory != null) {
-                    val notebookScope = scope + SupervisorJob(scope.coroutineContext[Job])
-                    try {
-                        notebook = notebookHandlerFactory.invoke(localEndpoint, notebookScope)?.let { handler ->
-                            try {
-                                require(handler.alpn.contentEquals(AUTOMERGE_REPO_ALPN)) { "Unexpected notebook ALPN" }
-                                InboundNotebook(localEndpoint, handler, notebookScope).also { it.start() }
-                            } catch (error: Throwable) {
-                                (handler as? AutoCloseable)?.close()
-                                throw error
-                            }
-                        }
-                    } finally {
-                        if (notebook == null) notebookScope.coroutineContext[Job]?.cancel()
-                    }
-                }
                 val dialedHandle = AtomicReference<IrohConnectionHandle?>(null)
                 val irohTransport = createTransport(localEndpoint, ticket, dialedHandle)
                 transport = irohTransport
@@ -84,11 +115,10 @@ internal class IrohDialer(
                 irohTransport.awaitConnectionReady()
                 val (engine, eventRouter) = buildIrohTurnEngine(appServerClient, config.clientVersion, scope)
                 buildHandle(
-                    HandleComponents(config, ticket, irohTransport, engine, serverCapabilities, eventRouter, localEndpoint, notebook),
+                    HandleComponents(config, ticket, irohTransport, engine, serverCapabilities, eventRouter, localEndpoint, sharedEndpoint == null),
                 ).also { dialedHandle.set(it) }
             } catch (error: Throwable) {
-                notebook?.close()
-                closeIrohResources("dial_failed", transport, localEndpoint)
+                closeIrohResources("dial_failed", transport, localEndpoint.takeIf { sharedEndpoint == null })
                 throw error
             }
         }.onFailure {
@@ -158,10 +188,9 @@ internal class IrohDialer(
             components.localEndpoint.connect(IrohAppServerTransportAdapter.parseIrohAddress(components.ticket), alpn)
         },
         close = { reason ->
-            components.notebook?.close()
             components.eventRouter.detach()
             onCloseResources(reason)
-            closeIrohResources(reason, components.transport, components.localEndpoint)
+            closeIrohResources(reason, components.transport, components.localEndpoint.takeIf { components.ownsEndpoint })
         },
     )
 
@@ -173,7 +202,7 @@ internal class IrohDialer(
         val serverCapabilities: Set<String>?,
         val eventRouter: AppServerRuntimeEventRouter,
         val localEndpoint: Endpoint,
-        val notebook: InboundNotebook?,
+        val ownsEndpoint: Boolean,
     )
 
     internal class InboundNotebook(

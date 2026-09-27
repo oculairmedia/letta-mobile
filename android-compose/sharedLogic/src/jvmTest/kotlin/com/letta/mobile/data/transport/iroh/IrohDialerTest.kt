@@ -148,6 +148,55 @@ class IrohDialerTest {
         }
     }
 
+    @Test
+    fun notebookSurvivesFailedDialAndIsBoundOnlyOnce(): Unit = runBlocking {
+        assumeTrue("Live Iroh requires -DrunIrohLiveE2E=true", System.getProperty("runIrohLiveE2E") == "true")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val peer = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val peerId = IrohDiagnostics.endpointIdHex(peer.addr().id())
+        val accepted = CompletableDeferred<Unit>()
+        val acceptedAfterFailure = CompletableDeferred<Unit>()
+        var accepts = 0
+        var binds = 0
+        lateinit var host: Endpoint
+        val dialer = IrohDialer(
+            scope = scope,
+            secretKeyStore = FakeSecretKeyStore(),
+            onConnectionLost = { _, _ -> },
+            notebookHandlerFactory = { endpoint, _ ->
+                host = endpoint
+                object : IrohNodeProtocolHandler {
+                    override val alpn = AUTOMERGE_REPO_ALPN
+                    override fun authorize(remoteEndpointId: String) = remoteEndpointId == peerId
+                    override suspend fun accept(connection: Connection, remoteEndpointId: String) {
+                        if (accepts++ == 0) accepted.complete(Unit) else acceptedAfterFailure.complete(Unit)
+                    }
+                }
+            },
+            bindEndpoint = { key, alpns ->
+                binds++
+                Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled(), secretKey = key, alpns = alpns))
+            },
+        )
+        try {
+            dialer.startNotebook()
+            dialer.startNotebook()
+            peer.connect(host.addr(), AUTOMERGE_REPO_ALPN).close(0L, ByteArray(0))
+            withTimeout(15_000) { accepted.await() }
+            assertFailsWith<Exception> {
+                dialer.dial(IrohConnectConfig("iroh://invalid-ticket", "", "dev", "1"))
+            }
+            assertEquals(1, binds)
+            // A failed App Server dial must not shut down the inbound endpoint.
+            peer.connect(host.addr(), AUTOMERGE_REPO_ALPN).close(0L, ByteArray(0))
+            withTimeout(15_000) { acceptedAfterFailure.await() }
+        } finally {
+            scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+            peer.shutdown()
+            peer.close()
+        }
+    }
+
     private class FakeSecretKeyStore(private val key: ByteArray = ByteArray(32)) : com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore {
         override suspend fun loadOrCreate(): ByteArray = key
     }

@@ -201,6 +201,25 @@ class IrohChannelTransport(
         onStateChanged = ::handleSupervisorStateChange,
     )
 
+    init {
+        if (notebookDirectory != null && notebookPeers != null) {
+            scope.launch {
+                try {
+                    irohDialer.startNotebook()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Telemetry.event("IrohTransport", "notebook.start.failed", "error" to (error.message ?: error.toString()))
+                }
+            }
+        }
+    }
+
+    /** Host may await notebook readiness without initiating an App Server dial. */
+    suspend fun startNotebook() {
+        irohDialer.startNotebook()
+    }
+
     /**
      * The host connection while it is ready, else null: side protocols that share its endpoint
      * (shared canvases, see [IrohCanvasRelayClient]) connect and reconnect on this.
