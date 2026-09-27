@@ -155,6 +155,7 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
             document.startTransaction().use { tx ->
                 tx.set(ObjectId.ROOT, "schema", "notebook/1")
                 tx.set(ObjectId.ROOT, "title", title)
+                tx.set(ObjectId.ROOT, "initialTitle", title)
                 tx.set(ObjectId.ROOT, "markdown", ObjectType.TEXT)
                 tx.set(ObjectId.ROOT, "boardVersion", 1)
                 tx.set(ObjectId.ROOT, "board", "{\"schema\":\"notebook-board/1\",\"elements\":[]}")
@@ -168,6 +169,46 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
 
     fun open(id: DocumentId): DocHandle? =
         repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
+
+    /** Claim a pristine, caller-selected notebook; never infer its ID from the canvas ID. */
+    @Synchronized
+    internal fun importCanvasInto(id: DocumentId, sourceId: String, title: String, board: String): NotebookCanvasImportResult {
+        check(!closed) { "Notebook store is closed" }
+        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
+        return handle.withDocument { document ->
+            document.startTransaction().use { tx ->
+                val marker = tx.get(ObjectId.ROOT, "importedCanvasId").orElse(null)
+                if (marker != null) {
+                    val importedBoard = (tx.get(ObjectId.ROOT, "importedBoard").orElse(null) as? AmValue.Str)?.value
+                    val currentBoard = (tx.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
+                    val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
+                    val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+                    val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+                    return@withDocument if ((marker as? AmValue.Str)?.value == sourceId && importedBoard == board &&
+                        importedBoard == currentBoard && currentTitle == title &&
+                        currentTitle == (tx.get(ObjectId.ROOT, "importedTitle").orElse(null) as? AmValue.Str)?.value &&
+                        tx.text(textId).orElseThrow().isEmpty() && tx.keys(itemsId).orElseThrow().isEmpty()
+                    ) NotebookCanvasImportResult.ALREADY_IMPORTED else NotebookCanvasImportResult.CONFLICT
+                }
+                val initialTitle = (tx.get(ObjectId.ROOT, "initialTitle").orElse(null) as? AmValue.Str)?.value
+                val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
+                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+                val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+                val currentBoard = (tx.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
+                if (initialTitle == null || initialTitle != currentTitle || tx.text(textId).orElseThrow().isNotEmpty() ||
+                    tx.keys(itemsId).orElseThrow().isNotEmpty() ||
+                    currentBoard != "{\"schema\":\"notebook-board/1\",\"elements\":[]}"
+                ) return@withDocument NotebookCanvasImportResult.CONFLICT
+                tx.set(ObjectId.ROOT, "title", title)
+                tx.set(ObjectId.ROOT, "board", board)
+                tx.set(ObjectId.ROOT, "importedCanvasId", sourceId)
+                tx.set(ObjectId.ROOT, "importedBoard", board)
+                tx.set(ObjectId.ROOT, "importedTitle", title)
+                tx.commit()
+                NotebookCanvasImportResult.IMPORTED
+            }
+        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
 
     fun setBoard(id: DocumentId, boardJson: String) {
         require(Json.parseToJsonElement(boardJson).jsonObject["schema"]?.jsonPrimitive?.content == "notebook-board/1") {
