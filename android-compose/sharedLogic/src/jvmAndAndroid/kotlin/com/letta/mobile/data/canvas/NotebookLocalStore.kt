@@ -145,6 +145,12 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
     private fun projectionResult(block: () -> NotebookProjectionResult?): NotebookProjectionResult? =
         try { block() } catch (_: Exception) { NotebookProjectionResult.ERROR }
 
+    internal data class CanvasImportData(
+        val sourceId: String,
+        val title: String,
+        val board: String,
+    )
+
     internal fun replaceProjection(id: DocumentId, expected: NotebookDocument, content: NotebookContent): Boolean {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         return handle.withDocument { document ->
@@ -153,9 +159,9 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
                 val previous = tx.text(textId).orElseThrow()
                 val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
                 val currentBoard = boardFrom(tx)
-                if (previous != expected.markdown || currentTitle != expected.title || currentBoard != expected.sceneJson) {
-                    return@withDocument false
-                }
+                if (previous != expected.markdown) return@withDocument false
+                if (currentTitle != expected.title) return@withDocument false
+                if (currentBoard != expected.sceneJson) return@withDocument false
                 tx.spliceText(textId, 0, previous.length.toLong(), content.markdown)
                 tx.set(ObjectId.ROOT, "title", content.title)
                 writeBoard(tx, content.board)
@@ -163,7 +169,6 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
                 true
             }
         }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-    }
     }
 
     val repo: Repo = Repo.load(
@@ -197,40 +202,61 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
     fun open(id: DocumentId): DocHandle? =
         repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
 
+    private fun checkAlreadyImported(
+        tx: Transaction,
+        marker: AmValue?,
+        importData: CanvasImportData,
+    ): Boolean {
+        if ((marker as? AmValue.Str)?.value != importData.sourceId) return false
+        val importedBoard = (tx.get(ObjectId.ROOT, "importedBoard").orElse(null) as? AmValue.Str)?.value ?: return false
+        if (importedBoard != importData.board) return false
+        val currentBoard = boardFrom(tx)
+        if (Json.parseToJsonElement(importedBoard) != Json.parseToJsonElement(currentBoard)) return false
+        val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
+        if (currentTitle != importData.title) return false
+        val importedTitle = (tx.get(ObjectId.ROOT, "importedTitle").orElse(null) as? AmValue.Str)?.value
+        if (currentTitle != importedTitle) return false
+        val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+        if (tx.text(textId).orElseThrow().isNotEmpty()) return false
+        val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+        return tx.keys(itemsId).orElseThrow().isEmpty()
+    }
+
+    private fun isPristineDocument(tx: Transaction): Boolean {
+        val initialTitle = (tx.get(ObjectId.ROOT, "initialTitle").orElse(null) as? AmValue.Str)?.value ?: return false
+        val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
+        if (initialTitle != currentTitle) return false
+        val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+        if (tx.text(textId).orElseThrow().isNotEmpty()) return false
+        val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+        if (tx.keys(itemsId).orElseThrow().isNotEmpty()) return false
+        val currentBoard = (tx.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
+        return currentBoard == "{\"schema\":\"notebook-board/1\",\"elements\":[]}"
+    }
+
     /** Claim a pristine, caller-selected notebook; never infer its ID from the canvas ID. */
     @Synchronized
-    internal fun importCanvasInto(id: DocumentId, sourceId: String, title: String, board: String): NotebookCanvasImportResult {
+    internal fun importCanvasInto(id: DocumentId, importData: CanvasImportData): NotebookCanvasImportResult {
         check(!closed) { "Notebook store is closed" }
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         return handle.withDocument { document ->
             document.startTransaction().use { tx ->
                 val marker = tx.get(ObjectId.ROOT, "importedCanvasId").orElse(null)
                 if (marker != null) {
-                    val importedBoard = (tx.get(ObjectId.ROOT, "importedBoard").orElse(null) as? AmValue.Str)?.value
-                    val currentBoard = boardFrom(tx)
-                    val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
-                    val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-                    val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
-                    return@withDocument if ((marker as? AmValue.Str)?.value == sourceId && importedBoard == board &&
-                        Json.parseToJsonElement(importedBoard) == Json.parseToJsonElement(currentBoard) && currentTitle == title &&
-                        currentTitle == (tx.get(ObjectId.ROOT, "importedTitle").orElse(null) as? AmValue.Str)?.value &&
-                        tx.text(textId).orElseThrow().isEmpty() && tx.keys(itemsId).orElseThrow().isEmpty()
-                    ) NotebookCanvasImportResult.ALREADY_IMPORTED else NotebookCanvasImportResult.CONFLICT
+                    return@withDocument if (checkAlreadyImported(tx, marker, importData)) {
+                        NotebookCanvasImportResult.ALREADY_IMPORTED
+                    } else {
+                        NotebookCanvasImportResult.CONFLICT
+                    }
                 }
-                val initialTitle = (tx.get(ObjectId.ROOT, "initialTitle").orElse(null) as? AmValue.Str)?.value
-                val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
-                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-                val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
-                val currentBoard = (tx.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
-                if (initialTitle == null || initialTitle != currentTitle || tx.text(textId).orElseThrow().isNotEmpty() ||
-                    tx.keys(itemsId).orElseThrow().isNotEmpty() ||
-                    currentBoard != "{\"schema\":\"notebook-board/1\",\"elements\":[]}"
-                ) return@withDocument NotebookCanvasImportResult.CONFLICT
-                tx.set(ObjectId.ROOT, "title", title)
-                writeBoard(tx, board)
-                tx.set(ObjectId.ROOT, "importedCanvasId", sourceId)
-                tx.set(ObjectId.ROOT, "importedBoard", board)
-                tx.set(ObjectId.ROOT, "importedTitle", title)
+                if (!isPristineDocument(tx)) {
+                    return@withDocument NotebookCanvasImportResult.CONFLICT
+                }
+                tx.set(ObjectId.ROOT, "title", importData.title)
+                writeBoard(tx, importData.board)
+                tx.set(ObjectId.ROOT, "importedCanvasId", importData.sourceId)
+                tx.set(ObjectId.ROOT, "importedBoard", importData.board)
+                tx.set(ObjectId.ROOT, "importedTitle", importData.title)
                 tx.commit()
                 NotebookCanvasImportResult.IMPORTED
             }
@@ -276,27 +302,25 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         (tx.get(ObjectId.ROOT, "boardElements").orElse(null) as? AmValue.Map)?.id
             ?: tx.set(ObjectId.ROOT, "boardElements", ObjectType.MAP)
 
-    private fun writeBoard(tx: Transaction, boardJson: String) {
-        val root = Json.parseToJsonElement(boardJson).jsonObject
-        val elements = boardElements(tx)
-        val incoming = (root["elements"] as? JsonArray).orEmpty().mapNotNull { value ->
+    private fun parseIncomingElements(root: JsonObject): Map<String, JsonObject> =
+        (root["elements"] as? JsonArray).orEmpty().mapNotNull { value ->
             (value as? JsonObject)?.let { obj ->
                 (obj["id"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }?.let { it to obj }
             }
         }.toMap()
+
+    private fun deleteMissingElements(tx: Transaction, elements: ObjectId, incomingKeys: Set<String>) {
         for (key in tx.keys(elements).orElseThrow()) {
-            if (key !in incoming) tx.delete(elements, key)
+            if (key !in incomingKeys) tx.delete(elements, key)
         }
-        val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)
-        incoming.forEach { (key, value) ->
-            if (tombstones != null && tx.get(tombstones.id, key).isPresent) tx.delete(tombstones.id, key)
-            val map = (tx.get(elements, key).orElse(null) as? AmValue.Map)?.id
-                ?: tx.set(elements, key, ObjectType.MAP)
-            for (field in tx.keys(map).orElseThrow()) {
-                if (field !in value) tx.delete(map, field)
-            }
-            value.forEach { (field, fieldValue) -> tx.set(map, field, fieldValue.toString()) }
-        }
+    }
+
+    private fun writeBoard(tx: Transaction, boardJson: String) {
+        val root = Json.parseToJsonElement(boardJson).jsonObject
+        val elements = boardElements(tx)
+        val incoming = parseIncomingElements(root)
+        deleteMissingElements(tx, elements, incoming.keys)
+        incoming.forEach { (key, value) -> putElement(tx, key, value) }
         // The envelope retains unknown metadata and non-addressable legacy entries.
         tx.set(ObjectId.ROOT, "board", boardJson)
     }
@@ -370,25 +394,45 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         return JsonObject(root + ("schema" to JsonPrimitive("notebook-board/1")))
     }
 
+    private fun syncElementDiff(
+        tx: Transaction,
+        key: String,
+        oldVal: JsonObject?,
+        nextVal: JsonObject?,
+    ) {
+        if (oldVal == nextVal) return
+        if (nextVal == null) {
+            removeElement(tx, key)
+        } else {
+            putElement(tx, key, nextVal)
+        }
+    }
+
+    private fun updateEnvelopeField(
+        envelope: MutableMap<String, JsonElement>,
+        key: String,
+        baseVal: JsonElement?,
+        incomingVal: JsonElement?,
+    ) {
+        if (baseVal == incomingVal) return
+        if (incomingVal != null) {
+            envelope[key] = incomingVal
+        } else {
+            envelope.remove(key)
+        }
+    }
+
     private fun mergeCanvasBoard(tx: Transaction, base: JsonObject, incoming: JsonObject) {
         val current = Json.parseToJsonElement(boardFrom(tx)).jsonObject
-        val old = (base["elements"] as JsonArray).mapNotNull { (it as? JsonObject)?.let { obj ->
-            (obj["id"] as? JsonPrimitive)?.content?.let { key -> key to obj }
-        } }.toMap()
-        val next = (incoming["elements"] as JsonArray).mapNotNull { (it as? JsonObject)?.let { obj ->
-            (obj["id"] as? JsonPrimitive)?.content?.let { key -> key to obj }
-        } }.toMap()
+        val old = parseIncomingElements(base)
+        val next = parseIncomingElements(incoming)
         // Only replace elements changed by this canvas write; unrelated notebook edits survive.
-        (old.keys + next.keys).forEach { key ->
-            if (old[key] != next[key]) {
-                if (next[key] == null) removeElement(tx, key) else putElement(tx, key, next.getValue(key))
-            }
+        for (key in (old.keys + next.keys)) {
+            syncElementDiff(tx, key, old[key], next[key])
         }
         val envelope = current.toMutableMap()
-        (base.keys + incoming.keys).filter { it != "elements" && it != "schema" }.forEach { key ->
-            if (base[key] != incoming[key]) {
-                if (key in incoming) envelope[key] = incoming.getValue(key) else envelope.remove(key)
-            }
+        for (key in (base.keys + incoming.keys).filter { it != "elements" && it != "schema" }) {
+            updateEnvelopeField(envelope, key, base[key], incoming[key])
         }
         tx.set(ObjectId.ROOT, "board", JsonObject(envelope).toString())
     }

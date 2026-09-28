@@ -25,7 +25,10 @@ class NotebookCanvasBridge(private val store: NotebookLocalStore) {
             root.forEach { (key, value) -> put(key, value) }
             put("schema", "notebook-board/1")
         }.toString()
-        return store.importCanvasInto(target, canvas.id.value, canvas.title, board)
+        return store.importCanvasInto(
+            target,
+            NotebookLocalStore.CanvasImportData(canvas.id.value, canvas.title, board),
+        )
     }
 
     /** Return DrawBox scene JSON, not the notebook board envelope. */

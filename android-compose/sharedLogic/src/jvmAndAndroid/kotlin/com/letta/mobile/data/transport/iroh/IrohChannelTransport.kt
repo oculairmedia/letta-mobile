@@ -182,18 +182,8 @@ class IrohChannelTransport(
 
     private var explicitConfig: IrohConnectConfig? = null
 
-    private val notebookHandlerFactory: ((computer.iroh.Endpoint, CoroutineScope) -> NotebookEndpointSession)? =
-        notebookPeers?.invoke()?.takeIf { it.isNotEmpty() }?.let { peers ->
-            when {
-                notebookStore != null -> { endpoint, notebookScope ->
-                    NotebookEndpointSession(notebookStore, endpoint, peers, notebookScope)
-                }
-                notebookDirectory != null -> { endpoint, notebookScope ->
-                    NotebookEndpointSession(notebookDirectory, endpoint, peers, notebookScope)
-                }
-                else -> null
-            }
-        }
+    private val notebookHandlerFactory =
+        IrohTransportSupport.createNotebookHandlerFactory(notebookPeers?.invoke(), notebookStore, notebookDirectory)
 
     private val irohDialer = IrohDialer(
         scope = scope,
@@ -215,15 +205,7 @@ class IrohChannelTransport(
 
     init {
         if (notebookHandlerFactory != null) {
-            scope.launch {
-                try {
-                    irohDialer.startNotebook()
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    Telemetry.event("IrohTransport", "notebook.start.failed", "error" to (error.message ?: error.toString()))
-                }
-            }
+            IrohTransportSupport.launchNotebook(scope) { irohDialer.startNotebook() }
         }
     }
 
@@ -786,7 +768,7 @@ class IrohChannelTransport(
                 val decoded = subagentJson.decodeFromJsonElement<CronListRpcResult>(result)
                 ServerFrame.CronListResponse(id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, tasks = decoded.tasks)
             },
-            onFailure = ::cronListFailure,
+            onFailure = IrohTransportSupport::cronListFailure,
         )
     }
 
@@ -812,7 +794,7 @@ class IrohChannelTransport(
                 val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
                 ServerFrame.CronAddResponse(id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, task = decoded.task, warning = decoded.warning)
             },
-            onFailure = ::cronAddFailure,
+            onFailure = IrohTransportSupport::cronAddFailure,
         )
     }
 
@@ -827,7 +809,7 @@ class IrohChannelTransport(
                 val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
                 ServerFrame.CronGetResponse(id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, task = decoded.task)
             },
-            onFailure = ::cronGetFailure,
+            onFailure = IrohTransportSupport::cronGetFailure,
         )
     }
 
@@ -841,7 +823,7 @@ class IrohChannelTransport(
             mapSuccess = { _ ->
                 ServerFrame.CronDeleteResponse(id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true)
             },
-            onFailure = ::cronDeleteFailure,
+            onFailure = IrohTransportSupport::cronDeleteFailure,
         )
     }
 
@@ -856,13 +838,13 @@ class IrohChannelTransport(
                 val decoded = subagentJson.decodeFromJsonElement<CronDeleteAllRpcResult>(result)
                 ServerFrame.CronDeleteAllResponse(id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, count = decoded.deleted)
             },
-            onFailure = ::cronDeleteAllFailure,
+            onFailure = IrohTransportSupport::cronDeleteAllFailure,
         )
     }
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {
         val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
-            ?: return subagentListFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
+            ?: return IrohTransportSupport.subagentListFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
         return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
@@ -888,14 +870,14 @@ class IrohChannelTransport(
                     subagents = decoded.subagents,
                 )
             },
-            onFailure = ::subagentListFailure,
+            onFailure = IrohTransportSupport::subagentListFailure,
         )
     }
 
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse {
         val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
-            ?: return subagentTodosFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
+            ?: return IrohTransportSupport.subagentTodosFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
         return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
@@ -924,12 +906,10 @@ class IrohChannelTransport(
                     todosFound = decoded.todosFound,
                 )
             },
-            onFailure = ::subagentTodosFailure,
+            onFailure = IrohTransportSupport::subagentTodosFailure,
         )
     }
 
-    /** A scoped-RPC failure: which request failed, and why. */
-    private data class ScopedRpcFailure(val requestId: String, val error: String)
 
     private data class ScopedRpcLabels(
         val unsupported: String,
@@ -982,14 +962,6 @@ class IrohChannelTransport(
         return SubagentRpcScope(conversationId.value, agentId)
     }
 
-    private fun subagentListFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentListResponse(
-        id = IrohTransportSupport.frameId("subagent_list"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
-    )
-
-    private fun subagentTodosFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentTodosResponse(
-        id = IrohTransportSupport.frameId("subagent_todos"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
-    )
-
     /** Shared scoped-RPC labels for the cron.* bridge methods (op = the admin_rpc method). */
     private fun cronLabels(op: String) = ScopedRpcLabels(
         unsupported = CRON_RPC_UNSUPPORTED,
@@ -1018,52 +990,13 @@ class IrohChannelTransport(
         onFailure = onFailure,
     )
 
-    private fun cronListFailure(failure: ScopedRpcFailure) = ServerFrame.CronListResponse(
-        id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
-    )
-
-    private fun cronAddFailure(failure: ScopedRpcFailure) = ServerFrame.CronAddResponse(
-        id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
-    )
-
-    private fun cronGetFailure(failure: ScopedRpcFailure) = ServerFrame.CronGetResponse(
-        id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
-    )
-
-    private fun cronDeleteFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteResponse(
-        id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
-    )
-
-    private fun cronDeleteAllFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteAllResponse(
-        id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = failure.requestId, success = false, error = failure.error,
-    )
-
-    @Serializable
-    private data class SubagentListRpcResult(val subagents: List<SubagentEntry> = emptyList())
-
-    @Serializable
-    private data class SubagentTodosRpcResult(
-        val found: Boolean = false,
-        val subagent: SubagentEntry? = null,
-        val todos: List<SubagentTodo> = emptyList(),
-        @SerialName("todos_found") val todosFound: Boolean = false,
-    )
-
-    private data class SubagentRpcScope(val conversationId: String, val agentId: String?)
-
-    @Serializable
-    private data class CronListRpcResult(val tasks: List<CronTask> = emptyList())
-
-    @Serializable
-    private data class CronMutationRpcResult(
-        val found: Boolean = false,
-        val task: CronTask? = null,
-        val warning: String? = null,
-    )
-
-    @Serializable
-    private data class CronDeleteAllRpcResult(val deleted: Long = 0L)
-
+    private fun subagentListFailure(failure: ScopedRpcFailure) = IrohTransportSupport.subagentListFailure(failure)
+    private fun subagentTodosFailure(failure: ScopedRpcFailure) = IrohTransportSupport.subagentTodosFailure(failure)
+    private fun cronListFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronListFailure(failure)
+    private fun cronAddFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronAddFailure(failure)
+    private fun cronGetFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronGetFailure(failure)
+    private fun cronDeleteFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronDeleteFailure(failure)
+    private fun cronDeleteAllFailure(failure: ScopedRpcFailure) = IrohTransportSupport.cronDeleteAllFailure(failure)
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
@@ -1086,39 +1019,7 @@ class IrohChannelTransport(
         private const val DEBUG_FORCE_IROH_URL = ""
         fun shouldUseIroh(url: String?): Boolean = DEBUG_FORCE_IROH_URL.isNotBlank() || isIrohUrl(url)
 
-        internal val READ_ONLY_ADMIN_RPC_METHODS = setOf(
-            "message.list",
-            "message.get",
-            "tool_return.get",
-            "conversation.list",
-            "goal.get",
-            "health.check",
-            // #822 review: idempotent agent reads issued right after connect
-            // (chat-screen load + conversation-list name resolution). Retrying
-            // these on a closed/timed-out connection over the stream-per-request
-            // (chunk-capable) path is safe — unlike the legacy control fallback,
-            // which they must stay OFF (see isLegacyFallbackSafeAdminRpcMethod).
-            "agent.get",
-            "agent.list",
-            "agent.count",
-            "agent.context",
-            "subagent.list",
-            "subagent.todos",
-            "schedule.get",
-            "schedule.list",
-            "skill.list",
-            "skill.list_agent",
-            "slash_command.list",
-            "slash_command.list_agent",
-            "tool.get",
-            "tool.list",
-            "block.get",
-            "block.list",
-            "block.list_agent",
-            "project.beadsRemoteStatus",
-            "project.get",
-            "project.list",
-        )
+        internal val READ_ONLY_ADMIN_RPC_METHODS = IrohTransportSupport.READ_ONLY_ADMIN_RPC_METHODS
 
         /**
          * Handles bare `iroh://`, `https://iroh://` (corrupted saved config), etc.

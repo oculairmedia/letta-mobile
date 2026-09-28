@@ -17,11 +17,13 @@ import org.automerge.repo.DocumentId
 enum class NotebookProjectionResult { UNCHANGED, EXPORTED, IMPORTED, CONFLICT, ERROR }
 
 internal class NotebookFilesystemProjection(private val root: Path) {
+    private enum class SyncMode { EXPORT_ONLY, RECONCILE }
+
     @Serializable
     private data class Baseline(val id: String, val markdown: String, val yaml: String)
 
     private data class Snapshot(val markdown: String, val yaml: String) {
-        fun baseline(id: String) = Baseline(id, digest(markdown), digest(yaml))
+        fun baseline(id: NotebookDocumentId) = Baseline(id.value, digest(markdown), digest(yaml))
     }
 
     private class ProjectionFiles(folder: Path) {
@@ -30,40 +32,83 @@ internal class NotebookFilesystemProjection(private val root: Path) {
         val baseline: Path = folder.resolve(".baseline.json")
     }
 
+    private data class MarkdownNote(val title: String, val body: String) {
+        fun format(): String =
+            "---\nschema: notebook/1\ntitle: ${Json.encodeToString(kotlinx.serialization.serializer<String>(), title)}\n---\n$body"
+
+        companion object {
+            fun parse(text: String): MarkdownNote {
+                val match = Regex("\\A---\\r?\\nschema: notebook/1\\r?\\ntitle: ([^\\r\\n]+)\\r?\\n---\\r?\\n").find(text)
+                requireNotNull(match) { "Invalid notebook Markdown front matter" }
+                return MarkdownNote(
+                    title = Json.decodeFromString<String>(match.groupValues[1]),
+                    body = text.substring(match.range.last + 1),
+                )
+            }
+        }
+    }
+
+    private data class BoardYaml(val boardJson: String) {
+        fun format(): String = buildString {
+            append("schema: notebook-board/1\nboardVersion: 1\nboard: |-\n")
+            boardJson.split('\n').forEach { append("  ").append(it).append('\n') }
+        }
+
+        companion object {
+            fun parse(yamlText: String): BoardYaml {
+                val lines = yamlText.split('\n')
+                require(lines.size >= 4 && lines[0] == "schema: notebook-board/1" && lines[1] == "boardVersion: 1" && lines[2] == "board: |-") {
+                    "Unsupported board YAML schema"
+                }
+                val body = lines.drop(3).dropLastWhile { it.isEmpty() }
+                require(body.isNotEmpty() && body.all { it.startsWith("  ") }) { "Invalid board YAML block" }
+                val board = body.joinToString("\n") { it.removePrefix("  ") }
+                require(Json.parseToJsonElement(board).jsonObject["schema"]?.jsonPrimitive?.content == "notebook-board/1") {
+                    "Unsupported notebook board schema"
+                }
+                return BoardYaml(board)
+            }
+        }
+    }
+
     fun hasBaseline(id: DocumentId): Boolean {
-        val folder = folder(id.getBytes().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') })
+        val hex = id.getBytes().joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+        val folder = folder(NotebookDocumentId(hex))
         if (!Files.exists(folder, NOFOLLOW_LINKS)) return false
         require(Files.isDirectory(folder, NOFOLLOW_LINKS)) { "Not a safe projection directory: $folder" }
         return safeRead(folder.resolve(".baseline.json")) != null
     }
 
     fun project(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
-        SyncSession(store, id, allowImport = false).execute()
+        SyncSession(store, id, SyncMode.EXPORT_ONLY).execute()
 
-    private fun folder(id: String): Path = root.resolve(digest(id))
+    private fun folder(id: NotebookDocumentId): Path = root.resolve(digest(id.value))
 
     fun reconcile(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
-        SyncSession(store, id, allowImport = true).execute()
+        SyncSession(store, id, SyncMode.RECONCILE).execute()
 
     private inner class SyncSession(
         private val store: NotebookLocalStore,
         private val id: DocumentId,
-        private val allowImport: Boolean,
+        private val mode: SyncMode,
     ) {
         private val document = requireNotNull(store.read(id)) { "Unknown notebook document: $id" }
-        private val docId = document.id.value
+        private val docId = document.id
         private val files = ProjectionFiles(folder(docId).also {
             checkDirectory(root)
             checkDirectory(it)
         })
-        private val current = Snapshot(markdown(document.title, document.markdown), yaml(document.sceneJson))
+        private val current = Snapshot(
+            MarkdownNote(document.title, document.markdown).format(),
+            BoardYaml(document.sceneJson).format(),
+        )
         private val diskMarkdown = safeRead(files.markdown)
         private val diskYaml = safeRead(files.yaml)
         private val disk = if (diskMarkdown != null && diskYaml != null) Snapshot(diskMarkdown, diskYaml) else null
         private val previous = safeRead(files.baseline)?.let { Json.decodeFromString<Baseline>(it) }
 
         fun execute(): NotebookProjectionResult {
-            require(previous == null || previous.id == docId) { "Projection ID mismatch" }
+            require(previous == null || previous.id == docId.value) { "Projection ID mismatch" }
             return if (previous == null) {
                 syncInitial()
             } else {
@@ -84,17 +129,10 @@ internal class NotebookFilesystemProjection(private val root: Path) {
             val localChanged = current.baseline(docId) != previous
             val diskChanged = disk?.baseline(docId) != previous
             if (!localChanged && !diskChanged) return NotebookProjectionResult.UNCHANGED
-            if (disk == null) return NotebookProjectionResult.CONFLICT // Never silently restore a deleted external file.
-            if (hasConflict(localChanged, diskChanged)) return NotebookProjectionResult.CONFLICT
-            if (!localChanged) {
-                return applyExternalImport(disk)
-            }
+            if (disk == null) return NotebookProjectionResult.CONFLICT
+            if (!localChanged) return applyExternalImport(disk)
+            if (diskChanged && current != disk) return NotebookProjectionResult.CONFLICT
             return exportCurrent(disk)
-        }
-
-        private fun hasConflict(localChanged: Boolean, diskChanged: Boolean): Boolean {
-            if (!localChanged || !diskChanged) return false
-            return current != disk
         }
 
         private fun exportCurrent(expected: Snapshot?): NotebookProjectionResult =
@@ -105,12 +143,12 @@ internal class NotebookFilesystemProjection(private val root: Path) {
             }
 
         private fun applyExternalImport(disk: Snapshot): NotebookProjectionResult {
-            if (!allowImport) return NotebookProjectionResult.CONFLICT
-            val (title, body) = parseMarkdown(disk.markdown)
-            val board = parseYaml(disk.yaml)
+            if (mode != SyncMode.RECONCILE) return NotebookProjectionResult.CONFLICT
+            val note = MarkdownNote.parse(disk.markdown)
+            val board = BoardYaml.parse(disk.yaml)
             // An external save during parsing must not be acknowledged by the baseline.
             if (diskChangedDuringImport(disk)) return NotebookProjectionResult.CONFLICT
-            if (!store.replaceProjection(id, document, NotebookLocalStore.NotebookContent(title, body, board))) {
+            if (!store.replaceProjection(id, document, NotebookLocalStore.NotebookContent(note.title, note.body, board.boardJson))) {
                 return NotebookProjectionResult.CONFLICT
             }
             if (diskChangedDuringImport(disk)) return NotebookProjectionResult.CONFLICT
@@ -122,7 +160,7 @@ internal class NotebookFilesystemProjection(private val root: Path) {
             safeRead(files.markdown) != expected.markdown || safeRead(files.yaml) != expected.yaml
     }
 
-    private fun publish(files: ProjectionFiles, snapshot: Snapshot, id: String, expected: Snapshot?): Boolean {
+    private fun publish(files: ProjectionFiles, snapshot: Snapshot, id: NotebookDocumentId, expected: Snapshot?): Boolean {
         if (safeRead(files.markdown) != expected?.markdown || safeRead(files.yaml) != expected?.yaml) return false
         atomicWrite(files.markdown, snapshot.markdown)
         atomicWrite(files.yaml, snapshot.yaml)
@@ -155,32 +193,6 @@ internal class NotebookFilesystemProjection(private val root: Path) {
         } finally {
             Files.deleteIfExists(temp)
         }
-    }
-
-    private fun markdown(title: String, body: String): String =
-        "---\nschema: notebook/1\ntitle: ${Json.encodeToString(kotlinx.serialization.serializer<String>(), title)}\n---\n$body"
-
-    private fun parseMarkdown(value: String): Pair<String, String> {
-        val match = Regex("\\A---\\r?\\nschema: notebook/1\\r?\\ntitle: ([^\\r\\n]+)\\r?\\n---\\r?\\n").find(value)
-        requireNotNull(match) { "Invalid notebook Markdown front matter" }
-        return Json.decodeFromString<String>(match.groupValues[1]) to value.substring(match.range.last + 1)
-    }
-
-    private fun yaml(board: String): String = buildString {
-        append("schema: notebook-board/1\nboardVersion: 1\nboard: |-\n")
-        board.split('\n').forEach { append("  ").append(it).append('\n') }
-    }
-
-    private fun parseYaml(value: String): String {
-        val lines = value.split('\n')
-        require(lines.size >= 4 && lines[0] == "schema: notebook-board/1" && lines[1] == "boardVersion: 1" && lines[2] == "board: |-") { "Unsupported board YAML schema" }
-        val body = lines.drop(3).dropLastWhile { it.isEmpty() }
-        require(body.isNotEmpty() && body.all { it.startsWith("  ") }) { "Invalid board YAML block" }
-        val board = body.joinToString("\n") { it.removePrefix("  ") }
-        require(Json.parseToJsonElement(board).jsonObject["schema"]?.jsonPrimitive?.content == "notebook-board/1") {
-            "Unsupported notebook board schema"
-        }
-        return board
     }
 
     private companion object {

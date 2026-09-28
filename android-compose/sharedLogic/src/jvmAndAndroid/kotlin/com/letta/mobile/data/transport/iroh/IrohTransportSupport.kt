@@ -10,6 +10,7 @@ import com.letta.mobile.runtime.TurnInput
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
 
@@ -59,7 +60,121 @@ internal object IrohTransportSupport {
     fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
     fun nowIso(): String = Instant.now().toString()
 
+    val READ_ONLY_ADMIN_RPC_METHODS = setOf(
+        "message.list",
+        "message.get",
+        "tool_return.get",
+        "conversation.list",
+        "goal.get",
+        "health.check",
+        "agent.get",
+        "agent.list",
+        "agent.count",
+        "agent.context",
+        "subagent.list",
+        "subagent.todos",
+        "schedule.get",
+        "schedule.list",
+        "skill.list",
+        "skill.list_agent",
+        "slash_command.list",
+        "slash_command.list_agent",
+        "tool.get",
+        "tool.list",
+        "block.get",
+        "block.list",
+        "block.list_agent",
+        "project.beadsRemoteStatus",
+        "project.get",
+        "project.list",
+    )
+
     fun otherActiveConversationsLabel(registry: IrohTurnRegistry, conversationId: String): String =
         registry.concurrentTurns(excludingConversationId = IrohConversationId(conversationId))
             .joinToString(",") { it.conversationId }
+
+    fun createNotebookHandlerFactory(
+        peers: Set<String>?,
+        store: com.letta.mobile.data.canvas.NotebookLocalStore?,
+        directory: java.nio.file.Path?,
+    ): ((computer.iroh.Endpoint, kotlinx.coroutines.CoroutineScope) -> NotebookEndpointSession)? =
+        peers?.takeIf { it.isNotEmpty() }?.let { nonNullPeers ->
+            when {
+                store != null -> { endpoint, notebookScope ->
+                    NotebookEndpointSession(store, endpoint, nonNullPeers, notebookScope)
+                }
+                directory != null -> { endpoint, notebookScope ->
+                    NotebookEndpointSession(directory, endpoint, nonNullPeers, notebookScope)
+                }
+                else -> null
+            }
+        }
+
+    fun subagentListFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentListResponse(
+        id = frameId("subagent_list"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun subagentTodosFailure(failure: ScopedRpcFailure) = ServerFrame.SubagentTodosResponse(
+        id = frameId("subagent_todos"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun cronListFailure(failure: ScopedRpcFailure) = ServerFrame.CronListResponse(
+        id = frameId("cron_list"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun cronAddFailure(failure: ScopedRpcFailure) = ServerFrame.CronAddResponse(
+        id = frameId("cron_add"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun cronGetFailure(failure: ScopedRpcFailure) = ServerFrame.CronGetResponse(
+        id = frameId("cron_get"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun cronDeleteFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteResponse(
+        id = frameId("cron_delete"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun cronDeleteAllFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteAllResponse(
+        id = frameId("cron_delete_all"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun launchNotebook(scope: kotlinx.coroutines.CoroutineScope, starter: suspend () -> Unit) {
+        scope.launch {
+            try {
+                starter()
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                com.letta.mobile.util.Telemetry.event("IrohTransport", "notebook.start.failed", "error" to (error.message ?: error.toString()))
+            }
+        }
+    }
 }
+
+@kotlinx.serialization.Serializable
+internal data class SubagentListRpcResult(val subagents: List<com.letta.mobile.data.model.SubagentEntry> = emptyList())
+
+@kotlinx.serialization.Serializable
+internal data class SubagentTodosRpcResult(
+    val found: Boolean = false,
+    val subagent: com.letta.mobile.data.model.SubagentEntry? = null,
+    val todos: List<com.letta.mobile.data.model.SubagentTodo> = emptyList(),
+    @kotlinx.serialization.SerialName("todos_found") val todosFound: Boolean = false,
+)
+
+internal data class ScopedRpcFailure(val requestId: String, val error: String)
+
+
+@kotlinx.serialization.Serializable
+internal data class CronListRpcResult(val tasks: List<com.letta.mobile.data.model.CronTask> = emptyList())
+
+@kotlinx.serialization.Serializable
+internal data class CronMutationRpcResult(
+    val found: Boolean = false,
+    val task: com.letta.mobile.data.model.CronTask? = null,
+    val warning: String? = null,
+)
+
+@kotlinx.serialization.Serializable
+internal data class CronDeleteAllRpcResult(val deleted: Long = 0L)
+

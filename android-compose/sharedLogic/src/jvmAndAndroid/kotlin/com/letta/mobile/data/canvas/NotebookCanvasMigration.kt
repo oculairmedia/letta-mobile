@@ -43,20 +43,42 @@ class NotebookCanvasMappingStore(private val directory: Path) {
     }
 
     /** Hold the interprocess lock through import and completion, not just the claim write. */
-    internal fun migrate(canvas: CanvasDocument, target: DocumentId, importer: () -> NotebookCanvasImportResult): NotebookCanvasImportResult = locked { entries ->
+    internal fun migrate(
+        canvas: CanvasDocument,
+        target: DocumentId,
+        importer: () -> NotebookCanvasImportResult,
+    ): NotebookCanvasImportResult = locked { entries ->
         val key = target.hex()
         val fingerprint = fingerprint(canvas)
         val entry = entries.firstOrNull { it.canvasId == canvas.id.value }
-        if (entry != null && (entry.targetHex != key || entry.fingerprint != fingerprint) ||
-            entry == null && entries.any { it.targetHex == key }
-        ) return@locked NotebookCanvasImportResult.CONFLICT
-        if (entry == null) write(entries + Entry(canvas.id.value, key, fingerprint, false))
+        if (hasMappingConflict(entry, key, fingerprint, entries)) {
+            return@locked NotebookCanvasImportResult.CONFLICT
+        }
+        if (entry == null) {
+            write(entries + Entry(canvas.id.value, key, fingerprint, false))
+        }
         val result = importer()
         if (result != NotebookCanvasImportResult.CONFLICT && entry?.completed != true) {
-            val current = read()
-            write(current.map { if (it.canvasId == canvas.id.value) it.copy(completed = true) else it })
+            markCompleted(canvas.id.value)
         }
         result
+    }
+
+    private fun hasMappingConflict(
+        entry: Entry?,
+        targetHex: String,
+        fingerprint: String,
+        entries: List<Entry>,
+    ): Boolean {
+        if (entry != null) {
+            return entry.targetHex != targetHex || entry.fingerprint != fingerprint
+        }
+        return entries.any { it.targetHex == targetHex }
+    }
+
+    private fun markCompleted(canvasId: String) {
+        val current = read()
+        write(current.map { if (it.canvasId == canvasId) it.copy(completed = true) else it })
     }
 
     private fun <T> locked(action: (List<Entry>) -> T): T {

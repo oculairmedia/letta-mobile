@@ -77,104 +77,8 @@ import kotlin.time.Duration.Companion.seconds
  * [iroh-app-server] Listening on Iroh... (Ctrl+C to stop)
  * ```
  */
-fun buildProductionAdminRouter(
-    controller: DefaultAppServerController,
-    subagentRegistrySource: SubagentRegistrySource? = null,
-    /**
-     * lgns8.22.8: when set, the controller-native subagent registry is backed by
-     * this JSON file, so chips survive a controller restart and are reconciled
-     * against live state on the next authoritative snapshot. Unset keeps the
-     * previous in-memory-only behaviour.
-     */
-    subagentRegistryFile: String? = null,
-    pairingService: IrohPairingService? = null,
-    nativeClient: AppServerClient? = null,
-    vibesyncBaseUrl: String? = null,
-    /**
-     * lgns8.9: the letta-code on-disk backend root. Admin READS the App Server
-     * exposes no command for (run/step history, agent context, memory blocks)
-     * are served READ-ONLY from it — the same directory lettashim read. Unset =>
-     * those methods fail closed; there is no HTTP admin fallback any more.
-     */
-    localBackendDir: String? = System.getenv("LETTA_LOCAL_BACKEND_DIR"),
-    /**
-     * letta-mobile-7dm1q / lgns8.21.2: the letta-code skills root. letta-code
-     * 0.29.12 advertises no skill enumeration on the wire, so without a host-side
-     * enumerator `skill.list` answers `hydrated=false` forever and the Skills
-     * screen stays empty. Enumerating this directory at startup is that missing
-     * authoritative source. Unset => `LETTA_SKILLS_DIR` => `~/.letta/skills`.
-     */
-    skillsDir: String? = null,
-    eventScope: CoroutineScope? = null,
-    /** Pushes `agent_updated` to connected clients after agent writes. */
-    agentChanges: com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier? = null,
-    conversationChanges: com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier? = null,
-    /** letta-mobile-w4q4p: persisted model exposure decisions; null keeps them in memory. */
-    modelExposureFile: String? = null,
-): AdminRpcRouter {
-    val skillsCatalog = NativeSkillsCatalog()
-    // Cold-start discovery: hydrate BEFORE the router is built, so the very first
-    // skill.list after a restart is already authoritative (lgns8.21.2 AC:
-    // "discovery at cold start" + "preserved across restart" — the skills root is
-    // on disk, so re-enumerating on every boot preserves it by construction).
-    val resolvedSkillsDir = HostSkillsEnumerator
-        .resolveSkillsDir(skillsDir)
-    HostSkillsEnumerator.enumerate(resolvedSkillsDir)
-        ?.let { enumerated ->
-            skillsCatalog.hydrateFromHost(enumerated)
-            Telemetry.event(
-                "SkillsCatalog",
-                "host.hydrated",
-                "skillsDir" to resolvedSkillsDir,
-                "skills" to enumerated.size.toString(),
-            )
-        }
-        ?: Telemetry.event(
-            "SkillsCatalog",
-            "host.root_missing",
-            "skillsDir" to resolvedSkillsDir,
-        )
-    val subagentStore = subagentRegistryFile
-        ?.let { com.letta.mobile.data.subagents.FileSubagentRegistryStore(java.nio.file.Path.of(it)) }
-        ?: com.letta.mobile.data.subagents.InMemorySubagentRegistryStore()
-    val subagentSource = subagentRegistrySource
-        ?: com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource(
-            com.letta.mobile.data.subagents.DurableSubagentRegistry(store = subagentStore),
-        ).also { source ->
-            if (nativeClient != null && eventScope != null) {
-                source.start(eventScope, nativeClient.events)
-            }
-        }
-    if (nativeClient != null && eventScope != null) {
-        skillsCatalog.start(eventScope, nativeClient.events)
-    }
-    return AdminRpcRegistry.buildRouter(
-        controller = controller,
-        subagentRegistrySource = subagentSource,
-        pairingService = pairingService,
-        nativeClient = nativeClient,
-        vibesyncBaseUrl = vibesyncBaseUrl,
-        localBackendDir = localBackendDir,
-        skillsListing = skillsCatalog.asListingSource(),
-        agentChanges = agentChanges,
-        conversationChanges = conversationChanges,
-        modelExposureFile = modelExposureFile,
-    )
-}
 
-internal fun parseNotebookPeers(directory: String?, ids: String?): Set<String>? {
-    require((directory == null) == (ids == null)) {
-        "Notebook sync requires both --notebook-dir and --notebook-peer-ids"
-    }
-    if (directory == null) return null
-    require(directory.isNotBlank()) { "Notebook directory must not be blank" }
-    val peers = requireNotNull(ids).split(',').map(String::trim).filter(String::isNotEmpty).toSet()
-    require(peers.isNotEmpty()) { "Notebook sync requires at least one authorized peer" }
-    require(peers.all { it.matches(Regex("[0-9a-f]{64}")) }) {
-        "Notebook peers must be lowercase 64-character Iroh endpoint IDs"
-    }
-    return peers
-}
+
 
 class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
@@ -449,18 +353,9 @@ class AppServerServeIrohCommand : CliktCommand(
             println("[iroh-app-server] Starting Iroh endpoint...")
             
             val canvasRelay = startCanvasRelay(scope)
-            val notebookPeers = parseNotebookPeers(notebookDir, notebookPeerIds)
-            if (notebookPeers != null) {
-                val keyFile = requireNotNull(irohSecretKeyPath) {
-                    "Notebook sync requires --iroh-secret-key-file for stable peer identity"
-                }
-                val peerId = IrohNodeIdentity.nodeIdHexFromSecretBytes(FileIrohSecretKeyStore(keyFile).loadOrCreate())
-                val store = NotebookLocalStore(java.nio.file.Path.of(requireNotNull(notebookDir)), peerId)
-                notebookStore = store
-                notebookProtocol = AutomergeIrohRepoProtocol(store.repo, notebookPeers, scope) { remote, alpn ->
-                    checkNotNull(irohEndpoint) { "Iroh endpoint not started" }.connect(remote, alpn)
-                }
-            }
+            val (store, protocol) = initNotebookSync(scope) { irohEndpoint }
+            notebookStore = store
+            notebookProtocol = protocol
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
@@ -487,37 +382,10 @@ class AppServerServeIrohCommand : CliktCommand(
             // (null = Iroh-only/stub mode).
             val (controller, nativeAdminClient) = createController(effectiveAppServerUrl, requestTimeout.toLong(), scope)
 
-            // Register admin_rpc handlers so clients on an iroh:// backend can
-            // read conversations/messages/agents WITHOUT any direct HTTP route
-            // to this host (Iroh purity: letta-mobile-qfa81). Phase 4: no
-            // LettaShim admin base / HTTP subagent discovery.
-            // One notifier for the whole host: agent handlers feed it, the endpoint delivers it.
-            val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
-            val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
-            val adminRpcRouter = buildProductionAdminRouter(
-                controller = controller,
-                pairingService = pairingService,
-                nativeClient = nativeAdminClient,
-                vibesyncBaseUrl = vibesyncBaseUrl,
-                subagentRegistryFile = subagentRegistryFile,
-                skillsDir = skillsDir,
-                localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
-                eventScope = scope,
-                agentChanges = agentChanges,
-                conversationChanges = conversationChanges,
-                modelExposureFile = resolvedModelExposureFile(),
-            )
-            endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
-            agentChanges.attach(endpoint.agentChangeTarget())
-            conversationChanges.attach(endpoint.conversationChangeTarget())
-            println(
-                "[iroh-app-server] admin_rpc handlers registered " +
-                    "(methods: ${adminRpcRouter.methodCount}, " +
-                    "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
-            )
-            println(
-                "[iroh-app-server] local_backend_store: " +
-                    (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR") ?: "UNSET (block.list/agent.context fail closed)"),
+            setupAdminRpc(
+                endpoint = endpoint,
+                admin = AdminContext(controller, nativeAdminClient, pairingService),
+                scope = scope,
             )
 
             printChannelsHostBanner()
@@ -590,6 +458,62 @@ class AppServerServeIrohCommand : CliktCommand(
         while (true) {
             delay(1.seconds)
         }
+    }
+
+    private suspend fun initNotebookSync(
+        scope: CoroutineScope,
+        endpointProvider: () -> IrohNodeEndpoint?,
+    ): Pair<NotebookLocalStore?, AutomergeIrohRepoProtocol?> {
+        val peers = parseNotebookPeers(notebookDir, notebookPeerIds) ?: return null to null
+        val keyFile = requireNotNull(irohSecretKeyPath) {
+            "Notebook sync requires --iroh-secret-key-file for stable peer identity"
+        }
+        val peerId = IrohNodeIdentity.nodeIdHexFromSecretBytes(FileIrohSecretKeyStore(keyFile).loadOrCreate())
+        val store = NotebookLocalStore(java.nio.file.Path.of(requireNotNull(notebookDir)), peerId)
+        val protocol = AutomergeIrohRepoProtocol(store.repo, peers, scope) { remote, alpn ->
+            checkNotNull(endpointProvider()) { "Iroh endpoint not started" }.connect(remote, alpn)
+        }
+        return store to protocol
+    }
+
+    private class AdminContext(
+        val controller: DefaultAppServerController,
+        val nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient?,
+        val pairingService: IrohPairingService?,
+    )
+
+    private fun setupAdminRpc(
+        endpoint: IrohNodeEndpoint,
+        admin: AdminContext,
+        scope: CoroutineScope,
+    ) {
+        val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
+        val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
+        val adminRpcRouter = buildProductionAdminRouter(
+            controller = admin.controller,
+            pairingService = admin.pairingService,
+            nativeClient = admin.nativeClient,
+            vibesyncBaseUrl = vibesyncBaseUrl,
+            subagentRegistryFile = subagentRegistryFile,
+            skillsDir = skillsDir,
+            localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
+            eventScope = scope,
+            agentChanges = agentChanges,
+            conversationChanges = conversationChanges,
+            modelExposureFile = resolvedModelExposureFile(),
+        )
+        endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
+        agentChanges.attach(endpoint.agentChangeTarget())
+        conversationChanges.attach(endpoint.conversationChangeTarget())
+        println(
+            "[iroh-app-server] admin_rpc handlers registered " +
+                "(methods: ${adminRpcRouter.methodCount}, " +
+                "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
+        )
+        println(
+            "[iroh-app-server] local_backend_store: " +
+                (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR") ?: "UNSET (block.list/agent.context fail closed)"),
+        )
     }
 
     internal suspend fun <T> runWithLifecycleCleanup(

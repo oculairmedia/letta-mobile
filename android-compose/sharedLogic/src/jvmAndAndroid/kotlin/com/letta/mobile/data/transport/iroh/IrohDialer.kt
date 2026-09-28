@@ -218,39 +218,42 @@ internal class IrohDialer(
         fun start() {
             check(acceptJob == null && !closed)
             acceptJob = parentScope.launch {
-                while (isActive) {
-                    try {
-                        val incoming = endpoint.acceptNext()
-                        if (incoming == null) {
-                            delay(100)
-                            continue
-                        }
-                        launch { serve(incoming) }.also { child ->
-                            servingJobs.add(child)
-                            child.invokeOnCompletion { servingJobs.remove(child) }
-                        }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        if (!isActive) break
-                        Telemetry.event("IrohTransport", "notebook.accept.failed", "error" to (e.message ?: e.toString()))
-                        delay(100)
-                    }
+                acceptLoop()
+            }
+        }
+
+        private suspend fun CoroutineScope.acceptLoop() {
+            while (isActive) {
+                acceptNextConnection()
+            }
+        }
+
+        private suspend fun CoroutineScope.acceptNextConnection() {
+            try {
+                val incoming = endpoint.acceptNext()
+                if (incoming == null) {
+                    delay(100)
+                    return
                 }
+                launch { serve(incoming) }.also { child ->
+                    servingJobs.add(child)
+                    child.invokeOnCompletion { servingJobs.remove(child) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!isActive) return
+                Telemetry.event("IrohTransport", "notebook.accept.failed", "error" to (e.message ?: e.toString()))
+                delay(100)
             }
         }
 
         private suspend fun serve(incoming: Incoming) {
             var connection: Connection? = null
             try {
-                val accepting = incoming.accept()
-                if (!accepting.alpn().contentEquals(AUTOMERGE_REPO_ALPN)) return
-                connection = withTimeout(15_000) { accepting.connect() }
+                connection = establishConnection(incoming) ?: return
                 val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
-                if (closed || !handler.authorize(remoteId)) {
-                    connection.close(4403L, "peer_not_allowed".encodeToByteArray())
-                    return
-                }
+                if (!isAuthorizedPeer(connection, remoteId)) return
                 connections.add(connection)
                 if (!closed) handler.accept(connection, remoteId)
             } catch (e: CancellationException) {
@@ -263,6 +266,20 @@ internal class IrohDialer(
                     runCatching { it.close(0L, "closed".encodeToByteArray()) }
                 }
             }
+        }
+
+        private suspend fun establishConnection(incoming: Incoming): Connection? {
+            val accepting = incoming.accept()
+            if (!accepting.alpn().contentEquals(AUTOMERGE_REPO_ALPN)) return null
+            return withTimeout(15_000) { accepting.connect() }
+        }
+
+        private fun isAuthorizedPeer(connection: Connection, remoteId: String): Boolean {
+            if (closed || !handler.authorize(remoteId)) {
+                connection.close(4403L, "peer_not_allowed".encodeToByteArray())
+                return false
+            }
+            return true
         }
 
         override fun close() {
