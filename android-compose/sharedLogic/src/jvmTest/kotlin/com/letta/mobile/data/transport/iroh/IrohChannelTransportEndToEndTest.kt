@@ -93,7 +93,7 @@ class IrohChannelTransportEndToEndTest {
 
     private suspend fun runNotebookProtocolRoutingTest(
         createHandler: (CompletableDeferred<String>) -> IrohNodeProtocolHandler,
-    ) {
+    ): String {
         val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
         val resultPeer = CompletableDeferred<String>()
         val server = IrohNodeEndpoint(
@@ -106,11 +106,13 @@ class IrohChannelTransportEndToEndTest {
             server.create()
             server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
             val connection = client.connect(server.addr(), notebookAlpn)
+            val actualPeer = withTimeout(15.seconds) { resultPeer.await() }
             assertEquals(
                 IrohDiagnostics.endpointIdHex(client.addr().id()),
-                withTimeout(15.seconds) { resultPeer.await() },
+                actualPeer,
             )
             connection.close(0L, ByteArray(0))
+            return actualPeer
         } finally {
             client.shutdown()
             client.close()
@@ -121,7 +123,7 @@ class IrohChannelTransportEndToEndTest {
     @Test
     fun hostRoutesNotebookAlpnWithoutAppServerAuthentication() = runBlocking {
         val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
-        runNotebookProtocolRoutingTest { acceptedPeer ->
+        val routed = runNotebookProtocolRoutingTest { acceptedPeer ->
             object : IrohNodeProtocolHandler {
                 override val alpn = notebookAlpn
                 override fun authorize(remoteEndpointId: String) = true
@@ -131,12 +133,13 @@ class IrohChannelTransportEndToEndTest {
                 }
             }
         }
+        assertTrue(routed.isNotEmpty())
     }
 
     @Test
     fun notebookHandlerRejectsUnauthorizedPeerWithoutCallingAccept() = runBlocking {
         val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
-        runNotebookProtocolRoutingTest { denied ->
+        val denied = runNotebookProtocolRoutingTest { denied ->
             object : IrohNodeProtocolHandler {
                 override val alpn = notebookAlpn
                 override fun authorize(remoteEndpointId: String): Boolean {
@@ -148,6 +151,7 @@ class IrohChannelTransportEndToEndTest {
                 }
             }
         }
+        assertTrue(denied.isNotEmpty())
     }
 
     @Test
