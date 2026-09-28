@@ -37,7 +37,6 @@ import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalChatIsPinching
-import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.theme.LettaDimens
@@ -118,14 +117,13 @@ internal fun MessageReasoning(
         modifier = modifier
             .fillMaxWidth()
             .then(sizeAnimation)
-            // letta-mobile: MessageReasoning renders standalone (bypasses
-            // ChatMessageBubble, which is where every other run-step row gets
-            // its horizontal inset from `chatDimens.bubblePaddingHorizontal`).
-            // Without matching it here, the "Thought" title sits flush
-            // against the run gutter while sibling tool-call rows sit 10dp
-            // further right, so their content doesn't line up under a
-            // shared run's dot/rail — match the same token.
-            .padding(horizontal = MaterialTheme.chatDimens.bubblePaddingHorizontal, vertical = LettaDimens.Space.xs),
+            // MessageReasoning renders standalone (bypasses ChatMessageBubble).
+            // Bubble-less assistant prose adds NO horizontal padding there — the
+            // message list's own contentPadding is the only side gutter — so the
+            // "Thought" row must not add `bubblePaddingHorizontal` either; doing
+            // so inset the disclosure 10dp past the adjacent message text
+            // (product feedback, 2026-09-28: align the thought with the message).
+            .padding(vertical = LettaDimens.Space.xs),
     ) {
         Row(
             modifier = Modifier
