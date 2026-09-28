@@ -498,11 +498,14 @@ class CanonicalTimelineEngine(
         request: TimelineEngineRequest,
         page: TimelineRemotePageResult.Page,
     ): TimelineEngineReconcileResult = mutex.withLock {
-        if (pendingReconcile !== request || request.selection !== mutablePublication.value.selection ||
-            page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
-        ) return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
-        // A settled turn now depends on this path for its durable rows, so only refuse mid-stream.
-        if (liveFence != null && mutableLive.value?.settlementRevision == null && mutableSettling.value.isEmpty()) {
+        val requestMismatch = pendingReconcile !== request || request.selection !== mutablePublication.value.selection
+        val generationMismatch = page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
+        if (requestMismatch || generationMismatch) {
+            return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
+        }
+        val turnInFlight = liveFence != null && mutableLive.value?.settlementRevision == null
+        val nothingSettling = mutableSettling.value.isEmpty()
+        if (turnInFlight && nothingSettling) {
             return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
         }
         validate(page)
@@ -513,18 +516,22 @@ class CanonicalTimelineEngine(
             for (record in page.records) {
                 currentCoroutineContext().ensureActive()
                 val event = record.message.toTimelineEvent(0.0)
-                val identity = if (writer is TimelineExactCanonicalWriter && event != null)
-                    writer.canonicalIdentity(this, event.serverId, event.otid) else record.identity
+                val exact = (writer as? TimelineExactCanonicalWriter)?.takeIf { event != null }
+                val identity = if (exact != null) {
+                    exact.canonicalIdentity(this, event!!.serverId, event.otid)
+                } else {
+                    record.identity
+                }
                 val existed = locate(identity) != null
                 val merged = writer.merge(this, record)
                 if (merged && !existed) appended++
                 changed = merged || changed
                 // After the merge: a tool call's stored key is its group owner, which the tool
                 // index only knows once this record has been written.
-                if (writer is TimelineExactCanonicalWriter && event != null) {
+                if (exact != null) {
                     committed += CommittedRow(
-                        event = event,
-                        identity = writer.canonicalEventIdentity(this, event),
+                        event = event!!,
+                        identity = exact.canonicalEventIdentity(this, event),
                         isNew = !existed,
                         orderDate = record.message.date.orEmpty(),
                         orderOtid = record.message.otid ?: record.message.id,
