@@ -1,6 +1,7 @@
 package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.startup.AppStartupCoordinator
 import com.letta.mobile.util.EncryptedPrefsHelper
 import javax.inject.Inject
@@ -20,4 +21,6 @@ class LettaApplicationDependencies @Inject constructor(
     val crashReporter: CrashReporter,
     val appStartupCoordinator: AppStartupCoordinator,
     @Suppress("unused") val encryptedPrefsHelper: EncryptedPrefsHelper,
+    // Eager process owner: UI and relay resolve the same repository for the app lifetime.
+    val notebookLocalStore: NotebookLocalStore,
 )

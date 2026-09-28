@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
+import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerChannel
@@ -98,7 +99,7 @@ class IrohChannelTransportEndToEndTest {
         val resultPeer = CompletableDeferred<String>()
         val server = IrohNodeEndpoint(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("other-app-server-peer")),
             protocolHandlers = listOf(createHandler(resultPeer)),
         )
         val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
@@ -224,23 +225,10 @@ class IrohChannelTransportEndToEndTest {
      * Stub controller that starts any runtime and, on runTurn, emits a single assistant
      * stream frame followed by a Completed lifecycle — the minimal real-response shape.
      */
-    private class EchoAssistantController(private val reply: String) : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-
-        override suspend fun startRuntime(
-            agentId: AgentId,
-            conversationId: ConversationId,
-            cwd: String?,
-            mode: AppServerPermissionMode?,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = CanonicalRuntime(
-            scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value, actingUserId = null),
-            agent = null,
-            conversation = null,
-            created = null,
-        )
-
+    private class EchoAssistantController(
+        private val reply: String,
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
             emit(
                 RuntimeEventDraft(
@@ -264,21 +252,12 @@ class IrohChannelTransportEndToEndTest {
                     agentId = command.agentId,
                     conversationId = command.conversationId,
                     source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
+                    payload = RuntimeEventPayload.RunLifecycleChanged(
+                        status = RuntimeRunStatus.Completed,
+                    ),
                 ),
             )
         }
-
-        override suspend fun sync(
-            runtime: AppServerRuntimeScope,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-
-        override suspend fun abort(
-            runtime: AppServerRuntimeScope,
-            runId: String?,
-        ): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     @Test
@@ -479,10 +458,14 @@ class IrohChannelTransportEndToEndTest {
      * Controller that adds a configurable delay before emitting each turn's response,
      * simulating real LLM latency.
      */
-    private class LatentEchoController(private val delayMs: Long) : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-        override suspend fun startRuntime(agentId: AgentId, conversationId: ConversationId, cwd: String?, mode: AppServerPermissionMode?, recoverApprovals: Boolean, forceDeviceStatus: Boolean): CanonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value), agent = null, conversation = null, created = null)
-
+    /**
+     * Controller that adds a configurable delay before emitting each turn's response,
+     * simulating real LLM latency.
+     */
+    private class LatentEchoController(
+        private val delayMs: Long,
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> {
             val turnN = (command.input as? TurnInput.UserMessage)?.text?.let { t -> t.substringAfterLast('-').ifEmpty { "1" } } ?: "1"
             return flow {
@@ -492,25 +475,12 @@ class IrohChannelTransportEndToEndTest {
                 emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
             }
         }
-        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     /** Emits one assistant reply per turn, echoing the input text so each turn is distinguishable. */
-    private class PerTurnEchoController : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-        override suspend fun startRuntime(
-            agentId: AgentId,
-            conversationId: ConversationId,
-            cwd: String?,
-            mode: AppServerPermissionMode?,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = CanonicalRuntime(
-            scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value, actingUserId = null),
-            agent = null, conversation = null, created = null,
-        )
-
+    private class PerTurnEchoController(
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
             val turnText = (command.input as? TurnInput.UserMessage)?.text ?: "?"
             val n = turnText.substringAfterLast('-')
@@ -534,16 +504,12 @@ class IrohChannelTransportEndToEndTest {
                 ),
             )
         }
-
-        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     /** Emits a single excessively large frame to exercise the OOM guard line buffer. */
-    private class BigFrameController : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-        override suspend fun startRuntime(agentId: AgentId, conversationId: ConversationId, cwd: String?, mode: AppServerPermissionMode?, recoverApprovals: Boolean, forceDeviceStatus: Boolean): CanonicalRuntime =
-            CanonicalRuntime(scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value), agent = null, conversation = null, created = null)
+    private class BigFrameController(
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
             // Emit a frame larger than MAX_LINE_BYTES (1MB) to trigger the overflow guard
             val big = "x".repeat(2_000_000)
@@ -552,8 +518,6 @@ class IrohChannelTransportEndToEndTest {
             emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime,
                 payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
         }
-        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     @Test

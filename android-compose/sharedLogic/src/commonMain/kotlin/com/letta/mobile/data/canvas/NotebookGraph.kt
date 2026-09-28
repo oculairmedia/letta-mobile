@@ -33,6 +33,7 @@ data class NotebookItemContract(
     val editorId: String? = null,
     val agentToolId: String? = null,
     val executable: Boolean = false,
+    val pluginId: String? = null,
 )
 
 /** Per-peer grants are explicit; chat access is separately enforced by its App Server. */
@@ -42,12 +43,52 @@ data class NotebookPeerGrant(
     val mayRead: Boolean = true,
     val mayEdit: Boolean = false,
     val mayExecutePlugins: Boolean = false,
+    val mayReference: Boolean = false,
+    val mayUseAgentTools: Boolean = false,
 ) {
     init { require(peerId.isNotBlank()) }
 }
 
+/** Reference is a separate capability: neither reading nor editing implies it. */
+fun mayReadNotebook(grant: NotebookPeerGrant?): Boolean = grant?.mayRead == true
+fun mayEditNotebook(grant: NotebookPeerGrant?): Boolean = grant?.mayEdit == true
+fun mayReferenceNotebook(grant: NotebookPeerGrant?): Boolean = grant?.mayReference == true
+
+/** A locally installed plugin must be trusted for the exact kind and version it handles. */
+@Serializable
+data class NotebookInstalledPlugin(
+    val pluginId: String,
+    val kind: String,
+    val version: Int,
+    val trusted: Boolean = false,
+)
+
+/** This legacy grant check does not establish installation or trust; do not use it to run code. */
 fun mayExecuteNotebookItem(contract: NotebookItemContract?, grant: NotebookPeerGrant?): Boolean =
     contract?.executable == true && grant?.mayExecutePlugins == true && grant.mayEdit
+
+fun mayRunNotebookPlugin(
+    item: NotebookItem,
+    contract: NotebookItemContract?,
+    grant: NotebookPeerGrant?,
+    installedPlugin: NotebookInstalledPlugin?,
+): Boolean =
+    mayExecuteNotebookItem(contract, grant) &&
+        contract?.kind == item.kind && contract.version == item.version &&
+        !contract.pluginId.isNullOrBlank() &&
+        installedPlugin?.trusted == true && installedPlugin.pluginId == contract.pluginId &&
+        installedPlugin.kind == item.kind && installedPlugin.version == item.version
+
+/** Agent-tool authorization is independent of plugin execution and document edit grants. */
+fun mayUseNotebookAgentTool(
+    item: NotebookItem,
+    contract: NotebookItemContract?,
+    grant: NotebookPeerGrant?,
+    authorizedToolIds: Set<String>,
+): Boolean =
+    grant?.mayUseAgentTools == true && contract?.kind == item.kind &&
+        contract.version == item.version && !contract.agentToolId.isNullOrBlank() &&
+        contract.agentToolId in authorizedToolIds
 
 
 @Serializable

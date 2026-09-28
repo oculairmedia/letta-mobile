@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
+import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -15,9 +16,23 @@ import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
+import computer.iroh.Connection
+import computer.iroh.Incoming
 import computer.iroh.RelayMode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -29,10 +44,57 @@ internal class IrohDialer(
     private val onConnectionLost: (reason: String, handle: IrohConnectionHandle?) -> Unit,
     private val onCloseResources: (reason: String) -> Unit = {},
     private val externalToolRegistry: ExternalToolRegistry? = null,
-    private val bindEndpoint: suspend (ByteArray) -> Endpoint = { secretKey ->
-        Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey))
+    // Create a fresh handler for each session; its peer policy is independent of App Server auth.
+    private val notebookHandlerFactory: ((Endpoint, CoroutineScope) -> IrohNodeProtocolHandler?)? = null,
+    private val bindEndpoint: suspend (ByteArray, List<ByteArray>) -> Endpoint = { secretKey, alpns ->
+        Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey, alpns = alpns))
     },
 ) {
+    private val endpointMutex = Mutex()
+    private var hostEndpoint: Endpoint? = null
+    private var hostNotebook: InboundNotebook? = null
+
+    /** Bind once for the host lifetime, independently of App Server readiness. */
+    suspend fun startNotebook(): Endpoint? {
+        if (notebookHandlerFactory == null) return null
+        return endpointMutex.withLock {
+            hostEndpoint?.let { return@withLock it }
+            check(scope.isActive) { "Iroh host scope is closed" }
+            val endpoint = bindLocalEndpoint(secretKeyStore.loadOrCreate())
+            var notebook: InboundNotebook? = null
+            try {
+                val notebookScope = scope + SupervisorJob(scope.coroutineContext[Job])
+                try {
+                    notebook = notebookHandlerFactory.invoke(endpoint, notebookScope)?.let { handler ->
+                        try {
+                            require(handler.alpn.contentEquals(AUTOMERGE_REPO_ALPN)) { "Unexpected notebook ALPN" }
+                            InboundNotebook(endpoint, handler, notebookScope).also { it.start() }
+                        } catch (error: Throwable) {
+                            (handler as? AutoCloseable)?.close()
+                            throw error
+                        }
+                    }
+                } finally {
+                    if (notebook == null) notebookScope.coroutineContext[Job]?.cancel()
+                }
+                check(scope.isActive) { "Iroh host scope is closed" }
+                hostNotebook = notebook
+                hostEndpoint = endpoint
+                scope.coroutineContext[Job]?.invokeOnCompletion {
+                    notebook?.close()
+                    runCatching { runBlocking { endpoint.shutdown() } }
+                    runCatching { endpoint.close() }
+                }
+                endpoint
+            } catch (error: Throwable) {
+                notebook?.close()
+                endpoint.shutdown()
+                endpoint.close()
+                throw error
+            }
+        }
+    }
+
     suspend fun dial(
         config: IrohConnectConfig,
         effectiveUrlOverride: String? = null,
@@ -40,9 +102,9 @@ internal class IrohDialer(
     ): IrohConnectionHandle {
         val ticket = extractTicket(config, effectiveUrlOverride)
         onConnecting()
-        val secretKey = secretKeyStore.loadOrCreate()
         return runCatching {
-            val localEndpoint = bindLocalEndpoint(secretKey)
+            val sharedEndpoint = startNotebook()
+            val localEndpoint = sharedEndpoint ?: bindLocalEndpoint(secretKeyStore.loadOrCreate())
             var transport: IrohAppServerTransport? = null
             try {
                 val dialedHandle = AtomicReference<IrohConnectionHandle?>(null)
@@ -53,10 +115,10 @@ internal class IrohDialer(
                 irohTransport.awaitConnectionReady()
                 val (engine, eventRouter) = buildIrohTurnEngine(appServerClient, config.clientVersion, scope)
                 buildHandle(
-                    HandleComponents(config, ticket, irohTransport, engine, serverCapabilities, eventRouter, localEndpoint),
+                    HandleComponents(config, ticket, irohTransport, engine, serverCapabilities, eventRouter, localEndpoint, sharedEndpoint == null),
                 ).also { dialedHandle.set(it) }
             } catch (error: Throwable) {
-                closeIrohResources("dial_failed", transport, localEndpoint)
+                closeIrohResources("dial_failed", transport, localEndpoint.takeIf { sharedEndpoint == null })
                 throw error
             }
         }.onFailure {
@@ -74,7 +136,7 @@ internal class IrohDialer(
     }
 
     private suspend fun bindLocalEndpoint(secretKey: ByteArray): Endpoint = runCatching {
-        bindEndpoint(secretKey)
+        bindEndpoint(secretKey, if (notebookHandlerFactory == null) emptyList() else listOf(AUTOMERGE_REPO_ALPN))
     }.onFailure { t ->
         Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
     }.getOrThrow()
@@ -128,7 +190,7 @@ internal class IrohDialer(
         close = { reason ->
             components.eventRouter.detach()
             onCloseResources(reason)
-            closeIrohResources(reason, components.transport, components.localEndpoint)
+            closeIrohResources(reason, components.transport, components.localEndpoint.takeIf { components.ownsEndpoint })
         },
     )
 
@@ -140,7 +202,97 @@ internal class IrohDialer(
         val serverCapabilities: Set<String>?,
         val eventRouter: AppServerRuntimeEventRouter,
         val localEndpoint: Endpoint,
+        val ownsEndpoint: Boolean,
     )
+
+    internal class InboundNotebook(
+        private val endpoint: Endpoint,
+        private val handler: IrohNodeProtocolHandler,
+        private val parentScope: CoroutineScope,
+    ) : AutoCloseable {
+        private val connections = ConcurrentHashMap.newKeySet<Connection>()
+        private var acceptJob: Job? = null
+        private val servingJobs = ConcurrentHashMap.newKeySet<Job>()
+        @Volatile private var closed = false
+
+        fun start() {
+            check(acceptJob == null && !closed)
+            acceptJob = parentScope.launch {
+                acceptLoop()
+            }
+        }
+
+        private suspend fun CoroutineScope.acceptLoop() {
+            while (isActive) {
+                acceptNextConnection()
+            }
+        }
+
+        private suspend fun CoroutineScope.acceptNextConnection() {
+            try {
+                val incoming = endpoint.acceptNext()
+                if (incoming == null) {
+                    delay(100)
+                    return
+                }
+                launch { serve(incoming) }.also { child ->
+                    servingJobs.add(child)
+                    child.invokeOnCompletion { servingJobs.remove(child) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!isActive) return
+                Telemetry.event("IrohTransport", "notebook.accept.failed", "error" to (e.message ?: e.toString()))
+                delay(100)
+            }
+        }
+
+        private suspend fun serve(incoming: Incoming) {
+            var connection: Connection? = null
+            try {
+                connection = establishConnection(incoming) ?: return
+                val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
+                if (!isAuthorizedPeer(connection, remoteId)) return
+                connections.add(connection)
+                if (!closed) handler.accept(connection, remoteId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Telemetry.event("IrohTransport", "notebook.incoming.failed", "error" to (e.message ?: e.toString()))
+            } finally {
+                connection?.let {
+                    connections.remove(it)
+                    runCatching { it.close(0L, "closed".encodeToByteArray()) }
+                }
+            }
+        }
+
+        private suspend fun establishConnection(incoming: Incoming): Connection? {
+            val accepting = incoming.accept()
+            if (!accepting.alpn().contentEquals(AUTOMERGE_REPO_ALPN)) return null
+            return withTimeout(15_000) { accepting.connect() }
+        }
+
+        private fun isAuthorizedPeer(connection: Connection, remoteId: String): Boolean {
+            if (closed || !handler.authorize(remoteId)) {
+                connection.close(4403L, "peer_not_allowed".encodeToByteArray())
+                return false
+            }
+            return true
+        }
+
+        override fun close() {
+            if (closed) return
+            closed = true
+            acceptJob?.cancel()
+            servingJobs.forEach { it.cancel() }
+            connections.forEach { runCatching { it.close(0L, "closed".encodeToByteArray()) } }
+            connections.clear()
+            parentScope.coroutineContext[Job]?.cancel()
+            (handler as? AutoCloseable)?.close()
+        }
+    }
 
     private fun buildIrohTurnEngine(
         client: DefaultAppServerClient,
