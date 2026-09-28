@@ -2,7 +2,13 @@ package com.letta.mobile.data.canvas
 
 /** Canvas view of the notebook repository. Canvas identity and metadata live in each notebook CRDT,
  * not in a second canvas database. A repository lock serializes claims and revision checks. */
-class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) : CanvasDocumentStore {
+class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) : CanvasDocumentStore, CanvasDeletedElementStore {
+    override suspend fun deletedElements(id: CanvasId): List<CanvasDeletedElement> = notebooks.withCanvasLock {
+        val target = notebooks.listDocuments().firstOrNull { notebooks.canvasDocument(it)?.id == id }
+            ?: return@withCanvasLock emptyList()
+        notebooks.deletedBoardElements(target)
+    }
+
     private fun all(): List<CanvasDocument> = notebooks.listDocuments().mapNotNull { notebooks.canvasDocument(it) }
 
     override suspend fun get(id: CanvasId): CanvasDocument? = notebooks.withCanvasLock {

@@ -16,6 +16,51 @@ import kotlin.test.assertTrue
 
 class NotebookCanvasDocumentStoreTest {
     @Test
+    fun deletedDrawingItemsSurviveRestartAndRestoreOnlyTheirOwnElement() = runBlocking {
+        val path = Files.createTempDirectory("canvas-deleted-history-")
+        val canvasId = CanvasId("deleted-history")
+        NotebookLocalStore(path, "canvas-peer").use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val session = CanvasSession.create(store, CanvasCreateOptions(canvasId = canvasId))
+            session.applyLocal(CanvasOp.AddElementOp("add-a", "local_user", 1, "a", """{"id":"a","text":"original"}"""))
+            session.applyLocal(CanvasOp.AddElementOp("add-b", "local_user", 2, "b", """{"id":"b"}"""))
+            session.applyLocal(CanvasOp.RemoveElementOp("remove-a", "local_user", 3, "a"))
+            assertEquals(listOf("a"), session.deletedElements().map { it.elementId })
+            val unrelated = assertNotNull(store.get(canvasId))
+            store.upsert(unrelated.copy(revision = unrelated.revision + 1, sceneJson =
+                unrelated.sceneJson.replace("\"id\":\"b\"", "\"id\":\"b\",\"text\":\"changed\"")))
+            assertEquals(listOf("a"), session.deletedElements().map { it.elementId })
+        }
+        NotebookLocalStore(path, "canvas-peer").use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val session = assertNotNull(CanvasSession.open(store, canvasId))
+            assertEquals(listOf("a"), session.deletedElements().map { it.elementId })
+            val restored = assertNotNull(session.restoreDeletedElement(CanvasDeletedElement("a", "")))
+            val elements = Json.parseToJsonElement(restored.sceneJson).jsonObject.getValue("elements").jsonArray
+            assertEquals(setOf("a", "b"), elements.map { it.jsonObject.getValue("id").toString().trim('"') }.toSet())
+            assertTrue(session.deletedElements().isEmpty())
+            assertTrue(session.opLog.getOps(canvasId).last() is CanvasOp.AddElementOp)
+        }
+    }
+    @Test
+    fun staleSnapshotCannotReplaceAnotherPeersLiveElement() = runBlocking {
+        val path = Files.createTempDirectory("canvas-stale-restore-")
+        NotebookLocalStore(path, "peer-a").use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val session = CanvasSession.create(store, CanvasCreateOptions(canvasId = CanvasId("stale")))
+            session.applyLocal(CanvasOp.AddElementOp("add", "local_user", 1, "item", """{"id":"item","text":"old"}"""))
+            session.applyLocal(CanvasOp.RemoveElementOp("remove", "local_user", 2, "item"))
+            val id = notebooks.listDocuments().single()
+            // A second writer has re-added this ID while this session still holds the deletion.
+            notebooks.putBoardElement(id, Json.parseToJsonElement("""{"id":"item","text":"peer-b"}""").jsonObject)
+            assertEquals(null, session.restoreDeletedElement(CanvasDeletedElement("item", "")))
+            val live = Json.parseToJsonElement(assertNotNull(store.get(session.canvasId)).sceneJson)
+                .jsonObject.getValue("elements").jsonArray.single().jsonObject
+            assertEquals("peer-b", live.getValue("text").toString().trim('"'))
+        }
+    }
+
+    @Test
     fun revisionConflictPreservesAclAndIndependentNotebookData() = runBlocking {
         val path = Files.createTempDirectory("canvas-notebook-cas-")
         NotebookLocalStore(path, "canvas-peer").use { notebooks ->
