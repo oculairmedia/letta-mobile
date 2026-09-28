@@ -212,7 +212,7 @@ private fun CanvasNoteCard(
                 // a box that grew with type that did not - and the second op runs even when the
                 // first has already failed.
                 runCatching {
-                    session.setDocument(document.id, document.json, frame = committed, style = scaledStyle)
+                    session.moveDocument(document.id, committed, style = scaledStyle)
                 }
             }
         }
