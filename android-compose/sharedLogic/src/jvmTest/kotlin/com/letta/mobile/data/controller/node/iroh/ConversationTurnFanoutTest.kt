@@ -303,14 +303,30 @@ class ConversationTurnFanoutTest {
     }
 
     @Test
-    fun overlappingIncrementalFramesPreserveEveryByte() = runTest {
+    fun longerChunkThatContainsTheReplyReplacesIt() = runTest {
         assertAccumulatedText(
             source = StreamTextFrameSource.AppServerDelta,
             frames = listOf(
                 AssistantTestFrame("a", "overlap-1", "otid-overlap"),
                 AssistantTestFrame("aa", "overlap-2", "otid-overlap"),
             ),
-            expected = listOf("a", "aaa"),
+            expected = listOf("a", "aa"),
+        )
+    }
+
+    @Test
+    fun appServerSnapshotsOfOneReplyDoNotStack() = runTest {
+        val prefix = "I downloaded the latest production APK, v0.19.0"
+        val mid = "$prefix, but couldn't install it. Reconnecting to 192.168.50.234:555"
+        val full = "$mid" + "5 returned \"No route to host.\""
+        assertAccumulatedText(
+            source = StreamTextFrameSource.AppServerDelta,
+            frames = listOf(
+                AssistantTestFrame(prefix, "apk-1", otid = "reply-1", runId = "run-apk"),
+                AssistantTestFrame(mid, "apk-2", otid = "reply-1", runId = "run-apk"),
+                AssistantTestFrame(full, "apk-3", otid = "reply-1", runId = "run-apk"),
+            ),
+            expected = listOf(prefix, mid, full),
         )
     }
 
@@ -328,9 +344,9 @@ class ConversationTurnFanoutTest {
 
     /**
      * letta-mobile-64ies: rotating per-fragment `id` values without otid used
-     * to create one byKey entry per fragment (staircase). With run_id present,
-     * all assistant_message fragments of one run must collapse to one cumulative
-     * body.
+     * to create one byKey entry per fragment. With run_id present, fragments of
+     * one run share one body. A longer chunk that already contains that body
+     * replaces it; a chunk that does not ("H") still appends.
      */
     @Test
     fun rotatingFragmentIdsWithoutOtidAccumulateUnderRunId() = runTest {
@@ -356,7 +372,7 @@ class ConversationTurnFanoutTest {
                     runId = "run-64ies",
                 ),
             ),
-            expected = listOf("Hey", "HeyHey.", "HeyHey.H"),
+            expected = listOf("Hey", "Hey.", "Hey.H"),
         )
     }
 

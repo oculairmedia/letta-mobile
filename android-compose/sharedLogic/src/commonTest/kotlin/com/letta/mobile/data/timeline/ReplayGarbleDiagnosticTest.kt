@@ -144,6 +144,36 @@ class ReplayGarbleDiagnosticTest {
     }
 
     @Test
+    fun `longer snapshot replaces the same row when otids differ`() {
+        var t = Timeline("conv")
+        t = reduce(
+            t,
+            AssistantMessage(
+                id = "cm-stream-reply",
+                contentRaw = JsonPrimitive("reconnecting to 192.168.50.234:555"),
+                runId = "run-1",
+                otid = "fragment-a",
+                seqId = null,
+            ),
+        )
+        t = reduce(
+            t,
+            AssistantMessage(
+                id = "cm-stream-reply",
+                contentRaw = JsonPrimitive("reconnecting to 192.168.50.234:5555 returned \"No route to host.\""),
+                runId = "run-1",
+                otid = "fragment-b",
+                seqId = null,
+            ),
+        )
+        assertEquals(1, t.events.size)
+        assertEquals(
+            "reconnecting to 192.168.50.234:5555 returned \"No route to host.\"",
+            cur(t),
+        )
+    }
+
+    @Test
     fun `merge without seq ids still dedups equal and cumulative frames`() {
         // Direct call: pass isCumulativeStream=true to assert the new
         // contract (the reducer does this automatically when it sees a
@@ -168,9 +198,7 @@ class ReplayGarbleDiagnosticTest {
         assertEquals(StreamTextMergeBranch.CUMULATIVE, cumulative.branch)
         assertEquals("HeyHey. Dev", cumulative.text)
 
-        // Same EQUAL/CUMULATIVE inputs on an INCREMENTAL stream (no shape
-        // signal) must APPEND — the wucn guard. Asserts the new contract
-        // from the OTHER side.
+        // Identical text on an incremental stream still APPENDs — the wucn guard.
         val incrementalEqual = mergeStreamText(
             existing = "Hey",
             incoming = "Hey",
@@ -180,14 +208,16 @@ class ReplayGarbleDiagnosticTest {
         assertEquals(StreamTextMergeBranch.APPEND, incrementalEqual.branch)
         assertEquals("HeyHey", incrementalEqual.text)
 
+        // A longer body that already contains the reply replaces, even when
+        // the stream was not marked cumulative. Appending it is the staircase.
         val incrementalCumulative = mergeStreamText(
             existing = "Hey",
             incoming = "HeyHey. Dev",
             canUseSnapshotMerge = false,
             isCumulativeStream = false,
         )
-        assertEquals(StreamTextMergeBranch.APPEND, incrementalCumulative.branch)
-        assertEquals("HeyHeyHey. Dev", incrementalCumulative.text)
+        assertEquals(StreamTextMergeBranch.CUMULATIVE, incrementalCumulative.branch)
+        assertEquals("HeyHey. Dev", incrementalCumulative.text)
     }
 
     @Test
