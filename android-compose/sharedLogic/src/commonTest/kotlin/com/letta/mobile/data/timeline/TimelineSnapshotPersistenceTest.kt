@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -279,6 +280,80 @@ class TimelineSnapshotPersistenceTest {
                 StoredTimelineEnvelope(scope = scope, revision = 2L, events = listOf(reordered)),
             ),
         )
+    }
+
+    @Test
+    fun closeCancelsOutboundStreamBeforeWaitingForSnapshotWrite() = runTest {
+        val streamStarted = CompletableDeferred<Unit>()
+        val streamStopped = CompletableDeferred<Unit>()
+        val transport = object : TimelineTransport by EmptyTimelineTransport {
+            override suspend fun sendConversationMessage(
+                conversationId: String,
+                request: com.letta.mobile.data.model.MessageCreateRequest,
+            ) = kotlinx.coroutines.flow.flow<com.letta.mobile.data.model.LettaMessage> {
+                streamStarted.complete(Unit)
+                try {
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    streamStopped.complete(Unit)
+                }
+            }
+        }
+        val store = GatedConfirmedTimelineStore()
+        val scope = TimelineScope("test-backend", "conv-closing-send")
+        val loop = TimelineSyncLoop(
+            messageApi = transport,
+            conversationId = scope.conversationId,
+            scope = backgroundScope,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = scope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+        )
+
+        loop.send("in flight")
+        streamStarted.await()
+        store.firstWriteStarted.await()
+        val closing = async { loop.closeAndJoin() }
+        runCurrent()
+        try {
+            assertFalse(closing.isCompleted, "Snapshot persistence is still gated")
+            assertTrue(streamStopped.isCompleted, "The send worker must stop before its processor closes")
+        } finally {
+            store.releaseFirstWrite.complete(Unit)
+            closing.await()
+        }
+        assertTrue(store.firstWriteCompleted.isCompleted)
+    }
+
+    @Test
+    fun lateIngressDuringCloseIsCancellationAndCallerCancellationStillFlushes() = runTest {
+        val store = GatedConfirmedTimelineStore()
+        val scope = TimelineScope("test-backend", "conv-closing-ingress")
+        val loop = TimelineSyncLoop(
+            messageApi = EmptyTimelineTransport,
+            conversationId = scope.conversationId,
+            scope = backgroundScope,
+            startStreamSubscriber = false,
+            confirmedTimelineStore = store,
+            timelineScope = scope,
+            ioDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+        )
+        loop.scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+        store.firstWriteStarted.await()
+        val closing = async { loop.closeAndJoin() }
+        runCurrent()
+        closing.cancel()
+        try {
+            assertFailsWith<kotlinx.coroutines.CancellationException> {
+                loop.submitStreamEvent(ConfirmedMessageFixture("late", "late frame").message())
+            }
+        } finally {
+            store.releaseFirstWrite.complete(Unit)
+            closing.join()
+        }
+        assertTrue(store.firstWriteCompleted.isCompleted)
+        assertNotNull(store.readSnapshot(scope))
     }
 
     @Test

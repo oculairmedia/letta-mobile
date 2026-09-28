@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -65,8 +66,10 @@ internal class TimelineOutboundSendProcessor(
 ) {
     val sendQueue = Channel<PendingSend>(SEND_QUEUE_CAPACITY)
 
-    init {
-        scope.launch { processSendQueue() }
+    private val sendJob = scope.launch { processSendQueue() }
+
+    suspend fun stopAndJoin() {
+        sendJob.cancelAndJoin()
     }
 
     suspend fun send(
