@@ -27,10 +27,13 @@ internal class HostCanvasPreview(
     }
 
     private fun proposal(caller: HostCanvasCaller, input: JsonObject): List<CanvasOp>? {
-        val scene = HostCanvasToolInputs.sceneJson(input)
+        val hasScene = "scene_json" in input
         val ops = input["ops"]
-        require(scene == null || ops == null) { "Specify scene_json or ops, not both" }
-        if (scene != null) return listOf(CanvasOp.ReplaceSceneOp("", caller.agentId, 0L, scene))
+        require(!hasScene || ops == null) { "Specify scene_json or ops, not both" }
+        if (hasScene) {
+            val scene = HostCanvasToolInputs.sceneJson(input) ?: throw IllegalArgumentException("Invalid scene_json")
+            return listOf(CanvasOp.ReplaceSceneOp("", caller.agentId, 0L, scene))
+        }
         return ops?.let(HostCanvasToolInputs::ops)
     }
 }

@@ -61,8 +61,7 @@ class HostCanvasToolsTest {
         assertEquals(CanvasToolContract.all.map { it.name }.toSet(), names.toSet())
     }
 
-    @Test
-    fun previewIsGatedOnRendererAndDoesNotPublishCandidate() = runTest {
+    private class PreviewFixture {
         val store = InMemoryCanvasRelayStore()
         val rendered = mutableListOf<Pair<String, CanvasPreviewViewport>>()
         val renderer = CanvasPreviewRenderer { scene, viewport ->
@@ -71,37 +70,62 @@ class HostCanvasToolsTest {
         }
         val backend = HostCanvasBackend(CanvasRelayHost(store, hostId = { "host-preview" }), store, InMemoryHostCanvasDirectory())
         val registry = ExternalToolRegistry.hostTools(HostCanvasTools.all(backend, renderer))
-        val names = registry.advertisedToolsCommandGroups()!!.flatMap { it.tools.map { tool -> tool.name } }
-        assertEquals(CanvasToolContract.withPreview.map { it.name }.toSet(), names.toSet())
         val viewport = buildJsonObject {
             put("width_px", 393)
             put("height_px", 852)
             put("density", 3.0)
         }
+    }
+
+    @Test
+    fun previewAdvertisesToolWhenRendererPresent() = runTest {
+        val fixture = PreviewFixture()
+        val names = fixture.registry.advertisedToolsCommandGroups()!!.flatMap { it.tools.map { tool -> tool.name } }
+        assertEquals(CanvasToolContract.withPreview.map { it.name }.toSet(), names.toSet())
+    }
+
+    @Test
+    fun previewCandidateDoesNotPublishToStore() = runTest {
+        val fixture = PreviewFixture()
         val candidate = buildJsonObject {
-            viewport.forEach { (key, value) -> put(key, value) }
+            fixture.viewport.forEach { (key, value) -> put(key, value) }
             put("ops", JsonArray(listOf(json.encodeToJsonElement<CanvasOp>(addText("preview", "candidate")))))
         }
         val result = json.decodeFromString<CanvasPreviewResult>(
-            assertIs<ExternalToolResult.Success>(registry.invoke(CanvasToolContract.RENDER_PREVIEW, candidate,
+            assertIs<ExternalToolResult.Success>(fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW, candidate,
                 agentId = "agent-1", conversationId = "conv-1")).content,
         )
         assertTrue(result.candidate)
         assertEquals(0L, result.revision)
         assertEquals(393, result.viewport.widthPx)
-        assertTrue("candidate" in rendered.single().first)
+        assertTrue("candidate" in fixture.rendered.single().first)
         val topic = CanvasRelayProtocol.conversationTopic("conv-1")
-        assertTrue(store.readAfter(topic, 0L).isEmpty())
-        val published = registry.invoke(CanvasToolContract.RENDER_PREVIEW, viewport,
+        assertTrue(fixture.store.readAfter(topic, 0L).isEmpty())
+
+        val published = fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW, fixture.viewport,
             agentId = "agent-1", conversationId = "conv-1")
         assertEquals(false, json.decodeFromString<CanvasPreviewResult>(assertIs<ExternalToolResult.Success>(published).content).candidate)
-        assertTrue("candidate" !in rendered.last().first)
+        assertTrue("candidate" !in fixture.rendered.last().first)
+
+        fixture.registry.invoke(CanvasToolContract.APPLY_OPS, ops(addText("published", "on board")),
+            agentId = "agent-1", conversationId = "conv-1").content()
+        val committed = json.decodeFromString<CanvasPreviewResult>(assertIs<ExternalToolResult.Success>(
+            fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW, fixture.viewport, agentId = "agent-1", conversationId = "conv-1"),
+        ).content)
+        assertEquals(1L, committed.revision)
+        assertTrue("on board" in fixture.rendered.last().first)
+    }
+
+    @Test
+    fun previewRejectsInvalidParametersAndRefusesUnauthorizedAccess() = runTest {
+        val fixture = PreviewFixture()
         val invalid = buildJsonObject {
-            candidate.forEach { (key, value) -> put(key, value) }
+            fixture.viewport.forEach { (key, value) -> put(key, value) }
             put("width_px", 0)
         }
-        assertTrue("width_px" in assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+        assertTrue("width_px" in assertIs<ExternalToolResult.Error>(fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW,
             invalid, agentId = "agent-1", conversationId = "conv-1")).error)
+
         listOf(
             "zoom" to JsonPrimitive("invalid"),
             "font_scale" to JsonPrimitive("invalid"),
@@ -109,33 +133,35 @@ class HostCanvasToolsTest {
             "fit_to_content" to JsonArray(emptyList()),
         ).forEach { (key, value) ->
             val bad = buildJsonObject {
-                viewport.forEach { (name, setting) -> put(name, setting) }
+                fixture.viewport.forEach { (name, setting) -> put(name, setting) }
                 put(key, value)
             }
-            assertTrue(key in assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+            assertTrue(key in assertIs<ExternalToolResult.Error>(fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW,
                 bad, agentId = "agent-1", conversationId = "conv-1")).error)
         }
+
         val malformed = buildJsonObject {
-            viewport.forEach { (key, value) -> put(key, value) }
+            fixture.viewport.forEach { (key, value) -> put(key, value) }
             put("scene_json", "not a scene")
         }
-        assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+        assertIs<ExternalToolResult.Error>(fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW,
             malformed, agentId = "agent-1", conversationId = "conv-1"))
-        assertEquals(2, rendered.size, "invalid candidates never reach the renderer")
-        registry.invoke(CanvasToolContract.APPLY_OPS, ops(addText("published", "on board")),
-            agentId = "agent-1", conversationId = "conv-1").content()
-        val committed = json.decodeFromString<CanvasPreviewResult>(assertIs<ExternalToolResult.Success>(
-            registry.invoke(CanvasToolContract.RENDER_PREVIEW, viewport, agentId = "agent-1", conversationId = "conv-1"),
-        ).content)
-        assertEquals(1L, committed.revision)
-        assertTrue("on board" in rendered.last().first)
-        val forbidden = buildJsonObject {
-            viewport.forEach { (key, value) -> put(key, value) }
-            put("canvas_id", result.canvasId)
+
+        val invalidType = buildJsonObject {
+            fixture.viewport.forEach { (key, value) -> put(key, value) }
+            put("scene_json", JsonArray(emptyList()))
         }
-        assertTrue("cannot read" in assertIs<ExternalToolResult.Error>(registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+        assertIs<ExternalToolResult.Error>(fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW,
+            invalidType, agentId = "agent-1", conversationId = "conv-1"))
+        assertEquals(0, fixture.rendered.size, "invalid candidates never reach the renderer")
+
+        val forbidden = buildJsonObject {
+            fixture.viewport.forEach { (key, value) -> put(key, value) }
+            put("canvas_id", CanvasId.forConversation("conv-1").value)
+        }
+        assertTrue("cannot read" in assertIs<ExternalToolResult.Error>(fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW,
             forbidden, agentId = "agent-2", conversationId = "conv-2")).error)
-        assertEquals(3, rendered.size)
+        assertEquals(0, fixture.rendered.size)
     }
 
     @Test
