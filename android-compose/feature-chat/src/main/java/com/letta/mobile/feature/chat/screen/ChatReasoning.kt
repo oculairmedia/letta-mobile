@@ -198,8 +198,11 @@ internal fun MessageReasoning(
             exit = ChatMotion.verticalExit(slideDivisor = 4),
         ) {
             Column(
+                // No `start` indent: the expanded reasoning body aligns flush
+                // with the header and with adjacent message text (product
+                // feedback, 2026-09-28, second pass).
                 modifier = Modifier
-                    .padding(top = LettaDimens.Space.lg, start = LettaDimens.Space.sm, bottom = LettaDimens.Space.xs),
+                    .padding(top = LettaDimens.Space.lg, bottom = LettaDimens.Space.xs),
             ) {
                 if (isActive) {
                     if (message.content.isBlank()) {
