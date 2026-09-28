@@ -117,31 +117,37 @@ class CanonicalTimelinePresentation private constructor(
     val live: StateFlow<List<ChatRenderItem>> = mutableLive.asStateFlow()
 
     // Durability alone is not presentation: retain live until the settled ledger is at the turn's revision.
-    private val liveProjection: Flow<List<ChatRenderItem>> = combine(
-        owner.session.live, owner.session.pending, resident, residentOtids, residentServerIds,
-    ) { publication, pending, presented, settledOtids, settledServerIds ->
-        cacheStreamedAliases(publication)
-        // One logical event stays on screen once. Sends converge by otid; server-originated
-        // reasoning and assistant frames converge by server id even when storage remaps the row key.
-        val events = publication?.overlayEvents(presented).orEmpty()
-            .filterNot { event ->
-                (event.otid.isNotBlank() && event.otid in settledOtids) ||
-                    event.serverId in settledServerIds
-            }
-        // Only the sync path's durable echo clears pending storage, and the publication is dropped
-        // the moment settlement is acknowledged. Remember the otids this turn echoed so the local
-        // bubble cannot reappear in the gap between the overlay draining and that write landing.
-        //
-        // An otid is remembered only while the turn that echoed it is still the resident one. Once
-        // a different turn's overlay replaces it with the echo still not durable (its repair never
-        // committed), the overlay's copy of the prompt is gone; hiding the local bubble as well
-        // made the user's prompt vanish from the timeline.
-        publication?.let { current ->
-            echoedOtids.values.removeAll { it !== current.fence }
-            current.block.events.forEach { if (it.otid.isNotBlank()) echoedOtids[it.otid] = current.fence }
+    private val liveProjection: Flow<List<ChatRenderItem>> = createLiveProjection()
+
+    private data class ResidentState(
+        val presented: Map<TimelineMessageId, Long>,
+        val otids: Set<String>,
+        val serverIds: Set<String>,
+    )
+
+    private fun createLiveProjection(): Flow<List<ChatRenderItem>> {
+        val mergedPublications = combine(owner.session.live, owner.session.settling) { live, settling ->
+            settling + listOfNotNull(live)
         }
-        echoedOtids.keys.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
-        val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in settledOtids }
+        val residentState = combine(resident, residentOtids, residentServerIds, ::ResidentState)
+        return combine(
+            mergedPublications,
+            owner.session.pending,
+            residentState,
+        ) { publications, pending, residentSnapshot ->
+            projectLiveItems(publications, pending, residentSnapshot)
+        }
+    }
+
+    private fun projectLiveItems(
+        publications: List<TimelineLivePublication>,
+        pending: List<CanonicalPendingLocalStore.Record>,
+        residentState: ResidentState,
+    ): List<ChatRenderItem> {
+        publications.forEach(::cacheStreamedAliases)
+        val events = filterUnsettledEvents(publications, residentState)
+        updateEchoedOtids(publications, pending)
+        val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in residentState.otids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
         val activeMessages = events.mapNotNull { event ->
             timelineEventToUiMessage(event, owner.selection.scope.agentId)
@@ -151,7 +157,27 @@ class CanonicalTimelinePresentation private constructor(
             mode = ChatDisplayMode.Interactive,
             activeAgentId = owner.selection.scope.agentId,
         ).renderItems
-        active + optimistic.asReversed()
+        return active + optimistic.asReversed()
+    }
+
+    private fun filterUnsettledEvents(
+        publications: List<TimelineLivePublication>,
+        residentState: ResidentState,
+    ): List<TimelineEvent> = publications.flatMap { it.overlayEvents(residentState.presented) }
+        .filterNot { event ->
+            (event.otid.isNotBlank() && event.otid in residentState.otids) || event.serverId in residentState.serverIds
+        }
+
+    private fun updateEchoedOtids(
+        publications: List<TimelineLivePublication>,
+        pending: List<CanonicalPendingLocalStore.Record>,
+    ) {
+        val fences = publications.mapTo(mutableSetOf()) { it.fence }
+        echoedOtids.values.removeAll { it !in fences }
+        publications.forEach { current ->
+            current.block.events.forEach { if (it.otid.isNotBlank()) echoedOtids[it.otid] = current.fence }
+        }
+        echoedOtids.keys.retainAll(pending.mapTo(mutableSetOf()) { it.otid })
     }
 
     private fun cacheStreamedAliases(publication: TimelineLivePublication?) {
@@ -180,8 +206,10 @@ class CanonicalTimelinePresentation private constructor(
         resident.value = presented
         residentOtids.value = residents.mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
         residentServerIds.value = residents.mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) }
-        val fence = owner.session.live.value?.fence ?: return
-        scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
+        val fences = owner.session.settling.value.map { it.fence } + listOfNotNull(owner.session.live.value?.fence)
+        fences.forEach { fence ->
+            scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
+        }
     }
 
     suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk {
