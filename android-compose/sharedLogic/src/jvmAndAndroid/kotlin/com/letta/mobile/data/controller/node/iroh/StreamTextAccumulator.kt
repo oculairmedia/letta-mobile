@@ -43,14 +43,7 @@ internal class CumulativeStreamText {
     ): String {
         if (frame.isReplay) return existing.ifEmpty { frame.chunk }
         return when (source) {
-            StreamTextFrameSource.AppServerDelta -> when {
-                // A longer chunk that already contains the text so far is a snapshot
-                // of the reply, not a new token. Appending it stacks copies.
-                existing.isNotEmpty() &&
-                    frame.chunk.length > existing.length &&
-                    frame.chunk.startsWith(existing) -> frame.chunk
-                else -> existing + frame.chunk
-            }
+            StreamTextFrameSource.AppServerDelta -> frame.appendTo(existing)
             StreamTextFrameSource.CumulativeSnapshot -> frame.chunk
         }
     }
@@ -74,7 +67,7 @@ internal class CumulativeStreamText {
             messageType = messageType,
             field = field,
             chunk = chunk,
-            textKey = textKey(delta, messageType),
+            textKey = textKey(delta),
             isReplay = frameId != null && !seenFrameIds.add(frameId),
         )
     }
@@ -88,7 +81,8 @@ internal class CumulativeStreamText {
      * rows (letta-mobile-64ies). Prefer otid, then run_id, then message_id,
      * and only then the frame id.
      */
-    private fun textKey(delta: JsonObject, messageType: String): String {
+    private fun textKey(delta: JsonObject): String {
+        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull.orEmpty()
         val otid = delta["otid"]?.jsonPrimitive?.contentOrNull
         if (!otid.isNullOrBlank()) return "$otid:$messageType"
         val runId = delta["run_id"]?.jsonPrimitive?.contentOrNull
@@ -124,6 +118,11 @@ internal class CumulativeStreamText {
         val textKey: String,
         val isReplay: Boolean,
     ) {
+        fun appendTo(existing: String): String {
+            val isSnapshot = existing.isNotEmpty() && chunk.length > existing.length && chunk.startsWith(existing)
+            return if (isSnapshot) chunk else existing + chunk
+        }
+
         fun withText(cumulative: String): JsonObject {
             val cumulativeDelta = buildJsonObject {
                 delta.forEach { (key, value) -> if (key != field) put(key, value) }
