@@ -1841,6 +1841,11 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.core.ktx)
+    // NotebookLocalStore exposes DocumentId in its API; instrumentation needs it to compile.
+    androidTestImplementation(libs.automerge)
+    // Align the app's dependency constraints with AndroidX Test 1.3/1.7.
+    implementation(libs.androidx.concurrent.futures)
+    implementation(libs.androidx.concurrent.futures.ktx)
     androidTestImplementation(libs.kotlinx.coroutines.android)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

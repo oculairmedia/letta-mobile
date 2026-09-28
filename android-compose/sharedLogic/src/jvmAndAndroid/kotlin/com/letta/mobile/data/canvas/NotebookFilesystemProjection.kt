@@ -1,0 +1,160 @@
+package com.letta.mobile.data.canvas
+
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.security.MessageDigest
+import org.automerge.repo.DocumentId
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+/** Explicit polling avoids watcher feedback: call reconcile when external edits should be imported. */
+enum class NotebookProjectionResult { UNCHANGED, EXPORTED, IMPORTED, CONFLICT }
+
+internal class NotebookFilesystemProjection(private val root: Path) {
+    @Serializable
+    private data class Baseline(val id: String, val markdown: String, val yaml: String)
+
+    private data class Snapshot(val markdown: String, val yaml: String) {
+        fun baseline(id: String) = Baseline(id, digest(markdown), digest(yaml))
+    }
+
+    private class ProjectionFiles(folder: Path) {
+        val markdown: Path = folder.resolve("note.md")
+        val yaml: Path = folder.resolve("board.yaml")
+        val baseline: Path = folder.resolve(".baseline.json")
+    }
+
+    fun project(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
+        SyncSession(store, id, allowImport = false).execute()
+
+    fun reconcile(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
+        SyncSession(store, id, allowImport = true).execute()
+
+    private inner class SyncSession(
+        private val store: NotebookLocalStore,
+        private val id: DocumentId,
+        private val allowImport: Boolean,
+    ) {
+        private val document = requireNotNull(store.read(id)) { "Unknown notebook document: $id" }
+        private val docId = document.id.value
+        private val folder = root.resolve(digest(docId)).also {
+            checkDirectory(root)
+            checkDirectory(it)
+        }
+        private val files = ProjectionFiles(folder)
+        private val current = Snapshot(document.markdown, yaml(document.title, document.sceneJson))
+        private val diskMarkdown = safeRead(files.markdown)
+        private val diskYaml = safeRead(files.yaml)
+        private val disk = if (diskMarkdown != null && diskYaml != null) Snapshot(diskMarkdown, diskYaml) else null
+        private val previous = safeRead(files.baseline)?.let { Json.decodeFromString<Baseline>(it) }
+
+        fun execute(): NotebookProjectionResult {
+            require(previous == null || previous.id == docId) { "Projection ID mismatch" }
+            return if (previous == null) {
+                syncInitial()
+            } else {
+                syncIncremental(previous)
+            }
+        }
+
+        private fun syncInitial(): NotebookProjectionResult {
+            if (isPartialDisk()) return NotebookProjectionResult.CONFLICT
+            if (disk != null && disk != current) return NotebookProjectionResult.CONFLICT
+            publish(files, current, docId)
+            return NotebookProjectionResult.EXPORTED
+        }
+
+        private fun isPartialDisk(): Boolean =
+            (diskMarkdown == null) != (diskYaml == null)
+
+        private fun syncIncremental(previous: Baseline): NotebookProjectionResult {
+            val localChanged = current.baseline(docId) != previous
+            val diskChanged = disk?.baseline(docId) != previous
+            if (!localChanged && !diskChanged) return NotebookProjectionResult.UNCHANGED
+            if (disk == null) return NotebookProjectionResult.CONFLICT // Never silently restore a deleted external file.
+            if (hasConflict(localChanged, diskChanged)) return NotebookProjectionResult.CONFLICT
+            if (!localChanged) {
+                return applyExternalImport(disk)
+            }
+            publish(files, current, docId)
+            return NotebookProjectionResult.EXPORTED
+        }
+
+        private fun hasConflict(localChanged: Boolean, diskChanged: Boolean): Boolean {
+            if (!localChanged || !diskChanged) return false
+            return current != disk
+        }
+
+        private fun applyExternalImport(disk: Snapshot): NotebookProjectionResult {
+            if (!allowImport) return NotebookProjectionResult.CONFLICT
+            val (title, board) = parseYaml(disk.yaml)
+            store.replaceProjection(id, NotebookLocalStore.NotebookContent(title, disk.markdown, board))
+            atomicWrite(files.baseline, Json.encodeToString(Baseline.serializer(), disk.baseline(docId)))
+            return NotebookProjectionResult.IMPORTED
+        }
+    }
+
+    private fun publish(files: ProjectionFiles, snapshot: Snapshot, id: String) {
+        atomicWrite(files.markdown, snapshot.markdown)
+        atomicWrite(files.yaml, snapshot.yaml)
+        atomicWrite(files.baseline, Json.encodeToString(Baseline.serializer(), snapshot.baseline(id)))
+    }
+
+    private fun checkDirectory(path: Path) {
+        if (Files.exists(path, NOFOLLOW_LINKS)) {
+            require(Files.isDirectory(path, NOFOLLOW_LINKS)) { "Not a safe projection directory: $path" }
+        } else {
+            val parent = path.parent
+            if (parent != null && !Files.isDirectory(parent, NOFOLLOW_LINKS)) checkDirectory(parent)
+            Files.createDirectory(path)
+        }
+    }
+
+    private fun safeRead(path: Path): String? {
+        if (!Files.exists(path, NOFOLLOW_LINKS)) return null
+        require(Files.isRegularFile(path, NOFOLLOW_LINKS)) { "Not a regular projection file: $path" }
+        return Files.readString(path, UTF_8)
+    }
+
+    private fun atomicWrite(path: Path, value: String) {
+        safeRead(path) // Reject symlinks and non-regular destinations before replacement.
+        val temp = Files.createTempFile(path.parent, ".notebook-", ".tmp")
+        try {
+            Files.writeString(temp, value, UTF_8)
+            Files.move(temp, path, ATOMIC_MOVE, REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+    }
+
+    private fun yaml(title: String, board: String): String = buildString {
+        append("schema: notebook-board/1\nboardVersion: 1\ntitle: ")
+        append(Json.encodeToString(kotlinx.serialization.serializer<String>(), title))
+        append("\nboard: |-\n")
+        board.split('\n').forEach { append("  ").append(it).append('\n') }
+    }
+
+    private fun parseYaml(value: String): Pair<String, String> {
+        val lines = value.split('\n')
+        require(lines.size >= 5 && lines[0] == "schema: notebook-board/1" && lines[1] == "boardVersion: 1" && lines[2].startsWith("title: ") && lines[3] == "board: |-") { "Unsupported board YAML schema" }
+        val title = Json.decodeFromString<String>(lines[2].removePrefix("title: "))
+        val body = lines.drop(4).dropLastWhile { it.isEmpty() }
+        require(body.isNotEmpty() && body.all { it.startsWith("  ") }) { "Invalid board YAML block" }
+        val board = body.joinToString("\n") { it.removePrefix("  ") }
+        require(Json.parseToJsonElement(board).jsonObject["schema"]?.jsonPrimitive?.content == "notebook-board/1") {
+            "Unsupported notebook board schema"
+        }
+        return title to board
+    }
+
+    private companion object {
+        fun digest(value: String): String = MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(UTF_8)).joinToString("") { "%02x".format(it) }
+    }
+}

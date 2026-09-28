@@ -1405,8 +1405,11 @@ fun CanvasWorkspace(
 
 
             CanvasHistoryDialog(
-                show = showHistoryDialog && session != null,
-                checkpoints = checkpoints,
+                state = CanvasHistoryDialogState(
+                    show = showHistoryDialog && session != null,
+                    checkpoints = checkpoints,
+                    compact = compact,
+                ),
                 onDismiss = { showHistoryDialog = false },
                 onRestore = { cp ->
                     val s = session ?: return@CanvasHistoryDialog

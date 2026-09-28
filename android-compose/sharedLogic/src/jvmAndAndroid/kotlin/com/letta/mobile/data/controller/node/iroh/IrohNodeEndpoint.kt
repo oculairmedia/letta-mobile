@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
+import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.Incoming
 import computer.iroh.EndpointAddr
@@ -62,6 +63,8 @@ class IrohNodeEndpoint(
      * accepts the canvas ALPNs, from peers with an authenticated App Server connection only.
      */
     private val canvasRelay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay? = null,
+    /** Additional protocols on this host-owned endpoint; handlers own their connection lifecycle. */
+    private val protocolHandlers: List<IrohNodeProtocolHandler> = emptyList(),
 ) {
     /** Live App Server connections by peer id, to gate that peer's canvas connections. */
     private val appServerConnections =
@@ -70,6 +73,11 @@ class IrohNodeEndpoint(
     // d6e8g.3: ONE verifier across every connection this endpoint accepts, so
     // per-NodeId auth-failure rate limiting survives redials.
     private val authVerifier = IrohBearerAuthVerifier(authPolicy)
+
+    init {
+        val alpns = listOf(alpn) + canvasRelay?.alpns.orEmpty() + protocolHandlers.map { it.alpn }
+        require(alpns.map { it.toList() }.distinct().size == alpns.size) { "Duplicate Iroh protocol ALPN" }
+    }
 
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
@@ -133,6 +141,14 @@ class IrohNodeEndpoint(
         return ep.addr()
     }
 
+    /** Dial using this endpoint's stable host identity, not a second protocol-specific endpoint. */
+    suspend fun connect(remote: EndpointAddr, protocolAlpn: ByteArray): Connection {
+        require(protocolAlpn.contentEquals(alpn) ||
+            canvasRelay?.handles(protocolAlpn) == true ||
+            protocolHandlers.any { it.alpn.contentEquals(protocolAlpn) }) { "Unregistered Iroh protocol ALPN" }
+        return checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }.connect(remote, protocolAlpn)
+    }
+
     /**
      * Returns the node ID as a hex string (64 hex characters = 32 bytes).
      */
@@ -163,7 +179,7 @@ class IrohNodeEndpoint(
                 },
                 bindAddr = bindAddr,
                 secretKey = resolveSecretKeyStore().loadOrCreate(),
-                alpns = listOf(alpn) + canvasRelay?.alpns.orEmpty(),
+                alpns = listOf(alpn) + canvasRelay?.alpns.orEmpty() + protocolHandlers.map { it.alpn },
                 relayMode = relayMode,
             )
         ).also { ep ->
@@ -286,31 +302,11 @@ class IrohNodeEndpoint(
                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                 return
             }
-            val relay = canvasRelay
-            if (relay != null && relay.handles(peerAlpn)) {
-                serveCanvas(relay, peerAlpn, connection, remoteId)
-                return
-            }
-            val nodeConnection = IrohNodeConnection(
-                connection = connection,
-                controller = controller,
-                adminRpcRouter = adminRpcRouter,
-                authPolicy = authPolicy,
-                authVerifier = authVerifier,
-                pairingService = pairingService,
-                remoteEndpointId = remoteId,
-                connectionRegistry = connectionRegistry,
-                turnHost = turnHost,
+            dispatchAcceptedConnection(
+                AcceptedConnection(peerAlpn, connection, remoteId),
+                controller,
+                turnHost,
             )
-            val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
-                java.util.concurrent.ConcurrentHashMap.newKeySet()
-            }
-            peerConnections.add(nodeConnection)
-            try {
-                nodeConnection.serve()
-            } finally {
-                peerConnections.remove(nodeConnection)
-            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -320,6 +316,75 @@ class IrohNodeEndpoint(
                 "class" to e::class.simpleName,
                 level = Telemetry.Level.WARN,
             )
+        }
+    }
+
+    private class AcceptedConnection(
+        val peerAlpn: ByteArray,
+        val connection: Connection,
+        val remoteId: String,
+    )
+
+    private suspend fun dispatchAcceptedConnection(
+        accepted: AcceptedConnection,
+        controller: AppServerController,
+        turnHost: NodeTurnHost,
+    ) {
+        val handler = protocolHandlers.firstOrNull { it.alpn.contentEquals(accepted.peerAlpn) }
+        if (handler != null) {
+            serveProtocol(handler, accepted.connection, accepted.remoteId)
+            return
+        }
+        val relay = canvasRelay
+        if (relay != null && relay.handles(accepted.peerAlpn)) {
+            serveCanvas(relay, accepted.peerAlpn, accepted.connection, accepted.remoteId)
+            return
+        }
+        if (!accepted.peerAlpn.contentEquals(alpn)) {
+            accepted.connection.close(4404L, "unknown_alpn".encodeToByteArray())
+            return
+        }
+        serveAppServer(accepted.connection, accepted.remoteId, controller, turnHost)
+    }
+
+    private suspend fun serveProtocol(
+        handler: IrohNodeProtocolHandler,
+        connection: Connection,
+        remoteId: String,
+    ) {
+        if (!handler.authorize(remoteId)) {
+            Telemetry.event("IrohNode", "protocol.rejected", "remoteEndpointId" to remoteId)
+            connection.close(4403L, "protocol_not_authorized".encodeToByteArray())
+            return
+        }
+        handler.accept(connection, remoteId)
+    }
+
+    private suspend fun serveAppServer(
+        connection: Connection,
+        remoteId: String,
+        controller: AppServerController,
+        turnHost: NodeTurnHost,
+    ) {
+        val nodeConnection = IrohNodeConnection(
+            connection = connection,
+            controller = controller,
+            adminRpcRouter = adminRpcRouter,
+            authPolicy = authPolicy,
+            authVerifier = authVerifier,
+            pairingService = pairingService,
+            remoteEndpointId = remoteId,
+            connectionRegistry = connectionRegistry,
+            turnHost = turnHost,
+        )
+        val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
+            java.util.concurrent.ConcurrentHashMap.newKeySet()
+        }
+        peerConnections.add(nodeConnection)
+        try {
+            nodeConnection.serve()
+        } finally {
+            peerConnections.remove(nodeConnection)
         }
     }
 
@@ -367,4 +432,12 @@ class IrohNodeEndpoint(
         private const val ACCEPT_NULL_RETRY_MS = 1_000L
         private const val ACCEPT_FAILURE_RETRY_MS = 500L
     }
+}
+
+/** A peer-owned protocol accepted on the host endpoint, with its own authorization policy. */
+interface IrohNodeProtocolHandler {
+    val alpn: ByteArray
+    /** Opt in each remote peer explicitly; an App Server login does not grant notebook access. */
+    fun authorize(remoteEndpointId: String): Boolean
+    suspend fun accept(connection: Connection, remoteEndpointId: String)
 }

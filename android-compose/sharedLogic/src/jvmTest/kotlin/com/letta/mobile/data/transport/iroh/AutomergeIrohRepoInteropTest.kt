@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +27,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.automerge.AmValue
 import org.automerge.ObjectId
+import org.automerge.ObjectType
 import org.automerge.repo.AcceptorHandle
 import org.automerge.repo.Dialer
+import org.automerge.repo.DialerHandle
 import org.automerge.repo.DocHandle
 import org.automerge.repo.DocumentId
 import org.automerge.repo.PeerId
@@ -108,6 +111,111 @@ class AutomergeIrohRepoInteropTest {
         }
     }
 
+    @Test
+    fun offlineNotebookEditsConvergeAfterReconnectAndReload() = runBlocking {
+        val root = Files.createTempDirectory("meridian-notebook-offline-")
+        val leftStore = root.resolve("left")
+        val rightStore = root.resolve("right")
+        val leftPeer = PeerId.fromString("notebook-left")
+        val rightPeer = PeerId.fromString("notebook-right")
+
+        clientEndpoint = bindEndpoint()
+        serverEndpoint = bindEndpoint()
+        val leftRepo = loadRepo(leftStore, leftPeer).also(closeables::add)
+        val rightRepo = loadRepo(rightStore, rightPeer).also(closeables::add)
+        val left = leftRepo.create().get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val documentId = left.documentId
+        left.withDocument { document ->
+            document.startTransaction().use { tx ->
+                tx.set(ObjectId.ROOT, "kind", "notebook")
+                tx.set(ObjectId.ROOT, "note", ObjectType.TEXT).also { tx.spliceText(it, 0, 0, "shared") }
+                tx.set(ObjectId.ROOT, "items", ObjectType.MAP)
+                tx.commit()
+            }
+        }.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+
+        val firstLink = connectRepositories(leftRepo, rightRepo)
+        val right = waitForDocument(rightRepo, documentId)
+        waitForString(right, "kind")
+        waitForNote(right, "shared")
+        firstLink.close()
+        assertEquals("shared", readNotebook(left).first)
+        assertEquals("shared", readNotebook(right).first)
+        // Both repositories remain open and independently writable while the transport is down.
+        left.withDocument { document ->
+            document.startTransaction().use { tx ->
+                val note = (tx.get(ObjectId.ROOT, "note").orElseThrow() as AmValue.Text).id
+                tx.spliceText(note, 0, 0, "left ")
+                val items = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+                tx.set(items, "note-ref", "note:shared")
+                tx.commit()
+            }
+        }.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        right.withDocument { document ->
+            document.startTransaction().use { tx ->
+                val note = (tx.get(ObjectId.ROOT, "note").orElseThrow() as AmValue.Text).id
+                tx.spliceText(note, 6, 0, " right")
+                val items = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+                tx.set(items, "chat-ref", "conversation:independent")
+                tx.commit()
+            }
+        }.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+
+        assertEquals("left shared", readNotebook(left).first)
+        assertEquals("shared right", readNotebook(right).first)
+        assertEquals(setOf("note-ref"), readNotebook(left).second.keys)
+        assertEquals(setOf("chat-ref"), readNotebook(right).second.keys)
+
+        connectRepositories(leftRepo, rightRepo)
+        for (handle in listOf(left, right)) {
+            val (note, items) = waitForNotebook(handle)
+            assertEquals("left shared right", note)
+            assertEquals(mapOf("note-ref" to "note:shared", "chat-ref" to "conversation:independent"), items)
+        }
+
+        rightRepo.close()
+        closeables.remove(rightRepo)
+        loadRepo(rightStore, rightPeer).use { reopened ->
+            val restored = reopened.find(documentId).get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS).orElseThrow()
+            val (note, items) = readNotebook(restored)
+            assertEquals("left shared right", note)
+            assertEquals(2, items.size)
+        }
+    }
+
+    private fun readNotebook(handle: DocHandle): Pair<String, Map<String, String>> =
+        handle.withDocument { document ->
+            val noteId = (document.get(ObjectId.ROOT, "note").orElseThrow() as AmValue.Text).id
+            val itemsId = (document.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+            val items = document.keys(itemsId).orElseThrow().associateWith { key ->
+                (document.get(itemsId, key).orElseThrow() as AmValue.Str).value
+            }
+            document.text(noteId).orElseThrow() to items
+        }.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+
+    private suspend fun waitForNote(handle: DocHandle, expected: String) = withTimeout(15.seconds) {
+        while (true) {
+            val value = withContext(Dispatchers.IO) {
+                handle.withDocument { document ->
+                    val id = (document.get(ObjectId.ROOT, "note").orElse(null) as? AmValue.Text)?.id
+                    id?.let { document.text(it).orElse(null) }
+                }.get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            }
+            if (value == expected) return@withTimeout
+            kotlinx.coroutines.delay(50)
+        }
+    }
+
+    private suspend fun waitForNotebook(handle: DocHandle): Pair<String, Map<String, String>> =
+        withTimeout(20.seconds) {
+            while (true) {
+                val state = withContext(Dispatchers.IO) { readNotebook(handle) }
+                if (state.first == "left shared right" && state.second.size == 2) return@withTimeout state
+                kotlinx.coroutines.delay(50)
+            }
+            error("unreachable")
+        }
+
     private suspend fun bindEndpoint(): Endpoint = Endpoint.bind(
         EndpointOptions(
             relayMode = RelayMode.disabled(),
@@ -122,22 +230,28 @@ class AutomergeIrohRepoInteropTest {
             .build(),
     )
 
-    private suspend fun connectRepositories(clientRepo: Repo, serverRepo: Repo) {
+    private suspend fun connectRepositories(clientRepo: Repo, serverRepo: Repo): RepoLink {
         val acceptor = serverRepo.makeAcceptor("iroh://server").also(closeables::add)
-        val accepted = CompletableDeferred<Unit>()
+        val accepted = CompletableDeferred<IrohRepoTransport>()
         scope.launch {
-            val incoming = checkNotNull(serverEndpoint.acceptNext())
-            val accepting = incoming.accept()
-            assertEquals(AUTOMERGE_REPO_ALPN.toList(), accepting.alpn().toList())
-            val connection = accepting.connect()
-            val stream = connection.acceptBi()
-            val transport = IrohRepoTransport(connection, stream, scope)
-            closeables += transport
-            acceptor.accept(transport.transport)
-            accepted.complete(Unit)
+            try {
+                val incoming = checkNotNull(serverEndpoint.acceptNext())
+                val accepting = incoming.accept()
+                assertEquals(AUTOMERGE_REPO_ALPN.toList(), accepting.alpn().toList())
+                val connection = accepting.connect()
+                val stream = connection.acceptBi()
+                val transport = IrohRepoTransport(connection, stream, scope)
+                closeables += transport
+                acceptor.accept(transport.transport).get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                accepted.complete(transport)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                accepted.completeExceptionally(error)
+            }
         }
 
-        clientRepo.dial(
+        val outgoing = CompletableDeferred<IrohRepoTransport>()
+        val dialer = clientRepo.dial(
             object : Dialer {
                 override fun getUrl(): String = "iroh://server"
 
@@ -145,12 +259,32 @@ class AutomergeIrohRepoInteropTest {
                     runBlocking {
                         val connection = clientEndpoint.connect(serverEndpoint.addr(), AUTOMERGE_REPO_ALPN)
                         val stream = connection.openBi()
-                        IrohRepoTransport(connection, stream, scope).also { closeables += it }.transport
+                        IrohRepoTransport(connection, stream, scope).also {
+                            closeables += it
+                            outgoing.complete(it)
+                        }.transport
                     }
                 }
             },
-        )
-        withTimeout(10.seconds) { accepted.await() }
+        ).also(closeables::add)
+        return withTimeout(10.seconds) {
+            withContext(Dispatchers.IO) { dialer.onEstablished().get(FUTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+            RepoLink(dialer, acceptor, outgoing.await(), accepted.await())
+        }
+    }
+
+    private class RepoLink(
+        private val dialer: DialerHandle,
+        private val acceptor: AcceptorHandle,
+        private val outgoing: IrohRepoTransport,
+        private val incoming: IrohRepoTransport,
+    ) : AutoCloseable {
+        override fun close() {
+            dialer.close()
+            outgoing.close()
+            incoming.close()
+            acceptor.close()
+        }
     }
 
     private suspend fun waitForDocument(repo: Repo, documentId: DocumentId): DocHandle =

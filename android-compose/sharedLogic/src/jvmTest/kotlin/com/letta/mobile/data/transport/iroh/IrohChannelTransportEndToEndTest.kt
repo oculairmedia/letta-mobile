@@ -13,6 +13,12 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
+import computer.iroh.Connection
+import computer.iroh.Endpoint
+import computer.iroh.EndpointOptions
+import computer.iroh.RelayMode
+import kotlinx.coroutines.CompletableDeferred
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -83,6 +89,69 @@ class IrohChannelTransportEndToEndTest {
     @AfterTest
     fun tearDown() {
         clientScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+    }
+
+    private suspend fun runNotebookProtocolRoutingTest(
+        createHandler: (CompletableDeferred<String>) -> IrohNodeProtocolHandler,
+    ): String {
+        val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
+        val resultPeer = CompletableDeferred<String>()
+        val server = IrohNodeEndpoint(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+            protocolHandlers = listOf(createHandler(resultPeer)),
+        )
+        val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        try {
+            server.create()
+            server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
+            val connection = client.connect(server.addr(), notebookAlpn)
+            val actualPeer = withTimeout(15.seconds) { resultPeer.await() }
+            assertEquals(
+                IrohDiagnostics.endpointIdHex(client.addr().id()),
+                actualPeer,
+            )
+            connection.close(0L, ByteArray(0))
+            return actualPeer
+        } finally {
+            client.shutdown()
+            client.close()
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun hostRoutesNotebookAlpnWithoutAppServerAuthentication() = runBlocking {
+        val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
+        val routed = runNotebookProtocolRoutingTest { acceptedPeer ->
+            object : IrohNodeProtocolHandler {
+                override val alpn = notebookAlpn
+                override fun authorize(remoteEndpointId: String) = true
+                override suspend fun accept(connection: Connection, remoteEndpointId: String) {
+                    acceptedPeer.complete(remoteEndpointId)
+                    connection.close(0L, ByteArray(0))
+                }
+            }
+        }
+        assertTrue(routed.isNotEmpty())
+    }
+
+    @Test
+    fun notebookHandlerRejectsUnauthorizedPeerWithoutCallingAccept() = runBlocking {
+        val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
+        val denied = runNotebookProtocolRoutingTest { denied ->
+            object : IrohNodeProtocolHandler {
+                override val alpn = notebookAlpn
+                override fun authorize(remoteEndpointId: String): Boolean {
+                    denied.complete(remoteEndpointId)
+                    return false
+                }
+                override suspend fun accept(connection: Connection, remoteEndpointId: String) {
+                    error("Unauthorized peer reached notebook handler")
+                }
+            }
+        }
+        assertTrue(denied.isNotEmpty())
     }
 
     @Test
