@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -63,6 +64,7 @@ internal fun MemoryGraphCanvas(
     LaunchedEffect(params.layout) { viewportState.sync(params.layout, viewportState.size) }
     Canvas(
         modifier = modifier
+            .clipToBounds()
             .onSizeChanged { viewportState.sync(current.layout, MemoryGraphSize(it.width.toFloat(), it.height.toFloat())) }
             .graphGestures(viewportState)
             // Keyed on the viewport holder and reading [current]: a reload must not restart
