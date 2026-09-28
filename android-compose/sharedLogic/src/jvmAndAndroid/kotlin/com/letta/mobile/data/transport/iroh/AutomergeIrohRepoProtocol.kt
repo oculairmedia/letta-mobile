@@ -78,25 +78,7 @@ class AutomergeIrohRepoProtocol(
         require(authorize(remoteEndpointId)) { "Peer not allowed" }
         val connectionFuture = CompletableFuture<Transport>()
         val job = scope.launch {
-            var connection: Connection? = null
-            var link: RepoStream? = null
-            try {
-                connection = connect(remote, alpn)
-                check(IrohDiagnostics.endpointIdHex(connection.remoteId()) == remoteEndpointId) { "Dialed unexpected peer" }
-                check(authorize(remoteEndpointId)) { "Peer no longer allowed" }
-                val opened = RepoStream(connection, connection.openBi(), scope)
-                link = opened
-                links.add(opened)
-                if (closed.get()) throw CancellationException("Protocol closed")
-                if (!connectionFuture.complete(opened.transport)) return@launch
-                opened.awaitClosed()
-            } catch (error: Throwable) {
-                connectionFuture.completeExceptionally(error)
-                if (error is CancellationException) throw error
-            } finally {
-                link?.close()
-                connection?.close(0, "closed".encodeToByteArray())
-            }
+            runDialedStream(remote, remoteEndpointId, connectionFuture)
         }
         val handle = try {
             repo.dial(object : Dialer {
@@ -114,6 +96,32 @@ class AutomergeIrohRepoProtocol(
         links.add(owned)
         if (closed.get()) owned.close()
         return AutoCloseable { links.remove(owned); owned.close() }
+    }
+
+    private suspend fun runDialedStream(
+        remote: EndpointAddr,
+        remoteEndpointId: String,
+        connectionFuture: CompletableFuture<Transport>,
+    ) {
+        var connection: Connection? = null
+        var link: RepoStream? = null
+        try {
+            connection = connect(remote, alpn)
+            check(IrohDiagnostics.endpointIdHex(connection.remoteId()) == remoteEndpointId) { "Dialed unexpected peer" }
+            check(authorize(remoteEndpointId)) { "Peer no longer allowed" }
+            val opened = RepoStream(connection, connection.openBi(), scope)
+            link = opened
+            links.add(opened)
+            if (closed.get()) throw CancellationException("Protocol closed")
+            if (!connectionFuture.complete(opened.transport)) return
+            opened.awaitClosed()
+        } catch (error: Throwable) {
+            connectionFuture.completeExceptionally(error)
+            if (error is CancellationException) throw error
+        } finally {
+            link?.close()
+            connection?.close(0, "closed".encodeToByteArray())
+        }
     }
 
     override fun close() {

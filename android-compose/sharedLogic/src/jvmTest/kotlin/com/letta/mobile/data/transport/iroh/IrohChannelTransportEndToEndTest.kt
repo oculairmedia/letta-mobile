@@ -91,21 +91,15 @@ class IrohChannelTransportEndToEndTest {
         clientScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 
-    @Test
-    fun hostRoutesNotebookAlpnWithoutAppServerAuthentication() = runBlocking {
+    private suspend fun runNotebookProtocolRoutingTest(
+        createHandler: (CompletableDeferred<String>) -> IrohNodeProtocolHandler,
+    ) {
         val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
-        val acceptedPeer = CompletableDeferred<String>()
+        val resultPeer = CompletableDeferred<String>()
         val server = IrohNodeEndpoint(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
-            protocolHandlers = listOf(object : IrohNodeProtocolHandler {
-                override val alpn = notebookAlpn
-                override fun authorize(remoteEndpointId: String) = true
-                override suspend fun accept(connection: Connection, remoteEndpointId: String) {
-                    acceptedPeer.complete(remoteEndpointId)
-                    connection.close(0L, ByteArray(0))
-                }
-            }),
+            protocolHandlers = listOf(createHandler(resultPeer)),
         )
         val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
         try {
@@ -114,7 +108,7 @@ class IrohChannelTransportEndToEndTest {
             val connection = client.connect(server.addr(), notebookAlpn)
             assertEquals(
                 IrohDiagnostics.endpointIdHex(client.addr().id()),
-                withTimeout(15.seconds) { acceptedPeer.await() },
+                withTimeout(15.seconds) { resultPeer.await() },
             )
             connection.close(0L, ByteArray(0))
         } finally {
@@ -125,13 +119,25 @@ class IrohChannelTransportEndToEndTest {
     }
 
     @Test
+    fun hostRoutesNotebookAlpnWithoutAppServerAuthentication() = runBlocking {
+        val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
+        runNotebookProtocolRoutingTest { acceptedPeer ->
+            object : IrohNodeProtocolHandler {
+                override val alpn = notebookAlpn
+                override fun authorize(remoteEndpointId: String) = true
+                override suspend fun accept(connection: Connection, remoteEndpointId: String) {
+                    acceptedPeer.complete(remoteEndpointId)
+                    connection.close(0L, ByteArray(0))
+                }
+            }
+        }
+    }
+
+    @Test
     fun notebookHandlerRejectsUnauthorizedPeerWithoutCallingAccept() = runBlocking {
         val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
-        val denied = CompletableDeferred<String>()
-        val server = IrohNodeEndpoint(
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
-            protocolHandlers = listOf(object : IrohNodeProtocolHandler {
+        runNotebookProtocolRoutingTest { denied ->
+            object : IrohNodeProtocolHandler {
                 override val alpn = notebookAlpn
                 override fun authorize(remoteEndpointId: String): Boolean {
                     denied.complete(remoteEndpointId)
@@ -140,22 +146,7 @@ class IrohChannelTransportEndToEndTest {
                 override suspend fun accept(connection: Connection, remoteEndpointId: String) {
                     error("Unauthorized peer reached notebook handler")
                 }
-            }),
-        )
-        val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
-        try {
-            server.create()
-            server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
-            val connection = client.connect(server.addr(), notebookAlpn)
-            assertEquals(
-                IrohDiagnostics.endpointIdHex(client.addr().id()),
-                withTimeout(15.seconds) { denied.await() },
-            )
-            connection.close(0L, ByteArray(0))
-        } finally {
-            client.shutdown()
-            client.close()
-            server.shutdown()
+            }
         }
     }
 

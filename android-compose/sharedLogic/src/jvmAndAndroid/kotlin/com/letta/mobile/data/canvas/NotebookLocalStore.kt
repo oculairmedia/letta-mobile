@@ -27,18 +27,20 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
     @Synchronized
     fun project(id: DocumentId): NotebookProjectionResult = projection.project(this, id)
 
-    internal fun replaceProjection(id: DocumentId, title: String, markdown: String, board: String) {
-        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        handle.withDocument { document ->
-            document.startTransaction().use { tx ->
-                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-                val previous = tx.text(textId).orElseThrow()
-                tx.spliceText(textId, 0, previous.length.toLong(), markdown)
-                tx.set(ObjectId.ROOT, "title", title)
-                tx.set(ObjectId.ROOT, "board", board)
-                tx.commit()
-            }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+data class NotebookContent(
+    val title: String,
+    val markdown: String,
+    val board: String,
+)
+
+    internal fun replaceProjection(id: DocumentId, content: NotebookContent) {
+        mutate(id) { tx ->
+            val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+            val previous = tx.text(textId).orElseThrow()
+            tx.spliceText(textId, 0, previous.length.toLong(), content.markdown)
+            tx.set(ObjectId.ROOT, "title", content.title)
+            tx.set(ObjectId.ROOT, "board", content.board)
+        }
     }
 
     val repo: Repo = Repo.load(
@@ -71,13 +73,9 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         require(Json.parseToJsonElement(boardJson).jsonObject["schema"]?.jsonPrimitive?.content == "notebook-board/1") {
             "Unsupported notebook board schema"
         }
-        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        handle.withDocument { document ->
-            document.startTransaction().use { tx ->
-                tx.set(ObjectId.ROOT, "board", boardJson)
-                tx.commit()
-            }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        mutate(id) { tx ->
+            tx.set(ObjectId.ROOT, "board", boardJson)
+        }
     }
 
     fun read(id: DocumentId): NotebookDocument? = open(id)?.withDocument { document ->
@@ -94,23 +92,25 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
 
     fun insertMarkdown(id: DocumentId, index: Int, text: String) {
         require(index >= 0)
-        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        handle.withDocument { document ->
-            document.startTransaction().use { tx ->
-                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-                tx.spliceText(textId, index.toLong(), 0, text)
-                tx.commit()
-            }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        mutate(id) { tx ->
+            val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+            tx.spliceText(textId, index.toLong(), 0, text)
+        }
     }
 
     fun putItem(id: DocumentId, item: NotebookItem) {
         require(item.id.isNotBlank())
+        mutate(id) { tx ->
+            val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+            tx.set(itemsId, item.id, Json.encodeToString(NotebookItem.serializer(), item))
+        }
+    }
+
+    private inline fun mutate(id: DocumentId, crossinline action: (org.automerge.Transaction) -> Unit) {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         handle.withDocument { document ->
             document.startTransaction().use { tx ->
-                val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
-                tx.set(itemsId, item.id, Json.encodeToString(NotebookItem.serializer(), item))
+                action(tx)
                 tx.commit()
             }
         }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)

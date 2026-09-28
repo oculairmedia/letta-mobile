@@ -24,50 +24,86 @@ internal class NotebookFilesystemProjection(private val root: Path) {
         fun baseline(id: String) = Baseline(id, digest(markdown), digest(yaml))
     }
 
-    fun project(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult = sync(store, id, false)
-    fun reconcile(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult = sync(store, id, true)
-
-    private fun sync(store: NotebookLocalStore, id: DocumentId, import: Boolean): NotebookProjectionResult {
-        val document = requireNotNull(store.read(id)) { "Unknown notebook document: $id" }
-        val key = digest(document.id.value)
-        checkDirectory(root)
-        val folder = root.resolve(key)
-        checkDirectory(folder)
-        val markdownFile = folder.resolve("note.md")
-        val yamlFile = folder.resolve("board.yaml")
-        val baselineFile = folder.resolve(".baseline.json")
-        val current = Snapshot(document.markdown, yaml(document.title, document.sceneJson))
-        val diskMarkdown = safeRead(markdownFile)
-        val diskYaml = safeRead(yamlFile)
-        val disk = if (diskMarkdown != null && diskYaml != null) Snapshot(diskMarkdown, diskYaml) else null
-        val previous = safeRead(baselineFile)?.let { Json.decodeFromString<Baseline>(it) }
-        require(previous == null || previous.id == document.id.value) { "Projection ID mismatch" }
-        if (previous == null) {
-            if (disk != null && disk != current) return NotebookProjectionResult.CONFLICT
-            if (disk == null && (diskMarkdown != null || diskYaml != null)) return NotebookProjectionResult.CONFLICT
-            publish(markdownFile, yamlFile, baselineFile, current, document.id.value)
-            return NotebookProjectionResult.EXPORTED
-        }
-        val localChanged = current.baseline(document.id.value) != previous
-        val diskChanged = disk?.baseline(document.id.value) != previous
-        if (!localChanged && !diskChanged) return NotebookProjectionResult.UNCHANGED
-        if (disk == null) return NotebookProjectionResult.CONFLICT // Never silently restore a deleted external file.
-        if (localChanged && diskChanged && current != disk) return NotebookProjectionResult.CONFLICT
-        if (diskChanged && !localChanged) {
-            if (!import) return NotebookProjectionResult.CONFLICT
-            val (title, board) = parseYaml(disk.yaml)
-            store.replaceProjection(id, title, disk.markdown, board)
-            atomicWrite(baselineFile, Json.encodeToString(Baseline.serializer(), disk.baseline(document.id.value)))
-            return NotebookProjectionResult.IMPORTED
-        }
-        publish(markdownFile, yamlFile, baselineFile, current, document.id.value)
-        return NotebookProjectionResult.EXPORTED
+    private class ProjectionFiles(folder: Path) {
+        val markdown: Path = folder.resolve("note.md")
+        val yaml: Path = folder.resolve("board.yaml")
+        val baseline: Path = folder.resolve(".baseline.json")
     }
 
-    private fun publish(md: Path, yaml: Path, baseline: Path, snapshot: Snapshot, id: String) {
-        atomicWrite(md, snapshot.markdown)
-        atomicWrite(yaml, snapshot.yaml)
-        atomicWrite(baseline, Json.encodeToString(Baseline.serializer(), snapshot.baseline(id)))
+    fun project(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
+        SyncSession(store, id, allowImport = false).execute()
+
+    fun reconcile(store: NotebookLocalStore, id: DocumentId): NotebookProjectionResult =
+        SyncSession(store, id, allowImport = true).execute()
+
+    private inner class SyncSession(
+        private val store: NotebookLocalStore,
+        private val id: DocumentId,
+        private val allowImport: Boolean,
+    ) {
+        private val document = requireNotNull(store.read(id)) { "Unknown notebook document: $id" }
+        private val docId = document.id.value
+        private val folder = root.resolve(digest(docId)).also {
+            checkDirectory(root)
+            checkDirectory(it)
+        }
+        private val files = ProjectionFiles(folder)
+        private val current = Snapshot(document.markdown, yaml(document.title, document.sceneJson))
+        private val diskMarkdown = safeRead(files.markdown)
+        private val diskYaml = safeRead(files.yaml)
+        private val disk = if (diskMarkdown != null && diskYaml != null) Snapshot(diskMarkdown, diskYaml) else null
+        private val previous = safeRead(files.baseline)?.let { Json.decodeFromString<Baseline>(it) }
+
+        fun execute(): NotebookProjectionResult {
+            require(previous == null || previous.id == docId) { "Projection ID mismatch" }
+            return if (previous == null) {
+                syncInitial()
+            } else {
+                syncIncremental(previous)
+            }
+        }
+
+        private fun syncInitial(): NotebookProjectionResult {
+            if (isPartialDisk()) return NotebookProjectionResult.CONFLICT
+            if (disk != null && disk != current) return NotebookProjectionResult.CONFLICT
+            publish(files, current, docId)
+            return NotebookProjectionResult.EXPORTED
+        }
+
+        private fun isPartialDisk(): Boolean =
+            (diskMarkdown == null) != (diskYaml == null)
+
+        private fun syncIncremental(previous: Baseline): NotebookProjectionResult {
+            val localChanged = current.baseline(docId) != previous
+            val diskChanged = disk?.baseline(docId) != previous
+            if (!localChanged && !diskChanged) return NotebookProjectionResult.UNCHANGED
+            if (disk == null) return NotebookProjectionResult.CONFLICT // Never silently restore a deleted external file.
+            if (hasConflict(localChanged, diskChanged)) return NotebookProjectionResult.CONFLICT
+            if (!localChanged) {
+                return applyExternalImport(disk)
+            }
+            publish(files, current, docId)
+            return NotebookProjectionResult.EXPORTED
+        }
+
+        private fun hasConflict(localChanged: Boolean, diskChanged: Boolean): Boolean {
+            if (!localChanged || !diskChanged) return false
+            return current != disk
+        }
+
+        private fun applyExternalImport(disk: Snapshot): NotebookProjectionResult {
+            if (!allowImport) return NotebookProjectionResult.CONFLICT
+            val (title, board) = parseYaml(disk.yaml)
+            store.replaceProjection(id, NotebookLocalStore.NotebookContent(title, disk.markdown, board))
+            atomicWrite(files.baseline, Json.encodeToString(Baseline.serializer(), disk.baseline(docId)))
+            return NotebookProjectionResult.IMPORTED
+        }
+    }
+
+    private fun publish(files: ProjectionFiles, snapshot: Snapshot, id: String) {
+        atomicWrite(files.markdown, snapshot.markdown)
+        atomicWrite(files.yaml, snapshot.yaml)
+        atomicWrite(files.baseline, Json.encodeToString(Baseline.serializer(), snapshot.baseline(id)))
     }
 
     private fun checkDirectory(path: Path) {

@@ -25,20 +25,24 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasCheckpoint
 import com.letta.mobile.ui.theme.LettaDimens
 
+internal data class CanvasHistoryDialogState(
+    val show: Boolean,
+    val checkpoints: List<CanvasCheckpoint>,
+    val compact: Boolean = false,
+)
+
 @Composable
 internal fun CanvasHistoryDialog(
-    show: Boolean,
-    checkpoints: List<CanvasCheckpoint>,
+    state: CanvasHistoryDialogState,
     onDismiss: () -> Unit,
     onRestore: (CanvasCheckpoint) -> Unit,
-    compact: Boolean = false,
 ) {
-    if (!show) return
-    if (compact) {
+    if (!state.show) return
+    if (state.compact) {
         ModalBottomSheet(onDismissRequest = onDismiss) {
             Column(modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md)) {
                 Text("Revision History", style = MaterialTheme.typography.titleMedium)
-                CanvasHistoryContent(checkpoints, onRestore)
+                CanvasHistoryContent(state.checkpoints, onRestore)
             }
         }
         return
@@ -46,7 +50,7 @@ internal fun CanvasHistoryDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Revision History", style = MaterialTheme.typography.titleMedium) },
-        text = { CanvasHistoryContent(checkpoints, onRestore) },
+        text = { CanvasHistoryContent(state.checkpoints, onRestore) },
         confirmButton = {
             Button(onClick = onDismiss) { Text("Close") }
         },

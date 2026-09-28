@@ -302,45 +302,11 @@ class IrohNodeEndpoint(
                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                 return
             }
-            val handler = protocolHandlers.firstOrNull { it.alpn.contentEquals(peerAlpn) }
-            if (handler != null) {
-                if (!handler.authorize(remoteId)) {
-                    Telemetry.event("IrohNode", "protocol.rejected", "remoteEndpointId" to remoteId)
-                    connection.close(4403L, "protocol_not_authorized".encodeToByteArray())
-                    return
-                }
-                handler.accept(connection, remoteId)
-                return
-            }
-            val relay = canvasRelay
-            if (relay != null && relay.handles(peerAlpn)) {
-                serveCanvas(relay, peerAlpn, connection, remoteId)
-                return
-            }
-            if (!peerAlpn.contentEquals(alpn)) {
-                connection.close(4404L, "unknown_alpn".encodeToByteArray())
-                return
-            }
-            val nodeConnection = IrohNodeConnection(
-                connection = connection,
-                controller = controller,
-                adminRpcRouter = adminRpcRouter,
-                authPolicy = authPolicy,
-                authVerifier = authVerifier,
-                pairingService = pairingService,
-                remoteEndpointId = remoteId,
-                connectionRegistry = connectionRegistry,
-                turnHost = turnHost,
+            dispatchAcceptedConnection(
+                AcceptedConnection(peerAlpn, connection, remoteId),
+                controller,
+                turnHost,
             )
-            val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
-                java.util.concurrent.ConcurrentHashMap.newKeySet()
-            }
-            peerConnections.add(nodeConnection)
-            try {
-                nodeConnection.serve()
-            } finally {
-                peerConnections.remove(nodeConnection)
-            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -350,6 +316,75 @@ class IrohNodeEndpoint(
                 "class" to e::class.simpleName,
                 level = Telemetry.Level.WARN,
             )
+        }
+    }
+
+    private class AcceptedConnection(
+        val peerAlpn: ByteArray,
+        val connection: Connection,
+        val remoteId: String,
+    )
+
+    private suspend fun dispatchAcceptedConnection(
+        accepted: AcceptedConnection,
+        controller: AppServerController,
+        turnHost: NodeTurnHost,
+    ) {
+        val handler = protocolHandlers.firstOrNull { it.alpn.contentEquals(accepted.peerAlpn) }
+        if (handler != null) {
+            serveProtocol(handler, accepted.connection, accepted.remoteId)
+            return
+        }
+        val relay = canvasRelay
+        if (relay != null && relay.handles(accepted.peerAlpn)) {
+            serveCanvas(relay, accepted.peerAlpn, accepted.connection, accepted.remoteId)
+            return
+        }
+        if (!accepted.peerAlpn.contentEquals(alpn)) {
+            accepted.connection.close(4404L, "unknown_alpn".encodeToByteArray())
+            return
+        }
+        serveAppServer(accepted.connection, accepted.remoteId, controller, turnHost)
+    }
+
+    private suspend fun serveProtocol(
+        handler: IrohNodeProtocolHandler,
+        connection: Connection,
+        remoteId: String,
+    ) {
+        if (!handler.authorize(remoteId)) {
+            Telemetry.event("IrohNode", "protocol.rejected", "remoteEndpointId" to remoteId)
+            connection.close(4403L, "protocol_not_authorized".encodeToByteArray())
+            return
+        }
+        handler.accept(connection, remoteId)
+    }
+
+    private suspend fun serveAppServer(
+        connection: Connection,
+        remoteId: String,
+        controller: AppServerController,
+        turnHost: NodeTurnHost,
+    ) {
+        val nodeConnection = IrohNodeConnection(
+            connection = connection,
+            controller = controller,
+            adminRpcRouter = adminRpcRouter,
+            authPolicy = authPolicy,
+            authVerifier = authVerifier,
+            pairingService = pairingService,
+            remoteEndpointId = remoteId,
+            connectionRegistry = connectionRegistry,
+            turnHost = turnHost,
+        )
+        val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
+            java.util.concurrent.ConcurrentHashMap.newKeySet()
+        }
+        peerConnections.add(nodeConnection)
+        try {
+            nodeConnection.serve()
+        } finally {
+            peerConnections.remove(nodeConnection)
         }
     }
 
