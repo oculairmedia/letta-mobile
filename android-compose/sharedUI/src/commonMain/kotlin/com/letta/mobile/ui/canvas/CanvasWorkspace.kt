@@ -1404,31 +1404,48 @@ fun CanvasWorkspace(
             }
 
 
+            var deletedHistory by remember(session) { mutableStateOf(emptyList<com.letta.mobile.data.canvas.CanvasDeletedElement>()) }
+            androidx.compose.runtime.LaunchedEffect(showHistoryDialog, session, sessionDoc?.revision) {
+                if (showHistoryDialog) deletedHistory = session?.deletedElements().orEmpty()
+            }
             CanvasHistoryDialog(
                 state = CanvasHistoryDialogState(
                     show = showHistoryDialog && session != null,
                     checkpoints = checkpoints,
+                    deletedElements = deletedHistory,
                     compact = compact,
                 ),
+                onRestoreElement = { element ->
+                    coroutineScope.launch {
+                        CanvasHistoryRestorer.restoreElement(
+                            context = CanvasHistoryRestorer.WorkspaceContext(session, assets, controller, history),
+                            element = element,
+                            onSuccess = { state ->
+                                lastExportedJson = state.sceneJson
+                                lastDrawing = state.cleanDrawing
+                                lastSavedElements = state.elements
+                                deletedHistory = state.deletedHistory
+                                statusMessage = state.message
+                            },
+                            onFailure = { msg -> statusMessage = "Restore failed: $msg" },
+                        )
+                    }
+                },
                 onDismiss = { showHistoryDialog = false },
                 onRestore = { cp ->
-                    val s = session ?: return@CanvasHistoryDialog
                     coroutineScope.launch {
-                        val outcome = runCatching { s.restoreCheckpoint(cp.checkpointId) }
-                        outcome.getOrNull()?.let { restored ->
-                            lastExportedJson = restored.sceneJson
-                            // As on open: parsed off the main thread, its images given their bytes
-                            // from the store, since a checkpoint holds only their refs.
-                            val clean = CanvasOpProjector.stripMetadataForDrawBox(restored.sceneJson)
-                            val parsed = withContext(Dispatchers.Default) { CanvasImageAssets.parse(clean, assets) }
-                            if (parsed != null) controller.importPath(parsed) else controller.importPath(clean)
-                            history.clear()
-                            statusMessage = "Restored to revision ${cp.revision}"
-                            showHistoryDialog = false
-                        }
-                        outcome.exceptionOrNull()?.let { err ->
-                            statusMessage = "Restore failed: ${err.message}"
-                        }
+                        CanvasHistoryRestorer.restoreCheckpoint(
+                            context = CanvasHistoryRestorer.WorkspaceContext(session, assets, controller, history),
+                            checkpoint = cp,
+                            onSuccess = { state ->
+                                lastExportedJson = state.sceneJson
+                                lastDrawing = state.cleanDrawing
+                                lastSavedElements = state.elements
+                                statusMessage = state.message
+                                showHistoryDialog = false
+                            },
+                            onFailure = { msg -> statusMessage = "Restore failed: $msg" },
+                        )
                     }
                 },
             )

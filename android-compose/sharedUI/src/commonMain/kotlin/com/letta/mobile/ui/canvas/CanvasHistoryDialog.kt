@@ -23,11 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasCheckpoint
+import com.letta.mobile.data.canvas.CanvasDeletedElement
 import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class CanvasHistoryDialogState(
     val show: Boolean,
     val checkpoints: List<CanvasCheckpoint>,
+    val deletedElements: List<CanvasDeletedElement> = emptyList(),
     val compact: Boolean = false,
 )
 
@@ -36,13 +38,14 @@ internal fun CanvasHistoryDialog(
     state: CanvasHistoryDialogState,
     onDismiss: () -> Unit,
     onRestore: (CanvasCheckpoint) -> Unit,
+    onRestoreElement: (CanvasDeletedElement) -> Unit = {},
 ) {
     if (!state.show) return
     if (state.compact) {
         ModalBottomSheet(onDismissRequest = onDismiss) {
             Column(modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md)) {
                 Text("Revision History", style = MaterialTheme.typography.titleMedium)
-                CanvasHistoryContent(state.checkpoints, onRestore)
+                CanvasHistoryContent(state.checkpoints, onRestore, state.deletedElements, onRestoreElement)
             }
         }
         return
@@ -50,7 +53,7 @@ internal fun CanvasHistoryDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Revision History", style = MaterialTheme.typography.titleMedium) },
-        text = { CanvasHistoryContent(state.checkpoints, onRestore) },
+        text = { CanvasHistoryContent(state.checkpoints, onRestore, state.deletedElements, onRestoreElement) },
         confirmButton = {
             Button(onClick = onDismiss) { Text("Close") }
         },
@@ -61,14 +64,29 @@ internal fun CanvasHistoryDialog(
 private fun CanvasHistoryContent(
     checkpoints: List<CanvasCheckpoint>,
     onRestore: (CanvasCheckpoint) -> Unit,
+    deletedElements: List<CanvasDeletedElement>,
+    onRestoreElement: (CanvasDeletedElement) -> Unit,
 ) {
-    if (checkpoints.isEmpty()) {
+    if (checkpoints.isEmpty() && deletedElements.isEmpty()) {
         Text("No revision checkpoints recorded yet.", style = MaterialTheme.typography.bodyMedium)
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxWidth().height(300.dp),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
+            if (deletedElements.isNotEmpty()) {
+                item { Text("Deleted drawing items", style = MaterialTheme.typography.titleSmall) }
+                items(deletedElements, key = { "deleted-${it.elementId}" }) { element ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Deleted: ${element.elementId}", modifier = Modifier.weight(1f))
+                        Button(onClick = { onRestoreElement(element) }) { Text("Restore") }
+                    }
+                }
+            }
             items(checkpoints) { cp -> CanvasHistoryCard(cp = cp, onRestore = { onRestore(cp) }) }
         }
     }

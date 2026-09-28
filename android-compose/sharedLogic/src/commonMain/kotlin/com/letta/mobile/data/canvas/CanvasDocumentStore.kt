@@ -6,6 +6,13 @@ package com.letta.mobile.data.canvas
  * Implemented via Room on Android ([com.letta.mobile.data.local.RoomCanvasDocumentStore])
  * and atomic JSON files on Desktop ([com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore]).
  */
+data class CanvasDeletedElement(val elementId: String, val elementJson: String)
+
+/** Optional durable history of individually deleted drawing elements. */
+interface CanvasDeletedElementStore {
+    suspend fun deletedElements(id: CanvasId): List<CanvasDeletedElement>
+}
+
 interface CanvasDocumentStore {
     suspend fun get(id: CanvasId): CanvasDocument?
     suspend fun getForConversation(conversationId: String): CanvasDocument?

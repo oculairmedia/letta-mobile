@@ -8,6 +8,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Runtime session managing a [CanvasDocument] with multi-writer op-log support.
@@ -401,6 +405,33 @@ class CanvasSession(
             last = applyLocalLocked(stamped)
         }
         last
+    }
+
+    /** Shared notebook history, independent of this person's undo stack. */
+    suspend fun deletedElements(): List<CanvasDeletedElement> =
+        (store as? CanvasDeletedElementStore)?.deletedElements(canvasId).orEmpty()
+
+    /** Restore just one deleted drawing item, using a fresh LWW stamp and a normal synced op. */
+    suspend fun restoreDeletedElement(
+        target: CanvasDeletedElement,
+    ): CanvasDocument? = mutex.withLock {
+        val snapshot = (store as? CanvasDeletedElementStore)?.deletedElements(canvasId)
+            ?.firstOrNull { it.elementId == target.elementId } ?: return@withLock null
+        val stored = store.get(canvasId) ?: return@withLock null
+        // A snapshot can outlive a peer's re-add; never replace an already live same-ID item.
+        val live = Json.parseToJsonElement(stored.sceneJson).jsonObject["elements"]?.jsonArray.orEmpty()
+        if (live.any { it.jsonObject["id"]?.jsonPrimitive?.content == target.elementId }) return@withLock null
+        _document.value = stored
+        adoptLamportOf(stored)
+        applyLocalLocked(
+            CanvasOp.AddElementOp(
+                opId = CanvasOpDiffer.generateOpId("restore"),
+                actorId = LOCAL_USER_ACTOR_ID,
+                lamport = ++lamportClock,
+                elementId = target.elementId,
+                elementJson = snapshot.elementJson,
+            ),
+        )
     }
 
     /** Which shape owns which label document; see [CanvasOp.SetLabelOwnerOp]. */

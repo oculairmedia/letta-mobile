@@ -298,6 +298,23 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
+    internal fun deletedBoardElements(id: DocumentId): List<CanvasDeletedElement> =
+        requireNotNull(open(id)).withDocument { document ->
+            val snapshots = (document.get(ObjectId.ROOT, "boardDeletedElements").orElse(null) as? AmValue.Map)
+                ?: return@withDocument emptyList()
+            val live = Json.parseToJsonElement(boardFrom(document)).jsonObject["elements"] as? JsonArray
+            val liveIds = live.orEmpty().mapNotNull { (it as? JsonObject)?.get("id")?.jsonPrimitive?.content }.toSet()
+            document.keys(snapshots.id).orElseThrow().mapNotNull { key ->
+                if (key in liveIds) null else (document.get(snapshots.id, key).orElse(null) as? AmValue.Str)?.value?.let {
+                    CanvasDeletedElement(key, it)
+                }
+            }
+        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+
+    private fun deletedElements(tx: Transaction): ObjectId =
+        (tx.get(ObjectId.ROOT, "boardDeletedElements").orElse(null) as? AmValue.Map)?.id
+            ?: tx.set(ObjectId.ROOT, "boardDeletedElements", ObjectType.MAP)
+
     private fun boardElements(tx: Transaction): ObjectId =
         (tx.get(ObjectId.ROOT, "boardElements").orElse(null) as? AmValue.Map)?.id
             ?: tx.set(ObjectId.ROOT, "boardElements", ObjectType.MAP)
@@ -394,16 +411,22 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         return JsonObject(root + ("schema" to JsonPrimitive("notebook-board/1")))
     }
 
+    private data class ElementSyncTransition(
+        val oldVal: JsonObject?,
+        val nextVal: JsonObject?,
+        val isLive: Boolean,
+    )
+
     private fun syncElementDiff(
         tx: Transaction,
         key: String,
-        oldVal: JsonObject?,
-        nextVal: JsonObject?,
+        transition: ElementSyncTransition,
     ) {
+        val (oldVal, nextVal, isLive) = transition
         if (oldVal == nextVal) return
         if (nextVal == null) {
             removeElement(tx, key)
-        } else {
+        } else if (oldVal == null || isLive) {
             putElement(tx, key, nextVal)
         }
     }
@@ -424,11 +447,15 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
 
     private fun mergeCanvasBoard(tx: Transaction, base: JsonObject, incoming: JsonObject) {
         val current = Json.parseToJsonElement(boardFrom(tx)).jsonObject
+        val liveIds = (current["elements"] as? JsonArray)
+            ?.mapNotNull { (it as? JsonObject)?.get("id")?.jsonPrimitive?.content }
+            ?.toSet()
+            .orEmpty()
         val old = parseIncomingElements(base)
         val next = parseIncomingElements(incoming)
         // Only replace elements changed by this canvas write; unrelated notebook edits survive.
         for (key in (old.keys + next.keys)) {
-            syncElementDiff(tx, key, old[key], next[key])
+            syncElementDiff(tx, key, ElementSyncTransition(old[key], next[key], key in liveIds))
         }
         val envelope = current.toMutableMap()
         for (key in (base.keys + incoming.keys).filter { it != "elements" && it != "schema" }) {
@@ -444,11 +471,20 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         value.forEach { (field, fieldValue) -> tx.set(map, field, fieldValue.toString()) }
         val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)
         if (tombstones != null && tx.get(tombstones.id, key).isPresent) tx.delete(tombstones.id, key)
+        val deleted = (tx.get(ObjectId.ROOT, "boardDeletedElements").orElse(null) as? AmValue.Map)
+        if (deleted != null && tx.get(deleted.id, key).isPresent) tx.delete(deleted.id, key)
     }
 
     private fun removeElement(tx: Transaction, key: String) {
         val elements = boardElements(tx)
-        if (tx.get(elements, key).isPresent) tx.delete(elements, key)
+        val previous = (tx.get(elements, key).orElse(null) as? AmValue.Map)?.id
+        if (previous != null) {
+            val snapshot = JsonObject(tx.keys(previous).orElseThrow().associateWith { field ->
+                Json.parseToJsonElement((tx.get(previous, field).orElseThrow() as AmValue.Str).value)
+            })
+            tx.set(deletedElements(tx), key, snapshot.toString())
+            tx.delete(elements, key)
+        }
         val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)?.id
             ?: tx.set(ObjectId.ROOT, "boardTombstones", ObjectType.MAP)
         tx.set(tombstones, key, true)
