@@ -23,7 +23,7 @@ private val hostCanvasJson = Json {
  * refused before anything is read, and nothing in the input can name a different caller.
  */
 object HostCanvasTools {
-    fun all(backend: HostCanvasBackend): List<HostExternalTool> = listOf(
+    fun all(backend: HostCanvasBackend, renderer: CanvasPreviewRenderer? = null): List<HostExternalTool> = listOf(
         HostCanvasTool(CanvasToolContract.create, "Failed to create canvas") { caller, input -> create(backend, caller, input) },
         HostCanvasTool(CanvasToolContract.getScene, "Failed to get scene") { caller, input ->
             withCanvas(backend, caller, input) { entry -> getScene(backend, entry) }
@@ -45,7 +45,12 @@ object HostCanvasTools {
             }
         },
         HostCanvasTool(CanvasToolContract.list, "Failed to list canvases") { caller, input -> list(backend, caller, input) },
-    )
+    ) + listOfNotNull(renderer?.let { previewRenderer ->
+        val preview = HostCanvasPreview(backend, previewRenderer)
+        HostCanvasTool(CanvasToolContract.renderPreview, "Failed to render preview") { caller, input ->
+            withCanvas(backend, caller, input) { entry -> preview.run(caller, entry, input) }
+        }
+    })
 
     private suspend fun getScene(backend: HostCanvasBackend, entry: HostCanvasEntry): ExternalToolResult {
         val scene = backend.scene(entry)
