@@ -362,7 +362,7 @@ class CanvasSession(
         style: CanvasTextStyle? = null,
     ): CanvasDocument? = mutex.withLock {
         val existing = documents().firstOrNull { it.id == documentId } ?: return@withLock null
-        if (existing.frame == frame && (style == null || existing.style == style)) return@withLock null
+        if (isMoveRedundant(existing, frame, style)) return@withLock null
         applyLocalLocked(
             CanvasOp.SetDocumentOp(
                 opId = CanvasOpDiffer.generateOpId("doc"),
@@ -374,6 +374,12 @@ class CanvasSession(
                 style = style,
             ),
         )
+    }
+
+    private fun isMoveRedundant(existing: CanvasSceneDocument, frame: CanvasDocumentFrame, style: CanvasTextStyle?): Boolean {
+        if (existing.frame != frame) return false
+        if (style == null) return true
+        return existing.style == style
     }
 
     /** Connector ends bound to block documents, by connector element id. */
