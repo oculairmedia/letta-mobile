@@ -195,3 +195,9 @@
     <fields>;
     native <methods>;
 }
+
+# Automerge notebook JNI resolves repository pointers, result variants and
+# callbacks by their Java names. The Android native AAR supplies the .so files
+# but no consumer rules, so retain the Java bridge in minified builds as well.
+# Repo.load runs during application startup, including the benchmark APK.
+-keep class org.automerge.** { *; }
