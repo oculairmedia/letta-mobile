@@ -47,6 +47,10 @@ class SharedUiDisclosureChevronContractTest {
     private fun shouldScanFile(file: Path): Boolean {
         if (!file.isRegularFile() || !file.name.endsWith(".kt")) return false
         val name = file.name
+        // DisclosureChevron is the one allowed renderer. LettaIcons is the glyph
+        // source. A2uiBasicWidgets is the A2UI catalog (name → vector), not a
+        // disclosure rendering site — leave it out so nobody "fixes" the catalog
+        // into this scan.
         if (name == "DisclosureChevron.kt" || name == "LettaIcons.kt" || name == "A2uiBasicWidgets.kt") {
             return false
         }

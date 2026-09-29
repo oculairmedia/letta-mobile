@@ -109,7 +109,8 @@ object DisclosureChevronDefaults {
  * Unified disclosure chevron affordance for expandable content, accordions, and sheet triggers.
  *
  * @param expanded Whether the target section or container is currently expanded.
- * @param modifier Caller layout modifiers. Row-specific geometry tests keep tagging via caller modifier.
+ * @param modifier Caller layout modifiers. A testTag on this modifier replaces the
+ * default tag; the default remains when the caller does not set one.
  * @param enabled When false, renders at reduced opacity (0.4 alpha) overriding emphasis.
  * @param emphasis Visual emphasis tier ([ChevronEmphasis.Neutral] or [ChevronEmphasis.Emphasized]).
  * @param indicates Destination role ([ChevronIndication.Expansion] animated rotation vs [ChevronIndication.Sheet] static).
@@ -156,9 +157,11 @@ fun DisclosureChevron(
         imageVector = LettaIcons.ExpandMore,
         contentDescription = effectiveContentDescription,
         tint = tint,
+        // TestTag keeps the outer value. The caller modifier is outside the
+        // default tag, so a caller tag wins and the default remains when absent.
         modifier = modifier
+            .testTag(DisclosureChevronDefaults.TestTag)
             .size(iconSize)
-            .rotate(rotation)
-            .testTag(DisclosureChevronDefaults.TestTag),
+            .rotate(rotation),
     )
 }
