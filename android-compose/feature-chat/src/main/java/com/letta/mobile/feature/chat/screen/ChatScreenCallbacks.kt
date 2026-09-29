@@ -41,6 +41,14 @@ internal data class ChatContentAppearance(
     val chatBackground: ChatBackground = ChatBackground.Default,
     val topPadding: Dp = 0.dp,
     val bottomPadding: Dp = 0.dp,
+    /**
+     * Bottom clearance for the scroll-to-bottom FAB: [bottomPadding] minus the
+     * visually transparent band above the composer's input card, so the FAB
+     * anchors above the card the user perceives as the composer (2026-09-28
+     * product feedback). Defaults to [bottomPadding] for callers that have no
+     * measured input card.
+     */
+    val scrollFabBottomPadding: Dp = bottomPadding,
     val activeFontScale: Float = 1f,
     val scrollToMessageId: String? = null,
 )

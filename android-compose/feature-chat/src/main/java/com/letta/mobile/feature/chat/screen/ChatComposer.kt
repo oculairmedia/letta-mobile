@@ -37,12 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.window.Dialog
@@ -175,6 +177,15 @@ internal fun ChatComposer(
     /** The companion mascot was tapped: open the agent's pane. */
     onCompanionClick: (() -> Unit)? = null,
     canQueueWhileStreaming: Boolean = false,
+    /**
+     * Reports the measured height of the input card (the prompt Box only,
+     * excluding the companion strip, tool chips, and anything stacked above
+     * the composer). The screen layer subtracts it from the total composer
+     * height to learn how much transparent band sits above the card, so the
+     * scroll-to-bottom FAB can anchor above the card instead of floating
+     * above the whole column (product feedback, 2026-09-28).
+     */
+    onInputCardHeightChange: (Dp) -> Unit = {},
 ) {
     val model = ChatComposerUiModel(
         agentId = agentId,
@@ -203,6 +214,7 @@ internal fun ChatComposer(
         modifier = modifier,
         companionStatus = companionStatus,
         onCompanionClick = onCompanionClick,
+        onInputCardHeightChange = onInputCardHeightChange,
     )
 }
 
@@ -213,9 +225,11 @@ private fun ChatComposerContent(
     modifier: Modifier,
     companionStatus: (@Composable () -> Unit)? = null,
     onCompanionClick: (() -> Unit)? = null,
+    onInputCardHeightChange: (Dp) -> Unit = {},
 ) {
     var previewAttachment by remember { mutableStateOf<MessageContentPart.Image?>(null) }
     var showComposerActions by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
     val onToolSelected: (Tool) -> Unit = { tool ->
         callbacks.onTextChange(appendToolCallTemplate(model.inputText, buildToolCallTemplate(tool)))
     }
@@ -273,7 +287,8 @@ private fun ChatComposerContent(
                     enabled = !keyboardOpen && !model.isStreaming,
                     onTrigger = callbacks.onOpenCanvas,
                 )
-                .mascotGazeTarget(MascotGazeSurface.INPUT),
+                .mascotGazeTarget(MascotGazeSurface.INPUT)
+                .onSizeChanged { onInputCardHeightChange(with(density) { it.height.toDp() }) },
         ) {
             ChatComposerInput(
                 state = ChatComposerInputState(

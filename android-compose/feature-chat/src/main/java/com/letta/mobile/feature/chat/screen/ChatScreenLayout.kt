@@ -99,6 +99,7 @@ internal fun ChatScreenLayout(
             params = params,
             contentCallbacks = localState.contentCallbacks,
             bottomPaddingDp = localState.bottomPaddingDp,
+            composerAboveInputDp = localState.composerAboveInputDp,
             openSubagentTarget = localState.openSubagentTarget,
         )
         ChatScreenSubagentRingsOverlay(
@@ -122,6 +123,7 @@ internal fun ChatScreenLayout(
                 reducedMotion = reducedMotion,
                 bottomInsetDp = params.bottomInsetDp,
                 onComposerHeightChange = localState.onComposerHeightChange,
+                onInputCardHeightChange = localState.onInputCardHeightChange,
                 modifier = Modifier.align(Alignment.BottomCenter),
             ),
         )
@@ -161,6 +163,7 @@ private fun ChatScreenMainContent(
     params: ChatScreenLayoutParams,
     contentCallbacks: ChatContentCallbacks,
     bottomPaddingDp: Dp,
+    composerAboveInputDp: Dp,
     openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
 ) {
     val contentPhase = chatScreenContentPhase(params.state)
@@ -191,6 +194,12 @@ private fun ChatScreenMainContent(
                         chatBackground = params.chatBackground,
                         topPadding = params.contentPadding.calculateTopPadding(),
                         bottomPadding = bottomPaddingDp,
+                        // The FAB anchors above the input CARD, not the whole
+                        // composer column: subtract the transparent band above
+                        // the card (companion row, tool chips, queued sends,
+                        // goal status) so it sits at the same visual height the
+                        // user perceives as "above the composer" (2026-09-28).
+                        scrollFabBottomPadding = bottomPaddingDp - composerAboveInputDp,
                         activeFontScale = params.activeFontScale,
                         scrollToMessageId = params.viewModel.scrollToMessageId,
                     ),
@@ -277,6 +286,7 @@ private data class ChatScreenComposerColumnParams(
     val reducedMotion: Boolean,
     val bottomInsetDp: Dp,
     val onComposerHeightChange: (Dp) -> Unit,
+    val onInputCardHeightChange: (Dp) -> Unit,
     val modifier: Modifier = Modifier,
 )
 
@@ -441,6 +451,7 @@ private fun ChatScreenComposerColumn(params: ChatScreenComposerColumnParams) {
             composerState = params.composerState,
             viewModel = params.viewModel,
             navigation = params.navigation,
+            onInputCardHeightChange = params.onInputCardHeightChange,
         )
     }
 }
@@ -518,6 +529,7 @@ private fun ChatScreenComposerInputSection(
     composerState: ChatComposerState,
     viewModel: AdminChatViewModel,
     navigation: ChatScreenNavigationCallbacks,
+    onInputCardHeightChange: (Dp) -> Unit,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
     val launchPicker = rememberImageAttachmentPicker(
@@ -567,6 +579,7 @@ private fun ChatScreenComposerInputSection(
                 emptyList()
             },
             onOpenCanvas = navigation.onOpenCanvas,
+            onInputCardHeightChange = onInputCardHeightChange,
         )
     }
 }

@@ -26,7 +26,9 @@ internal data class ChatScreenLayoutLocalState(
     val imageViewerState: Pair<ImmutableList<UiImageAttachment>, Int>?,
     val onImageViewerStateChange: (Pair<ImmutableList<UiImageAttachment>, Int>?) -> Unit,
     val bottomPaddingDp: Dp,
+    val composerAboveInputDp: Dp,
     val onComposerHeightChange: (Dp) -> Unit,
+    val onInputCardHeightChange: (Dp) -> Unit,
     val contentCallbacks: ChatContentCallbacks,
     val toolRunDetails: List<ToolTimelineGroup>?,
     val onToolRunDetailsChange: (List<ToolTimelineGroup>?) -> Unit,
@@ -42,7 +44,13 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
     }
     var toolRunDetails by remember { mutableStateOf<List<ToolTimelineGroup>?>(null) }
     var composerHeightDp by remember { mutableStateOf(0.dp) }
+    var inputCardHeightDp by remember { mutableStateOf(0.dp) }
     val bottomPaddingDp = composerHeightDp + params.bottomInsetDp
+    // The visually transparent band inside the composer column above the
+    // input card (goal status, queued sends, mascot companion/thinking row,
+    // tool chips). Zero until the card reports its first measurement, so
+    // consumers fall back to the full composer clearance on frame one.
+    val composerAboveInputDp = composerBandAboveInput(composerHeightDp, inputCardHeightDp)
 
     val openImageViewer: (List<UiImageAttachment>, Int) -> Unit = remember {
         { attachments, index ->
@@ -87,10 +95,12 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         imageViewerState = imageViewerState,
         onImageViewerStateChange = { imageViewerState = it },
         bottomPaddingDp = bottomPaddingDp,
+        composerAboveInputDp = composerAboveInputDp,
         onComposerHeightChange = {
             composerHeightDp = it
             params.onComposerMeasured(it)
         },
+        onInputCardHeightChange = { inputCardHeightDp = it },
         contentCallbacks = contentCallbacks,
         toolRunDetails = toolRunDetails,
         onToolRunDetailsChange = { toolRunDetails = it },
@@ -125,3 +135,18 @@ private fun rememberChatContentCallbacks(
         )
     }
 }
+
+/**
+ * Height of the visually transparent band inside the composer column: the
+ * measured column height minus the measured input card height. Returns zero
+ * until the card reports its first measurement, and zero when the column IS
+ * the card (no attachments/controls band above it). Never negative — a
+ * transient frame where the card measures taller than the column falls back
+ * to full-column clearance rather than pulling the FAB below the card.
+ */
+internal fun composerBandAboveInput(composerHeight: Dp, inputCardHeight: Dp): Dp =
+    if (inputCardHeight > 0.dp) {
+        (composerHeight - inputCardHeight).coerceAtLeast(0.dp)
+    } else {
+        0.dp
+    }

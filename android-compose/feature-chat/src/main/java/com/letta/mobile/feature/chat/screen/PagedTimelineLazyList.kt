@@ -394,7 +394,7 @@ internal object PagedTimelineLazyLayout {
             },
             modifier = modifier.padding(
                 end = LettaSpacing.INNER_PADDING,
-                bottom = LettaSpacing.INNER_PADDING + params.appearance.bottomPadding,
+                bottom = LettaSpacing.INNER_PADDING + params.appearance.scrollFabBottomPadding,
             ),
         )
     }
