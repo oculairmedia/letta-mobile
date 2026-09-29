@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -26,7 +25,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import ca.oculair.meridian.R
-import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.components.ChevronIndication
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -79,7 +79,10 @@ private fun ConversationFilterMenu(
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 Text(stringResource(filter.labelRes), style = MaterialTheme.typography.labelLarge)
-                Icon(LettaIcons.ChevronDown, contentDescription = null, modifier = Modifier.size(LettaIconSizing.Inline))
+                DisclosureChevron(
+                    expanded = false,
+                    indicates = ChevronIndication.Sheet,
+                )
             }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {

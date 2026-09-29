@@ -58,6 +58,7 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.MultiFieldInputDialog
@@ -669,8 +670,8 @@ private fun ToolCodeSection(
                         )
                     }
                     IconButton(onClick = { expanded = !expanded }) {
-                        Icon(
-                            imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
+                        DisclosureChevron(
+                            expanded = expanded,
                             contentDescription = if (expanded) {
                                 stringResource(R.string.screen_tool_detail_collapse)
                             } else {

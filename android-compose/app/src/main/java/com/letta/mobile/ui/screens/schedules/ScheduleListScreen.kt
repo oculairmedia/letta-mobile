@@ -52,7 +52,10 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
+import com.letta.mobile.ui.components.ChevronEmphasis
+import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -251,7 +254,11 @@ private fun AgentSelector(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Icon(LettaIcons.ExpandMore, contentDescription = null)
+            DisclosureChevron(
+                expanded = false,
+                emphasis = ChevronEmphasis.Emphasized,
+                indicates = ChevronIndication.Sheet,
+            )
         }
         DropdownMenu(
             expanded = expanded,

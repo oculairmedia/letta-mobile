@@ -2,8 +2,6 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,14 +23,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -48,7 +45,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.motion.ChatMotionPolicy
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.theme.LettaTheme
@@ -266,12 +263,6 @@ fun CollapsibleStatusRow(
 
     val toggleActionLabel = if (expanded) "Collapse details" else "Expand details"
 
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = if (motionPolicy.isReducedMotionEnabled) snap() else MaterialTheme.motionScheme.fastSpatialSpec(),
-        label = "status_row_chevron",
-    )
-
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -345,14 +336,11 @@ fun CollapsibleStatusRow(
 
             if (content != null) {
                 Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    imageVector = LettaIcons.ExpandMore,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(LettaIconSizing.Inline)
-                        .rotate(chevronRotation),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                CompositionLocalProvider(
+                    LocalReducedMotion provides motionPolicy.isReducedMotionEnabled,
+                ) {
+                    DisclosureChevron(expanded = expanded)
+                }
             }
         }
 
