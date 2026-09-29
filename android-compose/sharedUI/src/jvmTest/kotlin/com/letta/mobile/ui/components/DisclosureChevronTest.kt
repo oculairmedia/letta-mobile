@@ -14,7 +14,7 @@ class DisclosureChevronTest {
     private val primary = Color(0xFF6750A4)
 
     @Test
-    fun `rotation values for expansion indicate 0deg collapsed and 180deg expanded`() {
+    fun `rotation targets for expansion and sheet modes`() {
         assertEquals(
             0f,
             DisclosureChevronDefaults.targetRotation(
@@ -29,10 +29,6 @@ class DisclosureChevronTest {
                 expanded = true,
             ),
         )
-    }
-
-    @Test
-    fun `sheet indication keeps static 0deg rotation regardless of expanded state`() {
         assertEquals(
             0f,
             DisclosureChevronDefaults.targetRotation(

@@ -44,6 +44,15 @@ class SharedUiDisclosureChevronContractTest {
         }
     }
 
+    private fun shouldScanFile(file: Path): Boolean {
+        if (!file.isRegularFile() || !file.name.endsWith(".kt")) return false
+        val name = file.name
+        if (name == "DisclosureChevron.kt" || name == "LettaIcons.kt" || name == "A2uiBasicWidgets.kt") {
+            return false
+        }
+        return !TEMPORARY_ALLOWLIST.contains(name)
+    }
+
     @Test
     fun `no unapproved disclosure icons in sharedUI production sources`() {
         val sharedUiDir = locateSharedUiDir()
@@ -59,25 +68,12 @@ class SharedUiDisclosureChevronContractTest {
 
         prodSourceRoots.forEach { root ->
             Files.walk(root).use { stream ->
-                stream.filter { it.isRegularFile() && it.name.endsWith(".kt") }
-                    .forEach { file ->
-                        val fileName = file.name
-                        if (fileName == "DisclosureChevron.kt" || fileName == "LettaIcons.kt" || fileName == "A2uiBasicWidgets.kt") {
-                            // DisclosureChevron is the definition site.
-                            // LettaIcons is the icon registry table.
-                            // A2uiBasicWidgets maps JSON string names ("ChevronDown") to icon vectors without rendering an Icon.
-                            return@forEach
-                        }
-                        if (TEMPORARY_ALLOWLIST.contains(fileName)) {
-                            return@forEach
-                        }
-
-                        val content = file.readText()
-                        val fileViolations = findViolationsInSource(content)
-                        if (fileViolations.isNotEmpty()) {
-                            violations.add("${file.fileName}: ${fileViolations.joinToString("; ")}")
-                        }
+                stream.filter(::shouldScanFile).forEach { file ->
+                    val fileViolations = findViolationsInSource(file.readText())
+                    if (fileViolations.isNotEmpty()) {
+                        violations.add("${file.fileName}: ${fileViolations.joinToString("; ")}")
                     }
+                }
             }
         }
 
@@ -99,8 +95,7 @@ class SharedUiDisclosureChevronContractTest {
                 stream.filter { it.isRegularFile() && it.name == fileName }
                     .forEach { file ->
                         found = true
-                        val content = file.readText()
-                        val violations = findViolationsInSource(content)
+                        val violations = findViolationsInSource(file.readText())
                         assertTrue(
                             violations.isNotEmpty(),
                             "Allowlist entry $fileName does not contain any legacy icon pattern. Stale allowlist entry must be removed!",
