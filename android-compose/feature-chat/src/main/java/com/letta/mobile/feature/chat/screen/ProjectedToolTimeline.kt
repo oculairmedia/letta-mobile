@@ -282,7 +282,10 @@ private fun ToolRunSummaryRow(
                     }
             }
             .clickable(onClick = onClick)
-            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.md),
+            // Align with the Thought (MessageReasoning) rows: no horizontal inset, so the
+            // summary label shares their leading edge, and the same xs vertical self-pad,
+            // so the step beat comes solely from the group card's groupedMessageSpacing.
+            .padding(vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
