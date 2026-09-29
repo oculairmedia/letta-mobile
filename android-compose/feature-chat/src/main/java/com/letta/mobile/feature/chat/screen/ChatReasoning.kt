@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -139,7 +140,23 @@ internal fun MessageReasoning(
                         Modifier
                     },
                 )
-                .padding(vertical = LettaDimens.Space.xs),
+                .then(
+                    if (canToggle) {
+                        // Same tap-target floor as RunActivityDisclosure: a collapsed
+                        // "Thought" row and a tool-run disclosure row must measure the same
+                        // header height (letta-mobile-eohab.7, product feedback 2026-09-29).
+                        // heightIn precedes the pad to mirror that row's modifier shape, and
+                        // the xs self-pad collapses to hair so a single-line header never
+                        // exceeds the 44dp floor.
+                        Modifier
+                            .heightIn(min = LettaDimens.Orb.railSlotHeight)
+                            .padding(vertical = LettaDimens.Space.hair)
+                    } else {
+                        // Streaming/active rows stay content-height: no tap target, and a
+                        // floor here would inflate every live reasoning row.
+                        Modifier.padding(vertical = LettaDimens.Space.xs)
+                    },
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {

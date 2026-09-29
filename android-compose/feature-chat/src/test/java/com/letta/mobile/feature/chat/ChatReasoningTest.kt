@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -7,19 +8,29 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.screen.ChatReasoningTestTags
 import com.letta.mobile.feature.chat.screen.MessageReasoning
+import com.letta.mobile.feature.chat.screen.RunActivityDisclosure
+import com.letta.mobile.feature.chat.screen.RunActivityDisclosureTestTags
+import com.letta.mobile.feature.chat.screen.RunActivityProjection
+import com.letta.mobile.feature.chat.screen.RunActivityState
+import com.letta.mobile.ui.components.DisclosureChevronDefaults
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -355,6 +366,148 @@ class ChatReasoningTest {
         awaitReasoningContent(present = false)
         header.assert(reasoningState("Reasoning collapsed", actionLabel = "Expand reasoning"))
         content.assertDoesNotExist()
+    }
+
+    // letta-mobile-eohab.7: a collapsed "Thought" disclosure must measure the same
+    // header height as a tool-run disclosure row (44dp interactive floor).
+    // FALSE-PASS GUARD: asserting only the chevron size (20dp since #1719) passes on
+    // the unfixed head — these assertions measure the header ROW bounds instead.
+    @Test
+    fun collapsedToggleableHeaderMeasuresTheSharedFortyFourDpFloor() {
+        val completedMessage = UiMessage(
+            id = "reasoning-floor",
+            role = "assistant",
+            content = "Completed trace step.",
+            timestamp = "2026-07-26T12:00:00Z",
+            isPending = false,
+            isReasoning = true,
+            latencyMs = 1450L,
+        )
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    MessageReasoning(
+                        message = completedMessage,
+                        isStreaming = false,
+                        collapsed = true,
+                        onToggleCollapsed = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ChatReasoningTestTags.Header)
+            .assertHeightIsAtLeast(44.dp)
+            .assertHeightIsEqualTo(44.dp)
+    }
+
+    @Test
+    fun collapsedReasoningHeaderMatchesRunDisclosureHeaderHeight() {
+        val completedMessage = UiMessage(
+            id = "reasoning-unified",
+            role = "assistant",
+            content = "Completed trace step.",
+            timestamp = "2026-07-26T12:00:00Z",
+            isPending = false,
+            isReasoning = true,
+            latencyMs = 1450L,
+        )
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    Column {
+                        MessageReasoning(
+                            message = completedMessage,
+                            isStreaming = false,
+                            collapsed = true,
+                            onToggleCollapsed = {},
+                        )
+                        RunActivityDisclosure(
+                            activity = RunActivityProjection(
+                                state = RunActivityState.Thought,
+                                durationMs = 2_400L,
+                                toolCount = 2,
+                                failureCount = 0,
+                            ),
+                            collapsed = true,
+                            onToggleCollapsed = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        val reasoningHeader = composeRule.onNodeWithTag(ChatReasoningTestTags.Header)
+            .fetchSemanticsNode().boundsInRoot
+        val disclosureHeader = composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
+            .fetchSemanticsNode().boundsInRoot
+        assertEquals(
+            "collapsed reasoning header must match the run disclosure header height",
+            disclosureHeader.height,
+            reasoningHeader.height,
+            1f,
+        )
+        // The reasoning header must keep rendering the SHARED DisclosureChevron
+        // (rotation/tint/a11y/default tag), not a hand-rolled Icon. The default
+        // tag resolves exactly once here: the disclosure chevron overrides it
+        // with RunActivityDisclosureTestTags.Chevron. Unmerged tree because the
+        // header Row sets semantics(mergeDescendants = true), which folds the
+        // child tag into the header node in the merged tree.
+        composeRule.onAllNodesWithTag(DisclosureChevronDefaults.TestTag, useUnmergedTree = true)
+            .assertCountEquals(1)
+    }
+
+    @Test
+    fun activeStreamingHeaderKeepsCompactContentHeightWithoutTheFloor() {
+        val activeMessage = UiMessage(
+            id = "reasoning-active-no-floor",
+            role = "assistant",
+            content = "",
+            timestamp = "2026-07-26T12:00:00Z",
+            isPending = true,
+            isReasoning = true,
+        )
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    MessageReasoning(
+                        message = activeMessage,
+                        isStreaming = true,
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        // No tap target on a live row, so the 44dp floor must NOT apply. At the test
+        // density the content header measures exactly 43dp, so the bound is <= 43dp:
+        // a leaked floor would measure 44dp and still fail, with no false-negative gap.
+        val activeHeader = composeRule.onNodeWithTag(ChatReasoningTestTags.Header)
+            .fetchSemanticsNode().boundsInRoot
+        val maxHeightPx = with(composeRule.density) { 43.dp.toPx() }
+        assertTrue(
+            "active (non-collapsible) header must stay content-height, was ${activeHeader.height}px",
+            activeHeader.height <= maxHeightPx,
+        )
     }
 
     private fun reasoningState(state: String, actionLabel: String?): SemanticsMatcher {
