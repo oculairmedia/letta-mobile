@@ -3,9 +3,7 @@
 package com.letta.mobile.ui.screens.projects
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -52,7 +50,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -72,6 +69,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.CardGroup
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ExpandableSearchField
@@ -573,11 +571,6 @@ private fun ProjectIssueCompletedTimelineCard(
     // letta-mobile: collapsed by default to match the tool-call card pattern
     // while keeping project-screen motion local to the app module.
     var expanded by rememberSaveable(items) { mutableStateOf(false) }
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = projectTimelineChipCrossfadeSpec,
-        label = "ProjectTimelineChevronRotation",
-    )
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -611,17 +604,13 @@ private fun ProjectIssueCompletedTimelineCard(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Icon(
-                        imageVector = LettaIcons.ExpandMore,
+                    DisclosureChevron(
+                        expanded = expanded,
                         contentDescription = if (expanded) {
                             stringResource(R.string.action_collapse)
                         } else {
                             stringResource(R.string.action_expand)
                         },
-                        modifier = Modifier
-                            .size(LettaDimens.Control.iconButtonSm)
-                            .rotate(chevronRotation),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -692,9 +681,6 @@ private fun ProjectIssueCompletedTimelineCard(
         }
     }
 }
-
-private val projectTimelineChipCrossfadeSpec =
-    tween<Float>(durationMillis = 150, easing = FastOutSlowInEasing)
 
 private fun projectTimelineExpandEnter() =
     fadeIn(animationSpec = tween(durationMillis = 190, easing = LinearOutSlowInEasing)) +
