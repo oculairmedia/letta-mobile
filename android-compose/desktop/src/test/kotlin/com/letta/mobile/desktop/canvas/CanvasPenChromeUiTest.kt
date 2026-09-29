@@ -2,6 +2,9 @@
 
 package com.letta.mobile.desktop.canvas
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -11,7 +14,10 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.ui.canvas.CanvasPenEvent
 import com.letta.mobile.ui.canvas.CanvasPenRegistry
+import com.letta.mobile.ui.canvas.CanvasPenTarget
+import com.letta.mobile.ui.canvas.DefaultPenTarget
 import com.letta.mobile.ui.canvas.LocalCanvasPenRegistry
+import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.canvas.CanvasPenTool
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import io.ak1.drawbox.domain.model.Mode
@@ -40,6 +46,40 @@ class CanvasPenChromeUiTest {
         )
     }
 
+    /** One open board, with the density and pen target the stroke helper has to share. */
+    private class PenBoard(
+        val session: CanvasSession,
+        val controller: DrawBoxController,
+        val registry: CanvasPenRegistry,
+    ) {
+        var density: Float = 1f
+        var penTarget: CanvasPenTarget = DefaultPenTarget
+    }
+
+    private fun ComposeUiTest.penBoard(): PenBoard {
+        val board = PenBoard(
+            session = session(),
+            controller = DrawBoxController(Reducer(UseCase())),
+            registry = CanvasPenRegistry(),
+        )
+        setContent {
+            board.density = LocalDensity.current.density
+            board.penTarget = LocalCanvasPenTarget.current
+            CompositionLocalProvider(LocalCanvasPenRegistry provides board.registry) {
+                CanvasWorkspace(session = board.session, controller = board.controller)
+            }
+        }
+        return board
+    }
+
+    /** The same board with the pen tool selected and a consumer registered. */
+    private fun ComposeUiTest.readyPen(): PenBoard {
+        val board = penBoard()
+        board.controller.setMode(Mode.PEN)
+        waitUntil(timeoutMillis = 5000) { board.registry.hasConsumer(board.penTarget) }
+        return board
+    }
+
     /**
      * One quick stroke, as the pen reports it: down, a move, up.
      *
@@ -64,96 +104,57 @@ class CanvasPenChromeUiTest {
 
     @Test
     fun theNoteIsWrittenInRatherThanDrawnOn() = runComposeUiTest {
-        val session = session()
-        val controller = DrawBoxController(Reducer(UseCase()))
-        val registry = CanvasPenRegistry()
-        var density = 1f
-        var penTarget: com.letta.mobile.ui.canvas.CanvasPenTarget = com.letta.mobile.ui.canvas.DefaultPenTarget
-        setContent {
-            density = androidx.compose.ui.platform.LocalDensity.current.density
-            penTarget = com.letta.mobile.ui.canvas.LocalCanvasPenTarget.current
-            androidx.compose.runtime.CompositionLocalProvider(LocalCanvasPenRegistry provides registry) {
-                CanvasWorkspace(session = session, controller = controller)
-            }
-        }
+        val board = penBoard()
 
         onNodeWithContentDescription("Add note").performClick()
-        waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
-        controller.setMode(Mode.PEN)
-        waitUntil(timeoutMillis = 5000) { controller.state.value.mode == Mode.PEN }
-        waitUntil(timeoutMillis = 5000) { registry.hasConsumer(penTarget) }
+        waitUntil(timeoutMillis = 5000) { board.session.documents().size == 1 }
+        board.controller.setMode(Mode.PEN)
+        waitUntil(timeoutMillis = 5000) { board.controller.state.value.mode == Mode.PEN }
+        waitUntil(timeoutMillis = 5000) { board.registry.hasConsumer(board.penTarget) }
 
-        val frame = session.documents().single().frame!!
-        val centreOfNote = controller.state.value.viewport.worldToScreen(
+        val frame = board.session.documents().single().frame!!
+        val centreOfNote = board.controller.state.value.viewport.worldToScreen(
             androidx.compose.ui.geometry.Offset(frame.x + frame.width / 2f, frame.y + frame.height / 2f),
         )
-        val elementsBefore = controller.state.value.elements.size
+        val elementsBefore = board.controller.state.value.elements.size
 
-        val takenOverNote = stroke(centreOfNote.x to centreOfNote.y, density, penTarget, registry)
+        val takenOverNote = stroke(centreOfNote.x to centreOfNote.y, board.density, board.penTarget, board.registry)
         waitForIdle()
 
         assertTrue(!takenOverNote, "the pen must decline a stroke that starts on a note")
         assertEquals(
             elementsBefore,
-            controller.state.value.elements.size,
+            board.controller.state.value.elements.size,
             "a stroke was drawn on the board underneath the note",
         )
     }
 
     @Test
     fun thePropertyPanelIsPressedRatherThanDrawnOn() = runComposeUiTest {
-        val session = session()
-        val controller = DrawBoxController(Reducer(UseCase()))
-        val registry = CanvasPenRegistry()
-        var density = 1f
-        var penTarget: com.letta.mobile.ui.canvas.CanvasPenTarget = com.letta.mobile.ui.canvas.DefaultPenTarget
-        setContent {
-            density = androidx.compose.ui.platform.LocalDensity.current.density
-            penTarget = com.letta.mobile.ui.canvas.LocalCanvasPenTarget.current
-            androidx.compose.runtime.CompositionLocalProvider(LocalCanvasPenRegistry provides registry) {
-                CanvasWorkspace(session = session, controller = controller)
-            }
-        }
-
-        controller.setMode(Mode.PEN)
-        waitUntil(timeoutMillis = 5000) { registry.hasConsumer(penTarget) }
+        val board = readyPen()
         onNodeWithContentDescription("Stroke color").performClick()
         waitUntil(timeoutMillis = 5000) {
             onAllNodesWithContentDescription("Property panel").fetchSemanticsNodes().isNotEmpty()
         }
         val panel = onNodeWithContentDescription("Property panel").fetchSemanticsNode().boundsInRoot
-        val elementsBefore = controller.state.value.elements.size
+        val elementsBefore = board.controller.state.value.elements.size
 
-        val taken = stroke(panel.center.x to panel.center.y, density, penTarget, registry)
+        val taken = stroke(panel.center.x to panel.center.y, board.density, board.penTarget, board.registry)
         waitForIdle()
 
         assertTrue(!taken, "the pen must decline a stroke that starts on the property panel")
-        assertEquals(elementsBefore, controller.state.value.elements.size, "a stroke was drawn through the property panel")
+        assertEquals(elementsBefore, board.controller.state.value.elements.size, "a stroke was drawn through the property panel")
     }
 
     @Test
     fun theOpenBoardStillDraws() = runComposeUiTest {
         // The other half of the same rule: excluding chrome must not cost the board its ink.
-        val session = session()
-        val controller = DrawBoxController(Reducer(UseCase()))
-        val registry = CanvasPenRegistry()
-        var density = 1f
-        var penTarget: com.letta.mobile.ui.canvas.CanvasPenTarget = com.letta.mobile.ui.canvas.DefaultPenTarget
-        setContent {
-            density = androidx.compose.ui.platform.LocalDensity.current.density
-            penTarget = com.letta.mobile.ui.canvas.LocalCanvasPenTarget.current
-            androidx.compose.runtime.CompositionLocalProvider(LocalCanvasPenRegistry provides registry) {
-                CanvasWorkspace(session = session, controller = controller)
-            }
-        }
-
-        controller.setMode(Mode.PEN)
-        waitUntil(timeoutMillis = 5000) { registry.hasConsumer(penTarget) }
-        val elementsBefore = controller.state.value.elements.size
+        val board = readyPen()
+        val elementsBefore = board.controller.state.value.elements.size
 
         // Far from the rail down the left and clear of the bars top and bottom.
-        stroke(600f to 400f, density, penTarget, registry)
+        stroke(600f to 400f, board.density, board.penTarget, board.registry)
 
-        waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size > elementsBefore }
+        waitUntil(timeoutMillis = 5000) { board.controller.state.value.elements.size > elementsBefore }
     }
 }
