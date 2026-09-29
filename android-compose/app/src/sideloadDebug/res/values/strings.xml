@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Variant-specific launcher label for sideload-debug (ca.oculair.meridian.dev).
+
+      All debug variants previously shared src/debug's app_name ("Meridian Dev").
+      Since the Play identity freeze (#1497) root-debug (com.letta.mobile.dev) and
+      sideload-debug (ca.oculair.meridian.dev) are separately-installed packages
+      that can coexist, which produced two visually identical "Meridian Dev"
+      launcher icons on the same device. Keep this distinct from root-debug's
+      "Meridian Dev" so the sideload build is recognizable at a glance.
+    -->
+    <string name="app_name">Meridian Sideload</string>
+</resources>
