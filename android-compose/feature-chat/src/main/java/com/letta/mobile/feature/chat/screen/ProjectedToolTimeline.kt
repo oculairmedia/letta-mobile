@@ -33,7 +33,9 @@ import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
+import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.CollapsibleStatusRow
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LiveStatusText
 import com.letta.mobile.ui.components.StatusTimeline
 import com.letta.mobile.ui.components.StatusTimelineItem
@@ -290,11 +292,10 @@ private fun ToolRunSummaryRow(
             color = color,
             modifier = Modifier.weight(1f),
         )
-        Icon(
-            imageVector = LettaIcons.ExpandMore,
+        DisclosureChevron(
+            expanded = false,
+            indicates = ChevronIndication.Sheet,
             contentDescription = "Open command details",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }
