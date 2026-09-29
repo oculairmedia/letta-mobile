@@ -48,8 +48,10 @@ import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
@@ -1030,6 +1032,7 @@ fun CanvasWorkspace(
         LocalCanvasDocumentRecorder provides documentRecorder,
         LocalCanvasFocusRequest provides focusRequest,
         LocalCanvasCompact provides compact,
+        LocalCanvasChromeRegions provides chromeRegions,
     ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -1048,7 +1051,10 @@ fun CanvasWorkspace(
                     val first = drops.firstOrNull() ?: return@imageDragAndDropTarget
                     placeImages(drops.map { it.bytes }, controller.state.value.viewport.screenToWorld(first.dropPositionScreen))
                 }
-                .onGloballyPositioned { boardBounds = it.boundsInRoot() }
+                .onGloballyPositioned {
+                    boardBounds = it.boundsInRoot()
+                    chromeRegions.sceneRootInWindow = it.findRootCoordinates().positionInWindow()
+                }
                 .pointerInput(controller) {
                     awaitPointerEventScope {
                         while (true) {

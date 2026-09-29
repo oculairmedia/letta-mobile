@@ -2,6 +2,7 @@
 
 package com.letta.mobile.desktop.canvas
 
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -97,6 +98,37 @@ class CanvasPenChromeUiTest {
             controller.state.value.elements.size,
             "a stroke was drawn on the board underneath the note",
         )
+    }
+
+    @Test
+    fun thePropertyPanelIsPressedRatherThanDrawnOn() = runComposeUiTest {
+        val session = session()
+        val controller = DrawBoxController(Reducer(UseCase()))
+        val registry = CanvasPenRegistry()
+        var density = 1f
+        var penTarget: com.letta.mobile.ui.canvas.CanvasPenTarget = com.letta.mobile.ui.canvas.DefaultPenTarget
+        setContent {
+            density = androidx.compose.ui.platform.LocalDensity.current.density
+            penTarget = com.letta.mobile.ui.canvas.LocalCanvasPenTarget.current
+            androidx.compose.runtime.CompositionLocalProvider(LocalCanvasPenRegistry provides registry) {
+                CanvasWorkspace(session = session, controller = controller)
+            }
+        }
+
+        controller.setMode(Mode.PEN)
+        waitUntil(timeoutMillis = 5000) { registry.hasConsumer(penTarget) }
+        onNodeWithContentDescription("Stroke color").performClick()
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodesWithContentDescription("Property panel").fetchSemanticsNodes().isNotEmpty()
+        }
+        val panel = onNodeWithContentDescription("Property panel").fetchSemanticsNode().boundsInRoot
+        val elementsBefore = controller.state.value.elements.size
+
+        val taken = stroke(panel.center.x to panel.center.y, density, penTarget, registry)
+        waitForIdle()
+
+        assertTrue(!taken, "the pen must decline a stroke that starts on the property panel")
+        assertEquals(elementsBefore, controller.state.value.elements.size, "a stroke was drawn through the property panel")
     }
 
     @Test

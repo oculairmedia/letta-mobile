@@ -38,6 +38,7 @@ import kotlin.math.roundToInt
  */
 internal class DesktopTouchDragExclusionRegistry<K : Any> {
     private val bounds: MutableMap<K, Rectangle> = Collections.synchronizedMap(WeakHashMap())
+    private val overlays: MutableMap<K, MutableMap<Any, Rectangle>> = Collections.synchronizedMap(WeakHashMap())
 
     /** Publishes the excluded region for [key], or clears it when [screenBounds] is null. */
     fun publish(key: K, screenBounds: Rectangle?) {
@@ -49,13 +50,31 @@ internal class DesktopTouchDragExclusionRegistry<K : Any> {
     }
 
     /**
+     * Publishes one more excluded region for [key], beside [publish].
+     *
+     * The title bar owns [publish]. A menu that opens over the page needs its own rectangle,
+     * or a finger drag on a slider is swallowed as scrolling and the title bar loses its
+     * exclusion the moment the menu publishes.
+     */
+    fun publishOverlay(key: K, id: Any, screenBounds: Rectangle?) {
+        synchronized(overlays) {
+            val regions = overlays.getOrPut(key) { mutableMapOf() }
+            if (screenBounds == null) regions.remove(id) else regions[id] = screenBounds
+        }
+    }
+
+    /**
      * True when ([screenX], [screenY]) falls inside [key]'s published region.
      * A window this registry has never heard from — or one whose publisher
      * hasn't composed yet — degrades to "not excluded" rather than throwing,
      * so a lookup miss never blocks a legitimate scroll.
      */
-    fun contains(key: K, screenX: Int, screenY: Int): Boolean =
-        bounds[key]?.contains(screenX, screenY) ?: false
+    fun contains(key: K, screenX: Int, screenY: Int): Boolean {
+        if (bounds[key]?.contains(screenX, screenY) == true) return true
+        synchronized(overlays) {
+            return overlays[key]?.values?.any { it.contains(screenX, screenY) } == true
+        }
+    }
 }
 
 /** Process-wide registry shared by the title bar (publisher) and the touch shim (reader). */

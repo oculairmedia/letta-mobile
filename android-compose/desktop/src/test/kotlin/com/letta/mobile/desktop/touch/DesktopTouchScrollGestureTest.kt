@@ -382,6 +382,22 @@ class DesktopTouchScrollGestureTest {
     }
 
     @Test
+    fun `an overlay rect is excluded without replacing the title bar`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        registry.publish(window, java.awt.Rectangle(0, 0, 400, 40))
+        registry.publishOverlay(window, "menu", java.awt.Rectangle(80, 120, 200, 300))
+
+        assertTrue(registry.contains(window, screenX = 10, screenY = 10))
+        assertTrue(registry.contains(window, screenX = 100, screenY = 200))
+        assertFalse(registry.contains(window, screenX = 10, screenY = 200))
+
+        registry.publishOverlay(window, "menu", null)
+        assertTrue(registry.contains(window, screenX = 10, screenY = 10))
+        assertFalse(registry.contains(window, screenX = 100, screenY = 200))
+    }
+
+    @Test
     fun `clearing the published bounds degrades back to not excluded`() {
         val registry = DesktopTouchDragExclusionRegistry<Any>()
         val window = Any()

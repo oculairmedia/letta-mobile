@@ -187,7 +187,10 @@ private fun CanvasPropertyPanel(
         shape = RoundedCornerShape(LettaDimens.Radius.lg),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shadowElevation = LettaDimens.Space.sm,
-        modifier = Modifier.semantics { contentDescription = "Property panel" },
+        modifier = Modifier
+            .semantics { contentDescription = "Property panel" }
+            .canvasChrome(LocalCanvasChromeRegions.current)
+            .passthroughPointerRegion("canvas-property-panel"),
     ) {
         Column(
             modifier = Modifier

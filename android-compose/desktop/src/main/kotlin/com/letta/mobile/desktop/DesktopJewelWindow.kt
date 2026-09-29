@@ -26,6 +26,8 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
+import com.letta.mobile.ui.canvas.LocalScreenRegionPublisher
+import com.letta.mobile.ui.canvas.ScreenRegionPublisher
 import com.letta.mobile.ui.components.LocalMenuActionScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -392,9 +394,23 @@ internal fun DesktopJewelWindow(
                     // The window's own scope runs what a menu item chose: a popup is dismissed by
                     // being removed, so the action cannot belong to the popup.
                     val windowScope = rememberCoroutineScope()
+                    val dragPassthrough = remember(window) {
+                        ScreenRegionPublisher { id, region ->
+                            val rect = region?.let {
+                                screenExclusionRectOrNull(
+                                    it.left,
+                                    it.top,
+                                    kotlin.math.round(it.width).toInt(),
+                                    kotlin.math.round(it.height).toInt(),
+                                )
+                            }
+                            DesktopTouchDragExclusion.publishOverlay(window, id, rect)
+                        }
+                    }
                     CompositionLocalProvider(
                         LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
                         com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
+                        LocalScreenRegionPublisher provides dragPassthrough,
                         LocalMenuActionScope provides windowScope,
                     ) {
                         content()

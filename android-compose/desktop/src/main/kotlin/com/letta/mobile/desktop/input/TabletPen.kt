@@ -25,6 +25,7 @@ internal class TabletPen(
     private val connection = TabletPenConnection(window)
     private val awtMapper = TabletPenAwtMapper()
     private val _pressure = MutableStateFlow(TabletBridge.NO_PRESSURE)
+    private var windowLocation: java.awt.Point? = null
 
     val pressure: StateFlow<Float> = _pressure
     val connected: Boolean get() = connection.isConnected
@@ -82,6 +83,10 @@ internal class TabletPen(
         val scale = runCatching {
             target.graphicsConfiguration?.defaultTransform?.scaleX?.takeIf { it > 0.0 } ?: 1.0
         }.getOrDefault(1.0)
+        val windowMoved = windowMoved()
+        // A drag repositions the window under a pointer that is still down. Releasing the
+        // synthetic button here keeps that drag from continuing into the page.
+        if (windowMoved) awtMapper.releaseIfDown(target)
         var index = 0
         while (index + TabletBridge.STRIDE <= events.size) {
             val sample = TabletPenDecoder.decodeSample(events, index, scale)
@@ -89,8 +94,25 @@ internal class TabletPen(
             if (sample.force != TabletBridge.NO_PRESSURE) _pressure.value = sample.force
 
             if (offerToCanvas(sample)) continue
-            awtMapper.dispatch(target, sample, scale)
+            if (penSampleMirrorsToMouse(sample.tool, windowMoved)) {
+                awtMapper.dispatch(target, sample, scale)
+            }
         }
+    }
+
+    /**
+     * True when this window's screen position changed since the previous batch.
+     *
+     * Dragging the window onto another display moves it under the pen. Samples from that
+     * interval are still valid for a canvas stroke, but mirroring them as mouse input paints
+     * presses into whichever control slid underneath.
+     */
+    private fun windowMoved(): Boolean {
+        val location = runCatching { window.takeIf { it.isShowing }?.locationOnScreen }.getOrNull()
+            ?: return false
+        val moved = windowLocation != null && windowLocation != location
+        windowLocation = location
+        return moved
     }
 
     private fun offerToCanvas(sample: TabletPenDecoder.DecodedSample): Boolean {
@@ -118,3 +140,14 @@ internal class TabletPen(
 }
 
 internal data class WindowPenTarget(val window: Window) : CanvasPenTarget
+
+/**
+ * Whether a tablet sample should also be posted as a mouse event.
+ *
+ * A real pen still needs that path: AWT has no stylus, so buttons and text would ignore it.
+ * An emulated tool is the system mouse, which AWT already delivered. A sample that arrives
+ * while the window is moving is the same pointer sliding across the page underneath the drag.
+ * Mirroring either one is a second touch.
+ */
+internal fun penSampleMirrorsToMouse(tool: Int, windowMoved: Boolean): Boolean =
+    tool != TabletBridge.TOOL_EMULATED && !windowMoved
