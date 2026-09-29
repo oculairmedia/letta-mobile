@@ -8,7 +8,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -47,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -68,6 +66,8 @@ import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.components.ChevronEmphasis
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LocalChatFontScale
@@ -274,13 +274,9 @@ private fun SubagentCompletedSummaryRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Icon(
-            imageVector = LettaIcons.ExpandMore,
+        DisclosureChevron(
+            expanded = expanded,
             contentDescription = disclosure,
-            modifier = Modifier
-                .size(LettaDimens.Control.icon)
-                .rotate(if (expanded) 180f else 0f),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -404,13 +400,10 @@ private fun SubagentNotificationActions(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Icon(
-                    imageVector = LettaIcons.ExpandMore,
+                DisclosureChevron(
+                    expanded = expanded,
+                    emphasis = ChevronEmphasis.Emphasized,
                     contentDescription = disclosure,
-                    modifier = Modifier
-                        .size(LettaDimens.Control.icon)
-                        .rotate(if (expanded) 180f else 0f),
-                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -505,13 +498,10 @@ internal fun SubagentDispatchCard(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(
-                    imageVector = LettaIcons.ExpandMore,
+                DisclosureChevron(
+                    expanded = expanded,
+                    emphasis = ChevronEmphasis.Emphasized,
                     contentDescription = if (expanded) "Hide prompt" else "Show prompt",
-                    modifier = Modifier
-                        .size(LettaDimens.Control.icon)
-                        .rotate(if (expanded) 180f else 0f),
-                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
             AnimatedVisibility(visible = expanded) {
@@ -1097,11 +1087,6 @@ private fun ToolCallExpandedBodyContentInner(
                 // config change (rotation, process death) preserves the
                 // user's current expand/collapse choice.
                 var resultExpanded by rememberSaveable(toolCall.toolCallId) { mutableStateOf(false) }
-                val resultChevronRotation by animateFloatAsState(
-                    targetValue = if (resultExpanded) 180f else 0f,
-                    animationSpec = ChatMotion.chipCrossfadeSpec,
-                    label = "ToolOutputChevronRotation",
-                )
                 Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                 Row(
                     modifier = Modifier
@@ -1131,13 +1116,9 @@ private fun ToolCallExpandedBodyContentInner(
                         )
                         Spacer(modifier = Modifier.width(LettaDimens.Space.xs))
                     }
-                    Icon(
-                        imageVector = LettaIcons.ExpandMore,
+                    DisclosureChevron(
+                        expanded = resultExpanded,
                         contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
-                        modifier = Modifier
-                            .size(LettaDimens.Control.icon)
-                            .rotate(resultChevronRotation),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
                     )
                 }
                 ToolOutputRenderer(
