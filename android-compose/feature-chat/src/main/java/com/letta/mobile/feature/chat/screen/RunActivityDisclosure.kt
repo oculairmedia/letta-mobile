@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -40,6 +41,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 internal object RunActivityDisclosureTestTags {
     const val Header = "run-activity-disclosure"
     const val WorkingIndicator = "run-activity-working-indicator"
+    const val Chevron = "run-activity-disclosure-chevron"
 }
 
 @Composable
@@ -86,11 +88,6 @@ internal fun RunActivityDisclosure(
     ) {
         if (activity.isActive) {
             WorkingIndicator()
-        } else if (collapsible) {
-            DisclosureChevron(
-                expanded = !collapsed,
-                compact = isSimpleMode,
-            )
         }
         val titleColor = if (activity.isActive) {
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f)
@@ -101,6 +98,19 @@ internal fun RunActivityDisclosure(
             Text(text = title, style = textStyle, color = titleColor)
         }
         ActivityCounts(activity, isSimpleMode = isSimpleMode)
+        if (canToggle) {
+            // Trailing chevron: the same disclosure grammar as every other
+            // expandable timeline row (thought blocks, tool cards, projected
+            // tool rows). The leading position made run disclosures the one
+            // outlier when both row kinds rendered together (product
+            // feedback, 2026-09-28).
+            Spacer(Modifier.weight(1f))
+            DisclosureChevron(
+                expanded = !collapsed,
+                compact = isSimpleMode,
+                modifier = Modifier.testTag(RunActivityDisclosureTestTags.Chevron),
+            )
+        }
     }
 }
 
