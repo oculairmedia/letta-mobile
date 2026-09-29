@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
@@ -31,6 +30,9 @@ import com.letta.mobile.data.memory.MemoryParityAgentOption
 import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.memory.MemorySummaryMetric
 import com.letta.mobile.data.memory.graph.MemoryPageActions
+import com.letta.mobile.ui.components.ChevronEmphasis
+import com.letta.mobile.ui.components.ChevronIndication
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
@@ -97,7 +99,12 @@ private fun MemoryAgentPicker(
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.widthIn(max = LettaDimens.Pane.sidePanelWidth)) {
             Text(selected.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            Icon(LettaIcons.ExpandMore, contentDescription = "Choose agent", modifier = Modifier.size(LettaDimens.Control.icon))
+            DisclosureChevron(
+                expanded = false,
+                emphasis = ChevronEmphasis.Emphasized,
+                indicates = ChevronIndication.Sheet,
+                contentDescription = "Choose agent",
+            )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             agents.forEach { agent ->

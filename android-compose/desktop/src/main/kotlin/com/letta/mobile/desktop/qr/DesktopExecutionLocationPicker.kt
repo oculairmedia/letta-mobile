@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.controller.node.iroh.PairedPeer
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.desktop.DesktopMaterialTheme
 import com.letta.mobile.desktop.DesktopSelectableChip
 import com.letta.mobile.ui.theme.LettaDimens
@@ -131,12 +130,7 @@ private fun CollapsedChip(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Icon(
-                imageVector = if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Control.icon),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            DisclosureChevron(expanded = expanded)
         }
     }
 }
