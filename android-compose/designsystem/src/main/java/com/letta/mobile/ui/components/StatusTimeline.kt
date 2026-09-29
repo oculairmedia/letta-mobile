@@ -450,6 +450,8 @@ fun StatusTimelineItem(
  * Scope for constructing timeline items inside [StatusTimeline].
  */
 interface StatusTimelineScope {
+    // Compose item keys are heterogeneous identities, the same contract as LazyList.
+    @Suppress("NoAnyType")
     fun item(
         key: Any? = null,
         content: @Composable (isFirst: Boolean, isLast: Boolean) -> Unit,
@@ -457,8 +459,10 @@ interface StatusTimelineScope {
 }
 
 private class StatusTimelineScopeImpl : StatusTimelineScope {
+    @Suppress("NoAnyType")
     val items = mutableListOf<Pair<Any?, @Composable (isFirst: Boolean, isLast: Boolean) -> Unit>>()
 
+    @Suppress("NoAnyType")
     override fun item(
         key: Any?,
         content: @Composable (isFirst: Boolean, isLast: Boolean) -> Unit,
@@ -471,6 +475,7 @@ private class StatusTimelineScopeImpl : StatusTimelineScope {
  * Domain-neutral vertical container for structured timeline items.
  */
 @Composable
+@Suppress("NoAnyType") // Compose item keys are heterogeneous identities, the same contract as LazyList.
 fun <T> StatusTimeline(
     items: List<T>,
     modifier: Modifier = Modifier,
