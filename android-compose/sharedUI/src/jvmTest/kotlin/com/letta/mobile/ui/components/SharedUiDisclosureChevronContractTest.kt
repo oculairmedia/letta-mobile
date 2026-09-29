@@ -14,19 +14,15 @@ import kotlin.test.assertTrue
  * No production source in sharedUI renders a disclosure-role Icon directly
  * outside [DisclosureChevron.kt].
  *
- * Temporary allowlist entries will be retired when child .4 lands.
+ * The temporary allowlist is empty after letta-mobile-eohab.4.
  */
 class SharedUiDisclosureChevronContractTest {
 
     companion object {
         /**
-         * Temporary allowlist for files to be migrated in letta-mobile-eohab.4.
-         * Must be empty once .4 merges.
+         * Kept as an explicit empty set so a reintroduced bypass fails this gate.
          */
-        val TEMPORARY_ALLOWLIST = setOf(
-            "AgentMessageProvenanceLabel.kt",
-            "MemoryPageChrome.kt",
-        )
+        val TEMPORARY_ALLOWLIST = emptySet<String>()
 
         private val LEGACY_ICON_PATTERN = Regex(
             """Icon\s*\(.*?(LettaIcons\.(ExpandMore|ExpandLess|ChevronDown|ChevronUp)|Lucide\.(ChevronDown|ChevronUp)|Icons\.[A-Za-z0-9_]+\.Expand)""",
@@ -89,25 +85,11 @@ class SharedUiDisclosureChevronContractTest {
     }
 
     @Test
-    fun `allowlist entries are valid and currently contain legacy patterns`() {
-        val sharedUiDir = locateSharedUiDir()
-        val commonMain = sharedUiDir.resolve("src/commonMain/kotlin")
-
-        TEMPORARY_ALLOWLIST.forEach { fileName ->
-            var found = false
-            Files.walk(commonMain).use { stream ->
-                stream.filter { it.isRegularFile() && it.name == fileName }
-                    .forEach { file ->
-                        found = true
-                        val violations = findViolationsInSource(file.readText())
-                        assertTrue(
-                            violations.isNotEmpty(),
-                            "Allowlist entry $fileName does not contain any legacy icon pattern. Stale allowlist entry must be removed!",
-                        )
-                    }
-            }
-            assertTrue(found, "Allowlist file $fileName not found under $commonMain")
-        }
+    fun `sharedUI disclosure allowlist is empty`() {
+        assertTrue(
+            TEMPORARY_ALLOWLIST.isEmpty(),
+            "TEMPORARY_ALLOWLIST must stay empty after letta-mobile-eohab.4. Remaining: $TEMPORARY_ALLOWLIST",
+        )
     }
 
     @Test

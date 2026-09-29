@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,14 +23,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ChevronDown
-import com.composables.icons.lucide.ChevronUp
-import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.AgentMessageDirection
 import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.messaging.agentMessageDisplayLabel
 import com.letta.mobile.data.messaging.displayLabel
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -157,7 +154,14 @@ private fun AgentMessageProvenanceHeader(
     ) {
         AgentRoute(provenance, spec, tint, onAgentClick)
         DeliveryState(provenance.deliveryState, spec.isFailed)
-        ExpansionIcon(expanded)
+        DisclosureChevron(
+            expanded = expanded,
+            contentDescription = if (expanded) {
+                "Collapse agent message details"
+            } else {
+                "Expand agent message details"
+            },
+        )
     }
 }
 
@@ -205,16 +209,6 @@ private fun DeliveryState(state: AgentMessageDeliveryState, isFailed: Boolean) {
         text = state.displayLabel(),
         style = MaterialTheme.typography.labelSmall,
         color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
-private fun ExpansionIcon(expanded: Boolean) {
-    Icon(
-        imageVector = if (expanded) Lucide.ChevronUp else Lucide.ChevronDown,
-        contentDescription = if (expanded) "Collapse agent message details" else "Expand agent message details",
-        modifier = Modifier.padding(0.dp),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
