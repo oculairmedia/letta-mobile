@@ -120,6 +120,8 @@ private fun QuickCreateTarget(
         modifier = Modifier
             .size(if (compact) TOUCH_TARGET else TARGET)
             .canvasChrome(chromeRegions)
+            // Pulling a shape out of the target is a drag; a desktop finger on it would scroll.
+            .passthroughPointerRegion("canvas-quick-create-${direction.name}")
             .semantics { contentDescription = "Add ${direction.label}" }
             .then(pull),
     ) {

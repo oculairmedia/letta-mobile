@@ -40,6 +40,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
+import kotlinx.coroutines.Job
+import io.ak1.drawbox.domain.model.Intent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -148,6 +152,8 @@ fun CanvasWorkspace(
     // controller.state, notes came from a list captured before they existed.
     val liveDocuments by rememberUpdatedState(documents)
     val coroutineScope = rememberCoroutineScope()
+    // Whether the press DrawBox is picking for came from a finger, which needs a wider target.
+    val fingerRecency = remember { CanvasFingerRecency() }
 
     var statusMessage by remember { mutableStateOf("Ready") }
     var initialLoadDone by remember { mutableStateOf(false) }
@@ -1073,6 +1079,7 @@ fun CanvasWorkspace(
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
                 additiveTaps = compact && multiSelecting,
+                pickTolerance = { fingerRecency.pickTolerance(System.currentTimeMillis()) },
                 // Gestures read the controller's state as it is now, not as of the last frame, so
                 // anything the board dispatches during a press is already seen by that press.
                 liveState = { controller.state.value },
@@ -1264,6 +1271,7 @@ fun CanvasWorkspace(
                         penDensity = penDensity,
                         penPreview = penPreview,
                         onEraseArea = { eraseNotesAt(it) },
+                        onDoubleTapText = { openTextIn(it) },
                     ),
                 )
             }
@@ -1283,14 +1291,71 @@ fun CanvasWorkspace(
             touchBinding.chrome = chromeRegions
             touchBinding.pan = { delta -> controller.panBy(delta) }
             touchBinding.zoom = { factor, focal -> controller.zoomBy(factor, focal) }
+            touchBinding.animateZoom = { factor, focal ->
+                coroutineScope.launch {
+                    var applied = 1f
+                    animate(1f, factor, animationSpec = tween(DOUBLE_TAP_ZOOM_MILLIS)) { value, _ ->
+                        controller.zoomBy(value / applied, focal)
+                        applied = value
+                    }
+                }
+            }
+            // A double tap on a shape or text types into it, and the touch keyboard follows the
+            // finger that asked. Open board has nothing to type into, so it zooms instead.
+            touchBinding.doubleTap = { at ->
+                val now = controller.state.value
+                val tolerance = FINGER_PICK_TOLERANCE.value * penDensity / now.viewport.scale
+                val hit = io.ak1.drawbox.domain.model.topmostHit(
+                    now.elements,
+                    now.viewport.screenToWorld(at),
+                    tolerance,
+                    now.selectInsideHollowShapes,
+                )
+                val typeable = CanvasWorkspaceSupport.holdsText(hit)
+                if (hit != null && typeable) openTextIn(hit)
+                typeable
+            }
+            touchBinding.longPress = { at ->
+                val now = controller.state.value
+                val tolerance = FINGER_PICK_TOLERANCE.value * penDensity / now.viewport.scale
+                controller.onIntent(Intent.SelectAt(now.viewport.screenToWorld(at), tolerance, additive = true))
+            }
+            touchBinding.marquee = { from, to, commit ->
+                val viewport = controller.state.value.viewport
+                val rect = to?.let { boxOf(viewport.screenToWorld(from), viewport.screenToWorld(it)) }
+                when {
+                    rect == null -> controller.onIntent(Intent.SetMarqueeRect(null))
+                    commit -> controller.onIntent(Intent.CommitMarquee(rect))
+                    else -> controller.onIntent(Intent.SetMarqueeRect(rect))
+                }
+            }
             val boardFling = remember(coroutineScope) { PanFling(coroutineScope) { delta -> touchBinding.pan(delta) } }
             DisposableEffect(boardTouch, penTarget, fingerGesture) {
+                var longPressTimer: Job? = null
                 val disposeTouch = boardTouch.register(penTarget) { sample ->
+                    fingerRecency.touched(System.currentTimeMillis())
                     val outcome = fingerGesture.offer(sample.contact, sample.phase, sample.x, sample.y, touchBinding.hits(sample.x, sample.y))
                     touchBinding.apply(outcome.effects, boardFling, System.currentTimeMillis())
+                    // A finger held still sends nothing more, so the long press is timed here.
+                    when (sample.phase) {
+                        CanvasBoardTouchSample.Phase.DOWN -> {
+                            longPressTimer?.cancel()
+                            longPressTimer = coroutineScope.launch {
+                                while (fingerGesture.mayLongPress()) {
+                                    delay(LONG_PRESS_POLL_MILLIS)
+                                    val held = fingerGesture.longPress() ?: continue
+                                    touchBinding.apply(held, boardFling, System.currentTimeMillis())
+                                    break
+                                }
+                            }
+                        }
+                        CanvasBoardTouchSample.Phase.MOVE -> Unit
+                        else -> if (!fingerGesture.mayLongPress()) longPressTimer?.cancel()
+                    }
                     outcome.result
                 }
                 onDispose {
+                    longPressTimer?.cancel()
                     disposeTouch()
                     boardFling.stop()
                 }

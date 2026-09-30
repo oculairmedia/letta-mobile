@@ -41,6 +41,7 @@ import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
 import com.letta.mobile.desktop.touch.LocalDesktopWindow
+import com.letta.mobile.desktop.touch.composeScreenRectOrNull
 import com.letta.mobile.desktop.touch.screenExclusionRectOrNull
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
@@ -253,6 +254,7 @@ internal fun DesktopJewelWindow(
                         onDispose { DesktopTouchDragExclusion.publish(window, null) }
                     }
                     val titleBarHeightPx = with(LocalDensity.current) { TitleBarHeight.roundToPx() }
+                    val titleBarDensity = LocalDensity.current.density
                     BasicTitleBar(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
@@ -266,6 +268,7 @@ internal fun DesktopJewelWindow(
                                         coordinates = coordinates,
                                         windowOriginOnScreen = runCatching { window.locationOnScreen }.getOrNull(),
                                         titleBarHeightPx = titleBarHeightPx,
+                                        density = titleBarDensity,
                                     )
                                     DesktopTouchDragExclusion.publish(window, bounds)
                                 },
@@ -396,15 +399,11 @@ internal fun DesktopJewelWindow(
                     // The window's own scope runs what a menu item chose: a popup is dismissed by
                     // being removed, so the action cannot belong to the popup.
                     val windowScope = rememberCoroutineScope()
-                    val dragPassthrough = remember(window) {
+                    val passthroughDensity = LocalDensity.current.density
+                    val dragPassthrough = remember(window, passthroughDensity) {
                         ScreenRegionPublisher { id, region ->
                             val rect = region?.let {
-                                screenExclusionRectOrNull(
-                                    it.left,
-                                    it.top,
-                                    kotlin.math.round(it.width).toInt(),
-                                    kotlin.math.round(it.height).toInt(),
-                                )
+                                composeScreenRectOrNull(it.left, it.top, it.width, it.height, passthroughDensity)
                             }
                             DesktopTouchDragExclusion.publishOverlay(window, id, rect)
                         }
@@ -443,8 +442,17 @@ private fun titleBarScreenBoundsOrNull(
     coordinates: LayoutCoordinates,
     windowOriginOnScreen: java.awt.Point?,
     titleBarHeightPx: Int,
+    density: Float,
 ): Rectangle? {
     val topLeft = coordinates.positionOnScreen()
-    val y = windowOriginOnScreen?.y?.toFloat() ?: topLeft.y
-    return screenExclusionRectOrNull(topLeft.x, y, coordinates.size.width, titleBarHeightPx)
+    val rect = composeScreenRectOrNull(
+        topLeft.x,
+        topLeft.y,
+        coordinates.size.width.toFloat(),
+        titleBarHeightPx.toFloat(),
+        density,
+    ) ?: return null
+    // The window origin is already an AWT point, so it is not scaled again.
+    windowOriginOnScreen?.let { rect.y = it.y }
+    return rect
 }

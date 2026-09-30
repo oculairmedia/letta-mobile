@@ -487,6 +487,18 @@ class DesktopTouchScrollGestureTest {
     }
 
     @Test
+    fun `a panel Compose measured in pixels is published in the AWT points a finger is checked in`() {
+        // At 200% a tool menu at AWT (600, 300) sized 200x400 is (1200, 600) 400x800 in Compose.
+        val rect = assertNotNull(composeScreenRectOrNull(1200f, 600f, 400f, 800f, density = 2f))
+        assertEquals(java.awt.Rectangle(600, 300, 200, 400), rect)
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        registry.publishOverlay(window, "menu", rect)
+        assertTrue(registry.containsOverlay(window, 700, 500))
+        assertFalse(registry.containsOverlay(window, 1300, 700))
+    }
+
+    @Test
     fun `publishing a NaN-derived bounds never throws and leaves the window not excluded`() {
         val registry = DesktopTouchDragExclusionRegistry<Any>()
         val window = Any()

@@ -7,6 +7,7 @@ import com.letta.mobile.desktop.input.keepsFingerOwnership
 import com.letta.mobile.desktop.input.penDownWaitsForPose
 import java.awt.Frame
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -34,17 +35,30 @@ class DesktopPointerTouchTest {
     @Test
     fun aListScrollThatSlidesOntoThePanelDoesNotStop() {
         val latch = FingerControlLatch()
-        assertFalse(latch.owns(TabletBridge.KIND_DOWN, pressedOnControl = false))
-        assertFalse(latch.owns(TabletBridge.KIND_MOVE, pressedOnControl = true))
-        assertFalse(latch.owns(TabletBridge.KIND_UP, pressedOnControl = true))
+        assertFalse(latch.owns(TabletBridge.KIND_DOWN) { true })
+        assertFalse(latch.owns(TabletBridge.KIND_MOVE) { false })
+        assertFalse(latch.owns(TabletBridge.KIND_MOVE) { true })
+        assertFalse(latch.owns(TabletBridge.KIND_UP) { true })
     }
 
     @Test
     fun aSliderDragStaysWithTheSliderAfterTheFingerSlidesOffIt() {
         val latch = FingerControlLatch()
-        assertTrue(latch.owns(TabletBridge.KIND_DOWN, pressedOnControl = true))
-        assertTrue(latch.owns(TabletBridge.KIND_MOVE, pressedOnControl = false))
-        assertTrue(latch.owns(TabletBridge.KIND_UP, pressedOnControl = false))
+        assertFalse(latch.owns(TabletBridge.KIND_DOWN) { false })
+        assertTrue(latch.owns(TabletBridge.KIND_MOVE) { true })
+        assertTrue(latch.owns(TabletBridge.KIND_MOVE) { false })
+        assertTrue(latch.owns(TabletBridge.KIND_UP) { false })
+    }
+
+    @Test
+    fun theStaleDownPoseDoesNotDecideWhetherTheFingerIsOnTheSlider() {
+        val latch = FingerControlLatch()
+        var asked = 0
+        // The down sample is the previous pose. Only the first placed move is asked.
+        latch.owns(TabletBridge.KIND_DOWN) { asked++; false }
+        assertEquals(0, asked)
+        assertTrue(latch.owns(TabletBridge.KIND_MOVE) { asked++; true })
+        assertEquals(1, asked)
     }
 
     @Test

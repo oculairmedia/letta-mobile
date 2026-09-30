@@ -6,6 +6,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.platform.LocalDensity
 import java.awt.Window
 
 /** The AWT window the current composition is drawn in, when one exists. */
@@ -18,6 +19,7 @@ internal val LocalDesktopWindow = compositionLocalOf<Window?> { null }
 @Composable
 internal fun Modifier.fingerPressesAsClicks(id: String): Modifier {
     val window = LocalDesktopWindow.current ?: return this
+    val density = LocalDensity.current.density
     DisposableEffect(window, id) {
         onDispose { DesktopTouchInteractive.publishOverlay(window, id, null) }
     }
@@ -27,7 +29,7 @@ internal fun Modifier.fingerPressesAsClicks(id: String): Modifier {
         DesktopTouchInteractive.publishOverlay(
             window,
             id,
-            screenExclusionRectOrNull(origin.x, origin.y, size.width, size.height),
+            composeScreenRectOrNull(origin.x, origin.y, size.width.toFloat(), size.height.toFloat(), density),
         )
     }
 }

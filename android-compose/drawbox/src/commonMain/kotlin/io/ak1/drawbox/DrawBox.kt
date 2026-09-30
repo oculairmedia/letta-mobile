@@ -219,8 +219,15 @@ fun DrawBox(
     hiddenTextElementIds: Set<String> = emptySet(),
     /** Taps in the select tool toggle elements in and out of the selection instead of replacing it. */
     additiveTaps: Boolean = false,
+    /**
+     * How far from an element a press or tap still picks it, read at the moment of the press.
+     * A host that knows the press came from a finger widens it: a thin line is a few pixels
+     * wide and a fingertip is not. Null keeps the default 12dp.
+     */
+    pickTolerance: (() -> Dp)? = null,
 ) {
     val additiveTapsNow by rememberUpdatedState(additiveTaps)
+    val pickToleranceNow by rememberUpdatedState(pickTolerance)
     // Two-layer split:
     //   - finalizedLayer: cached display list of "static" elements (everything not
     //     currently being mutated). Re-recorded only when the static set OR the
@@ -320,7 +327,8 @@ fun DrawBox(
     // so a captured value would hit-test the chrome where it used to be drawn.
     val handleHitPx by rememberUpdatedState(with(density) { selectionStyle.hitRadius.toPx() })
     val rotationOffsetPx by rememberUpdatedState(with(density) { selectionStyle.rotationOffset.toPx() })
-    val pickTolerancePx by rememberUpdatedState(with(density) { 12.dp.toPx() })
+    val densityNow by rememberUpdatedState(density)
+    fun pickTolerancePx(): Float = with(densityNow) { (pickToleranceNow?.invoke() ?: 12.dp).toPx() }
     // Screen-space metrics for the selection chrome. Kept in px here (resolved
     // once per density change) and scaled by inverseScale at draw time so the
     // box, handles, and padding stay a constant on-screen size at any zoom.
@@ -619,14 +627,14 @@ fun DrawBox(
                         val s = stateNow()
                         if (s.effectiveMode == Mode.SELECT) {
                             val world = s.viewport.screenToWorld(screenPos)
-                            val tol = pickTolerancePx / s.viewport.scale
+                            val tol = pickTolerancePx() / s.viewport.scale
                             latestOnIntent(Intent.RequestTextEditAt(world, tol))
                         }
                     },
                     onTap = { screenPos ->
                         val s = stateNow()
                         val world = s.viewport.screenToWorld(screenPos)
-                        val tol = pickTolerancePx / s.viewport.scale
+                        val tol = pickTolerancePx() / s.viewport.scale
                         when (s.effectiveMode) {
                             Mode.SELECT -> latestOnIntent(Intent.SelectAt(world, tol, additive = additiveTapsNow))
                             Mode.PEN -> {
@@ -696,12 +704,12 @@ fun DrawBox(
                                     pointerWorld = world,
                                     handleHitWorld = handleHitPx / s.viewport.scale,
                                     rotationOffsetWorld = rotationOffsetPx / s.viewport.scale,
-                                    pickToleranceWorld = pickTolerancePx / s.viewport.scale,
+                                    pickToleranceWorld = pickTolerancePx() / s.viewport.scale,
                                     paddingWorld = chromeMetrics.paddingPx / s.viewport.scale,
                                 )
                                 interaction = when (classified) {
                                     is SelectionInteraction.SelectAndMove -> {
-                                        latestOnIntent(Intent.SelectAt(world, pickTolerancePx / s.viewport.scale))
+                                        latestOnIntent(Intent.SelectAt(world, pickTolerancePx() / s.viewport.scale))
                                         latestOnIntent(Intent.BeginTransform)
                                         dragInProgress = true
                                         SelectionInteraction.Move

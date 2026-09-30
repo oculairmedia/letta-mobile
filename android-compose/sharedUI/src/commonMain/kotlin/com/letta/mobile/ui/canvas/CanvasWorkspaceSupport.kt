@@ -18,6 +18,7 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import io.ak1.drawbox.domain.model.State as DrawBoxState
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
+import io.ak1.drawbox.domain.model.topmostHit
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.resolvedTextColor
@@ -73,6 +74,9 @@ internal data class PenConsumerParams(
     val penDensity: Float,
     val penPreview: MutableList<Element.PathSample>,
     val onEraseArea: (EraserArea) -> Unit,
+    /** A pen double tap landed on somewhere to type while drawing. Opens its text. */
+    val onDoubleTapText: (Element) -> Unit = {},
+    val penTaps: CanvasPenDoubleTap = CanvasPenDoubleTap(),
 )
 
 internal data class DrawPhaseParams(
@@ -504,22 +508,68 @@ internal object CanvasWorkspaceSupport {
     fun createPenConsumer(params: PenConsumerParams): (CanvasPenEvent) -> Boolean {
         var stroke: CanvasPenStroke? = null
         var strokeStartedOnDocument = false
+        // The second tap of a double tap opened text; the rest of that contact draws nothing.
+        var swallowing = false
         return consumer@{ event ->
+            if (swallowing) {
+                if (event.phase == CanvasPenEvent.Phase.UP || event.phase == CanvasPenEvent.Phase.OUT) swallowing = false
+                return@consumer true
+            }
             val world = validatePenPosition(event, params) ?: return@consumer false
             if (event.tool == CanvasPenTool.ERASER) {
+                params.penTaps.clear()
                 return@consumer handleEraserEvent(event, world, params.controller, params.onEraseArea)
             }
             val current = params.controller.state.value
-            if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
+            if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) {
+                params.penTaps.clear()
+                return@consumer false
+            }
             if (event.phase == CanvasPenEvent.Phase.DOWN) {
                 strokeStartedOnDocument = isWorldPointInDocuments(world, params.session?.documents().orEmpty())
+                if (!strokeStartedOnDocument && openTextOnPenDoubleTap(event, world, params)) {
+                    params.penPreview.clear()
+                    stroke = null
+                    swallowing = true
+                    return@consumer true
+                }
             }
             if (strokeStartedOnDocument) return@consumer false
+            if (event.phase == CanvasPenEvent.Phase.MOVE) params.penTaps.move(event.x, event.y)
             val drawParams = DrawPhaseParams(event, world, params.controller, params.penPreview)
             val (updatedStroke, handled) = handleDrawPhase(drawParams, stroke)
+            if (event.phase == CanvasPenEvent.Phase.UP || event.phase == CanvasPenEvent.Phase.OUT) {
+                val dot = params.controller.state.value.elements.lastOrNull()?.takeIf { it is Element.Path }?.id
+                params.penTaps.up(event.x, event.y, dot.takeIf { stroke != null })
+            }
             stroke = updatedStroke
             handled
         }
+    }
+
+    /**
+     * A pen down that finishes a double tap on a shape or text: takes back the first tap's dot
+     * (as one undo step with it) and opens the text. False leaves the down to draw as usual.
+     */
+    private fun openTextOnPenDoubleTap(event: CanvasPenEvent, world: Offset, params: PenConsumerParams): Boolean {
+        val first = params.penTaps.down(event.x, event.y) ?: return false
+        val state = params.controller.state.value
+        val tolerance = FINGER_PICK_TOLERANCE.value * params.penDensity / state.viewport.scale
+        val target = topmostHit(
+            state.elements.filter { it.id != first.dotId },
+            world,
+            tolerance,
+            state.selectInsideHollowShapes,
+        )
+        if (!holdsText(target) || target == null) return false
+        first.dotId?.let { dot ->
+            if (state.elements.any { it.id == dot }) {
+                params.controller.onIntent(Intent.DeleteElement(dot))
+                params.controller.onIntent(Intent.MergeUndoSteps(2))
+            }
+        }
+        params.onDoubleTapText(target)
+        return true
     }
 
     fun evaluateExternalDocSync(params: ExternalSyncParams): ExternalSyncResult? {

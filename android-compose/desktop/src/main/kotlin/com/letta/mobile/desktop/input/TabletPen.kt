@@ -14,6 +14,7 @@ import java.awt.Point
 import java.awt.Window
 import com.letta.mobile.desktop.touch.DesktopPointerTouch
 import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
+import com.letta.mobile.desktop.touch.DesktopTouchOrigin
 import com.letta.mobile.ui.canvas.CanvasBoardTouchRegistry
 import com.letta.mobile.ui.canvas.CanvasBoardTouchResult
 import com.letta.mobile.ui.canvas.CanvasBoardTouchSample
@@ -157,6 +158,9 @@ internal class TabletPen(
             }
             if (sample.kind == TabletBridge.KIND_DOWN) {
                 println("TABLET: contact tool=${sample.tool} force=${sample.force} slot=${sample.contact}")
+                // A text field the pen taps into (a shape's text, the composer) needs the
+                // on-screen keyboard as much as one a finger taps into. There is no other.
+                if (isPenNib(sample.tool)) DesktopTouchOrigin.record(isTouch = true, atMillis = System.currentTimeMillis())
             }
             // A finger shares this bridge with the pen and has no pressure axis.
             // It must not be offered to the canvas as ink, and it must not be
@@ -237,7 +241,9 @@ internal class TabletPen(
         val origin = runCatching { target.locationOnScreen }.getOrNull() ?: return false
         val screenX = origin.x + sample.x.toInt()
         val screenY = origin.y + sample.y.toInt()
-        return DesktopTouchDragExclusion.contains(window, screenX, screenY)
+        val onControl = DesktopTouchDragExclusion.containsOverlay(window, screenX, screenY)
+        if (onControl) println("TABLET: finger placed on a control at screen=($screenX,$screenY)")
+        return onControl
     }
 
     private val controlLatch = FingerControlLatch()
@@ -254,25 +260,40 @@ internal class TabletPen(
         if (!windowMoved || lifting) {
             when (val offer = boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())) {
                 CanvasBoardTouchResult.Ignored -> {
-                    val pressedOnControl = sample.kind == TabletBridge.KIND_DOWN &&
-                        fingerIsOnPassthrough(target, sample)
-                    val onControl = controlLatch.owns(sample.kind, pressedOnControl)
-                    if (!windowMoved && !onControl) {
+                    val onControl = controlLatch.owns(sample.kind) { fingerIsOnPassthrough(target, sample) }
+                    if (onControl) {
+                        fingerPointer.onControlSample(target, sample)
+                    } else if (!windowMoved) {
                         fingerPointer.onSample(target, sample)
-                    } else if (onControl) {
-                        fingerPointer.cancel()
                     }
                 }
                 CanvasBoardTouchResult.Consumed -> {
                     if (lifting) controlLatch.clear()
-                    fingerPointer.cancel()
-                    if (lifting) fingerPointer.exitPointer(target, Point(sample.x.toInt(), sample.y.toInt()))
+                    // A second finger riding along must not let go of the one holding the mouse.
+                    fingerPointer.cancelScroll()
+                    if (lifting && !fingerPointer.isHolding) {
+                        fingerPointer.exitPointer(target, Point(sample.x.toInt(), sample.y.toInt()))
+                    }
                     noteBoardPinch(sample)
                 }
                 is CanvasBoardTouchResult.Tap -> {
                     controlLatch.clear()
                     fingerPointer.cancel()
                     fingerPointer.tapAt(target, offer.x.toInt(), offer.y.toInt())
+                }
+                // One finger on the board is the mouse, so the current tool draws or selects.
+                is CanvasBoardTouchResult.Press -> {
+                    controlLatch.clear()
+                    fingerPointer.hold(
+                        target,
+                        Point(offer.x.toInt(), offer.y.toInt()),
+                        Point(offer.toX.toInt(), offer.toY.toInt()),
+                    )
+                }
+                is CanvasBoardTouchResult.Drag -> fingerPointer.dragHeld(Point(offer.x.toInt(), offer.y.toInt()))
+                CanvasBoardTouchResult.Release -> {
+                    controlLatch.clear()
+                    fingerPointer.releaseControl()
                 }
             }
         }
@@ -349,18 +370,28 @@ internal data class WindowPenTarget(val window: Window) : CanvasPenTarget
 /**
  * Whether a finger gesture belongs to a published control.
  *
- * Decided at touch-down, matching the AWT exclusion latch. A later sample that
- * slides onto the panel does not stop a scroll that started on the list.
+ * Decided where the finger is first placed. The touch-down sample is the previous
+ * pose, often nowhere near the finger, so deciding there sent a slider drag to the
+ * scroll path. A later sample that slides onto the panel does not stop a scroll
+ * that started on the list.
  */
 internal class FingerControlLatch {
     private var onControl: Boolean? = null
+    private var placing = false
 
-    fun owns(kind: Int, pressedOnControl: Boolean): Boolean {
+    fun owns(kind: Int, fingerOnControl: () -> Boolean): Boolean {
         when (kind) {
-            TabletBridge.KIND_DOWN -> onControl = pressedOnControl
+            TabletBridge.KIND_DOWN -> {
+                onControl = null
+                placing = true
+            }
+            TabletBridge.KIND_MOVE -> if (placing) {
+                placing = false
+                onControl = fingerOnControl()
+            }
             TabletBridge.KIND_UP, TabletBridge.KIND_OUT, TabletBridge.KIND_CANCEL -> {
                 val owned = onControl == true
-                onControl = null
+                clear()
                 return owned
             }
         }
@@ -369,6 +400,7 @@ internal class FingerControlLatch {
 
     fun clear() {
         onControl = null
+        placing = false
     }
 }
 

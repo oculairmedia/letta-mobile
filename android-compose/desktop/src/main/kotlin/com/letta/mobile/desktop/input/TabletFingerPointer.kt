@@ -40,6 +40,12 @@ internal class TabletFingerPointer(
     private var lastMillis = 0L
     private var velocitySeeded = false
     private var flingTimer: Timer? = null
+    private var controlTarget: Component? = null
+    private var controlAt = Point()
+    private val scrollTrace = FingerScrollTrace()
+
+    /** True while a finger holds the mouse button, on a control or on the board. */
+    internal val isHolding: Boolean get() = controlTarget != null
 
     /** True while a lift is still coasting. */
     internal val isFlinging: Boolean get() = flingTimer?.isRunning == true
@@ -60,10 +66,65 @@ internal class TabletFingerPointer(
     }
 
     fun cancel() {
+        releaseControl()
+        cancelScroll()
+    }
+
+    /** Stops scrolling and coasting, and keeps a held button held. */
+    fun cancelScroll() {
         contact.cancel()
         velocity.reset()
         velocitySeeded = false
         stopFling()
+    }
+
+    /**
+     * A finger on a published control, such as a tool-menu slider.
+     *
+     * Windows sends no mouse input for a finger here, and the scroll path would turn the
+     * drag into a wheel. The control gets a held button instead: a press where the finger
+     * was placed, a drag per move, a release on lift. The latch hands over the first
+     * placed move, so the stale contact-down pose never presses.
+     */
+    fun onControlSample(target: Component, sample: TabletPenDecoder.DecodedSample) {
+        val point = Point(sample.x.toInt(), sample.y.toInt())
+        when (sample.kind) {
+            TabletBridge.KIND_MOVE -> if (controlTarget == null) hold(target, point, point) else dragHeld(point)
+            TabletBridge.KIND_UP, TabletBridge.KIND_OUT, TabletBridge.KIND_CANCEL -> releaseControl()
+        }
+    }
+
+    /**
+     * The board made one finger the mouse. The button goes down where the finger was
+     * placed, then drags to where it is now, so the stroke starts at the finger.
+     */
+    fun hold(target: Component, at: Point, to: Point) {
+        cancel()
+        controlTarget = target
+        controlAt = at
+        DesktopTouchOrigin.record(isTouch = true, atMillis = clock())
+        post(target, MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1_DOWN_MASK, at, MouseEvent.BUTTON1)
+        dragHeld(to)
+    }
+
+    /** Drags the held button to [to]. Nothing is held, nothing moves. */
+    fun dragHeld(to: Point) {
+        val held = controlTarget ?: return
+        if (to == controlAt) return
+        controlAt = to
+        post(held, MouseEvent.MOUSE_DRAGGED, MouseEvent.BUTTON1_DOWN_MASK, to, MouseEvent.NOBUTTON)
+    }
+
+    /** Lets go of the held button where it last dragged. */
+    fun releaseControl() {
+        val held = controlTarget ?: return
+        controlTarget = null
+        post(held, MouseEvent.MOUSE_RELEASED, 0, controlAt, MouseEvent.BUTTON1)
+        exitPointer(held, controlAt)
+    }
+
+    private fun post(target: Component, id: Int, modifiers: Int, point: Point, button: Int) {
+        target.dispatchEvent(MouseEvent(target, id, clock(), modifiers, point.x, point.y, 1, false, button))
     }
 
     /** One click where the finger was, after the board decided the contact was a tap. */
@@ -84,6 +145,7 @@ internal class TabletFingerPointer(
         }
         velocity.record(point.y, now)
         smoothScroll.begin()
+        scrollTrace.move(now, point.y - last.y)
         scrollBy(target, point, (point.y - last.y).toFloat())
         last = point
         lastMillis = now
@@ -101,6 +163,7 @@ internal class TabletFingerPointer(
                 SwingUtilities.invokeLater { DesktopTouchKeyboardTaps.gate?.fingerTapped() }
             }
             else -> {
+                scrollTrace.lift(clock())?.let(::println)
                 val speed = velocity.liftVelocityY(clock())
                 velocity.reset()
                 startFling(target, last, speed)
@@ -212,6 +275,42 @@ internal class TabletFingerPointer(
 
     private companion object {
         const val FINGER_FLING_FRAME_MILLIS = 16
+    }
+}
+
+/**
+ * One log line per finger scroll: how often moves arrived and how far they went.
+ *
+ * Samples carry no timestamp, so the gap between moves is the poll cadence the
+ * user feels. A large gap is late delivery; small gaps with a short distance are
+ * the scroll gain.
+ */
+internal class FingerScrollTrace {
+    private var firstMillis = 0L
+    private var lastMillis = 0L
+    private var moves = 0
+    private var maxGapMillis = 0L
+    private var travelPx = 0
+
+    fun move(atMillis: Long, dyPx: Int) {
+        if (moves == 0) {
+            firstMillis = atMillis
+        } else {
+            maxGapMillis = maxOf(maxGapMillis, atMillis - lastMillis)
+        }
+        lastMillis = atMillis
+        moves++
+        travelPx += dyPx
+    }
+
+    fun lift(atMillis: Long): String? {
+        if (moves == 0) return null
+        val line = "TABLET: finger scroll moves=$moves ms=${lastMillis - firstMillis} " +
+            "maxGapMs=$maxGapMillis liftGapMs=${atMillis - lastMillis} travelPx=$travelPx"
+        moves = 0
+        maxGapMillis = 0L
+        travelPx = 0
+        return line
     }
 }
 

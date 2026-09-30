@@ -71,6 +71,11 @@ internal class DesktopTouchDragExclusionRegistry<K : Any> {
      */
     fun contains(key: K, screenX: Int, screenY: Int): Boolean {
         if (bounds[key]?.contains(screenX, screenY) == true) return true
+        return containsOverlay(key, screenX, screenY)
+    }
+
+    /** True inside one of [key]'s [publishOverlay] regions only. The title bar is not one. */
+    fun containsOverlay(key: K, screenX: Int, screenY: Int): Boolean {
         synchronized(overlays) {
             return overlays[key]?.values?.any { it.contains(screenX, screenY) } == true
         }
@@ -113,4 +118,28 @@ internal val DesktopTouchInteractive = DesktopTouchDragExclusionRegistry<Window>
 internal fun screenExclusionRectOrNull(screenX: Float, screenY: Float, width: Int, height: Int): Rectangle? {
     if (!screenX.isFinite() || !screenY.isFinite()) return null
     return Rectangle(screenX.roundToInt(), screenY.roundToInt(), width, height)
+}
+
+/**
+ * [screenExclusionRectOrNull] for a rectangle Compose measured.
+ *
+ * Compose's `positionOnScreen()` and layout sizes are pixels: the window's AWT screen
+ * position times [density]. Every reader of these registries compares AWT screen points,
+ * which are not scaled. At 200% a panel published in pixels sat at twice its real place,
+ * and a finger on a tool-menu slider was never on it.
+ */
+internal fun composeScreenRectOrNull(
+    screenXPx: Float,
+    screenYPx: Float,
+    widthPx: Float,
+    heightPx: Float,
+    density: Float,
+): Rectangle? {
+    val scale = density.takeIf { it.isFinite() && it > 0f } ?: 1f
+    return screenExclusionRectOrNull(
+        screenXPx / scale,
+        screenYPx / scale,
+        (widthPx / scale).roundToInt(),
+        (heightPx / scale).roundToInt(),
+    )
 }
