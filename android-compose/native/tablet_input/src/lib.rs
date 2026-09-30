@@ -133,6 +133,8 @@ use std::sync::{Mutex, OnceLock};
         position: [f32; 2],
         pressure: f32,
         slot: f32,
+        /// Down arrived before any pose, so it must not be emitted at the origin.
+        awaiting_pose: bool,
     }
 
     enum Pending {
@@ -292,11 +294,13 @@ use std::sync::{Mutex, OnceLock};
                         if !self.accept_ink(ink, fate) {
                             continue;
                         }
-                        let slot = {
+                        let (slot, emit_down) = {
                             let runtime = self.runtime(ink, id);
                             runtime.position = position;
                             runtime.pressure = pressure;
-                            runtime.slot
+                            let emit_down = runtime.awaiting_pose && pressure != NO_PRESSURE;
+                            runtime.awaiting_pose = false;
+                            (runtime.slot, emit_down)
                         };
                         self.last_seen = position;
                         if self.ink_all && ink_finger_suppressed && pressure == NO_PRESSURE {
@@ -305,6 +309,11 @@ use std::sync::{Mutex, OnceLock};
                         if self.ink_all && self.rearm_finger && pressure == NO_PRESSURE {
                             push(&mut out, encode_event(KIND_DOWN, position, NO_PRESSURE, tool, slot));
                             self.rearm_finger = false;
+                        }
+                        // The down was held because it arrived with no pose. Emit it at this
+                        // point so the stroke starts where the pen actually is.
+                        if emit_down {
+                            push(&mut out, encode_event(KIND_DOWN, position, pressure, tool, slot));
                         }
                         push(&mut out, encode_event(KIND_MOVE, position, pressure, tool, slot));
                     }
@@ -318,12 +327,21 @@ use std::sync::{Mutex, OnceLock};
                         let key = ToolKey { ink, id: id.clone() };
                         let (encoded, pressure) = {
                             let runtime = self.runtime(ink, id);
-                            let pressure = if kind == KIND_IN || kind == KIND_OUT { NO_PRESSURE } else { runtime.pressure };
-                            (encode_event(kind, runtime.position, pressure, tool, runtime.slot), pressure)
+                            if kind == KIND_DOWN && pen_down_needs_a_pose(runtime.pressure) {
+                                runtime.awaiting_pose = true;
+                                (None, NO_PRESSURE)
+                            } else {
+                                if kind == KIND_DOWN {
+                                    runtime.awaiting_pose = false;
+                                }
+                                let pressure = if kind == KIND_IN || kind == KIND_OUT { NO_PRESSURE } else { runtime.pressure };
+                                (Some(encode_event(kind, runtime.position, pressure, tool, runtime.slot)), pressure)
+                            }
                         };
                         if clear {
                             self.tools.remove(&key);
                         }
+                        let Some(encoded) = encoded else { continue };
                         if self.ink_all && ink_finger_suppressed && pressure == NO_PRESSURE {
                             continue;
                         }
@@ -451,6 +469,7 @@ use std::sync::{Mutex, OnceLock};
                         position: [0.0, 0.0],
                         pressure: NO_PRESSURE,
                         slot,
+                        awaiting_pose: false,
                     },
                 );
             }
@@ -611,6 +630,12 @@ use std::sync::{Mutex, OnceLock};
         Keep,
         Pressureless,
         Duplicate,
+    }
+
+    /// A down with no pose yet is still at the origin with [NO_PRESSURE]. Hold it.
+    /// Hover pressure 0.0 already has a pose, so it is emitted.
+    fn pen_down_needs_a_pose(pressure: f32) -> bool {
+        pressure == NO_PRESSURE
     }
 
     /// The first pressure-bearing tablet wins. Hover pressure 0.0 counts. A pressureless
@@ -1186,6 +1211,13 @@ mod tests {
     fn an_index_override_is_exact_and_a_name_filter_keeps_every_match() {
         assert_eq!(choose_ink_tablets(&this_machine(), None, Some(6)), vec![6]);
         assert_eq!(choose_ink_tablets(&this_machine(), Some("cintiq"), None), vec![5, 6]);
+    }
+
+    #[test]
+    fn a_pen_that_touches_before_it_hovers_waits_for_the_pose() {
+        assert!(pen_down_needs_a_pose(NO_PRESSURE));
+        assert!(!pen_down_needs_a_pose(0.0));
+        assert!(!pen_down_needs_a_pose(0.4));
     }
 
     #[test]

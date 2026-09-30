@@ -265,7 +265,10 @@ internal class CanvasBoardTouchBinding {
         val bounds = board ?: return false
         val pixel = Offset(x * density, y * density)
         if (!bounds.contains(pixel)) return false
-        return chrome?.contains(pixel - bounds.topLeft) != true
+        // Controls are registered in root space, the same space as [pixel]. Subtracting the
+        // board origin shifts that map, so open board reads as a control and a control reads
+        // as board.
+        return chrome?.contains(pixel) != true
     }
 
     fun apply(effects: List<CanvasFingerEffect>, fling: PanFling, now: Long) {

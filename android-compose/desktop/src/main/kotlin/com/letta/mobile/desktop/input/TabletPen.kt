@@ -13,6 +13,7 @@ import java.awt.Component
 import java.awt.Point
 import java.awt.Window
 import com.letta.mobile.desktop.touch.DesktopPointerTouch
+import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
 import com.letta.mobile.ui.canvas.CanvasBoardTouchRegistry
 import com.letta.mobile.ui.canvas.CanvasBoardTouchResult
 import com.letta.mobile.ui.canvas.CanvasBoardTouchSample
@@ -157,7 +158,12 @@ internal class TabletPen(
             // A finger shares this bridge with the pen and has no pressure axis.
             // It must not be offered to the canvas as ink, and it must not be
             // replayed as a moving mouse cursor. A tap clicks; a drag scrolls.
-            if (!lastPoseHadPressure && sample.kind != TabletBridge.KIND_IN) {
+            // A draw or eraser nib stays on the pen path even when its down
+            // arrives before any pose; that down is not a finger.
+            if (penDownWaitsForPose(sample.tool, sample.kind, sample.force)) {
+                continue
+            }
+            if (!isPenNib(sample.tool) && !lastPoseHadPressure && sample.kind != TabletBridge.KIND_IN) {
                 dispatchFinger(target, sample, windowMoved)
                 if (sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT) {
                     lastPoseHadPressure = false
@@ -222,6 +228,13 @@ internal class TabletPen(
         connection.close()
     }
 
+    private fun fingerIsOnPassthrough(target: Component, sample: TabletPenDecoder.DecodedSample): Boolean {
+        val origin = runCatching { target.locationOnScreen }.getOrNull() ?: return false
+        val screenX = origin.x + sample.x.toInt()
+        val screenY = origin.y + sample.y.toInt()
+        return DesktopTouchDragExclusion.contains(window, screenX, screenY)
+    }
+
     private fun dispatchFinger(target: Component, sample: TabletPenDecoder.DecodedSample, windowMoved: Boolean) {
         if (sample.kind == TabletBridge.KIND_CANCEL) {
             boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())
@@ -231,7 +244,14 @@ internal class TabletPen(
         val lifting = sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT
         if (!windowMoved || lifting) {
             when (val offer = boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())) {
-                CanvasBoardTouchResult.Ignored -> if (!windowMoved) fingerPointer.onSample(target, sample)
+                CanvasBoardTouchResult.Ignored -> {
+                    val onControl = fingerIsOnPassthrough(target, sample)
+                    if (!windowMoved && !onControl) {
+                        fingerPointer.onSample(target, sample)
+                    } else if (onControl) {
+                        fingerPointer.cancel()
+                    }
+                }
                 CanvasBoardTouchResult.Consumed -> {
                     fingerPointer.cancel()
                     if (lifting) fingerPointer.exitPointer(target, Point(sample.x.toInt(), sample.y.toInt()))
@@ -318,7 +338,12 @@ internal fun keepsFingerOwnership(tool: Int, kind: Int, alreadyOwned: Boolean): 
     return alreadyOwned
 }
 
-internal fun penSampleMirrorsToMouse(tool: Int, windowMoved: Boolean, hasPressureAxis: Boolean): Boolean {
-    val penTool = tool == TabletBridge.TOOL_DRAW || tool == TabletBridge.TOOL_ERASER
-    return penTool && hasPressureAxis && !windowMoved
-}
+internal fun isPenNib(tool: Int): Boolean =
+    tool == TabletBridge.TOOL_DRAW || tool == TabletBridge.TOOL_ERASER
+
+/** A pen down with no pose yet must wait. Emitting it starts a stroke at the origin, or drops it. */
+internal fun penDownWaitsForPose(tool: Int, kind: Int, force: Float): Boolean =
+    isPenNib(tool) && kind == TabletBridge.KIND_DOWN && force == TabletBridge.NO_PRESSURE
+
+internal fun penSampleMirrorsToMouse(tool: Int, windowMoved: Boolean, hasPressureAxis: Boolean): Boolean =
+    isPenNib(tool) && hasPressureAxis && !windowMoved

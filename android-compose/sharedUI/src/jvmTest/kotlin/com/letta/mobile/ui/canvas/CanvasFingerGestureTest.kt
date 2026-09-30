@@ -91,13 +91,14 @@ class CanvasFingerGestureTest {
     @Test
     fun chromeInsideTheBoardIsNotTheBoard() {
         val chrome = CanvasChromeRegions()
-        chrome.register { Rect(0f, 0f, 20f, 20f) }
+        // Root space, not board-local. The board itself does not start at the origin.
+        chrome.register { Rect(100f, 80f, 140f, 120f) }
         val binding = CanvasBoardTouchBinding()
-        binding.board = Rect(0f, 0f, 200f, 200f)
+        binding.board = Rect(100f, 80f, 300f, 280f)
         binding.density = 2f
         binding.chrome = chrome
-        assertTrue(!binding.hits(5f, 5f))
-        assertTrue(binding.hits(40f, 40f))
+        assertTrue(!binding.hits(55f, 45f))
+        assertTrue(binding.hits(105f, 85f))
     }
 
     @Test

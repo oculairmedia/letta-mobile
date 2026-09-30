@@ -362,7 +362,7 @@ internal object DesktopWindowsTouchInput {
             if (!interactive) return false
             val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
             recordOrigin(event, isTouch)
-            if (dropBecausePointerOwnsFingers(event, window, isTouch)) return true
+            if (dropBecausePointerOwnsFingers(event, window, isTouch, passthrough = false)) return true
             if (event.id == MouseEvent.MOUSE_PRESSED) {
                 cancelFling()
                 interactiveSawMousePress = true
@@ -415,7 +415,9 @@ internal object DesktopWindowsTouchInput {
             }
             if (!excluded) return false
             val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
-            if (dropBecausePointerOwnsFingers(event, window, isTouch)) return true
+            // A published region is a control the finger has to drag, such as a tool-menu
+            // slider. Owning the finger must not swallow that drag.
+            if (dropBecausePointerOwnsFingers(event, window, isTouch, passthrough = true)) return true
             if (event.id == MouseEvent.MOUSE_PRESSED) cancelFling()
             super.dispatchEvent(event)
             return true
@@ -426,7 +428,7 @@ internal object DesktopWindowsTouchInput {
             val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
             recordOrigin(event, isTouch)
             val window = managedWindow(component)
-            if (window != null && dropBecausePointerOwnsFingers(event, window, isTouch)) return
+            if (window != null && dropBecausePointerOwnsFingers(event, window, isTouch, passthrough = false)) return
             if (!isTouch) {
                 if (event.id == MouseEvent.MOUSE_PRESSED) cancelFling()
                 super.dispatchEvent(event)
@@ -472,8 +474,13 @@ internal object DesktopWindowsTouchInput {
          * Pointer frames already own this finger. The matching AWT mouse would be a second
          * click and a second scroll. A mouse or a pen is not touch-caused, so it still goes through.
          */
-        private fun dropBecausePointerOwnsFingers(event: MouseEvent, window: Window, isTouch: Boolean): Boolean {
-            if (!isTouch || !DesktopPointerTouch.ownsFingers(window)) return false
+        private fun dropBecausePointerOwnsFingers(
+            event: MouseEvent,
+            window: Window,
+            isTouch: Boolean,
+            passthrough: Boolean,
+        ): Boolean {
+            if (!ownedFingerBlocksPointer(isTouch, DesktopPointerTouch.ownsFingers(window), passthrough)) return false
             if (event.id !in OWNED_FINGER_MOUSE_IDS) return false
             withheldPress = null
             gesture.abandon()
@@ -597,3 +604,11 @@ internal object DesktopWindowsTouchInput {
         private fun MouseEvent.toSample() = TouchSample(x = x, y = y, timeMillis = `when`)
     }
 }
+
+/**
+ * A finger the pointer path owns must not also become an AWT press, drag, or click.
+ * A control that published itself as a passthrough region is the exception: the slider
+ * (or title bar) has to receive that drag.
+ */
+internal fun ownedFingerBlocksPointer(isTouch: Boolean, ownsFingers: Boolean, passthrough: Boolean): Boolean =
+    isTouch && ownsFingers && !passthrough
