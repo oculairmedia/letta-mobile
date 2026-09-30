@@ -218,8 +218,8 @@ internal data class DesktopAppServerEngineConfig(
 )
 
 /**
- * The desktop's own canvas.* tools, for an App Server it reaches directly. On Iroh the host answers
- * canvas.* for every runtime it serves (letta-mobile-aknkw), so the desktop offers none there.
+ * The desktop's own canvas_* tools, for an App Server it reaches directly. On Iroh the host answers
+ * canvas_* for every runtime it serves (letta-mobile-aknkw), so the desktop offers none there.
  */
 internal fun desktopCanvasToolRegistry(
     isIroh: Boolean,

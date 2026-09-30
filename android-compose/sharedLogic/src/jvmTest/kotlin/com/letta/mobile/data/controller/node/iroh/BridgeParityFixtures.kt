@@ -29,7 +29,7 @@ internal object BridgeParityFixtures {
         EngineSetup(permissionMode = AppServerPermissionMode.Strict, driver = DenyApprovalsDriver),
     )
 
-    /** A host (canvas.*) tool: external_tool_call_request, the client's response, then the reply. */
+    /** A host (canvas_*) tool: external_tool_call_request, the client's response, then the reply. */
     val EXTERNAL_TOOL = ParityFixture(
         "$DIR/external-tool-round-trip.jsonl",
         "cm-parity-external-tool-1",

@@ -61,7 +61,7 @@ class ProductionIrohToolRegistryWiringTest {
     }
 
     /**
-     * letta-mobile-aknkw: every runtime the host starts gets the host's canvas.* tools, whether or
+     * letta-mobile-aknkw: every runtime the host starts gets the host's canvas_* tools, whether or
      * not --meridian-binary is set, since they need only the canvas relay the host runs.
      */
     @Test
