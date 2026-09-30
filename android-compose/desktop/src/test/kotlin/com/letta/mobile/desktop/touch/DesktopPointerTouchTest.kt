@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.touch
 
+import com.letta.mobile.desktop.input.FingerControlLatch
 import com.letta.mobile.desktop.input.TabletBridge
 import com.letta.mobile.desktop.input.isPenNib
 import com.letta.mobile.desktop.input.keepsFingerOwnership
@@ -28,6 +29,22 @@ class DesktopPointerTouchTest {
             canvas.dispose()
             other.dispose()
         }
+    }
+
+    @Test
+    fun aListScrollThatSlidesOntoThePanelDoesNotStop() {
+        val latch = FingerControlLatch()
+        assertFalse(latch.owns(TabletBridge.KIND_DOWN, pressedOnControl = false))
+        assertFalse(latch.owns(TabletBridge.KIND_MOVE, pressedOnControl = true))
+        assertFalse(latch.owns(TabletBridge.KIND_UP, pressedOnControl = true))
+    }
+
+    @Test
+    fun aSliderDragStaysWithTheSliderAfterTheFingerSlidesOffIt() {
+        val latch = FingerControlLatch()
+        assertTrue(latch.owns(TabletBridge.KIND_DOWN, pressedOnControl = true))
+        assertTrue(latch.owns(TabletBridge.KIND_MOVE, pressedOnControl = false))
+        assertTrue(latch.owns(TabletBridge.KIND_UP, pressedOnControl = false))
     }
 
     @Test

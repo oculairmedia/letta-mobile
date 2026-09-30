@@ -142,6 +142,9 @@ internal class TabletPen(
         while (index + TabletBridge.STRIDE <= events.size) {
             val sample = TabletPenDecoder.decodeSample(events, index, scale)
             index += TabletBridge.STRIDE
+            if (!keepsFingerOwnership(sample.tool, sample.kind, DesktopPointerTouch.ownsFingers(window))) {
+                DesktopPointerTouch.release(window)
+            }
             if (sample.tool == TabletBridge.TOOL_TOUCH || sample.kind == TabletBridge.KIND_CANCEL) {
                 noteTouchContact(sample, scale)
                 DesktopPointerTouch.markOwned(window)
@@ -163,8 +166,10 @@ internal class TabletPen(
             if (penDownWaitsForPose(sample.tool, sample.kind, sample.force)) {
                 continue
             }
+            // A pressureless sample that is not a nib and not a finger is an Ink phase
+            // event (Up, In, Out) from a tool the pen filter rejected. Feeding it to the
+            // finger pointer lifts whatever finger is already scrolling.
             if (!isPenNib(sample.tool) && !lastPoseHadPressure && sample.kind != TabletBridge.KIND_IN) {
-                dispatchFinger(target, sample, windowMoved)
                 if (sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT) {
                     lastPoseHadPressure = false
                 }
@@ -235,17 +240,23 @@ internal class TabletPen(
         return DesktopTouchDragExclusion.contains(window, screenX, screenY)
     }
 
+    private val controlLatch = FingerControlLatch()
+
     private fun dispatchFinger(target: Component, sample: TabletPenDecoder.DecodedSample, windowMoved: Boolean) {
         if (sample.kind == TabletBridge.KIND_CANCEL) {
             boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())
-            fingerPointer.cancel()
+            controlLatch.clear()
+            // An Ink cancel is not this finger. Cancelling the pointer here kills a paused scroll.
+            if (sample.tool == TabletBridge.TOOL_TOUCH) fingerPointer.cancel()
             return
         }
         val lifting = sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT
         if (!windowMoved || lifting) {
             when (val offer = boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())) {
                 CanvasBoardTouchResult.Ignored -> {
-                    val onControl = fingerIsOnPassthrough(target, sample)
+                    val pressedOnControl = sample.kind == TabletBridge.KIND_DOWN &&
+                        fingerIsOnPassthrough(target, sample)
+                    val onControl = controlLatch.owns(sample.kind, pressedOnControl)
                     if (!windowMoved && !onControl) {
                         fingerPointer.onSample(target, sample)
                     } else if (onControl) {
@@ -253,11 +264,13 @@ internal class TabletPen(
                     }
                 }
                 CanvasBoardTouchResult.Consumed -> {
+                    if (lifting) controlLatch.clear()
                     fingerPointer.cancel()
                     if (lifting) fingerPointer.exitPointer(target, Point(sample.x.toInt(), sample.y.toInt()))
                     noteBoardPinch(sample)
                 }
                 is CanvasBoardTouchResult.Tap -> {
+                    controlLatch.clear()
                     fingerPointer.cancel()
                     fingerPointer.tapAt(target, offer.x.toInt(), offer.y.toInt())
                 }
@@ -333,6 +346,32 @@ internal data class WindowPenTarget(val window: Window) : CanvasPenTarget
  * arrives while the window is moving is that pointer sliding across the page under the drag.
  */
 /** A finger claim sticks for the session. A pressureless Ink sample must not clear it. */
+/**
+ * Whether a finger gesture belongs to a published control.
+ *
+ * Decided at touch-down, matching the AWT exclusion latch. A later sample that
+ * slides onto the panel does not stop a scroll that started on the list.
+ */
+internal class FingerControlLatch {
+    private var onControl: Boolean? = null
+
+    fun owns(kind: Int, pressedOnControl: Boolean): Boolean {
+        when (kind) {
+            TabletBridge.KIND_DOWN -> onControl = pressedOnControl
+            TabletBridge.KIND_UP, TabletBridge.KIND_OUT, TabletBridge.KIND_CANCEL -> {
+                val owned = onControl == true
+                onControl = null
+                return owned
+            }
+        }
+        return onControl == true
+    }
+
+    fun clear() {
+        onControl = null
+    }
+}
+
 internal fun keepsFingerOwnership(tool: Int, kind: Int, alreadyOwned: Boolean): Boolean {
     if (tool == TabletBridge.TOOL_TOUCH || kind == TabletBridge.KIND_CANCEL) return true
     return alreadyOwned

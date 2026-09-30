@@ -77,13 +77,12 @@ use std::sync::{Mutex, OnceLock};
     pub struct Bridge {
         /// The window the manager claims Ink on, kept so a broken manager can be rebuilt.
         hwnd: NonZeroIsize,
-        /// One RealTimeStylus per pen tablet. A failed entry is retried next frame.
+        /// One RealTimeStylus per pen tablet. A failed entry backs off, it is not rebuilt every poll.
         managers: Vec<InkManager>,
         /// Where each tool last was. Down and Up carry no coordinates, and one shared
         /// position makes a second finger jump to the first. The ink index is part of the
         /// key because two stylus services can reuse the same cursor id.
-        tools: HashMap<ToolKey, ToolRuntime>,
-        next_slot: f32,
+        pen: PenBook<ToolKey>,
         /// The last position any tool reported, so a rebuilt bridge can still lift the pen.
         last_seen: [f32; 2],
         /// Pointer-touch contacts copied into this window, keyed by pointer id.
@@ -106,16 +105,17 @@ use std::sync::{Mutex, OnceLock};
         ink_off: bool,
         /// Debug escape hatch: every tablet, including the touchscreen.
         ink_all: bool,
-        /// The pen tablet that first reported a pressure axis. The others are ignored.
-        pen_latch: Option<i32>,
-        pressureless_logged: Vec<i32>,
-        duplicate_logged: Vec<i32>,
+        /// Next time to compare the pen list with what Windows has now.
+        next_ink_scan: u64,
     }
 
     struct InkManager {
         index: i32,
         name: String,
         manager: Option<Manager>,
+        /// Milliseconds before a failed build is tried again.
+        retry_after: u64,
+        failures: u32,
     }
 
     #[derive(Clone, PartialEq, Eq, Hash)]
@@ -127,9 +127,12 @@ use std::sync::{Mutex, OnceLock};
     struct TouchState {
         positions: HashMap<u32, [f32; 2]>,
         ups: Vec<u32>,
+        cancels: Vec<u32>,
     }
 
     struct ToolRuntime {
+        ink: i32,
+        tool: f32,
         position: [f32; 2],
         pressure: f32,
         slot: f32,
@@ -159,20 +162,25 @@ use std::sync::{Mutex, OnceLock};
             let hwnd = NonZeroIsize::new(hwnd)?;
             log_build_tag();
             let plan = ink_plan();
-            let managers = plan.slots.iter().map(|(index, name)| InkManager {
-                index: *index,
-                name: name.clone(),
-                manager: if plan.ink_off { None } else { build_manager(hwnd, *index, name) },
+            let managers = plan.slots.iter().map(|(index, name)| {
+                let manager = if plan.ink_off { None } else { build_manager(hwnd, *index, name, true) };
+                let failed = manager.is_none() && !plan.ink_off;
+                InkManager {
+                    index: *index,
+                    name: name.clone(),
+                    manager,
+                    retry_after: if failed { now_millis().saturating_add(1_000) } else { 0 },
+                    failures: if failed { 1 } else { 0 },
+                }
             }).collect();
             LIVE_BRIDGES.fetch_add(1, Ordering::AcqRel);
             ensure_pointer_hook(hwnd);
             Some(Self {
                 hwnd,
                 managers,
-                tools: HashMap::new(),
-                next_slot: 0.0,
+                pen: PenBook::new(),
                 last_seen: [0.0, 0.0],
-                touch_state: Mutex::new(TouchState { positions: HashMap::new(), ups: Vec::new() }),
+                touch_state: Mutex::new(TouchState { positions: HashMap::new(), ups: Vec::new(), cancels: Vec::new() }),
                 touch_generation: AtomicU64::new(0),
                 touch_generation_seen: 0,
                 touch_down: HashMap::new(),
@@ -183,9 +191,7 @@ use std::sync::{Mutex, OnceLock};
                 shared_seen: 0,
                 ink_off: plan.ink_off,
                 ink_all: plan.ink_all,
-                pen_latch: None,
-                pressureless_logged: Vec::new(),
-                duplicate_logged: Vec::new(),
+                next_ink_scan: now_millis().saturating_add(2_000),
             })
         }
 
@@ -205,23 +211,25 @@ use std::sync::{Mutex, OnceLock};
                 let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || drop(broken)));
             }
             let mut out = Vec::new();
-            if self.tools.is_empty() {
+            if self.pen.tools.is_empty() {
                 push(&mut out, encode_event(KIND_UP, self.last_seen, NO_PRESSURE, TOOL_UNKNOWN, 0.0));
                 push(&mut out, encode_event(KIND_OUT, self.last_seen, NO_PRESSURE, TOOL_UNKNOWN, 0.0));
             } else {
-                for runtime in self.tools.values() {
+                for runtime in self.pen.tools.values() {
                     push(&mut out, encode_event(KIND_UP, runtime.position, NO_PRESSURE, TOOL_UNKNOWN, runtime.slot));
                     push(&mut out, encode_event(KIND_OUT, runtime.position, NO_PRESSURE, TOOL_UNKNOWN, runtime.slot));
                 }
             }
             if !self.ink_off {
                 for slot in &mut self.managers {
-                    slot.manager = build_manager(self.hwnd, slot.index, &slot.name);
+                    slot.manager = build_manager(self.hwnd, slot.index, &slot.name, true);
+                    slot.failures = if slot.manager.is_none() { 1 } else { 0 };
+                    slot.retry_after = if slot.manager.is_none() { now_millis().saturating_add(1_000) } else { 0 };
                 }
             }
-            self.tools.clear();
-            self.next_slot = 0.0;
-            self.pen_latch = None;
+            self.pen.tools.clear();
+            self.pen.next_slot = 0.0;
+            self.pen.latch = None;
             out
         }
 
@@ -230,10 +238,23 @@ use std::sync::{Mutex, OnceLock};
             // Pump borrows the manager, which borrows self. Copy the samples out
             // before updating per-tool state, or the two borrows cannot coexist.
             let mut pending = Vec::new();
+            self.consider_replug();
+            self.sweep_stale_touch();
+            let now = now_millis();
             for slot in &mut self.managers {
                 if slot.manager.is_none() {
-                    if !self.ink_off {
-                        slot.manager = build_manager(self.hwnd, slot.index, &slot.name);
+                    if self.ink_off || now < slot.retry_after {
+                        continue;
+                    }
+                    let log = slot.failures == 0;
+                    slot.manager = build_manager(self.hwnd, slot.index, &slot.name, log);
+                    if slot.manager.is_none() {
+                        slot.failures = slot.failures.saturating_add(1);
+                        let shift = (slot.failures as u64).min(5);
+                        slot.retry_after = now.saturating_add((1_000u64 << shift).min(30_000));
+                    } else {
+                        slot.failures = 0;
+                        slot.retry_after = 0;
                     }
                     continue;
                 }
@@ -279,80 +300,77 @@ use std::sync::{Mutex, OnceLock};
                 self.touch_latched = false;
                 self.rearm_finger = true;
             }
-            let ink_finger_suppressed = self.touch_latched;
+            let mut ctx = PenCtx {
+                ink_all: self.ink_all,
+                finger_suppressed: self.touch_latched,
+                rearm_finger: self.rearm_finger,
+            };
             for item in pending {
-                match item {
+                let event = match item {
                     Pending::Pose { ink, id, tool, position, pressure } => {
-                        let (latch, fate) = classify_ink_sample(self.pen_latch, ink, pressure, !self.ink_all);
-                        if self.pen_latch.is_none() && latch.is_some() {
-                            self.pen_latch = latch;
-                            let name = self.managers.iter().find(|slot| slot.index == ink).map(|slot| slot.name.as_str()).unwrap_or("");
-                            eprintln!("TABLET: pen latched ink #{ink} \"{name}\"");
-                        } else {
-                            self.pen_latch = latch;
-                        }
-                        if !self.accept_ink(ink, fate) {
-                            continue;
-                        }
-                        let (slot, emit_down) = {
-                            let runtime = self.runtime(ink, id);
-                            runtime.position = position;
-                            runtime.pressure = pressure;
-                            let emit_down = runtime.awaiting_pose && pressure != NO_PRESSURE;
-                            runtime.awaiting_pose = false;
-                            (runtime.slot, emit_down)
-                        };
-                        self.last_seen = position;
-                        if self.ink_all && ink_finger_suppressed && pressure == NO_PRESSURE {
-                            continue;
-                        }
-                        if self.ink_all && self.rearm_finger && pressure == NO_PRESSURE {
-                            push(&mut out, encode_event(KIND_DOWN, position, NO_PRESSURE, tool, slot));
-                            self.rearm_finger = false;
-                        }
-                        // The down was held because it arrived with no pose. Emit it at this
-                        // point so the stroke starts where the pen actually is.
-                        if emit_down {
-                            push(&mut out, encode_event(KIND_DOWN, position, pressure, tool, slot));
-                        }
-                        push(&mut out, encode_event(KIND_MOVE, position, pressure, tool, slot));
+                        PenEvent::Pose { ink, id: ToolKey { ink, id }, tool, position, pressure }
                     }
                     Pending::At { ink, id, tool, kind, clear } => {
-                        if let Some(winner) = self.pen_latch {
-                            if winner != ink {
-                                self.note_duplicate(ink);
-                                continue;
-                            }
-                        }
-                        let key = ToolKey { ink, id: id.clone() };
-                        let (encoded, pressure) = {
-                            let runtime = self.runtime(ink, id);
-                            if kind == KIND_DOWN && pen_down_needs_a_pose(runtime.pressure) {
-                                runtime.awaiting_pose = true;
-                                (None, NO_PRESSURE)
-                            } else {
-                                if kind == KIND_DOWN {
-                                    runtime.awaiting_pose = false;
-                                }
-                                let pressure = if kind == KIND_IN || kind == KIND_OUT { NO_PRESSURE } else { runtime.pressure };
-                                (Some(encode_event(kind, runtime.position, pressure, tool, runtime.slot)), pressure)
-                            }
-                        };
-                        if clear {
-                            self.tools.remove(&key);
-                        }
-                        let Some(encoded) = encoded else { continue };
-                        if self.ink_all && ink_finger_suppressed && pressure == NO_PRESSURE {
-                            continue;
-                        }
-                        if self.ink_all && self.rearm_finger && pressure == NO_PRESSURE && kind == KIND_DOWN {
-                            self.rearm_finger = false;
-                        }
-                        push(&mut out, encoded);
+                        PenEvent::At { ink, id: ToolKey { ink, id }, tool, kind, clear }
                     }
+                };
+                for encoded in self.pen.ingest(event, &mut ctx) {
+                    push(&mut out, encoded);
                 }
             }
+            self.rearm_finger = ctx.rearm_finger;
+            self.last_seen = self.pen.last_seen;
             out
+        }
+
+        /// The pen list is chosen once at launch. A Cintiq power-cycle comes back under a new
+        /// index, so compare again every couple of seconds and rebuild only when the list changed.
+        fn consider_replug(&mut self) {
+            let now = now_millis();
+            if now < self.next_ink_scan || self.ink_all {
+                return;
+            }
+            self.next_ink_scan = now.saturating_add(2_000);
+            let plan = ink_plan();
+            if ink_slots_match(&plan.slots, &self.managers) {
+                return;
+            }
+            eprintln!("TABLET: pen tablets changed; listening again");
+            self.managers = plan.slots.iter().map(|(index, name)| {
+                let manager = if plan.ink_off { None } else { build_manager(self.hwnd, *index, name, true) };
+                let failed = manager.is_none() && !plan.ink_off;
+                InkManager {
+                    index: *index,
+                    name: name.clone(),
+                    manager,
+                    retry_after: if failed { now.saturating_add(1_000) } else { 0 },
+                    failures: if failed { 1 } else { 0 },
+                }
+            }).collect();
+            self.ink_off = plan.ink_off;
+            self.pen.latch = None;
+            self.pen.tools.clear();
+        }
+
+        /// WM_TOUCH only sweeps a contact that has gone quiet when the next touch message
+        /// arrives. Polling does it too, so a finger that lifts without another message still lifts.
+        fn sweep_stale_touch(&mut self) {
+            if touch_source_name() != "WM_TOUCH" {
+                return;
+            }
+            let republish = {
+                let mut frames = touch_frames().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                let before = frames.live_count();
+                let contacts = frames.apply(&[], now_millis());
+                if contacts.len() == before {
+                    None
+                } else {
+                    Some((frames.hwnd, contacts))
+                }
+            };
+            if let Some((hwnd, contacts)) = republish {
+                publish_contacts(SOURCE_WM_TOUCH, hwnd, contacts);
+            }
         }
 
         fn pointer_is_current(&self) -> bool {
@@ -397,6 +415,15 @@ use std::sync::{Mutex, OnceLock};
                     push(out, encode_event(KIND_UP, pos, NO_PRESSURE, TOOL_TOUCH, touch_slot(id)));
                 }
             }
+            let cancels = {
+                let mut state = self.touch_state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                std::mem::take(&mut state.cancels)
+            };
+            for id in cancels {
+                if let Some(pos) = self.touch_down.remove(&id) {
+                    push(out, encode_event(KIND_CANCEL, pos, NO_PRESSURE, TOOL_TOUCH, touch_slot(id)));
+                }
+            }
             for (id, pos) in positions {
                 let slot = touch_slot(id);
                 match self.touch_down.get(&id).copied() {
@@ -417,9 +444,10 @@ use std::sync::{Mutex, OnceLock};
         /// Ink's copy of a finger is not a lift. An Up would fling or tap as the real fingers arrive.
         fn cancel_pressureless_tools(&mut self, out: &mut Vec<f32>) {
             let lifts: Vec<(f32, [f32; 2])> = self
+                .pen
                 .tools
                 .values()
-                .filter(|runtime| runtime.pressure == NO_PRESSURE)
+                .filter(|runtime| runtime.pressure == NO_PRESSURE && !runtime.awaiting_pose && !is_pen_nib(runtime.tool))
                 .map(|runtime| (runtime.slot, runtime.position))
                 .collect();
             for (slot, pos) in lifts {
@@ -429,12 +457,13 @@ use std::sync::{Mutex, OnceLock};
 
         /// Copies the process-wide touch frame into this window's client coordinates.
         fn absorb_shared_touch(&mut self) {
-            let (generation, screen) = {
-                let shared = shared_touch().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let (generation, screen, cancelled) = {
+                let mut shared = shared_touch().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                 if shared.generation == self.shared_seen {
                     return;
                 }
-                (shared.generation, shared.screen.clone())
+                let cancelled = std::mem::take(&mut shared.cancelled);
+                (shared.generation, shared.screen.clone(), cancelled)
             };
             self.shared_seen = generation;
             self.last_pointer_millis = now_millis();
@@ -450,22 +479,180 @@ use std::sync::{Mutex, OnceLock};
             {
                 let mut state = self.touch_state.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                 let gone: Vec<u32> = state.positions.keys().copied().filter(|id| !converted.contains_key(id)).collect();
-                for id in gone {
-                    state.ups.push(id);
-                }
+                let (ups, cancels) = classify_departures(&gone, &cancelled);
+                state.ups.extend(ups);
+                state.cancels.extend(cancels);
                 state.positions = converted;
             }
             self.touch_generation.fetch_add(1, Ordering::Release);
         }
 
-        fn runtime(&mut self, ink: i32, id: ToolId) -> &mut ToolRuntime {
-            let key = ToolKey { ink, id };
-            if !self.tools.contains_key(&key) {
+    }
+
+    impl Drop for Bridge {
+        fn drop(&mut self) {
+            if LIVE_BRIDGES.fetch_sub(1, Ordering::AcqRel) == 1 {
+                let hook = POINTER_HOOK.swap(0, Ordering::AcqRel);
+                if hook != 0 {
+                    unsafe { UnhookWindowsHookEx(hook) };
+                }
+                HOOK_STARTED.store(false, Ordering::Release);
+                clear_shared_touch();
+            }
+        }
+    }
+
+    struct PenCtx {
+        ink_all: bool,
+        finger_suppressed: bool,
+        rearm_finger: bool,
+    }
+
+    enum PenEvent<K> {
+        Pose {
+            ink: i32,
+            id: K,
+            tool: f32,
+            position: [f32; 2],
+            pressure: f32,
+        },
+        At {
+            ink: i32,
+            id: K,
+            tool: f32,
+            kind: f32,
+            clear: bool,
+        },
+    }
+
+    struct PenBook<K> {
+        tools: HashMap<K, ToolRuntime>,
+        next_slot: f32,
+        latch: Option<i32>,
+        last_seen: [f32; 2],
+        pressureless_logged: Vec<i32>,
+        duplicate_logged: Vec<i32>,
+    }
+
+    impl<K: Clone + Eq + std::hash::Hash> PenBook<K> {
+        fn new() -> Self {
+            Self {
+                tools: HashMap::new(),
+                next_slot: 0.0,
+                latch: None,
+                last_seen: [0.0, 0.0],
+                pressureless_logged: Vec::new(),
+                duplicate_logged: Vec::new(),
+            }
+        }
+
+        /// One pen sample. A down with no pose is held. A lift before that pose drops both,
+        /// so the next hover does not start a stroke. A tool that is not a nib never becomes a finger.
+        fn ingest(&mut self, event: PenEvent<K>, ctx: &mut PenCtx) -> Vec<[f32; STRIDE]> {
+            match event {
+                PenEvent::Pose { ink, id, tool, position, pressure } => self.ingest_pose(ink, id, tool, position, pressure, ctx),
+                PenEvent::At { ink, id, tool, kind, clear } => self.ingest_phase(ink, id, tool, kind, clear, ctx),
+            }
+        }
+
+        fn ingest_pose(&mut self, ink: i32, id: K, tool: f32, position: [f32; 2], pressure: f32, ctx: &mut PenCtx) -> Vec<[f32; STRIDE]> {
+            let (latch, fate) = classify_ink_sample(self.latch, ink, pressure, !ctx.ink_all);
+            if self.latch.is_none() && latch.is_some() {
+                eprintln!("TABLET: pen latched ink #{ink}");
+            }
+            self.latch = latch;
+            if !self.accept(ink, fate) {
+                return Vec::new();
+            }
+            let (slot, emit_down) = {
+                let runtime = self.runtime(ink, id, tool);
+                runtime.position = position;
+                runtime.pressure = pressure;
+                runtime.tool = tool;
+                let emit_down = runtime.awaiting_pose && pressure != NO_PRESSURE;
+                runtime.awaiting_pose = false;
+                (runtime.slot, emit_down)
+            };
+            self.last_seen = position;
+            if ctx.ink_all && ctx.finger_suppressed && pressure == NO_PRESSURE {
+                return Vec::new();
+            }
+            let mut out = Vec::new();
+            if ctx.ink_all && ctx.rearm_finger && pressure == NO_PRESSURE {
+                out.push(encode_event(KIND_DOWN, position, NO_PRESSURE, tool, slot));
+                ctx.rearm_finger = false;
+            }
+            if emit_down {
+                out.push(encode_event(KIND_DOWN, position, pressure, tool, slot));
+            }
+            out.push(encode_event(KIND_MOVE, position, pressure, tool, slot));
+            out
+        }
+
+        fn ingest_phase(&mut self, ink: i32, id: K, tool: f32, kind: f32, clear: bool, ctx: &mut PenCtx) -> Vec<[f32; STRIDE]> {
+            if let Some(winner) = self.latch {
+                if winner != ink {
+                    self.note_duplicate(ink);
+                    return Vec::new();
+                }
+            }
+            if !ctx.ink_all && !is_pen_nib(tool) {
+                let pressure = self.tools.get(&id).map(|runtime| runtime.pressure).unwrap_or(NO_PRESSURE);
+                if pressure == NO_PRESSURE {
+                    if clear {
+                        self.tools.remove(&id);
+                        self.release_latch(ink);
+                    }
+                    return Vec::new();
+                }
+            }
+            let key = id.clone();
+            let encoded = {
+                let runtime = self.runtime(ink, id, tool);
+                runtime.tool = tool;
+                if kind == KIND_UP && runtime.awaiting_pose {
+                    runtime.awaiting_pose = false;
+                    None
+                } else if kind == KIND_DOWN && pen_down_needs_a_pose(runtime.pressure) {
+                    runtime.awaiting_pose = true;
+                    None
+                } else {
+                    if kind == KIND_DOWN {
+                        runtime.awaiting_pose = false;
+                    }
+                    let pressure = if kind == KIND_IN || kind == KIND_OUT { NO_PRESSURE } else { runtime.pressure };
+                    Some((encode_event(kind, runtime.position, pressure, tool, runtime.slot), pressure))
+                }
+            };
+            if clear {
+                self.tools.remove(&key);
+                self.release_latch(ink);
+            }
+            let Some((encoded, pressure)) = encoded else { return Vec::new() };
+            if ctx.ink_all && ctx.finger_suppressed && pressure == NO_PRESSURE {
+                return Vec::new();
+            }
+            if ctx.ink_all && ctx.rearm_finger && pressure == NO_PRESSURE && kind == KIND_DOWN {
+                ctx.rearm_finger = false;
+            }
+            vec![encoded]
+        }
+
+        fn release_latch(&mut self, ink: i32) {
+            if self.latch == Some(ink) && !self.tools.values().any(|runtime| runtime.ink == ink) {
+                self.latch = None;
+            }
+        }
+
+        fn runtime(&mut self, ink: i32, id: K, tool: f32) -> &mut ToolRuntime {
+            if !self.tools.contains_key(&id) {
                 let slot = self.next_slot;
                 self.next_slot += 1.0;
                 self.tools.insert(
-                    key.clone(),
+                    id.clone(),
                     ToolRuntime {
+                        ink,
+                        tool,
                         position: [0.0, 0.0],
                         pressure: NO_PRESSURE,
                         slot,
@@ -473,10 +660,10 @@ use std::sync::{Mutex, OnceLock};
                     },
                 );
             }
-            self.tools.get_mut(&key).expect("tool runtime inserted above")
+            self.tools.get_mut(&id).expect("tool runtime inserted above")
         }
 
-        fn accept_ink(&mut self, ink: i32, fate: SampleFate) -> bool {
+        fn accept(&mut self, ink: i32, fate: SampleFate) -> bool {
             match fate {
                 SampleFate::Keep => true,
                 SampleFate::Pressureless => {
@@ -502,16 +689,13 @@ use std::sync::{Mutex, OnceLock};
         }
     }
 
-    impl Drop for Bridge {
-        fn drop(&mut self) {
-            if LIVE_BRIDGES.fetch_sub(1, Ordering::AcqRel) == 1 {
-                let hook = POINTER_HOOK.swap(0, Ordering::AcqRel);
-                if hook != 0 {
-                    unsafe { UnhookWindowsHookEx(hook) };
-                }
-                HOOK_STARTED.store(false, Ordering::Release);
-            }
-        }
+    fn is_pen_nib(tool: f32) -> bool {
+        tool == TOOL_DRAW || tool == TOOL_ERASER
+    }
+
+    fn ink_slots_match(slots: &[(i32, String)], managers: &[InkManager]) -> bool {
+        slots.len() == managers.len()
+            && slots.iter().all(|(index, name)| managers.iter().any(|slot| slot.index == *index && slot.name == *name))
     }
 
     struct InkPlan {
@@ -651,7 +835,7 @@ use std::sync::{Mutex, OnceLock};
         }
     }
 
-    fn build_manager(hwnd: NonZeroIsize, ink_index: i32, name: &str) -> Option<Manager> {
+    fn build_manager(hwnd: NonZeroIsize, ink_index: i32, name: &str, log: bool) -> Option<Manager> {
         let mut builder = Builder::default();
         if ink_index >= 0 {
             builder = builder.ink_single_tablet(Some(ink_index));
@@ -659,11 +843,15 @@ use std::sync::{Mutex, OnceLock};
         // SAFETY: see AwtWindow.
         match unsafe { builder.build_raw(AwtWindow(hwnd)) } {
             Ok(manager) => {
-                eprintln!("TABLET: ink manager hwnd={} #{ink_index} \"{name}\" ok", hwnd.get());
+                if log {
+                    eprintln!("TABLET: ink manager hwnd={} #{ink_index} \"{name}\" ok", hwnd.get());
+                }
                 Some(manager)
             }
             Err(error) => {
-                eprintln!("TABLET: ink manager hwnd={} #{ink_index} \"{name}\" failed {error}", hwnd.get());
+                if log {
+                    eprintln!("TABLET: ink manager hwnd={} #{ink_index} \"{name}\" failed {error}", hwnd.get());
+                }
                 None
             }
         }
@@ -797,12 +985,14 @@ struct ScreenTouch {
 
 struct SharedTouch {
     screen: HashMap<u32, ScreenTouch>,
+    /// Pointer ids removed by leave or capture loss. Those are cancels, not lifts.
+    cancelled: Vec<u32>,
     generation: u64,
 }
 
 fn shared_touch() -> &'static Mutex<SharedTouch> {
     static SHARED: OnceLock<Mutex<SharedTouch>> = OnceLock::new();
-    SHARED.get_or_init(|| Mutex::new(SharedTouch { screen: HashMap::new(), generation: 0 }))
+    SHARED.get_or_init(|| Mutex::new(SharedTouch { screen: HashMap::new(), cancelled: Vec::new(), generation: 0 }))
 }
 
 fn now_millis() -> u64 {
@@ -877,10 +1067,22 @@ fn publish_contacts(source: u8, hwnd: isize, contacts: HashMap<u32, [f32; 2]>) {
     shared.generation = shared.generation.wrapping_add(1);
 }
 
-struct PointerFrame {
+struct PointedTouch {
+    x: f32,
+    y: f32,
     hwnd: isize,
-    down: HashMap<u32, [f32; 2]>,
+}
+
+struct PointerFrame {
+    down: HashMap<u32, PointedTouch>,
     lifted: Vec<u32>,
+}
+
+struct PointerProbe {
+    in_contact: bool,
+    x: f32,
+    y: f32,
+    hwnd: isize,
 }
 
 fn arm_touch_gesture() {
@@ -892,7 +1094,6 @@ pub fn touch_gesture_active() -> bool {
 }
 
 fn contacts_from(infos: &[PointerTouchInfo]) -> PointerFrame {
-    let hwnd = infos.first().map(|info| info.pointer_info.hwnd_target).unwrap_or(0);
     let mut down = HashMap::new();
     let mut lifted = Vec::new();
     for info in infos {
@@ -905,50 +1106,92 @@ fn contacts_from(infos: &[PointerTouchInfo]) -> PointerFrame {
         if flags & (POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN) == 0 {
             continue;
         }
-        down.insert(id, [info.pointer_info.pixel_x as f32, info.pointer_info.pixel_y as f32]);
+        down.insert(
+            id,
+            PointedTouch {
+                x: info.pointer_info.pixel_x as f32,
+                y: info.pointer_info.pixel_y as f32,
+                hwnd: info.pointer_info.hwnd_target,
+            },
+        );
     }
-    PointerFrame { hwnd, down, lifted }
+    PointerFrame { down, lifted }
+}
+
+/// Merge one pointer message into the contacts we already have.
+/// A failed probe keeps the other finger. A successful probe that says it is up drops it.
+fn merge_pointer_contacts(
+    screen: &mut HashMap<u32, ScreenTouch>,
+    down: &HashMap<u32, PointedTouch>,
+    lifted: &[u32],
+    now: u64,
+    probe: impl Fn(u32) -> Option<PointerProbe>,
+) {
+    for id in lifted {
+        screen.remove(id);
+    }
+    for (id, touch) in down {
+        screen.insert(*id, ScreenTouch { x: touch.x, y: touch.y, hwnd: touch.hwnd, seen_millis: now });
+    }
+    let others: Vec<u32> = screen.keys().copied().filter(|id| !down.contains_key(id)).collect();
+    for id in others {
+        match probe(id) {
+            None => {}
+            Some(info) if info.in_contact => {
+                if let Some(slot) = screen.get_mut(&id) {
+                    slot.x = info.x;
+                    slot.y = info.y;
+                    slot.seen_millis = now;
+                    if info.hwnd != 0 {
+                        slot.hwnd = info.hwnd;
+                    }
+                }
+            }
+            Some(_) => {
+                screen.remove(&id);
+            }
+        }
+    }
+}
+
+/// Ids that disappeared because the pointer left or lost capture are cancels.
+/// A real lift is an up.
+fn classify_departures(gone: &[u32], cancelled: &[u32]) -> (Vec<u32>, Vec<u32>) {
+    let mut ups = Vec::new();
+    let mut cancels = Vec::new();
+    for id in gone {
+        if cancelled.contains(id) {
+            cancels.push(*id);
+        } else {
+            ups.push(*id);
+        }
+    }
+    (ups, cancels)
 }
 
 /// One pointer message describes one finger. Replacing the whole map dropped the other
 /// finger, so a pinch never had two contacts. Merge this message, then ask Windows
 /// whether every finger we already know is still down.
-fn apply_pointer_update(hwnd: isize, down: HashMap<u32, [f32; 2]>, lifted: &[u32]) {
+fn apply_pointer_update(down: HashMap<u32, PointedTouch>, lifted: &[u32]) {
     if !claim_touch_source(SOURCE_WM_POINTER) {
         return;
     }
     let now = now_millis();
     let mut shared = shared_touch().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    for id in lifted {
-        shared.screen.remove(id);
-    }
-    for (id, pos) in &down {
-        shared.screen.insert(
-            *id,
-            ScreenTouch { x: pos[0], y: pos[1], hwnd, seen_millis: now },
-        );
-    }
-    let others: Vec<u32> = shared.screen.keys().copied().filter(|id| !down.contains_key(id)).collect();
-    for id in others {
+    merge_pointer_contacts(&mut shared.screen, &down, lifted, now, |id| {
         let mut info = unsafe { std::mem::zeroed::<PointerTouchInfo>() };
         if unsafe { GetPointerTouchInfo(id, &mut info) } == 0 {
-            continue;
+            return None;
         }
         let flags = info.pointer_info.pointer_flags;
         let in_contact = flags & POINTER_FLAG_UP == 0 && flags & (POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN) != 0;
-        if !in_contact {
-            shared.screen.remove(&id);
-            continue;
-        }
-        if let Some(slot) = shared.screen.get_mut(&id) {
-            slot.x = info.pointer_info.pixel_x as f32;
-            slot.y = info.pointer_info.pixel_y as f32;
-            slot.seen_millis = now;
-            if info.pointer_info.hwnd_target != 0 {
-                slot.hwnd = info.pointer_info.hwnd_target;
-            }
-        }
-    }
+        Some(PointerProbe {
+            in_contact,
+            x: info.pointer_info.pixel_x as f32,
+            y: info.pointer_info.pixel_y as f32,
+            hwnd: info.pointer_info.hwnd_target,
+        })
+    });
     let live = shared.screen.len();
     shared.generation = shared.generation.wrapping_add(1);
     if live >= 2 && !LOGGED_TWO_FINGERS.swap(true, Ordering::Relaxed) {
@@ -972,14 +1215,27 @@ fn read_pointer_frame(id: u32) -> Option<PointerFrame> {
     None
 }
 
-fn forget_pointer(id: u32) {
+fn forget_pointer(id: u32, cancel: bool) {
     if TOUCH_SOURCE.load(Ordering::Relaxed) != SOURCE_WM_POINTER {
         return;
     }
     let mut shared = shared_touch().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if shared.screen.remove(&id).is_some() {
+        if cancel {
+            shared.cancelled.push(id);
+        }
         shared.generation = shared.generation.wrapping_add(1);
     }
+}
+
+fn clear_shared_touch() {
+    let mut shared = shared_touch().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    shared.screen.clear();
+    shared.cancelled.clear();
+    shared.generation = shared.generation.wrapping_add(1);
+    TOUCH_SOURCE.store(SOURCE_NONE, Ordering::Release);
+    let mut frames = touch_frames().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    *frames = TouchFrames::new();
 }
 
 fn note_pointer_message(msg: &WinMsg) {
@@ -995,33 +1251,38 @@ fn note_pointer_message(msg: &WinMsg) {
         if !SAW_WM_POINTER.swap(true, Ordering::Relaxed) {
             eprintln!("TABLET: hook saw WM_POINTER touch hwnd=0");
         }
-        forget_pointer(id);
+        forget_pointer(id, true);
         return;
     }
-    if let Some(frame) = read_pointer_frame(id) {
-        let hwnd = if frame.hwnd != 0 { frame.hwnd } else { msg.hwnd };
+    if let Some(mut frame) = read_pointer_frame(id) {
+        for touch in frame.down.values_mut() {
+            if touch.hwnd == 0 {
+                touch.hwnd = msg.hwnd;
+            }
+        }
+        let hwnd = frame.down.values().find(|touch| touch.hwnd != 0).map(|touch| touch.hwnd).unwrap_or(msg.hwnd);
         if !SAW_WM_POINTER.swap(true, Ordering::Relaxed) {
             eprintln!("TABLET: hook saw WM_POINTER touch hwnd={hwnd}");
         }
         if !LOGGED_POINTER_FRAME.swap(true, Ordering::Relaxed) {
             eprintln!("TABLET: pointer frame contacts={} hwnd={hwnd}", frame.down.len());
         }
-        apply_pointer_update(hwnd, frame.down, &frame.lifted);
+        apply_pointer_update(frame.down, &frame.lifted);
         return;
     }
     if !TOUCH_READ_FAILED.swap(true, Ordering::Relaxed) {
         eprintln!("TABLET: pointer frame unread ({}); using the message point", unsafe { GetLastError() });
     }
     if msg.message == WM_POINTERUP {
-        forget_pointer(id);
+        forget_pointer(id, false);
         return;
     }
     if !SAW_WM_POINTER.swap(true, Ordering::Relaxed) {
         eprintln!("TABLET: hook saw WM_POINTER touch hwnd={}", msg.hwnd);
     }
     let mut contacts = HashMap::new();
-    contacts.insert(id, [msg.pt_x as f32, msg.pt_y as f32]);
-    apply_pointer_update(msg.hwnd, contacts, &[]);
+    contacts.insert(id, PointedTouch { x: msg.pt_x as f32, y: msg.pt_y as f32, hwnd: msg.hwnd });
+    apply_pointer_update(contacts, &[]);
 }
 
 fn note_touch_message(hwnd: isize, wparam: usize, lparam: isize) {
@@ -1043,6 +1304,7 @@ fn note_touch_message(hwnd: isize, wparam: usize, lparam: isize) {
     }
     let entries: Vec<(u32, u32, i32, i32)> = inputs.iter().take(count as usize).map(|input| (input.id, input.flags, input.x, input.y)).collect();
     let mut frames = touch_frames().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    frames.hwnd = hwnd;
     let contacts = frames.apply(&entries, now_millis());
     drop(frames);
     publish_contacts(SOURCE_WM_TOUCH, hwnd, contacts);
@@ -1053,6 +1315,7 @@ struct TouchFrames {
     live: HashMap<u32, TouchContact>,
     next_ordinal: u32,
     free_ordinals: Vec<u32>,
+    hwnd: isize,
 }
 
 struct TouchContact {
@@ -1064,7 +1327,11 @@ struct TouchContact {
 
 impl TouchFrames {
     fn new() -> Self {
-        Self { live: HashMap::new(), next_ordinal: 0, free_ordinals: Vec::new() }
+        Self { live: HashMap::new(), next_ordinal: 0, free_ordinals: Vec::new(), hwnd: 0 }
+    }
+
+    fn live_count(&self) -> usize {
+        self.live.len()
     }
 
     /// `entries` are `(raw id, flags, x in hundredths of a screen pixel, y the same)`.
@@ -1263,9 +1530,152 @@ mod tests {
         let palm = frames.apply(&[(9, TOUCHEVENTF_PALM | TOUCHEVENTF_DOWN, 1000, 1000)], 32);
         assert_eq!(palm.len(), 2);
         let quiet = frames.apply(&[], 16 + TOUCH_CONTACT_SILENCE_MILLIS + 1);
-        assert!(quiet.is_empty() || quiet.len() < 2);
+        assert!(quiet.is_empty(), "both fingers have been silent long enough to lift");
         let later = frames.apply(&[], 32 + TOUCH_CONTACT_SILENCE_MILLIS + 1);
         assert!(later.is_empty());
+    }
+
+    #[test]
+    fn silence_lifts_only_the_finger_that_went_quiet() {
+        let mut frames = TouchFrames::new();
+        frames.apply(&[(7, TOUCHEVENTF_DOWN, 5000, 5000), (8, TOUCHEVENTF_DOWN, 8000, 8000)], 0);
+        frames.apply(&[(7, TOUCHEVENTF_MOVE, 5100, 5000)], 16);
+        let later = frames.apply(&[], TOUCH_CONTACT_SILENCE_MILLIS + 1);
+        assert_eq!(later.len(), 1);
+        assert!(later.contains_key(&0));
+    }
+
+    #[test]
+    fn a_pen_down_is_emitted_at_the_following_pose() {
+        let mut pen = PenBook::<u64>::new();
+        let mut ctx = PenCtx { ink_all: false, finger_suppressed: false, rearm_finger: false };
+        let held = pen.ingest(
+            PenEvent::At { ink: 5, id: 1, tool: TOOL_DRAW, kind: KIND_DOWN, clear: false },
+            &mut ctx,
+        );
+        assert!(held.is_empty());
+        let posed = pen.ingest(
+            PenEvent::Pose { ink: 5, id: 1, tool: TOOL_DRAW, position: [40.0, 50.0], pressure: 0.4 },
+            &mut ctx,
+        );
+        assert_eq!(posed.len(), 2);
+        assert_eq!(posed[0][0], KIND_DOWN);
+        assert_eq!(posed[0][1], 40.0);
+        assert_eq!(posed[0][2], 50.0);
+        assert_eq!(posed[0][3], 0.4);
+        assert_eq!(posed[1][0], KIND_MOVE);
+    }
+
+    #[test]
+    fn a_lift_before_the_pose_does_not_draw_on_the_next_hover() {
+        let mut pen = PenBook::<u64>::new();
+        let mut ctx = PenCtx { ink_all: false, finger_suppressed: false, rearm_finger: false };
+        pen.ingest(PenEvent::At { ink: 5, id: 1, tool: TOOL_DRAW, kind: KIND_DOWN, clear: false }, &mut ctx);
+        let up = pen.ingest(PenEvent::At { ink: 5, id: 1, tool: TOOL_DRAW, kind: KIND_UP, clear: false }, &mut ctx);
+        assert!(up.is_empty());
+        let hover = pen.ingest(
+            PenEvent::Pose { ink: 5, id: 1, tool: TOOL_DRAW, position: [10.0, 12.0], pressure: 0.0 },
+            &mut ctx,
+        );
+        assert_eq!(hover.len(), 1);
+        assert_eq!(hover[0][0], KIND_MOVE);
+    }
+
+    #[test]
+    fn a_rejected_tools_up_is_not_a_finger_lift() {
+        let mut pen = PenBook::<u64>::new();
+        let mut ctx = PenCtx { ink_all: false, finger_suppressed: false, rearm_finger: false };
+        let up = pen.ingest(
+            PenEvent::At { ink: 1, id: 9, tool: TOOL_UNKNOWN, kind: KIND_UP, clear: false },
+            &mut ctx,
+        );
+        assert!(up.is_empty());
+    }
+
+    #[test]
+    fn the_pen_latch_releases_when_that_pen_leaves() {
+        let mut pen = PenBook::<u64>::new();
+        let mut ctx = PenCtx { ink_all: false, finger_suppressed: false, rearm_finger: false };
+        pen.ingest(
+            PenEvent::Pose { ink: 5, id: 1, tool: TOOL_DRAW, position: [1.0, 1.0], pressure: 0.2 },
+            &mut ctx,
+        );
+        assert_eq!(pen.latch, Some(5));
+        pen.ingest(PenEvent::At { ink: 5, id: 1, tool: TOOL_DRAW, kind: KIND_OUT, clear: true }, &mut ctx);
+        assert_eq!(pen.latch, None);
+        let other = pen.ingest(
+            PenEvent::Pose { ink: 6, id: 2, tool: TOOL_DRAW, position: [3.0, 4.0], pressure: 0.5 },
+            &mut ctx,
+        );
+        assert_eq!(other.len(), 1);
+        assert_eq!(other[0][0], KIND_MOVE);
+        assert_eq!(pen.latch, Some(6));
+    }
+
+    #[test]
+    fn a_second_pointer_does_not_replace_the_first_and_each_keeps_its_window() {
+        let mut screen = HashMap::new();
+        let mut first = HashMap::new();
+        first.insert(1u32, PointedTouch { x: 10.0, y: 20.0, hwnd: 100 });
+        merge_pointer_contacts(&mut screen, &first, &[], 1, |_| None);
+        let mut second = HashMap::new();
+        second.insert(2u32, PointedTouch { x: 30.0, y: 40.0, hwnd: 200 });
+        merge_pointer_contacts(&mut screen, &second, &[], 2, |id| {
+            if id == 1 {
+                Some(PointerProbe { in_contact: true, x: 11.0, y: 21.0, hwnd: 100 })
+            } else {
+                None
+            }
+        });
+        assert_eq!(screen.len(), 2);
+        assert_eq!(screen.get(&1).map(|touch| touch.hwnd), Some(100));
+        assert_eq!(screen.get(&2).map(|touch| touch.hwnd), Some(200));
+    }
+
+    #[test]
+    fn a_failed_pointer_probe_keeps_the_other_finger() {
+        let mut screen = HashMap::new();
+        let mut both = HashMap::new();
+        both.insert(1u32, PointedTouch { x: 1.0, y: 1.0, hwnd: 7 });
+        both.insert(2u32, PointedTouch { x: 2.0, y: 2.0, hwnd: 8 });
+        merge_pointer_contacts(&mut screen, &both, &[], 1, |_| None);
+        let mut one = HashMap::new();
+        one.insert(1u32, PointedTouch { x: 3.0, y: 3.0, hwnd: 7 });
+        merge_pointer_contacts(&mut screen, &one, &[], 2, |_| None);
+        assert!(screen.contains_key(&2));
+    }
+
+    #[test]
+    fn a_pointer_frame_keeps_each_contacts_window() {
+        let mut left = unsafe { std::mem::zeroed::<PointerTouchInfo>() };
+        left.pointer_info.pointer_id = 4;
+        left.pointer_info.pointer_flags = POINTER_FLAG_INCONTACT;
+        left.pointer_info.hwnd_target = 11;
+        left.pointer_info.pixel_x = 5;
+        left.pointer_info.pixel_y = 6;
+        let mut right = unsafe { std::mem::zeroed::<PointerTouchInfo>() };
+        right.pointer_info.pointer_id = 5;
+        right.pointer_info.pointer_flags = POINTER_FLAG_DOWN;
+        right.pointer_info.hwnd_target = 22;
+        right.pointer_info.pixel_x = 7;
+        right.pointer_info.pixel_y = 8;
+        let frame = contacts_from(&[left, right]);
+        assert_eq!(frame.down.get(&4).map(|touch| touch.hwnd), Some(11));
+        assert_eq!(frame.down.get(&5).map(|touch| touch.hwnd), Some(22));
+    }
+
+    #[test]
+    fn a_leave_is_a_cancel_and_a_lift_is_an_up() {
+        let (ups, cancels) = classify_departures(&[1, 2], &[2]);
+        assert_eq!(ups, vec![1]);
+        assert_eq!(cancels, vec![2]);
+    }
+
+    #[test]
+    fn a_changed_pen_list_does_not_match_the_one_already_open() {
+        let open = vec![InkManager { index: 5, name: "Cintiq Pro 16".to_string(), manager: None, retry_after: 0, failures: 0 }];
+        assert!(ink_slots_match(&[(5, "Cintiq Pro 16".to_string())], &open));
+        assert!(!ink_slots_match(&[(9, "Cintiq Pro 16".to_string())], &open));
     }
 
     #[test]
