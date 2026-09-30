@@ -68,8 +68,11 @@ internal fun CanvasQuickCreateTargets(
 ) {
     val gapPx = with(LocalDensity.current) { (if (compact) TOUCH_OFFSET else OFFSET).toPx() }
     fun centreOf(direction: QuickCreateDirection): Offset = CanvasQuickCreate.targetCentre(anchor, direction, gapPx)
-    // The drag outlives recompositions (the anchor moves as the board pans), so it reads these fresh.
-    val centre by rememberUpdatedState(::centreOf)
+    // The drag outlives recompositions (the element moves, the board pans), so it reads the anchor
+    // itself fresh. A remembered reference to centreOf kept the first anchor: a shape moved after it
+    // was selected pulled its arrow out of where it used to be.
+    val liveAnchor by rememberUpdatedState(anchor)
+    val liveGap by rememberUpdatedState(gapPx)
     val latest by rememberUpdatedState(actions)
     Layout(
         modifier = modifier,
@@ -80,7 +83,11 @@ internal fun CanvasQuickCreateTargets(
                     compact = compact,
                     chromeRegions = chromeRegions,
                     onClick = { latest.onCreate(direction) },
-                    pull = Modifier.pullArrow(direction, { centre(direction) }, { latest }),
+                    pull = Modifier.pullArrow(
+                        direction,
+                        { CanvasQuickCreate.targetCentre(liveAnchor, direction, liveGap) },
+                        { latest },
+                    ),
                 )
             }
         },
@@ -133,8 +140,8 @@ private fun QuickCreateTarget(
 
 /**
  * An arrow pulled out of the target for [direction]: it starts at the target's centre ([from], read
- * fresh as the board pans) and follows the pointer, reported to [actions] as it moves and where it
- * is let go.
+ * fresh on every step, so it stays on the element as the board pans under the drag) and follows
+ * the pointer, reported to [actions] as it moves and where it is let go.
  */
 private fun Modifier.pullArrow(
     direction: QuickCreateDirection,
@@ -158,7 +165,7 @@ private fun Modifier.pullArrow(
         onDragCancel = { report(null) },
     ) { change, amount ->
         change.consume()
-        report(drag?.let { it.copy(to = it.to + amount) })
+        report(drag?.let { it.copy(from = from(), to = it.to + amount) })
     }
 }
 

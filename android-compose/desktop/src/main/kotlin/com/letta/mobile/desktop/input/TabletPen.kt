@@ -12,6 +12,7 @@ import kotlin.coroutines.coroutineContext
 import java.awt.Component
 import java.awt.Point
 import java.awt.Window
+import com.letta.mobile.desktop.touch.ComposeTouchInjector
 import com.letta.mobile.desktop.touch.DesktopPointerTouch
 import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
 import com.letta.mobile.desktop.touch.DesktopTouchOrigin
@@ -248,7 +249,17 @@ internal class TabletPen(
 
     private val controlLatch = FingerControlLatch()
 
+    /** Fingers as real Compose touch, when that is switched on and this Compose build allows it. */
+    private val composeTouch: ComposeTouchInjector? by lazy {
+        if (ComposeTouchInjector.enabled) ComposeTouchInjector.bindOrNull(window) else null
+    }
+
     private fun dispatchFinger(target: Component, sample: TabletPenDecoder.DecodedSample, windowMoved: Boolean) {
+        val touch = composeTouch
+        if (touch != null) {
+            if (windowMoved) touch.releaseAll() else touch.onSample(target, sample)
+            return
+        }
         if (sample.kind == TabletBridge.KIND_CANCEL) {
             boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())
             controlLatch.clear()

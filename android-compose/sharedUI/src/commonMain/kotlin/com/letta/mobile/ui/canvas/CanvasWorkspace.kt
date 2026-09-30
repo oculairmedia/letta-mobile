@@ -40,6 +40,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.Job
@@ -1067,6 +1068,10 @@ fun CanvasWorkspace(
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             CanvasWorkspaceSupport.handleWheelZoom(event, controller)
+                            // A real touch press picks with a fingertip's reach, before DrawBox sees it.
+                            if (event.type == PointerEventType.Press && event.changes.any { it.type == PointerType.Touch }) {
+                                fingerRecency.touched(System.currentTimeMillis())
+                            }
                         }
                     }
                 },
