@@ -138,7 +138,11 @@ internal class ComposeTouchInjector private constructor(
             ComposeTouchInjector(scene, container, content) {
                 (bounds.invoke(mediator) as? androidx.compose.ui.geometry.Rect)?.topLeft ?: Offset.Zero
             }
-        }.onSuccess { println("TOUCH: fingers go to Compose as touch") }
+        }.onSuccess {
+            // The same fingers still reach AWT; its copy must not land as a second pointer.
+            DesktopTouchEchoFilter.guard(window)
+            println("TOUCH: fingers go to Compose as touch")
+        }
             .onFailure { println("TOUCH: compose scene unavailable; fingers do nothing until it is found again: $it") }
             .getOrNull()
 

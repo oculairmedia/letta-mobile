@@ -52,6 +52,8 @@ internal class TabletPen(
 
         return scope.launch(Dispatchers.Main) {
             println("TABLET: polling on ${Thread.currentThread().name}")
+            // Bind before the first finger, so its AWT copy is already being dropped.
+            composeTouch
             try {
                 pollLoop()
             } finally {

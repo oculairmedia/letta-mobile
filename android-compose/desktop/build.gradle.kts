@@ -461,6 +461,11 @@ nucleus.application {
     // text components, so the touch keyboard never pops).
     javaHome = packagingJavaHome
 
+    // Windows touch: AWT still turns each finger into touch-caused mouse events,
+    // and the only flag that says so sits behind sun.awt.AWTAccessor.
+    // DesktopTouchEchoFilter reads it to drop that copy, since fingers reach
+    // Compose as real touch (ComposeTouchInjector).
+    //
     // The Windows touch keyboard: DesktopWindowsTouchKeyboard reflects onto
     // WToolkit.showTouchKeyboard/hideTouchKeyboard to raise the touch
     // keyboard, since the COM ITipInvocation route is dead on Windows 11
@@ -474,6 +479,7 @@ nucleus.application {
     // packaged build with:
     //   findstr add-opens "<install dir>\app\Letta Desktop.cfg"
     jvmArgs(
+        "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
     )
 
