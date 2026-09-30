@@ -53,6 +53,7 @@ internal object DesktopJdkTouchKeyboardAccessor {
      * never propagates a failure, without touching the real AWT toolkit or
      * popping a real keyboard on a CI box.
      */
+    @Suppress("NoAnyType") // Bound by reflection; the stand-in cannot share a type with WToolkit.
     fun bindOrNull(toolkit: Any = Toolkit.getDefaultToolkit()): DesktopTouchKeyboardController? = runCatching {
         val showMethod = toolkit.javaClass
             .getDeclaredMethod("showTouchKeyboard", Boolean::class.javaPrimitiveType)

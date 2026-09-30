@@ -90,6 +90,8 @@ internal object DesktopWindowsTouchInput {
     private val PAN_UNIT_PIXELS =
         System.getProperty("letta.touchPanUnitPixels")?.toDoubleOrNull() ?: 2.5
 
+    // The event queue it feeds is pushed once per process, so the window set is too.
+    @Suppress("NoProcessGlobalMutableState")
     private val windows: MutableSet<Window> =
         Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
     private val installed = AtomicBoolean(false)

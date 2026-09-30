@@ -16,7 +16,7 @@ internal val LocalDesktopWindow = compositionLocalOf<Window?> { null }
  * touch keyboard can open. Lists stay on the scroll path.
  */
 @Composable
-internal fun Modifier.fingerPressesAsClicks(id: Any): Modifier {
+internal fun Modifier.fingerPressesAsClicks(id: String): Modifier {
     val window = LocalDesktopWindow.current ?: return this
     DisposableEffect(window, id) {
         onDispose { DesktopTouchInteractive.publishOverlay(window, id, null) }

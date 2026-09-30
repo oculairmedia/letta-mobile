@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
  */
 internal class DesktopTouchDragExclusionRegistry<K : Any> {
     private val bounds: MutableMap<K, Rectangle> = Collections.synchronizedMap(WeakHashMap())
-    private val overlays: MutableMap<K, MutableMap<Any, Rectangle>> = Collections.synchronizedMap(WeakHashMap())
+    private val overlays: MutableMap<K, MutableMap<String, Rectangle>> = Collections.synchronizedMap(WeakHashMap())
 
     /** Publishes the excluded region for [key], or clears it when [screenBounds] is null. */
     fun publish(key: K, screenBounds: Rectangle?) {
@@ -56,7 +56,7 @@ internal class DesktopTouchDragExclusionRegistry<K : Any> {
      * or a finger drag on a slider is swallowed as scrolling and the title bar loses its
      * exclusion the moment the menu publishes.
      */
-    fun publishOverlay(key: K, id: Any, screenBounds: Rectangle?) {
+    fun publishOverlay(key: K, id: String, screenBounds: Rectangle?) {
         synchronized(overlays) {
             val regions = overlays.getOrPut(key) { mutableMapOf() }
             if (screenBounds == null) regions.remove(id) else regions[id] = screenBounds

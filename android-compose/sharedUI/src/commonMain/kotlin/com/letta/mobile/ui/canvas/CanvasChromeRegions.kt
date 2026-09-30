@@ -97,14 +97,14 @@ val LocalCanvasChromeRegions = androidx.compose.runtime.compositionLocalOf<Canva
  * without this it never hears the finger. Null bounds clear the publication.
  */
 fun interface ScreenRegionPublisher {
-    fun publish(id: Any, bounds: Rect?)
+    fun publish(id: String, bounds: Rect?)
 }
 
 val LocalScreenRegionPublisher = androidx.compose.runtime.compositionLocalOf<ScreenRegionPublisher?> { null }
 
 /** Registers this composable with [LocalScreenRegionPublisher] for as long as it is shown. */
 @Composable
-fun Modifier.passthroughPointerRegion(id: Any): Modifier {
+fun Modifier.passthroughPointerRegion(id: String): Modifier {
     val publisher = LocalScreenRegionPublisher.current ?: return this
     DisposableEffect(publisher, id) {
         onDispose { publisher.publish(id, null) }
