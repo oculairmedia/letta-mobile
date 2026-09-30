@@ -80,6 +80,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.ak1.drawbox.domain.model.BackgroundPattern
 import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.linePath
+import io.ak1.drawbox.domain.model.LinePath
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.model.ResizeHandle
@@ -1949,7 +1951,8 @@ private fun DrawScope.drawShape(shape: Element.Shape) {
             drawArrowShape(shape)
         }
         ShapeType.LINE -> {
-            if (shape.bend == Offset.Zero) {
+            val linePath = shape.linePath()
+            if (linePath is LinePath.Straight) {
                 drawLine(
                     color = shape.strokeColor,
                     start = start,
@@ -1959,13 +1962,8 @@ private fun DrawScope.drawShape(shape: Element.Shape) {
                     pathEffect = shape.strokeStyle.toPathEffect(shape.strokeWidth),
                 )
             } else {
-                val control = shape.controlPoint()
-                val path = Path().apply {
-                    moveTo(start.x, start.y)
-                    quadraticTo(control.x, control.y, end.x, end.y)
-                }
                 drawPath(
-                    path,
+                    linePath.toComposePath(),
                     color = shape.strokeColor,
                     style = Stroke(
                         width = shape.strokeWidth,
@@ -2277,6 +2275,20 @@ private fun normalizeOffset(v: Offset): Offset {
     return if (len > 0f) Offset(v.x / len, v.y / len) else Offset.Zero
 }
 
+/** The drawable path for a curved [LinePath]. */
+private fun LinePath.toComposePath(): Path = Path().apply {
+    moveTo(start.x, start.y)
+    when (val path = this@toComposePath) {
+        is LinePath.Straight -> lineTo(path.end.x, path.end.y)
+        is LinePath.Quadratic -> quadraticTo(path.control.x, path.control.y, path.end.x, path.end.y)
+        is LinePath.Cubic -> cubicTo(
+            path.control1.x, path.control1.y,
+            path.control2.x, path.control2.y,
+            path.end.x, path.end.y,
+        )
+    }
+}
+
 /**
  * Render an arrow shape with intelligent head sizing.
  *
@@ -2314,7 +2326,8 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
     val arrowDepth = arrowSize * cos(PI / 6).toFloat()
 
     val angle: Float
-    if (shape.bend == Offset.Zero) {
+    val linePath = shape.linePath()
+    if (linePath is LinePath.Straight) {
         // Straight arrow — body is shortened so the head sits cleanly at the tip.
         val dx = end.x - start.x
         val dy = end.y - start.y
@@ -2333,18 +2346,11 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
             pathEffect = shape.strokeStyle.toPathEffect(strokeWidth),
         )
     } else {
-        // Curved arrow — quadratic bezier; head direction comes from the tangent
-        // at t = 1, i.e. 2 * (end - control), simplified to (end - control).
-        val control = shape.controlPoint()
-        val tx = end.x - control.x
-        val ty = end.y - control.y
-        angle = atan2(ty, tx)
-        val path = Path().apply {
-            moveTo(start.x, start.y)
-            quadraticTo(control.x, control.y, end.x, end.y)
-        }
+        // Curved arrow: the head points the way the curve arrives.
+        val heading = linePath.endDirection()
+        angle = atan2(heading.y, heading.x)
         drawPath(
-            path,
+            linePath.toComposePath(),
             color = color,
             style = Stroke(
                 width = strokeWidth,

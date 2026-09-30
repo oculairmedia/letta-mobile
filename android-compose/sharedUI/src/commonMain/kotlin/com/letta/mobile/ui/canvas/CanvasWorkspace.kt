@@ -864,6 +864,18 @@ fun CanvasWorkspace(
         }
     }
 
+    // Moves the board by [delta] over a short ease rather than in one step.
+    fun glideBy(delta: Offset) {
+        coroutineScope.launch {
+            var applied = Offset.Zero
+            animate(0f, 1f, animationSpec = tween(QUICK_CREATE_GLIDE_MILLIS)) { fraction, _ ->
+                val target = delta * fraction
+                controller.panBy(target - applied)
+                applied = target
+            }
+        }
+    }
+
     // Adds [next] joined to the element at [from] by an arrow off its [direction] side, as one undo
     // step, and puts the caret in it. [fromNote]: the arrow starts on a note card, which DrawBox
     // does not bind, so the board snaps it.
@@ -875,14 +887,18 @@ fun CanvasWorkspace(
     ) {
         val undoStepsBefore = controller.state.value.history.size
         controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(next))
-        // A phone shows little of the board, so the new shape is centred for typing into it;
-        // a wide board only moves when the new shape would land off its edge.
-        CanvasViewportFit.panToShow(next.bounds(), controller.state.value.viewport, boardSize, centre = compact)
-            ?.let(controller::panBy)
         val (start, end) = CanvasQuickCreate.connector(from, next.bounds(), direction)
         CanvasQuickCreate.addArrow(controller, start, end)?.let { arrowId ->
             controller.onIntent(io.ak1.drawbox.domain.model.Intent.FinalizeArrowBindings(arrowId))
+            // Once bound, it leaves one shape and meets the other square to their sides, and
+            // keeps doing so as either moves.
+            controller.onIntent(io.ak1.drawbox.domain.model.Intent.SmoothConnector(arrowId))
         }
+        // A phone shows little of the board, so the new shape is centred for typing into it;
+        // a wide board only moves when the new shape would land off its edge. It glides there:
+        // a jump loses where the shape came from.
+        CanvasViewportFit.panToShow(next.bounds(), controller.state.value.viewport, boardSize, centre = compact)
+            ?.let(::glideBy)
         // The shape and its arrow are one action: one undo takes both.
         controller.onIntent(
             io.ak1.drawbox.domain.model.Intent.MergeUndoSteps(controller.state.value.history.size - undoStepsBefore),
@@ -966,7 +982,8 @@ fun CanvasWorkspace(
             else -> {
                 val base = shape ?: CanvasQuickCreate.defaultShape(current.strokeColor, current.strokeWidth)
                 val next = CanvasQuickCreate.shapeAt(base, world, kind, current.elements.maxOfOrNull { it.zIndex } ?: 0)
-                addJoinedShape(from, next, direction, fromNote = shape == null)
+                // The arrow leaves the side it was pulled from, curving round to where it was let go.
+                addJoinedShape(from, next, drop.direction, fromNote = shape == null)
             }
         }
     }
@@ -1616,9 +1633,18 @@ fun CanvasWorkspace(
                 QuickCreateAnchorParams(
                     state = state,
                     activeNote = activeNote?.takeIf { expandedNoteId == null && !notesSelected },
-                    editing = editingTextId != null,
+                    // A shape just made has the caret in it; its targets stay so the next one can follow.
+                    editing = editingTextId != null && editingTextId !in state.selectedIds,
                 ),
             )
+            // The arrow being pulled out, and while its menu is open, the arrow it will become. Drawn
+            // first, so it runs out from under the target it was pulled from.
+            (quickDrag ?: quickDrop)?.let { pulled ->
+                val tint = MaterialTheme.colorScheme.primary
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawQuickCreateArrow(pulled.from, pulled.to, pulled.direction, tint)
+                }
+            }
             if (quickAnchor != null) {
                 CanvasQuickCreateTargets(
                     anchor = quickAnchor,
@@ -1632,13 +1658,6 @@ fun CanvasWorkspace(
                     modifier = Modifier.fillMaxSize(),
                     compact = compact,
                 )
-            }
-            // The arrow being pulled out, and while its menu is open, the arrow it will become.
-            (quickDrag ?: quickDrop)?.let { pulled ->
-                val tint = MaterialTheme.colorScheme.primary
-                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawQuickCreateArrow(pulled.from, pulled.to, tint)
-                }
             }
             quickDrop?.let { drop ->
                 Box(modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(drop.to.x.toInt(), drop.to.y.toInt()) }) {
@@ -1835,17 +1854,33 @@ private fun storedKey(image: io.ak1.drawbox.domain.model.Element.Image): String 
     "${image.id}:${image.bytes.size}:${image.bytes.contentHashCode()}"
 /** How far (board px) an arrow must be pulled out of a quick-create target to count as one. */
 private const val QUICK_PULL_MIN_PX = 24f
-private const val QUICK_ARROW_HEAD_PX = 14f
+private const val QUICK_ARROW_HEAD_PX = 16f
+private val QUICK_ARROW_STROKE = 3.5.dp
+private const val QUICK_CREATE_GLIDE_MILLIS = 250
 
-/** The arrow being pulled out of a quick-create target: a line with a head at the pointer. */
+/**
+ * The arrow being pulled out of a quick-create target: a curve leaving the target square to its
+ * side, the shape the arrow it makes will have, with a head at the pointer.
+ */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawQuickCreateArrow(
     from: Offset,
     to: Offset,
+    direction: QuickCreateDirection,
     color: androidx.compose.ui.graphics.Color,
 ) {
-    val stroke = 2.dp.toPx()
-    drawLine(color, from, to, strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-    val d = to - from
+    val stroke = QUICK_ARROW_STROKE.toPx()
+    val control = CanvasQuickCreate.pullControl(from, to, direction)
+    val curve = androidx.compose.ui.graphics.Path().apply {
+        moveTo(from.x, from.y)
+        quadraticTo(control.x, control.y, to.x, to.y)
+    }
+    drawPath(
+        curve,
+        color,
+        style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+    )
+    // The head follows the curve's last tangent, which runs from the control point.
+    val d = if ((to - control).getDistance() >= 1f) to - control else to - from
     val length = d.getDistance()
     if (length < 1f) return
     val unit = d / length

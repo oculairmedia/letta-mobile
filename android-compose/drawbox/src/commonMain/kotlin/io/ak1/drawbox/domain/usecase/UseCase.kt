@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import io.ak1.drawbox.domain.model.smoothConnectorHandles
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.ResizeHandle
 import io.ak1.drawbox.domain.model.ShapeType
@@ -557,9 +558,27 @@ class UseCase {
         id: String,
         bend: Offset,
     ): List<Element> = elements.map { el ->
+        // Bending by hand makes it a single arc: the smooth connector's handles give way.
         if (el.id == id && el is Element.Shape && el.shapeType.isLineLike()) {
-            el.copy(bend = bend).touched()
+            el.copy(bend = bend, startHandle = null, endHandle = null).touched()
         } else el
+    }
+
+    /** See [Intent.SmoothConnector]. A no-op for anything but an arrow with two ends. */
+    fun smoothConnector(elements: List<Element>, id: String): List<Element> {
+        val byId = elements.associateBy { it.id }
+        return elements.map { el ->
+            if (el.id != id || el !is Element.Shape || el.shapeType != ShapeType.ARROW || el.points.size < 2) {
+                return@map el
+            }
+            val (out, inward) = smoothConnectorHandles(
+                el.points[0],
+                el.points.last(),
+                el.startBinding?.let { byId[it] as? Element.Shape },
+                el.endBinding?.let { byId[it] as? Element.Shape },
+            )
+            el.copy(bend = Offset.Zero, startHandle = out, endHandle = inward).touched()
+        }
     }
 
     /**
@@ -595,7 +614,7 @@ class UseCase {
 
         val freshFullyConnected = startId != null && endId != null &&
             (target.startBinding != startId || target.endBinding != endId) &&
-            target.bend == Offset.Zero
+            target.bend == Offset.Zero && target.startHandle == null
         val seededBend = if (freshFullyConnected && startId != null && endId != null) {
             // Predict where propagateBindings will snap the endpoints to and size
             // the bend relative to THAT segment. Using the raw drag points (often
@@ -645,12 +664,19 @@ class UseCase {
             val newEndBinding = if (endTarget == null) null else el.endBinding
             // Skip touching the arrow when nothing actually changed — propagateBindings
             // runs after every mutation and most calls are no-ops for any given arrow.
+            // A smooth connector's handles are re-aimed with its ends, so it keeps meeting each
+            // shape square to its side wherever the shapes go.
+            val smooth = el.startHandle != null && el.endHandle != null
+            val handles = if (smooth) smoothConnectorHandles(newStart, newEnd, startTarget, endTarget) else null
             val unchanged = newStart == el.points[0] && newEnd == el.points.last() &&
-                newStartBinding == el.startBinding && newEndBinding == el.endBinding
+                newStartBinding == el.startBinding && newEndBinding == el.endBinding &&
+                (handles == null || (handles.first == el.startHandle && handles.second == el.endHandle))
             if (unchanged) el else el.copy(
                 points = listOf(newStart, newEnd),
                 startBinding = newStartBinding,
                 endBinding = newEndBinding,
+                startHandle = handles?.first ?: el.startHandle,
+                endHandle = handles?.second ?: el.endHandle,
             ).touched()
         }
     }

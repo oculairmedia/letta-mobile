@@ -217,6 +217,14 @@ internal object CanvasQuickCreate {
         QuickCreateDirection.LEFT -> Offset(from.left, from.center.y) to Offset(to.right, to.center.y)
     }
 
+    /**
+     * The control point of the arrow shown while it is pulled out of the [direction] target:
+     * straight out from [start] along that side, so it leaves the element square to its edge and
+     * bends round to the pointer. Reaches half the run. The arrow it makes is a smooth connector.
+     */
+    fun pullControl(start: Offset, end: Offset, direction: QuickCreateDirection): Offset =
+        start + Offset(direction.dx, direction.dy) * ((end - start).getDistance() * PULL_HANDLE)
+
     /** Which side of [from] faces [point]: the one along the axis it is furthest out on. */
     fun directionToward(from: Rect, point: Offset): QuickCreateDirection {
         val d = point - from.center
@@ -276,6 +284,7 @@ enum class QuickCreateKind(val label: String) {
 }
 
 private const val ROUNDED_CORNER = 0.2f
+private const val PULL_HANDLE = 0.5f
 private const val DEFAULT_WIDTH = 160f
 private const val DEFAULT_HEIGHT = 100f
 

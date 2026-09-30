@@ -44,4 +44,15 @@ class CanvasQuickCreateGeometryTest {
         val same = CanvasQuickCreate.shapeAt(box, centre, QuickCreateKind.SAME, topZ = 0)
         assertEquals(box.bounds().size, same.bounds().size)
     }
+
+    @Test
+    fun aPulledArrowLeavesItsSideSquareAndCurvesToThePointer() {
+        val start = Offset(200f, 100f)
+        val end = Offset(400f, 300f)
+        val control = CanvasQuickCreate.pullControl(start, end, QuickCreateDirection.RIGHT)
+        // Straight out to the right, half the run: the curve's first tangent is the side's normal.
+        assertEquals(start.y, control.y, 0.001f)
+        assertEquals(start.x + (end - start).getDistance() / 2f, control.x, 0.001f)
+
+    }
 }
