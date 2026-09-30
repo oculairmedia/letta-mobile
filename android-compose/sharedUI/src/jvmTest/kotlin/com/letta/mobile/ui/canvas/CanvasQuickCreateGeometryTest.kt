@@ -55,4 +55,25 @@ class CanvasQuickCreateGeometryTest {
         assertEquals(start.x + (end - start).getDistance() / 2f, control.x, 0.001f)
 
     }
+
+    @Test
+    fun revealingWhereTheArrowWasLetGoLeavesNothingToMoveWhenTheShapeIsMade() {
+        val board = androidx.compose.ui.unit.IntSize(1200, 800)
+        // Let go well off the right of the board.
+        val drop = Offset(2000f, 400f)
+        listOf(false, true).forEach { phone ->
+            var viewport = io.ak1.drawbox.domain.model.Viewport()
+            val reveal = CanvasViewportFit.panToShow(CanvasQuickCreate.landing(box, drop), viewport, board, centre = phone)
+            assertTrue(reveal != null, "a drop off the board is brought into view")
+            viewport = viewport.panBy(reveal!!)
+            QuickCreateKind.entries.filter { it != QuickCreateKind.NOTE && it != QuickCreateKind.TEXT }.forEach { kind ->
+                val made = CanvasQuickCreate.shapeAt(box, drop, kind, topZ = 0)
+                assertEquals(
+                    null,
+                    CanvasViewportFit.panToShow(made.bounds(), viewport, board, centre = phone),
+                    "making a ${kind.label} after the reveal moved the board (phone=$phone)",
+                )
+            }
+        }
+    }
 }

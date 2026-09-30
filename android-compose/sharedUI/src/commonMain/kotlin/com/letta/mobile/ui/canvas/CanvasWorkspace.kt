@@ -41,6 +41,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.Job
@@ -871,16 +872,31 @@ fun CanvasWorkspace(
         }
     }
 
-    // Moves the board by [delta] over a short ease rather than in one step.
-    fun glideBy(delta: Offset) {
+    // Moves the board by [delta] with a smooth ramp up and down rather than in one step, telling
+    // [onStep] each part of the move, for anything drawn in screen space that rides with the board.
+    fun glideBy(delta: Offset, onStep: (Offset) -> Unit = {}) {
         coroutineScope.launch {
             var applied = Offset.Zero
-            animate(0f, 1f, animationSpec = tween(QUICK_CREATE_GLIDE_MILLIS)) { fraction, _ ->
-                val target = delta * fraction
-                controller.panBy(target - applied)
-                applied = target
+            animate(0f, 1f, animationSpec = tween(QUICK_CREATE_GLIDE_MILLIS, easing = EaseInOutCubic)) { fraction, _ ->
+                val step = delta * fraction - applied
+                controller.panBy(step)
+                onStep(step)
+                applied += step
             }
         }
+    }
+
+    // Where a pulled arrow is let go comes into view as it is let go, so the shape picked from the
+    // menu there lands in sight and the board has no reason to move again when it is made. The
+    // arrow and the menu ride with the board.
+    fun revealDrop(drop: QuickCreateDrag) {
+        val current = controller.state.value
+        val source = (current.elements.singleOrNull { it.id in current.selectedIds } as? io.ak1.drawbox.domain.model.Element.Shape)
+            ?.takeIf { it.canHoldText }
+        val base = source ?: CanvasQuickCreate.defaultShape(current.strokeColor, current.strokeWidth)
+        val landing = CanvasQuickCreate.landing(base, current.viewport.screenToWorld(drop.to))
+        val delta = CanvasViewportFit.panToShow(landing, current.viewport, boardSize, centre = compact) ?: return
+        glideBy(delta) { step -> quickDrop = quickDrop?.let { it.copy(from = it.from + step, to = it.to + step) } }
     }
 
     // Adds [next] joined to the element at [from] by an arrow off its [direction] side, as one undo
@@ -1615,7 +1631,12 @@ fun CanvasWorkspace(
                         onCreate = ::quickCreate,
                         onDrag = { quickDrag = it },
                         // A pull that barely left the target was a fumbled press, not an arrow.
-                        onDrop = { drop -> if ((drop.to - drop.from).getDistance() > QUICK_PULL_MIN_PX) quickDrop = drop },
+                        onDrop = { drop ->
+                            if ((drop.to - drop.from).getDistance() > QUICK_PULL_MIN_PX) {
+                                quickDrop = drop
+                                revealDrop(drop)
+                            }
+                        },
                     ),
                     chromeRegions = chromeRegions,
                     modifier = Modifier.fillMaxSize(),
@@ -1819,7 +1840,7 @@ private fun storedKey(image: io.ak1.drawbox.domain.model.Element.Image): String 
 private const val QUICK_PULL_MIN_PX = 24f
 private const val QUICK_ARROW_HEAD_PX = 16f
 private val QUICK_ARROW_STROKE = 3.5.dp
-private const val QUICK_CREATE_GLIDE_MILLIS = 250
+private const val QUICK_CREATE_GLIDE_MILLIS = 420
 
 /**
  * The arrow being pulled out of a quick-create target: a curve leaving the target square to its

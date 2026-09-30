@@ -252,6 +252,16 @@ internal object CanvasQuickCreate {
         }
     }
 
+    /**
+     * Where a shape made from [base] will land when the arrow is let go at [drop] (board units):
+     * [shapeAt] centres it there at [base]'s size, whichever kind is picked. Brought into view on
+     * release, so making the shape moves nothing.
+     */
+    fun landing(base: Element.Shape, drop: Offset): Rect {
+        val size = base.bounds().size
+        return Rect(drop - Offset(size.width / 2f, size.height / 2f), size)
+    }
+
     /** A plain box to size new shapes from when the arrow comes out of a note rather than a shape. */
     fun defaultShape(strokeColor: Color, strokeWidth: Float): Element.Shape = Element.Shape(
         id = "shape",
