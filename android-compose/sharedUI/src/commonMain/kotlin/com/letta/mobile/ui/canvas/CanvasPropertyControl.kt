@@ -189,8 +189,7 @@ private fun CanvasPropertyPanel(
         shadowElevation = LettaDimens.Space.sm,
         modifier = Modifier
             .semantics { contentDescription = "Property panel" }
-            .canvasChrome(LocalCanvasChromeRegions.current)
-            .passthroughPointerRegion("canvas-property-panel"),
+            .canvasChrome(LocalCanvasChromeRegions.current),
     ) {
         Column(
             modifier = Modifier

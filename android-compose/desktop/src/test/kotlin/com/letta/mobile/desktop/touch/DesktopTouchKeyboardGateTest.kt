@@ -1,7 +1,5 @@
 package com.letta.mobile.desktop.touch
 
-import java.awt.Component
-import java.awt.event.MouseEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -101,43 +99,6 @@ class DesktopTouchKeyboardGateTest {
         assertTrue(origin.wasTouch(nowMillis = 1_400L))
     }
 
-    @Test
-    fun `the unavailable accessor classifies nothing as touch`() {
-        val event = MouseEvent(
-            HeadlessComponent(),
-            MouseEvent.MOUSE_PRESSED,
-            0L,
-            0,
-            0,
-            0,
-            1,
-            false,
-        )
-        assertFalse(DesktopTouchEventAccessor.Unavailable.isCausedByTouchEvent(event))
-    }
-
-    @Test
-    fun `binding the reflective accessor never throws, whatever the JDK allows`() {
-        // On a JDK/launcher without --add-opens java.desktop/sun.awt this
-        // returns null and the caller falls back; it must never propagate.
-        val accessor = DesktopTouchEventAccessor.bindOrNull()
-        if (accessor != null) {
-            val event = MouseEvent(
-                HeadlessComponent(),
-                MouseEvent.MOUSE_PRESSED,
-                0L,
-                0,
-                0,
-                0,
-                1,
-                false,
-            )
-            assertFalse(accessor.isCausedByTouchEvent(event))
-        }
-    }
-
-    /** `java.awt.Component` itself has no headless check, unlike its widgets. */
-    private class HeadlessComponent : Component()
 
     // --- DesktopJdkTouchKeyboardAccessor -----------------------------------
 

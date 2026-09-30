@@ -3,7 +3,6 @@ package com.letta.mobile.desktop.input
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
-import com.letta.mobile.ui.canvas.CanvasBoardTouchRegistry
 import com.letta.mobile.ui.canvas.CanvasPenRegistry
 import java.awt.Window
 
@@ -24,10 +23,10 @@ import java.awt.Window
  * its own to leak.
  */
 @Composable
-internal fun InstallTabletPen(window: Window, penRegistry: CanvasPenRegistry, boardTouch: CanvasBoardTouchRegistry) {
+internal fun InstallTabletPen(window: Window, penRegistry: CanvasPenRegistry) {
     val scope = rememberCoroutineScope()
-    DisposableEffect(window, penRegistry, boardTouch) {
-        val pen = TabletPen(window, penRegistry, boardTouch)
+    DisposableEffect(window, penRegistry) {
+        val pen = TabletPen(window, penRegistry)
         val polling = pen.start(scope)
         onDispose {
             // Cancelled BEFORE the handles close: it stops the poll loop and any open that has

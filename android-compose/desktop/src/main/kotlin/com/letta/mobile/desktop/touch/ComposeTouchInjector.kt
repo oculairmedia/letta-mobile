@@ -24,9 +24,12 @@ import javax.swing.SwingUtilities
  * window's scene typed [PointerType.Touch], so Compose's own slop, fling, sliders, text
  * selection and multi-finger gestures run as they do on a phone.
  *
- * The scene is not public. It is reached by reflection from the window, and every step
- * fails soft: [bindOrNull] returns null and the caller keeps the older finger path, which
- * `LETTA_TOUCH_COMPOSE=0` (or `-Dletta.touch.compose=false`) also selects.
+ * The scene is not public. It is reached by reflection from the window; when a Compose upgrade
+ * moves it, [bindOrNull] logs and returns null, and `ComposeTouchInjectorTest` fails first.
+ *
+ * A finger is touch to the rest of the app too: each press is recorded in [DesktopTouchOrigin],
+ * so a text field it focuses raises the touch keyboard, and a tap on a field that already has
+ * focus raises it through [DesktopTouchKeyboardTaps].
  */
 @OptIn(InternalComposeUiApi::class)
 internal class ComposeTouchInjector private constructor(
@@ -41,6 +44,9 @@ internal class ComposeTouchInjector private constructor(
     /** Fingers that are down but not yet placed: the down sample is the previous pose. */
     private val placing = mutableSetOf<Int>()
 
+    /** Where and when each finger was placed, to tell a tap from a drag when it lifts. */
+    private val placedAt = HashMap<Int, Pair<Offset, Long>>()
+
     fun onSample(target: Component, sample: TabletPenDecoder.DecodedSample) {
         val contact = sample.contact
         when (sample.kind) {
@@ -49,6 +55,9 @@ internal class ComposeTouchInjector private constructor(
                 val position = toScene(target, sample.x, sample.y) ?: return
                 if (placing.remove(contact)) {
                     active[contact] = position
+                    val now = System.currentTimeMillis()
+                    placedAt[contact] = position to now
+                    DesktopTouchOrigin.record(isTouch = true, atMillis = now)
                     send(PointerEventType.Press, released = null)
                 } else if (contact in active) {
                     if (active[contact] == position) return
@@ -60,16 +69,27 @@ internal class ComposeTouchInjector private constructor(
                 placing -= contact
                 if (contact !in active) return
                 send(PointerEventType.Release, released = contact)
-                active -= contact
+                val lifted = active.remove(contact)
+                val placed = placedAt.remove(contact)
+                if (lifted != null && placed != null && isTap(placed, lifted)) {
+                    SwingUtilities.invokeLater { DesktopTouchKeyboardTaps.gate?.fingerTapped() }
+                }
             }
             // An Ink cancel is the Ink copy of a finger leaving, not this finger.
             TabletBridge.KIND_CANCEL -> Unit
         }
     }
 
+    private fun isTap(placed: Pair<Offset, Long>, lifted: Offset): Boolean {
+        val density = content.graphicsConfiguration?.defaultTransform?.scaleX?.toFloat()?.takeIf { it > 0f } ?: 1f
+        return (lifted - placed.first).getDistance() <= TAP_SLOP_DP * density &&
+            System.currentTimeMillis() - placed.second <= TAP_MILLIS
+    }
+
     /** Lets go of every finger, as when the window moves under them. */
     fun releaseAll() {
         placing.clear()
+        placedAt.clear()
         while (active.isNotEmpty()) {
             val contact = active.keys.first()
             send(PointerEventType.Release, released = contact)
@@ -102,25 +122,54 @@ internal class ComposeTouchInjector private constructor(
     }
 
     companion object {
-        val enabled: Boolean =
-            System.getProperty("letta.touch.compose")?.toBoolean() ?: (System.getenv("LETTA_TOUCH_COMPOSE") != "0")
+        private const val TAP_SLOP_DP = 12f
+        private const val TAP_MILLIS = 300L
 
         /** Reaches [window]'s Compose scene, or null (logged) when this Compose build is laid out differently. */
         fun bindOrNull(window: Window): ComposeTouchInjector? = runCatching {
-            val panel = field(window, "composePanel")
-            val composeContainer = field(panel, "_composeContainer")
-            val mediator = field(composeContainer, "mediator")
+            val panel = field(window, PANEL_FIELD)
+            val composeContainer = field(panel, CONTAINER_FIELD)
+            val mediator = field(composeContainer, MEDIATOR_FIELD)
             val mediatorClass = mediator.javaClass
-            val scene = mediatorClass.getMethod("access\$getScene", mediatorClass).invoke(null, mediator) as ComposeScene
-            val container = mediatorClass.getMethod("access\$getContainer\$p", mediatorClass).invoke(null, mediator) as JComponent
-            val content = mediatorClass.getMethod("getContentComponent").invoke(mediator) as JComponent
-            val bounds = mediatorClass.getMethod("getSceneBoundsInPx")
+            val scene = mediatorClass.getMethod(GET_SCENE, mediatorClass).invoke(null, mediator) as ComposeScene
+            val container = mediatorClass.getMethod(GET_CONTAINER, mediatorClass).invoke(null, mediator) as JComponent
+            val content = mediatorClass.getMethod(GET_CONTENT).invoke(mediator) as JComponent
+            val bounds = mediatorClass.getMethod(GET_BOUNDS)
             ComposeTouchInjector(scene, container, content) {
                 (bounds.invoke(mediator) as? androidx.compose.ui.geometry.Rect)?.topLeft ?: Offset.Zero
             }
         }.onSuccess { println("TOUCH: fingers go to Compose as touch") }
-            .onFailure { println("TOUCH: compose scene unavailable, keeping the older finger path: $it") }
+            .onFailure { println("TOUCH: compose scene unavailable; fingers do nothing until it is found again: $it") }
             .getOrNull()
+
+        private const val PANEL_FIELD = "composePanel"
+        private const val CONTAINER_FIELD = "_composeContainer"
+        private const val MEDIATOR_FIELD = "mediator"
+        private const val GET_SCENE = "access\$getScene"
+        private const val GET_CONTAINER = "access\$getContainer\$p"
+        private const val GET_CONTENT = "getContentComponent"
+        private const val GET_BOUNDS = "getSceneBoundsInPx"
+
+        /**
+         * The steps from a window to its scene that this Compose build no longer has, checked on
+         * the classes alone so it needs no window. Empty when [bindOrNull] can reach the scene.
+         */
+        internal fun missingSceneSteps(): List<String> {
+            fun declares(type: Class<*>?, name: String): Boolean =
+                generateSequence(type) { it.superclass }.any { t -> t.declaredFields.any { it.name == name } }
+            val missing = mutableListOf<String>()
+            val window = Class.forName("androidx.compose.ui.awt.ComposeWindow")
+            val panel = Class.forName("androidx.compose.ui.awt.ComposeWindowPanel")
+            val container = Class.forName("androidx.compose.ui.scene.ComposeContainer")
+            val mediator = Class.forName("androidx.compose.ui.scene.ComposeSceneMediator")
+            if (!declares(window, PANEL_FIELD)) missing += "ComposeWindow.$PANEL_FIELD"
+            if (!declares(panel, CONTAINER_FIELD)) missing += "ComposeWindowPanel.$CONTAINER_FIELD"
+            if (!declares(container, MEDIATOR_FIELD)) missing += "ComposeContainer.$MEDIATOR_FIELD"
+            listOf(GET_SCENE, GET_CONTAINER, GET_CONTENT, GET_BOUNDS).forEach { name ->
+                if (mediator.methods.none { it.name == name }) missing += "ComposeSceneMediator.$name"
+            }
+            return missing
+        }
 
         @Suppress("NoAnyType") // Walks Compose's private fields by reflection; their types are not public.
         private fun field(owner: Any, name: String): Any {

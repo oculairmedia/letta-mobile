@@ -33,17 +33,16 @@ fun main() {
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
         val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
-        val boardTouch = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasBoardTouchRegistry() }
-        InstallTabletPen(window, penRegistry, boardTouch)
+        InstallTabletPen(window, penRegistry)
         CompositionLocalProvider(
             LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
             com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
-            com.letta.mobile.ui.canvas.LocalCanvasBoardTouchRegistry provides boardTouch,
         ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
                     initialJson = CanvasSamples.buildCycleJson,
+                    longPressDrawsSelectionBox = true,
                 )
             }
         }
@@ -72,17 +71,16 @@ internal fun CanvasDebugWindow(
     ) {
         // Without this the canvas sees the pen as a mouse: flat pressure, no eraser end.
         val penRegistry = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
-        val boardTouch = androidx.compose.runtime.remember(window) { com.letta.mobile.ui.canvas.CanvasBoardTouchRegistry() }
-        InstallTabletPen(window, penRegistry, boardTouch)
+        InstallTabletPen(window, penRegistry)
         CompositionLocalProvider(
             LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
             com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
-            com.letta.mobile.ui.canvas.LocalCanvasBoardTouchRegistry provides boardTouch,
         ) {
         MaterialTheme(colorScheme = darkColorScheme()) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
                     initialJson = CanvasSamples.buildCycleJson,
+                    longPressDrawsSelectionBox = true,
                     onNavigateBack = {
                         open = false
                         onClose?.invoke()

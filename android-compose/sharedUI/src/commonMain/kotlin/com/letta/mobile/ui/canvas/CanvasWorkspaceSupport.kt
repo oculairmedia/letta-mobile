@@ -76,7 +76,8 @@ internal data class PenConsumerParams(
     val onEraseArea: (EraserArea) -> Unit,
     /** A pen double tap landed on somewhere to type while drawing. Opens its text. */
     val onDoubleTapText: (Element) -> Unit = {},
-    val penTaps: CanvasPenDoubleTap = CanvasPenDoubleTap(),
+    val penTaps: CanvasDoubleTap = CanvasDoubleTap(),
+    val clock: () -> Long = { System.currentTimeMillis() },
 )
 
 internal data class DrawPhaseParams(
@@ -540,7 +541,7 @@ internal object CanvasWorkspaceSupport {
             val (updatedStroke, handled) = handleDrawPhase(drawParams, stroke)
             if (event.phase == CanvasPenEvent.Phase.UP || event.phase == CanvasPenEvent.Phase.OUT) {
                 val dot = params.controller.state.value.elements.lastOrNull()?.takeIf { it is Element.Path }?.id
-                params.penTaps.up(event.x, event.y, dot.takeIf { stroke != null })
+                params.penTaps.up(event.x, event.y, params.clock(), dot.takeIf { stroke != null })
             }
             stroke = updatedStroke
             handled
@@ -552,17 +553,17 @@ internal object CanvasWorkspaceSupport {
      * (as one undo step with it) and opens the text. False leaves the down to draw as usual.
      */
     private fun openTextOnPenDoubleTap(event: CanvasPenEvent, world: Offset, params: PenConsumerParams): Boolean {
-        val first = params.penTaps.down(event.x, event.y) ?: return false
+        val first = params.penTaps.down(event.x, event.y, params.clock()) ?: return false
         val state = params.controller.state.value
         val tolerance = FINGER_PICK_TOLERANCE.value * params.penDensity / state.viewport.scale
         val target = topmostHit(
-            state.elements.filter { it.id != first.dotId },
+            state.elements.filter { it.id != first.mark },
             world,
             tolerance,
             state.selectInsideHollowShapes,
         )
         if (!holdsText(target) || target == null) return false
-        first.dotId?.let { dot ->
+        first.mark?.let { dot ->
             if (state.elements.any { it.id == dot }) {
                 params.controller.onIntent(Intent.DeleteElement(dot))
                 params.controller.onIntent(Intent.MergeUndoSteps(2))

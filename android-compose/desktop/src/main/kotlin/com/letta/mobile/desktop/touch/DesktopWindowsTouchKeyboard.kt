@@ -36,9 +36,8 @@ internal interface DesktopTouchKeyboardController {
  * Skia canvas — the focused AWT component is always the Compose panel. Calling
  * the private natives directly sidesteps that focused-component gate entirely.
  *
- * Needs `--add-opens java.desktop/sun.awt.windows=ALL-UNNAMED` (a different
- * package from the `sun.awt` open `DesktopTouchEventAccessor` uses). Without
- * it, [bindOrNull] returns null and the caller falls back.
+ * Needs `--add-opens java.desktop/sun.awt.windows=ALL-UNNAMED`. Without it,
+ * [bindOrNull] returns null and the caller falls back.
  */
 internal object DesktopJdkTouchKeyboardAccessor {
 
@@ -135,9 +134,8 @@ internal object DesktopWindowsTouchKeyboard : DesktopTouchKeyboardController {
     private val fallbackFailureLogged = AtomicBoolean(false)
 
     /**
-     * Bound once, up front, the same fail-safe way
-     * [DesktopTouchEventAccessor.bindOrNull] binds: null means "unavailable",
-     * logged once, and every call becomes the COM/TabTip fallback.
+     * Bound once, up front, fail-safe: null means "unavailable", logged once,
+     * and every call becomes the COM/TabTip fallback.
      */
     private val jdkController: DesktopTouchKeyboardController? by lazy {
         DesktopJdkTouchKeyboardAccessor.bindOrNull().also { bound ->

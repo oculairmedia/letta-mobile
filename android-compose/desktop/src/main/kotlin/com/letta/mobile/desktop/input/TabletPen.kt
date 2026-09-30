@@ -10,30 +10,23 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 import java.awt.Component
-import java.awt.Point
 import java.awt.Window
 import com.letta.mobile.desktop.touch.ComposeTouchInjector
-import com.letta.mobile.desktop.touch.DesktopPointerTouch
-import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
 import com.letta.mobile.desktop.touch.DesktopTouchOrigin
-import com.letta.mobile.ui.canvas.CanvasBoardTouchRegistry
-import com.letta.mobile.ui.canvas.CanvasBoardTouchResult
-import com.letta.mobile.ui.canvas.CanvasBoardTouchSample
 import com.letta.mobile.ui.canvas.CanvasPenRegistry
 import com.letta.mobile.ui.canvas.CanvasPenTarget
 
 /**
- * Drives the pen into the application as ordinary input and delivers canvas strokes.
+ * Drives the pen into the application as ordinary input and delivers canvas strokes. Fingers
+ * from the same bridge go to Compose as real touch ([ComposeTouchInjector]).
  */
 internal class TabletPen(
     private val window: Window,
     private val penRegistry: CanvasPenRegistry,
-    private val boardTouch: CanvasBoardTouchRegistry,
     private val pollInterval: Long = POLL_INTERVAL_MS,
 ) {
     private val connection = TabletPenConnection(window)
     private val awtMapper = TabletPenAwtMapper()
-    private val fingerPointer = TabletFingerPointer()
     private val _pressure = MutableStateFlow(TabletBridge.NO_PRESSURE)
     private var windowLocation: java.awt.Point? = null
 
@@ -138,19 +131,15 @@ internal class TabletPen(
         // synthetic button here keeps that drag from continuing into the page.
         if (windowMoved) {
             awtMapper.releaseIfDown(target)
-            fingerPointer.cancel()
+            composeTouch?.releaseAll()
         }
         var index = 0
         while (index + TabletBridge.STRIDE <= events.size) {
             val sample = TabletPenDecoder.decodeSample(events, index, scale)
             index += TabletBridge.STRIDE
-            if (!keepsFingerOwnership(sample.tool, sample.kind, DesktopPointerTouch.ownsFingers(window))) {
-                DesktopPointerTouch.release(window)
-            }
             if (sample.tool == TabletBridge.TOOL_TOUCH || sample.kind == TabletBridge.KIND_CANCEL) {
                 noteTouchContact(sample, scale)
-                DesktopPointerTouch.markOwned(window)
-                dispatchFinger(target, sample, windowMoved)
+                if (!windowMoved) composeTouch?.onSample(target, sample)
                 continue
             }
             if (sample.force != TabletBridge.NO_PRESSURE) _pressure.value = sample.force
@@ -238,80 +227,10 @@ internal class TabletPen(
         connection.close()
     }
 
-    private fun fingerIsOnPassthrough(target: Component, sample: TabletPenDecoder.DecodedSample): Boolean {
-        val origin = runCatching { target.locationOnScreen }.getOrNull() ?: return false
-        val screenX = origin.x + sample.x.toInt()
-        val screenY = origin.y + sample.y.toInt()
-        val onControl = DesktopTouchDragExclusion.containsOverlay(window, screenX, screenY)
-        if (onControl) println("TABLET: finger placed on a control at screen=($screenX,$screenY)")
-        return onControl
-    }
-
-    private val controlLatch = FingerControlLatch()
-
-    /** Fingers as real Compose touch, when that is switched on and this Compose build allows it. */
-    private val composeTouch: ComposeTouchInjector? by lazy {
-        if (ComposeTouchInjector.enabled) ComposeTouchInjector.bindOrNull(window) else null
-    }
-
-    private fun dispatchFinger(target: Component, sample: TabletPenDecoder.DecodedSample, windowMoved: Boolean) {
-        val touch = composeTouch
-        if (touch != null) {
-            if (windowMoved) touch.releaseAll() else touch.onSample(target, sample)
-            return
-        }
-        if (sample.kind == TabletBridge.KIND_CANCEL) {
-            boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())
-            controlLatch.clear()
-            // An Ink cancel is not this finger. Cancelling the pointer here kills a paused scroll.
-            if (sample.tool == TabletBridge.TOOL_TOUCH) fingerPointer.cancel()
-            return
-        }
-        val lifting = sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT
-        if (!windowMoved || lifting) {
-            when (val offer = boardTouch.deliver(WindowPenTarget(window), sample.toBoardTouch())) {
-                CanvasBoardTouchResult.Ignored -> {
-                    val onControl = controlLatch.owns(sample.kind) { fingerIsOnPassthrough(target, sample) }
-                    if (onControl) {
-                        fingerPointer.onControlSample(target, sample)
-                    } else if (!windowMoved) {
-                        fingerPointer.onSample(target, sample)
-                    }
-                }
-                CanvasBoardTouchResult.Consumed -> {
-                    if (lifting) controlLatch.clear()
-                    // A second finger riding along must not let go of the one holding the mouse.
-                    fingerPointer.cancelScroll()
-                    if (lifting && !fingerPointer.isHolding) {
-                        fingerPointer.exitPointer(target, Point(sample.x.toInt(), sample.y.toInt()))
-                    }
-                    noteBoardPinch(sample)
-                }
-                is CanvasBoardTouchResult.Tap -> {
-                    controlLatch.clear()
-                    fingerPointer.cancel()
-                    fingerPointer.tapAt(target, offer.x.toInt(), offer.y.toInt())
-                }
-                // One finger on the board is the mouse, so the current tool draws or selects.
-                is CanvasBoardTouchResult.Press -> {
-                    controlLatch.clear()
-                    fingerPointer.hold(
-                        target,
-                        Point(offer.x.toInt(), offer.y.toInt()),
-                        Point(offer.toX.toInt(), offer.toY.toInt()),
-                    )
-                }
-                is CanvasBoardTouchResult.Drag -> fingerPointer.dragHeld(Point(offer.x.toInt(), offer.y.toInt()))
-                CanvasBoardTouchResult.Release -> {
-                    controlLatch.clear()
-                    fingerPointer.releaseControl()
-                }
-            }
-        }
-    }
+    /** Fingers as real Compose touch; null (logged) when this Compose build hides its scene. */
+    private val composeTouch: ComposeTouchInjector? by lazy { ComposeTouchInjector.bindOrNull(window) }
 
     private val touchContacts = mutableSetOf<Int>()
-    private var pinchLogged = false
     private var fingerSource: String? = null
     private var awaitPenStroke = false
 
@@ -324,18 +243,8 @@ internal class TabletPen(
                     "TABLET: finger down contact=${sample.contact} fingersDown=${touchContacts.size} at=(${sample.x},${sample.y}) scale=$scale",
                 )
             }
-            TabletBridge.KIND_UP, TabletBridge.KIND_OUT, TabletBridge.KIND_CANCEL -> {
-                touchContacts.remove(sample.contact)
-                if (touchContacts.size < 2) pinchLogged = false
-            }
+            TabletBridge.KIND_UP, TabletBridge.KIND_OUT, TabletBridge.KIND_CANCEL -> touchContacts.remove(sample.contact)
         }
-    }
-
-    /** Once per gesture, the first move the board consumed while two fingers were down. */
-    private fun noteBoardPinch(sample: TabletPenDecoder.DecodedSample) {
-        if (pinchLogged || sample.kind != TabletBridge.KIND_MOVE || touchContacts.size < 2) return
-        pinchLogged = true
-        println("TABLET: board pinch contacts=${touchContacts.sorted().joinToString(",")}")
     }
 
     private fun windowTitle(): String = (window as? java.awt.Frame)?.title ?: window.name.orEmpty()
@@ -357,17 +266,14 @@ internal class TabletPen(
     }
 }
 
-private fun TabletPenDecoder.DecodedSample.toBoardTouch(): CanvasBoardTouchSample {
-    val phase = when (kind) {
-        TabletBridge.KIND_DOWN -> CanvasBoardTouchSample.Phase.DOWN
-        TabletBridge.KIND_MOVE -> CanvasBoardTouchSample.Phase.MOVE
-        TabletBridge.KIND_CANCEL -> CanvasBoardTouchSample.Phase.CANCEL
-        else -> CanvasBoardTouchSample.Phase.UP
-    }
-    return CanvasBoardTouchSample(contact = contact, phase = phase, x = x, y = y)
-}
-
 internal data class WindowPenTarget(val window: Window) : CanvasPenTarget
+
+internal fun isPenNib(tool: Int): Boolean =
+    tool == TabletBridge.TOOL_DRAW || tool == TabletBridge.TOOL_ERASER
+
+/** A pen down with no pose yet must wait. Emitting it starts a stroke at the origin, or drops it. */
+internal fun penDownWaitsForPose(tool: Int, kind: Int, force: Float): Boolean =
+    isPenNib(tool) && kind == TabletBridge.KIND_DOWN && force == TabletBridge.NO_PRESSURE
 
 /**
  * Whether a tablet sample should also be posted as a mouse event.
@@ -377,55 +283,5 @@ internal data class WindowPenTarget(val window: Window) : CanvasPenTarget
  * same bridge, and posting them again is a second pointer — the arrow cursor. A sample that
  * arrives while the window is moving is that pointer sliding across the page under the drag.
  */
-/** A finger claim sticks for the session. A pressureless Ink sample must not clear it. */
-/**
- * Whether a finger gesture belongs to a published control.
- *
- * Decided where the finger is first placed. The touch-down sample is the previous
- * pose, often nowhere near the finger, so deciding there sent a slider drag to the
- * scroll path. A later sample that slides onto the panel does not stop a scroll
- * that started on the list.
- */
-internal class FingerControlLatch {
-    private var onControl: Boolean? = null
-    private var placing = false
-
-    fun owns(kind: Int, fingerOnControl: () -> Boolean): Boolean {
-        when (kind) {
-            TabletBridge.KIND_DOWN -> {
-                onControl = null
-                placing = true
-            }
-            TabletBridge.KIND_MOVE -> if (placing) {
-                placing = false
-                onControl = fingerOnControl()
-            }
-            TabletBridge.KIND_UP, TabletBridge.KIND_OUT, TabletBridge.KIND_CANCEL -> {
-                val owned = onControl == true
-                clear()
-                return owned
-            }
-        }
-        return onControl == true
-    }
-
-    fun clear() {
-        onControl = null
-        placing = false
-    }
-}
-
-internal fun keepsFingerOwnership(tool: Int, kind: Int, alreadyOwned: Boolean): Boolean {
-    if (tool == TabletBridge.TOOL_TOUCH || kind == TabletBridge.KIND_CANCEL) return true
-    return alreadyOwned
-}
-
-internal fun isPenNib(tool: Int): Boolean =
-    tool == TabletBridge.TOOL_DRAW || tool == TabletBridge.TOOL_ERASER
-
-/** A pen down with no pose yet must wait. Emitting it starts a stroke at the origin, or drops it. */
-internal fun penDownWaitsForPose(tool: Int, kind: Int, force: Float): Boolean =
-    isPenNib(tool) && kind == TabletBridge.KIND_DOWN && force == TabletBridge.NO_PRESSURE
-
 internal fun penSampleMirrorsToMouse(tool: Int, windowMoved: Boolean, hasPressureAxis: Boolean): Boolean =
     isPenNib(tool) && hasPressureAxis && !windowMoved

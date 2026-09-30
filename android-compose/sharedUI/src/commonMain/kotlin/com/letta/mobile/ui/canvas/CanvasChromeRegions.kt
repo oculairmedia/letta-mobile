@@ -11,7 +11,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.layout.positionOnScreen
 
 /**
  * The board's own controls, by where they are on screen.
@@ -90,38 +89,6 @@ internal fun Modifier.canvasChrome(regions: CanvasChromeRegions?): Modifier {
 /** The board the control is drawn on, so a popup can register itself as chrome. */
 val LocalCanvasChromeRegions = androidx.compose.runtime.compositionLocalOf<CanvasChromeRegions?> { null }
 
-/**
- * Publishes a control's screen rectangle so a platform can let drags on it through.
- *
- * Desktop turns a finger drag into scrolling. A slider inside a menu is a drag too, and
- * without this it never hears the finger. Null bounds clear the publication.
- */
-fun interface ScreenRegionPublisher {
-    fun publish(id: String, bounds: Rect?)
-}
-
-val LocalScreenRegionPublisher = androidx.compose.runtime.compositionLocalOf<ScreenRegionPublisher?> { null }
-
-/** Registers this composable with [LocalScreenRegionPublisher] for as long as it is shown. */
-@Composable
-fun Modifier.passthroughPointerRegion(id: String): Modifier {
-    val publisher = LocalScreenRegionPublisher.current ?: return this
-    DisposableEffect(publisher, id) {
-        onDispose { publisher.publish(id, null) }
-    }
-    return onGloballyPositioned { coordinates ->
-        val origin = coordinates.positionOnScreen()
-        val size = coordinates.size
-        publisher.publish(
-            id,
-            if (origin.x.isFinite() && origin.y.isFinite()) {
-                Rect(origin.x, origin.y, origin.x + size.width, origin.y + size.height)
-            } else {
-                null
-            },
-        )
-    }
-}
 
 /** Where one control currently is. Plain, so moving a control does not recompose anything. */
 private class ChromeBounds {

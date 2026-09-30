@@ -18,21 +18,11 @@ class PenMouseMirrorTest {
     }
 
     @Test
-    fun aFingerDragScrollsAndAShortLiftClicks() {
-        val contact = FingerContact()
-        contact.down()
-        // The down sample is the previous pose. The first move places the finger and must not scroll.
-        assertFalse(contact.move(400, 300))
-        assertFalse(contact.move(404, 302))
-        val tap = contact.up()
-        assertTrue(tap != null && tap.tap)
-        assertTrue(tap!!.x == 400 && tap.y == 300)
-
-        contact.down()
-        assertFalse(contact.move(400, 300))
-        assertTrue(contact.move(430, 300))
-        val drag = contact.up()
-        assertTrue(drag != null && !drag.tap)
+    fun aPenDownWithNoPoseWaitsForOne() {
+        assertTrue(penDownWaitsForPose(TabletBridge.TOOL_DRAW, TabletBridge.KIND_DOWN, TabletBridge.NO_PRESSURE))
+        assertTrue(isPenNib(TabletBridge.TOOL_ERASER))
+        assertFalse(penDownWaitsForPose(TabletBridge.TOOL_DRAW, TabletBridge.KIND_MOVE, 0.4f))
+        assertFalse(penDownWaitsForPose(TabletBridge.TOOL_TOUCH, TabletBridge.KIND_DOWN, TabletBridge.NO_PRESSURE))
     }
 
     @Test

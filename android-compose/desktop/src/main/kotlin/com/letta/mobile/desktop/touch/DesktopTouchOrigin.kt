@@ -8,14 +8,12 @@ import java.util.concurrent.atomic.AtomicReference
  * The Windows touch keyboard must never appear for mouse or precision-touchpad
  * users, and Compose gives no hint about input provenance: by the time a text
  * field asks for an input method, the originating AWT event is long gone and
- * was a plain `MouseEvent` anyway. [DesktopWindowsTouchInput] already has to
- * classify every pointer event to do drag-to-scroll, so it records the verdict
- * here and [DesktopTouchKeyboardSessionGate] reads it back.
+ * was a plain `MouseEvent` anyway. The tablet bridge sees every finger and
+ * pen contact first ([ComposeTouchInjector], [com.letta.mobile.desktop.input.TabletPen]),
+ * so it records them here and [DesktopTouchKeyboardSessionGate] reads it back.
  *
- * Fail-safe by construction: when the reflective touch accessor is
- * unavailable — a missing `--add-opens`, a non-Windows host, a future JDK that
- * drops the hook — nothing ever records a touch and the keyboard simply never
- * appears, which is exactly today's behaviour.
+ * Fail-safe by construction: without the tablet bridge nothing records a
+ * touch and the keyboard simply never appears.
  */
 internal class DesktopTouchOriginTracker(
     private val recencyWindowMillis: Long = DEFAULT_RECENCY_WINDOW_MILLIS,

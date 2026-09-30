@@ -94,7 +94,7 @@ class CanvasElementInteractionUiTest {
     }
 
     @Test
-    fun aLongPressOnAShapeOpensItsMenu() = runComposeUiTest {
+    fun aLongPressOnAShapeAddsItToTheSelectionRatherThanOpeningItsMenu() = runComposeUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
@@ -102,6 +102,20 @@ class CanvasElementInteractionUiTest {
         waitForIdle()
 
         onNodeWithContentDescription("Canvas board").performTouchInput { longClick(Offset(400f, 360f)) }
+        waitForIdle()
+        assertTrue("r1" in controller.state.value.selectedIds, "the held shape is selected")
+        onNodeWithText("Edit text").assertDoesNotExist()
+    }
+
+    @Test
+    fun aRightClickOnAShapeOpensItsMenu() = runComposeUiTest {
+        val session = session()
+        val controller = DrawBoxController(Reducer(UseCase()))
+        setContent { CanvasWorkspace(session = session, controller = controller) }
+        controller.onIntent(Intent.AddElement(rectangle("r1", 300f, 300f)))
+        waitForIdle()
+
+        onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(400f, 360f)) }
         onNodeWithText("Edit text").assertExists()
         onNodeWithText("Delete").performClick()
         waitUntil(timeoutMillis = 5000) { shapes(controller).isEmpty() }
