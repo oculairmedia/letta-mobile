@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ToolCall
@@ -10,6 +11,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -17,6 +19,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Integration-level coverage of the hydration guard wired into
@@ -124,6 +127,33 @@ class TimelineSyncLoopDanglingToolTest {
     }
 
     @Test
+    fun successful_terminal_retires_prior_turn_failure_notice_for_its_conversation() = runTest(UnconfinedTestDispatcher()) {
+        val loop = turnFailureLoop("conv-C")
+        loop.ingestStreamEvent(turnFailureNotice("turn-1", "run-1"))
+        assertEquals("turn-failed-turn-1-run-1", (loop.state.value.events.single() as TimelineEvent.Confirmed).serverId)
+
+        loop.turnStarted("run-2", "turn-2")
+        loop.turnEnded(clean = true)
+
+        assertTrue(loop.state.value.events.none { (it as? TimelineEvent.Confirmed)?.serverId?.startsWith("turn-failed-") == true })
+        loop.closeAndJoin()
+    }
+
+    @Test
+    fun successful_terminal_for_different_conversation_does_not_retire_unsettled_failure_notice() = runTest(UnconfinedTestDispatcher()) {
+        val loopC = turnFailureLoop("conv-C")
+        val loopD = turnFailureLoop("conv-D")
+        loopC.ingestStreamEvent(turnFailureNotice("turn-1", "run-1"))
+
+        loopD.turnStarted("run-2", "turn-2")
+        loopD.turnEnded(clean = true)
+
+        assertEquals("turn-failed-turn-1-run-1", (loopC.state.value.events.single() as TimelineEvent.Confirmed).serverId)
+        loopC.closeAndJoin()
+        loopD.closeAndJoin()
+    }
+
+    @Test
     fun hydrate_does_not_trigger_hydration_guard_when_a_turn_is_active() = runTest(UnconfinedTestDispatcher()) {
         val transport = DanglingToolTransport()
         val loop = TimelineSyncLoop(
@@ -143,6 +173,22 @@ class TimelineSyncLoopDanglingToolTest {
         assertEquals(1, transport.listCalls)
         loop.closeAndJoin()
     }
+
+    private fun CoroutineScope.turnFailureLoop(conversationId: String) = TimelineSyncLoop(
+        messageApi = DanglingToolTransport(),
+        conversationId = conversationId,
+        scope = this,
+        pendingLocalStore = NoOpPendingLocalStore,
+        conversationCursorStore = NoOpConversationCursorStore,
+        startStreamSubscriber = false,
+    )
+
+    private fun turnFailureNotice(turnId: String, runId: String) = ErrorMessage(
+        id = "turn-failed-$turnId-$runId",
+        contentRaw = JsonPrimitive("The connection to the agent host dropped mid-turn."),
+        code = "connection_lost",
+        runId = runId,
+    )
 
     private class DanglingToolTransport : TimelineTransport {
         var listCalls = 0

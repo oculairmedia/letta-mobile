@@ -951,6 +951,10 @@ class TimelineSyncLoop(
      */
     suspend fun turnEnded(clean: Boolean) {
         turnActive = false
+        if (clean) {
+            // Successful terminal evidence supersedes live connection-loss notices for this conversation.
+            timelineProcessor.submit(TimelineMutation.RetireTurnFailureNotices)
+        }
         // Bump the generation so a timer already past its delay cannot enqueue a
         // post-terminal write, then cancel the current one.
         turnSafetyFlushGeneration++
