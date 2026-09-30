@@ -81,6 +81,16 @@ internal class DesktopTouchDragExclusionRegistry<K : Any> {
 internal val DesktopTouchDragExclusion = DesktopTouchDragExclusionRegistry<Window>()
 
 /**
+ * Regions where a finger must be a click, not a scroll.
+ *
+ * The chat list is a scroll surface. The prompt bar is not: a tap there has to
+ * focus the field, which is what raises the touch keyboard. Kept separate from
+ * [DesktopTouchDragExclusion] because that path deliberately does not record a
+ * finger — the title bar is a drag, and recording it would pop the keyboard.
+ */
+internal val DesktopTouchInteractive = DesktopTouchDragExclusionRegistry<Window>()
+
+/**
  * Builds the screen-space [Rectangle] to publish for a title-bar-shaped
  * region, or null when [screenX]/[screenY] are not finite.
  *

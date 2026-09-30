@@ -162,6 +162,8 @@ val buildDesktopTabletNative = tasks.register<Exec>("buildDesktopTabletNative") 
         manifest,
         tabletInputDir.file("Cargo.lock"),
         fileTree(tabletInputDir.dir("src")),
+        tabletInputDir.file("build.rs"),
+        fileTree(rootProject.layout.projectDirectory.dir("native/octotablet")),
     )
     outputs.file(tabletInputDir.file("target/release/$tabletNativeLibraryName"))
     commandLine(

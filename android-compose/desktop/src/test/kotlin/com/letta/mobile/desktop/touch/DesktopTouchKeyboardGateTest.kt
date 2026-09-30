@@ -40,6 +40,25 @@ class DesktopTouchKeyboardGateTest {
     }
 
     @Test
+    fun `a finger tap on an already open text session raises the keyboard`() {
+        val origin = DesktopTouchOriginTracker()
+        val keyboard = RecordingKeyboard()
+        val gate = DesktopTouchKeyboardSessionGate(keyboard, origin) { 1_000L }
+
+        origin.record(isTouch = false, atMillis = 900L)
+        val raised = gate.begin()
+        assertFalse(raised)
+        assertEquals(0, keyboard.shows)
+
+        origin.record(isTouch = true, atMillis = 1_000L)
+        gate.fingerTapped()
+        assertEquals(1, keyboard.shows)
+
+        gate.end(raised)
+        assertEquals(1, keyboard.hides)
+    }
+
+    @Test
     fun `a mouse click never raises the keyboard`() {
         val origin = DesktopTouchOriginTracker()
         val keyboard = RecordingKeyboard()

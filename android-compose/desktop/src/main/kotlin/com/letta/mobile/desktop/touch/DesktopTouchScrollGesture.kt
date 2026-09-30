@@ -151,11 +151,15 @@ internal sealed interface TouchGestureEnd {
  */
 internal const val DEFAULT_TOUCH_SLOP_PX = 12
 
+/** A contact that never left the slop is a tap, so the control under it must receive a click. */
+internal fun touchContactIsATap(travelPx: Float, slopPx: Int = DEFAULT_TOUCH_SLOP_PX): Boolean =
+    travelPx < slopPx
+
 /** Velocity is averaged over the tail of the gesture, not its whole length. */
-private const val VELOCITY_WINDOW_MILLIS = 100L
+internal const val VELOCITY_WINDOW_MILLIS = 100L
 
 /** ~8 px/ms is already a full screen height in ~100ms; beyond that is noise. */
-private const val MAX_FLING_VELOCITY_PX_PER_MS = 8f
+internal const val MAX_FLING_VELOCITY_PX_PER_MS = 8f
 
 /**
  * Tracks one finger from press to release and reports the scroll distance to
@@ -184,6 +188,14 @@ internal class DesktopTouchDragGesture(
         samples.addLast(sample)
         origin = sample
         previous = sample
+        axis = null
+    }
+
+    /** Drops a gesture the pointer frames took over, so a later drag is not a scroll. */
+    fun abandon() {
+        samples.clear()
+        origin = null
+        previous = null
         axis = null
     }
 

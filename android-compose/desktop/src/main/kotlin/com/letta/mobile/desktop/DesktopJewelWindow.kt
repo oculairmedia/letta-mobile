@@ -40,6 +40,7 @@ import androidx.compose.ui.window.WindowState
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
+import com.letta.mobile.desktop.touch.LocalDesktopWindow
 import com.letta.mobile.desktop.touch.screenExclusionRectOrNull
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
@@ -182,7 +183,8 @@ internal fun DesktopJewelWindow(
             // below registers with it, so the table of live consumers dies with the window that
             // owns it rather than outliving every window in the process.
             val penRegistry = remember(window) { com.letta.mobile.ui.canvas.CanvasPenRegistry() }
-            com.letta.mobile.desktop.input.InstallTabletPen(window, penRegistry)
+            val boardTouch = remember(window) { com.letta.mobile.ui.canvas.CanvasBoardTouchRegistry() }
+            com.letta.mobile.desktop.input.InstallTabletPen(window, penRegistry, boardTouch)
             DesktopMaterialTheme {
                 val colorScheme = MaterialTheme.colorScheme
                 // With a tab strip the active tab is painted in the page
@@ -410,7 +412,9 @@ internal fun DesktopJewelWindow(
                     CompositionLocalProvider(
                         LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
                         com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
+                        com.letta.mobile.ui.canvas.LocalCanvasBoardTouchRegistry provides boardTouch,
                         LocalScreenRegionPublisher provides dragPassthrough,
+                        LocalDesktopWindow provides window,
                         LocalMenuActionScope provides windowScope,
                     ) {
                         content()

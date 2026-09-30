@@ -382,6 +382,27 @@ class DesktopTouchScrollGestureTest {
     }
 
     @Test
+    fun `a short contact is a tap and a longer one is not`() {
+        assertTrue(touchContactIsATap(travelPx = 0f))
+        assertTrue(touchContactIsATap(travelPx = 11.9f))
+        assertFalse(touchContactIsATap(travelPx = 12f))
+    }
+
+    @Test
+    fun `the prompt bar registry does not replace the title bar exclusion`() {
+        val titleBar = DesktopTouchDragExclusionRegistry<Any>()
+        val prompt = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        titleBar.publish(window, java.awt.Rectangle(0, 0, 400, 40))
+        prompt.publishOverlay(window, "composer", java.awt.Rectangle(80, 700, 240, 64))
+
+        assertTrue(titleBar.contains(window, screenX = 10, screenY = 10))
+        assertFalse(titleBar.contains(window, screenX = 100, screenY = 720))
+        assertTrue(prompt.contains(window, screenX = 100, screenY = 720))
+        assertFalse(prompt.contains(window, screenX = 10, screenY = 10))
+    }
+
+    @Test
     fun `an overlay rect is excluded without replacing the title bar`() {
         val registry = DesktopTouchDragExclusionRegistry<Any>()
         val window = Any()

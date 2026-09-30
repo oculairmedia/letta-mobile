@@ -53,6 +53,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.desktop.touch.fingerPressesAsClicks
 import com.letta.mobile.data.composer.ActiveToken
 import com.letta.mobile.data.composer.AutocompleteTrigger
 import com.letta.mobile.data.composer.ComposerAutocomplete
@@ -284,6 +285,7 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = LettaDimens.Space.xl, max = 120.dp)
+            .fingerPressesAsClicks("composer")
             .testTag("composer-input")
             .mascotGazeTarget(MascotGazeSurface.INPUT)
             .onPreviewKeyEvent { event ->

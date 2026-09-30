@@ -75,6 +75,7 @@ import io.ak1.drawbox.domain.model.Viewport
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
+import io.ak1.drawbox.presentation.PanFling
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -1269,6 +1270,30 @@ fun CanvasWorkspace(
             DisposableEffect(penConsumer, penTarget, penRegistry) {
                 val disposePen = penRegistry.register(penTarget, penConsumer)
                 onDispose { disposePen() }
+            }
+
+            // Desktop fingers are not PointerType.Touch, so the phone's one-finger pan and
+            // DrawBox's pinch never see them. Offer each contact here: on the board it pans
+            // in both axes and pinches; anywhere else the platform keeps scrolling.
+            val boardTouch = LocalCanvasBoardTouchRegistry.current
+            val fingerGesture = remember { CanvasFingerGesture() }
+            val touchBinding = remember { CanvasBoardTouchBinding() }
+            touchBinding.board = boardBounds
+            touchBinding.density = penDensity
+            touchBinding.chrome = chromeRegions
+            touchBinding.pan = { delta -> controller.panBy(delta) }
+            touchBinding.zoom = { factor, focal -> controller.zoomBy(factor, focal) }
+            val boardFling = remember(coroutineScope) { PanFling(coroutineScope) { delta -> touchBinding.pan(delta) } }
+            DisposableEffect(boardTouch, penTarget, fingerGesture) {
+                val disposeTouch = boardTouch.register(penTarget) { sample ->
+                    val outcome = fingerGesture.offer(sample.contact, sample.phase, sample.x, sample.y, touchBinding.hits(sample.x, sample.y))
+                    touchBinding.apply(outcome.effects, boardFling, System.currentTimeMillis())
+                    outcome.result
+                }
+                onDispose {
+                    disposeTouch()
+                    boardFling.stop()
+                }
             }
 
             // A label lives inside its shape: it is re-framed whenever the shape moves or is

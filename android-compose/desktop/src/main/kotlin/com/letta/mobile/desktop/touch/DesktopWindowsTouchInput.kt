@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
@@ -70,6 +71,13 @@ internal object DesktopWindowsTouchInput {
     private const val TOUCH_SCROLL_END = 4
     private val TOUCH_PAN_SCROLL_TYPES =
         setOf(TOUCH_SCROLL_BEGIN, TOUCH_SCROLL_UPDATE, TOUCH_SCROLL_END)
+
+    private val OWNED_FINGER_MOUSE_IDS = setOf(
+        MouseEvent.MOUSE_PRESSED,
+        MouseEvent.MOUSE_DRAGGED,
+        MouseEvent.MOUSE_RELEASED,
+        MouseEvent.MOUSE_CLICKED,
+    )
 
     /**
      * Pixels of content travel per pan unit the JDK reports.
@@ -158,6 +166,27 @@ internal object DesktopWindowsTouchInput {
          */
         private val exclusionLatch = DesktopTouchDragExclusionLatch()
 
+        /**
+         * Whether the current gesture started on a control that must receive a
+         * real click, such as the prompt bar. Same latch rule as [exclusionLatch].
+         */
+        private val interactiveLatch = DesktopTouchDragExclusionLatch()
+
+        /** A finger pan that started on an interactive control must not scroll the page. */
+        private var interactivePan = false
+
+        /** How far that pan travelled, in pixels, so a twitch is still a tap. */
+        private var panTravelPx = 0f
+
+        private var panAnchorX = 0
+        private var panAnchorY = 0
+
+        /** The mouse path already focused the control, so the pan must not click again. */
+        private var interactiveSawMousePress = false
+
+        /** Snapshot of [interactiveSawMousePress] at pan begin, so a later release cannot change it. */
+        private var interactiveMouseAlreadyDown = false
+
         /** Held back until the gesture is known to be a tap rather than a scroll. */
         private var withheldPress: MouseEvent? = null
 
@@ -215,7 +244,36 @@ internal object DesktopWindowsTouchInput {
         private fun dispatchTouchPan(event: MouseWheelEvent): Boolean {
             if (event.scrollType !in TOUCH_PAN_SCROLL_TYPES) return false
             val component = event.source as? Component ?: return false
-            if (managedWindow(component) == null) return false
+            val window = managedWindow(component) ?: return false
+            // The pointer hook arms this before AWT turns the finger into a pan wheel.
+            // Without it every touch on the canvas was a downward wheel, because the
+            // window was not marked owned until the next poll.
+            if (DesktopPointerTouch.ownsFingers(window) || com.letta.mobile.desktop.input.TabletBridge.touchGestureActive()) {
+                return true
+            }
+            if (event.scrollType == TOUCH_SCROLL_BEGIN) translatedThisGesture = false
+            noteTranslated("pan", window)
+            if (event.scrollType == TOUCH_SCROLL_BEGIN) {
+                interactivePan = DesktopTouchInteractive.contains(window, event.xOnScreen, event.yOnScreen)
+                panAnchorX = event.xOnScreen
+                panAnchorY = event.yOnScreen
+                panTravelPx = 0f
+                interactiveMouseAlreadyDown = interactiveSawMousePress
+            }
+            if (interactivePan) {
+                val dx = (event.xOnScreen - panAnchorX).toFloat()
+                val dy = (event.yOnScreen - panAnchorY).toFloat()
+                panTravelPx = maxOf(panTravelPx, hypot(dx, dy))
+                panTravelPx += abs(event.preciseWheelRotation * PAN_UNIT_PIXELS).toFloat()
+                if (event.scrollType == TOUCH_SCROLL_END) {
+                    if (!interactiveMouseAlreadyDown && touchContactIsATap(panTravelPx)) {
+                        deliverFingerTap(component, event)
+                    }
+                    interactivePan = false
+                    interactiveSawMousePress = false
+                }
+                return true
+            }
             // A pan is unambiguously a finger, so the touch-keyboard gate should
             // see it even though AWT does not flag wheel events as touch-caused.
             DesktopTouchOrigin.record(isTouch = true, atMillis = System.currentTimeMillis())
@@ -287,8 +345,62 @@ internal object DesktopWindowsTouchInput {
                 super.dispatchEvent(event)
                 return
             }
+            if (dispatchIfInteractive(event, window)) return
             if (dispatchIfExcluded(event, window)) return
             dispatchClassified(event, requireNotNull(component))
+        }
+
+        /**
+         * A finger on the prompt bar (or any other published interactive control)
+         * is a click. The touch-keyboard gate reads the origin recorded here;
+         * the title-bar exclusion path must not, because that drag is not typing.
+         */
+        private fun dispatchIfInteractive(event: MouseEvent, window: Window): Boolean {
+            val interactive = interactiveLatch.classify(event.id) {
+                DesktopTouchInteractive.contains(window, event.xOnScreen, event.yOnScreen)
+            }
+            if (!interactive) return false
+            val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
+            recordOrigin(event, isTouch)
+            if (dropBecausePointerOwnsFingers(event, window, isTouch)) return true
+            if (event.id == MouseEvent.MOUSE_PRESSED) {
+                cancelFling()
+                interactiveSawMousePress = true
+            } else if (event.id == MouseEvent.MOUSE_RELEASED || event.id == MouseEvent.MOUSE_CLICKED) {
+                interactiveSawMousePress = false
+            }
+            super.dispatchEvent(event)
+            if (event.id == MouseEvent.MOUSE_RELEASED && isTouch) {
+                SwingUtilities.invokeLater { DesktopTouchKeyboardTaps.gate?.fingerTapped() }
+            }
+            return true
+        }
+
+        /** Press, release, and click, delivered behind this queue so they are not scrolled away. */
+        private fun deliverFingerTap(component: Component, source: MouseEvent) {
+            DesktopTouchOrigin.record(isTouch = true, atMillis = System.currentTimeMillis())
+            val time = System.currentTimeMillis()
+            fun post(id: Int, modifiers: Int, whenMillis: Long) {
+                super.dispatchEvent(
+                    MouseEvent(
+                        component,
+                        id,
+                        whenMillis,
+                        modifiers,
+                        source.x,
+                        source.y,
+                        source.xOnScreen,
+                        source.yOnScreen,
+                        1,
+                        false,
+                        MouseEvent.BUTTON1,
+                    ),
+                )
+            }
+            post(MouseEvent.MOUSE_PRESSED, InputEvent.BUTTON1_DOWN_MASK, time)
+            post(MouseEvent.MOUSE_RELEASED, 0, time + 1)
+            post(MouseEvent.MOUSE_CLICKED, 0, time + 2)
+            SwingUtilities.invokeLater { DesktopTouchKeyboardTaps.gate?.fingerTapped() }
         }
 
         /**
@@ -302,6 +414,8 @@ internal object DesktopWindowsTouchInput {
                 DesktopTouchDragExclusion.contains(window, event.xOnScreen, event.yOnScreen)
             }
             if (!excluded) return false
+            val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
+            if (dropBecausePointerOwnsFingers(event, window, isTouch)) return true
             if (event.id == MouseEvent.MOUSE_PRESSED) cancelFling()
             super.dispatchEvent(event)
             return true
@@ -311,6 +425,8 @@ internal object DesktopWindowsTouchInput {
         private fun dispatchClassified(event: MouseEvent, component: Component) {
             val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
             recordOrigin(event, isTouch)
+            val window = managedWindow(component)
+            if (window != null && dropBecausePointerOwnsFingers(event, window, isTouch)) return
             if (!isTouch) {
                 if (event.id == MouseEvent.MOUSE_PRESSED) cancelFling()
                 super.dispatchEvent(event)
@@ -352,7 +468,31 @@ internal object DesktopWindowsTouchInput {
             }
         }
 
+        /**
+         * Pointer frames already own this finger. The matching AWT mouse would be a second
+         * click and a second scroll. A mouse or a pen is not touch-caused, so it still goes through.
+         */
+        private fun dropBecausePointerOwnsFingers(event: MouseEvent, window: Window, isTouch: Boolean): Boolean {
+            if (!isTouch || !DesktopPointerTouch.ownsFingers(window)) return false
+            if (event.id !in OWNED_FINGER_MOUSE_IDS) return false
+            withheldPress = null
+            gesture.abandon()
+            cancelFling()
+            return true
+        }
+
+        private var translatedThisGesture = false
+
+        private fun noteTranslated(kind: String, window: Window) {
+            if (translatedThisGesture) return
+            translatedThisGesture = true
+            println("TOUCHSHIM: translated $kind owned=${DesktopPointerTouch.ownsFingers(window)}")
+        }
+
         private fun onTouchPress(event: MouseEvent) {
+            translatedThisGesture = false
+            val window = managedWindow(event.source as? Component)
+            if (window != null) noteTranslated("drag", window)
             cancelFling()
             gesture.press(event.toSample())
             withheldPress = event
@@ -371,6 +511,7 @@ internal object DesktopWindowsTouchInput {
         }
 
         private fun onTouchRelease(event: MouseEvent, component: Component) {
+            translatedThisGesture = false
             when (val end = gesture.release(event.toSample())) {
                 TouchGestureEnd.Tap -> {
                     // A tap: hand Compose the press it never saw, then the
