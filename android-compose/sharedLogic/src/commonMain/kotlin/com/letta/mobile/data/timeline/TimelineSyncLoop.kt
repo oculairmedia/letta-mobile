@@ -4,6 +4,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineImageBodies
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
@@ -15,6 +16,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotMutationCharacterizer
 import com.letta.mobile.data.timeline.snapshot.TimelineIncrementalSnapshotPlanner
 import com.letta.mobile.data.timeline.snapshot.SnapshotStructuralSummary
+import com.letta.mobile.data.timeline.snapshot.withImageBodies
 import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.atomic
@@ -285,7 +287,7 @@ class TimelineSyncLoop(
                 scope = snapshotScope,
                 revision = snapshotRevision,
                 writtenAtMillis = timelineCurrentTimeMillis(),
-            )
+            ).withStoredImageBodies(committedState.timeline)
             envelope to TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
         }
 
@@ -344,6 +346,13 @@ class TimelineSyncLoop(
             )
         }
     }
+
+    // Stores that keep image bodies get them written before the envelope that names them;
+    // otherwise an image over the inline budget is persisted as size-only metadata.
+    private suspend fun StoredTimelineEnvelope.withStoredImageBodies(timeline: Timeline): StoredTimelineEnvelope =
+        (confirmedTimelineStore as? ConfirmedTimelineImageBodies)?.let {
+            withImageBodies(timeline, it, previous = lastPersistedEnvelope)
+        } ?: this
 
     internal data class IncrementalPlanningDecision(
         val result: TimelineIncrementalSnapshotPlanner.Result,
@@ -457,7 +466,7 @@ class TimelineSyncLoop(
             scope = snapshotScope,
             revision = revision,
             writtenAtMillis = startedAtMs,
-        )
+        ).withStoredImageBodies(timeline)
         val fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
         try {
             withContext(ioDispatcher + NonCancellable) {
