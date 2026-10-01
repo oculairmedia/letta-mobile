@@ -123,7 +123,11 @@ internal fun DesktopSharedChatPage(
             },
             host = host,
             modifier = Modifier.fillMaxSize(),
-            appearance = ChatSurfaceAppearance(fontScale = LocalDesktopChatFontScale.current),
+            appearance = ChatSurfaceAppearance(
+                fontScale = LocalDesktopChatFontScale.current,
+                // The font-scale host already scales the window's text through density.
+                fontScaleAppliedByHost = true,
+            ),
             pagedTimeline = state.pagedTimeline,
         )
     }

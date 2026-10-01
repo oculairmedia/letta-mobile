@@ -13,6 +13,12 @@ data class ChatSurfaceAppearance(
     val displayMode: ChatDisplayMode = ChatDisplayMode.Interactive,
     /** Timeline text scale; pinch-to-zoom reports changes through ChatActions.setFontScale. */
     val fontScale: Float = 1f,
+    /**
+     * True when the host already scales the page's text by [fontScale] (desktop does it
+     * through the window density). The page then keeps [fontScale] only as the baseline
+     * for pinch-to-zoom and must not scale text again.
+     */
+    val fontScaleAppliedByHost: Boolean = false,
     val hapticsEnabled: Boolean = true,
 )
 
