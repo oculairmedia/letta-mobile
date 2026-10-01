@@ -53,7 +53,7 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLaunche
 
 /*
  * letta-mobile-bglj6.1 (stage 3, desktop): the Conversations destination rendered with the shared
- * KMP chat page instead of ChatDetailPane, behind DesktopSharedChatPageFlag.
+ * KMP chat page.
  */
 
 /**

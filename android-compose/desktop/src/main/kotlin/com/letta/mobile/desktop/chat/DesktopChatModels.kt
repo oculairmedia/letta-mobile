@@ -42,9 +42,9 @@ data class DesktopChatSurfaceState(
     val statusMessage: String? = null,
     val errorMessage: String? = null,
     /**
-     * The composer's own error (attachment limits, a refused send, a failed canvas share). It is
-     * also written to [errorMessage] so the legacy page, which has one error, still shows it; the
-     * shared page shows it in the composer and keeps it out of the page snackbar.
+     * The composer's own error (attachment limits, a refused send, a failed canvas share), shown
+     * in the composer. It is never the page error ([errorMessage]): it neither reaches the page
+     * snackbar nor turns the ambient glow to "failed".
      */
     val composerErrorMessage: String? = null,
     val backendLabel: String,
@@ -197,15 +197,13 @@ fun DesktopChatSurfaceState.withRuntimeState(runtimeState: ChatSessionState): De
         selectionGeneration = runtimeState.selectionGeneration,
     )
 
-/** Shows [message] as the composer's error (and, for the legacy page, the surface error). */
+/** Shows [message] as the composer's error. */
 internal fun DesktopChatSurfaceState.withComposerError(message: String): DesktopChatSurfaceState =
-    copy(composerErrorMessage = message, errorMessage = message)
+    copy(composerErrorMessage = message)
 
-/** Clears the composer's error, and the surface error when that was the same error. */
-internal fun DesktopChatSurfaceState.withoutComposerError(): DesktopChatSurfaceState {
-    val composerError = composerErrorMessage ?: return this
-    return copy(composerErrorMessage = null, errorMessage = errorMessage.takeUnless { it == composerError })
-}
+/** Clears the composer's error. */
+internal fun DesktopChatSurfaceState.withoutComposerError(): DesktopChatSurfaceState =
+    if (composerErrorMessage == null) this else copy(composerErrorMessage = null)
 
 fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
     val draft = ChatComposerPolicy.beginSend(composer) ?: return this

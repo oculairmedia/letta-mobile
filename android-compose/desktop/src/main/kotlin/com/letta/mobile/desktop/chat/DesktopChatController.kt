@@ -1278,8 +1278,6 @@ class DesktopChatController(
     }
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()
-    private val _canonicalStatus = MutableStateFlow<String?>(null)
-    val canonicalStatus = _canonicalStatus.asStateFlow()
 
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
         if (!isActiveSelection(generation)) return
@@ -1299,9 +1297,7 @@ class DesktopChatController(
 
         _canonicalPresentation.value = null
         val canonical = canonicalOpen
-        _canonicalStatus.value = null
         if (canonical != null && canonicalEligible(conversationId)) {
-            _canonicalStatus.value = "Opening conversation..."
             timelineJob = scope.launch {
                 try {
                     val presentation = canonical(
@@ -1325,7 +1321,6 @@ class DesktopChatController(
                     throw cancelled
                 } catch (failure: Exception) {
                     if (isActiveSelection(generation)) {
-                        _canonicalStatus.value = failure.message ?: "Canonical timeline failed to open"
                         _state.update {
                             it.withRuntimeState(ChatSessionReducer.hydrateFailed(it.runtimeState, generation,
                                 failure.message ?: "Canonical timeline failed to open"))

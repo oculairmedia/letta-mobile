@@ -45,7 +45,7 @@ private const val ChatComposerTag = "chat-composer"
  * covered in sharedLogic commonTest).
  *
  * The composer + scroll state are deliberately siblings of the collapsible
- * sidebar — not nested inside it — mirroring how [ChatDetailPane] sits
+ * sidebar — not nested inside it — mirroring how the chat page sits
  * beside (not inside) [DesktopAgentSidebar] in the real shell. That
  * placement is what makes AC #4 (collapsing preserves composer draft +
  * scroll position) true by construction: the chat subtree is never disposed

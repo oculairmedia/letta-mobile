@@ -36,6 +36,9 @@ import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import kotlin.math.PI
 import kotlin.math.sin
+import androidx.compose.runtime.mutableStateOf
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
 
 /** Coarse agent activity used to tint the ambient glow. */
 internal enum class DesktopAmbientStatus { Idle, Running, Failed, Completed }
@@ -226,3 +229,34 @@ private const val AMBIENT_TELEMETRY_TAG = "DesktopAmbient"
 private const val HiddenAlpha = 0.001f
 private const val IdentityBlend = 0.35f
 private val TwoPi = (2 * PI).toFloat()
+
+/**
+ * Drives the ambient glow off the thinking state: a teal breath while the agent works, a brief
+ * "completed" settle afterward, error tint on failure. Drawn behind the chat page.
+ */
+@Composable
+internal fun rememberDesktopAmbientStatus(isThinking: Boolean, errorMessage: String?): DesktopAmbientStatus {
+    var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
+    var hadActiveRun by remember { mutableStateOf(false) }
+    LaunchedEffect(isThinking, errorMessage) {
+        when {
+            errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
+            isThinking -> {
+                hadActiveRun = true
+                ambientStatus = DesktopAmbientStatus.Running
+            }
+            hadActiveRun -> {
+                ambientStatus = DesktopAmbientStatus.Completed
+                // Held for exactly as long as the shared table says the
+                // Completed decay runs: a shorter hold cancels the decay
+                // mid-flight and Idle animates the envelope back UP, which
+                // reads as a rebound rather than an afterglow.
+                delay(AmbientMotion.holdMillis(AmbientMotionStatus.Completed).milliseconds)
+                hadActiveRun = false
+                ambientStatus = DesktopAmbientStatus.Idle
+            }
+            else -> ambientStatus = DesktopAmbientStatus.Idle
+        }
+    }
+    return ambientStatus
+}

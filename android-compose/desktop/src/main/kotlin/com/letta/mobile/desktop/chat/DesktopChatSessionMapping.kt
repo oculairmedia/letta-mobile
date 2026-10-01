@@ -90,12 +90,12 @@ internal fun submittingApprovalOnScreen(submitting: Set<String>, messages: List<
 }
 
 /**
- * The page (snackbar) error: the surface error unless it is the composer's own error, which the
- * composer shows, or the page already showed it ([acknowledged]). Acknowledging does not clear
- * the controller's error, so the ambient glow keeps reading "failed" until the next send.
+ * The page (snackbar) error: the surface error unless the page already showed it ([acknowledged]).
+ * Acknowledging does not clear the controller's error, so the ambient glow keeps reading "failed"
+ * until the next send.
  */
 internal fun DesktopChatSurfaceState.pageError(acknowledged: String?): String? =
-    errorMessage.takeUnless { it == composerErrorMessage || it == acknowledged }
+    errorMessage.takeUnless { it == acknowledged }
 
 /** Reuses the previous list instance when the content is unchanged, so the timeline skips work. */
 private fun nextMessages(previous: ImmutableList<UiMessage>?, next: List<UiMessage>): ImmutableList<UiMessage> =

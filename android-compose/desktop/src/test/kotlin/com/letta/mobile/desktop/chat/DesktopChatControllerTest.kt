@@ -324,7 +324,8 @@ class DesktopChatControllerTest {
 
         val state = controller.state.value
         assertEquals(4, state.pendingImageAttachments.size)
-        assertEquals("Attach up to 4 images.", state.errorMessage)
+        assertEquals("Attach up to 4 images.", state.composerErrorMessage)
+        assertEquals(null, state.errorMessage)
 
         controller.close()
     }

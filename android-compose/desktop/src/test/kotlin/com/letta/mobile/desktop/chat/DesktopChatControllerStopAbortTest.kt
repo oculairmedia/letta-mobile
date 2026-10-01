@@ -81,7 +81,7 @@ class DesktopChatControllerStopAbortTest {
         runCurrent()
 
         assertEquals(1, loop.sentMessages.size)
-        assertEquals(STOPPING_SEND_BLOCKED_MESSAGE, controller.state.value.errorMessage)
+        assertEquals(STOPPING_SEND_BLOCKED_MESSAGE, controller.state.value.composerErrorMessage)
 
         controller.close()
     }

@@ -29,8 +29,6 @@ import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.onboarding.OnboardingTaskKind
-import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import kotlinx.coroutines.launch
 
 /** Model picker options: display label to route-stable selection token. */
@@ -424,16 +422,12 @@ internal data class DesktopComposerCommandsParams(
     val agentSlashCommands: List<AgentSlashCommand>,
     val selectedConversationId: String?,
     val selectedAgentId: String?,
-    val selectedAgentName: String,
     val selectedDestination: DesktopDestination,
-    val canvasStore: com.letta.mobile.data.canvas.CanvasDocumentStore,
-    val chatScope: CoroutineScope,
     val onNavigate: (DesktopDestination) -> Unit,
     val onCreateAgent: () -> Unit,
     val onEditAgent: (String?) -> Unit,
-    val onCanvasSessionChange: (com.letta.mobile.data.canvas.CanvasSession?) -> Unit,
-    /** Set while the shared chat page docks the conversation's board: the canvas command shows it. */
-    val showDockedCanvas: (() -> Unit)? = null,
+    /** The canvas command shows the conversation's board, docked under the chat page. */
+    val showDockedCanvas: () -> Unit,
 )
 
 @Composable
@@ -443,9 +437,7 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
         params.agentSlashCommands,
         params.selectedDestination,
         params.selectedAgentId,
-        params.showDockedCanvas != null,
     ) {
-        val showDocked = params.showDockedCanvas
         buildComposerCommands(
             BuildComposerCommandsParams(
                 chatController = params.chatController,
@@ -453,68 +445,10 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
                 onCreateAgent = params.onCreateAgent,
                 onEditAgent = { params.onEditAgent(params.selectedAgentId) },
                 onNavigate = params.onNavigate,
-                onOpenCanvas = showDocked ?: {
-                    openDesktopCanvasSession(
-                        OpenDesktopCanvasParams(
-                            scope = params.chatScope,
-                            store = params.canvasStore,
-                            conversationId = params.selectedConversationId,
-                            agentId = params.selectedAgentId,
-                            agentName = params.selectedAgentName,
-                            onSessionReady = params.onCanvasSessionChange,
-                        ),
-                    )
-                },
+                onOpenCanvas = params.showDockedCanvas,
             ),
         )
     }
-}
-
-internal data class CreateDesktopChatDetailPaneActionsParams(
-    val chatController: DesktopChatController,
-    val canSubmitApprovals: Boolean,
-    val onA2uiAction: (com.letta.mobile.data.a2ui.A2uiAction) -> Unit,
-    val onAttachImage: () -> Unit,
-    val onOpenCanvas: (() -> Unit)? = null,
-    val onOpenModelPicker: () -> Unit,
-    val onSetPersona: () -> Unit,
-    val onNavigateToChannels: () -> Unit,
-    val onNavigateToAgents: () -> Unit,
-    val onOpenAgent: (String) -> Unit,
-    /** The composer companion mascot taps into the agent pane. */
-    val onOpenAgentPane: () -> Unit = {},
-    val onEditAgent: () -> Unit = {},
-)
-
-internal fun createDesktopChatDetailPaneActions(
-    params: CreateDesktopChatDetailPaneActionsParams,
-): ChatDetailPaneActions {
-    val chatController = params.chatController
-    return ChatDetailPaneActions(
-        onComposerTextChanged = chatController::updateComposerText,
-        onSend = chatController::send,
-        onSubmitApproval = chatController::submitApproval.takeIf { params.canSubmitApprovals },
-        onA2uiAction = params.onA2uiAction,
-        onAttachImage = params.onAttachImage,
-        onOpenCanvas = params.onOpenCanvas,
-        onRemoveImageAttachment = chatController::removeImageAttachment,
-        onRetryConnection = chatController::retryConnection,
-        onModelSelected = chatController::setConversationModel,
-        onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
-        onOpenModelPicker = params.onOpenModelPicker,
-        onOpenAgentPane = params.onOpenAgentPane,
-        onEditAgent = params.onEditAgent,
-        onOnboardingTask = { kind ->
-            when (kind) {
-                OnboardingTaskKind.SetPersona -> params.onSetPersona()
-                OnboardingTaskKind.ConnectChannel -> params.onNavigateToChannels()
-                OnboardingTaskKind.AddSkills -> params.onNavigateToAgents()
-            }
-        },
-        onOpenAgent = params.onOpenAgent,
-        queue = desktopQueuedSendActions(chatController),
-        queueControls = chatController::canonicalSendQueue,
-    )
 }
 
 internal fun handleDesktopShareCanvasToChat(

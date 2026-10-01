@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 import com.letta.mobile.data.canvas.CanvasId
 
 /**
- * letta-mobile-bglj6.1: while the shared chat page is on, the conversation's board lives in the
+ * letta-mobile-bglj6.1: the conversation's board lives in the chat
  * page's docked canvas. Requests that would open it again in the side pane (the composer's canvas
  * command, "open canvas", a library or search pick of the same board) are routed to the dock
  * instead, so one board never has two live CanvasSessions.

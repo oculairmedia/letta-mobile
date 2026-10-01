@@ -25,7 +25,6 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
@@ -38,8 +37,6 @@ import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.desktop.data.DesktopShellLayoutStore
-import com.letta.mobile.desktop.chat.ChatDetailPaneActions
-import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -59,10 +56,6 @@ import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.ui.mascot.MascotTransportLayer
-import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
-import io.github.vinceglb.filekit.dialogs.FileKitMode
-import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.letta.mobile.desktop.chat.DesktopChatController
@@ -184,17 +177,12 @@ internal fun LettaDesktopApp(
     )
     val chatState by chatController.state.collectAsState()
     val canonicalPresentation by chatController.canonicalPresentation.collectAsState()
-    val canonicalStatus by chatController.canonicalStatus.collectAsState()
     var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
-    val submittingApprovals by chatController.submittingApprovals.collectAsState()
-    val canSubmitApprovals by chatController.canSubmitApprovals.collectAsState()
     // letta-mobile folder-settings #2: re-read the working directory whenever
     // the selected conversation changes (or its identity resolves for the
     // first time after a fresh connect).
-    val selectedConversationWorkingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
-    val workingDirectoryLoading by chatController.workingDirectoryLoading.collectAsState()
     LaunchedEffect(chatState.selectedConversationId, chatState.selectedConversation?.agentId) {
         chatController.refreshSelectedConversationWorkingDirectory()
     }
@@ -228,25 +216,6 @@ internal fun LettaDesktopApp(
     val toolLibraryState by libraries.tools.state.collectAsState()
     CommandPaletteKeyDispatcherEffect(onOpenPalette = { overlays.commandPalette = true })
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
-    val pickerLauncher = rememberFilePickerLauncher(
-        type = FileKitType.Image,
-        mode = FileKitMode.Multiple(maxItems = ImageIngressPolicy.MAX_FILES),
-        dialogSettings = FileKitDialogSettings(title = "Attach images"),
-    ) { files ->
-        files.orEmpty().forEach { file ->
-            chatScope.launch {
-                runCatching {
-                    val path = file.file.toPath()
-                    imageAttachmentLoader.load(path)
-                }.onSuccess(chatController::attachImage)
-                    .onFailure {
-                        chatController.showComposerError(
-                            it.message ?: it::class.simpleName ?: "Could not attach image",
-                        )
-                    }
-            }
-        }
-    }
     val isDragActive by DesktopImageIngressEffect(
         DesktopImageIngressConfig(
             enabled = selectedDestination == DesktopDestination.Conversations,
@@ -316,24 +285,18 @@ internal fun LettaDesktopApp(
         }
         sessionGraph.channelTransport.sendA2uiAction(resolvedAction)
     }
-    // letta-mobile-bglj6.1: the shared KMP chat page's port, built only while the preview flag is on.
-    val sharedChatEnabled by LocalDesktopSharedChatPageFlag.current.enabled.collectAsState()
-    val sharedChatPort = if (sharedChatEnabled) {
-        rememberDesktopChatSessionPort(chatController, ::dispatchA2uiAction)
-    } else {
-        null
-    }
-    val dockedCanvasRouter = remember { DesktopDockedCanvasRouter() }
-    // Only while the shared page is on does the conversation's board live in its dock.
-    val dockedCanvas = dockedCanvasRouter.takeIf { sharedChatPort != null }
-    val showDockedCanvas: (() -> Unit)? = dockedCanvas?.let { router ->
-        {
-            selectedDestination = DesktopDestination.Conversations
-            router.showDocked()
-        }
+    // letta-mobile-bglj6.1: the shared KMP chat page's port, for the selected conversation.
+    val sharedChatPort = rememberDesktopChatSessionPort(chatController, ::dispatchA2uiAction)
+    // The conversation's board lives in the page's dock; the side pane only shows other boards.
+    val dockedCanvas = remember { DesktopDockedCanvasRouter() }
+    val showDockedCanvas: () -> Unit = {
+        selectedDestination = DesktopDestination.Conversations
+        dockedCanvas.showDocked()
     }
     val openCanvasById: (com.letta.mobile.data.canvas.CanvasId) -> Unit = { id ->
-        if (dockedCanvas != null && id == dockedCanvas.dockedCanvasId) showDockedCanvas?.invoke() else canvasShell.open(id)
+        dockedCanvas.open(id) {
+            canvasShell.open(it)
+        }
     }
     LaunchedEffect(sessionGraph, chatState.connectionState) {
         runCatching {
@@ -783,14 +746,10 @@ internal fun LettaDesktopApp(
                             agentSlashCommands = agentSlashCommands,
                             selectedConversationId = chatState.selectedConversationId,
                             selectedAgentId = selectedAgentId,
-                            selectedAgentName = selectedAgentName,
                             selectedDestination = selectedDestination,
-                            canvasStore = canvasShell.store,
-                            chatScope = chatScope,
                             onNavigate = { selectedDestination = it },
                             onCreateAgent = { overlays.newAgent = true },
                             onEditAgent = { editAgentId = it },
-                            onCanvasSessionChange = { canvasShell.activeSession = it },
                             showDockedCanvas = showDockedCanvas,
                         ),
                     )
@@ -800,51 +759,44 @@ internal fun LettaDesktopApp(
                         settled = !isThinkingSelected && !isStreamingReplySelected,
                         repository = dataBindings.sessionGraphProvider.current.agentRepository,
                     )
-                    val openConversationCanvas = showDockedCanvas ?: {
-                        canvasShell.openForConversation(
-                            DesktopCanvasOwner(chatState.selectedConversationId, selectedAgentId, selectedAgentName),
-                        )
-                    }
                     val agentNamesById = remember(rosterAgents) { rosterAgents.associate { it.id.value to it.name } }
-                    val sharedChatPage: (@Composable (Modifier) -> Unit)? = sharedChatPort?.let { port ->
-                        { pageModifier ->
-                            DesktopSharedChatPage(
-                                state = DesktopSharedChatPageState(
-                                    port = port,
-                                    pagedTimeline = canonicalPresentation,
-                                    hostInputs = DesktopChatComposerHostInputs(
-                                        commands = composerCommands,
-                                        mentionables = mentionables,
-                                        contextUsage = contextUsage,
-                                        placeholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
-                                    ),
-                                    isThinking = isThinkingSelected,
-                                    errorMessage = chatState.errorMessage,
-                                    canvasStore = canvasShell.store,
-                                    canvasOwner = DesktopCanvasOwner(
-                                        chatState.selectedConversationId,
-                                        selectedAgentId,
-                                        selectedAgentName,
-                                    ),
-                                    dockedCanvas = dockedCanvas,
+                    val sharedChatPage: @Composable (Modifier) -> Unit = { pageModifier ->
+                        DesktopSharedChatPage(
+                            state = DesktopSharedChatPageState(
+                                port = sharedChatPort,
+                                pagedTimeline = canonicalPresentation,
+                                hostInputs = DesktopChatComposerHostInputs(
+                                    commands = composerCommands,
+                                    mentionables = mentionables,
+                                    contextUsage = contextUsage,
+                                    placeholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
                                 ),
-                                navigation = DesktopSharedChatPageNavigation(
-                                    openCanvas = { openConversationCanvas() },
-                                    openAgent = ::openAgent,
-                                    openModelPicker = { overlays.modelPicker = true },
-                                    // As on the old page: the companion mascot brings the agent pane
-                                    // back and leaves any editor; its pencil opens the editor.
-                                    openAgentPane = {
-                                        editAgentId = null
-                                        selectedDestination = DesktopDestination.Conversations
-                                        shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
-                                    },
-                                    editAgent = { editAgentId = selectedAgentId },
-                                    agentNamesById = agentNamesById,
+                                isThinking = isThinkingSelected,
+                                errorMessage = chatState.errorMessage,
+                                canvasStore = canvasShell.store,
+                                canvasOwner = DesktopCanvasOwner(
+                                    chatState.selectedConversationId,
+                                    selectedAgentId,
+                                    selectedAgentName,
                                 ),
-                                modifier = pageModifier,
-                            )
-                        }
+                                dockedCanvas = dockedCanvas,
+                            ),
+                            navigation = DesktopSharedChatPageNavigation(
+                                openCanvas = showDockedCanvas,
+                                openAgent = ::openAgent,
+                                openModelPicker = { overlays.modelPicker = true },
+                                // As on the old page: the companion mascot brings the agent pane
+                                // back and leaves any editor; its pencil opens the editor.
+                                openAgentPane = {
+                                    editAgentId = null
+                                    selectedDestination = DesktopDestination.Conversations
+                                    shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
+                                },
+                                editAgent = { editAgentId = selectedAgentId },
+                                agentNamesById = agentNamesById,
+                            ),
+                            modifier = pageModifier,
+                        )
                     }
                     DesktopMainContentPane(
                         inputs = DesktopMainContentInputs(
@@ -855,27 +807,6 @@ internal fun LettaDesktopApp(
                             blockApi = blockApi,
                             secureSettingsStore = secureSettingsStore,
                             chatScope = chatScope,
-                            chatDetailState = ChatDetailPaneState(
-                                surface = chatState,
-                                canonicalPresentation = canonicalPresentation,
-                                canonicalStatus = canonicalStatus,
-                                contextUsage = contextUsage,
-                                isThinking = isThinkingSelected,
-                                isStreamingReply = isStreamingReplySelected,
-                                modelOptions = modelOptions,
-                                commands = composerCommands,
-                                mentionables = mentionables,
-                                composerPlaceholder = WorkPlayLens.composerPlaceholder(
-                                    workPlayMode,
-                                    selectedAgentName,
-                                ),
-                                submittingApprovalRequestIds = submittingApprovals,
-                                agentNamesById = agentNamesById,
-                                agentIdentitiesById = identityByAgentId,
-                                workingDirectory = selectedConversationWorkingDirectory,
-                                workingDirectorySupported = chatController.supportsWorkingDirectory,
-                                workingDirectoryLoading = workingDirectoryLoading,
-                            ),
                             destinationInputs = DestinationContentInputs(
                                 railRecencyDays = railPrefs.recencyDays,
                                 state = bootstrapState,
@@ -907,7 +838,7 @@ internal fun LettaDesktopApp(
                             subagentRepository = subagentRepository,
                             activeSubagents = activeSubagents,
                             activeCanvasSession = canvasShell.activeSession,
-                            dockedCanvasId = dockedCanvas?.dockedCanvasId,
+                            dockedCanvasId = dockedCanvas.dockedCanvasId,
                             sharedChatPage = sharedChatPage,
                         ),
                         actions = DesktopMainContentActions(
@@ -924,28 +855,6 @@ internal fun LettaDesktopApp(
                                     canvasShell.close()
                                 }
                             },
-                            chatDetailActions = createDesktopChatDetailPaneActions(
-                                CreateDesktopChatDetailPaneActionsParams(
-                                    chatController = chatController,
-                                    canSubmitApprovals = canSubmitApprovals,
-                                    onA2uiAction = ::dispatchA2uiAction,
-                                    onAttachImage = { pickerLauncher.launch() },
-                                    onOpenCanvas = { openConversationCanvas() },
-                                    onOpenModelPicker = { overlays.modelPicker = true },
-                                    onSetPersona = { editAgentId = selectedAgentId },
-                                    onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
-                                    onNavigateToAgents = { selectedDestination = DesktopDestination.Agents },
-                                    onOpenAgent = ::openAgent,
-                                    onEditAgent = { editAgentId = selectedAgentId },
-                                    // The companion mascot is the way into its agent: bring the agent
-                                    // pane (the sidebar) back if it was collapsed and leave any editor.
-                                    onOpenAgentPane = {
-                                        editAgentId = null
-                                        selectedDestination = DesktopDestination.Conversations
-                                        shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
-                                    },
-                                ),
-                            ),
                             destinationActions = DestinationContentActions(
                                 onRailRecencyDaysChange = railPrefs::updateRecencyDays,
                                 onRetryConnection = chatController::retryConnection,
