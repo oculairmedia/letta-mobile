@@ -165,6 +165,10 @@ internal fun TimelineWelcome(
     hasConversation: Boolean,
     onStarterPrompt: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** The conversation's agent: its mascot greets at hero size above the headline. */
+    agentId: String? = null,
+    /** The mascot's pencil badge: open the agent's editor. */
+    onEditAgent: (() -> Unit)? = null,
 ) {
     Box(modifier = modifier.fillMaxSize().testTag(ChatTimelineTags.WELCOME), contentAlignment = Alignment.Center) {
         Column(
@@ -172,6 +176,7 @@ internal fun TimelineWelcome(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
+            if (hasConversation) TimelineWelcomeHero(agentId, onEditAgent)
             WelcomeHeadline(agentName, hasConversation)
             Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 StarterPrompts.forEach { prompt ->

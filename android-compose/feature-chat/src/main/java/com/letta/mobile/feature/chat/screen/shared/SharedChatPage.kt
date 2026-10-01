@@ -128,6 +128,8 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(): ChatSurfaceHost {
         openAgent = openPane?.let { { _: String -> it() } },
         viewSubagentConversation = onViewSubagentConversation,
         openModelPicker = null,
+        // The composer companion mascot opens the agent drawer, as the legacy page's does.
+        openAgentPane = openPane,
     )
 }
 

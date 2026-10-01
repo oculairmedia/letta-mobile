@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_placeholder
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -65,6 +67,8 @@ internal fun ComposerTextField(
             .heightIn(min = LettaDimens.Space.xl, max = style.maxHeight)
             .testTag(style.testTag)
             .then(rememberSendFlightSource())
+            // Where the user types: the agent's mascot glances here (letta-mobile-bglj6.1).
+            .mascotGazeTarget(MascotGazeSurface.INPUT)
             .onPreviewKeyEvent { event ->
                 composerEnterKeyHandled(
                     ComposerEnterKeyParams(

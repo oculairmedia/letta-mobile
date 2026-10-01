@@ -126,4 +126,11 @@ data class ChatSurfaceHost(
     val viewSubagentConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
     val openModelPicker: (() -> Unit)? = null,
     val pickWorkingDirectory: (() -> Unit)? = null,
+    /**
+     * Shows the conversation's agent pane (desktop: the sidebar). The agent's mascot beside the
+     * composer is the way in; null leaves the mascot unclickable.
+     */
+    val openAgentPane: (() -> Unit)? = null,
+    /** Opens the conversation's agent in its editor (the mascot's pencil badge); null hides it. */
+    val editAgent: (() -> Unit)? = null,
 )

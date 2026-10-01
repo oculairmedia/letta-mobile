@@ -1,13 +1,9 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,7 +14,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -29,7 +24,6 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.launch
@@ -43,6 +37,8 @@ internal class LegacyTimelineParams(
     val appearance: ChatSurfaceAppearance,
     val bindings: TimelineRowBindings,
     val bottomReserve: Dp,
+    /** False while the agent's mascot shows its thinking beside the composer. */
+    val showThinkingRow: Boolean = true,
 )
 
 private const val THINKING_KEY = "__thinking__"
@@ -63,7 +59,7 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
     val rows = remember(items) { timelineRowsNewestFirst(items) }
     val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
     val listState = remember(conversationId) { LazyListState() }
-    val thinking = state.isAgentTyping
+    val thinking = state.isAgentTyping && params.showThinkingRow
     val leading = if (thinking) 1 else 0
 
     val follow = rememberLegacyFollow(listState, conversationId, rows, thinking)
@@ -94,7 +90,7 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
         ),
         modifier = modifier,
     ) {
-        legacyRows(rows, params.bindings, thinking, state.isLoadingOlderMessages, today)
+        legacyRows(rows, params.bindings, thinking, state.isLoadingOlderMessages, today, state.agentId)
     }
 }
 
@@ -111,17 +107,14 @@ private fun LazyListScope.legacyRows(
     thinking: Boolean,
     loadingOlder: Boolean,
     today: LocalDate,
+    agentId: String?,
 ) {
     if (thinking) item(key = THINKING_KEY) { ThinkingRow() }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
         TimelineRowContent(rows[index], bindings, today)
     }
     if (loadingOlder) {
-        item(key = LOADING_OLDER_KEY) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(LettaDimens.Control.icon))
-            }
-        }
+        item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(agentId) }
     }
 }
 

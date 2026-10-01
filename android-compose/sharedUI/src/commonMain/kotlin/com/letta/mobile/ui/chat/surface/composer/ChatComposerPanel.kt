@@ -78,7 +78,7 @@ internal fun ChatComposerPanel(
         if (mode == ChatSurfaceMode.Docked) {
             DockedComposerBar(model, attachImage)
         } else {
-            ComposerPromptCard(model, attachImage)
+            ComposerCompanionRow(model) { ComposerPromptCard(model, attachImage) }
             ComposerHintRow(visible = composerHintVisible(composer.text, composer.attachments.isNotEmpty()))
         }
     }

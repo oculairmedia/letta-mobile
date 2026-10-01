@@ -816,6 +816,14 @@ internal fun LettaDesktopApp(
                                     openCanvas = { openConversationCanvas() },
                                     openAgent = ::openAgent,
                                     openModelPicker = { overlays.modelPicker = true },
+                                    // As on the old page: the companion mascot brings the agent pane
+                                    // back and leaves any editor; its pencil opens the editor.
+                                    openAgentPane = {
+                                        editAgentId = null
+                                        selectedDestination = DesktopDestination.Conversations
+                                        shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
+                                    },
+                                    editAgent = { editAgentId = selectedAgentId },
                                 ),
                                 modifier = pageModifier,
                             )

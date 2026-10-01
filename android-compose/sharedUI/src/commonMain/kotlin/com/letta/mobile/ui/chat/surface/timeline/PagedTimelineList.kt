@@ -81,7 +81,7 @@ private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier
     ObserveResidentRows(presentation, settled)
 
     when (pagedOpeningOf(settled.loadState, rows.size - rows.leading)) {
-        PagedOpening.Loading -> TimelineLoadingSkeleton(modifier.fillMaxSize())
+        PagedOpening.Loading -> TimelineLoading(params.agentId, modifier.fillMaxSize())
         PagedOpening.Empty -> Box(modifier) { params.emptyContent() }
         PagedOpening.Ready -> PagedTimelineBody(params, settled, rows, modifier)
     }

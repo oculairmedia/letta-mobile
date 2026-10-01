@@ -27,6 +27,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatImageViewer
+import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -71,7 +72,7 @@ internal fun ChatTimeline(
                 GoalStatusCard(goal, state.isGoalStatusLoading, actions::sendText, Modifier.align(Alignment.CenterHorizontally))
             }
             TimelineBody(
-                TimelineBodyParams(state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve),
+                TimelineBodyParams(state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, host.editAgent),
                 Modifier.weight(1f).fillMaxWidth(),
             )
         }
@@ -108,6 +109,8 @@ private class TimelineBodyParams(
     val appearance: ChatSurfaceAppearance,
     val bindings: TimelineRowBindings,
     val bottomReserve: Dp,
+    /** The mascot's pencil on the welcome hero. */
+    val editAgent: (() -> Unit)? = null,
 )
 
 /** The one body the current [ChatTimelinePhase] calls for. */
@@ -115,10 +118,10 @@ private class TimelineBodyParams(
 private fun TimelineBody(params: TimelineBodyParams, modifier: Modifier) {
     val state = params.state
     when (val phase = chatTimelinePhaseOf(state, paged = params.pagedTimeline != null)) {
-        ChatTimelinePhase.Loading -> TimelineLoadingSkeleton(modifier)
+        ChatTimelinePhase.Loading -> TimelineLoading(state.agentId, modifier)
         is ChatTimelinePhase.Failed -> TimelineStatusPanel(phase.message, params.actions::retryLoad, modifier)
         is ChatTimelinePhase.Welcome ->
-            TimelineWelcome(state.agentName, phase.hasConversation, params.actions::sendText, modifier)
+            TimelineWelcome(state.agentName, phase.hasConversation, params.actions::sendText, modifier, state.agentId, params.editAgent)
         ChatTimelinePhase.Ready -> TimelineList(params, modifier)
     }
 }
@@ -126,6 +129,8 @@ private fun TimelineBody(params: TimelineBodyParams, modifier: Modifier) {
 @Composable
 private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
     val paged = params.pagedTimeline
+    // The agent's mascot beside the composer shows its thinking; the row would say it twice.
+    val showThinkingRow = !mascotAvailable(params.state.agentId)
     if (paged == null) {
         LegacyTimelineList(
             LegacyTimelineParams(
@@ -135,6 +140,7 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
                 appearance = params.appearance,
                 bindings = params.bindings,
                 bottomReserve = params.bottomReserve,
+                showThinkingRow = showThinkingRow,
             ),
             modifier,
         )
@@ -144,11 +150,17 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
         PagedTimelineParams(
             presentation = paged,
             agentId = params.state.agentId,
-            thinking = params.state.isAgentTyping,
+            thinking = params.state.isAgentTyping && showThinkingRow,
             bindings = params.bindings,
             bottomReserve = params.bottomReserve,
             emptyContent = {
-                TimelineWelcome(params.state.agentName, hasConversation = true, onStarterPrompt = params.actions::sendText)
+                TimelineWelcome(
+                    params.state.agentName,
+                    hasConversation = true,
+                    onStarterPrompt = params.actions::sendText,
+                    agentId = params.state.agentId,
+                    onEditAgent = params.editAgent,
+                )
             },
         ),
         modifier,

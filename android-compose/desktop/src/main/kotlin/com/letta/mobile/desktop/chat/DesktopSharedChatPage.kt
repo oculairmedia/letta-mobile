@@ -83,6 +83,10 @@ internal data class DesktopSharedChatPageNavigation(
     val openCanvas: () -> Unit,
     val openAgent: (agentId: String) -> Unit,
     val openModelPicker: () -> Unit,
+    /** The composer companion mascot was clicked: bring back the agent pane (the sidebar). */
+    val openAgentPane: (() -> Unit)? = null,
+    /** The pencil on the mascot: open the selected agent's editor. */
+    val editAgent: (() -> Unit)? = null,
 )
 
 internal data class DesktopSharedChatPageState(
@@ -196,6 +200,8 @@ private fun rememberDesktopChatSurfaceHost(
             openAgent = navigation.openAgent,
             openModelPicker = navigation.openModelPicker,
             pickWorkingDirectory = if (supportsWorkingDirectory) ({ directoryPicker.launch() }) else null,
+            openAgentPane = navigation.openAgentPane,
+            editAgent = navigation.editAgent,
         )
     }
 }

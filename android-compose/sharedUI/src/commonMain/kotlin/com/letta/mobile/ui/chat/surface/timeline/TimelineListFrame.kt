@@ -24,6 +24,8 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
+import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -74,6 +76,8 @@ internal fun TimelineListFrame(
                 modifier = Modifier
                     .fillMaxSize()
                     .timelineFadingEdges(fades)
+                    // The conversation: the agent's mascot glances at it (letta-mobile-bglj6.1).
+                    .mascotGazeTarget(MascotGazeSurface.TIMELINE)
                     .testTag(ChatTimelineTags.LIST),
                 contentPadding = PaddingValues(
                     start = LettaDimens.Space.lg,
