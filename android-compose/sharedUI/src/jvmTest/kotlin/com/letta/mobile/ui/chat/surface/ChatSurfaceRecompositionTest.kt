@@ -69,12 +69,20 @@ class ChatSurfaceRecompositionTest {
 
     private var resolves = 0
 
-    /** A brand-new host per call, as a host that does not remember its callbacks builds one. */
+    /** The host's name roster: remembered by real hosts, so the same resolver every time. */
+    private val resolver: (String) -> String? = { _ ->
+        resolves++
+        null
+    }
+
+    /**
+     * A brand-new host per call, as a host that does not remember its callbacks builds one: fresh
+     * navigation lambdas around the same name resolver.
+     */
     private fun freshHost(): ChatSurfaceHost = ChatSurfaceHost(
-        resolveAgentName = { _ ->
-            resolves++
-            null
-        },
+        openAgent = { _ -> },
+        openAgentPane = {},
+        resolveAgentName = resolver,
     )
 
     private fun freshIntent(): (ChatSurfaceIntent) -> Unit = { _ -> }

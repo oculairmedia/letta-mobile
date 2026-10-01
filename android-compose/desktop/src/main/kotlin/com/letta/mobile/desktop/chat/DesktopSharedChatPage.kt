@@ -238,12 +238,14 @@ private fun rememberDesktopChatSurfaceHost(
     val latest by rememberUpdatedState(navigation)
     val hasAgentPane = navigation.openAgentPane != null
     val hasEditAgent = navigation.editAgent != null
-    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent) {
+    // Keyed on the roster: rows resolve names while they compose, so new names are a new host.
+    val agentNames = navigation.agentNamesById
+    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent, agentNames) {
         ChatSurfaceHost(
             openCanvas = { latest.openCanvas() },
             openAgent = { agentId -> latest.openAgent(agentId) },
             openModelPicker = { latest.openModelPicker() },
-            resolveAgentName = { agentId -> latest.agentNamesById[agentId] },
+            resolveAgentName = agentNames::get,
             pickWorkingDirectory = if (supportsWorkingDirectory) ({ directoryPicker.launch() }) else null,
             openAgentPane = if (hasAgentPane) ({ latest.openAgentPane?.invoke() }) else null,
             editAgent = if (hasEditAgent) ({ latest.editAgent?.invoke() }) else null,

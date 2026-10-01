@@ -15,6 +15,11 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
  * reach every timeline row through its callbacks, so an unstable one recomposes the whole
  * timeline per keystroke. These wrappers keep ONE instance whose lambdas forward to the latest
  * value; they change only when the set of affordances (which members are null) changes.
+ *
+ * [ChatSurfaceHost.resolveAgentName] is the exception: rows call it WHILE they compose, so a
+ * forwarder would make every row read the host and recompose whenever it changes. It is passed
+ * through as given (a host keeps it stable, e.g. remembered on its name roster), and a new
+ * resolver is a new host, so the labels follow a roster that changes.
  */
 @Composable
 internal fun rememberLatestIntent(onIntent: (ChatSurfaceIntent) -> Unit): (ChatSurfaceIntent) -> Unit {
@@ -25,7 +30,7 @@ internal fun rememberLatestIntent(onIntent: (ChatSurfaceIntent) -> Unit): (ChatS
 @Composable
 internal fun rememberStableHost(host: ChatSurfaceHost): ChatSurfaceHost {
     val current = rememberUpdatedState(host)
-    return remember(host.affordanceShape()) { forwardingHost(current) }
+    return remember(host.affordanceShape(), host.resolveAgentName) { forwardingHost(current) }
 }
 
 @Composable
@@ -47,11 +52,7 @@ internal fun forwardingHost(current: State<ChatSurfaceHost>): ChatSurfaceHost {
     return ChatSurfaceHost(
         openCanvas = if (host.openCanvas == null) null else { { current.value.openCanvas?.invoke() } },
         openAgent = if (host.openAgent == null) null else { { agentId -> current.value.openAgent?.invoke(agentId) } },
-        resolveAgentName = if (host.resolveAgentName == null) {
-            null
-        } else {
-            { agentId -> current.value.resolveAgentName?.invoke(agentId) }
-        },
+        resolveAgentName = host.resolveAgentName,
         openSubagent = if (host.openSubagent == null) {
             null
         } else {
