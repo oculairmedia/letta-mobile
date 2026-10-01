@@ -90,6 +90,8 @@ class ChatSelectionToolbarTest {
     fun aHeldSelectionOnAStillTimelineKeepsItsToolbarStill() = runComposeUiTest {
         val toolbar = CountingToolbar()
         val shell = FakeMascotShell(AGENT)
+        // The mascot layer's character never rests: step the clock by hand.
+        mainClock.autoAdvance = false
         setContent {
             shell.Provide {
                 MascotTransportLayer(reducedMotion = false) {
@@ -112,13 +114,12 @@ class ChatSelectionToolbarTest {
                 }
             }
         }
-        waitForIdle()
+        mainClock.advanceTimeBy(SETTLE_MILLIS)
         onAllNodesWithTag(ChatRowTestTags.AGENT_TEXT)[0].performTouchInput { longClick(center) }
-        waitForIdle()
+        mainClock.advanceTimeBy(SETTLE_MILLIS)
         assertEquals(TextToolbarStatus.Shown, toolbar.status, "the long press selects and shows the toolbar")
         val shows = toolbar.shows
         val hides = toolbar.hides
-        mainClock.autoAdvance = false
         repeat(HELD_FRAMES) { mainClock.advanceTimeByFrame() }
         assertEquals(shows, toolbar.shows, "the toolbar was re-shown while nothing moved")
         assertEquals(hides, toolbar.hides, "the toolbar was hidden while nothing moved")
@@ -129,5 +130,6 @@ class ChatSelectionToolbarTest {
         const val PHONE_WIDTH = 412
         const val PHONE_HEIGHT = 900
         const val HELD_FRAMES = 60
+        const val SETTLE_MILLIS = 1_000L
     }
 }
