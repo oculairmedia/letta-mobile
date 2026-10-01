@@ -1,0 +1,95 @@
+package com.letta.mobile.ui.chat.session
+
+import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.composer.Mentionable
+import com.letta.mobile.data.context.ContextWindowUsageState
+import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.SlashCommand
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+
+/**
+ * letta-mobile-bglj6.1: everything the shared chat page's composer draws.
+ *
+ * [com.letta.mobile.ui.chat.render.ChatUiState] is the timeline contract; this is the
+ * composer's. They are separate flows because the composer changes on every keystroke
+ * and the timeline must not recompose with it.
+ *
+ * The draft lives with the session owner, not in the composable, so the docked bar and
+ * the full-screen page edit the SAME draft: switching mode never loses text or images.
+ */
+@Immutable
+data class ChatComposerUiState(
+    val text: String = "",
+    val attachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
+    /** A user-facing composer error (attachment too large, send blocked), or null. */
+    val error: String? = null,
+    /** The owner will accept a send right now (connection, run and payload permitting). */
+    val canSend: Boolean = false,
+    /** A send during an active run is queued rather than refused. */
+    val canQueueWhileStreaming: Boolean = false,
+    /** Overrides the default placeholder; null uses the shared resource string. */
+    val placeholder: String? = null,
+    val maxAttachments: Int = 4,
+    val commands: ImmutableList<ChatComposerCommand> = persistentListOf(),
+    val mentionables: ImmutableList<Mentionable> = persistentListOf(),
+    val model: ChatModelUiState? = null,
+    val contextUsage: ContextWindowUsageState? = null,
+    val workingDirectory: ChatWorkingDirectoryUiState? = null,
+) {
+    val hasPayload: Boolean get() = text.isNotBlank() || attachments.isNotEmpty()
+}
+
+/**
+ * A `/` command offered by the composer's autocomplete.
+ *
+ * [fillsComposer] commands (server slash commands, skills) put their text in the draft for
+ * the user to finish and send; the others run an app action through
+ * [ChatActions.runComposerCommand] and never reach the agent.
+ */
+@Immutable
+data class ChatComposerCommand(
+    val id: String,
+    val label: String,
+    val description: String = "",
+    val fillsComposer: Boolean = false,
+    /** Installed server commands the user may uninstall. */
+    val removable: Boolean = false,
+) {
+    companion object {
+        fun fromSlashCommand(command: SlashCommand): ChatComposerCommand =
+            ChatComposerCommand(
+                id = command.command,
+                label = command.command,
+                description = command.description,
+                fillsComposer = true,
+                removable = command.installed,
+            )
+    }
+}
+
+/** The conversation's model, and what the picker may switch it to. */
+@Immutable
+data class ChatModelUiState(
+    val currentHandle: String?,
+    val currentLabel: String,
+    val currentEffort: String? = null,
+    val options: ImmutableList<ChatModelOption> = persistentListOf(),
+    val isSwitching: Boolean = false,
+)
+
+@Immutable
+data class ChatModelOption(
+    val handle: String,
+    val label: String,
+    val provider: String? = null,
+    /** Named reasoning efforts this model accepts; empty when it has none. */
+    val reasoningEfforts: ImmutableList<String> = persistentListOf(),
+)
+
+/** The coding agent's working directory, for owners whose backend has one. */
+@Immutable
+data class ChatWorkingDirectoryUiState(
+    val path: String?,
+    val isLoading: Boolean = false,
+)
