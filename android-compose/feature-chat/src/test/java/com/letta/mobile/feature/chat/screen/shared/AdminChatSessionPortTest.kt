@@ -81,6 +81,24 @@ class AdminChatSessionPortTest {
     }
 
     @Test
+    fun `the page knows the route's agent from the first state`() = runTest {
+        // letta-mobile-bglj6.1: the Touch chat head and the composer companion draw the agent's
+        // mascot from uiState.agentId; null drew the stand-in sphere for every agent.
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var viewModel: AdminChatViewModel? = null
+        try {
+            val agent = TestData.agent("agent-mascot", "Meridian")
+            val vm = openedChatViewModel(canonicalPagingHost(), agent, "conversation-mascot", "mascot")
+            viewModel = vm
+            val port = AdminChatSessionPort(vm, vm.viewModelScope)
+            assertEquals(agent.id.value, port.uiState.value.agentId)
+        } finally {
+            viewModel?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun `send submits the current draft through submitComposer`() {
         val vm = mockViewModel(ChatComposerState(inputText = "draft"))
         every { vm.submitComposer(any()) } returns null

@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
@@ -42,6 +43,8 @@ internal class LegacyTimelineParams(
     val listState: LazyListState,
     /** False while the agent's mascot shows its thinking beside the composer. */
     val showThinkingRow: Boolean = true,
+    /** Host chrome floating over the list's top (see TimelineFrameOverlays.topReserve). */
+    val topReserve: Dp = 0.dp,
 )
 
 private const val THINKING_KEY = "__thinking__"
@@ -65,7 +68,8 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
     val thinking = state.isAgentTyping && params.showThinkingRow
     val leading = if (thinking) 1 else 0
 
-    val follow = rememberLegacyFollow(listState, conversationId, rows, thinking)
+    val glide = rememberNewestEdgeGlide(listState)
+    val follow = rememberLegacyFollow(listState, glide, conversationId, rows, thinking)
     OlderHistoryEffect(
         listState = listState,
         gate = OlderHistoryGate(
@@ -89,7 +93,9 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
             pinnedPrompt = pinned,
             showScrollToLatest = follow.showScrollToLatest,
             onScrollToLatest = follow.scrollToLatest,
+            glide = glide,
             bottomReserve = params.bottomReserve,
+            topReserve = params.topReserve,
         ),
         modifier = modifier,
     ) {
@@ -143,11 +149,12 @@ internal class TimelineFollow(
 /**
  * Follow-latest (desktop MessageListFollowEffects over the shared ChatViewportFollowPolicy):
  * leaving the newest edge stops following and shows the button; a tail change while following
- * snaps back; a prompt the user just sent always brings them to it.
+ * snaps back; a prompt the user just sent always brings them to it. The button glides back.
  */
 @Composable
 private fun rememberLegacyFollow(
     listState: LazyListState,
+    glide: NewestEdgeGlide,
     conversationId: String?,
     rows: List<TimelineRow>,
     thinking: Boolean,
@@ -168,7 +175,7 @@ private fun rememberLegacyFollow(
     val showButton = ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.reversedViewportSnapshot(isDragged))
     return TimelineFollow(showScrollToLatest = showButton) {
         following = true
-        scope.launch { listState.animateScrollToItem(0) }
+        scope.launch { glide.toNewest() }
     }
 }
 

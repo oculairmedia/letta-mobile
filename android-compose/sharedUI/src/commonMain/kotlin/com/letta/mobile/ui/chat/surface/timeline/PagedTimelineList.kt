@@ -26,6 +26,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.paging.CombinedLoadStates
 import androidx.paging.ItemSnapshotList
 import androidx.paging.LoadState
@@ -60,6 +61,8 @@ internal class PagedTimelineParams(
     val listState: LazyListState,
     /** Drawn instead of the list when history is confirmed empty (the welcome / starter prompts). */
     val emptyContent: @Composable () -> Unit,
+    /** Host chrome floating over the list's top (see TimelineFrameOverlays.topReserve). */
+    val topReserve: Dp = 0.dp,
 )
 
 private const val THINKING_KEY = "__thinking__"
@@ -86,8 +89,8 @@ private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier
     ObserveResidentRows(presentation, settled)
 
     when (pagedOpeningOf(settled.loadState, rows.size - rows.leading)) {
-        PagedOpening.Loading -> TimelineLoading(params.agentId, modifier.fillMaxSize())
-        PagedOpening.Empty -> Box(modifier) { params.emptyContent() }
+        PagedOpening.Loading -> TimelineLoading(params.agentId, modifier.fillMaxSize().padding(top = params.topReserve))
+        PagedOpening.Empty -> Box(modifier.padding(top = params.topReserve)) { params.emptyContent() }
         PagedOpening.Ready -> PagedTimelineBody(params, settled, rows, modifier)
     }
 }
@@ -117,11 +120,12 @@ private fun PagedTimelineBody(
         RecordReadingPosition(presentation, listState, rows)
     }
     val pinned by rememberPinnedPrompt(listState, rows.size, rows::itemAt)
+    val glide = rememberNewestEdgeGlide(listState)
     val today = rememberCurrentDate()
     // The newest row is the live overlay's head, not necessarily the owner state's last message.
     val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
     val bindings = remember(params.bindings, newestId) {
-        TimelineRowBindings(params.bindings.contexts.withNewest(newestId), params.bindings.callbacks)
+        TimelineRowBindings(params.bindings.contexts.withNewest(newestId), params.bindings.callbacks, params.bindings.pinch)
     }
 
     Box(modifier) {
@@ -136,10 +140,14 @@ private fun PagedTimelineBody(
                     scope.launch {
                         // Anchored on a search target, index 0 is the newest row of THAT window.
                         if (anchoredTarget != null) presentation.navigate(null)
-                        listState.scrollToItem(0)
+                        glide.toNewest()
+                        // The glide's own scroll stopped the follow; it ends on the newest edge.
+                        following = true
                     }
                 },
+                glide = glide,
                 bottomReserve = params.bottomReserve,
+                topReserve = params.topReserve,
             ),
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -150,7 +158,7 @@ private fun PagedTimelineBody(
                 text = stringResource(Res.string.timeline_missing_target, missing),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.TopCenter).padding(LettaDimens.Space.sm),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = params.topReserve).padding(LettaDimens.Space.sm),
             )
         }
     }
@@ -302,7 +310,12 @@ private fun LazyListScope.pagedLoadFooter(scope: PagedRowsScope) {
 
 /**
  * Only rows actually held by the list count as resident: this drains the live overlay. Every view
- * of a paged timeline (the full page and the docked panel) must run it, or the overlay never drains.
+ * of a paged timeline (the full page, the docked panel, the minimised dock's bubble) must run it,
+ * or the overlay never drains.
+ *
+ * Several views report the same pager and the last report wins, so a view that has not loaded yet
+ * stays quiet: a freshly mounted [LazyPagingItems] reports an empty list while its first page is
+ * still on its way, which would clear what the other views hold.
  */
 @Composable
 internal fun ObserveResidentRows(
@@ -310,9 +323,14 @@ internal fun ObserveResidentRows(
     settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
 ) {
     LaunchedEffect(presentation, settled) {
-        snapshotFlow { settled.itemSnapshotList.items }.collect(presentation::onResidentRows)
+        snapshotFlow { residentReport(settled.itemSnapshotList.items, settled.loadState.refresh) }
+            .collect { rows -> if (rows != null) presentation.onResidentRows(rows) }
     }
 }
+
+/** What a view reports as resident: nothing (null) while its first page is still loading. */
+internal fun <T> residentReport(rows: List<T>, refresh: LoadState): List<T>? =
+    rows.takeUnless { it.isEmpty() && refresh is LoadState.Loading }
 
 /**
  * Leaving the newest edge stops following; coming back resumes, but only once that edge is the

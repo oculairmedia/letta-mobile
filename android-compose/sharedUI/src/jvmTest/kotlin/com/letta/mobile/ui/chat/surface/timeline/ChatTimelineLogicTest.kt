@@ -122,7 +122,29 @@ class ChatTimelineLogicTest {
         val snapped = pinch.finish()
         assertEquals(1.25f, snapped, 0.011f)
         assertEquals(snapped, pinch.effectiveScale(1f), "shown until the owner commits it")
+        assertEquals(snapped, pinch.restingScale(1f), "rows hold it too, with no flash back")
         assertEquals(snapped, pinch.effectiveScale(snapped))
+    }
+
+    @Test
+    fun aPinchInProgressMovesOnlyTheLayerScale() {
+        val pinch = TimelinePinchScale()
+        pinch.begin(committed = 1.2f)
+        pinch.applyZoom(1.25f)
+        assertEquals(1.2f, pinch.restingScale(1.2f), "rows keep the committed scale while pinching")
+        assertEquals(1.25f, pinch.layerScale, 0.0001f)
+        assertEquals(1.5f, pinch.effectiveScale(1.2f), 0.0001f)
+        val snapped = pinch.finish()
+        assertEquals(1f, pinch.layerScale, "the layer rests once the rows take the snapped scale")
+        assertEquals(snapped, pinch.restingScale(1.2f))
+    }
+
+    @Test
+    fun theLayerScaleStopsAtTheRangeEdge() {
+        val pinch = TimelinePinchScale()
+        pinch.begin(committed = 1.5f)
+        pinch.applyZoom(2f)
+        assertEquals(TimelinePinchScale.MAX_SCALE / 1.5f, pinch.layerScale, 0.0001f)
     }
 
     @Test
@@ -176,6 +198,16 @@ class ChatTimelineLogicTest {
         assertEquals(PagedOpening.Empty, pagedOpeningOf(states(LoadState.NotLoading(true), true), residentRows = 0))
         assertEquals(PagedOpening.Ready, pagedOpeningOf(states(LoadState.Loading, false), residentRows = 3))
         assertEquals(PagedOpening.Ready, pagedOpeningOf(states(LoadState.Error(IllegalStateException()), false), 0))
+    }
+
+    @Test
+    fun aViewStillLoadingItsFirstPageReportsNoResidents() {
+        val rows = listOf(settledRow("s-0"))
+        // A freshly mounted pager's empty list would clear what the other views of it hold.
+        assertNull(residentReport(emptyList<CanonicalTimelinePresentation.Row>(), LoadState.Loading))
+        assertEquals(rows, residentReport(rows, LoadState.Loading))
+        // Loaded and empty is a real report: the conversation has no settled rows.
+        assertEquals(emptyList(), residentReport(emptyList<CanonicalTimelinePresentation.Row>(), LoadState.NotLoading(true)))
     }
 
     private fun item(id: String): ChatRenderItem =

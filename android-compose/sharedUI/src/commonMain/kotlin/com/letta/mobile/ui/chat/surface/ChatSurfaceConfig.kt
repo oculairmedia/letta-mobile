@@ -3,6 +3,7 @@ package com.letta.mobile.ui.chat.surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 
 /**
@@ -100,6 +101,13 @@ data class ChatSurfacePlatform(
      * that keeps clear of the composer (Android's ambient glow) can follow it.
      */
     val onComposerHeightChange: ((Dp) -> Unit)? = null,
+    /**
+     * Host chrome floating over the top of the page, measured from its top edge (Android: the
+     * status bar and the chat screen's header pills). The page still draws edge to edge under it:
+     * the full-screen timeline scrolls behind it with its rows resting below it, and the Touch chat
+     * head keeps below it. Zero where nothing floats over the page (desktop).
+     */
+    val topChromeInset: Dp = 0.dp,
 ) {
     companion object {
         val Default = ChatSurfacePlatform()

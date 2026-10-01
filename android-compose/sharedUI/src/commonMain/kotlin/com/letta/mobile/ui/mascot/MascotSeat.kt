@@ -91,6 +91,8 @@ fun MascotSeat(
     onEdit: (() -> Unit)? = null,
     /** A drag on the character, in dp (see [SeatHandlers.onDrag]). */
     onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null,
+    /** Whether a drag starting now goes to [onDrag]; one it turns down is left to what is under it. */
+    dragEnabled: () -> Boolean = { true },
     empty: @Composable (MascotSeatVacancy) -> Unit,
 ) {
     val transport = LocalMascotTransport.current
@@ -100,6 +102,7 @@ fun MascotSeat(
     handlers.onClick = onClick
     handlers.onEdit = onEdit
     handlers.onDrag = onDrag
+    handlers.dragEnabled = dragEnabled
     DisposableEffect(transport, key) {
         onDispose { key?.let { transport.seats.remove(it) } }
     }

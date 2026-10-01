@@ -4,9 +4,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
@@ -27,9 +29,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import com.letta.mobile.sharedui.resources.Res
@@ -88,27 +98,34 @@ internal fun CopyIconButton(
     )
     val description = if (copied) stringResource(Res.string.rows_copied) else action.contentDescription
     val borderColor = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
+    val copy = {
+        clipboard.setText(AnnotatedString(action.text))
+        copied = true
+    }
+    // Hidden, a pointer must not hit it: taps meant for the text beneath go through (touch has
+    // no hover to reveal it). Focus or hover reveals and arms it.
+    val armed = action.visible || engaged
     Box(
         modifier = modifier
             .sizeIn(minWidth = LettaDimens.Control.actionButton, minHeight = LettaDimens.Control.actionButton)
             .graphicsLayer { this.alpha = alpha }
             .clip(CircleShape)
             .border(LettaDimens.Stroke.hairline, borderColor, CircleShape)
-            .semantics { contentDescription = description }
-            // Focusable ahead of the click: a hidden (disabled) click must not take the
-            // keyboard's way in with it.
+            // Always a button to assistive technology: TalkBack on a phone, with no hover to
+            // reveal it, copies from here whether or not it shows.
+            .semantics {
+                contentDescription = description
+                role = Role.Button
+                onClick { copy(); true }
+            }
+            // The one focus stop (a clickable would add a second): the keyboard reaches it
+            // hidden, which reveals it, and Enter or Space copies.
             .focusable(interactionSource = interactionSource)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-                role = Role.Button,
-                // Hidden, it must not swallow taps meant for the text beneath it (touch has
-                // no hover to reveal it); focus or hover reveals and arms it.
-                enabled = action.visible || engaged,
-            ) {
-                clipboard.setText(AnnotatedString(action.text))
-                copied = true
-            },
+            .onKeyEvent { event ->
+                (event.type == KeyEventType.KeyUp && event.key in ACTIVATION_KEYS).also { if (it) copy() }
+            }
+            .indication(interactionSource, LocalIndication.current)
+            .then(if (armed) Modifier.copyTap(interactionSource, copy) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -119,6 +136,21 @@ internal fun CopyIconButton(
         )
     }
 }
+
+/** A tap copies; the press shows through [interactionSource] like a clickable's would. */
+private fun Modifier.copyTap(interactionSource: MutableInteractionSource, onTap: () -> Unit): Modifier =
+    pointerInput(interactionSource) {
+        detectTapGestures(
+            onPress = { offset ->
+                val press = PressInteraction.Press(offset)
+                interactionSource.emit(press)
+                interactionSource.emit(if (tryAwaitRelease()) PressInteraction.Release(press) else PressInteraction.Cancel(press))
+            },
+            onTap = { onTap() },
+        )
+    }
+
+private val ACTIVATION_KEYS = setOf(Key.Enter, Key.NumPadEnter, Key.Spacebar)
 
 private fun copyAlpha(revealed: Boolean, strong: Boolean): Float = when {
     !revealed -> 0f

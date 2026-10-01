@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,16 +91,20 @@ internal fun ToolRunGroup(
     startedAtTimestamp: String? = null,
 ) {
     if (toolCalls.isEmpty()) return
-    var detailsOpen by remember { mutableStateOf(false) }
+    // Saved by the run's first call (it stays first as the run adds more), so a disclosure the
+    // person opened survives scrolling it away.
+    var detailsOpen by rememberSaveable(toolCalls.first().disclosureKey()) { mutableStateOf(false) }
     val inline = context.toolDetails == ChatToolDetails.Inline
     val reducedMotion = LocalReducedMotion.current
+    val summary = remember(toolCalls, approvals) { summarizeToolRun(toolCalls, approvals) }
+    val startedAtEpochMs = remember(startedAtTimestamp) { startedAtTimestamp?.let(::parseTimestampEpochMillis) }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         ToolRunSummaryRow(
-            summary = remember(toolCalls, approvals) { summarizeToolRun(toolCalls, approvals) },
-            startedAtEpochMs = remember(startedAtTimestamp) { startedAtTimestamp?.let(::parseTimestampEpochMillis) },
+            summary = summary,
+            startedAtEpochMs = startedAtEpochMs,
             disclosure = if (inline) ToolRunDisclosure.Inline(expanded = detailsOpen) else ToolRunDisclosure.Sheet,
             onClick = { detailsOpen = if (inline) !detailsOpen else true },
         )
@@ -119,9 +124,13 @@ internal fun ToolRunGroup(
         approvals.filter { it.requiresUserInput() }.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
     if (detailsOpen && !inline) {
-        ToolRunDetailsSheet(toolCalls, callbacks) { detailsOpen = false }
+        ToolRunDetailsSheet(toolCalls, ToolRunSheetHeading(summary, startedAtEpochMs), callbacks) { detailsOpen = false }
     }
 }
+
+/** What the sheet's title says: the summary line's own words, approvals and running clock included. */
+@Immutable
+private class ToolRunSheetHeading(val summary: ToolRunSummary, val startedAtEpochMs: Long?)
 
 /** What the summary line's chevron promises: a sheet, or an in-place disclosure and its state. */
 @Immutable
@@ -241,7 +250,13 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 
 /** The run's calls in full, one [ToolCard] each, led by its step status. */
 @Composable
-private fun ToolRunDetailsSheet(toolCalls: ImmutableList<UiToolCall>, callbacks: ChatRowCallbacks, onDismiss: () -> Unit) {
+private fun ToolRunDetailsSheet(
+    toolCalls: ImmutableList<UiToolCall>,
+    heading: ToolRunSheetHeading,
+    callbacks: ChatRowCallbacks,
+    onDismiss: () -> Unit,
+) {
+    val elapsed by rememberElapsedSeconds(heading.summary.running, heading.startedAtEpochMs)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -255,7 +270,7 @@ private fun ToolRunDetailsSheet(toolCalls: ImmutableList<UiToolCall>, callbacks:
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             Text(
-                text = toolRunLabel(summarizeToolRun(toolCalls), 0L),
+                text = toolRunLabel(heading.summary, elapsed),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
