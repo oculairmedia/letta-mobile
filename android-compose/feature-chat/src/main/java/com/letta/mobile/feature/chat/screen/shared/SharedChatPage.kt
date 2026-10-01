@@ -13,6 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -49,6 +50,8 @@ internal data class SharedChatPageParams(
     val subagents: SharedChatSubagentInputs,
     /** The ambient agent glow, drawn behind the full-screen page. */
     val pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)? = null,
+    /** The full-screen composer's measured height, for [pageBackground] to keep the glow above it. */
+    val onComposerHeightChange: ((Dp) -> Unit)? = null,
 )
 
 /**
@@ -117,6 +120,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             appearance = appearance,
             platform = rememberAndroidChatSurfacePlatform(
                 pageBackground = params.pageBackground,
+                onComposerHeightChange = params.onComposerHeightChange,
                 timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
             ),
             pagedTimeline = params.pagingPresentation?.canonical,
@@ -169,15 +173,18 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(
 @Composable
 private fun rememberAndroidChatSurfacePlatform(
     pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)?,
+    onComposerHeightChange: ((Dp) -> Unit)?,
     timelineOverlay: @Composable () -> Unit,
 ): ChatSurfacePlatform {
+    val currentOnComposerHeight by rememberUpdatedState(onComposerHeightChange)
+    val reportsComposerHeight = onComposerHeightChange != null
     val currentOverlay by rememberUpdatedState(timelineOverlay)
     // ChatScreen hands a fresh glow lambda per recomposition; forward to the latest one.
     val currentBackground by rememberUpdatedState(pageBackground)
     val activity = LocalContext.current as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
     val hasBackground = pageBackground != null
-    return remember(isHiltHost, hasBackground) {
+    return remember(isHiltHost, hasBackground, reportsComposerHeight) {
         ChatSurfacePlatform(
             voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
             pageBackground = if (hasBackground) {
@@ -188,6 +195,11 @@ private fun rememberAndroidChatSurfacePlatform(
             // Touch first: the composer's keyboard-shortcut strip is desktop chrome.
             showKeyboardHints = false,
             timelineOverlay = { currentOverlay() },
+            onComposerHeightChange = if (reportsComposerHeight) {
+                { height -> currentOnComposerHeight?.invoke(height) }
+            } else {
+                null
+            },
         )
     }
 }

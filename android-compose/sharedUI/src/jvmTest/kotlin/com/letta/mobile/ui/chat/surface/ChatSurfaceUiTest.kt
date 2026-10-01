@@ -153,6 +153,31 @@ class ChatSurfaceUiTest {
     }
 
     @Test
+    fun theFullScreenComposerReportsItsHeight() = runComposeUiTest {
+        val heights = mutableListOf<androidx.compose.ui.unit.Dp>()
+        show(
+            TestPort(ready),
+            ChatSurfacePresentation.ChatFirst,
+            platform = ChatSurfacePlatform(onComposerHeightChange = { heights += it }),
+        )
+        waitUntil(timeoutMillis = 10_000) { heights.isNotEmpty() }
+        val reported = heights.last()
+        kotlin.test.assertTrue(reported > 0.dp && reported < 720.dp, "composer height was $reported")
+    }
+
+    @Test
+    fun theDockDoesNotReportAComposerHeight() = runComposeUiTest {
+        val heights = mutableListOf<androidx.compose.ui.unit.Dp>()
+        show(
+            TestPort(ready),
+            ChatSurfacePresentation.CanvasFirst,
+            platform = ChatSurfacePlatform(onComposerHeightChange = { heights += it }),
+        )
+        waitForIdle()
+        kotlin.test.assertTrue(heights.isEmpty(), "the dock reported $heights")
+    }
+
+    @Test
     fun timelineOverlayIsNotDrawnWhileDocked() = runComposeUiTest {
         show(
             TestPort(ready),

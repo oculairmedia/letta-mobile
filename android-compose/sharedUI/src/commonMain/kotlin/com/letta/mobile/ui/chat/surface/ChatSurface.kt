@@ -18,6 +18,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
@@ -232,11 +234,20 @@ private fun FullPageBody(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode)
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxSize()) {
             TimelineWithOverlay(frame, Modifier.weight(1f).fillMaxWidth())
-            Composer(frame, composerMode, Modifier.fillMaxWidth())
+            Composer(frame, composerMode, Modifier.fillMaxWidth().reportComposerHeight(frame, composerMode))
         }
     }
     val background = frame.platform.pageBackground
     if (background != null) background(content) else content()
+}
+
+/** Reports the full-screen composer's height to [ChatSurfacePlatform.onComposerHeightChange]. */
+@Composable
+private fun Modifier.reportComposerHeight(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode): Modifier {
+    val onHeight = frame.platform.onComposerHeightChange
+    if (onHeight == null || composerMode != ChatSurfaceMode.FullScreen) return this
+    val density = LocalDensity.current
+    return onSizeChanged { size -> onHeight(with(density) { size.height.toDp() }) }
 }
 
 /** The timeline, with the host's [ChatSurfacePlatform.timelineOverlay] drawn over its top. */

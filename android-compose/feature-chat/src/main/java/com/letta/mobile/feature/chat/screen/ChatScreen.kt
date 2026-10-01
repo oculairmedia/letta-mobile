@@ -129,6 +129,8 @@ internal fun ChatScreen(
                             modifier = Modifier.fillMaxSize().then(backgroundModifier),
                         ) { content() }
                     },
+                    // The shared composer reports its height so the glow keeps clear of it.
+                    onComposerHeightChange = { composerHeight = it },
                 ),
                 modifier = modifier.fillMaxSize().padding(contentPadding),
             )

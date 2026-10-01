@@ -44,7 +44,7 @@ internal fun ChatSurfaceHost.affordanceShape(): Int = listOf(
     openCanvas, openAgent, resolveAgentName, openSubagent, openModelPicker, pickWorkingDirectory, openAgentPane, editAgent,
 ).foldIndexed(0) { index, mask, member -> if (member != null) mask or (1 shl index) else mask }
 
-private fun ChatSurfacePlatform.slotShape(): Int = listOf(voiceInput, pageBackground, timelineOverlay)
+private fun ChatSurfacePlatform.slotShape(): Int = listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange)
     .foldIndexed(0) { index, mask, member -> if (member != null) mask or (1 shl index) else mask }
 
 internal fun forwardingHost(current: State<ChatSurfaceHost>): ChatSurfaceHost {
@@ -89,5 +89,10 @@ private fun forwardingPlatform(current: State<ChatSurfacePlatform>): ChatSurface
         },
         showKeyboardHints = platform.showKeyboardHints,
         timelineOverlay = if (platform.timelineOverlay == null) null else { @Composable { current.value.timelineOverlay?.invoke() } },
+        onComposerHeightChange = if (platform.onComposerHeightChange == null) {
+            null
+        } else {
+            { height -> current.value.onComposerHeightChange?.invoke(height) }
+        },
     )
 }

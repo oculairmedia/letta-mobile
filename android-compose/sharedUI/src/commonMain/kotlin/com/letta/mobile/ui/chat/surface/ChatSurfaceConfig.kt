@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 
 /**
@@ -55,6 +56,11 @@ data class ChatSurfacePlatform(
      * the shared page does not own, such as Android's active-subagent rings.
      */
     val timelineOverlay: (@Composable () -> Unit)? = null,
+    /**
+     * Told the full-screen composer's measured height whenever it changes, so a [pageBackground]
+     * that keeps clear of the composer (Android's ambient glow) can follow it.
+     */
+    val onComposerHeightChange: ((Dp) -> Unit)? = null,
 ) {
     companion object {
         val Default = ChatSurfacePlatform()
