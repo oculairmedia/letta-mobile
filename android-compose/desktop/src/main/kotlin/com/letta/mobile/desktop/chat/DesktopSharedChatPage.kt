@@ -17,6 +17,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
@@ -30,6 +35,8 @@ import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.openDesktopCanvasSession
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
+import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
@@ -128,7 +135,15 @@ internal fun DesktopSharedChatPage(
         presentation = presentation,
         onIntent = { intent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) },
         host = host,
-        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            // Bubble phase, so an open image viewer or popup takes its own Escape first.
+            .onKeyEvent { event ->
+                val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
+                if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
+                collapse
+            },
         appearance = ChatSurfaceAppearance(
             fontScale = LocalDesktopChatFontScale.current,
             // The font-scale host already scales the window's text through density.
@@ -146,6 +161,10 @@ internal fun DesktopSharedChatPage(
         canvas = { actions -> DockedConversationCanvas(session, actions) },
     )
 }
+
+/** Escape on the full-screen page goes back to the canvas (Android's Back does the same). */
+internal fun escapeCollapsesToCanvas(mode: ChatSurfaceMode, key: Key, type: KeyEventType): Boolean =
+    mode == ChatSurfaceMode.FullScreen && key == Key.Escape && type == KeyEventType.KeyDown
 
 /** The selected conversation's own board, created on first open (the side pane's same session). */
 @Composable

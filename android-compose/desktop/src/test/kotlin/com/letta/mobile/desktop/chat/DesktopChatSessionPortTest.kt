@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
@@ -187,6 +189,14 @@ class DesktopChatSessionPortTest {
         assertNull(unknown.currentHandle)
         assertEquals("Auto", unknown.currentLabel)
         assertEquals(listOf("anthropic/sonnet", "openai/gpt"), unknown.options.map { it.handle })
+    }
+
+    @Test
+    fun escapeCollapsesOnlyTheFullScreenPage() {
+        assertTrue(escapeCollapsesToCanvas(ChatSurfaceMode.FullScreen, Key.Escape, KeyEventType.KeyDown))
+        assertFalse(escapeCollapsesToCanvas(ChatSurfaceMode.FullScreen, Key.Escape, KeyEventType.KeyUp))
+        assertFalse(escapeCollapsesToCanvas(ChatSurfaceMode.Docked, Key.Escape, KeyEventType.KeyDown))
+        assertFalse(escapeCollapsesToCanvas(ChatSurfaceMode.FullScreen, Key.Enter, KeyEventType.KeyDown))
     }
 
     private fun TestScope.startedPort(): Pair<DesktopChatController, DesktopChatSessionPort> {
