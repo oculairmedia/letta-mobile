@@ -1,0 +1,29 @@
+{
+  "ok": true,
+  "catalog": "letta.canvas.compose",
+  "version": 1,
+  "artifact_id": "standup",
+  "canvas_id": "canvas-conversation-conv-123",
+  "status": "dry_run",
+  "title": "Stand-up",
+  "bounds": {
+    "x": 80.0,
+    "y": 80.0,
+    "width": 824.0,
+    "height": 120.0
+  },
+  "items": [
+    {
+      "key": "i0",
+      "kind": "TEXT",
+      "id": "cmp-standup-i0"
+    },
+    {
+      "key": "blockers",
+      "kind": "CHECKLIST",
+      "id": "cmp-standup-blockers",
+      "count": 1
+    }
+  ],
+  "warnings": []
+}

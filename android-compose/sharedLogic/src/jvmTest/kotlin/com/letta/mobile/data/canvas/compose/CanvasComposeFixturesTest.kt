@@ -34,7 +34,7 @@ class CanvasComposeFixturesTest {
     @Test
     fun everyFixtureFileIsCoveredHere() {
         val dir = File(checkNotNull(javaClass.getResource(DIR)).toURI())
-        // compiled-ops.json joins with the compiler (letta-mobile-bglj6.10) and its own test;
+        // compiled-ops.json is held by the compiler's CanvasComposeCompiledGoldenTest (letta-mobile-bglj6.10);
         // placement-golden.json is held by CanvasComposePlacementGoldenTest (letta-mobile-bglj6.9).
         val ownTests = setOf("compiled-ops.json", "placement-golden.json")
         val files = dir.list()!!.filter { it.endsWith(".json") && it !in ownTests }.toSet()
@@ -141,6 +141,7 @@ class CanvasComposeFixturesTest {
         val REFUSED_REQUESTS = setOf("request-unsupported-version.json", "request-unknown-kind.json")
         val OUTPUTS: Map<String, KSerializer<*>> = mapOf(
             "receipt.json" to ComposeReceipt.serializer(),
+            "receipt-dry-run.json" to ComposeReceipt.serializer(),
             "error-validation.json" to ComposeRefusal.serializer(),
             "error-board-refused.json" to ComposeRefusal.serializer(),
         )
