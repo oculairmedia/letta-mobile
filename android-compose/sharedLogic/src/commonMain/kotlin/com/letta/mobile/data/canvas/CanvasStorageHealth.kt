@@ -33,10 +33,26 @@ data class CanvasStorageFault(
 
         /** The document's history was archived and it continues from its current state. */
         COMPACTED,
+
+        /**
+         * The document's history passed its size budget and is not restarted, because it does or
+         * may sync with peers (a fresh history under the same id would conflict with theirs).
+         */
+        OVER_BUDGET,
+
+        /**
+         * Writes are refused: the store hit an error it cannot vouch for having recovered from
+         * (out of memory on a repository thread), or the document's board layout is newer than
+         * this build understands. Changes made since [atEpochMs] are not saved.
+         */
+        READ_ONLY,
     }
 
     /** Faults the person must act on or be told about; budget notes are only logged. */
-    val isError: Boolean get() = kind == Kind.SAVE_FAILED || kind == Kind.LOAD_FAILED || kind == Kind.QUARANTINED
+    val isError: Boolean get() = when (kind) {
+        Kind.SAVE_FAILED, Kind.LOAD_FAILED, Kind.QUARANTINED, Kind.OVER_BUDGET, Kind.READ_ONLY -> true
+        Kind.NEAR_BUDGET, Kind.COMPACTED -> false
+    }
 }
 
 /** A canvas store that can report storage faults. Android and desktop render [faults]. */

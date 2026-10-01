@@ -1,10 +1,14 @@
 package com.letta.mobile.data.canvas
 
 import java.math.BigInteger
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardOpenOption.CREATE_NEW
+import java.nio.file.StandardOpenOption.WRITE
 import java.security.MessageDigest
 import java.util.Date
 import java.util.zip.GZIPInputStream
@@ -25,20 +29,23 @@ import org.automerge.Transaction
  * A size budget for one notebook document's Automerge history.
  *
  * Normal edits keep history small (see [NotebookBoardStorage]); the budget is the safety net. At
- * [warnBytes] the store logs a warning. Past [maxDocumentBytes], when the store opens, the full
- * history is archived to a compressed cold file and the document continues from a fresh history
- * holding its current state, under the same document id and canvas identity
- * ([NotebookHistoryArchive.compact]).
+ * [warnBytes] the store logs a warning; past [maxDocumentBytes] it raises an
+ * [CanvasStorageFault.Kind.OVER_BUDGET] error that the board shows. Only a store that opted in with
+ * [compactOversized] then archives the full history to a compressed cold file and continues the
+ * document from a fresh history holding its current state, under the same document id and canvas
+ * identity ([NotebookHistoryArchive.compact]).
  */
 data class NotebookHistoryBudget(
     val maxDocumentBytes: Long = DEFAULT_MAX_DOCUMENT_BYTES,
     val warnFraction: Double = DEFAULT_WARN_FRACTION,
     /**
-     * Archive and restart an over-budget document when the store opens. Turn it off for a
-     * repository that syncs documents with peers: a fresh history under the same id would meet
-     * the peers' old history as concurrent edits.
+     * Archive and restart an over-budget document when the store opens. Off unless asked for: a
+     * fresh history under the same id meets any peer's copy of the old history as a concurrent
+     * root, and the merge silently loses edits. Only a repository that never syncs may opt in.
+     * [NotebookLocalStore.repoForSync] refuses a store that opted in, and a directory that was
+     * ever handed to sync is never restarted, whatever a later store asks for.
      */
-    val compactOversized: Boolean = true,
+    val compactOversized: Boolean = false,
 ) {
     init {
         require(maxDocumentBytes > 0 && warnFraction > 0.0 && warnFraction <= 1.0)
@@ -55,7 +62,8 @@ data class NotebookHistoryBudget(
 
 /**
  * Archives and restarts over-budget documents. Run only while no repository has the document
- * open: the store does it before it loads its repository.
+ * open and while holding the repository's canvas lock: the store does both before its repository
+ * may open the document.
  *
  * Layout, beside the repository's own files:
  * ```
@@ -68,11 +76,37 @@ data class NotebookHistoryBudget(
  * state at those heads. A history or undo view walks the chain backwards: the live document's
  * changes, then the newest archive's (whose final state at `heads` is the live document's first
  * state), and so on. Archives are append-only; nothing here deletes them.
+ *
+ * While a restart runs, the same directory holds `<epochMs>.building` (the fresh document being
+ * written), `<epochMs>.fresh` (written whole) and `<epochMs>.replaced` (the old chunks, moved
+ * aside); [recoverInterrupted] resolves any combination a crash leaves.
  */
-internal class NotebookHistoryArchive(private val storageRoot: Path) {
+internal class NotebookHistoryArchive(
+    private val storageRoot: Path,
+    /** Called after each step of [compact]; tests throw from it to stand in for a crash there. */
+    private val afterStep: (Step) -> Unit = {},
+) {
     val archiveRoot: Path = storageRoot.resolve(ARCHIVE_DIRECTORY)
 
     data class Compaction(val archive: Path, val bytesBefore: Long, val bytesAfter: Long)
+
+    /** The points a crash can interrupt [compact] at; [recoverInterrupted] handles each. */
+    enum class Step {
+        /** The cold archive is written; nothing else has changed. */
+        ARCHIVED,
+
+        /** The fresh snapshot is written into `<stamp>.building`, which is not yet renamed. */
+        FRESH_PARTIAL,
+
+        /** The fresh document directory is whole, as `<stamp>.fresh`. */
+        FRESH_READY,
+
+        /** The old chunks are moved aside to `<stamp>.replaced`; the document directory is gone. */
+        MOVED_ASIDE,
+
+        /** The fresh directory is in place; the old chunks still wait to be deleted. */
+        SWAPPED,
+    }
 
     /** Where the repository's file storage keeps [documentKey]'s chunks. */
     fun documentDirectory(documentKey: String): Path {
@@ -86,21 +120,52 @@ internal class NotebookHistoryArchive(private val storageRoot: Path) {
     fun documentBytes(documentKey: String): Long = chunks(documentDirectory(documentKey)).sumOf { Files.size(it) }
 
     /**
-     * Finish or undo a compaction a crash interrupted. The old chunks are moved aside before the
-     * fresh snapshot is moved in, so a document directory with files is always whole.
+     * Finish or undo a restart a crash interrupted, from whichever step it stopped at. The fresh
+     * document is built whole beside the old one and moved in with one atomic rename, so the
+     * document directory is always the whole old history, the whole fresh snapshot, or absent
+     * (with the old history waiting in `<stamp>.replaced`). Directories are deleted recursively,
+     * so an empty or partial document directory (which older builds could leave) never blocks a
+     * restore.
      */
     fun recoverInterrupted(documentKey: String) {
         val directory = archiveRoot.resolve(documentKey)
         if (!Files.isDirectory(directory, NOFOLLOW_LINKS)) return
-        val replaced = Files.list(directory).use { stream -> stream.iterator().asSequence().filter { it.name.endsWith(REPLACED_SUFFIX) }.toList() }
+        val entries = Files.list(directory).use { stream -> stream.iterator().asSequence().toList() }
+        // Half-built fresh documents, and the temp files of older builds' restarts.
+        entries.filter { it.name.endsWith(BUILDING_SUFFIX) || (it.name.startsWith(".") && it.name.endsWith(".tmp")) }
+            .forEach(::deleteTree)
+        val stamps = entries.mapNotNull { entry ->
+            when {
+                entry.name.endsWith(FRESH_SUFFIX) -> entry.name.removeSuffix(FRESH_SUFFIX)
+                entry.name.endsWith(REPLACED_SUFFIX) -> entry.name.removeSuffix(REPLACED_SUFFIX)
+                else -> null
+            }
+        }.distinct().sorted()
         val target = documentDirectory(documentKey)
-        for (staged in replaced.sorted()) {
-            if (chunks(target).isEmpty()) {
-                Files.createDirectories(target.parent)
-                Files.deleteIfExists(target)
-                Files.move(staged, target, ATOMIC_MOVE)
-            } else {
-                deleteTree(staged)
+        for (stamp in stamps) {
+            val fresh = directory.resolve("$stamp$FRESH_SUFFIX")
+            val replaced = directory.resolve("$stamp$REPLACED_SUFFIX")
+            val hasFresh = Files.isDirectory(fresh, NOFOLLOW_LINKS)
+            val hasReplaced = Files.isDirectory(replaced, NOFOLLOW_LINKS)
+            when {
+                hasReplaced && chunks(target).isEmpty() -> {
+                    // Moved aside but not replaced (or, from older builds, replaced by an empty
+                    // directory): finish with the fresh document if it is whole, else put the old
+                    // history back. The target holds no chunk files, so deleting it loses nothing.
+                    deleteTree(target)
+                    Files.createDirectories(target.parent)
+                    Files.move(if (hasFresh) fresh else replaced, target, ATOMIC_MOVE)
+                    deleteTree(replaced)
+                }
+                hasReplaced -> {
+                    // The swap happened; only the cleanup was cut short.
+                    deleteTree(replaced)
+                    deleteTree(fresh)
+                }
+                hasFresh -> {
+                    // Stopped before the old history moved: it is still whole where it was.
+                    deleteTree(fresh)
+                }
             }
         }
     }
@@ -127,6 +192,7 @@ internal class NotebookHistoryArchive(private val storageRoot: Path) {
         val archiveDirectory = Files.createDirectories(archiveRoot.resolve(documentKey))
         val archive = archiveDirectory.resolve("$nowEpochMs$ARCHIVE_SUFFIX")
         writeArchive(archive, history)
+        afterStep(Step.ARCHIVED)
 
         val old = Document.load(history)
         val fresh = Document()
@@ -144,13 +210,25 @@ internal class NotebookHistoryArchive(private val storageRoot: Path) {
         }
         Document.load(freshBytes).free()
 
-        // Move the old chunks aside, then put the fresh snapshot in their place.
+        // Build the fresh document directory whole beside the old one, then swap it in with one
+        // rename. recoverInterrupted resolves a crash between any two of these steps.
+        val building = archiveDirectory.resolve("$nowEpochMs$BUILDING_SUFFIX")
+        deleteTree(building)
+        val snapshot = Files.createDirectories(building.resolve("snapshot")).resolve(sha256Hex(freshBytes))
+        FileChannel.open(snapshot, CREATE_NEW, WRITE).use { channel ->
+            val buffer = ByteBuffer.wrap(freshBytes)
+            while (buffer.hasRemaining()) channel.write(buffer)
+            channel.force(true)
+        }
+        afterStep(Step.FRESH_PARTIAL)
+        val freshDirectory = archiveDirectory.resolve("$nowEpochMs$FRESH_SUFFIX")
+        Files.move(building, freshDirectory, ATOMIC_MOVE)
+        afterStep(Step.FRESH_READY)
         val staged = archiveDirectory.resolve("$nowEpochMs$REPLACED_SUFFIX")
         Files.move(directory, staged, ATOMIC_MOVE)
-        val snapshot = Files.createDirectories(directory.resolve("snapshot")).resolve(sha256Hex(freshBytes))
-        val temp = Files.createTempFile(archiveDirectory, ".snapshot-", ".tmp")
-        Files.write(temp, freshBytes)
-        Files.move(temp, snapshot, ATOMIC_MOVE)
+        afterStep(Step.MOVED_ASIDE)
+        Files.move(freshDirectory, directory, ATOMIC_MOVE)
+        afterStep(Step.SWAPPED)
         deleteTree(staged)
         return Compaction(archive, history.size.toLong(), freshBytes.size.toLong())
     }
@@ -211,6 +289,8 @@ internal class NotebookHistoryArchive(private val storageRoot: Path) {
         const val HISTORY_ARCHIVE = "historyArchive"
         private const val ARCHIVE_SUFFIX = ".automerge.gz"
         private const val REPLACED_SUFFIX = ".replaced"
+        private const val FRESH_SUFFIX = ".fresh"
+        private const val BUILDING_SUFFIX = ".building"
         private const val BUFFER_BYTES = 64 * 1024
         private const val ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 

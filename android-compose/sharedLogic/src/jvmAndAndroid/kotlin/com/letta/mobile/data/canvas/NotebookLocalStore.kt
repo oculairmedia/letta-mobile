@@ -10,6 +10,8 @@ import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -21,6 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.automerge.AmValue
+import org.automerge.Document
 import org.automerge.ObjectId
 import org.automerge.ObjectType
 import org.automerge.Read
@@ -33,11 +36,17 @@ import org.automerge.repo.RepoConfig
 import org.automerge.repo.Storage
 import org.automerge.repo.storage.FileSystemStorage
 
-/** One peer's durable notebook documents, independent of App Server conversations. */
+/**
+ * One peer's durable notebook documents, independent of App Server conversations.
+ *
+ * Over-budget histories are reported, not restarted, unless [budget] opts in with
+ * [NotebookHistoryBudget.compactOversized]; a store that opted in cannot be handed to peer sync
+ * ([repoForSync]), and a directory that ever was is never restarted again.
+ */
 class NotebookLocalStore(
     directory: Path,
     peerId: String,
-    budget: NotebookHistoryBudget = NotebookHistoryBudget(),
+    private val budget: NotebookHistoryBudget = NotebookHistoryBudget(),
     /** Wraps the repository's file storage; tests use it to inject failures. */
     storage: (Storage) -> Storage = { it },
 ) : AutoCloseable, CanvasStorageHealth {
@@ -47,8 +56,16 @@ class NotebookLocalStore(
     private val canvasLockFile = directory.resolve("notebook-canvas.lock")
     private val projection = NotebookFilesystemProjection(directory.resolve("projection"))
 
-    /** Serialize canvas claims and CAS across instances and processes using this repository. */
+    /**
+     * Serialize canvas claims, CAS and history restarts across instances and processes using this
+     * repository. Waits for this store's own startup restarts first, which run under the same lock.
+     */
     internal fun <T> withCanvasLock(action: () -> T): T {
+        health.awaitPrepared()
+        return fileLock(action)
+    }
+
+    private fun <T> fileLock(action: () -> T): T {
         require(!Files.isSymbolicLink(canvasLockFile)) { "Canvas lock must not be a symlink" }
         FileChannel.open(canvasLockFile, CREATE, WRITE).use { channel ->
             while (true) {
@@ -159,45 +176,120 @@ class NotebookLocalStore(
 
     internal fun replaceProjection(id: DocumentId, expected: NotebookDocument, content: NotebookContent): Boolean {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        return handle.withDocument { document ->
+        return handle.writing(id) { document ->
             document.startTransaction().use { tx ->
                 val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
                 val previous = tx.text(textId).orElseThrow()
                 val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
                 val currentBoard = boardFrom(tx)
-                if (previous != expected.markdown) return@withDocument false
-                if (currentTitle != expected.title) return@withDocument false
-                if (currentBoard != expected.sceneJson) return@withDocument false
+                if (previous != expected.markdown) return@writing false
+                if (currentTitle != expected.title) return@writing false
+                if (currentBoard != expected.sceneJson) return@writing false
                 if (previous != content.markdown) tx.spliceText(textId, 0, previous.length.toLong(), content.markdown)
                 NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "title", content.title)
                 writeBoard(tx, content.board)
                 tx.commit()
                 true
             }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        }
     }
 
-    private val health = NotebookStorageHealth(directory, budget) { readIndex() }
+    private val health = NotebookStorageHealth(directory, budget, { readIndex() }, { action -> fileLock(action) })
 
-    /** Storage faults: logged at ERROR and kept here for the board to show. Nothing is thrown. */
+    /**
+     * Storage faults: logged at ERROR and kept here for the board to show. Nothing is thrown,
+     * except [NotebookReadOnlyException] from a write the store refuses.
+     */
     val faults: NotebookStorageFaults get() = health.faults
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = health.faults.faults
 
+    /** Whether writes are refused after a repository error; see [CanvasStorageFault.Kind.READ_ONLY]. */
+    val isReadOnly: Boolean get() = health.isReadOnly
+
     init {
-        // An over-budget document is archived and restarted (on a background thread) before the
-        // repository may open it, and one that cannot be is set aside, so it never loads either.
+        // On a background thread, before the repository may open anything: finish interrupted
+        // restarts, check every document against the budget, and (only if opted in and never
+        // synced) archive and restart over-budget ones or set aside those that cannot be.
         health.prepare()
     }
 
-    val repo: Repo = Repo.load(
+    /**
+     * The Automerge repository, for this store's own reads and writes. Peer sync must take it
+     * from [repoForSync] instead, which refuses a store that restarts histories.
+     */
+    internal val repo: Repo = Repo.load(
         RepoConfig.builder()
             .storage(health.observe(storage(FileSystemStorage(directory))))
             .peerId(PeerId.fromString(peerId))
             .build(),
-    )
+    ).also(health::attach)
+
+    /**
+     * The repository, for peer sync. Refuses a store that opted into restarting over-budget
+     * histories: a restarted document meets the peers' copy of its old history as a concurrent
+     * root, and the merge silently loses edits. Also records, on disk, that this repository syncs,
+     * so no later store restarts its documents either.
+     */
+    fun repoForSync(): Repo {
+        check(!budget.compactOversized) {
+            "This notebook store restarts over-budget histories (compactOversized); it must not sync with peers"
+        }
+        health.awaitPrepared()
+        health.markSynced()
+        return repo
+    }
+
+    /**
+     * Note every document whose board layout this build cannot write, so each shows a READ_ONLY
+     * fault now rather than on its first refused write. Returns their ids.
+     */
+    fun checkLayouts(): List<DocumentId> = listDocuments().filter { id ->
+        runCatching {
+            open(id)?.withDocument { document -> NotebookBoardStorage.layoutVersion(document) }?.await()
+        }.getOrNull()?.let { version -> noteLayout(id, version) } == false
+    }
+
+    /** True if this build can write [version]; otherwise records the refusal. */
+    private fun noteLayout(id: DocumentId, version: Long): Boolean {
+        if (version <= NotebookBoardStorage.LAYOUT_VERSION) return true
+        health.refuseLayout(id.stableKey(), version)
+        return false
+    }
+
+    private class Written<T>(val value: T)
+
+    /**
+     * Run a write on [id]'s document, refused (with [NotebookReadOnlyException], outside the
+     * repository's callback) while the store is read-only or the board's layout is newer than this
+     * build's. Nothing is thrown inside the callback: an exception escaping a `withDocument` block
+     * leaves the repository's copy of the document unusable.
+     */
+    private fun <T> DocHandle.writing(id: DocumentId, block: (Document) -> T): T {
+        health.checkWritable()
+        var newerLayout = 0L
+        val written = withDocument { document ->
+            val version = NotebookBoardStorage.layoutVersion(document)
+            if (version > NotebookBoardStorage.LAYOUT_VERSION) {
+                newerLayout = version
+                null
+            } else {
+                Written(block(document))
+            }
+        }.await()
+        if (written == null) throw health.refuseLayout(id.stableKey(), newerLayout)
+        return written.value
+    }
+
+    /** Await a repository future, surfacing a refused write as itself rather than wrapped. */
+    private fun <T> CompletableFuture<T>.await(): T = try {
+        get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    } catch (error: ExecutionException) {
+        throw (error.cause as? NotebookReadOnlyException) ?: error
+    }
 
     @Synchronized
     fun create(title: String): DocumentId {
+        health.checkWritable()
         val handle = repo.create().get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
         handle.withDocument { document ->
             document.startTransaction().use { tx ->
@@ -261,18 +353,18 @@ class NotebookLocalStore(
     internal fun importCanvasInto(id: DocumentId, importData: CanvasImportData): NotebookCanvasImportResult {
         check(!closed) { "Notebook store is closed" }
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        return handle.withDocument { document ->
+        return handle.writing(id) { document ->
             document.startTransaction().use { tx ->
                 val marker = tx.get(ObjectId.ROOT, "importedCanvasId").orElse(null)
                 if (marker != null) {
-                    return@withDocument if (checkAlreadyImported(tx, marker, importData)) {
+                    return@writing if (checkAlreadyImported(tx, marker, importData)) {
                         NotebookCanvasImportResult.ALREADY_IMPORTED
                     } else {
                         NotebookCanvasImportResult.CONFLICT
                     }
                 }
                 if (!isPristineDocument(tx)) {
-                    return@withDocument NotebookCanvasImportResult.CONFLICT
+                    return@writing NotebookCanvasImportResult.CONFLICT
                 }
                 tx.set(ObjectId.ROOT, "title", importData.title)
                 writeBoard(tx, importData.board)
@@ -282,7 +374,7 @@ class NotebookLocalStore(
                 tx.commit()
                 NotebookCanvasImportResult.IMPORTED
             }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        }
     }
 
     /** Update one element without replacing other elements' Automerge registers. */
@@ -309,8 +401,13 @@ class NotebookLocalStore(
 
     /** Canvas metadata and board live in the same Automerge transaction; notebook items are untouched. */
     internal fun canvasDocument(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
-        canvasFrom(document)
-    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.also { remember(id, it) }
+        canvasFrom(document) to NotebookBoardStorage.layoutVersion(document)
+    }?.await()?.let { (doc, layout) ->
+        doc?.let { remember(id, it) }
+        // A board this build cannot write still opens; it says why its edits are not saved.
+        noteLayout(id, layout)
+        doc
+    }
 
     /**
      * The canvas's identity and ownership without its board: [CanvasDocument.sceneJson] is not
@@ -337,25 +434,28 @@ class NotebookLocalStore(
      */
     internal fun writeCanvas(id: DocumentId, doc: CanvasDocument, expectedRevision: Long?): Boolean {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        return handle.withDocument { document ->
+        // Parsed before entering the repository's callback, which must not throw.
+        val incoming = NotebookBoardStorage.sceneBoard(doc.sceneJson)
+        val baseOfDoc = NotebookBoardStorage.sceneBaseOf(doc.sceneJson)
+        val result = handle.writing(id) { document ->
             document.startTransaction().use { tx ->
                 val current = canvasFrom(tx)
-                if (expectedRevision != null && current?.revision != expectedRevision) return@withDocument false
-                if (current != null && current.id != doc.id) error("Notebook belongs to another canvas")
+                if (expectedRevision != null && current?.revision != expectedRevision) return@writing false
+                if (current != null && current.id != doc.id) return@writing null
                 val base = NotebookBoardStorage.readSceneBase(tx)
-                val incoming = NotebookBoardStorage.sceneBoard(doc.sceneJson)
                 if (base == null || current?.sceneJson != doc.sceneJson) {
                     if (base == null) NotebookBoardStorage.writeBoard(tx, incoming)
                     else NotebookBoardStorage.mergeCanvasBoard(tx, base, incoming)
                 }
                 val metadata = Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = ""))
                 NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "canvasMetadata", metadata)
-                NotebookBoardStorage.writeSceneBase(tx, NotebookBoardStorage.sceneBaseOf(doc.sceneJson))
+                NotebookBoardStorage.writeSceneBase(tx, baseOfDoc)
                 NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "title", doc.title)
                 tx.commit()
                 true
             }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS).also { written ->
+        }
+        return checkNotNull(result) { "Notebook belongs to another canvas" }.also { written ->
             if (written) {
                 remember(id, doc)
                 health.checkBudget(id.stableKey())
@@ -402,12 +502,12 @@ class NotebookLocalStore(
 
     private inline fun mutate(id: DocumentId, crossinline action: (org.automerge.Transaction) -> Unit) {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        handle.withDocument { document ->
+        handle.writing(id) { document ->
             document.startTransaction().use { tx ->
                 action(tx)
                 tx.commit()
             }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        }
     }
 
     @Synchronized

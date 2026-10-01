@@ -92,25 +92,42 @@ internal class ObservedStorage(
 }
 
 /**
- * Keeps an error thrown on the Automerge repository's own threads (an [OutOfMemoryError] copying
- * a huge snapshot, say) from killing the process. The repository catches [Exception] but not
- * [Error], and an uncaught throwable on any thread ends an Android process. The guard handles
- * only throwables raised in `org.automerge` code off the main thread while a store is open;
- * everything else goes to the previous handler unchanged.
+ * Thrown by a notebook write the store refuses: the store is read-only after an error it cannot
+ * vouch for having recovered from, or the document's board layout is newer than this build
+ * understands. The refusal is already recorded as a [CanvasStorageFault.Kind.READ_ONLY] fault.
  */
-object AutomergeFaultGuard {
-    private val listeners = CopyOnWriteArrayList<(Thread, Throwable) -> Unit>()
+class NotebookReadOnlyException(message: String) : IllegalStateException(message)
+
+/**
+ * Keeps an [Error] thrown on an Automerge repository's own threads (an [OutOfMemoryError] copying
+ * a huge snapshot, say) from killing the process. The repository catches [Exception] but not
+ * [Error], and an uncaught throwable on any thread ends an Android process.
+ *
+ * Only [Error]s are absorbed, and only on a thread an open store claims as its repository's (see
+ * [Listener.owns]) or, failing that, when the error was raised in `org.automerge` code itself. An
+ * [Exception] (an app bug inside a `withDocument` block, a sync-protocol fault), anything on the
+ * main thread, and anything on another thread go to the previous handler unchanged.
+ */
+internal object AutomergeFaultGuard {
+    /** One open store: which threads are its repository's, and what to do with an absorbed error. */
+    class Listener(
+        val owns: (Thread) -> Boolean,
+        val onError: (Thread, Throwable) -> Unit,
+    )
+
+    private val listeners = CopyOnWriteArrayList<Listener>()
     private var installed = false
 
     @Synchronized
-    fun register(listener: (Thread, Throwable) -> Unit) {
+    fun register(listener: Listener) {
         listeners += listener
         if (installed) return
         installed = true
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            if (handles(thread, error)) {
-                listeners.forEach { runCatching { it(thread, error) } }
+            val claimants = claimants(thread, error)
+            if (claimants.isNotEmpty()) {
+                claimants.forEach { runCatching { it.onError(thread, error) } }
             } else {
                 previous?.uncaughtException(thread, error) ?: run {
                     System.err.print("Exception in thread \"${thread.name}\" ")
@@ -120,17 +137,21 @@ object AutomergeFaultGuard {
         }
     }
 
-    fun unregister(listener: (Thread, Throwable) -> Unit) {
+    fun unregister(listener: Listener) {
         listeners -= listener
     }
 
-    /** Whether [error] on [thread] is the repository's to absorb. */
-    fun handles(thread: Thread, error: Throwable): Boolean =
-        listeners.isNotEmpty() && thread.name != "main" && fromAutomerge(error)
+    /** Whether [error] on [thread] is a repository's to absorb. */
+    fun handles(thread: Thread, error: Throwable): Boolean = claimants(thread, error).isNotEmpty()
 
-    private fun fromAutomerge(error: Throwable): Boolean =
-        generateSequence(error) { it.cause.takeIf { cause -> cause !== it } }.take(MAX_CAUSES)
-            .any { cause -> cause.stackTrace.any { it.className.startsWith("org.automerge.") } }
+    private fun claimants(thread: Thread, error: Throwable): List<Listener> {
+        if (error !is Error || thread.name == "main") return emptyList()
+        val owners = listeners.filter { runCatching { it.owns(thread) }.getOrDefault(false) }
+        if (owners.isNotEmpty()) return owners
+        val raisedInAutomerge = error.stackTrace.firstOrNull()?.className?.startsWith("org.automerge.") == true
+        return if (raisedInAutomerge) listeners.toList() else emptyList()
+    }
 
-    private const val MAX_CAUSES = 8
+    /** RepoRuntime names its hub, IO and tick executors' threads `automerge-*`. */
+    fun isRepositoryThreadName(name: String): Boolean = name.startsWith("automerge-")
 }

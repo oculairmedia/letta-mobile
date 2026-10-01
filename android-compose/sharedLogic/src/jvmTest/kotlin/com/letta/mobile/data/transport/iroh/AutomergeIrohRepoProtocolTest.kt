@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.canvas.NotebookHistoryBudget
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
@@ -37,6 +38,29 @@ class AutomergeIrohRepoProtocolTest {
         } finally {
             scope.cancel()
             store.close()
+            endpoint.shutdown()
+            endpoint.close()
+        }
+    }
+
+    @Test
+    fun aStoreThatRestartsHistoriesCannotBeBoundToSyncAndABoundDirectoryIsNeverRestarted() = runBlocking {
+        val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val directory = Files.createTempDirectory("notebook-sync-compaction-")
+        try {
+            // Opted into restarting over-budget histories: binding it to peers is refused outright.
+            NotebookLocalStore(directory, "test-peer", NotebookHistoryBudget(compactOversized = true)).use { store ->
+                assertFailsWith<IllegalStateException> { NotebookEndpointSession(store, endpoint, setOf("a".repeat(64)), scope) }
+            }
+            assertFalse(Files.exists(directory.resolve("notebook-synced")))
+            // The default store binds, and the directory remembers that it syncs.
+            NotebookLocalStore(directory, "test-peer").use { store ->
+                NotebookEndpointSession(store, endpoint, setOf("a".repeat(64)), scope).close()
+            }
+            assertTrue(Files.exists(directory.resolve("notebook-synced")))
+        } finally {
+            scope.cancel()
             endpoint.shutdown()
             endpoint.close()
         }

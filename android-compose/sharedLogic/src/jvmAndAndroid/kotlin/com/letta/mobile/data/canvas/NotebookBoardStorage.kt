@@ -36,6 +36,23 @@ internal object NotebookBoardStorage {
     const val SCHEMA = "notebook-board/1"
     const val EMPTY_BOARD = "{\"schema\":\"notebook-board/1\",\"elements\":[]}"
 
+    /**
+     * The board layout this build reads and writes, in `ROOT.boardVersion`. 1: everything inline
+     * in `ROOT.board` plus `ROOT.boardElements`. 2: object fields moved to `ROOT.boardFields`,
+     * leaving `{}` placeholders in `ROOT.board`; written the first time a document gets
+     * `boardFields`. A document with a higher version is read but never written (see
+     * [NotebookLocalStore]), so this build cannot clobber fields it does not know about. Builds
+     * from before the marker do not read it; that residual risk is in the PR that added it.
+     */
+    const val LAYOUT_VERSION = 2
+    private const val LAYOUT = "boardVersion"
+
+    fun layoutVersion(read: Read): Long = when (val value = read.get(ObjectId.ROOT, LAYOUT).orElse(null)) {
+        is AmValue.Int -> value.value
+        is AmValue.UInt -> value.value
+        else -> 1L
+    }
+
     private const val BOARD = "board"
     private const val FIELDS = "boardFields"
     private const val ELEMENTS = "boardElements"
@@ -195,6 +212,8 @@ internal object NotebookBoardStorage {
         setStringIfChanged(tx, ObjectId.ROOT, BOARD, raw)
         val existing = (tx.get(ObjectId.ROOT, FIELDS).orElse(null) as? AmValue.Map)?.id
         if (existing == null && objectFields.isEmpty()) return
+        // A reader of layout 1 would see the `{}` placeholders as empty fields and write them back.
+        if (layoutVersion(tx) < LAYOUT_VERSION) tx.set(ObjectId.ROOT, LAYOUT, LAYOUT_VERSION)
         val fields = existing ?: tx.set(ObjectId.ROOT, FIELDS, ObjectType.MAP)
         tx.keys(fields).orElseThrow().filter { it !in objectFields }.forEach { tx.delete(fields, it) }
         objectFields.forEach { (key, value) ->
