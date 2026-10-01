@@ -186,7 +186,7 @@ private fun TouchChatHead(content: TouchHeadContent) {
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     var hidden by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(turn.turnKey) { hidden = false }
-    val hasReply = turn.hasReply && turn.turnKey != dismissedTurn
+    val hasReply = turn.hasReply && turn.dismissKey != dismissedTurn
     val popupShown = hasReply && !hidden
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val lane = HeadLane(maxWidth.value, maxHeight.value)
@@ -201,7 +201,7 @@ private fun TouchChatHead(content: TouchHeadContent) {
                 agentName = content.agentName,
                 placement = PopupPlacement(lane, right, position),
                 onOpen = content.openChat,
-                onDismiss = { dismissedTurn = turn.turnKey },
+                onDismiss = { dismissedTurn = turn.dismissKey },
             )
         }
         ChatHead(

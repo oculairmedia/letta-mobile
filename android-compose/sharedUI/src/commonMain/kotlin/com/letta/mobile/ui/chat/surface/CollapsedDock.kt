@@ -125,8 +125,17 @@ internal data class CollapsedTurn(
     /** Something to put in the bubble; before this the mascot just thinks. */
     val hasReply: Boolean get() = text.isNotBlank() || working || needsInput
 
+    /**
+     * What a dismissal remembers. A conversation with no turn yet (a form waiting before any
+     * prompt) has no [turnKey]: it gets one of its own, so "nothing dismissed" (null) never
+     * reads as "this was dismissed".
+     */
+    val dismissKey: String get() = turnKey ?: NO_TURN_DISMISS_KEY
+
     companion object {
         val None = CollapsedTurn()
+
+        private const val NO_TURN_DISMISS_KEY = "collapsed-turn:none"
     }
 }
 
@@ -222,7 +231,7 @@ private fun CollapsedTurnColumn(
 ) {
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
-    val showReply = turn.hasReply && turn.turnKey != dismissedTurn
+    val showReply = turn.hasReply && turn.dismissKey != dismissedTurn
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         when {
             showReply -> ReplyBubble(
@@ -230,7 +239,7 @@ private fun CollapsedTurnColumn(
                 agentName = content.agentName,
                 actions = BubbleActions(
                     open = state::restore,
-                    dismiss = { dismissedTurn = turn.turnKey },
+                    dismiss = { dismissedTurn = turn.dismissKey },
                 ),
                 modifier = Modifier.dockDrag(state),
             )
