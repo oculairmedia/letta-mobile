@@ -13,13 +13,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -81,9 +81,11 @@ fun ChatSurface(
     dockGeometry: ChatDockGeometry = ChatDockGeometry.Default,
     onDockGeometryChange: (ChatDockGeometry) -> Unit = {},
 ) {
-    val uiState by port.uiState.collectAsState()
-    val composer by port.composer.collectAsState()
-    val capabilities by port.capabilities.collectAsState()
+    // Lifecycle-aware: a backgrounded host stops collecting, so the owner's WhileSubscribed
+    // flows (Android's composer projection) can stop with it.
+    val uiState by port.uiState.collectAsStateWithLifecycle()
+    val composer by port.composer.collectAsStateWithLifecycle()
+    val capabilities by port.capabilities.collectAsStateWithLifecycle()
     val shareFailed = stringResource(Res.string.chat_surface_canvas_share_failed)
     // Hosts pass fresh lambdas per recomposition; these keep one instance so rows stay skippable.
     val stableOnIntent = rememberLatestIntent(onIntent)

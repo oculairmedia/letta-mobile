@@ -112,6 +112,9 @@ kotlin {
                 implementation(libs.androidx.paging.compose)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
+                // letta-mobile-bglj6.1: collectAsStateWithLifecycle for the shared chat page's port flows
+                // (android + jvm; the version Compose Multiplatform 1.10 itself pulls in).
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.9.6")
             }
         }
 
