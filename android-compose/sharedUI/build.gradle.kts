@@ -133,6 +133,8 @@ kotlin {
                 implementation(libs.junit4)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(compose.desktop.currentOs)
+                // letta-mobile-bglj6.1: Compose UI tests for the shared chat page (runComposeUiTest).
+                implementation(libs.compose.desktop.ui.test)
                 implementation(kotlin("test"))
             }
         }
