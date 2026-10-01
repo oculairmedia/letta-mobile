@@ -131,7 +131,18 @@ class ChatSurfacePhoneSnapshotTest {
         val transportLayer: Boolean = true,
     )
 
-    private fun snapshot(shot: Shot) = runDesktopComposeUiTest(width = PHONE_WIDTH_DP * SCALE, height = PHONE_HEIGHT_DP * SCALE) {
+    private fun snapshot(shot: Shot) {
+        capture(shot)
+    }
+
+    /** Renders and writes [shot], and hands back what it drew. */
+    private fun capture(shot: Shot): BufferedImage {
+        lateinit var image: BufferedImage
+        render(shot) { image = it }
+        return image
+    }
+
+    private fun render(shot: Shot, onImage: (BufferedImage) -> Unit) = runDesktopComposeUiTest(width = PHONE_WIDTH_DP * SCALE, height = PHONE_HEIGHT_DP * SCALE) {
         // The mascot's layer keeps a frame loop running, so the page never idles: step the clock.
         mainClock.autoAdvance = false
         val start = if (shot.morphMillis != null) shot.presentation.other() else shot.presentation
@@ -170,6 +181,7 @@ class ChatSurfacePhoneSnapshotTest {
         val out = File("build/chat-surface-snapshots").apply { mkdirs() }.resolve("${shot.name}.png")
         ImageIO.write(image, "png", out)
         assertTrue(out.length() > 0)
+        onImage(image)
     }
 
     private fun ChatSurfacePresentation.other(): ChatSurfacePresentation =
@@ -276,6 +288,27 @@ class ChatSurfacePhoneSnapshotTest {
         ),
     )
 
+    /**
+     * The canvas's bar and the chat page's bar with the same draft, their feet side by side
+     * (phone-bar-side-by-side.png): one bar, the same rounded top, the same height.
+     */
+    @Test
+    fun theCanvasBarMirrorsTheChatBar() {
+        val draft = idleComposer.copy(text = "Make it vegetarian")
+        val canvas = capture(Shot("phone-bar-canvas-light", ChatSurfacePresentation.CanvasFirst, dark = false, withCanvas = true, composer = draft))
+        val chat = capture(Shot("phone-bar-chat-light", ChatSurfacePresentation.ChatFirst, dark = false, withCanvas = true, composer = draft))
+        val foot = FOOT_DP * SCALE
+        val pair = BufferedImage(canvas.width * 2, foot, BufferedImage.TYPE_INT_ARGB)
+        pair.createGraphics().apply {
+            drawImage(canvas.getSubimage(0, canvas.height - foot, canvas.width, foot), 0, 0, null)
+            drawImage(chat.getSubimage(0, chat.height - foot, chat.width, foot), canvas.width, 0, null)
+            dispose()
+        }
+        val out = File("build/chat-surface-snapshots").resolve("phone-bar-side-by-side.png")
+        ImageIO.write(pair, "png", out)
+        assertTrue(out.length() > 0)
+    }
+
     @Test
     fun canvasToChatMidMorph() = snapshot(
         Shot("phone-morph", ChatSurfacePresentation.ChatFirst, withCanvas = true, morphMillis = MID_MORPH_MILLIS),
@@ -295,6 +328,9 @@ class ChatSurfacePhoneSnapshotTest {
         const val FRAME_MILLIS = 16L
         const val MID_MORPH_MILLIS = 160L
         const val MIC_FILL = 0.9f
+
+        /** How much of the screen's foot the side-by-side bar comparison keeps, in dp. */
+        const val FOOT_DP = 240
 
         const val LONG_REPLY = "Here's a list for **six people**:\n\n" +
             "- 2 lb ground beef, or black beans for the vegetarians\n" +

@@ -31,6 +31,14 @@ enum class CanvasLayout {
  */
 internal val LocalCanvasCompact = androidx.compose.runtime.staticCompositionLocalOf { false }
 
+/**
+ * Host chrome along the foot of the window, measured from the window's bottom edge like the system
+ * bars it joins: the phone's shared chat bar, whose rounded top the board runs on under. The board
+ * draws under it; its own foot (the tool bar, a note's formatting) keeps above it. Like any inset,
+ * what a parent has already padded and consumed is not padded again.
+ */
+internal val LocalCanvasChromeBottomInset = androidx.compose.runtime.compositionLocalOf { 0.dp }
+
 /** The layout for a board measured [widthPx] wide ([width] in dp); null until it has been measured. */
 internal fun CanvasLayout.resolveMeasured(widthPx: Int, width: Dp): CanvasLayout? =
     resolve(width).takeIf { widthPx > 0 }

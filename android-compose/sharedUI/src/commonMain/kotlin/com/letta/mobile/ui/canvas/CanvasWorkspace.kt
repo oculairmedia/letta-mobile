@@ -146,7 +146,10 @@ fun CanvasWorkspace(
     val state by controller.state.collectAsState()
     // What the board's chrome keeps clear of: the system bars and the keyboard, and the host's chrome.
     val systemInsets = WindowInsets.safeDrawing
-    val chromeInsets = remember(systemInsets, chromeTopInset) { systemInsets.union(WindowInsets(top = chromeTopInset)) }
+    val chromeBottomInset = LocalCanvasChromeBottomInset.current
+    val chromeInsets = remember(systemInsets, chromeTopInset, chromeBottomInset) {
+        systemInsets.union(WindowInsets(top = chromeTopInset, bottom = chromeBottomInset))
+    }
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
     val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
@@ -1807,11 +1810,11 @@ fun CanvasWorkspace(
             }
 
             // The foot of the board: the active note's formatting bar, centred, above the status line
-            // on a desktop and above the tool bar on a phone. Inset from the system bars and the
-            // keyboard, so on a phone the formatting bar rides up with the keyboard.
+            // on a desktop and above the tool bar on a phone. Inset from the system bars, the
+            // keyboard and the host's chrome, so on a phone the formatting bar rides up with the keyboard.
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing).padding(CHROME_INSET)
+                    .windowInsetsPadding(chromeInsets).padding(CHROME_INSET)
                     .canvasChrome(chromeRegions)
                     .onSizeChanged { footHeight[0] = it.height },
                 horizontalAlignment = Alignment.CenterHorizontally,
