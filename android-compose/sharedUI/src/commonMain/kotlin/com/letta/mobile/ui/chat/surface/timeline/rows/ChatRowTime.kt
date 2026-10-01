@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_duration_minutes
 import com.letta.mobile.sharedui.resources.rows_duration_ms
+import com.letta.mobile.sharedui.resources.rows_duration_ms_compact
 import com.letta.mobile.sharedui.resources.rows_duration_seconds
+import com.letta.mobile.sharedui.resources.rows_duration_tenths
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
@@ -53,3 +55,26 @@ internal fun formatDuration(durationMs: Long): String {
     if (seconds < SECONDS_PER_MINUTE) return stringResource(Res.string.rows_duration_seconds, seconds)
     return stringResource(Res.string.rows_duration_minutes, seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
 }
+
+/**
+ * The run and reasoning headers' duration, as the Android timeline writes it
+ * (formatToolExecutionTime): "850ms", "2.4s" (tenths, rounded), "3m 5s".
+ */
+@Composable
+internal fun formatRunDuration(durationMs: Long): String {
+    if (durationMs < MILLIS_PER_SECOND) return stringResource(Res.string.rows_duration_ms_compact, durationMs)
+    if (durationMs < MILLIS_PER_SECOND * SECONDS_PER_MINUTE) {
+        val tenths = (durationMs + HALF_TENTH_MILLIS) / TENTH_MILLIS
+        return stringResource(Res.string.rows_duration_tenths, tenths / TENTHS_PER_SECOND, tenths % TENTHS_PER_SECOND)
+    }
+    val seconds = durationMs / MILLIS_PER_SECOND
+    return stringResource(Res.string.rows_duration_minutes, seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
+}
+
+/** "0:42": a running run's elapsed clock (feature-chat formatElapsedSeconds). */
+internal fun formatElapsedClock(totalSeconds: Long): String =
+    "${totalSeconds / SECONDS_PER_MINUTE}:${(totalSeconds % SECONDS_PER_MINUTE).toString().padStart(2, '0')}"
+
+private const val TENTH_MILLIS = 100L
+private const val HALF_TENTH_MILLIS = 50L
+private const val TENTHS_PER_SECOND = 10L

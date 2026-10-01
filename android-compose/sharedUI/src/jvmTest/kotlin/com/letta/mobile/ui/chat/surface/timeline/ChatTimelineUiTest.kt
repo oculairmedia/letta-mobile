@@ -26,6 +26,7 @@ import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -211,6 +212,8 @@ class ChatTimelineUiTest {
         val host = ChatSurfaceHost(openSubagent = { callId, agentId, description -> opened += Triple(callId, agentId, description) })
         show(ready.copy(messages = messages.toPersistentList()), RecordingChatActions(), host)
 
+        // The dispatch reads as one tool summary line; its card opens from it.
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
         onNodeWithText("Dispatched: Audit the build").performClick()
         runOnIdle { assertEquals(listOf<Triple<String, String?, String>>(Triple("agent-call-1", "agent-sub", "Audit the build")), opened) }
     }

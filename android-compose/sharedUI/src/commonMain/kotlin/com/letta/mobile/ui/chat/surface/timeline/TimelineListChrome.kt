@@ -1,14 +1,20 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -21,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -37,13 +44,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_scroll_to_latest
+import com.letta.mobile.sharedui.resources.timeline_running_tool
 import com.letta.mobile.sharedui.resources.timeline_thinking
+import com.letta.mobile.sharedui.resources.timeline_thinking_elapsed
 import com.letta.mobile.sharedui.resources.timeline_today
 import com.letta.mobile.sharedui.resources.timeline_yesterday
+import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.chat.surface.timeline.rows.formatElapsedClock
+import com.letta.mobile.ui.chat.surface.timeline.rows.rememberElapsedSeconds
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatRowAlpha
+import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.stringResource
 
@@ -147,51 +163,113 @@ internal fun ScrollToLatestButton(onClick: () -> Unit, modifier: Modifier = Modi
     }
 }
 
-/** Trails the thread while the agent is working and nothing has streamed yet. */
+/**
+ * Trails the thread while the agent is working and nothing has streamed yet: the Android
+ * thinking token (designsystem ThinkingTextToken as ChatScreen feeds it), "0:12  Thinking…" or
+ * "0:12  Running Bash", its glyphs swept by a primary/tertiary gradient.
+ */
 @Composable
-internal fun ThinkingRow(modifier: Modifier = Modifier) {
+internal fun ThinkingRow(messages: List<UiMessage>, modifier: Modifier = Modifier) {
+    val activity = remember(messages) { activeRunActivity(messages) }
+    val elapsed by rememberElapsedSeconds(active = true, startedAtEpochMs = activity.startedAtEpochMs)
+    val phase = activity.runningToolName?.let { stringResource(Res.string.timeline_running_tool, it) }
+        ?: stringResource(Res.string.timeline_thinking)
+    val brush = rememberThinkingBrush()
     Row(
         modifier = modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
+            .heightIn(min = ChatRowSpacing.thinkingRowHeight)
             .padding(vertical = LettaDimens.Space.xs)
             .testTag(ChatTimelineTags.THINKING),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-            strokeWidth = LettaDimens.Space.hair,
-        )
         Text(
-            text = stringResource(Res.string.timeline_thinking),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = stringResource(Res.string.timeline_thinking_elapsed, formatElapsedClock(elapsed), phase),
+            style = MaterialTheme.typography.bodyMedium.copy(brush = brush),
+            modifier = Modifier.defaultMinSize(minHeight = ChatRowSpacing.thinkingTextMinHeight),
         )
     }
 }
 
-/** A day boundary: the rules carry the boundary and the word only names it (desktop). */
+/** What the newest run is doing (feature-chat activeRunActivity): its running tool and start. */
+private class ActiveRunActivity(val runningToolName: String?, val startedAtEpochMs: Long?)
+
+private fun activeRunActivity(messages: List<UiMessage>): ActiveRunActivity {
+    val newestRunId = messages.lastOrNull()?.runId
+    val run = messages.takeLastWhile { it.runId != null && it.runId == newestRunId }
+    return ActiveRunActivity(
+        runningToolName = run.flatMap { it.toolCalls.orEmpty() }
+            .lastOrNull { it.status.isNullOrBlank() || it.status.equals(RUNNING_STATUS, ignoreCase = true) }
+            ?.name,
+        startedAtEpochMs = run.firstNotNullOfOrNull { parseTimestampEpochMillis(it.timestamp) },
+    )
+}
+
+private const val RUNNING_STATUS = "running"
+
+/** The thinking token's sweep: a bright band crossing the text, still under reduced motion. */
+@Composable
+private fun rememberThinkingBrush(): Brush {
+    val scheme = MaterialTheme.colorScheme
+    val phase = if (LocalReducedMotion.current) {
+        0f
+    } else {
+        val transition = rememberInfiniteTransition(label = "thinkingSweep")
+        val animated by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(THINKING_SWEEP_MILLIS, easing = LinearEasing), RepeatMode.Restart),
+            label = "thinkingSweepPhase",
+        )
+        animated
+    }
+    return remember(phase, scheme) {
+        val tail = scheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.thinkingTail)
+        val startX = -THINKING_SWEEP_BAND_PX + phase * THINKING_SWEEP_TRAVEL_PX
+        Brush.linearGradient(
+            colorStops = arrayOf(
+                0f to tail,
+                THINKING_STOP_INNER to scheme.primary,
+                THINKING_STOP_MID to scheme.tertiary,
+                THINKING_STOP_OUTER to scheme.primary,
+                1f to tail,
+            ),
+            start = Offset(startX, 0f),
+            end = Offset(startX + THINKING_SWEEP_BAND_PX, 0f),
+        )
+    }
+}
+
+private const val THINKING_SWEEP_MILLIS = 2_400
+private const val THINKING_SWEEP_BAND_PX = 800f
+private const val THINKING_SWEEP_TRAVEL_PX = 2_400f
+private const val THINKING_STOP_INNER = 0.35f
+private const val THINKING_STOP_MID = 0.5f
+private const val THINKING_STOP_OUTER = 0.65f
+
+/** A day boundary as the Android timeline marks it (designsystem DateSeparator): a small centred pill. */
 @Composable
 internal fun DayDividerRow(date: LocalDate, today: LocalDate, modifier: Modifier = Modifier) {
-    val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)
     val label = when (val day = dayLabelOf(date, today)) {
         DayLabel.Today -> stringResource(Res.string.timeline_today)
         DayLabel.Yesterday -> stringResource(Res.string.timeline_yesterday)
         is DayLabel.Date -> day.text
     }
-    Row(
-        modifier = modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+    Box(
+        modifier = modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth().padding(vertical = LettaDimens.Space.sm),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.weight(1f).height(LettaDimens.Stroke.hairline).background(ruleColor))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatTimelineDimens.Alpha.mutedLabel),
-            textAlign = TextAlign.Center,
-        )
-        Box(Modifier.weight(1f).height(LettaDimens.Stroke.hairline).background(ruleColor))
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(percent = PILL_PERCENT)) {
+            Text(
+                text = label,
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
+
+private const val PILL_PERCENT = 50

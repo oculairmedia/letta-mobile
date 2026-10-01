@@ -26,10 +26,22 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowContext
 internal class TimelineRowContexts(
     val base: ChatRowContext,
     private val streaming: ChatRowContext?,
+    /** The conversation's newest message; the row holding it gets [ChatRowContext.newestMessageId]. */
+    private val newestMessageId: String? = null,
 ) {
+    private val newest: ChatRowContext? = newestMessageId?.let { base.copy(newestMessageId = it) }
+    private val streamingNewest: ChatRowContext? = newestMessageId?.let { streaming?.copy(newestMessageId = it) }
+
     fun forItem(item: ChatRenderItem): ChatRowContext {
-        val id = streaming?.streamingMessageId ?: return base
-        return if (item.containsMessageId(id)) streaming else base
+        val holdsNewest = newestMessageId != null && item.containsMessageId(newestMessageId)
+        val streamingId = streaming?.streamingMessageId
+        val holdsStreaming = streamingId != null && item.containsMessageId(streamingId)
+        return when {
+            holdsStreaming && holdsNewest -> streamingNewest ?: base
+            holdsStreaming -> streaming ?: base
+            holdsNewest -> newest ?: base
+            else -> base
+        }
     }
 }
 
@@ -46,9 +58,11 @@ internal fun rememberRowContexts(
 ): TimelineRowContexts {
     val itemState = state.toChatRenderItemState()
     val streamingId = streamingMessageIdOf(state)
+    val newestId = state.messages.lastOrNull()?.id
     return remember(
         itemState,
         streamingId,
+        newestId,
         state.a2uiSurfaces,
         state.a2uiResolvedActionCounters,
         appearance.displayMode,
@@ -63,7 +77,7 @@ internal fun rememberRowContexts(
             capabilities = capabilities,
             fontScale = fontScale,
         )
-        TimelineRowContexts(base, streamingId?.let { base.copy(streamingMessageId = it) })
+        TimelineRowContexts(base, streamingId?.let { base.copy(streamingMessageId = it) }, newestId)
     }
 }
 

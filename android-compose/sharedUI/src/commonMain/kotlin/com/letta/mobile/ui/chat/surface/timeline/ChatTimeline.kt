@@ -154,6 +154,7 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
             presentation = paged,
             agentId = params.state.agentId,
             thinking = params.state.isAgentTyping && showThinkingRow,
+            thinkingMessages = params.state.messages,
             bindings = params.bindings,
             bottomReserve = params.bottomReserve,
             listState = params.listState,

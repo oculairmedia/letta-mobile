@@ -13,7 +13,9 @@ internal fun rowContext(
     collapsedRunIds: Set<String> = emptySet(),
     expandedReasoning: Set<String> = emptySet(),
     activeApprovalRequestId: String? = null,
+    newestMessageId: String? = null,
 ): ChatRowContext = ChatRowContext(
+    newestMessageId = newestMessageId,
     itemState = ChatRenderItemState(
         isStreaming = false,
         activeApprovalRequestId = activeApprovalRequestId,

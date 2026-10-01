@@ -24,6 +24,8 @@
     <!-- List chrome -->
     <string name="timeline_scroll_to_latest">Scroll to latest message</string>
     <string name="timeline_thinking">Thinking…</string>
+    <string name="timeline_running_tool">Running %1$s</string>
+    <string name="timeline_thinking_elapsed">%1$s  %2$s</string>
     <string name="timeline_today">Today</string>
     <string name="timeline_yesterday">Yesterday</string>
     <string name="timeline_tool_calls_count">%1$d tool calls</string>

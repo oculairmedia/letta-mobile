@@ -69,4 +69,36 @@ object ChatRowAlpha {
 
     /** Full-screen image viewer scrim. */
     const val viewerScrim: Float = 0.88f
+
+    // The legacy Android timeline's muted text (RunActivityDisclosure, MessageReasoning,
+    // DeliveryTimeText), lifted so the shared rows match it.
+
+    /** A run header's title while the run is working. */
+    const val workingTitle: Float = 0.88f
+
+    /** "2 tools" beside a run header. */
+    const val activityCount: Float = 0.76f
+
+    /** The reasoning preview beside "Thought". */
+    const val reasoningPreview: Float = 0.8f
+
+    /** "Thinking…" while reasoning streams. */
+    const val reasoningActiveTitle: Float = 0.92f
+
+    /** The "You" label on a prompt bubble. */
+    const val userRoleLabel: Float = 0.7f
+
+    /** The "Inter-agent" label on another agent's bubble. */
+    const val interAgentLabel: Float = 0.85f
+
+    /** The newest reply's delivery time, drawn at this layer alpha. */
+    const val deliveryTime: Float = 0.5f
+
+    /** The working orb's pulse: dim and bright ends, and its still value under reduced motion. */
+    const val workingOrbDim: Float = 0.44f
+    const val workingOrbBright: Float = 0.92f
+    const val workingOrbResting: Float = 0.72f
+
+    /** The faded tails of the thinking row's sweeping gradient. */
+    const val thinkingTail: Float = 0.45f
 }

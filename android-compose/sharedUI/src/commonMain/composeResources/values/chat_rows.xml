@@ -23,23 +23,55 @@
 
     <!-- Reasoning and run activity -->
     <string name="rows_thought">Thought</string>
-    <string name="rows_run_working">Working…</string>
+    <string name="rows_thinking">Thinking…</string>
+    <string name="rows_reasoning_shown">Shown</string>
+    <string name="rows_reasoning_empty">No reasoning recorded</string>
+    <string name="rows_reasoning_expand">Expand reasoning</string>
+    <string name="rows_reasoning_collapse">Collapse reasoning</string>
+    <string name="rows_reasoning_state_collapsed">Reasoning collapsed</string>
+    <string name="rows_reasoning_state_expanded">Reasoning expanded</string>
+    <string name="rows_reasoning_state_working">Reasoning in progress</string>
+    <string name="rows_run_working">Working</string>
     <string name="rows_run_thought">Thought</string>
     <string name="rows_run_worked">Worked</string>
     <string name="rows_run_for_duration">%1$s for %2$s</string>
+    <string name="rows_work_expand">Expand agent work</string>
+    <string name="rows_work_collapse">Collapse agent work</string>
+    <string name="rows_run_state_working">Agent work in progress</string>
+    <string name="rows_run_state_collapsed">Agent work collapsed</string>
+    <string name="rows_run_state_expanded">Agent work expanded</string>
     <string name="rows_list_separator"> · </string>
     <string name="rows_duration_ms">%1$d ms</string>
+    <string name="rows_duration_ms_compact">%1$dms</string>
+    <string name="rows_duration_tenths">%1$d.%2$ds</string>
     <string name="rows_duration_seconds">%1$ds</string>
     <string name="rows_duration_minutes">%1$dm %2$ds</string>
     <plurals name="rows_run_tools">
         <item quantity="one">%1$d tool</item>
         <item quantity="other">%1$d tools</item>
     </plurals>
-    <string name="rows_run_failures">%1$d failed</string>
-    <plurals name="rows_ran_steps">
-        <item quantity="one">Ran %1$d step</item>
-        <item quantity="other">Ran %1$d steps</item>
+    <plurals name="rows_run_failure_count">
+        <item quantity="one">%1$d failure</item>
+        <item quantity="other">%1$d failures</item>
     </plurals>
+
+    <!-- Tool run summary (one line per run's tool calls) -->
+    <plurals name="rows_command_count">
+        <item quantity="one">%1$d command</item>
+        <item quantity="other">%1$d commands</item>
+    </plurals>
+    <string name="rows_tool_run_ran">Ran %1$s</string>
+    <string name="rows_tool_run_failed">%1$d ran - %2$d failed</string>
+    <string name="rows_tool_run_running">Running %1$s - %2$s - %3$s</string>
+    <string name="rows_tool_run_approval">Approval needed - %1$s</string>
+    <string name="rows_tool_run_default_name">tool</string>
+    <string name="rows_tool_run_open">Open command details</string>
+    <string name="rows_tool_run_summary">Tool run summary</string>
+    <string name="rows_tool_run_state">%1$d tools, %2$d failed, %3$d awaiting approval</string>
+    <string name="rows_role_you">You</string>
+    <string name="rows_role_error">Error</string>
+    <string name="rows_role_inter_agent">Inter-agent</string>
+    <string name="rows_role_not_sent">%1$s · Not sent</string>
     <string name="rows_step_done">done</string>
     <string name="rows_step_failed">failed</string>
     <string name="rows_step_running">running</string>

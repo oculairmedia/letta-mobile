@@ -26,7 +26,16 @@ internal data class ChatRowContext(
     val displayMode: ChatDisplayMode = ChatDisplayMode.Interactive,
     val capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
     val fontScale: Float = 1f,
-)
+    /**
+     * The conversation's newest message, set only on the row that holds it (null elsewhere).
+     * That row alone shows its run's settled "Thought for 4s" header and the reply's delivery
+     * time, as the Android timeline does for its newest item.
+     */
+    val newestMessageId: String? = null,
+) {
+    /** True on the row holding the conversation's newest message. */
+    val isNewest: Boolean get() = newestMessageId != null
+}
 
 /**
  * What a subagent row asks the host to open: the dispatch's activity (its todo sheet on

@@ -95,15 +95,20 @@ internal fun CopyIconButton(
             .clip(CircleShape)
             .border(LettaDimens.Stroke.hairline, borderColor, CircleShape)
             .semantics { contentDescription = description }
+            // Focusable ahead of the click: a hidden (disabled) click must not take the
+            // keyboard's way in with it.
+            .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 role = Role.Button,
+                // Hidden, it must not swallow taps meant for the text beneath it (touch has
+                // no hover to reveal it); focus or hover reveals and arms it.
+                enabled = action.visible || engaged,
             ) {
                 clipboard.setText(AnnotatedString(action.text))
                 copied = true
-            }
-            .focusable(interactionSource = interactionSource),
+            },
         contentAlignment = Alignment.Center,
     ) {
         Icon(

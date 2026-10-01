@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
-import androidx.compose.foundation.layout.Arrangement
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
@@ -79,14 +82,16 @@ internal fun TimelineListFrame(
                     // The conversation: the agent's mascot glances at it (letta-mobile-bglj6.1).
                     .mascotGazeTarget(MascotGazeSurface.TIMELINE)
                     .testTag(ChatTimelineTags.LIST),
+                // The Android timeline's frame (ChatMessageListLazyColumn): a 12dp side gutter, a
+                // card gap at each end, and no gap between items: each row brings its own leading
+                // space (timelineLeadingSpace), tight within a turn, a section break between speakers.
                 contentPadding = PaddingValues(
-                    start = LettaDimens.Space.lg,
-                    end = LettaDimens.Space.lg,
-                    top = LettaDimens.Space.xl,
-                    bottom = LettaDimens.Space.xl + overlays.bottomReserve,
+                    start = ChatRowSpacing.contentPaddingHorizontal,
+                    end = ChatRowSpacing.contentPaddingHorizontal,
+                    top = ChatRowSpacing.listEdge,
+                    bottom = ChatRowSpacing.listEdge + overlays.bottomReserve,
                 ),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
                 content = content,
             )
         }
@@ -99,7 +104,7 @@ internal fun TimelineListFrame(
                     .testTag(ChatTimelineTags.PINNED_PROMPT),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                TimelineItemRow(prompt, bindings)
+                TimelineItemRow(prompt, bindings, leadingSpace = false)
             }
         }
         if (overlays.showScrollToLatest) {
@@ -113,10 +118,39 @@ internal fun TimelineListFrame(
     }
 }
 
-/** One render item, at the chat column's width, through the shared row seam. */
+/**
+ * One render item, at the chat column's width, through the shared row seam. In the list it
+ * carries its own leading space ([timelineLeadingSpace]); the pinned copy over the list does not.
+ */
 @Composable
-internal fun TimelineItemRow(item: ChatRenderItem, bindings: TimelineRowBindings, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+internal fun TimelineItemRow(
+    item: ChatRenderItem,
+    bindings: TimelineRowBindings,
+    modifier: Modifier = Modifier,
+    leadingSpace: Boolean = true,
+) {
+    Box(
+        modifier = modifier
+            .widthIn(max = ChatColumnMaxWidth)
+            .fillMaxWidth()
+            .padding(top = if (leadingSpace) timelineLeadingSpace(item) else 0.dp),
+    ) {
         ChatRenderItemRow(item = item, context = bindings.contexts.forItem(item), callbacks = bindings.callbacks)
+    }
+}
+
+/**
+ * The space above an item (feature-chat RenderChatMessage / ChatMessageListRenderRunItem): a
+ * run of tool calls, a reasoning or tool row, or the continuation of one speaker's group takes
+ * the tight beat; anything that starts a new speaker or a new run takes the section break.
+ */
+internal fun timelineLeadingSpace(item: ChatRenderItem): Dp = when (item) {
+    is ChatRenderItem.RunBlock ->
+        if (item.messages.all { !it.first.toolCalls.isNullOrEmpty() }) ChatRowSpacing.grouped else ChatRowSpacing.ungrouped
+    is ChatRenderItem.Single -> when {
+        item.stableRunKey != null -> ChatRowSpacing.ungrouped
+        item.message.isReasoning || !item.message.toolCalls.isNullOrEmpty() -> ChatRowSpacing.grouped
+        item.groupPosition == GroupPosition.Middle || item.groupPosition == GroupPosition.Last -> ChatRowSpacing.grouped
+        else -> ChatRowSpacing.ungrouped
     }
 }

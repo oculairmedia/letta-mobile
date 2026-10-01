@@ -112,7 +112,7 @@ internal fun ApprovalRequestCard(
     }
 }
 
-private fun UiApprovalRequest.requiresUserInput(): Boolean =
+internal fun UiApprovalRequest.requiresUserInput(): Boolean =
     toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
 
 @Composable

@@ -8,16 +8,16 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,10 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -48,20 +45,25 @@ import com.letta.mobile.sharedui.resources.rows_copy
 import com.letta.mobile.sharedui.resources.rows_copy_message
 import com.letta.mobile.sharedui.resources.rows_expand_prompt
 import com.letta.mobile.sharedui.resources.rows_message_actions
-import com.letta.mobile.sharedui.resources.rows_not_sent
+import com.letta.mobile.sharedui.resources.rows_role_inter_agent
+import com.letta.mobile.sharedui.resources.rows_role_not_sent
+import com.letta.mobile.sharedui.resources.rows_role_you
 import com.letta.mobile.sharedui.resources.rows_send_again
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightTarget
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
+import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.stringResource
 
-/** Expand/collapse and overflow state for one prompt card. */
+/** Expand/collapse and overflow state for one prompt bubble. */
 @Stable
 private class PromptCardState {
     var expanded by mutableStateOf(false)
@@ -70,14 +72,29 @@ private class PromptCardState {
     val canToggle: Boolean get() = overflowed || expanded
 }
 
+/** The bubble's colours: the user's own, or the inter-agent tint when another agent sent it. */
+private data class PromptBubbleColors(val container: Color, val content: Color, val label: Color)
+
+@Composable
+private fun promptBubbleColors(interAgent: Boolean): PromptBubbleColors {
+    val scheme = MaterialTheme.colorScheme
+    return if (interAgent) {
+        PromptBubbleColors(scheme.tertiaryContainer, scheme.onTertiaryContainer, scheme.onTertiaryContainer.copy(alpha = ChatRowAlpha.interAgentLabel))
+    } else {
+        PromptBubbleColors(scheme.primaryContainer, scheme.onPrimaryContainer, scheme.onPrimaryContainer.copy(alpha = ChatRowAlpha.userRoleLabel))
+    }
+}
+
 /**
- * letta-mobile-bglj6.1: the user prompt, lifted from desktop's UserPrompt: a full-width,
- * opaque card (the timeline pins it as a sticky header), clamped to three lines with an
- * expand control when the text overflows, compact image thumbnails, and a hover-revealed
- * copy action.
+ * letta-mobile-bglj6.1: the user's prompt as the Android timeline draws it (feature-chat
+ * ChatMessageItem + MessageBubbleSurface): an end-aligned primaryContainer bubble, at most 88%
+ * of the column and sized to its text, with a tight top-end corner and a "You" label. Another
+ * agent's message reads "Inter-agent" in the tertiary tint, its provenance above the bubble.
  *
- * Android behaviour added: a long press opens the message actions (Copy, and Send again when
- * the owner can rerun: shared MessageActionPolicy), and a failed send reads "Not sent".
+ * Kept from the shared prompt card: a long prompt clamps to three lines with an expand chevron,
+ * a long press opens the message actions (Copy, and Send again when the owner can rerun), a
+ * failed send reads "You · Not sent", and where a pointer can hover a copy action shows beside
+ * the bubble.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -92,80 +109,97 @@ internal fun UserPromptRow(
     }
     val hoverSource = remember(message.id) { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
-    val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ChatRowAlpha.promptEdge)
+    val interAgent = message.agentMessageProvenance != null
+    val colors = promptBubbleColors(interAgent)
     val actionsLabel = stringResource(Res.string.rows_message_actions)
-    Box {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = LettaDimens.Space.sm)
-                .then(rememberSendFlightTarget(message.id, message.content))
-                .testTag(ChatRowTestTags.USER_PROMPT)
-                .hoverable(hoverSource)
-                .clip(RoundedCornerShape(LettaDimens.Radius.md))
-                .combinedClickable(
-                    onClickLabel = null,
-                    onLongClickLabel = actionsLabel,
-                    onLongClick = if (availability.hasActions) ({ state.menuOpen = true }) else null,
-                    onClick = { if (state.canToggle) state.expanded = !state.expanded },
-                )
-                .drawBehind {
-                    // Sides and bottom only: the pinned card's top edge would double up against
-                    // the pane's own boundary.
-                    val stroke = LettaDimens.Stroke.hairline.toPx()
-                    val radius = LettaDimens.Space.md.toPx()
-                    clipRect(top = radius) {
-                        drawRoundRect(edgeColor, cornerRadius = CornerRadius(radius, radius), style = Stroke(stroke))
-                    }
-                },
-            shape = RoundedCornerShape(LettaDimens.Radius.md),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
+    val shape = ChatBubbleShapes.user()
+    Column(
+        modifier = Modifier.fillMaxWidth().hoverable(hoverSource),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        if (interAgent) ProvenanceLabel(message, callbacks)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val bubbleMaxWidth = maxWidth * ChatRowSpacing.bubbleMaxWidthFraction
             Row(
-                modifier = Modifier.padding(
-                    start = LettaDimens.Space.lg,
-                    end = LettaDimens.Space.sm,
-                    top = LettaDimens.Space.md,
-                    bottom = LettaDimens.Space.md,
-                ),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             ) {
-                PromptBody(message, state, callbacks)
-                PromptTrailing(message, state, hovered)
+                if (message.content.isNotBlank()) {
+                    CopyIconButton(
+                        CopyAction(
+                            text = message.content,
+                            contentDescription = stringResource(Res.string.rows_copy_message),
+                            emphasized = false,
+                            visible = hovered,
+                        ),
+                    )
+                }
+                Box {
+                    Surface(
+                        modifier = Modifier
+                            .widthIn(max = bubbleMaxWidth)
+                            .then(rememberSendFlightTarget(message.id, message.content))
+                            .testTag(ChatRowTestTags.USER_PROMPT)
+                            .clip(shape)
+                            .combinedClickable(
+                                onClickLabel = null,
+                                onLongClickLabel = actionsLabel,
+                                onLongClick = if (availability.hasActions) ({ state.menuOpen = true }) else null,
+                                onClick = { if (state.canToggle) state.expanded = !state.expanded },
+                            ),
+                        shape = shape,
+                        color = colors.container,
+                        contentColor = colors.content,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(
+                                horizontal = ChatRowSpacing.bubblePaddingHorizontal,
+                                vertical = ChatRowSpacing.bubblePaddingVertical,
+                            ),
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                        ) {
+                            PromptBody(message, state, colors, interAgent, callbacks, Modifier.weight(1f, fill = false))
+                            PromptExpandToggle(state)
+                        }
+                    }
+                    MessageActionsMenu(message, availability, state, callbacks)
+                }
             }
         }
-        MessageActionsMenu(message, availability, state, callbacks)
     }
 }
 
 @Composable
-private fun RowScope.PromptBody(message: UiMessage, state: PromptCardState, callbacks: ChatRowCallbacks) {
-    Column(
-        modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        ProvenanceLabel(message, callbacks)
-        if (message.content.isNotBlank()) PromptText(message.content, state)
-        if (message.isSendFailed) {
-            Text(
-                text = stringResource(Res.string.rows_not_sent),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
+private fun PromptBody(
+    message: UiMessage,
+    state: PromptCardState,
+    colors: PromptBubbleColors,
+    interAgent: Boolean,
+    callbacks: ChatRowCallbacks,
+    modifier: Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart)) {
+        val role = stringResource(if (interAgent) Res.string.rows_role_inter_agent else Res.string.rows_role_you)
+        Text(
+            text = if (message.isSendFailed) stringResource(Res.string.rows_role_not_sent, role) else role,
+            style = ChatRowType.roleLabel,
+            color = if (message.isSendFailed) MaterialTheme.colorScheme.error else colors.label,
+        )
         if (message.attachments.isNotEmpty()) {
             val images = remember(message.attachments) { message.attachments.toImmutableList() }
-            ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())
+            ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap))
         }
+        if (message.content.isNotBlank()) PromptText(message.content, state)
     }
 }
 
 @Composable
 private fun PromptText(content: String, state: PromptCardState) {
-    // Expanded height is capped with internal scrolling so the card never outgrows the
-    // viewport. No SelectionContainer: it would swallow the card's toggle clicks, and the
+    // Expanded height is capped with internal scrolling so the bubble never outgrows the
+    // viewport. No SelectionContainer: it would swallow the bubble's toggle clicks, and the
     // copy action carries the full text.
     Box(
         modifier = if (state.expanded) {
@@ -185,28 +219,17 @@ private fun PromptText(content: String, state: PromptCardState) {
 }
 
 @Composable
-private fun PromptTrailing(message: UiMessage, state: PromptCardState, hovered: Boolean) {
-    if (state.canToggle) {
-        val description = stringResource(if (state.expanded) Res.string.rows_collapse_prompt else Res.string.rows_expand_prompt)
-        Box(
-            modifier = Modifier
-                .sizeIn(minWidth = LettaDimens.Space.xxl, minHeight = LettaDimens.Space.xxl)
-                .clip(CircleShape)
-                .clickable { state.expanded = !state.expanded },
-            contentAlignment = Alignment.Center,
-        ) {
-            DisclosureChevron(expanded = state.expanded, contentDescription = description)
-        }
-    }
-    if (message.content.isNotBlank()) {
-        CopyIconButton(
-            CopyAction(
-                text = message.content,
-                contentDescription = stringResource(Res.string.rows_copy_message),
-                emphasized = false,
-                visible = hovered,
-            ),
-        )
+private fun PromptExpandToggle(state: PromptCardState) {
+    if (!state.canToggle) return
+    val description = stringResource(if (state.expanded) Res.string.rows_collapse_prompt else Res.string.rows_expand_prompt)
+    Box(
+        modifier = Modifier
+            .sizeIn(minWidth = LettaDimens.Space.xxl, minHeight = LettaDimens.Space.xxl)
+            .clip(CircleShape)
+            .clickable { state.expanded = !state.expanded },
+        contentAlignment = Alignment.Center,
+    ) {
+        DisclosureChevron(expanded = state.expanded, contentDescription = description)
     }
 }
 

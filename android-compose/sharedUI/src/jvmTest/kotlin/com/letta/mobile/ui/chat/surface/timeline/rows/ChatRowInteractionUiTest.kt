@@ -188,7 +188,8 @@ class ChatRowInteractionUiTest {
             ).map { it to GroupPosition.None },
         )
         setContent {
-            MaterialTheme { RenderRow(block, rowContext(collapsedRunIds = collapsed), rowCallbacks(actions)) }
+            // The settled header (and its collapse control) shows on the conversation's newest row.
+            MaterialTheme { RenderRow(block, rowContext(collapsedRunIds = collapsed, newestMessageId = "b"), rowCallbacks(actions)) }
         }
 
         onNodeWithText("Looking into it.").assertExists()
@@ -207,7 +208,7 @@ class ChatRowInteractionUiTest {
         val thought = UiMessage(
             id = "r-1",
             role = "assistant",
-            content = "Weighing the options",
+            content = "Weighing the options\n\nThen picking the cheaper one",
             timestamp = "2026-07-19T12:00:00Z",
             isReasoning = true,
         )
@@ -215,11 +216,13 @@ class ChatRowInteractionUiTest {
             MaterialTheme { RenderRow(single(thought), rowContext(expandedReasoning = expanded), rowCallbacks(actions)) }
         }
 
-        onNodeWithText("Weighing the options").assertDoesNotExist()
+        // Collapsed, the header previews only the reasoning's first line.
+        onNodeWithText("Weighing the options", substring = true, useUnmergedTree = true).assertExists()
+        onNodeWithText("Then picking the cheaper one", substring = true, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.REASONING_TOGGLE).performClick()
         runOnIdle { assertEquals(listOf("r-1"), actions.toggledReasoning) }
         runOnIdle { expanded = setOf("r-1") }
-        onNodeWithText("Weighing the options").assertExists()
+        onNodeWithText("Then picking the cheaper one", substring = true, useUnmergedTree = true).assertExists()
     }
 
     @Test
@@ -268,6 +271,8 @@ class ChatRowInteractionUiTest {
         )
         setContent { MaterialTheme { RenderRow(single(msg), rowContext(), rowCallbacks(openSubagent = { opened = it })) } }
 
+        // The call reads as one summary line; its cards open from it.
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
         onNodeWithText("Dispatched: Audit the build").performClick()
         runOnIdle { assertEquals(ChatSubagentTarget("agent-call-1", "Audit the build", "agent-sub"), opened) }
         onNodeWithText("Show prompt").performClick()

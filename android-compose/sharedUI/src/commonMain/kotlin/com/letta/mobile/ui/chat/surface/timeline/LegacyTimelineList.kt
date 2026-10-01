@@ -17,6 +17,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -92,7 +93,7 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
         ),
         modifier = modifier,
     ) {
-        legacyRows(rows, params.bindings, thinking, state.isLoadingOlderMessages, today, state.agentId)
+        legacyRows(rows, params.bindings, thinking, state.isLoadingOlderMessages, today, state.agentId, state.messages)
     }
 }
 
@@ -113,8 +114,9 @@ private fun LazyListScope.legacyRows(
     loadingOlder: Boolean,
     today: LocalDate,
     agentId: String?,
+    messages: List<UiMessage>,
 ) {
-    if (thinking) item(key = THINKING_KEY) { ThinkingRow() }
+    if (thinking) item(key = THINKING_KEY) { ThinkingRow(messages) }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
         TimelineRowContent(rows[index], bindings, today)
     }

@@ -33,6 +33,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.TimelineRowAssembly
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_history_error
@@ -51,6 +52,8 @@ internal class PagedTimelineParams(
     val presentation: CanonicalTimelinePresentation,
     val agentId: String?,
     val thinking: Boolean,
+    /** The conversation's messages, for the thinking row's "0:12  Running Bash" clock. */
+    val thinkingMessages: List<UiMessage> = emptyList(),
     val bindings: TimelineRowBindings,
     val bottomReserve: Dp,
     /** The page's hoisted scroll position for this presentation. */
@@ -231,7 +234,7 @@ private class PagedRowsScope(
 
 private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     val rows = scope.rows
-    if (rows.leading > 0) item(key = THINKING_KEY) { ThinkingRow() }
+    if (rows.leading > 0) item(key = THINKING_KEY) { ThinkingRow(scope.params.thinkingMessages) }
     items(count = rows.size - rows.leading, key = { rows.key(it + rows.leading) }) { offset ->
         val index = offset + rows.leading
         if (offset < rows.liveCount) {
@@ -264,7 +267,7 @@ private fun SettledRow(scope: PagedRowsScope, index: Int) {
 private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         pagedBoundaryDate(item, older)?.let { date ->
-            DayDividerRow(date, scope.today, Modifier.padding(bottom = LettaDimens.Space.lg))
+            DayDividerRow(date, scope.today)
         }
         TimelineItemRow(item, scope.params.bindings)
     }
