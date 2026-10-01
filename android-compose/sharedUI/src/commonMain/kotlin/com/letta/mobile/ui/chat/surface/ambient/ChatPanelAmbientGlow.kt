@@ -287,16 +287,12 @@ private fun rememberSettledRedraw(inputs: GlowInputs, motion: GlowMotion): Mutab
 }
 
 /**
- * How tall the shader's field is. The shader's light lives along the bottom edge of its field;
- * in the panel that edge is moved up to just above the composer bar, so the light rises from the
- * bar into the conversation instead of hiding behind it.
+ * How tall the shader's field is. The shader's light lives along the bottom edge of its field.
+ * In the panel that is the panel's own bottom edge, as on the hosts' full chat page: the glow
+ * rises from behind the composer bar, never as a band floating across the conversation.
  */
 private fun DrawScope.fieldHeightFor(placement: AmbientGlowPlacement): Float = when (placement) {
-    is AmbientGlowPlacement.AboveComposer -> {
-        val composer = placement.composerHeight()
-        val composerPx = if (composer == Dp.Unspecified) 0f else composer.toPx()
-        (size.height - composerPx + PanelFieldOverlap.toPx()).coerceIn(1f, size.height)
-    }
+    is AmbientGlowPlacement.AboveComposer -> size.height
     // The halo's light rises from the bar the mascot stands on: the field ends at the row's foot,
     // not at the bottom of the bleed below it (which the bar covers).
     AmbientGlowPlacement.Halo -> (size.height - ChatSurfaceDimens.collapsedHaloBleed.toPx()).coerceAtLeast(1f)
@@ -447,9 +443,6 @@ private val HALO_BAND = AmbientBand(top = 0.05f, peak = 0.8f)
  * otherwise show the glow as a sliver along its bar.
  */
 private val PANEL_BAND = AmbientBand(top = 0.45f, peak = 0.97f)
-
-/** How far the panel's field reaches down behind the composer bar's top edge. */
-private val PanelFieldOverlap = 12.dp
 
 /**
  * The shader's strength is tuned for a whole window (BAND_OPACITY), where the glow spans the
