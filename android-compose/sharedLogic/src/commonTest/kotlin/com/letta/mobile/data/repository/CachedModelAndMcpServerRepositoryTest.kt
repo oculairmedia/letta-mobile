@@ -361,5 +361,7 @@ class CachedModelRepositoryTest {
         override suspend fun setDynamicColor(enabled: Boolean) = Unit
         override suspend fun setEnableProjects(enabled: Boolean) = Unit
         override suspend fun setHapticsEnabled(enabled: Boolean) = Unit
+        override fun getSharedChatPageEnabled(): Flow<Boolean> = flowOf(false)
+        override suspend fun setSharedChatPageEnabled(enabled: Boolean) = Unit
     }
 }

@@ -49,6 +49,7 @@ data class ConfigUiState(
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
     val hapticsEnabled: Boolean = true,
+    val sharedChatPageEnabled: Boolean = false,
     val localModelPath: String = "",
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
@@ -147,6 +148,7 @@ class ConfigViewModel @Inject constructor(
                         dynamicColor = preferences.dynamicColor,
                         enableProjects = preferences.enableProjects,
                         hapticsEnabled = preferences.hapticsEnabled,
+                        sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                         localModelPath = activeConfig.localModelPath.orEmpty(),
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
@@ -171,6 +173,7 @@ class ConfigViewModel @Inject constructor(
                         dynamicColor = preferences.dynamicColor,
                         enableProjects = preferences.enableProjects,
                         hapticsEnabled = preferences.hapticsEnabled,
+                        sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
@@ -203,12 +206,14 @@ class ConfigViewModel @Inject constructor(
         val dynamicColor = async { settingsRepository.getDynamicColor().first() }
         val enableProjects = async { settingsRepository.getEnableProjects().first() }
         val hapticsEnabled = async { settingsRepository.getHapticsEnabled().first() }
+        val sharedChatPageEnabled = async { settingsRepository.getSharedChatPageEnabled().first() }
         DisplayPreferences(
             theme = theme.await(),
             themePreset = themePreset.await(),
             dynamicColor = dynamicColor.await(),
             enableProjects = enableProjects.await(),
             hapticsEnabled = hapticsEnabled.await(),
+            sharedChatPageEnabled = sharedChatPageEnabled.await(),
         )
     }
 
@@ -218,6 +223,7 @@ class ConfigViewModel @Inject constructor(
         val dynamicColor: Boolean,
         val enableProjects: Boolean,
         val hapticsEnabled: Boolean,
+        val sharedChatPageEnabled: Boolean,
     )
 
     fun updateMode(mode: ServerMode) {
@@ -306,6 +312,14 @@ class ConfigViewModel @Inject constructor(
             viewModelScope.launch {
                 settingsRepository.setHapticsEnabled(enabled)
             }
+        }
+    }
+
+    fun updateSharedChatPageEnabled(enabled: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, sharedChatPageEnabled = enabled))
+        viewModelScope.launch {
+            settingsRepository.setSharedChatPageEnabled(enabled)
         }
     }
 
