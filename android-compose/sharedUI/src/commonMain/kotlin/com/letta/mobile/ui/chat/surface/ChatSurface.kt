@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.session.ChatSessionPort
@@ -65,7 +66,7 @@ fun ChatSurface(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        ChatSurfaceMode.Docked, ChatSurfaceMode.Floating -> Box(modifier) {
+        ChatSurfaceMode.Docked, ChatSurfaceMode.Floating -> Box(modifier, contentAlignment = Alignment.BottomCenter) {
             ChatComposerPanel(
                 composer = composer,
                 uiState = uiState,
