@@ -48,36 +48,37 @@ internal class ComposeTouchInjector private constructor(
     private val placedAt = HashMap<Int, Pair<Offset, Long>>()
 
     fun onSample(target: Component, sample: TabletPenDecoder.DecodedSample) {
-        val contact = sample.contact
         when (sample.kind) {
-            TabletBridge.KIND_DOWN -> placing += contact
-            TabletBridge.KIND_MOVE -> {
-                val position = toScene(target, sample.x, sample.y) ?: return
-                if (placing.remove(contact)) {
-                    active[contact] = position
-                    val now = System.currentTimeMillis()
-                    placedAt[contact] = position to now
-                    DesktopTouchOrigin.record(isTouch = true, atMillis = now)
-                    send(PointerEventType.Press, released = null)
-                } else if (contact in active) {
-                    if (active[contact] == position) return
-                    active[contact] = position
-                    send(PointerEventType.Move, released = null)
-                }
-            }
-            TabletBridge.KIND_UP, TabletBridge.KIND_OUT -> {
-                placing -= contact
-                if (contact !in active) return
-                send(PointerEventType.Release, released = contact)
-                val lifted = active.remove(contact)
-                val placed = placedAt.remove(contact)
-                if (lifted != null && placed != null && isTap(placed, lifted)) {
-                    SwingUtilities.invokeLater { DesktopTouchKeyboardTaps.gate?.fingerTapped() }
-                }
-            }
+            TabletBridge.KIND_DOWN -> placing += sample.contact
+            TabletBridge.KIND_MOVE -> toScene(target, sample.x, sample.y)?.let { moveTo(sample.contact, it) }
+            TabletBridge.KIND_UP, TabletBridge.KIND_OUT -> lift(sample.contact)
             // An Ink cancel is the Ink copy of a finger leaving, not this finger.
             TabletBridge.KIND_CANCEL -> Unit
         }
+    }
+
+    /** The first move places a finger (the down was the previous pose); later ones move it. */
+    private fun moveTo(contact: Int, position: Offset) {
+        if (placing.remove(contact)) {
+            active[contact] = position
+            val now = System.currentTimeMillis()
+            placedAt[contact] = position to now
+            DesktopTouchOrigin.record(isTouch = true, atMillis = now)
+            send(PointerEventType.Press, released = null)
+        } else if (contact in active && active[contact] != position) {
+            active[contact] = position
+            send(PointerEventType.Move, released = null)
+        }
+    }
+
+    /** Releases a placed finger; a tap also tells the touch keyboard a field was tapped. */
+    private fun lift(contact: Int) {
+        placing -= contact
+        if (contact !in active) return
+        send(PointerEventType.Release, released = contact)
+        val lifted = active.remove(contact) ?: return
+        val placed = placedAt.remove(contact) ?: return
+        if (isTap(placed, lifted)) SwingUtilities.invokeLater { DesktopTouchKeyboardTaps.gate?.fingerTapped() }
     }
 
     private fun isTap(placed: Pair<Offset, Long>, lifted: Offset): Boolean {

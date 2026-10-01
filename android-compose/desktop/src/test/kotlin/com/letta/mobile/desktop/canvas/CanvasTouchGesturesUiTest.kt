@@ -3,6 +3,7 @@
 package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -31,10 +32,10 @@ import kotlin.test.assertTrue
  */
 class CanvasTouchGesturesUiTest {
 
-    private fun box(id: String, l: Float, t: Float, r: Float, b: Float) = Element.Shape(
+    private fun box(id: String, area: Rect) = Element.Shape(
         id = id,
         shapeType = ShapeType.RECTANGLE,
-        points = listOf(Offset(l, t), Offset(r, b)),
+        points = listOf(area.topLeft, area.bottomRight),
         strokeColor = Color.Red,
         strokeWidth = 4f,
     )
@@ -78,7 +79,7 @@ class CanvasTouchGesturesUiTest {
     @Test
     fun aDoubleTapOnAShapeLeavesTheZoomForItsText() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
-        val node = board(controller, desktop = true, box("a", 200f, 200f, 400f, 400f))
+        val node = board(controller, desktop = true, box("a", Rect(200f, 200f, 400f, 400f)))
         val before = controller.state.value.viewport.scale
         node.performTouchInput { doubleClick(Offset(300f, 300f)) }
         settle()
@@ -88,7 +89,7 @@ class CanvasTouchGesturesUiTest {
     @Test
     fun aLongPressOnAnElementAddsItToTheSelection() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
-        val node = board(controller, desktop = true, box("a", 100f, 100f, 200f, 200f), box("b", 300f, 100f, 400f, 200f))
+        val node = board(controller, desktop = true, box("a", Rect(100f, 100f, 200f, 200f)), box("b", Rect(300f, 100f, 400f, 200f)))
         controller.selectIds(setOf("a"))
         waitForIdle()
         node.performTouchInput { longClick(Offset(350f, 150f)) }
@@ -99,7 +100,7 @@ class CanvasTouchGesturesUiTest {
     @Test
     fun aLongPressOnAnElementAddsToTheSelectionOnAPhoneToo() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
-        val node = board(controller, desktop = false, box("a", 100f, 100f, 200f, 200f), box("b", 300f, 100f, 400f, 200f))
+        val node = board(controller, desktop = false, box("a", Rect(100f, 100f, 200f, 200f)), box("b", Rect(300f, 100f, 400f, 200f)))
         controller.selectIds(setOf("a"))
         waitForIdle()
         node.performTouchInput { longClick(Offset(350f, 150f)) }
@@ -113,9 +114,9 @@ class CanvasTouchGesturesUiTest {
         val node = board(
             controller,
             desktop = true,
-            box("a", 100f, 100f, 200f, 200f),
-            box("b", 300f, 100f, 400f, 200f),
-            box("far", 700f, 700f, 760f, 760f),
+            box("a", Rect(100f, 100f, 200f, 200f)),
+            box("b", Rect(300f, 100f, 400f, 200f)),
+            box("far", Rect(700f, 700f, 760f, 760f)),
         )
         node.performTouchInput {
             down(Offset(60f, 60f))
@@ -132,7 +133,7 @@ class CanvasTouchGesturesUiTest {
     @Test
     fun onAPhoneALongPressOnOpenBoardDoesNotDrawABox() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
-        val node = board(controller, desktop = false, box("a", 100f, 100f, 200f, 200f))
+        val node = board(controller, desktop = false, box("a", Rect(100f, 100f, 200f, 200f)))
         node.performTouchInput {
             down(Offset(60f, 60f))
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)

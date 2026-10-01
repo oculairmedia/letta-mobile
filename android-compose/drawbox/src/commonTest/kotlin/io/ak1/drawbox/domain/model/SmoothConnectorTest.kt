@@ -1,6 +1,7 @@
 package io.ak1.drawbox.domain.model
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import io.ak1.drawbox.domain.usecase.UseCase
 import kotlin.math.abs
@@ -15,10 +16,10 @@ import kotlin.test.assertTrue
 class SmoothConnectorTest {
     private val useCase = UseCase()
 
-    private fun box(id: String, l: Float, t: Float, r: Float, b: Float) = Element.Shape(
+    private fun box(id: String, area: Rect) = Element.Shape(
         id = id,
         shapeType = ShapeType.RECTANGLE,
-        points = listOf(Offset(l, t), Offset(r, b)),
+        points = listOf(area.topLeft, area.bottomRight),
         strokeColor = Color.Red,
         strokeWidth = 2f,
     )
@@ -34,8 +35,8 @@ class SmoothConnectorTest {
     )
 
     // The circle-ish source up-left, the box down-right: the case the curve jammed into the side.
-    private val source = box("source", 0f, 0f, 200f, 200f)
-    private val target = box("target", 500f, 400f, 700f, 600f)
+    private val source = box("source", Rect(0f, 0f, 200f, 200f))
+    private val target = box("target", Rect(500f, 400f, 700f, 600f))
 
     private fun smoothed(): Element.Shape {
         val elements = useCase.propagateBindings(listOf(source, target, arrow(Offset(200f, 100f), Offset(500f, 500f), "source", "target")))

@@ -55,8 +55,12 @@ internal object DesktopTouchEchoFilter {
 
     private class Queue(private val touchCaused: ((MouseEvent) -> Boolean)?) : EventQueue() {
         override fun dispatchEvent(event: AWTEvent) {
-            if (event is MouseEvent && guarded(event) && isEcho(event, touchCaused)) return
-            super.dispatchEvent(event)
+            if (!isGuardedEcho(event)) super.dispatchEvent(event)
+        }
+
+        private fun isGuardedEcho(event: AWTEvent): Boolean {
+            if (event !is MouseEvent || !guarded(event)) return false
+            return isEcho(event, touchCaused)
         }
 
         private fun guarded(event: MouseEvent): Boolean {

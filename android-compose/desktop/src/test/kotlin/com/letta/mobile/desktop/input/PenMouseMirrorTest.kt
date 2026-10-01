@@ -36,4 +36,27 @@ class PenMouseMirrorTest {
         assertFalse(penSampleMirrorsToMouse(TabletBridge.TOOL_DRAW, windowMoved = true, hasPressureAxis = true))
         assertFalse(penSampleMirrorsToMouse(TabletBridge.TOOL_ERASER, windowMoved = true, hasPressureAxis = true))
     }
+
+    @Test
+    fun aFingerOrAnInkCancelTakesTheTouchPath() {
+        assertTrue(isFingerSample(TabletBridge.TOOL_TOUCH, TabletBridge.KIND_MOVE))
+        assertTrue(isFingerSample(TabletBridge.TOOL_UNKNOWN, TabletBridge.KIND_CANCEL))
+        assertFalse(isFingerSample(TabletBridge.TOOL_DRAW, TabletBridge.KIND_MOVE))
+    }
+
+    @Test
+    fun aRejectedToolsPhaseEventIsNeitherInkNorAClick() {
+        assertTrue(isRejectedToolPhase(TabletBridge.TOOL_UNKNOWN, TabletBridge.KIND_UP, lastPoseHadPressure = false))
+        // A nib, a tool whose pose had pressure, or a tool coming into range is the pen's.
+        assertFalse(isRejectedToolPhase(TabletBridge.TOOL_DRAW, TabletBridge.KIND_UP, lastPoseHadPressure = false))
+        assertFalse(isRejectedToolPhase(TabletBridge.TOOL_UNKNOWN, TabletBridge.KIND_UP, lastPoseHadPressure = true))
+        assertFalse(isRejectedToolPhase(TabletBridge.TOOL_UNKNOWN, TabletBridge.KIND_IN, lastPoseHadPressure = false))
+    }
+
+    @Test
+    fun liftingIsUpOrOutOfRange() {
+        assertTrue(isLift(TabletBridge.KIND_UP))
+        assertTrue(isLift(TabletBridge.KIND_OUT))
+        assertFalse(isLift(TabletBridge.KIND_MOVE))
+    }
 }

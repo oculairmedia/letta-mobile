@@ -568,9 +568,7 @@ class UseCase {
     fun smoothConnector(elements: List<Element>, id: String): List<Element> {
         val byId = elements.associateBy { it.id }
         return elements.map { el ->
-            if (el.id != id || el !is Element.Shape || el.shapeType != ShapeType.ARROW || el.points.size < 2) {
-                return@map el
-            }
+            if (el.id != id || el !is Element.Shape || !el.isConnectableArrow()) return@map el
             val (out, inward) = smoothConnectorHandles(
                 el.points[0],
                 el.points.last(),
@@ -646,40 +644,51 @@ class UseCase {
     fun propagateBindings(elements: List<Element>): List<Element> {
         val byId = elements.associateBy { it.id }
         return elements.map { el ->
-            if (el !is Element.Shape || el.shapeType != ShapeType.ARROW) return@map el
-            if (el.startBinding == null && el.endBinding == null) return@map el
-            if (el.points.size < 2) return@map el
-            val startTarget = el.startBinding?.let { byId[it] as? Element.Shape }
-            val endTarget = el.endBinding?.let { byId[it] as? Element.Shape }
-
-            // Direction reference for boundary clipping: the OTHER endpoint's
-            // bound center if available, else its raw position. We compute the
-            // boundary intersection from each bound shape's center toward that
-            // reference point so the arrow visually starts/ends at the edge.
-            val endRef = endTarget?.bounds()?.center ?: el.points.last()
-            val startRef = startTarget?.bounds()?.center ?: el.points[0]
-            val newStart = startTarget?.connectorAnchor(endRef) ?: el.points[0]
-            val newEnd = endTarget?.connectorAnchor(startRef) ?: el.points.last()
-            val newStartBinding = if (startTarget == null) null else el.startBinding
-            val newEndBinding = if (endTarget == null) null else el.endBinding
-            // Skip touching the arrow when nothing actually changed — propagateBindings
-            // runs after every mutation and most calls are no-ops for any given arrow.
-            // A smooth connector's handles are re-aimed with its ends, so it keeps meeting each
-            // shape square to its side wherever the shapes go.
-            val smooth = el.startHandle != null && el.endHandle != null
-            val handles = if (smooth) smoothConnectorHandles(newStart, newEnd, startTarget, endTarget) else null
-            val unchanged = newStart == el.points[0] && newEnd == el.points.last() &&
-                newStartBinding == el.startBinding && newEndBinding == el.endBinding &&
-                (handles == null || (handles.first == el.startHandle && handles.second == el.endHandle))
-            if (unchanged) el else el.copy(
-                points = listOf(newStart, newEnd),
-                startBinding = newStartBinding,
-                endBinding = newEndBinding,
-                startHandle = handles?.first ?: el.startHandle,
-                endHandle = handles?.second ?: el.endHandle,
-            ).touched()
+            if (el is Element.Shape && el.isBoundArrow()) propagateArrow(el, byId) else el
         }
     }
+
+    private fun Element.Shape.isBoundArrow(): Boolean =
+        shapeType == ShapeType.ARROW && (startBinding != null || endBinding != null) && points.size >= 2
+
+    /** One bound arrow, its ends and handles moved onto the shapes it binds; unchanged when they are. */
+    private fun propagateArrow(el: Element.Shape, byId: Map<String, Element>): Element {
+        val startTarget = el.startBinding?.let { byId[it] as? Element.Shape }
+        val endTarget = el.endBinding?.let { byId[it] as? Element.Shape }
+
+        // Direction reference for boundary clipping: the OTHER endpoint's
+        // bound center if available, else its raw position. We compute the
+        // boundary intersection from each bound shape's center toward that
+        // reference point so the arrow visually starts/ends at the edge.
+        val endRef = endTarget?.bounds()?.center ?: el.points.last()
+        val startRef = startTarget?.bounds()?.center ?: el.points[0]
+        val newStart = startTarget?.connectorAnchor(endRef) ?: el.points[0]
+        val newEnd = endTarget?.connectorAnchor(startRef) ?: el.points.last()
+        val newStartBinding = el.startBinding.takeIf { startTarget != null }
+        val newEndBinding = el.endBinding.takeIf { endTarget != null }
+        // A smooth connector's handles are re-aimed with its ends, so it keeps meeting each
+        // shape square to its side wherever the shapes go.
+        val handles = if (el.isSmoothConnector()) smoothConnectorHandles(newStart, newEnd, startTarget, endTarget) else null
+        val updated = el.copy(
+            points = listOf(newStart, newEnd),
+            startBinding = newStartBinding,
+            endBinding = newEndBinding,
+            startHandle = handles?.first ?: el.startHandle,
+            endHandle = handles?.second ?: el.endHandle,
+        )
+        // Skip touching the arrow when nothing actually changed — propagateBindings
+        // runs after every mutation and most calls are no-ops for any given arrow.
+        return if (updated.sameGeometryAs(el)) el else updated.touched()
+    }
+
+    private fun Element.Shape.isConnectableArrow(): Boolean = shapeType == ShapeType.ARROW && points.size >= 2
+
+    private fun Element.Shape.isSmoothConnector(): Boolean = startHandle != null && endHandle != null
+
+    private fun Element.Shape.sameGeometryAs(other: Element.Shape): Boolean =
+        points[0] == other.points[0] && points.last() == other.points.last() &&
+            startBinding == other.startBinding && endBinding == other.endBinding &&
+            startHandle == other.startHandle && endHandle == other.endHandle
 }
 
 /**

@@ -506,47 +506,68 @@ internal object CanvasWorkspaceSupport {
         }
     }
 
-    fun createPenConsumer(params: PenConsumerParams): (CanvasPenEvent) -> Boolean {
-        var stroke: CanvasPenStroke? = null
-        var strokeStartedOnDocument = false
-        // The second tap of a double tap opened text; the rest of that contact draws nothing.
-        var swallowing = false
-        return consumer@{ event ->
-            if (swallowing) {
-                if (event.phase == CanvasPenEvent.Phase.UP || event.phase == CanvasPenEvent.Phase.OUT) swallowing = false
-                return@consumer true
-            }
-            val world = validatePenPosition(event, params) ?: return@consumer false
+    fun createPenConsumer(params: PenConsumerParams): (CanvasPenEvent) -> Boolean = PenInk(params)::consume
+
+    /**
+     * The pen on the board: ink in the drawing tools, the eraser anywhere, and a double tap that
+     * opens a shape's text. Anything else is declined, for the platform to deliver as a click.
+     */
+    private class PenInk(private val params: PenConsumerParams) {
+        private var stroke: CanvasPenStroke? = null
+        private var strokeStartedOnDocument = false
+
+        /** The second tap of a double tap opened text; the rest of that contact draws nothing. */
+        private var swallowing = false
+
+        fun consume(event: CanvasPenEvent): Boolean {
+            if (swallowing) return swallow(event)
+            val world = validatePenPosition(event, params) ?: return false
             if (event.tool == CanvasPenTool.ERASER) {
                 params.penTaps.clear()
-                return@consumer handleEraserEvent(event, world, params.controller, params.onEraseArea)
+                return handleEraserEvent(event, world, params.controller, params.onEraseArea)
             }
-            val current = params.controller.state.value
-            if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) {
+            if (!inks(event)) {
                 params.penTaps.clear()
-                return@consumer false
+                return false
             }
-            if (event.phase == CanvasPenEvent.Phase.DOWN) {
-                strokeStartedOnDocument = isWorldPointInDocuments(world, params.session?.documents().orEmpty())
-                if (!strokeStartedOnDocument && openTextOnPenDoubleTap(event, world, params)) {
-                    params.penPreview.clear()
-                    stroke = null
-                    swallowing = true
-                    return@consumer true
-                }
-            }
-            if (strokeStartedOnDocument) return@consumer false
+            if (event.phase == CanvasPenEvent.Phase.DOWN && startOrOpenText(event, world)) return true
+            if (strokeStartedOnDocument) return false
+            return draw(event, world)
+        }
+
+        private fun swallow(event: CanvasPenEvent): Boolean {
+            if (event.isLift()) swallowing = false
+            return true
+        }
+
+        /** The draw nib in a freehand tool. */
+        private fun inks(event: CanvasPenEvent): Boolean =
+            event.tool == CanvasPenTool.DRAW && params.controller.state.value.mode.isFreehandDrawing()
+
+        /** A down: note whether it is on a note card, and open text when it finishes a double tap. */
+        private fun startOrOpenText(event: CanvasPenEvent, world: Offset): Boolean {
+            strokeStartedOnDocument = isWorldPointInDocuments(world, params.session?.documents().orEmpty())
+            if (strokeStartedOnDocument || !openTextOnPenDoubleTap(event, world, params)) return false
+            params.penPreview.clear()
+            stroke = null
+            swallowing = true
+            return true
+        }
+
+        private fun draw(event: CanvasPenEvent, world: Offset): Boolean {
             if (event.phase == CanvasPenEvent.Phase.MOVE) params.penTaps.move(event.x, event.y)
-            val drawParams = DrawPhaseParams(event, world, params.controller, params.penPreview)
-            val (updatedStroke, handled) = handleDrawPhase(drawParams, stroke)
-            if (event.phase == CanvasPenEvent.Phase.UP || event.phase == CanvasPenEvent.Phase.OUT) {
+            val (updatedStroke, handled) = handleDrawPhase(DrawPhaseParams(event, world, params.controller, params.penPreview), stroke)
+            if (event.isLift()) {
+                // A tap's dot, so a double tap can take it back.
                 val dot = params.controller.state.value.elements.lastOrNull()?.takeIf { it is Element.Path }?.id
                 params.penTaps.up(event.x, event.y, params.clock(), dot.takeIf { stroke != null })
             }
             stroke = updatedStroke
-            handled
+            return handled
         }
     }
+
+    private fun CanvasPenEvent.isLift(): Boolean = phase == CanvasPenEvent.Phase.UP || phase == CanvasPenEvent.Phase.OUT
 
     /**
      * A pen down that finishes a double tap on a shape or text: takes back the first tap's dot

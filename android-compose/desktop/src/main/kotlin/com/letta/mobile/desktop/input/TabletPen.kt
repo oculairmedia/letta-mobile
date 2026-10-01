@@ -77,37 +77,39 @@ internal class TabletPen(
         // already talks to; until that is known, the deepest window is the board.
         val preferred = connection.sawFrom ?: handles.lastOrNull()?.first
         if (touchContacts.isEmpty()) fingerSource = preferred
-        val touchSource = fingerSource ?: preferred
-        val pointer = mutableListOf<Triple<String, FloatArray, java.awt.Component>>()
-        handles.forEach { (name, open, component) ->
-            val events = runCatching { TabletBridge.nativePoll(open) }
-                .onFailure { println("TABLET: poll threw: $it") }
-                .getOrDefault(FloatArray(0))
-            if (events.isEmpty()) return@forEach
-            if (isPointerTouch(events)) {
-                pointer += Triple(name, events, component)
-            } else {
-                handleTargetEvents(name, events, component)
-            }
-        }
-        // The pen's window when it has the frame; otherwise whichever window the finger
-        // actually hit. Dropping the other copy was how a touch on the debug canvas never
-        // became a finger and fell through to the vertical pan wheel.
-        val chosen = pointer.firstOrNull { it.first == touchSource } ?: pointer.firstOrNull()
-        if (chosen != null && chosen.third.isShowing) {
-            dispatchEvents(chosen.second, chosen.third)
-        }
+        val fingerBatches = handles.mapNotNull { (name, open, component) -> pollTarget(name, open, component) }
+        dispatchFingerBatch(fingerBatches, fingerSource ?: preferred)
     }
+
+    /** Reads one window's samples: the pen's are dispatched now, a finger batch is handed back. */
+    private fun pollTarget(name: String, open: Long, component: Component): FingerBatch? {
+        val events = runCatching { TabletBridge.nativePoll(open) }
+            .onFailure { println("TABLET: poll threw: $it") }
+            .getOrDefault(FloatArray(0))
+        if (events.isEmpty()) return null
+        if (isPointerTouch(events)) return FingerBatch(name, events, component)
+        handleTargetEvents(name, events, component)
+        return null
+    }
+
+    /**
+     * The pen's window when it has the frame; otherwise whichever window the finger actually hit.
+     * Dropping the other copy was how a touch on the debug canvas never became a finger.
+     */
+    private fun dispatchFingerBatch(batches: List<FingerBatch>, source: String?) {
+        val chosen = batches.firstOrNull { it.window == source } ?: batches.firstOrNull() ?: return
+        if (chosen.component.isShowing) dispatchEvents(chosen.events, chosen.component)
+    }
+
+    /** One window's finger samples from a poll. */
+    private class FingerBatch(val window: String, val events: FloatArray, val component: Component)
 
     /** True when the whole batch is pointer-touch, so it must not steal the pen's window. */
     private fun isPointerTouch(events: FloatArray): Boolean {
         var index = 0
         var any = false
         while (index + TabletBridge.STRIDE <= events.size) {
-            val kind = events[index].toInt()
-            val tool = events[index + 4].toInt()
-            val touch = tool == TabletBridge.TOOL_TOUCH || kind == TabletBridge.KIND_CANCEL
-            if (!touch) return false
+            if (!isFingerSample(tool = events[index + 4].toInt(), kind = events[index].toInt())) return false
             any = true
             index += TabletBridge.STRIDE
         }
@@ -139,60 +141,59 @@ internal class TabletPen(
         while (index + TabletBridge.STRIDE <= events.size) {
             val sample = TabletPenDecoder.decodeSample(events, index, scale)
             index += TabletBridge.STRIDE
-            if (sample.tool == TabletBridge.TOOL_TOUCH || sample.kind == TabletBridge.KIND_CANCEL) {
+            if (isFingerSample(sample.tool, sample.kind)) {
                 noteTouchContact(sample, scale)
                 if (!windowMoved) composeTouch?.onSample(target, sample)
-                continue
-            }
-            if (sample.force != TabletBridge.NO_PRESSURE) _pressure.value = sample.force
-            if (sample.kind == TabletBridge.KIND_DOWN || sample.kind == TabletBridge.KIND_MOVE) {
-                lastPoseHadPressure = sample.force != TabletBridge.NO_PRESSURE
-            }
-            if (sample.kind == TabletBridge.KIND_DOWN) {
-                println("TABLET: contact tool=${sample.tool} force=${sample.force} slot=${sample.contact}")
-                // A text field the pen taps into (a shape's text, the composer) needs the
-                // on-screen keyboard as much as one a finger taps into. There is no other.
-                if (isPenNib(sample.tool)) DesktopTouchOrigin.record(isTouch = true, atMillis = System.currentTimeMillis())
-            }
-            // A finger shares this bridge with the pen and has no pressure axis.
-            // It must not be offered to the canvas as ink, and it must not be
-            // replayed as a moving mouse cursor. A tap clicks; a drag scrolls.
-            // A draw or eraser nib stays on the pen path even when its down
-            // arrives before any pose; that down is not a finger.
-            if (penDownWaitsForPose(sample.tool, sample.kind, sample.force)) {
-                continue
-            }
-            // A pressureless sample that is not a nib and not a finger is an Ink phase
-            // event (Up, In, Out) from a tool the pen filter rejected. Feeding it to the
-            // finger pointer lifts whatever finger is already scrolling.
-            if (!isPenNib(sample.tool) && !lastPoseHadPressure && sample.kind != TabletBridge.KIND_IN) {
-                if (sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT) {
-                    lastPoseHadPressure = false
-                }
-                continue
-            }
-
-            if (sample.kind == TabletBridge.KIND_DOWN) awaitPenStroke = true
-            val closingMirroredPress = awtMapper.down &&
-                (sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT)
-            val taken = offerToCanvas(sample)
-            if (awaitPenStroke && sample.kind == TabletBridge.KIND_MOVE && sample.force > 0f) {
-                awaitPenStroke = false
-                logPenStroke(target, sample, scale, taken)
-            }
-            if (taken) {
-                if (sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT) {
-                    lastPoseHadPressure = false
-                }
-                continue
-            }
-            if (closingMirroredPress || penSampleMirrorsToMouse(sample.tool, windowMoved, lastPoseHadPressure)) {
-                awtMapper.dispatch(target, sample, scale)
-            }
-            if (sample.kind == TabletBridge.KIND_UP || sample.kind == TabletBridge.KIND_OUT) {
-                lastPoseHadPressure = false
+            } else {
+                dispatchPenSample(target, sample, PenBatch(scale, windowMoved))
             }
         }
+    }
+
+    /** What every pen sample in one batch shares. */
+    private class PenBatch(val scale: Double, val windowMoved: Boolean)
+
+    /**
+     * One pen sample: ink to the canvas when it takes it, otherwise a mouse event for the
+     * buttons and text a pen also presses.
+     */
+    private fun dispatchPenSample(target: Component, sample: TabletPenDecoder.DecodedSample, batch: PenBatch) {
+        notePose(sample)
+        // A draw or eraser nib's down can arrive before any pose; it waits for one.
+        if (penDownWaitsForPose(sample.tool, sample.kind, sample.force)) return
+        // A pressureless sample that is not a nib is an Ink phase event (Up, In, Out) from a tool
+        // the pen filter rejected. It is not ink and not a pen click.
+        if (isRejectedToolPhase(sample.tool, sample.kind, lastPoseHadPressure)) {
+            if (isLift(sample.kind)) lastPoseHadPressure = false
+            return
+        }
+        if (sample.kind == TabletBridge.KIND_DOWN) awaitPenStroke = true
+        val closingMirroredPress = awtMapper.down && isLift(sample.kind)
+        val taken = offerToCanvas(sample)
+        noteFirstStrokeSample(target, sample, batch.scale, taken)
+        val mirrors = closingMirroredPress || penSampleMirrorsToMouse(sample.tool, batch.windowMoved, lastPoseHadPressure)
+        if (!taken && mirrors) awtMapper.dispatch(target, sample, batch.scale)
+        if (isLift(sample.kind)) lastPoseHadPressure = false
+    }
+
+    /** Pressure for the stroke, whether the pose had a pressure axis, and the contact's start. */
+    private fun notePose(sample: TabletPenDecoder.DecodedSample) {
+        if (sample.force != TabletBridge.NO_PRESSURE) _pressure.value = sample.force
+        if (sample.kind == TabletBridge.KIND_DOWN || sample.kind == TabletBridge.KIND_MOVE) {
+            lastPoseHadPressure = sample.force != TabletBridge.NO_PRESSURE
+        }
+        if (sample.kind != TabletBridge.KIND_DOWN) return
+        println("TABLET: contact tool=${sample.tool} force=${sample.force} slot=${sample.contact}")
+        // A text field the pen taps into (a shape's text, the composer) needs the
+        // on-screen keyboard as much as one a finger taps into. There is no other.
+        if (isPenNib(sample.tool)) DesktopTouchOrigin.record(isTouch = true, atMillis = System.currentTimeMillis())
+    }
+
+    /** Logs the first inked sample of a stroke, once per stroke. */
+    private fun noteFirstStrokeSample(target: Component, sample: TabletPenDecoder.DecodedSample, scale: Double, taken: Boolean) {
+        if (!awaitPenStroke || sample.kind != TabletBridge.KIND_MOVE || sample.force <= 0f) return
+        awaitPenStroke = false
+        logPenStroke(target, sample, scale, taken)
     }
 
     /**
@@ -269,6 +270,20 @@ internal class TabletPen(
 }
 
 internal data class WindowPenTarget(val window: Window) : CanvasPenTarget
+
+/** A finger, or the Ink copy of a finger leaving: the touch path, not the pen's. */
+internal fun isFingerSample(tool: Int, kind: Int): Boolean =
+    tool == TabletBridge.TOOL_TOUCH || kind == TabletBridge.KIND_CANCEL
+
+/** The contact lifting or leaving range. */
+internal fun isLift(kind: Int): Boolean = kind == TabletBridge.KIND_UP || kind == TabletBridge.KIND_OUT
+
+/**
+ * A pressureless phase event (Up, Out; not In) from a tool that is not a nib, after a pose with
+ * no pressure axis: Ink reporting a tool the pen filter rejected. It is neither ink nor a click.
+ */
+internal fun isRejectedToolPhase(tool: Int, kind: Int, lastPoseHadPressure: Boolean): Boolean =
+    !isPenNib(tool) && !lastPoseHadPressure && kind != TabletBridge.KIND_IN
 
 internal fun isPenNib(tool: Int): Boolean =
     tool == TabletBridge.TOOL_DRAW || tool == TabletBridge.TOOL_ERASER
