@@ -27,7 +27,8 @@ internal fun rememberSendFlightSource(): Modifier {
 }
 
 /**
- * letta-mobile-cc25e: marks the user-prompt row [rowId] showing [text] as a landing spot. The row that
+ * letta-mobile-cc25e: marks the user-prompt row [rowId] (its identity across the optimistic ->
+ * server swap: the otid where it has one) showing [text] as a landing spot. The row that
  * claims a flight opens its slot with an eased insert and stays hidden until the ghost lands
  * on it; every other row is untouched. A no-op outside a chat page.
  */
