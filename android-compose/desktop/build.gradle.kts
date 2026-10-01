@@ -483,6 +483,13 @@ nucleus.application {
         "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
     )
 
+    // Skiko's FrameWatcher calls System.gc() every 30s once 1,000 frames have rendered, to
+    // reclaim native Skia peers. It assumes a concurrent collector; under G1's default that
+    // is a stop-the-world FULL collection (~80ms here), felt as a periodic halt while drawing
+    // on the canvas. This makes those calls start a concurrent cycle instead, which still
+    // reclaims the peers without freezing the UI.
+    jvmArgs("-XX:+ExplicitGCInvokesConcurrent")
+
     // How Compose renders popups, menus and tooltips: drawn into the window's own canvas as
     // scene "layers" (the default), or as separate heavyweight components. Overridable for
     // bisecting a layer-disposal crash: -PcomposeLayers=COMPONENT.
