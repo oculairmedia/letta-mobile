@@ -112,6 +112,9 @@ class AgentScaffoldHiltTest {
         every { viewModel.activeBackendLabel } returns MutableStateFlow<String?>("letta.test")
         every { viewModel.llmModels } returns MutableStateFlow(emptyList())
         every { viewModel.hapticsEnabled } returns MutableStateFlow(false)
+        // The scaffold reads both settings gates; a relaxed mock would hand it a bare Object.
+        every { viewModel.sharedChatPageEnabled } returns MutableStateFlow(false)
+        every { viewModel.openChatsOnCanvas } returns MutableStateFlow(false)
         every { viewModel.projectBindings } returns projectBindings
         every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null
