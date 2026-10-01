@@ -206,9 +206,11 @@ private fun PanelSurface(state: ChatDockState, content: DockedPanelContent, modi
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(LettaDimens.Radius.lg),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        // The chat's own neutral surface. No tonal elevation: Material tints elevated surfaces
+        // with the primary colour, which turned the panel teal; the shadow alone lifts it.
+        color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = ChatSurfaceDimens.dockedReplyElevation,
+        tonalElevation = 0.dp,
         shadowElevation = ChatSurfaceDimens.dockedReplyElevation,
         border = BorderStroke(
             LettaDimens.Stroke.hairline,
