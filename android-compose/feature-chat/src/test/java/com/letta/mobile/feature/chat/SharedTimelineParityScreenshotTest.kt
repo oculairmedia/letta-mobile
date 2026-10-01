@@ -294,7 +294,7 @@ class SharedTimelineParityScreenshotTest {
 }
 
 /** The shared page's intents, all ignored: the comparison only draws. */
-private object NoOpChatActions : ChatActions {
+internal object NoOpChatActions : ChatActions {
     override fun updateComposerText(text: String) = Unit
     override fun send() = Unit
     override fun sendText(text: String) = Unit
