@@ -17,6 +17,9 @@ object ChatTimelineDimens {
     /** Bottom fade ramp into the composer. */
     val bottomFadeLength: Dp = 44.dp
 
+    /** The thinking token's bright band, as wide as a phone line of it; it crosses three widths per sweep. */
+    val thinkingSweepBand: Dp = 320.dp
+
     /** Height a not-yet-loaded paged row reserves, so the list does not collapse while it loads. */
     val placeholderRowHeight: Dp = 48.dp
 
@@ -46,6 +49,17 @@ object ChatTimelineDimens {
         /** The goal card's near-opaque surface. */
         const val goalCard: Float = 0.94f
     }
+
+    /** The scroll-to-latest glide's springback peaks at most this far past the newest edge. */
+    val scrollToLatestMaxOvershoot: Dp = LettaDimens.Space.md
+
+    /**
+     * The Touch scroll-to-latest button (designsystem ScrollToBottomFab): its inset from the
+     * list's bottom-end corner (feature-chat LettaSpacing.INNER_PADDING) and its lift.
+     */
+    val scrollToLatestTouchInset: Dp = LettaDimens.Space.lg
+    val scrollToLatestTouchElevation: Dp = LettaDimens.Space.xs
+    val scrollToLatestTouchPressedElevation: Dp = LettaDimens.Space.sm
 
     /** Fade-edge cross-fade, matching desktop's list. */
     const val fadeAnimationMillis: Int = 250

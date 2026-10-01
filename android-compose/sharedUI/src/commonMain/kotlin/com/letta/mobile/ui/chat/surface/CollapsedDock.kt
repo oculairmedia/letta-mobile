@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -70,6 +69,7 @@ import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.MascotSeat
@@ -125,8 +125,17 @@ internal data class CollapsedTurn(
     /** Something to put in the bubble; before this the mascot just thinks. */
     val hasReply: Boolean get() = text.isNotBlank() || working || needsInput
 
+    /**
+     * What a dismissal remembers. A conversation with no turn yet (a form waiting before any
+     * prompt) has no [turnKey]: it gets one of its own, so "nothing dismissed" (null) never
+     * reads as "this was dismissed".
+     */
+    val dismissKey: String get() = turnKey ?: NO_TURN_DISMISS_KEY
+
     companion object {
         val None = CollapsedTurn()
+
+        private const val NO_TURN_DISMISS_KEY = "collapsed-turn:none"
     }
 }
 
@@ -222,7 +231,7 @@ private fun CollapsedTurnColumn(
 ) {
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
-    val showReply = turn.hasReply && turn.turnKey != dismissedTurn
+    val showReply = turn.hasReply && turn.dismissKey != dismissedTurn
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         when {
             showReply -> ReplyBubble(
@@ -230,7 +239,7 @@ private fun CollapsedTurnColumn(
                 agentName = content.agentName,
                 actions = BubbleActions(
                     open = state::restore,
-                    dismiss = { dismissedTurn = turn.turnKey },
+                    dismiss = { dismissedTurn = turn.dismissKey },
                 ),
                 modifier = Modifier.dockDrag(state),
             )
@@ -452,10 +461,10 @@ private fun RestoreButton(state: ChatDockState, modifier: Modifier) {
             onClick = state::restore,
             modifier = Modifier.size(LettaDimens.Control.iconButtonLg).testTag(DOCK_RESTORE_TAG),
         ) {
-            Icon(
-                Lucide.ChevronUp,
+            DisclosureChevron(
+                expanded = false,
                 contentDescription = stringResource(Res.string.chat_surface_dock_restore),
-                modifier = Modifier.size(LettaDimens.Control.icon),
+                opensUpward = true,
             )
         }
     }

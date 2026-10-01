@@ -73,6 +73,13 @@ object TouchComposerDimens {
     val restingCorner: Dp = LettaDimens.Space.xxl
     val engagedCorner: Dp = LettaDimens.Space.xl
 
+    /**
+     * How far the bar's rounded top reaches above its straight sides: its larger corner. What is
+     * behind the bar (the page, or the canvas on the canvas page) runs on under this band, so the
+     * corners show it.
+     */
+    val cornerReach: Dp = maxOf(restingCorner, engagedCorner)
+
     /** A hair of tonal lift once engaged. */
     val engagedElevation: Dp = LettaDimens.Space.hair
     val restingElevation: Dp = 0.dp

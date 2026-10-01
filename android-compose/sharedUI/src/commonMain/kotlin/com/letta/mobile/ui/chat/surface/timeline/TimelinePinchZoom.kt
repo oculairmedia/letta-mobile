@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -31,10 +32,12 @@ import kotlin.math.roundToInt
  * letta-mobile-bglj6.1: pinch-to-zoom of the timeline's text scale, in common pointer input.
  *
  * Lifted from Android's ChatMessageListPinch + PinchScalePreviewController without the
- * Choreographer frame-budget sampler (Android-only telemetry). While pinching, [effectiveScale]
- * tracks the gesture and rows re-lay out at it; on release the snapped scale is reported once
- * through ChatActions.setFontScale and shown until the owner's committed scale moves (to it, or
- * anywhere else: a host change such as desktop's Ctrl+scroll then wins).
+ * Choreographer frame-budget sampler (Android-only telemetry). While pinching, rows stay laid out
+ * at [restingScale] and only the list's draw layer follows the gesture ([layerScale], read in a
+ * graphicsLayer block), so a pinch frame recomposes and re-lays out nothing. On release the
+ * snapped scale is reported once through ChatActions.setFontScale and rows re-lay out at it once;
+ * it shows until the owner's committed scale moves (to it, or anywhere else: a host change such
+ * as desktop's Ctrl+scroll then wins).
  */
 @Stable
 internal class TimelinePinchScale(
@@ -53,11 +56,19 @@ internal class TimelinePinchScale(
     /** The owner's committed scale when the gesture began; [pending] holds only until it moves. */
     private var committedAtBegin = 1f
 
-    /** The scale rows draw at: the live gesture, else a just-committed value, else [committed]. */
-    fun effectiveScale(committed: Float): Float = when {
-        isPinching -> (base * transient).coerceIn(minScale, maxScale)
-        else -> pending?.takeIf { sameScale(committed, committedAtBegin) } ?: committed
-    }
+    /** The scale rows lay out at: a just-committed value, else [committed]. Never the live gesture. */
+    fun restingScale(committed: Float): Float =
+        pending?.takeIf { sameScale(committed, committedAtBegin) } ?: committed
+
+    /** The scale the read-out shows: the live gesture, else [restingScale]. */
+    fun effectiveScale(committed: Float): Float =
+        if (isPinching) liveScale() else restingScale(committed)
+
+    /** The list layer's scale over the rows' layout: the live gesture over its base. Draw phase only. */
+    val layerScale: Float
+        get() = if (isPinching) liveScale() / base else 1f
+
+    private fun liveScale(): Float = (base * transient).coerceIn(minScale, maxScale)
 
     /** The owner's committed scale changed: whatever it now is supersedes a pending commit. */
     fun onCommittedChanged(committed: Float) {
@@ -78,9 +89,9 @@ internal class TimelinePinchScale(
 
     /** Ends the gesture; returns the snapped scale to commit. */
     fun finish(): Float {
-        val snapped = (((base * transient).coerceIn(minScale, maxScale) / step).roundToInt() * step)
-            .coerceIn(minScale, maxScale)
-        pending = snapped
+        val snapped = ((liveScale() / step).roundToInt() * step).coerceIn(minScale, maxScale)
+        // A pinch back to where it began leaves the rows as they are: nothing to hold.
+        pending = snapped.takeUnless { sameScale(it, committedAtBegin) }
         isPinching = false
         transient = 1f
         return snapped
@@ -151,9 +162,22 @@ internal fun rememberTimelinePinch(
     return pinch to modifier
 }
 
+/**
+ * Where the list's pinch layer scales from: the bottom edge, which the reversed list is anchored
+ * to. The commit re-lays out the rows from that same edge (the newest row, or the scrolled-to one,
+ * stays put and the rest grow or shrink above it), so the release lands where the preview was.
+ */
+internal val TimelinePinchOrigin: TransformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
+
+/** The read-out while pinching, in its own scope: the live scale recomposes only this. */
+@Composable
+internal fun PinchScaleReadout(pinch: TimelinePinchScale, committedScale: Float, modifier: Modifier = Modifier) {
+    if (pinch.isPinching) PinchScaleIndicator(pinch.effectiveScale(committedScale), modifier)
+}
+
 /** The live "112%" read-out while pinching (Android's pinch indicator). */
 @Composable
-internal fun PinchScaleIndicator(scale: Float, modifier: Modifier = Modifier) {
+private fun PinchScaleIndicator(scale: Float, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.testTag(ChatTimelineTags.FONT_SCALE),
         shape = MaterialTheme.shapes.small,

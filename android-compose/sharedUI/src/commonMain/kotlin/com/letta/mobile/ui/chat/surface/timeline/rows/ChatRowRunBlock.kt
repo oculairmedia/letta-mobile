@@ -2,6 +2,8 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -106,8 +108,8 @@ internal fun RunBlockRow(
     Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
         AnimatedVisibility(
             visible = activity.isActive || context.isNewest,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
+            enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
         ) {
             RunActivityHeader(
                 activity = activity,

@@ -43,7 +43,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 class SendFlightChatSurfaceTest {
     /** An owner that, like the real ones, appends the prompt (oldest first) and clears the draft on send. */
-    private class SendingPort : ChatSessionPort {
+    private class SendingPort(private val promptId: String = "u1", private val clientMessageId: String? = null) : ChatSessionPort {
         override val uiState = MutableStateFlow(
             ChatUiState(
                 conversationState = ConversationState.Ready("conv-1"),
@@ -61,7 +61,13 @@ class SendFlightChatSurfaceTest {
         override val actions: ChatActions = object : ChatActions by recorded {
             override fun send() {
                 recorded.send()
-                val prompt = UiMessage(id = "u1", role = "user", content = composer.value.text, timestamp = "2026-09-30T18:01:00Z")
+                val prompt = UiMessage(
+                    id = promptId,
+                    role = "user",
+                    content = composer.value.text,
+                    timestamp = "2026-09-30T18:01:00Z",
+                    clientMessageId = clientMessageId,
+                )
                 uiState.value = uiState.value.copy(messages = (uiState.value.messages + prompt).toPersistentList())
                 composer.value = composer.value.copy(text = "")
             }
@@ -105,6 +111,45 @@ class SendFlightChatSurfaceTest {
         // Landed, the ghost IS the bubble: the primaryContainer fill, not the old grey card.
         assertTrue(fillPixels(ghost, bubbleFill) > (ghost.width * ghost.height) / 2, "the ghost lands as the teal bubble")
 
+        mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.HANDOFF_MILLIS + FRAME_SLACK)
+        assertEquals(0, ghosts(), "the ghost hands off to the row")
+    }
+
+    @Test
+    fun theFlightKeepsItsRowWhenTheServerRenamesThePrompt() = runComposeUiTest {
+        // The optimistic prompt carries a local id; the server's ack swaps in its own, keeping the otid.
+        val port = SendingPort(promptId = "local-1", clientMessageId = "otid-1")
+        var bubbleFill = Color.Unspecified
+        mainClock.autoAdvance = false
+        setContent {
+            MaterialTheme {
+                bubbleFill = MaterialTheme.colorScheme.primaryContainer
+                ChatSurface(
+                    port = port,
+                    presentation = ChatSurfacePresentation.ChatFirst,
+                    onIntent = {},
+                    host = ChatSurfaceHost(),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        frames(SETTLE_FRAMES)
+        onNodeWithTag(ComposerTestTags.SEND).performClick()
+        frames(2)
+        port.uiState.value = port.uiState.value.copy(
+            messages = port.uiState.value.messages
+                .map { if (it.id == "local-1") it.copy(id = "u1", isPending = false) else it }
+                .toPersistentList(),
+        )
+        frames(2)
+        val newRow = hasTestTag(ChatRowTestTags.USER_PROMPT) and hasText(SENT, substring = true)
+        assertEquals(1, ghosts(), "still in flight")
+        assertEquals(0, fillPixels(bounds(newRow), bubbleFill), "the renamed row stays hidden under the flight")
+
+        mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.FLIGHT_MILLIS + FRAME_SLACK)
+        val row = bounds(newRow)
+        val ghost = bounds(hasTestTag(SendFlightTestTags.GHOST))
+        assertTrue(abs(row.top - ghost.top) <= PIXEL_TOLERANCE, "the ghost lands on the renamed row ($ghost vs $row)")
         mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.HANDOFF_MILLIS + FRAME_SLACK)
         assertEquals(0, ghosts(), "the ghost hands off to the row")
     }

@@ -273,8 +273,12 @@ internal class AdminChatViewModel @Inject constructor(
         backgroundRefreshScope = viewModelScope,
     )
     private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository)
+    // The route's agent is this screen's for its whole life. The shared chat page reads it from
+    // here to draw the agent's mascot (the Touch chat head, the composer companion) and to scope
+    // foreign-agent rows out of the timeline (c4igq.4); without it every mascot site fell back
+    // to its stand-in (letta-mobile-bglj6.1).
     private val _uiState: MutableStateFlow<ChatUiState> = MutableStateFlow(
-        ChatUiState(agentName = initialAgentName.orEmpty())
+        ChatUiState(agentName = initialAgentName.orEmpty(), agentId = agentId.value.takeIf { it.isNotBlank() })
     )
 
     private val _sessionState = MutableStateFlow(ChatSessionState())

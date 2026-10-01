@@ -141,7 +141,9 @@ internal fun UserPromptRow(
                     Surface(
                         modifier = Modifier
                             .widthIn(max = bubbleMaxWidth)
-                            .then(rememberSendFlightTarget(message.id, message.content))
+                            // By the otid, as the list keys the row: the server's ack swaps the
+                            // optimistic id mid-flight, and the row must keep its claim.
+                            .then(rememberSendFlightTarget(message.clientMessageId?.takeIf { it.isNotBlank() } ?: message.id, message.content))
                             .testTag(ChatRowTestTags.USER_PROMPT)
                             .clip(shape)
                             .combinedClickable(

@@ -63,11 +63,12 @@ internal fun formatDuration(durationMs: Long): String {
 @Composable
 internal fun formatRunDuration(durationMs: Long): String {
     if (durationMs < MILLIS_PER_SECOND) return stringResource(Res.string.rows_duration_ms_compact, durationMs)
-    if (durationMs < MILLIS_PER_SECOND * SECONDS_PER_MINUTE) {
-        val tenths = (durationMs + HALF_TENTH_MILLIS) / TENTH_MILLIS
+    // Branch on the rounded value: 59,950 ms rounds to a whole minute, "1m 0s", never "60.0s".
+    val tenths = (durationMs + HALF_TENTH_MILLIS) / TENTH_MILLIS
+    if (tenths < SECONDS_PER_MINUTE * TENTHS_PER_SECOND) {
         return stringResource(Res.string.rows_duration_tenths, tenths / TENTHS_PER_SECOND, tenths % TENTHS_PER_SECOND)
     }
-    val seconds = durationMs / MILLIS_PER_SECOND
+    val seconds = (durationMs + MILLIS_PER_SECOND / 2) / MILLIS_PER_SECOND
     return stringResource(Res.string.rows_duration_minutes, seconds / SECONDS_PER_MINUTE, seconds % SECONDS_PER_MINUTE)
 }
 

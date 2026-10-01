@@ -64,7 +64,7 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
  * letta-mobile-bglj6.1: the conversation's own board under the shared chat page. Its share and
  * back act on that page (attach to the draft, expand the chat), not on navigation.
  */
-private val AppChatCanvasSlot = ChatCanvasSlot { target, actions ->
+private val AppChatCanvasSlot = ChatCanvasSlot { target, actions, chromeTopInset ->
     // No board for a chat without a conversation yet; once the first send creates one, the
     // board is that conversation's own, in a ViewModel keyed by it (CanvasViewModel binds once).
     val canvasKey = com.letta.mobile.ui.chat.surface.chatCanvasKey(target.conversationId)
@@ -81,6 +81,8 @@ private val AppChatCanvasSlot = ChatCanvasSlot { target, actions ->
                 onShareToChat = actions::shareToChat,
                 viewModel = hiltViewModel(key = canvasKey),
                 showTitle = false,
+                // Under the chat's floating header: the pill rests below it, the board runs behind it.
+                chromeTopInset = chromeTopInset,
             )
         }
     }
