@@ -120,6 +120,7 @@ private fun PagedTimelineBody(
         RecordReadingPosition(presentation, listState, rows)
     }
     val pinned by rememberPinnedPrompt(listState, rows.size, rows::itemAt)
+    val glide = rememberNewestEdgeGlide(listState)
     val today = rememberCurrentDate()
     // The newest row is the live overlay's head, not necessarily the owner state's last message.
     val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
@@ -139,9 +140,12 @@ private fun PagedTimelineBody(
                     scope.launch {
                         // Anchored on a search target, index 0 is the newest row of THAT window.
                         if (anchoredTarget != null) presentation.navigate(null)
-                        listState.scrollToItem(0)
+                        glide.toNewest()
+                        // The glide's own scroll stopped the follow; it ends on the newest edge.
+                        following = true
                     }
                 },
+                glide = glide,
                 bottomReserve = params.bottomReserve,
                 topReserve = params.topReserve,
             ),

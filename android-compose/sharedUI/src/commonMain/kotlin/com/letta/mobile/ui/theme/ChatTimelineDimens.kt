@@ -47,6 +47,17 @@ object ChatTimelineDimens {
         const val goalCard: Float = 0.94f
     }
 
+    /** The scroll-to-latest glide's springback peaks at most this far past the newest edge. */
+    val scrollToLatestMaxOvershoot: Dp = LettaDimens.Space.md
+
+    /**
+     * The Touch scroll-to-latest button (designsystem ScrollToBottomFab): its inset from the
+     * list's bottom-end corner (feature-chat LettaSpacing.INNER_PADDING) and its lift.
+     */
+    val scrollToLatestTouchInset: Dp = LettaDimens.Space.lg
+    val scrollToLatestTouchElevation: Dp = LettaDimens.Space.xs
+    val scrollToLatestTouchPressedElevation: Dp = LettaDimens.Space.sm
+
     /** Fade-edge cross-fade, matching desktop's list. */
     const val fadeAnimationMillis: Int = 250
 
