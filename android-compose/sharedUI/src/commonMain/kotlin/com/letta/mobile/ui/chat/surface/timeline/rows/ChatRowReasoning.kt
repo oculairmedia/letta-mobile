@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -102,7 +104,11 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             // Docked over the canvas the panel's ambient glow is the thinking cue, not the spinner.
-            AnimatedVisibility(visible = isActive && LocalChatWorkingCueAnimated.current, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+            AnimatedVisibility(
+                visible = isActive && LocalChatWorkingCueAnimated.current,
+                enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandHorizontally(),
+                exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkHorizontally(),
+            ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(LettaDimens.Control.icon),
                     color = MaterialTheme.colorScheme.primary,
@@ -130,7 +136,11 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
             )
             DisclosureChevron(expanded = !collapsed, enabled = canToggle)
         }
-        AnimatedVisibility(visible = !collapsed, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+        AnimatedVisibility(
+            visible = !collapsed,
+            enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+        ) {
             Column(modifier = Modifier.padding(top = LettaDimens.Space.lg, bottom = LettaDimens.Space.xs)) {
                 ReasoningBody(message, isActive)
             }

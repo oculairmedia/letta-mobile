@@ -4,7 +4,15 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -310,6 +318,45 @@ class ChatRowInteractionUiTest {
     }
 
     @Test
+    fun anOpenedToolDisclosureSurvivesScrollingAway() = runComposeUiTest {
+        val msg = message("m-1", "assistant", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello")))
+        lateinit var focus: FocusManager
+        setContent {
+            focus = LocalFocusManager.current
+            MaterialTheme {
+                LazyColumn(Modifier.height(SCROLL_VIEWPORT).testTag(SCROLL_LIST_TAG)) {
+                    item(key = "run") { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Inline)) }
+                    items(FILLER_ROWS) { Box(Modifier.height(SCROLL_VIEWPORT)) }
+                }
+            }
+        }
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertExists()
+        // A focused row stays pinned in the list: let go of it first.
+        runOnIdle { focus.clearFocus() }
+        // Far enough that the row leaves composition, then back.
+        onNodeWithTag(SCROLL_LIST_TAG).performScrollToIndex(FILLER_ROWS)
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
+        onNodeWithTag(SCROLL_LIST_TAG).performScrollToIndex(0)
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertExists()
+    }
+
+    @Test
+    fun aRunDurationJustShortOfAMinuteRoundsToAMinute() = runComposeUiTest {
+        var almost = ""
+        var minute = ""
+        var under = ""
+        setContent {
+            almost = formatRunDuration(59_950L)
+            minute = formatRunDuration(60_000L)
+            under = formatRunDuration(59_940L)
+        }
+        waitForIdle()
+        assertEquals(minute, almost, "59,950 ms reads as a minute, not \"60.0s\"")
+        assertTrue(under.startsWith("59.9"), under)
+    }
+
+    @Test
     fun toolSummaryOpensASheetOnATouchHost() = runComposeUiTest {
         val msg = message("m-1", "assistant", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello")))
         setContent { MaterialTheme { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Sheet)) } }
@@ -327,6 +374,12 @@ class ChatRowInteractionUiTest {
         assertEquals("2:30 PM", messageClockLabel("2026-07-19T16:30:00+02:00", TimeZone.UTC))
         assertEquals(null, messageClockLabel("", TimeZone.UTC))
         assertEquals(null, messageClockLabel("not a time", TimeZone.UTC))
+    }
+
+    private companion object {
+        val SCROLL_VIEWPORT = 400.dp
+        const val FILLER_ROWS = 30
+        const val SCROLL_LIST_TAG = "scroll-list"
     }
 
     private fun toolCall(status: String, result: String?) = UiToolCall(
