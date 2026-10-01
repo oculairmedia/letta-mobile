@@ -525,6 +525,7 @@ private fun UiMessage.runPanelEchoKey(): String? {
     if (!toolCalls.isNullOrEmpty()) return null
     if (generatedUi != null || approvalRequest != null || approvalResponse != null) return null
     if (attachments.isNotEmpty()) return null
+    if (artifacts.isNotEmpty()) return null
     EchoCompactionInstrumentation.recordNormalization()
     val normalized = content.normalizeRunPanelEchoText()
     return normalized.takeIf { it.length >= MinRunPanelEchoLength }

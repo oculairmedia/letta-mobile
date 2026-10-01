@@ -257,10 +257,14 @@ private fun UiMessage.isPlainAssistantStep(): Boolean =
     role == "assistant" && !isReasoning && !isError && generatedUi == null &&
         approvalResponse == null && attachments.isEmpty() && !toolCalls.isNullOrEmpty()
 
-/** A tool-call-only assistant message: folds entirely into the run's tool summary. */
-internal fun UiMessage.isRunToolCallMessage(): Boolean = isPlainAssistantStep() && content.isBlank()
+/**
+ * A tool-call-only assistant message: folds entirely into the run's tool summary. One carrying a
+ * canvas card (letta-mobile-bglj6.13: a compose call with no narration of its own) folds only its
+ * calls; the card stays a step.
+ */
+internal fun UiMessage.isRunToolCallMessage(): Boolean = isPlainAssistantStep() && content.isBlank() && artifacts.isEmpty()
 
-private fun UiMessage.hasProseAndToolCalls(): Boolean = isPlainAssistantStep() && content.isNotBlank()
+private fun UiMessage.hasProseAndToolCalls(): Boolean = isPlainAssistantStep() && (content.isNotBlank() || artifacts.isNotEmpty())
 
 /** A collapsed run previews its newest step that is not reasoning. */
 private fun collapsedPreview(messages: List<UiMessage>): UiMessage =

@@ -83,6 +83,8 @@ private val AppChatCanvasSlot = ChatCanvasSlot { target, actions, chromeTopInset
                 showTitle = false,
                 // Under the chat's floating header: the pill rests below it, the board runs behind it.
                 chromeTopInset = chromeTopInset,
+                // A chat card's "Show on canvas" frames its artifact on this board (bglj6.13).
+                cameraRequest = actions.camera,
             )
         }
     }

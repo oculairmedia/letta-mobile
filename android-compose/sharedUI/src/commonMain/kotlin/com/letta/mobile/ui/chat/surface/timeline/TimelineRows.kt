@@ -85,7 +85,8 @@ private fun ChatRenderItem.isToolOnlySingle(): Boolean {
         message.generatedUi == null &&
         message.approvalRequest == null &&
         message.approvalResponse == null &&
-        message.attachments.isEmpty()
+        message.attachments.isEmpty() &&
+        message.artifacts.isEmpty()
 }
 
 /**

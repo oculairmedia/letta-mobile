@@ -149,8 +149,14 @@ class CanonicalTimelinePresentation private constructor(
         updateEchoedOtids(publications, pending)
         val optimistic = pending.filterNot { it.otid in echoedOtids || it.otid in residentState.otids }
             .map { it.toRenderItem(owner.selection.scope.agentId) }
+        // letta-mobile-bglj6.13: compose receipts land on the narrating message of the overlay.
+        val receipts = com.letta.mobile.data.chat.projection.CanvasArtifactReceipts.attach(events)
         val activeMessages = events.mapNotNull { event ->
-            timelineEventToUiMessage(event, owner.selection.scope.agentId)
+            timelineEventToUiMessage(
+                event,
+                owner.selection.scope.agentId,
+                receipts[com.letta.mobile.data.chat.projection.CanvasArtifactReceipts.eventKey(event)].orEmpty(),
+            )
         }
         val active = buildChatRenderModel(
             messages = activeMessages,

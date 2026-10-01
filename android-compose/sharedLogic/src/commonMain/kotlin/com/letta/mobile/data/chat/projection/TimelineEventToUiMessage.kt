@@ -100,7 +100,12 @@ fun scrubUserEnvelope(content: String): String {
  *   tooling) should observe the timeline directly without going through this
  *   projection.
  */
-fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiMessage? {
+fun timelineEventToUiMessage(
+    ev: TimelineEvent,
+    ownAgentId: String? = null,
+    /** letta-mobile-bglj6.13: this event's compose receipts, from [CanvasArtifactReceipts.attach]. */
+    artifacts: List<CanvasArtifactReceipt> = emptyList(),
+): UiMessage? {
     return when (ev) {
         is TimelineEvent.Local -> {
             // letta-mobile-5s1n: Locals can now represent in-flight assistant
@@ -233,6 +238,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                 } else {
                     null
                 },
+                artifacts = artifacts,
             )
         }
         is TimelineEvent.Confirmed -> {
@@ -382,6 +388,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                 } else {
                     null
                 },
+                artifacts = artifacts,
             )
         }
     }

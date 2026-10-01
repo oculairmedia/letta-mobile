@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.session
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -131,6 +132,14 @@ data class ChatSurfaceCapabilities(
 @Immutable
 data class ChatSurfaceHost(
     val openCanvas: (() -> Unit)? = null,
+    /**
+     * letta-mobile-bglj6.13: "Show on canvas" on a canvas.compose card: open the conversation's
+     * board and frame [CanvasArtifactReceipt.bounds]. A page that draws the canvas itself binds
+     * this to its own board (ChatSurface does, through ChatCanvasActions); a host that only has a
+     * canvas route passes null and the card falls back to [openCanvas], without framing. An
+     * explicit action only: composing never switches to the canvas on its own.
+     */
+    val showOnCanvas: ((CanvasArtifactReceipt) -> Unit)? = null,
     val openAgent: ((agentId: String) -> Unit)? = null,
     /**
      * Display name for an agent id (inter-agent provenance labels). Null, or a null result,

@@ -128,6 +128,11 @@ fun CanvasWorkspace(
      * chat header over the status bar). The board draws under it; its own chrome keeps below it.
      */
     chromeTopInset: Dp = 0.dp,
+    /**
+     * Where something outside the board asks the camera to go (the chat's "Show on canvas",
+     * letta-mobile-bglj6.13); null when nothing outside steers it.
+     */
+    cameraRequest: CanvasCameraRequest? = null,
 ) {
     val state by controller.state.collectAsState()
     // What the board's chrome keeps clear of: the system bars and the keyboard, and the host's chrome.
@@ -557,6 +562,24 @@ fun CanvasWorkspace(
             // And in the select tool, where a drag moves around the board rather than drawing.
             controller.setMode(io.ak1.drawbox.domain.model.Mode.SELECT)
         }
+    }
+
+    // A region asked for from outside (the chat's "Show on canvas"): framed once the board is
+    // loaded and measured, never zoomed in past 100%, after the open-time fit so it wins. A jump,
+    // not an animation, so reduced motion has nothing to honour here.
+    val cameraTarget = cameraRequest?.target
+    LaunchedEffect(cameraTarget, initialLoadDone, boardSize) {
+        val target = cameraTarget ?: return@LaunchedEffect
+        if (!initialLoadDone || boardSize.width <= 0 || boardSize.height <= 0) return@LaunchedEffect
+        val boardId = session?.canvasId?.value
+        if (target.canvasId == null || boardId == null || target.canvasId == boardId) {
+            CanvasViewportFit.fitOrNull(target.bounds, boardSize, maxScale = 1f)?.let { fit ->
+                controller.resetCamera()
+                controller.zoomBy(fit.scale, Offset.Zero)
+                controller.panBy(fit.offset)
+            }
+        }
+        cameraRequest?.consume(target)
     }
 
     // The keyboard covers the bottom of a phone's board. While it is up, the camera (never the
