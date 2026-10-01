@@ -57,11 +57,17 @@ import kotlinx.coroutines.flow.filter
 /** Which layer of the page an anchor belongs to. */
 internal enum class CompanionLayer { Docked, Page }
 
+/**
+ * Identifies one place that reports a companion spot. It is compared by identity only: two anchors
+ * of the same layer (the composer leaving while the next one arrives) never clear each other.
+ */
+internal class CompanionAnchorOwner
+
 /** Where the companion may stand in each layer, in window coordinates. */
 @Stable
 internal class CompanionSeatAnchors {
     /** One reporter's spot; [owner] tells two reporters of the same layer apart. */
-    internal data class Anchor(val owner: Any, val rect: Rect)
+    internal data class Anchor(val owner: CompanionAnchorOwner, val rect: Rect)
 
     var docked: Anchor? by mutableStateOf(null)
         private set
@@ -78,7 +84,7 @@ internal class CompanionSeatAnchors {
     var anchored: Boolean by mutableStateOf(false)
         private set
 
-    fun report(layer: CompanionLayer, owner: Any, rect: Rect) {
+    fun report(layer: CompanionLayer, owner: CompanionAnchorOwner, rect: Rect) {
         val next = Anchor(owner, rect)
         when (layer) {
             CompanionLayer.Docked -> if (docked != next) docked = next
@@ -87,7 +93,7 @@ internal class CompanionSeatAnchors {
         if (!anchored) anchored = true
     }
 
-    fun clear(layer: CompanionLayer, owner: Any) {
+    fun clear(layer: CompanionLayer, owner: CompanionAnchorOwner) {
         when (layer) {
             CompanionLayer.Docked -> if (docked?.owner === owner) docked = null
             CompanionLayer.Page -> if (page?.owner === owner) page = null
@@ -113,7 +119,7 @@ internal fun CompanionSeatAnchor(
     size: Dp = ChatMascotDimens.composerCompanion,
 ) {
     val layer = LocalCompanionLayer.current
-    val owner = remember { Any() }
+    val owner = remember { CompanionAnchorOwner() }
     DisposableEffect(anchors, layer, owner) {
         onDispose { anchors.clear(layer, owner) }
     }
@@ -229,7 +235,7 @@ private class DockedGlide {
 
     /** Bumped for every change of hands; the effect starts a glide for each. */
     var handoffs: Int by mutableIntStateOf(0)
-    private var owner: Any? = null
+    private var owner: CompanionAnchorOwner? = null
 
     fun shown(anchor: CompanionSeatAnchors.Anchor, last: Rect?, animate: Boolean): Rect {
         val previous = owner
