@@ -3,8 +3,6 @@ package com.letta.mobile.ui.chat.surface.ambient
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
@@ -17,10 +15,9 @@ import com.letta.mobile.util.Telemetry
  * AmbientShaderAgentBackground compiles it (AGSL expects an unpremultiplied result). Runtime
  * shaders arrived in Android 13; below that this is null and the shared gradient fallback draws.
  */
-@Composable
-internal actual fun rememberAmbientGlowShader(): AmbientGlowShader? =
+internal actual fun createAmbientGlowShader(): AmbientGlowShader? =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        remember { AgslAmbientGlowShader.compile() }
+        AgslAmbientGlowShader.compile()
     } else {
         null
     }

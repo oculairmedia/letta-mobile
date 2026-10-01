@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -174,7 +176,8 @@ internal fun ThinkingRow(messages: List<UiMessage>, modifier: Modifier = Modifie
     val elapsed by rememberElapsedSeconds(active = true, startedAtEpochMs = activity.startedAtEpochMs)
     val phase = activity.runningToolName?.let { stringResource(Res.string.timeline_running_tool, it) }
         ?: stringResource(Res.string.timeline_thinking)
-    val brush = rememberThinkingBrush()
+    val sweep = rememberThinkingSweep()
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier = modifier
             .widthIn(max = ChatColumnMaxWidth)
@@ -186,8 +189,12 @@ internal fun ThinkingRow(messages: List<UiMessage>, modifier: Modifier = Modifie
     ) {
         Text(
             text = stringResource(Res.string.timeline_thinking_elapsed, formatElapsedClock(elapsed), phase),
-            style = MaterialTheme.typography.bodyMedium.copy(brush = brush),
-            modifier = Modifier.defaultMinSize(minHeight = ChatRowSpacing.thinkingTextMinHeight),
+            style = MaterialTheme.typography.bodyMedium,
+            // Drawn solid, then swept by the gradient in the draw phase (thinkingSweep).
+            color = scheme.onSurface,
+            modifier = Modifier
+                .defaultMinSize(minHeight = ChatRowSpacing.thinkingTextMinHeight)
+                .thinkingSweep(scheme, sweep),
         )
     }
 }
@@ -208,42 +215,54 @@ private fun activeRunActivity(messages: List<UiMessage>): ActiveRunActivity {
 
 private const val RUNNING_STATUS = "running"
 
-/** The thinking token's sweep: a bright band crossing the text, still under reduced motion. */
+/**
+ * The thinking token's sweep phase, 0..1, read only where it is drawn: the row never recomposes
+ * for it. Still (0) under reduced motion.
+ */
 @Composable
-private fun rememberThinkingBrush(): Brush {
-    val scheme = MaterialTheme.colorScheme
-    val phase = if (LocalReducedMotion.current) {
-        0f
-    } else {
-        val transition = rememberInfiniteTransition(label = "thinkingSweep")
-        val animated by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(THINKING_SWEEP_MILLIS, easing = LinearEasing), RepeatMode.Restart),
-            label = "thinkingSweepPhase",
-        )
-        animated
-    }
-    return remember(phase, scheme) {
-        val tail = scheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.thinkingTail)
-        val startX = -THINKING_SWEEP_BAND_PX + phase * THINKING_SWEEP_TRAVEL_PX
-        Brush.linearGradient(
-            colorStops = arrayOf(
-                0f to tail,
-                THINKING_STOP_INNER to scheme.primary,
-                THINKING_STOP_MID to scheme.tertiary,
-                THINKING_STOP_OUTER to scheme.primary,
-                1f to tail,
-            ),
-            start = Offset(startX, 0f),
-            end = Offset(startX + THINKING_SWEEP_BAND_PX, 0f),
-        )
-    }
+private fun rememberThinkingSweep(): () -> Float {
+    if (LocalReducedMotion.current) return { 0f }
+    val transition = rememberInfiniteTransition(label = "thinkingSweep")
+    val phase = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(THINKING_SWEEP_MILLIS, easing = LinearEasing), RepeatMode.Restart),
+        label = "thinkingSweepPhase",
+    )
+    return { phase.value }
 }
 
+/**
+ * Sweeps the drawn text with a bright band crossing it (the Android thinking token's gradient):
+ * the glyphs are drawn, then the gradient is kept only where they are (SrcIn in an offscreen
+ * layer). The band is sized in dp, so it crosses the same share of text at every density.
+ */
+private fun Modifier.thinkingSweep(scheme: ColorScheme, phase: () -> Float): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithCache {
+        val band = ChatTimelineDimens.thinkingSweepBand.toPx()
+        val tail = scheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.thinkingTail)
+        val stops = arrayOf(
+            0f to tail,
+            THINKING_STOP_INNER to scheme.primary,
+            THINKING_STOP_MID to scheme.tertiary,
+            THINKING_STOP_OUTER to scheme.primary,
+            1f to tail,
+        )
+        onDrawWithContent {
+            drawContent()
+            val startX = -band + phase() * band * THINKING_SWEEP_TRAVEL_BANDS
+            drawRect(
+                brush = Brush.linearGradient(colorStops = stops, start = Offset(startX, 0f), end = Offset(startX + band, 0f)),
+                blendMode = BlendMode.SrcIn,
+            )
+        }
+    }
+
 private const val THINKING_SWEEP_MILLIS = 2_400
-private const val THINKING_SWEEP_BAND_PX = 800f
-private const val THINKING_SWEEP_TRAVEL_PX = 2_400f
+
+/** How many band widths the band travels per sweep, from just off the start. */
+private const val THINKING_SWEEP_TRAVEL_BANDS = 3f
 private const val THINKING_STOP_INNER = 0.35f
 private const val THINKING_STOP_MID = 0.5f
 private const val THINKING_STOP_OUTER = 0.65f

@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -391,7 +392,8 @@ private fun HeadPopup(
     }
     val announcement = listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working.takeIf { turn.working }).joinToString(" ")
     val lane = placement.lane
-    val tailAtTop = placement.tailAtTop()
+    // The head's place moves every frame of a drag; the popup recomposes only when it changes half.
+    val tailAtTop by remember(placement) { derivedStateOf { placement.tailAtTop() } }
     val shape = remember(placement.headOnRight, tailAtTop) {
         SpeechBubbleShape(
             radius = LettaDimens.Radius.lg,

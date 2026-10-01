@@ -35,14 +35,17 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowAnimatedKey
 import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowPlacement
+import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.CHAT_AMBIENT_GLOW_TAG
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
+import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -187,6 +190,29 @@ class ChatPanelAmbientGlowTest {
             }
         }
         assertTrue(tinted, "the still glow still shows its tint")
+    }
+
+    @Test
+    fun the_page_compiles_its_glow_shader_once_across_runs() = runComposeUiTest {
+        val shaders = AmbientGlowShaders()
+        var ambient by mutableStateOf(ChatAmbient(AmbientMotionStatus.Running))
+        setContent {
+            StillTheme {
+                CompositionLocalProvider(LocalAmbientGlowShaders provides shaders) {
+                    ChatPanelAmbientGlow(ambient, AmbientGlowPlacement.Halo, Modifier.size(GLOW_SIZE))
+                }
+            }
+        }
+        waitForIdle()
+        val compiled = shaders.get()
+        assertTrue(compiled != null, "the shader compiles on the desktop test renderer")
+        // The run ends (the glow leaves composition) and the next one starts: the same shader.
+        ambient = ChatAmbient.Idle
+        waitForIdle()
+        ambient = ChatAmbient(AmbientMotionStatus.Running)
+        waitForIdle()
+        assertSame(compiled, shaders.get())
+        shaders.release()
     }
 
     @Test
