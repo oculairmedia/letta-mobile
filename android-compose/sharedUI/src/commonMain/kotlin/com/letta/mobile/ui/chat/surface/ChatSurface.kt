@@ -29,7 +29,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
+import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
+import com.letta.mobile.ui.chat.surface.ambient.rememberAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.chat.surface.composer.CompanionLayer
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchors
@@ -147,12 +149,15 @@ fun ChatSurface(
     // The page's one composer-companion seat; the composers only say where it should stand.
     val companionAnchors = remember { CompanionSeatAnchors() }
     val focusHandoff = remember { ComposerFocusHandoff() }
+    // The thinking glow's shader, compiled once for the page rather than at every run's start.
+    val glowShaders = rememberAmbientGlowShaders()
     // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
     CompositionLocalProvider(
         LocalComposerImageAttacher provides imageAttacher,
         LocalCompanionSeatAnchors provides companionAnchors,
         LocalComposerFocusHandoff provides focusHandoff,
         LocalChatPlatformStyle provides appearance.platformStyle,
+        LocalAmbientGlowShaders provides glowShaders,
     ) {
         SendFlightLayer(rememberSendFlightState(), modifier) {
             if (appearance.platformStyle == ChatPlatformStyle.Touch) {

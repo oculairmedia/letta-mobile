@@ -1,8 +1,5 @@
 package com.letta.mobile.ui.chat.surface.ambient
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -22,15 +19,10 @@ import org.jetbrains.skia.Surface as SkiaSurface
 
 /**
  * Desktop: the shared ambient source compiled as SkSL, exactly as DesktopAmbientChatBackground
- * compiles it (Skia expects a premultiplied result, hence that main). Compiled once per glow;
- * the builder and paint are reused across frames and released with the composition.
+ * compiles it (Skia expects a premultiplied result, hence that main). Compiled once per page
+ * (AmbientGlowShaders); the builder and paint are reused across frames and released with it.
  */
-@Composable
-internal actual fun rememberAmbientGlowShader(): AmbientGlowShader? {
-    val shader = remember { SkiaAmbientGlowShader.compile() }
-    DisposableEffect(shader) { onDispose { shader?.close() } }
-    return shader
-}
+internal actual fun createAmbientGlowShader(): AmbientGlowShader? = SkiaAmbientGlowShader.compile()
 
 private class SkiaAmbientGlowShader(private val builder: RuntimeShaderBuilder) : AmbientGlowShader {
     private val paint = SkiaPaint()
@@ -96,7 +88,11 @@ private class SkiaAmbientGlowShader(private val builder: RuntimeShaderBuilder) :
         still = null
     }
 
-    fun close() {
+    private var released = false
+
+    override fun release() {
+        if (released) return
+        released = true
         releaseStill()
         paint.shader = null
         paint.close()

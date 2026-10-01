@@ -17,6 +17,9 @@ object ChatTimelineDimens {
     /** Bottom fade ramp into the composer. */
     val bottomFadeLength: Dp = 44.dp
 
+    /** The thinking token's bright band, as wide as a phone line of it; it crosses three widths per sweep. */
+    val thinkingSweepBand: Dp = 320.dp
+
     /** Height a not-yet-loaded paged row reserves, so the list does not collapse while it loads. */
     val placeholderRowHeight: Dp = 48.dp
 
