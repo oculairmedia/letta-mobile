@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTestApi::class, ExperimentalEncodingApi::class)
+@file:OptIn(ExperimentalTestApi::class)
 
 package com.letta.mobile.ui.chat.surface
 
@@ -23,8 +23,9 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.ComposerImageSource
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
+import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -37,9 +38,10 @@ import kotlinx.coroutines.Job
  * page while it is encoding. The page, not one composer panel, owns the encode.
  */
 class ComposerImageAttachUiTest {
-    private val png = Base64.Default.decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADUlEQVR42mNk+M9QDwADjgGAv7SktwAAAABJRU5ErkJggg==",
-    )
+    /** A small opaque PNG the JVM's ImageIO decodes. */
+    private val png: ByteArray = ByteArrayOutputStream().also { out ->
+        ImageIO.write(BufferedImage(8, 4, BufferedImage.TYPE_INT_RGB), "png", out)
+    }.toByteArray()
 
     private val ready = ChatUiState(conversationState = ConversationState.Ready("conv-1"), isLoadingMessages = false)
 
@@ -76,8 +78,9 @@ class ComposerImageAttachUiTest {
         }
         val reading = CompletableDeferred<Unit>()
         var job: Job? = null
+        var started = false
         runOnIdle {
-            job = assertNotNull(attacher).attach(listOf<ComposerImageSource>({ reading.await(); png }))
+            job = assertNotNull(attacher).attach(listOf<ComposerImageSource>({ started = true; reading.await(); png }))
         }
         assertNotNull(job)
 
@@ -89,7 +92,13 @@ class ComposerImageAttachUiTest {
         assertFalse(job!!.isCancelled)
 
         reading.complete(Unit)
-        waitUntil(timeoutMillis = 10_000) { port.recording.count("attachImage") == 1 }
+        val attached = runCatching {
+            waitUntil(timeoutMillis = 10_000) { port.recording.count("attachImage") == 1 }
+        }
+        assertTrue(
+            attached.isSuccess,
+            "no image attached: calls=${port.recording.calls} started=$started job=${job}",
+        )
         assertFalse(job!!.isCancelled)
     }
 
