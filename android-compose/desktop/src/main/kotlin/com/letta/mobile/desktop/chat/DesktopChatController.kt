@@ -59,7 +59,8 @@ import kotlin.time.Duration.Companion.milliseconds
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
-    private val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
+    /** Read by the shared page's port, so its picker encodes to the limits this controller enforces. */
+    internal val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     private val gatewayFactory: suspend () -> DesktopChatGateway = {
         createDefaultDesktopChatGateway(bootstrapState.config)
     },

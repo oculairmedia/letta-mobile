@@ -62,6 +62,7 @@ internal fun ChatComposerPanel(
         ComposerImagePickerTarget(
             maxAttachments = composer.maxAttachments,
             pendingCount = composer.attachments.size,
+            limits = composer.attachmentLimits,
             onPicked = actions::attachImage,
             onError = actions::reportComposerError,
         ),

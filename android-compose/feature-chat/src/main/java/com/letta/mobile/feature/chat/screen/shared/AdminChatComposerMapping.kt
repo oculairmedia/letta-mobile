@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.context.ContextWindowUsage
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.Agent
@@ -30,6 +31,7 @@ internal object AdminChatComposerMapping {
         val canSend: Boolean,
         val canQueueWhileStreaming: Boolean,
         val maxAttachments: Int,
+        val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
         val model: ChatModelUiState?,
         val contextWindow: ContextWindowUiState,
     )
@@ -49,6 +51,7 @@ internal object AdminChatComposerMapping {
         canSend = inputs.canSend,
         canQueueWhileStreaming = inputs.canQueueWhileStreaming,
         maxAttachments = inputs.maxAttachments,
+        attachmentLimits = inputs.attachmentLimits,
         commands = inputs.composer.slashCommands.map(ChatComposerCommand::fromSlashCommand).toImmutableList(),
         model = inputs.model,
         contextUsage = contextUsage(inputs.contextWindow),

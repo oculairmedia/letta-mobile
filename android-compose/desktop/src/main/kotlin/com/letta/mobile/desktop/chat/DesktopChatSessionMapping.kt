@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
@@ -124,7 +125,7 @@ internal data class DesktopChatComposerInputs(
     val modelOptions: List<Pair<String, String>>,
     val workingDirectory: DesktopWorkingDirectoryInputs,
     val canQueueWhileStreaming: Boolean,
-    val maxAttachments: Int,
+    val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
 )
 
 internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): ChatComposerUiState {
@@ -136,7 +137,8 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
         canSend = surface.canSend,
         canQueueWhileStreaming = inputs.canQueueWhileStreaming,
         placeholder = inputs.host.placeholder,
-        maxAttachments = inputs.maxAttachments,
+        maxAttachments = inputs.attachmentLimits.maxAttachmentCount,
+        attachmentLimits = inputs.attachmentLimits,
         commands = inputs.host.commands.map(ComposerCommand::toChatComposerCommand).toImmutableList(),
         mentionables = inputs.host.mentionables.toImmutableList(),
         model = desktopChatModelUiState(surface.composerModelLabel, inputs.modelOptions),

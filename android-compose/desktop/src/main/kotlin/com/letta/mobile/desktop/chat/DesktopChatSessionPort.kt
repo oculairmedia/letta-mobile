@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedSendId
@@ -38,8 +37,6 @@ internal data class DesktopChatSessionBindings(
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Persists a pinch/zoom font scale through the desktop font-scale host. */
     val onSetFontScale: (Float) -> Unit = {},
-
-    val maxAttachments: Int = AttachmentLimits.Default.maxAttachmentCount,
 )
 
 /**
@@ -152,7 +149,7 @@ internal class DesktopChatSessionPort(
             loading = controller.workingDirectoryLoading.value,
         ),
         canQueueWhileStreaming = controller.canonicalPresentation.value != null,
-        maxAttachments = bindings.maxAttachments,
+        attachmentLimits = controller.attachmentLimits,
     )
 
     private fun composerInputs(): Flow<DesktopChatComposerInputs> = combine(
@@ -168,7 +165,7 @@ internal class DesktopChatSessionPort(
             modelOptions = buildModelOptions(models),
             workingDirectory = workingDirectory,
             canQueueWhileStreaming = canonical != null,
-            maxAttachments = bindings.maxAttachments,
+            attachmentLimits = controller.attachmentLimits,
         )
     }
 

@@ -79,6 +79,7 @@ internal class AdminChatSessionPort(
                 canSend = viewModel.canSendMessages,
                 canQueueWhileStreaming = viewModel.canQueueWhileStreaming,
                 maxAttachments = viewModel.attachmentLimits.maxAttachmentCount,
+                attachmentLimits = viewModel.attachmentLimits,
                 model = model,
                 contextWindow = ui.contextWindow,
             ),

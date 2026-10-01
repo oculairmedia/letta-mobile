@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.session
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.MessageContentPart
@@ -30,7 +31,9 @@ data class ChatComposerUiState(
     val canQueueWhileStreaming: Boolean = false,
     /** Overrides the default placeholder; null uses the shared resource string. */
     val placeholder: String? = null,
-    val maxAttachments: Int = 4,
+    val maxAttachments: Int = AttachmentLimits.Default.maxAttachmentCount,
+    /** The owner's image limits: picked images are scaled and encoded to these. */
+    val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val commands: ImmutableList<ChatComposerCommand> = persistentListOf(),
     val mentionables: ImmutableList<Mentionable> = persistentListOf(),
     val model: ChatModelUiState? = null,

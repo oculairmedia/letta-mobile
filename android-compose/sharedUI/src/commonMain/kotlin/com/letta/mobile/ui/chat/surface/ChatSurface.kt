@@ -12,6 +12,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -32,6 +33,8 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
+import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
+import com.letta.mobile.ui.chat.surface.composer.rememberComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.sendflight.SendFlightLayer
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightActions
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightState
@@ -116,16 +119,21 @@ fun ChatSurface(
         platform = stablePlatform,
         pagedTimeline = pagedTimeline,
     )
+    // Picked images encode in the page's scope: a mode switch composes a different composer
+    // panel, and the encode must outlive the one that started it.
+    val imageAttacher = rememberComposerImageAttacher()
     // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
-    SendFlightLayer(rememberSendFlightState(), modifier) {
-        if (canvas == null) {
-            if (presentation.mode == ChatSurfaceMode.FullScreen) {
-                FullScreenPage(frame, Modifier.fillMaxSize(), opaque = false)
+    CompositionLocalProvider(LocalComposerImageAttacher provides imageAttacher) {
+        SendFlightLayer(rememberSendFlightState(), modifier) {
+            if (canvas == null) {
+                if (presentation.mode == ChatSurfaceMode.FullScreen) {
+                    FullScreenPage(frame, Modifier.fillMaxSize(), opaque = false)
+                } else {
+                    DockedOverlay(frame, dock, Modifier.fillMaxSize())
+                }
             } else {
-                DockedOverlay(frame, dock, Modifier.fillMaxSize())
+                CanvasWithChat(frame, dock, { canvas(canvasActions) }, Modifier)
             }
-        } else {
-            CanvasWithChat(frame, dock, { canvas(canvasActions) }, Modifier)
         }
     }
 }
