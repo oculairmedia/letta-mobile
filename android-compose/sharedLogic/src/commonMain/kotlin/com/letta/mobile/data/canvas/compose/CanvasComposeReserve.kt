@@ -117,9 +117,13 @@ object CanvasComposeReserve {
     fun textFont(size: ComposeTextSize): Double = if (size == ComposeTextSize.HEADING) TEXT_HEADING_FONT else TEXT_BODY_FONT
 
     /**
-     * The blocks of a Cascade v2 document, depth-first, nested `children` one indent deeper. Reads
-     * only `type.typeId`, `type.level` and `content.text`, so a newer document still yields its
-     * blocks; a block of a type it does not know is booked as a paragraph, unreadable input as none.
+     * The blocks of a Cascade v2 document, depth-first. A block's depth is its
+     * `attributes.indentationLevel` (how cascade-editor 1.9.2 and [CanvasCascadeBlocks] store a
+     * nested list item: a flat list, the child carrying the level) plus how deep it sits in nested
+     * `children`; each level takes one [INDENT] off the line, as the editor indents it. Reads only
+     * `type.typeId`, `type.level`, `attributes.indentationLevel` and `content.text`, so a newer
+     * document still yields its blocks; a block of a type it does not know is booked as a
+     * paragraph, unreadable input as none.
      */
     fun blocksOf(documentJson: String): List<ReserveBlock> {
         if (documentJson.isBlank()) return emptyList()
@@ -136,10 +140,19 @@ object CanvasComposeReserve {
             val typeId = (type?.get("typeId") as? JsonPrimitive)?.contentOrNull
             val level = ReserveBlockType.headingLevel(typeId) ?: (type?.get("level") as? JsonPrimitive)?.intOrNull ?: 1
             val text = ((block["content"] as? JsonObject)?.get("text") as? JsonPrimitive)?.contentOrNull.orEmpty()
-            into += ReserveBlock(ReserveBlockType.of(typeId), text, level, depth)
+            into += ReserveBlock(ReserveBlockType.of(typeId), text, level, depth + indentationOf(block))
             collect(block["children"], depth + 1, into)
         }
     }
+
+    /** A block's `attributes.indentationLevel`, 0 when absent or unreadable. */
+    private fun indentationOf(block: JsonObject): Int {
+        val value = (block[CanvasCascadeBlocks.KEY_ATTRIBUTES] as? JsonObject)?.get(CanvasCascadeBlocks.KEY_INDENTATION_LEVEL) as? JsonPrimitive
+        return (value?.intOrNull ?: value?.contentOrNull?.toIntOrNull() ?: 0).coerceIn(0, MAX_INDENTATION)
+    }
+
+    /** Deeper than this is not an indentation any editor draws; it only stops a hostile value booking nothing. */
+    private const val MAX_INDENTATION = 16
 
     private fun documentReserve(blocks: List<ReserveBlock>, width: Double, fontScale: Double): Float {
         val body = blocks.sumOf { blockHeight(it, width, fontScale) }

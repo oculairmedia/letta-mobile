@@ -212,6 +212,40 @@ class CanvasNoteWorldUnitsUiTest {
         }
     }
 
+    /**
+     * Nested list items as cascade-editor and the compose compiler store them: a flat list whose
+     * children carry `attributes.indentationLevel`. The editor indents each level, so the words wrap
+     * sooner; the reserve reads the level too and still covers the rendered card, on a desktop and
+     * at a phone's density.
+     */
+    @Test
+    fun indentedListItemsAreCoveredByTheirReserve() {
+        val item = "Apples and pears from the market stall by the station"
+        fun block(id: String, type: String, level: Int): String {
+            val attributes = if (level > 0) ""","attributes":{"indentationLevel":$level}""" else ""
+            return """{"id":"$id","type":{"typeId":"$type"}$attributes,"content":{"kind":"text","version":1,"text":"$item","spans":[]}}"""
+        }
+        val levels = listOf(0, 1, 2, 3, 2, 1)
+        val indented = """{"version":2,"blocks":[${levels.mapIndexed { i, l -> block("i$i", if (i % 2 == 0) "bullet_list" else "todo", l) }.joinToString(",")}]}"""
+        val flat = """{"version":2,"blocks":[${levels.mapIndexed { i, _ -> block("f$i", if (i % 2 == 0) "bullet_list" else "todo", 0) }.joinToString(",")}]}"""
+        val reserve = com.letta.mobile.data.canvas.compose.CanvasComposeReserve.reserveDocument(indented, 320f)
+        assertTrue(reserve > com.letta.mobile.data.canvas.compose.CanvasComposeReserve.reserveDocument(flat, 320f), "the reserve reads the indentation")
+        // Below the cap, or the gate would hold by clamping rather than by estimating.
+        assertTrue(reserve < com.letta.mobile.data.canvas.compose.CanvasComposeReserve.MAX_RESERVE, "reserve $reserve is the cap")
+        listOf(desktop, Display(2.75f, 1.3f)).forEach { display ->
+            runDesktopComposeUiTest(width = BOARD, height = BOARD) {
+                val session = session()
+                put(session, "indented", indented, CanvasDocumentFrame(40f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO)
+                put(session, "flat", flat, CanvasDocumentFrame(400f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO)
+                showNotes(session, display)
+                val rendered = cardBounds("indented").height
+                println("reserve-gate@$display indented list: rendered=$rendered (flat ${cardBounds("flat").height}) reserve=$reserve")
+                assertEquals(1f, fontScale("indented"))
+                assertTrue(rendered <= reserve, "at $display the indented list renders $rendered > reserve $reserve")
+            }
+        }
+    }
+
     /** Typing into an AUTO note on a phone-density board still works: caret, input, the hoisted toolbar, the write. */
     @Test
     fun typingIntoAnAutoNoteStillWorksInWorldUnits() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {

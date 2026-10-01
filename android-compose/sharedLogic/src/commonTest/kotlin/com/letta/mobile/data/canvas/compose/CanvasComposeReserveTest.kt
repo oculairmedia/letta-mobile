@@ -181,6 +181,33 @@ class CanvasComposeReserveTest {
     }
 
     /**
+     * A nested list item as cascade-editor and CanvasCascadeBlocks store it: a flat list whose
+     * children carry `attributes.indentationLevel`. Each level is one indent narrower, so it books
+     * at least as much as the same item nested through `children`, and more than it would flat.
+     */
+    @Test
+    fun anIndentationLevelIsReadAsNestingDepth() {
+        val item = "Groceries for the week ahead, apples and pears from the market"
+        fun block(id: String, level: Int?): String {
+            val attributes = level?.let { ""","attributes":{"indentationLevel":$it}""" }.orEmpty()
+            return """{"id":"$id","type":{"typeId":"bullet_list"}$attributes,"content":{"kind":"text","version":1,"text":"$item","spans":[]}}"""
+        }
+        val flat = """{"version":2,"blocks":[${block("a", null)},${block("b", 1)},${block("c", 2)},${block("d", 3)}]}"""
+        assertEquals(listOf(0, 1, 2, 3), CanvasComposeReserve.blocksOf(flat).map { it.depth })
+
+        val unindented = """{"version":2,"blocks":[${block("a", null)},${block("b", null)},${block("c", null)},${block("d", null)}]}"""
+        assertTrue(CanvasComposeReserve.reserveDocument(flat) > CanvasComposeReserve.reserveDocument(unindented), "indented items wrap sooner and book more")
+        val viaChildren = document(B("bullet_list", item, children = listOf(B("bullet_list", item, children = listOf(B("bullet_list", item, children = listOf(B("bullet_list", item))))))))
+        assertEquals(CanvasComposeReserve.reserveDocument(viaChildren), CanvasComposeReserve.reserveDocument(flat))
+
+        // A level in a string, a negative or an absurd one: read as what an editor could draw.
+        val odd = """{"version":2,"blocks":[{"id":"x","type":{"typeId":"bullet_list"},"attributes":{"indentationLevel":"2"},"content":{"kind":"text","version":1,"text":"x","spans":[]}},""" +
+            """{"id":"y","type":{"typeId":"bullet_list"},"attributes":{"indentationLevel":-4},"content":{"kind":"text","version":1,"text":"y","spans":[]}},""" +
+            """{"id":"z","type":{"typeId":"bullet_list"},"attributes":{"indentationLevel":9999},"content":{"kind":"text","version":1,"text":"z","spans":[]}}]}"""
+        assertEquals(listOf(2, 0, 16), CanvasComposeReserve.blocksOf(odd).map { it.depth })
+    }
+
+    /**
      * cascade-editor 1.9.2 writes `BlockType.Heading(2)` as `{"typeId":"heading_2"}` (verified by
      * encoding one with the library's DocumentSchema; letta-mobile-bglj6.11). Read that, and a bare
      * `heading` with a `level` too, as headings at their level; never as a 16-px paragraph.
