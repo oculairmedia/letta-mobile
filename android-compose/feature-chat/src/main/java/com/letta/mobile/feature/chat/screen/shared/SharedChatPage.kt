@@ -41,6 +41,8 @@ internal data class SharedChatPageParams(
     val fontScale: Float,
     val hapticsEnabled: Boolean,
     val pagingPresentation: ChatPagingPresentation?,
+    /** "Open conversations on the canvas": the initial presentation only. */
+    val openOnCanvas: Boolean = true,
     /** The ambient agent glow, drawn behind the full-screen page. */
     val pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)? = null,
 )
@@ -59,7 +61,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val port = rememberAdminChatSessionPort(params.viewModel, params.navigation.onBugCommand)
     val canvasSlot = LocalChatCanvasSlot.current
     var presentation by rememberSaveable(stateSaver = PresentationSaver) {
-        mutableStateOf(if (canvasSlot != null) ChatSurfacePresentation.CanvasFirst else ChatSurfacePresentation.ChatFirst)
+        mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
     }
     val host = remember(params.navigation) { params.navigation.toSurfaceHost() }
     val onIntent: (ChatSurfaceIntent) -> Unit = { intent ->

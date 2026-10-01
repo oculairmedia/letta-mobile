@@ -46,6 +46,8 @@ internal fun ChatScreen(
     val activeFontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
     val sharedChatPageEnabled by viewModel.sharedChatPageEnabled.collectAsStateWithLifecycle()
+    // Subscribed alongside the gate above so both come from the same settings snapshot.
+    val openChatsOnCanvas by viewModel.openChatsOnCanvas.collectAsStateWithLifecycle()
 
     val backgroundModifier = when (chatBackground) {
         is ChatBackground.Default -> Modifier
@@ -113,6 +115,7 @@ internal fun ChatScreen(
                     fontScale = committedFontScale,
                     hapticsEnabled = hapticsEnabled,
                     pagingPresentation = pagingPresentation,
+                    openOnCanvas = openChatsOnCanvas,
                     pageBackground = { content ->
                         AmbientShaderAgentBackground(
                             agentStatus = ambient.status,

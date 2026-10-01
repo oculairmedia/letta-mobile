@@ -77,6 +77,15 @@ data class ChatSurfacePresentation(
 
         /** Traditional chat: the optional full-screen page. */
         val ChatFirst = ChatSurfacePresentation(mode = ChatSurfaceMode.FullScreen)
+
+        /**
+         * How a conversation first opens: on the canvas when the "Open conversations on the
+         * canvas" preference is on and the host has a canvas to dock under, otherwise the
+         * traditional full-screen chat. Only the initial value; later intents (and any saved
+         * mode) win after that.
+         */
+        fun initial(openOnCanvas: Boolean, hasCanvas: Boolean): ChatSurfacePresentation =
+            if (openOnCanvas && hasCanvas) CanvasFirst else ChatFirst
     }
 }
 

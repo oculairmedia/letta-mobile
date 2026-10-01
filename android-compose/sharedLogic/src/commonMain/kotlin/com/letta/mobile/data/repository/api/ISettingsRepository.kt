@@ -91,6 +91,14 @@ interface ISettingsRepository {
      */
     fun getSharedChatPageEnabled(): Flow<Boolean>
     suspend fun setSharedChatPageEnabled(enabled: Boolean)
+
+    /**
+     * letta-mobile-bglj6.1: whether the shared chat page opens a conversation on the canvas
+     * (canvas-first) rather than the traditional full-screen chat. Only the initial
+     * presentation; the user's later surface mode still wins. Defaults to enabled.
+     */
+    fun getOpenChatsOnCanvas(): Flow<Boolean>
+    suspend fun setOpenChatsOnCanvas(enabled: Boolean)
     suspend fun setTheme(theme: AppTheme)
     suspend fun setThemePreset(themePreset: ThemePreset)
     suspend fun setDynamicColor(enabled: Boolean)

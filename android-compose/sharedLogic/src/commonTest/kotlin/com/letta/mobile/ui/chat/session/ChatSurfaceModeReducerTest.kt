@@ -23,6 +23,14 @@ class ChatSurfaceModeReducerTest {
     }
 
     @Test
+    fun initialPresentationFollowsTheOpenOnCanvasPreference() {
+        assertEquals(docked, ChatSurfacePresentation.initial(openOnCanvas = true, hasCanvas = true))
+        assertEquals(fullScreen, ChatSurfacePresentation.initial(openOnCanvas = false, hasCanvas = true))
+        assertEquals(fullScreen, ChatSurfacePresentation.initial(openOnCanvas = true, hasCanvas = false))
+        assertEquals(fullScreen, ChatSurfacePresentation.initial(openOnCanvas = false, hasCanvas = false))
+    }
+
+    @Test
     fun expandingTheDockOpensFullScreenChatAndHidesTheCanvas() {
         val next = docked.after(ChatSurfaceIntent.Expand)
         assertEquals(ChatSurfaceMode.FullScreen, next.mode)

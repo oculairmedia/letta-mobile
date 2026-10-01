@@ -391,6 +391,16 @@ open class CachedSettingsRepository(
         }
     }
 
+    override fun getOpenChatsOnCanvas(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
+        prefs.getBoolean(SettingsPreferenceKeys.OPEN_CHATS_ON_CANVAS) ?: true
+    }
+
+    override suspend fun setOpenChatsOnCanvas(enabled: Boolean) {
+        preferencesStore.edit { prefs ->
+            prefs.putBoolean(SettingsPreferenceKeys.OPEN_CHATS_ON_CANVAS, enabled)
+        }
+    }
+
     override fun observeResumeRecentConversation(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
         prefs.getBoolean(SettingsPreferenceKeys.RESUME_RECENT_CONVERSATION)
             ?: platformDefaults.defaultResumeRecentConversation

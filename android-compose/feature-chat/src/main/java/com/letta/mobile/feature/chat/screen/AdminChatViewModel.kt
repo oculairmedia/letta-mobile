@@ -558,6 +558,10 @@ internal class AdminChatViewModel @Inject constructor(
     val sharedChatPageEnabled: StateFlow<Boolean> = settingsRepository.getSharedChatPageEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    /** letta-mobile-bglj6.1: open conversations canvas-first on the shared chat page (default on). */
+    val openChatsOnCanvas: StateFlow<Boolean> = settingsRepository.getOpenChatsOnCanvas()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

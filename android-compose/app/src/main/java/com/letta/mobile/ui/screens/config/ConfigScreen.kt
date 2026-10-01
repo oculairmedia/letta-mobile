@@ -96,6 +96,7 @@ fun ConfigScreen(
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
                 onHapticsEnabledChange = { viewModel.updateHapticsEnabled(it) },
                 onSharedChatPageEnabledChange = { viewModel.updateSharedChatPageEnabled(it) },
+                onOpenChatsOnCanvasChange = { viewModel.updateOpenChatsOnCanvas(it) },
                 onLocalModelPathChange = { viewModel.updateLocalModelPath(it) },
                 onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
                 onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
@@ -166,6 +167,7 @@ private fun ConfigContent(
     onEnableProjectsChange: (Boolean) -> Unit,
     onHapticsEnabledChange: (Boolean) -> Unit,
     onSharedChatPageEnabledChange: (Boolean) -> Unit,
+    onOpenChatsOnCanvasChange: (Boolean) -> Unit,
     onLocalModelPathChange: (String) -> Unit,
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
@@ -387,6 +389,18 @@ private fun ConfigContent(
                     )
                 },
             )
+            if (state.sharedChatPageEnabled) {
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas)) },
+                    supportingContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas_description)) },
+                    trailingContent = {
+                        HapticSwitch(
+                            checked = state.openChatsOnCanvas,
+                            onCheckedChange = onOpenChatsOnCanvasChange,
+                        )
+                    },
+                )
+            }
         }
 
         CardGroup(title = {
