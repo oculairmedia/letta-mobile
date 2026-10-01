@@ -35,6 +35,8 @@ import com.letta.mobile.data.repository.LastChatSelection
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.chatGraph
+import com.letta.mobile.feature.chat.screen.shared.ChatCanvasSlot
+import com.letta.mobile.feature.chat.screen.shared.LocalChatCanvasSlot
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.feature.editagent.editAgentGraph
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
@@ -57,6 +59,20 @@ const val PROJECT_CREATED_REFRESH_KEY: String = "project_created_refresh"
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
+
+/**
+ * letta-mobile-bglj6.1: the conversation's own board under the shared chat page. Its share and
+ * back act on that page (attach to the draft, expand the chat), not on navigation.
+ */
+private val AppChatCanvasSlot = ChatCanvasSlot { target, actions ->
+    com.letta.mobile.ui.screens.canvas.CanvasScreen(
+        canvasId = "",
+        conversationId = target.conversationId,
+        agentId = target.agentId,
+        onNavigateBack = actions::back,
+        onShareToChat = actions::shareToChat,
+    )
+}
 
 private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavHostController) {
     chatGraph(
@@ -230,6 +246,9 @@ fun AppNavGraph(
         onConsumed = onNotificationTargetConsumed,
     )
 
+    // letta-mobile-bglj6.1: the shared chat page docks under the conversation's canvas; the
+    // canvas screen lives here in :app, so it is handed to feature-chat as a slot.
+    androidx.compose.runtime.CompositionLocalProvider(LocalChatCanvasSlot provides AppChatCanvasSlot) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -260,6 +279,7 @@ fun AppNavGraph(
         appChatGraph(navController)
 
         appCanvasGraph(navController)
+    }
     }
 
     AppBackendSwitcherHost(

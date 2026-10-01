@@ -87,7 +87,7 @@ class ChatSurfaceSnapshotTest {
                         onIntent = {},
                         host = ChatSurfaceHost(openCanvas = {}),
                         canvas = if (withCanvas) {
-                            { Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.tertiaryContainer)) }
+                            { _ -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.tertiaryContainer)) }
                         } else {
                             null
                         },

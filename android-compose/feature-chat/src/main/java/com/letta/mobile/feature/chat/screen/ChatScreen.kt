@@ -102,6 +102,30 @@ internal fun ChatScreen(
         // receives `bottomInsetDp` for navbar-clearance.
         // The composer's height, as the layout measures it, so the glow can stay above it.
         var composerHeight by remember { mutableStateOf(androidx.compose.ui.unit.Dp.Unspecified) }
+        if (committedFontScale != null && sharedChatPageEnabled) {
+            // letta-mobile-bglj6.1: the shared page draws the glow behind its own full-screen
+            // layer (it is opaque over the docked canvas), and its composer handles the IME.
+            SharedChatPage(
+                params = SharedChatPageParams(
+                    viewModel = viewModel,
+                    navigation = navigation,
+                    chatMode = chatMode,
+                    fontScale = committedFontScale,
+                    hapticsEnabled = hapticsEnabled,
+                    pagingPresentation = pagingPresentation,
+                    pageBackground = { content ->
+                        AmbientShaderAgentBackground(
+                            agentStatus = ambient.status,
+                            streamActivityPulse = streamActivityPulse,
+                            composerHeight = { composerHeight },
+                            modifier = Modifier.fillMaxSize().then(backgroundModifier),
+                        ) { content() }
+                    },
+                ),
+                modifier = modifier.fillMaxSize().padding(contentPadding),
+            )
+            return@LettaChatTheme
+        }
         AmbientShaderAgentBackground(
             agentStatus = ambient.status,
             streamActivityPulse = streamActivityPulse,
@@ -111,19 +135,7 @@ internal fun ChatScreen(
                 .imePadding()
                 .then(backgroundModifier),
         ) {
-            if (committedFontScale != null && sharedChatPageEnabled) {
-                SharedChatPage(
-                    params = SharedChatPageParams(
-                        viewModel = viewModel,
-                        navigation = navigation,
-                        chatMode = chatMode,
-                        fontScale = committedFontScale,
-                        hapticsEnabled = hapticsEnabled,
-                        pagingPresentation = pagingPresentation,
-                    ),
-                    modifier = Modifier.fillMaxSize().padding(contentPadding),
-                )
-            } else if (committedFontScale != null) {
+            if (committedFontScale != null) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalChatPagingPresentation provides pagingPresentation,
                 ) {

@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
@@ -39,30 +41,44 @@ internal data class SharedChatPageParams(
     val fontScale: Float,
     val hapticsEnabled: Boolean,
     val pagingPresentation: ChatPagingPresentation?,
+    /** The ambient agent glow, drawn behind the full-screen page. */
+    val pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)? = null,
 )
 
 /**
  * letta-mobile-bglj6.1: Android's binding of the shared KMP chat page (sharedUI [ChatSurface]),
  * drawn in place of the legacy chat layout while the "Shared chat page (preview)" setting is on.
  *
- * The page opens full-screen. The docked-in-canvas presentation is a later stage, so an
- * "open canvas" request from the full-screen page goes to the existing canvas navigation
- * instead of docking the page.
+ * With the app's canvas ([LocalChatCanvasSlot]) the conversation opens on its canvas with the
+ * chat docked under it; expanding the dock gives the full-screen page, and swipe up on its
+ * prompt (or Back) returns to the canvas. Without a canvas slot the page opens full-screen and
+ * "open canvas" uses the canvas route.
  */
 @Composable
 internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = Modifier) {
     val port = rememberAdminChatSessionPort(params.viewModel, params.navigation.onBugCommand)
+    val canvasSlot = LocalChatCanvasSlot.current
     var presentation by rememberSaveable(stateSaver = PresentationSaver) {
-        mutableStateOf(ChatSurfacePresentation.ChatFirst)
+        mutableStateOf(if (canvasSlot != null) ChatSurfacePresentation.CanvasFirst else ChatSurfacePresentation.ChatFirst)
     }
     val host = remember(params.navigation) { params.navigation.toSurfaceHost() }
     val onIntent: (ChatSurfaceIntent) -> Unit = { intent ->
-        if (routesToCanvasNavigation(presentation, intent)) {
+        if (canvasSlot == null && routesToCanvasNavigation(presentation, intent)) {
             host.openCanvas?.invoke()
         } else {
             presentation = ChatSurfaceModeReducer.reduce(presentation, intent)
         }
     }
+    // Back from the full-screen page returns to the canvas, the default view.
+    BackHandler(enabled = canvasSlot != null && presentation.mode == ChatSurfaceMode.FullScreen) {
+        onIntent(ChatSurfaceIntent.Collapse)
+    }
+    val target = ChatCanvasTarget(
+        agentId = params.viewModel.agentId.value,
+        conversationId = params.viewModel.conversationId?.value,
+    )
+    val canvas: (@Composable (ChatCanvasActions) -> Unit)? =
+        canvasSlot?.let { slot -> { actions -> slot.content(target, actions) } }
     val appearance = remember(params.chatMode, params.fontScale, params.hapticsEnabled) {
         ChatSurfaceAppearance(
             displayMode = params.chatMode.toChatDisplayMode(),
@@ -78,8 +94,9 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             host = host,
             modifier = Modifier.fillMaxSize(),
             appearance = appearance,
-            platform = rememberAndroidChatSurfacePlatform(),
+            platform = rememberAndroidChatSurfacePlatform(params.pageBackground),
             pagedTimeline = params.pagingPresentation?.canonical,
+            canvas = canvas,
         )
         ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
     }
@@ -114,15 +131,16 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(): ChatSurfaceHost {
 
 /** Dictation needs the Hilt-provided recognizer; previews and tests without one get no mic. */
 @Composable
-private fun rememberAndroidChatSurfacePlatform(): ChatSurfacePlatform {
+private fun rememberAndroidChatSurfacePlatform(
+    pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)?,
+): ChatSurfacePlatform {
     val activity = LocalContext.current as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
-    return remember(isHiltHost) {
-        if (isHiltHost) {
-            ChatSurfacePlatform(voiceInput = { onDictated -> DictationButton(onDictated) })
-        } else {
-            ChatSurfacePlatform.Default
-        }
+    return remember(isHiltHost, pageBackground) {
+        ChatSurfacePlatform(
+            voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
+            pageBackground = pageBackground,
+        )
     }
 }
 

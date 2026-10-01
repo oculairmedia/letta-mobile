@@ -805,6 +805,12 @@ internal fun LettaDesktopApp(
                                     ),
                                     isThinking = isThinkingSelected,
                                     errorMessage = chatState.errorMessage,
+                                    canvasStore = canvasShell.store,
+                                    canvasOwner = DesktopCanvasOwner(
+                                        chatState.selectedConversationId,
+                                        selectedAgentId,
+                                        selectedAgentName,
+                                    ),
                                 ),
                                 navigation = DesktopSharedChatPageNavigation(
                                     openCanvas = { openConversationCanvas() },

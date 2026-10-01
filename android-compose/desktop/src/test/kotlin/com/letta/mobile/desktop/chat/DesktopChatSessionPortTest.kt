@@ -189,31 +189,6 @@ class DesktopChatSessionPortTest {
         assertEquals(listOf("anthropic/sonnet", "openai/gpt"), unknown.options.map { it.handle })
     }
 
-    @Test
-    fun openCanvasFromFullScreenOpensTheCanvasWithoutChangingMode() {
-        var opened = 0
-        val fullScreen = ChatSurfacePresentation.ChatFirst
-
-        val next = reduceDesktopChatSurfaceIntent(fullScreen, ChatSurfaceIntent.OpenCanvas) { opened++ }
-
-        assertSame(fullScreen, next)
-        assertEquals(1, opened)
-    }
-
-    @Test
-    fun otherIntentsGoThroughTheSharedReducer() {
-        var opened = 0
-        val collapsed = reduceDesktopChatSurfaceIntent(
-            ChatSurfacePresentation.ChatFirst,
-            ChatSurfaceIntent.Collapse,
-        ) { opened++ }
-        assertEquals(ChatSurfaceMode.Docked, collapsed.mode)
-
-        val expanded = reduceDesktopChatSurfaceIntent(collapsed, ChatSurfaceIntent.Expand) { opened++ }
-        assertEquals(ChatSurfaceMode.FullScreen, expanded.mode)
-        assertEquals(0, opened)
-    }
-
     private fun TestScope.startedPort(): Pair<DesktopChatController, DesktopChatSessionPort> {
         val controller = testController()
         val port = DesktopChatSessionPort(controller = controller, scope = backgroundScope)

@@ -23,7 +23,10 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.chat_surface_canvas_share_failed
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * letta-mobile-bglj6.1: the ONE chat page, shared by Android and desktop.
@@ -58,10 +61,12 @@ fun ChatSurface(
     appearance: ChatSurfaceAppearance = ChatSurfaceAppearance(),
     platform: ChatSurfacePlatform = ChatSurfacePlatform.Default,
     pagedTimeline: CanonicalTimelinePresentation? = null,
-    canvas: (@Composable () -> Unit)? = null,
+    canvas: (@Composable (ChatCanvasActions) -> Unit)? = null,
 ) {
     val uiState by port.uiState.collectAsState()
     val composer by port.composer.collectAsState()
+    val shareFailed = stringResource(Res.string.chat_surface_canvas_share_failed)
+    val canvasActions = remember(port, onIntent, shareFailed) { ChatCanvasActions(port.actions, onIntent, shareFailed) }
     // With a canvas in hand, "open canvas" is a mode change, not the host's navigation.
     val effectiveHost = remember(host, canvas != null, onIntent) {
         if (canvas == null) host else host.copy(openCanvas = { onIntent(ChatSurfaceIntent.OpenCanvas) })
@@ -85,7 +90,7 @@ fun ChatSurface(
         }
         return
     }
-    CanvasWithChat(frame, canvas, modifier)
+    CanvasWithChat(frame, { canvas(canvasActions) }, modifier)
 }
 
 /** One composition's worth of what every part of the page reads. */
