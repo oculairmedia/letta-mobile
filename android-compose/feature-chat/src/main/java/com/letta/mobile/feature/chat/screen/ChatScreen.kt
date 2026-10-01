@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -132,7 +133,9 @@ internal fun ChatScreen(
                     // The shared composer reports its height so the glow keeps clear of it.
                     onComposerHeightChange = { composerHeight = it },
                 ),
-                modifier = modifier.fillMaxSize().padding(contentPadding),
+                // The host already pads for its bars: consumed, so the canvas's own chrome (its
+                // actions pill, its tool bar) and the composer's insets do not pad for them again.
+                modifier = modifier.fillMaxSize().padding(contentPadding).consumeWindowInsets(contentPadding),
             )
             return@LettaChatTheme
         }
