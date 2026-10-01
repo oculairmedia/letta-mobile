@@ -25,6 +25,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
@@ -46,7 +47,7 @@ import kotlinx.coroutines.flow.filter
  * dropped the character and brought its scene up again - a visible blink - and the companion
  * slot closed and reopened under it.
  *
- * Now the places the companion can stand (the docked bar's slot, the minimised dock's spot, the
+ * Now the places the companion can stand (the open panel's badge, the minimised dock's spot, the
  * page composer's slot) only report where they are, and one seat drawn over the page follows
  * them: between the docked and the page layer by the morph's progress, and from one docked spot
  * to the other with a short glide when the dock folds.
@@ -94,11 +95,16 @@ internal val LocalCompanionSeatAnchors = staticCompositionLocalOf<CompanionSeatA
 internal val LocalCompanionLayer = staticCompositionLocalOf { CompanionLayer.Docked }
 
 /**
- * Reserves the companion's box here and reports it to [anchors]. Draws nothing: the page's one
- * seat ([CompanionSeatOverlay]) stands over it.
+ * Reserves the companion's box here, [size] square, and reports it to [anchors]. Draws nothing:
+ * the page's one seat ([CompanionSeatOverlay]) stands over it, scaled to [size] (the docked
+ * panel's badge seats it smaller than the composer does).
  */
 @Composable
-internal fun CompanionSeatAnchor(anchors: CompanionSeatAnchors, modifier: Modifier = Modifier) {
+internal fun CompanionSeatAnchor(
+    anchors: CompanionSeatAnchors,
+    modifier: Modifier = Modifier,
+    size: Dp = ChatMascotDimens.composerCompanion,
+) {
     val layer = LocalCompanionLayer.current
     val owner = remember { Any() }
     DisposableEffect(anchors, layer, owner) {
@@ -106,7 +112,7 @@ internal fun CompanionSeatAnchor(anchors: CompanionSeatAnchors, modifier: Modifi
     }
     Box(
         modifier
-            .requiredSize(ChatMascotDimens.composerCompanion)
+            .requiredSize(size)
             .onGloballyPositioned { anchors.report(layer, owner, it.boundsInWindow()) },
     )
 }
@@ -145,10 +151,16 @@ internal fun CompanionSeatOverlay(
                 val placeable = measurable.measure(Constraints())
                 layout(placeable.width, placeable.height) {
                     val rect = placement.rect(pageWeight())
-                    placeable.place(
-                        (rect.left - placement.origin.x).roundToInt(),
-                        (rect.top - placement.origin.y).roundToInt(),
-                    )
+                    // The seat keeps its one size and is scaled to the anchor's (the badge's is
+                    // smaller): the renderer is never resized while the seat glides between them.
+                    val scale = if (placeable.width > 0 && rect.width > 0f) rect.width / placeable.width else 1f
+                    placeable.placeWithLayer(
+                        (rect.center.x - placeable.width / 2f - placement.origin.x).roundToInt(),
+                        (rect.center.y - placeable.height / 2f - placement.origin.y).roundToInt(),
+                    ) {
+                        scaleX = scale
+                        scaleY = scale
+                    }
                 }
             },
             onClick = onClick,
@@ -179,7 +191,7 @@ private class SeatPlacement(private val anchors: CompanionSeatAnchors, private v
 }
 
 /**
- * When the docked anchor changes hands (the bar's slot, or the minimised dock's place above the
+ * When the docked anchor changes hands (the open panel's badge, or the minimised dock's place above the
  * bar), the seat glides from where it stood instead of jumping. It holds still from the moment
  * the change is seen until the glide starts, so no frame shows it at the far end.
  */

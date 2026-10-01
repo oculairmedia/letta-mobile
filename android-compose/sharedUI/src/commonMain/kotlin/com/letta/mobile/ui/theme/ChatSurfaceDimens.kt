@@ -42,6 +42,15 @@ object ChatSurfaceDimens {
     val dockGripWidth: Dp = 32.dp
     val dockGripHeight: Dp = 4.dp
 
+    /** How far the mascot badge rises above the open panel's top edge: half the disc. */
+    val dockBadgeOverhang: Dp = ChatMascotDimens.dockBadge / 2
+
+    /** The badge's lift off the panel (a soft shadow, no tonal tint). */
+    val dockBadgeElevation: Dp = 3.dp
+
+    /** The header strip under a badge: the disc's lower half and a little air below it. */
+    val dockBadgeHeader: Dp = dockBadgeOverhang + 6.dp
+
     /** The collapsed dock's height (the mascot over its bar) before it is first measured. */
     val dockCollapsedHeightEstimate: Dp = 180.dp
 

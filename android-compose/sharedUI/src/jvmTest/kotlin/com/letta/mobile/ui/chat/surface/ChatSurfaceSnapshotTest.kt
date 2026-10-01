@@ -4,11 +4,18 @@ package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onRoot
@@ -24,6 +31,13 @@ import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.ui.mascot.FakeMascotHost
+import com.letta.mobile.ui.mascot.FakeMascotShell
+import com.letta.mobile.ui.mascot.LocalMascotHost
+import com.letta.mobile.ui.mascot.MascotEntry
+import com.letta.mobile.ui.mascot.MascotHost
+import com.letta.mobile.ui.mascot.MascotTransportLayer
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
@@ -79,30 +93,77 @@ class ChatSurfaceSnapshotTest {
         withCanvas: Boolean = false,
         dock: ChatDockGeometry = ChatDockGeometry.Default,
         uiState: ChatUiState = state,
+        withMascot: Boolean = false,
     ) = runComposeUiTest {
+        // The mascot's layer keeps a frame loop running, so the page never idles: step the clock.
+        if (withMascot) mainClock.autoAdvance = false
         setContent {
             MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
-                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    ChatSurface(
-                        port = FixturePort(uiState, composer),
-                        presentation = presentation,
-                        onIntent = {},
-                        host = ChatSurfaceHost(openCanvas = {}),
-                        canvas = if (withCanvas) {
-                            { _ -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.tertiaryContainer)) }
-                        } else {
-                            null
-                        },
-                        dockGeometry = dock,
-                    )
+                WithMascot(withMascot) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        ChatSurface(
+                            port = FixturePort(uiState, composer),
+                            presentation = presentation,
+                            onIntent = {},
+                            host = ChatSurfaceHost(openCanvas = {}),
+                            canvas = if (withCanvas) {
+                                { _ -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.tertiaryContainer)) }
+                            } else {
+                                null
+                            },
+                            dockGeometry = dock,
+                        )
+                    }
                 }
             }
         }
-        waitForIdle()
+        if (withMascot) {
+            repeat(SETTLE_FRAMES) { mainClock.advanceTimeBy(FRAME_MILLIS) }
+        } else {
+            waitForIdle()
+        }
         val image = onRoot().captureToImage().toAwtImage()
         val out = File("build/chat-surface-snapshots").apply { mkdirs() }.resolve("$name.png")
         ImageIO.write(image, "png", out)
         assertTrue(out.length() > 0)
+    }
+
+    /** The agent's mascot under a transport layer, drawn as a simple stand-in figure. */
+    @Composable
+    private fun WithMascot(enabled: Boolean, content: @Composable () -> Unit) {
+        if (!enabled) return content()
+        val shell = FakeMascotShell("agent-1")
+        shell.Provide {
+            CompositionLocalProvider(LocalMascotHost provides StandInMascotHost) {
+                MascotTransportLayer { content() }
+            }
+        }
+    }
+
+    /** Paints a body and a face filling ~60 % of the seat, like the real characters. */
+    private object StandInMascotHost : MascotHost {
+        override val available: Boolean = true
+
+        override fun entry(agentId: String, identity: MascotIdentity): MascotEntry = FakeMascotHost.entry(agentId, identity)
+
+        @Composable
+        override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
+            Box(modifier, contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize(BODY).background(BODY_COLOR, CircleShape), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth(FACE_WIDTH).fillMaxHeight(FACE_HEIGHT).background(Color.White, CircleShape))
+                }
+            }
+        }
+
+        private const val BODY = 0.6f
+        private const val FACE_WIDTH = 0.55f
+        private const val FACE_HEIGHT = 0.3f
+        private val BODY_COLOR = Color(0xFF00AA88)
+    }
+
+    private companion object {
+        const val SETTLE_FRAMES = 90
+        const val FRAME_MILLIS = 16L
     }
 
     @Test
@@ -116,7 +177,7 @@ class ChatSurfaceSnapshotTest {
 
     @Test
     fun dockedUnderCanvas() =
-        snapshot("docked-canvas", ChatSurfacePresentation.CanvasFirst, dark = false, withCanvas = true)
+        snapshot("docked-canvas", ChatSurfacePresentation.CanvasFirst, dark = false, withCanvas = true, withMascot = true)
 
     @Test
     fun dockedPanelMovedAndResized() = snapshot(
@@ -125,6 +186,18 @@ class ChatSurfaceSnapshotTest {
         dark = true,
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 1f, anchorY = 0.3f, widthDp = 460f, heightDp = 520f),
+        withMascot = true,
+    )
+
+    /** Dragged against the canvas's top edge: the badge above the panel stays on the canvas. */
+    @Test
+    fun dockedPanelAtTheTopKeepsItsBadge() = snapshot(
+        "docked-panel-top",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = false,
+        withCanvas = true,
+        dock = ChatDockGeometry(anchorX = 0f, anchorY = 0f, widthDp = 420f, heightDp = 360f),
+        withMascot = true,
     )
 
     /** Minimised just after a send: the agent thinking over its bar, no panel. */
@@ -136,6 +209,7 @@ class ChatSurfaceSnapshotTest {
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 0.1f, anchorY = 1f, widthDp = 520f, collapsed = true),
         uiState = state.copy(isAgentTyping = true),
+        withMascot = true,
     )
 
     /** Minimised with the reply in: the bubble beside the agent, tail towards it. */
@@ -201,5 +275,5 @@ class ChatSurfaceSnapshotTest {
 
     @Test
     fun fullScreenOverCanvas() =
-        snapshot("full-screen-canvas", ChatSurfacePresentation.ChatFirst, dark = true, withCanvas = true)
+        snapshot("full-screen-canvas", ChatSurfacePresentation.ChatFirst, dark = true, withCanvas = true, withMascot = true)
 }

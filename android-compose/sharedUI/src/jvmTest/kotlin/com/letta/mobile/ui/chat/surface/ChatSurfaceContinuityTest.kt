@@ -12,11 +12,19 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
+import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.width
+import com.letta.mobile.ui.chat.surface.composer.ComposerCompanionTags
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
+import com.letta.mobile.ui.mascot.MascotStage
+import com.letta.mobile.ui.mascot.MascotTransport
+import com.letta.mobile.ui.theme.ChatMascotDimens
+import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -113,6 +121,34 @@ class ChatSurfaceContinuityTest {
     }
 
     @Test
+    fun theOpenPanelWearsTheMascotAsATopCentreBadgeAndTheBarTakesItsWidth() = runComposeUiTest {
+        val rig = ChatSurfaceFlickerRig("badge")
+        with(rig) {
+            mount()
+            val panel = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+            val bar = onNodeWithTag(ComposerTestTags.DOCKED_BAR).getBoundsInRoot()
+            // No companion slot beside the bar: it spans the panel less the composer's side inset.
+            onNodeWithTag(ComposerCompanionTags.SLOT).assertDoesNotExist()
+            assertEquals((panel.left + LettaDimens.Space.lg).value, bar.left.value, DP_TOLERANCE, "bar $bar in $panel")
+            assertEquals((panel.right - LettaDimens.Space.lg).value, bar.right.value, DP_TOLERANCE, "bar $bar in $panel")
+
+            // The seat stands in the badge, centred on the panel's top edge, half of it above.
+            val badge = onNodeWithTag(DOCK_BADGE_TAG).getBoundsInRoot()
+            assertEquals(ChatMascotDimens.dockBadge.value, badge.width.value, DP_TOLERANCE)
+            assertEquals(panel.top.value, ((badge.top + badge.bottom) / 2).value, DP_TOLERANCE, "badge $badge on $panel")
+            val seat = assertNotNull(shell.transport.seat(MascotTransport.SeatKey(ChatSurfaceFlickerRig.AGENT, MascotStage.COMPOSER_COMPANION)))
+            val seatDp = with(density) { seat.bounds.let { DpRect(it.left.toDp(), it.top.toDp(), it.right.toDp(), it.bottom.toDp()) } }
+            assertEquals(ChatMascotDimens.dockBadgeSeat.value, seatDp.width.value, DP_TOLERANCE, "seat $seatDp")
+            assertEquals(((panel.left + panel.right) / 2).value, ((seatDp.left + seatDp.right) / 2).value, DP_TOLERANCE, "seat $seatDp")
+            assertEquals(panel.top.value, ((seatDp.top + seatDp.bottom) / 2).value, DP_TOLERANCE, "seat $seatDp")
+            assertTrue(seatDp.top < panel.top, "the seat rises above the panel's edge: $seatDp over $panel")
+            // The layer still draws the character at the seat's own size, scaled to the badge.
+            assertEquals(with(density) { ChatMascotDimens.composerCompanion.toPx() }, seat.drawWidth, 1f)
+        }
+        assertEquals(1, rig.seatRegistrations)
+    }
+
+    @Test
     fun theFullPageKeepsItsScrollPositionThroughTheMorph() = runComposeUiTest {
         val rig = ChatSurfaceFlickerRig("scroll")
         with(rig) {
@@ -150,11 +186,17 @@ class ChatSurfaceContinuityTest {
     private fun ComposeUiTest.scrollPosition(): Float =
         onNodeWithTag(ChatTimelineTags.LIST).fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
 
-    /** The bar stays where it is while the dock folds above it (its width follows the companion's slot). */
+    /**
+     * The bar stays exactly where it is while the dock folds above it: no companion slot beside it
+     * open (the mascot is in the panel's badge) or minimised (it stands above the bar), so not even
+     * its width changes.
+     */
     private fun ComposeUiTest.assertBarStill(before: androidx.compose.ui.unit.DpRect) {
         val now = onNodeWithTag(ComposerTestTags.DOCKED_BAR).getBoundsInRoot()
         assertEquals(before.top, now.top, "bar top: $before -> $now")
         assertEquals(before.bottom, now.bottom, "bar bottom: $before -> $now")
+        assertEquals(before.left, now.left, "bar left: $before -> $now")
+        assertEquals(before.right, now.right, "bar right: $before -> $now")
     }
 
     private fun assertMascotLivedThrough(rig: ChatSurfaceFlickerRig) {
@@ -187,5 +229,6 @@ class ChatSurfaceContinuityTest {
         const val FOLD_FRAMES = 40
         const val SCROLLED_INDEX = 6
         const val REST_TOLERANCE = 0.0005
+        const val DP_TOLERANCE = 1f
     }
 }

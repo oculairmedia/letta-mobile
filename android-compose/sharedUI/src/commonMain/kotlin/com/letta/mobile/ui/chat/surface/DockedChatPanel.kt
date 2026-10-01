@@ -7,6 +7,7 @@ import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -82,9 +85,13 @@ import com.letta.mobile.ui.chat.session.ChatDockRect
 import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowPlacement
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
+import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
+import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon
+import com.letta.mobile.ui.mascot.mascotAvailable
+import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -210,6 +217,8 @@ private val DockLimits = ChatDockLimits(
     marginDp = ChatSurfaceDimens.dockMargin.value,
     defaultWidthDp = ChatSurfaceDimens.dockDefaultWidth.value,
     defaultHeightFraction = ChatSurfaceDimens.dockDefaultHeightFraction,
+    // The mascot badge rises above the panel's top edge; it must not leave the canvas.
+    topInsetDp = ChatSurfaceDimens.dockBadgeOverhang.value,
 )
 
 /**
@@ -340,6 +349,16 @@ internal fun DockedChatPanel(
                 }
             }
             if (showPanel && !showMinimised && !morph.morphing) Box(Modifier.matchParentSize()) { ResizeHandles(state) }
+            // Over the panel, its handles and its surface's glow: the agent's avatar on the top edge.
+            if (showPanel) {
+                PanelBadge(
+                    state = state,
+                    agentId = content.collapsed.agentId,
+                    seated = !collapsed,
+                    alpha = { opennessValue() * morphDockedAlpha(fraction()) },
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            }
         }
     }
 }
@@ -471,7 +490,7 @@ private fun PanelChrome(
 private fun PanelTop(state: ChatDockState, content: DockedPanelContent, modifier: Modifier) {
     Column(modifier.testTag(DOCK_SURFACE_TAG)) {
         // No progress bar: the panel's ambient glow says the agent is working.
-        PanelHeader(state)
+        PanelHeader(state, badged = dockBadgeShown(content.collapsed.agentId))
         content.conversation(Modifier.weight(1f).fillMaxWidth())
     }
 }
@@ -498,33 +517,75 @@ internal fun Modifier.dockDrag(state: ChatDockState): Modifier = pointerInput(st
 }
 
 /**
- * The panel's top edge: a slim drag strip with a centred grip pill (drag to move, double-click
- * or double-tap to reset) and the minimise control at its end. No title: the agent's mascot
- * beside the composer already says who this is, and the composer's own expand control opens the
- * full chat. Minimised there is no header at all; [CollapsedDock] has its own restore control.
+ * The panel's top edge: a slim drag strip (drag to move, double-click or double-tap to reset)
+ * with the minimise control at its end. Its centre is the agent's avatar ([PanelBadge], drawn
+ * over the panel's top edge, so the strip is as tall as the badge's lower half); for an agent
+ * without a mascot it is a grip pill. No title: the avatar already says who this is, and the
+ * composer's own expand control opens the full chat. Minimised there is no header at all;
+ * [CollapsedDock] has its own restore control.
  */
 @Composable
-private fun PanelHeader(state: ChatDockState) {
+private fun PanelHeader(state: ChatDockState, badged: Boolean) {
     val moveLabel = stringResource(Res.string.chat_surface_dock_move)
     Box(
         Modifier
             .fillMaxWidth()
-            .height(LettaDimens.Control.iconButton)
+            .height(if (badged) ChatSurfaceDimens.dockBadgeHeader else LettaDimens.Control.iconButton)
             .moveHandle(state)
             .semantics { contentDescription = moveLabel }
             .testTag(DOCK_HEADER_TAG),
     ) {
-        Box(
-            Modifier
-                .align(Alignment.Center)
-                .size(ChatSurfaceDimens.dockGripWidth, ChatSurfaceDimens.dockGripHeight)
-                .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(LettaDimens.Radius.sm)),
-        )
+        if (!badged) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .size(ChatSurfaceDimens.dockGripWidth, ChatSurfaceDimens.dockGripHeight)
+                    .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(LettaDimens.Radius.sm)),
+            )
+        }
         Box(Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Space.sm)) {
             HeaderButton(Lucide.ChevronDown, stringResource(Res.string.chat_surface_dock_collapse), DOCK_COLLAPSE_TAG) {
                 state.toggleCollapsed()
             }
         }
+    }
+}
+
+/** The open panel wears the agent's avatar badge: on a chat page, for an agent with a mascot. */
+@Composable
+private fun dockBadgeShown(agentId: String?): Boolean =
+    LocalCompanionSeatAnchors.current != null && mascotAvailable(agentId)
+
+/**
+ * The agent's avatar at the top centre of the open panel: a neutral disc with a hairline ring
+ * and a soft shadow, half above the panel's top edge (the dock's top inset keeps that half on
+ * the canvas). The page's one companion seat stands in it ([CompanionSeatAnchor], scaled to
+ * [ChatMascotDimens.dockBadgeSeat]); a tap on the character opens the agent pane, its pencil
+ * edits it, and the disc's rim drags the panel like the strip around it. [seated] is false once
+ * the dock minimises: the seat glides on to the mascot over the bar while the disc fades.
+ */
+@Composable
+private fun PanelBadge(state: ChatDockState, agentId: String?, seated: Boolean, alpha: () -> Float, modifier: Modifier) {
+    if (!dockBadgeShown(agentId)) return
+    val anchors = LocalCompanionSeatAnchors.current ?: return
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier
+            .offset(y = -ChatSurfaceDimens.dockBadgeOverhang)
+            .size(ChatMascotDimens.dockBadge)
+            .graphicsLayer { this.alpha = alpha() }
+            // No clip: the seat's spot inside is larger than the disc and must report whole.
+            .shadow(ChatSurfaceDimens.dockBadgeElevation, CircleShape, clip = false)
+            .background(scheme.surfaceContainerHigh, CircleShape)
+            .border(LettaDimens.Stroke.hairline, scheme.outlineVariant, CircleShape)
+            .pointerHoverIcon(movePointerIcon())
+            .dockDrag(state)
+            .testTag(DOCK_BADGE_TAG)
+            // Decoration: the character's own seat is what assistive technology reaches.
+            .clearAndSetSemantics { },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (seated) CompanionSeatAnchor(anchors, size = ChatMascotDimens.dockBadgeSeat)
     }
 }
 
@@ -636,3 +697,4 @@ internal const val DOCK_SURFACE_TAG = "chat-dock-surface"
 internal const val DOCK_COLLAPSE_TAG = "chat-dock-collapse"
 internal const val DOCK_RESTORE_TAG = "chat-dock-restore"
 internal const val DOCK_RESIZE_GRIP_TAG = "chat-dock-resize-grip"
+internal const val DOCK_BADGE_TAG = "chat-dock-badge"

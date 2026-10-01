@@ -29,8 +29,9 @@ internal object ComposerCompanionTags {
 }
 
 /**
- * False where the agent's mascot already stands somewhere else on the same surface (the
- * collapsed dock seats it above the bar): the composer then draws no companion slot, so the
+ * False where the agent's mascot already stands somewhere else on the same surface (the open
+ * docked panel seats it in its top-centre badge, the collapsed dock above the bar): the composer
+ * then draws no companion slot and keeps its full width, and the
  * [MascotStage.COMPOSER_COMPANION] seat is declared exactly once.
  */
 internal val LocalComposerCompanion = staticCompositionLocalOf { true }

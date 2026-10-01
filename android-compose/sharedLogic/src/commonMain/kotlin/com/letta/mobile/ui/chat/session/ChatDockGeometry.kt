@@ -42,6 +42,11 @@ data class ChatDockLimits(
     val defaultWidthDp: Float,
     /** The default expanded height as a share of the container height. */
     val defaultHeightFraction: Float,
+    /**
+     * Extra space kept above the panel, on top of [marginDp]: what the panel draws above its own
+     * top edge (the mascot badge) stays inside the container.
+     */
+    val topInsetDp: Float = 0f,
 )
 
 /** A resolved panel rectangle in dp, relative to the container's top-left. */
@@ -201,15 +206,16 @@ object ChatDockGeometryMath {
         return start to end
     }
 
-    /** The usable area: the container less its margin, and the size limits that fit in it. */
+    /** The usable area: the container less its margin (and top inset), and the size limits that fit in it. */
     private class Area(frame: ChatDockFrame) {
         val limits: ChatDockLimits = frame.limits
         val containerWidth: Float = frame.containerWidthDp
         val containerHeight: Float = frame.containerHeightDp
         val left: Float = limits.marginDp.coerceAtMost(containerWidth / 2f)
-        val top: Float = limits.marginDp.coerceAtMost(containerHeight / 2f)
+        private val bottomMargin: Float = limits.marginDp.coerceAtMost(containerHeight / 2f)
+        val top: Float = (limits.marginDp + limits.topInsetDp.coerceAtLeast(0f)).coerceAtMost(containerHeight / 2f)
         val width: Float = (containerWidth - 2f * left).coerceAtLeast(0f)
-        val height: Float = (containerHeight - 2f * top).coerceAtLeast(0f)
+        val height: Float = (containerHeight - top - bottomMargin).coerceAtLeast(0f)
         val right: Float get() = left + width
         val bottom: Float get() = top + height
         val maxWidth: Float = minOf(limits.maxWidthDp, width)

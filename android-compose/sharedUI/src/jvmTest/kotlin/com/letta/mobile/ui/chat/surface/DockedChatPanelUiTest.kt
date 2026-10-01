@@ -35,6 +35,7 @@ import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
+import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -132,6 +133,16 @@ class DockedChatPanelUiTest {
         assertEquals(before.width, after.width)
         assertTrue(harness.reported.isNotEmpty())
         assertTrue(harness.geometry.anchorX < 0.5f && harness.geometry.anchorY < 1f, "${harness.geometry}")
+    }
+
+    @Test
+    fun draggedToTheTopThePanelLeavesRoomForItsBadge() = runComposeUiTest {
+        show()
+        onNodeWithTag(DOCK_HEADER_TAG).performTouchInput { swipe(center, center + Offset(0f, -5000f)) }
+        waitForIdle()
+        val top = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot().top
+        // The badge's upper half rises above the panel's edge; it stays on the canvas, inside the margin.
+        assertEquals((ChatSurfaceDimens.dockMargin + ChatSurfaceDimens.dockBadgeOverhang).value, top.value, 0.5f)
     }
 
     @Test

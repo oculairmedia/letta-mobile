@@ -75,9 +75,19 @@ internal data class MascotSeatInfo(
     val overscale: Float,
     val identity: MascotIdentity?,
     val handlers: SeatHandlers,
+    /**
+     * The seat box's own width in px, before any layer scale. A seat that scales itself (the chat
+     * page's companion shrinking into the docked panel's badge) reports scaled [bounds]; the layer
+     * keeps drawing the character at this size and scales it, so the renderer is never resized
+     * per frame. Zero means the same as [bounds].
+     */
+    val layoutWidth: Float = 0f,
 ) {
     val onClick: (() -> Unit)? get() = handlers.onClick
     val onEdit: (() -> Unit)? get() = handlers.onEdit
+
+    /** The box the character is drawn in, before the seat's own scale. */
+    val drawWidth: Float get() = if (layoutWidth > 0f) layoutWidth else bounds.width
 }
 
 /** The latest click / edit handlers of one seat; updated in place, never compared. */
@@ -227,16 +237,17 @@ private fun TransportedMascot(
     // loop on every size change, so resizing it per frame is what made a hop stutter.
     val rect = shownRect(flight, seat.bounds)
     val density = LocalDensity.current
-    val boxSize = with(density) { seat.bounds.width.toDp() }
-    val flightScale = if (seat.bounds.width > 0f) rect.width / seat.bounds.width else 1f
+    val drawWidth = seat.drawWidth
+    val boxSize = with(density) { drawWidth.toDp() }
+    val flightScale = if (drawWidth > 0f) rect.width / drawWidth else 1f
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
     Box(
         modifier = Modifier
             .offset {
                 IntOffset(
-                    (rect.center.x - seat.bounds.width / 2f - origin.x).roundToInt(),
-                    (rect.center.y - seat.bounds.height / 2f - origin.y).roundToInt(),
+                    (rect.center.x - drawWidth / 2f - origin.x).roundToInt(),
+                    (rect.center.y - drawWidth / 2f - origin.y).roundToInt(),
                 )
             }
             .requiredSize(boxSize)

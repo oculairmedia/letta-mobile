@@ -28,6 +28,18 @@ class ChatDockGeometryMathTest {
     }
 
     @Test
+    fun aTopInsetKeepsRoomAboveThePanelOnly() {
+        val inset = ChatDockFrame(1200f, 800f, limits.copy(topInsetDp = 30f), 60f)
+        val top = ChatDockGeometryMath.rect(ChatDockGeometry(anchorY = 0f, heightDp = 2000f), inset)
+        assertEquals(40f, top.top, EPS)
+        assertEquals(790f, top.bottom, EPS)
+        val dragged = ChatDockGeometryMath.drag(ChatDockGeometry.Default, 0f, -5000f, inset)
+        assertEquals(40f, ChatDockGeometryMath.rect(dragged, inset).top, EPS)
+        // The bottom keeps the plain margin: the default panel sits where it always did.
+        assertEquals(790f, ChatDockGeometryMath.rect(ChatDockGeometry.Default, inset).bottom, EPS)
+    }
+
+    @Test
     fun theDefaultIsBottomCentreAtTheDefaultSize() {
         val rect = ChatDockGeometryMath.rect(ChatDockGeometry.Default, frame())
         assertEquals(760f, rect.width, EPS)

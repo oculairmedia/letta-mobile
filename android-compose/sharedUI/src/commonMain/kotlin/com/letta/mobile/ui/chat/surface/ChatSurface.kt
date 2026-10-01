@@ -307,15 +307,17 @@ private fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams = Dock
 
 /**
  * The dock's composer bar, open or minimised: one composition either way, so folding the dock
- * leaves the prompt (its text, focus and caret) alone. Minimised it has no companion (the mascot
- * stands above it) and no A2UI stack (the bubble's "needs your input" chip opens the panel for it).
+ * leaves the prompt (its text, focus and caret) alone. It never has a companion beside it: open,
+ * the mascot sits in the panel's top-centre badge; minimised, it stands above the bar. So the bar
+ * keeps the panel's whole width either way. Minimised it has no A2UI stack (the bubble's "needs
+ * your input" chip opens the panel for it).
  */
 @Composable
 private fun DockComposer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, collapsed: Boolean) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
         if (!collapsed && mode == ChatSurfaceMode.Docked) DockedA2uiStack(frame)
-        CompositionLocalProvider(LocalComposerCompanion provides !collapsed) {
+        CompositionLocalProvider(LocalComposerCompanion provides false) {
             ComposerPanel(frame, mode, Modifier.fillMaxWidth())
         }
     }

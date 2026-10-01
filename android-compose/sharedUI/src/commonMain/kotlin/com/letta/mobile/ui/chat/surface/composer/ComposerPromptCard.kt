@@ -79,8 +79,9 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
 
 /**
  * The docked bar: the same draft and the same send in one line, with an expand control that
- * raises [ChatSurfaceIntent.Expand] to open the full page. The agent's mascot rides beside it
- * ([ComposerCompanionRow]), so it moves with the bar.
+ * raises [ChatSurfaceIntent.Expand] to open the full page. Off the chat page the agent's mascot
+ * rides beside it ([ComposerCompanionRow]); on the chat page the docked panel seats it in its
+ * top-centre badge instead ([LocalComposerCompanion] is off), so the bar keeps the full width.
  */
 @Composable
 internal fun DockedComposerBar(model: ComposerModel, onAttachImage: () -> Unit) {

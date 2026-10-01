@@ -14,6 +14,16 @@ object ChatMascotDimens {
     /** Width the prompt row reserves for the companion at the box's left edge. */
     val composerCompanionSlot: Dp = 108.dp
 
+    /**
+     * The open docked panel's avatar badge: a disc at the top centre of the panel, straddling its
+     * top edge, with the companion inside instead of beside the bar (the bar keeps the panel's
+     * whole width).
+     */
+    val dockBadge: Dp = 60.dp
+
+    /** The companion's seat inside [dockBadge]: the body (~60 % of it) sits within the disc. */
+    val dockBadgeSeat: Dp = 80.dp
+
     /** The fresh conversation's greeting: the agent at hero size above the starter prompts. */
     val welcomeHero: Dp = 220.dp
 

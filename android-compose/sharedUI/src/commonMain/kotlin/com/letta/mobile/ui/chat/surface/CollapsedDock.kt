@@ -249,7 +249,7 @@ private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent,
         contentAlignment = Alignment.Center,
     ) {
         // On the chat page the page's one companion seat stands here (it glides over from the
-        // bar's slot as the dock folds); this spot only tells it where.
+        // open panel's badge as the dock folds); this spot only tells it where.
         val anchors = LocalCompanionSeatAnchors.current
         if (anchors != null && mascotAvailable(content.agentId)) {
             if (seated) CompanionSeatAnchor(anchors)
