@@ -34,6 +34,45 @@ class ChatImageBitmapsTest {
     }
 
     @Test
+    fun theCacheIsBoundedByDecodedBytes() {
+        val bitmap = assertNotNull(ChatImageBitmaps.decode(png)) // 2 x 1 px = 8 bytes
+        val cache = ImageBitmapLruCache(maxEntries = 32, maxBytes = 20)
+        cache.put(ImageContentKey(1, 1), bitmap)
+        cache.put(ImageContentKey(2, 2), bitmap)
+        assertEquals(16, cache.bytes)
+
+        cache.put(ImageContentKey(3, 3), bitmap)
+
+        assertEquals(2, cache.size)
+        assertEquals(16, cache.bytes)
+        assertNull(cache[ImageContentKey(1, 1)])
+    }
+
+    @Test
+    fun anImageLargerThanTheBudgetIsNotKept() {
+        val bitmap = assertNotNull(ChatImageBitmaps.decode(png))
+        val cache = ImageBitmapLruCache(maxEntries = 32, maxBytes = 4)
+        cache.put(ImageContentKey(1, 1), bitmap)
+        assertEquals(0, cache.size)
+        assertEquals(0, cache.bytes)
+    }
+
+    @Test
+    fun trimAndClearReleaseMemory() {
+        val bitmap = assertNotNull(ChatImageBitmaps.decode(png))
+        val cache = ImageBitmapLruCache(maxEntries = 32)
+        repeat(4) { cache.put(ImageContentKey(it, it), bitmap) }
+
+        cache.trim(targetBytes = 16)
+        assertEquals(2, cache.size)
+        assertNotNull(cache[ImageContentKey(3, 3)])
+
+        cache.clear()
+        assertEquals(0, cache.size)
+        assertEquals(0, cache.bytes)
+    }
+
+    @Test
     fun decodeRejectsWhatIsNotAnImage() {
         assertNull(ChatImageBitmaps.decode("not an image"))
         assertEquals(2, ChatImageBitmaps.decode(png)?.width)

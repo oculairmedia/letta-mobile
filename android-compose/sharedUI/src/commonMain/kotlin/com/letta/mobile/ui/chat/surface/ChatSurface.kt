@@ -97,6 +97,7 @@ fun ChatSurface(
     val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
     val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
+    ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
     val dock = rememberChatDockState(dockGeometry, onDockGeometryChange)
     val frame = ChatSurfaceFrame(
