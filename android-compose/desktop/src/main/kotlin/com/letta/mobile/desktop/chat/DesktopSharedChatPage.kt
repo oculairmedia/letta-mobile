@@ -40,6 +40,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
+import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
@@ -127,6 +128,7 @@ internal fun DesktopSharedChatPage(
     var presentation by remember {
         mutableStateOf(ChatSurfacePresentation.initial(openOnCanvas.enabled.value, hasCanvas = true))
     }
+    val hasConversation = state.canvasOwner.conversationId != null
     val host = rememberDesktopChatSurfaceHost(port, navigation)
     val ambientStatus = rememberDesktopAmbientStatus(state.isThinking, state.errorMessage)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
@@ -158,7 +160,9 @@ internal fun DesktopSharedChatPage(
             )
         },
         pagedTimeline = state.pagedTimeline,
-        canvas = { actions -> DockedConversationCanvas(session, actions) },
+        canvas = { actions ->
+            if (hasConversation) DockedConversationCanvas(session, actions) else ChatCanvasPlaceholder()
+        },
     )
 }
 
@@ -174,6 +178,8 @@ private fun rememberConversationCanvasSession(
 ): CanvasSession? {
     val session by produceState<CanvasSession?>(null, store, owner.conversationId, owner.agentId) {
         value = null
+        // A new chat has no board yet: never fall back to a shared default board for it.
+        if (owner.conversationId == null) return@produceState
         openDesktopCanvasSession(
             OpenDesktopCanvasParams(
                 scope = this,

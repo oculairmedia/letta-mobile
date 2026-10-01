@@ -65,13 +65,23 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
  * back act on that page (attach to the draft, expand the chat), not on navigation.
  */
 private val AppChatCanvasSlot = ChatCanvasSlot { target, actions ->
-    com.letta.mobile.ui.screens.canvas.CanvasScreen(
-        canvasId = "",
-        conversationId = target.conversationId,
-        agentId = target.agentId,
-        onNavigateBack = actions::back,
-        onShareToChat = actions::shareToChat,
-    )
+    // No board for a chat without a conversation yet; once the first send creates one, the
+    // board is that conversation's own, in a ViewModel keyed by it (CanvasViewModel binds once).
+    val canvasKey = com.letta.mobile.ui.chat.surface.chatCanvasKey(target.conversationId)
+    if (canvasKey == null) {
+        com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder()
+    } else {
+        androidx.compose.runtime.key(canvasKey) {
+            com.letta.mobile.ui.screens.canvas.CanvasScreen(
+                canvasId = "",
+                conversationId = target.conversationId,
+                agentId = target.agentId,
+                onNavigateBack = actions::back,
+                onShareToChat = actions::shareToChat,
+                viewModel = hiltViewModel(key = canvasKey),
+            )
+        }
+    }
 }
 
 private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavHostController) {

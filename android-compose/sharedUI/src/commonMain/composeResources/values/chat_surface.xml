@@ -5,4 +5,5 @@
     <string name="chat_surface_canvas_share_failed">Couldn’t attach the canvas to the message</string>
     <string name="chat_surface_docked_reply_expand">Open the full chat</string>
     <string name="chat_surface_docked_reply_dismiss">Hide this reply</string>
+    <string name="chat_surface_canvas_pending">Send a message to start this conversation’s canvas</string>
 </resources>
