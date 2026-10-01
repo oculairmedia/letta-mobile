@@ -291,9 +291,12 @@ private fun LazyListScope.pagedLoadFooter(scope: PagedRowsScope) {
     }
 }
 
-/** Only rows actually held by the list count as resident: this drains the live overlay. */
+/**
+ * Only rows actually held by the list count as resident: this drains the live overlay. Every view
+ * of a paged timeline (the full page and the docked panel) must run it, or the overlay never drains.
+ */
 @Composable
-private fun ObserveResidentRows(
+internal fun ObserveResidentRows(
     presentation: CanonicalTimelinePresentation,
     settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
 ) {

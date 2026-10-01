@@ -30,6 +30,7 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
+import com.letta.mobile.ui.chat.surface.timeline.ObserveResidentRows
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowContexts
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
@@ -109,6 +110,8 @@ private fun rememberMessageHistory(state: ChatUiState, appearance: ChatSurfaceAp
 private fun rememberPagedHistory(presentation: CanonicalTimelinePresentation): List<ChatRenderItem> {
     val live by presentation.live.collectAsState()
     val settled = presentation.settled.collectAsLazyPagingItems()
+    // Docked is the default view: without this the live overlay would never drain while docked.
+    ObserveResidentRows(presentation, settled)
     val snapshot = settled.itemSnapshotList
     return remember(live, snapshot) {
         val liveKeys = live.mapTo(HashSet()) { it.key }
