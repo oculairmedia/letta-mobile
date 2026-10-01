@@ -49,7 +49,7 @@ internal fun keyboardOpen(): Boolean = WindowInsets.ime.getBottom(LocalDensity.c
  */
 @Composable
 internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit) {
-    val swipeEnabled = model.mode == ChatSurfaceMode.FullScreen && !model.streaming && !keyboardOpen()
+    val swipeEnabled = model.offersOpenCanvas && !model.streaming && !keyboardOpen()
     Surface(
         // Order matters: widthIn BEFORE fillMaxWidth, or fillMaxWidth pins min == max and the cap is lost.
         modifier = Modifier

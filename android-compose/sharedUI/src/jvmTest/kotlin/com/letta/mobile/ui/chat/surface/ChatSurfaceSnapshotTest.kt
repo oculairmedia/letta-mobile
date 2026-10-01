@@ -72,7 +72,12 @@ class ChatSurfaceSnapshotTest {
         model = ChatModelUiState(currentHandle = "anthropic/claude-sonnet", currentLabel = "Sonnet"),
     )
 
-    private fun snapshot(name: String, presentation: ChatSurfacePresentation, dark: Boolean) = runComposeUiTest {
+    private fun snapshot(
+        name: String,
+        presentation: ChatSurfacePresentation,
+        dark: Boolean,
+        withCanvas: Boolean = false,
+    ) = runComposeUiTest {
         setContent {
             MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -81,6 +86,11 @@ class ChatSurfaceSnapshotTest {
                         presentation = presentation,
                         onIntent = {},
                         host = ChatSurfaceHost(openCanvas = {}),
+                        canvas = if (withCanvas) {
+                            { Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.tertiaryContainer)) }
+                        } else {
+                            null
+                        },
                     )
                 }
             }
@@ -100,4 +110,12 @@ class ChatSurfaceSnapshotTest {
 
     @Test
     fun dockedLight() = snapshot("docked-light", ChatSurfacePresentation.CanvasFirst, dark = false)
+
+    @Test
+    fun dockedUnderCanvas() =
+        snapshot("docked-canvas", ChatSurfacePresentation.CanvasFirst, dark = false, withCanvas = true)
+
+    @Test
+    fun fullScreenOverCanvas() =
+        snapshot("full-screen-canvas", ChatSurfacePresentation.ChatFirst, dark = true, withCanvas = true)
 }

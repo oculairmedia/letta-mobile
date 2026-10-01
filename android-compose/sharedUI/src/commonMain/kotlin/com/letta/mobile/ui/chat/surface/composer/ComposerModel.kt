@@ -34,8 +34,11 @@ internal data class ComposerModel(
 
     val showModel: Boolean get() = capabilities.modelSwitch && composer.model != null
 
-    /** "Open canvas" belongs to the full-screen page: docked, the canvas is already on screen. */
-    val offersOpenCanvas: Boolean get() = mode == ChatSurfaceMode.FullScreen
+    /**
+     * "Open canvas" belongs to the full-screen page of a host that has a canvas: docked, the
+     * canvas is already on screen; with no canvas there is nowhere to go.
+     */
+    val offersOpenCanvas: Boolean get() = mode == ChatSurfaceMode.FullScreen && host.openCanvas != null
 
     /** Sends (or, during a run with nothing to queue, stops). */
     fun runAction() {

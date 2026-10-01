@@ -150,10 +150,26 @@ class ChatComposerPanelUiTest {
     @Test
     fun swipeUpOnTheFullScreenCardOpensTheCanvas() = runComposeUiTest {
         val intents = mutableListOf<ChatSurfaceIntent>()
-        setContent { Panel(composer = ready(), actions = RecordingChatActions(), onIntent = { intents += it }) }
+        setContent {
+            Panel(
+                composer = ready(),
+                actions = RecordingChatActions(),
+                onIntent = { intents += it },
+                host = ChatSurfaceHost(openCanvas = {}),
+            )
+        }
 
         onNodeWithTag(ComposerTestTags.CARD).performTouchInput { swipeUp() }
         runOnIdle { assertEquals(listOf<ChatSurfaceIntent>(ChatSurfaceIntent.OpenCanvas), intents) }
+    }
+
+    @Test
+    fun swipeUpDoesNothingWhenTheHostHasNoCanvas() = runComposeUiTest {
+        val intents = mutableListOf<ChatSurfaceIntent>()
+        setContent { Panel(composer = ready(), actions = RecordingChatActions(), onIntent = { intents += it }) }
+
+        onNodeWithTag(ComposerTestTags.CARD).performTouchInput { swipeUp() }
+        runOnIdle { assertTrue(intents.isEmpty(), "got $intents") }
     }
 
     @Test

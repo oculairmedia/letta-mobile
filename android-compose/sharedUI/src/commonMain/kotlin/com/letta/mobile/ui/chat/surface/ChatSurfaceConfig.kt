@@ -34,6 +34,12 @@ data class ChatSurfacePlatform(
      * with recognised text, which the composer appends to the draft.
      */
     val voiceInput: (@Composable (onDictated: (String) -> Unit) -> Unit)? = null,
+    /**
+     * Draws the full-screen page's background (the hosts' ambient agent glow) around its
+     * content. Null uses the theme background. It is the page's own layer because, over a
+     * canvas, the page must be opaque.
+     */
+    val pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)? = null,
 ) {
     companion object {
         val Default = ChatSurfacePlatform()
