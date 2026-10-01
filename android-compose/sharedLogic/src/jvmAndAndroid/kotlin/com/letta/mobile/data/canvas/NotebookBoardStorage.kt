@@ -272,6 +272,72 @@ internal object NotebookBoardStorage {
         digests.forEach { (entry, value) -> setStringIfChanged(tx, map, entry, value) }
     }
 
+    // ---- moving to a new document ---------------------------------------------------------
+
+    /**
+     * Copy [source]'s current state into a new document's first transaction, keeping only what the
+     * board needs (see [NotebookHistoryArchive.compactToNewDocument]); root keys in [skip] are left
+     * to the caller. Left behind, and kept only in the archive, whose final state has all of it:
+     * - Tombstones, and the element bodies they hide. They only mask writes made concurrently with
+     *   a delete in the old history, which never merges into the new document; the board reads the
+     *   same without them ([sameContent] checks).
+     * - Deleted-element snapshots (the history view's restore list) past [restoreListBytes]. Kept
+     *   ones are chosen smallest first, which keeps the most elements restorable; the store records
+     *   no deletion times to keep the most recent instead.
+     * - The legacy full-scene copy of the canvas base; the base is written as digests.
+     * Returns how many restore-list entries were left in the archive.
+     */
+    fun copyCurrentState(source: Read, tx: Transaction, skip: Set<String>, restoreListBytes: Long): Int {
+        val handled = setOf(ELEMENTS, TOMBSTONES, DELETED, LEGACY_BASE, BASE_BLANK, BASE_ELEMENTS, BASE_FIELDS)
+        for (key in source.keys(ObjectId.ROOT).orElseThrow()) {
+            if (key in skip || key in handled) continue
+            NotebookHistoryArchive.copyValue(source, source.get(ObjectId.ROOT, key).orElseThrow(), tx, ObjectId.ROOT, key)
+        }
+        val hidden = (source.get(ObjectId.ROOT, TOMBSTONES).orElse(null) as? AmValue.Map)
+            ?.let { source.keys(it.id).orElseThrow().toSet() }.orEmpty()
+        // Created even when empty, as a new notebook has them: two peers creating one concurrently
+        // would each make their own map, and one map's entries would be lost.
+        val elements = tx.set(ObjectId.ROOT, ELEMENTS, ObjectType.MAP)
+        tx.set(ObjectId.ROOT, TOMBSTONES, ObjectType.MAP)
+        val restore = tx.set(ObjectId.ROOT, DELETED, ObjectType.MAP)
+        (source.get(ObjectId.ROOT, ELEMENTS).orElse(null) as? AmValue.Map)?.let { from ->
+            for (key in source.keys(from.id).orElseThrow()) {
+                if (key !in hidden) NotebookHistoryArchive.copyValue(source, source.get(from.id, key).orElseThrow(), tx, elements, key)
+            }
+        }
+        val snapshots = (source.get(ObjectId.ROOT, DELETED).orElse(null) as? AmValue.Map)?.let { map ->
+            source.keys(map.id).orElseThrow().mapNotNull { key ->
+                (source.get(map.id, key).orElse(null) as? AmValue.Str)?.value?.let { key to it }
+            }
+        }.orEmpty()
+        val live = (Json.parseToJsonElement(boardJson(source)).jsonObject["elements"] as? JsonArray).orEmpty().mapNotNull(::idOf).toSet()
+        val restorable = snapshots.filter { (key, _) -> key !in live }.sortedWith(compareBy({ it.second.length }, { it.first }))
+        var bytes = 0L
+        val kept = restorable.takeWhile { (key, value) ->
+            bytes += key.length + value.length
+            bytes <= restoreListBytes
+        }
+        kept.forEach { (key, value) -> tx.set(restore, key, value) }
+        readSceneBase(source)?.let { writeSceneBase(tx, it) }
+        return restorable.size - kept.size
+    }
+
+    /** Whether [a] and [b] read as the same notebook: board, canvas base, title, text, items and metadata. */
+    fun sameContent(a: Read, b: Read): Boolean {
+        fun string(read: Read, key: String) = (read.get(ObjectId.ROOT, key).orElse(null) as? AmValue.Str)?.value
+        fun text(read: Read) = (read.get(ObjectId.ROOT, "markdown").orElse(null) as? AmValue.Text)?.let { read.text(it.id).orElse(null) }
+        fun items(read: Read) = (read.get(ObjectId.ROOT, "items").orElse(null) as? AmValue.Map)?.let { map ->
+            read.keys(map.id).orElseThrow().associateWith { (read.get(map.id, it).orElse(null) as? AmValue.Str)?.value }
+        }
+        return Json.parseToJsonElement(boardJson(a)) == Json.parseToJsonElement(boardJson(b)) &&
+            readSceneBase(a) == readSceneBase(b) &&
+            baseIsBlank(a) == baseIsBlank(b) &&
+            layoutVersion(a) == layoutVersion(b) &&
+            listOf("title", "canvasMetadata", "schema").all { string(a, it) == string(b, it) } &&
+            text(a) == text(b) &&
+            items(a) == items(b)
+    }
+
     // ---- helpers ------------------------------------------------------------------------
 
     fun sceneBoard(scene: String): JsonObject {

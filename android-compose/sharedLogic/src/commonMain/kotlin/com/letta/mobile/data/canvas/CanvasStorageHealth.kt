@@ -31,12 +31,15 @@ data class CanvasStorageFault(
         /** The document's history passed the warning share of its size budget. */
         NEAR_BUDGET,
 
-        /** The document's history was archived and it continues from its current state. */
+        /**
+         * The document's history was archived, and the board continues from its current state in
+         * a new document; the old one is retired.
+         */
         COMPACTED,
 
         /**
-         * The document's history passed its size budget and is not restarted, because it does or
-         * may sync with peers (a fresh history under the same id would conflict with theirs).
+         * The document's history passed its size budget: it is moved to a new document the next
+         * time the store opens, or it could not be, and stays as it is.
          */
         OVER_BUDGET,
 

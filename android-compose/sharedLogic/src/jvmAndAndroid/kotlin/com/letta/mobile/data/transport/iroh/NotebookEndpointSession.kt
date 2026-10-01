@@ -45,13 +45,12 @@ class NotebookEndpointSession private constructor(
     /** Compatibility constructor for sessions that own their own store and projection poller. */
     constructor(directory: Path, endpoint: Endpoint, peers: Set<String>, scope: CoroutineScope) :
         this(
-            // A synced store: an over-budget history is reported, never restarted under peers.
             NotebookLocalStore(directory, IrohDiagnostics.endpointIdHex(endpoint.addr().id()), NotebookHistoryBudget()),
             endpoint, peers, scope, true,
         )
 
-    // repoForSync refuses a store that restarts histories, and marks the directory as synced so
-    // that no later store restarts one either.
+    // repoForSync waits for the store's startup moves; documents they retired are never announced
+    // to peers, and a peer offering one is neither stored nor indexed.
     private val protocol = AutomergeIrohRepoProtocol(store.repoForSync(), peers, scope, endpoint::connect)
     init {
         if (ownsStore) store.startPolling(1_000)

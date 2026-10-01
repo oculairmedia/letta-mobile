@@ -1,22 +1,18 @@
 package com.letta.mobile.data.canvas
 
-import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.channels.FileChannel
 import java.nio.channels.OverlappingFileLockException
 import java.nio.file.StandardOpenOption.CREATE
 import java.nio.file.StandardOpenOption.WRITE
 import java.nio.file.Files
-import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -39,9 +35,10 @@ import org.automerge.repo.storage.FileSystemStorage
 /**
  * One peer's durable notebook documents, independent of App Server conversations.
  *
- * Over-budget histories are reported, not restarted, unless [budget] opts in with
- * [NotebookHistoryBudget.compactOversized]; a store that opted in cannot be handed to peer sync
- * ([repoForSync]), and a directory that ever was is never restarted again.
+ * When the store opens, before anything can be opened, a document whose history is over [budget]
+ * is archived and its board moved to a new document (new id, same canvas metadata), and the old id
+ * is retired: it is never opened, indexed or stored again, whichever peer offers it. Canvas lookups
+ * go by canvas id or conversation, so they find the new document. See [NotebookHistoryArchive].
  */
 class NotebookLocalStore(
     directory: Path,
@@ -50,15 +47,12 @@ class NotebookLocalStore(
     /** Wraps the repository's file storage; tests use it to inject failures. */
     storage: (Storage) -> Storage = { it },
 ) : AutoCloseable, CanvasStorageHealth {
-    @Serializable
-    private data class DocumentIndex(val ids: List<String>)
-
     private val canvasLockFile = directory.resolve("notebook-canvas.lock")
     private val projection = NotebookFilesystemProjection(directory.resolve("projection"))
 
     /**
-     * Serialize canvas claims, CAS and history restarts across instances and processes using this
-     * repository. Waits for this store's own startup restarts first, which run under the same lock.
+     * Serialize canvas claims, CAS and history moves across instances and processes using this
+     * repository. Waits for this store's own startup moves first, which run under the same lock.
      */
     internal fun <T> withCanvasLock(action: () -> T): T {
         health.awaitPrepared()
@@ -77,7 +71,7 @@ class NotebookLocalStore(
             }
         }
     }
-    private val indexFile = directory.resolve("notebook-documents.json")
+    private val documents = NotebookDocumentIndex(directory)
     private val poller = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "notebook-projection-poller").apply { isDaemon = true }
     }
@@ -86,7 +80,8 @@ class NotebookLocalStore(
 
     /** Indexed notebooks include local creations and explicitly registered remote documents. */
     @Synchronized
-    fun listDocuments(): List<DocumentId> = health.awaitPrepared().let { readIndex() }.filterNot(health::isQuarantined).map { key ->
+    fun listDocuments(): List<DocumentId> = health.awaitPrepared().let { documents.read() }
+        .filterNot { health.isQuarantined(it) || health.isRetired(it) }.map { key ->
         DocumentId.fromBytes(key.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
     }
 
@@ -119,36 +114,26 @@ class NotebookLocalStore(
         polling = null
     }
 
-    private fun readIndex(): List<String> {
-        if (!Files.exists(indexFile, NOFOLLOW_LINKS)) return emptyList()
-        require(Files.isRegularFile(indexFile, NOFOLLOW_LINKS)) { "Not a regular notebook index: $indexFile" }
-        val ids = Json.decodeFromString<DocumentIndex>(Files.readString(indexFile, UTF_8)).ids
-        require(ids.all { it.length == 32 && it.all { char -> char in '0'..'9' || char in 'a'..'f' } } && ids.distinct().size == ids.size) {
-            "Invalid notebook document index"
-        }
-        return ids
-    }
-
-    /** Register a known remote document after it is available in this repository. */
+    /**
+     * Register a known remote document after it is available in this repository. A retired
+     * document (moved to a new one here) is never registered again, whoever offers it; returns
+     * whether [id] is indexed.
+     */
     @Synchronized
-    fun registerDocument(id: DocumentId) {
+    fun registerDocument(id: DocumentId): Boolean {
         check(!closed) { "Notebook store is closed" }
-        requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        index(id)
-    }
-
-    private fun index(id: DocumentId) {
-        val key = id.stableKey()
-        val previous = readIndex()
-        if (key in previous) return
-        val ids = previous + key
-        val temp = Files.createTempFile(indexFile.parent, ".notebook-index-", ".tmp")
-        try {
-            Files.writeString(temp, Json.encodeToString(DocumentIndex.serializer(), DocumentIndex(ids)), UTF_8)
-            Files.move(temp, indexFile, ATOMIC_MOVE, REPLACE_EXISTING)
-        } finally {
-            Files.deleteIfExists(temp)
+        health.awaitPrepared()
+        if (health.isRetired(id.stableKey())) {
+            Telemetry.event(
+                NotebookStorageFaults.TAG, "retired_document_refused",
+                "documentId" to id.stableKey(), "reason" to "moved to a new document; not registered again",
+                level = Telemetry.Level.WARN,
+            )
+            return false
         }
+        requireNotNull(open(id)) { "Unknown notebook document: $id" }
+        documents.add(id.stableKey())
+        return true
     }
 
     /** Poll for external edits; returns a conflict without changing either copy if both changed. */
@@ -194,7 +179,7 @@ class NotebookLocalStore(
         }
     }
 
-    private val health = NotebookStorageHealth(directory, budget, { readIndex() }, { action -> fileLock(action) })
+    private val health = NotebookStorageHealth(directory, budget, documents, { action -> fileLock(action) })
 
     /**
      * Storage faults: logged at ERROR and kept here for the board to show. Nothing is thrown,
@@ -208,36 +193,33 @@ class NotebookLocalStore(
 
     init {
         // On a background thread, before the repository may open anything: finish interrupted
-        // restarts, check every document against the budget, and (only if opted in and never
-        // synced) archive and restart over-budget ones or set aside those that cannot be.
+        // moves, check every document against the budget, and move over-budget ones to new
+        // documents (or set aside those that cannot be). Moving only here, before any open, means
+        // no canvas session is ever bound to a document that is then retired under it.
         health.prepare()
     }
 
-    /**
-     * The Automerge repository, for this store's own reads and writes. Peer sync must take it
-     * from [repoForSync] instead, which refuses a store that restarts histories.
-     */
+    /** The Automerge repository, for this store's own reads and writes; peer sync uses [repoForSync]. */
     internal val repo: Repo = Repo.load(
         RepoConfig.builder()
             .storage(health.observe(storage(FileSystemStorage(directory))))
             .peerId(PeerId.fromString(peerId))
+            // Retired documents are never offered to peers; their storage is filtered out too.
+            .announcePolicy { id, _ -> CompletableFuture.completedFuture(!health.isRetired(id.stableKey())) }
             .build(),
     ).also(health::attach)
 
     /**
-     * The repository, for peer sync. Refuses a store that opted into restarting over-budget
-     * histories: a restarted document meets the peers' copy of its old history as a concurrent
-     * root, and the merge silently loses edits. Also records, on disk, that this repository syncs,
-     * so no later store restarts its documents either.
+     * The repository, for peer sync, once the store's startup moves are done. A peer may still
+     * offer a retired document: it is neither stored nor indexed (see [NotebookDocumentIndex]).
      */
     fun repoForSync(): Repo {
-        check(!budget.compactOversized) {
-            "This notebook store restarts over-budget histories (compactOversized); it must not sync with peers"
-        }
         health.awaitPrepared()
-        health.markSynced()
         return repo
     }
+
+    /** Retired documents a peer offered since the store opened; each was refused. */
+    internal fun retiredDocumentsOffered(): Set<String> = health.retiredOffered()
 
     /**
      * Note every document whose board layout this build cannot write, so each shows a READ_ONLY
@@ -305,13 +287,13 @@ class NotebookLocalStore(
                 tx.commit()
             }
         }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        index(handle.documentId)
+        documents.add(handle.documentId.stableKey())
         return handle.documentId
     }
 
     fun open(id: DocumentId): DocHandle? {
         health.awaitPrepared()
-        if (health.isQuarantined(id.stableKey())) return null
+        if (health.isQuarantined(id.stableKey()) || health.isRetired(id.stableKey())) return null
         return repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
     }
 

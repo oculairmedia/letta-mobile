@@ -11,12 +11,15 @@ import org.automerge.repo.DocumentId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * A crash can stop a history restart between any two of its steps. Whichever step it stopped at,
- * the next store to open the repository finds the document whole (old history or fresh restart),
- * openable, and with no restart debris left behind.
+ * A crash can stop a move to a new document between any two of its steps. Whichever step it
+ * stopped at, the next store to open the repository finds exactly one document holding the board
+ * (the old one, or the new one with the old retired), openable, and no move debris left behind.
  */
 class NotebookHistoryArchiveRecoveryTest {
     private class Crash : RuntimeException("simulated crash")
@@ -27,9 +30,8 @@ class NotebookHistoryArchiveRecoveryTest {
         store.create("Recovered").also { id -> store.insertMarkdown(id, 0, "Kept text") }
     }
 
-    /** Whether the document continues from a restart (it names its archive) rather than its old history. */
-    private fun restarted(store: NotebookLocalStore, id: DocumentId): Boolean = store.open(id)!!.withDocument { document ->
-        document.get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE).orElse(null) is AmValue.List
+    private fun previousDocument(store: NotebookLocalStore, id: DocumentId): String? = store.open(id)!!.withDocument { document ->
+        (document.get(ObjectId.ROOT, NotebookHistoryArchive.PREVIOUS_DOCUMENT).orElse(null) as? AmValue.Str)?.value
     }.get(5, TimeUnit.SECONDS)
 
     private fun debris(path: Path, key: String): List<String> {
@@ -39,45 +41,70 @@ class NotebookHistoryArchiveRecoveryTest {
             .filterNot { it.endsWith(".automerge.gz") }
     }
 
-    /** Crash a restart right after [step], then open the repository as the next launch would. */
-    private fun crashAfter(step: NotebookHistoryArchive.Step, expectRestarted: Boolean) {
+    /** Crash a move right after [step], then open the repository as the next launch would. */
+    private fun crashAfter(step: NotebookHistoryArchive.Step, expectMoved: Boolean) {
         val path = Files.createTempDirectory("notebook-crash-${step.name.lowercase()}-")
         val id = notebook(path)
         val key = id.key()
+        val archive = NotebookHistoryArchive(path)
         val crashing = NotebookHistoryArchive(path) { if (it == step) throw Crash() }
-        assertFailsWith<Crash> { crashing.compact(key, System.currentTimeMillis()) }
+        assertFailsWith<Crash> { crashing.compactToNewDocument(key, System.currentTimeMillis(), NotebookDocumentIndex(path), 1024) }
 
         NotebookLocalStore(path, "recovery-peer").use { store ->
-            assertEquals(listOf(id), store.listDocuments())
-            assertEquals("Kept text", store.read(id)!!.markdown)
-            assertEquals(expectRestarted, restarted(store, id), "after $step")
+            val current = store.listDocuments().single()
+            if (expectMoved) {
+                assertNotEquals(id, current, "after $step")
+                assertEquals(key, previousDocument(store, current), "after $step")
+                assertNull(store.open(id), "after $step")
+                assertFalse(Files.exists(archive.documentDirectory(key)), "after $step")
+                assertTrue(key in NotebookDocumentIndex(path).retired(), "after $step")
+            } else {
+                assertEquals(id, current, "after $step")
+                assertNull(previousDocument(store, id), "after $step")
+                assertTrue(NotebookDocumentIndex(path).retired().isEmpty(), "after $step")
+            }
+            assertEquals("Kept text", store.read(current)!!.markdown)
             assertTrue(store.faults.faults.value.none { it.isError }, store.faults.faults.value.toString())
             // And it takes writes.
-            store.insertMarkdown(id, 0, ">")
-            assertEquals(">Kept text", store.read(id)!!.markdown)
+            store.insertMarkdown(current, 0, ">")
+            assertEquals(">Kept text", store.read(current)!!.markdown)
         }
         assertEquals(emptyList(), debris(path, key), "after $step")
+        // No orphaned new document is left in storage: only the indexed one (and nothing retired).
+        val storageDirectories = Files.list(path).use { s -> s.iterator().asSequence().toList() }
+            .filter { Files.isDirectory(it) && it.name.length == 2 }
+            .sumOf { prefix -> Files.list(prefix).use { s -> s.filter { Files.isDirectory(it) }.count().toInt() } }
+        assertEquals(1, storageDirectories, "after $step")
     }
 
     @Test
-    fun aCrashAfterArchivingKeepsTheOldHistory() = crashAfter(NotebookHistoryArchive.Step.ARCHIVED, expectRestarted = false)
+    fun aCrashAfterArchivingKeepsTheOldDocument() = crashAfter(NotebookHistoryArchive.Step.ARCHIVED, expectMoved = false)
 
     @Test
-    fun aCrashWhileBuildingTheFreshDocumentKeepsTheOldHistory() =
-        crashAfter(NotebookHistoryArchive.Step.FRESH_PARTIAL, expectRestarted = false)
+    fun aCrashWhileBuildingTheNewDocumentKeepsTheOldDocument() =
+        crashAfter(NotebookHistoryArchive.Step.SUCCESSOR_PARTIAL, expectMoved = false)
 
     @Test
-    fun aCrashBeforeTheOldHistoryMovesKeepsIt() = crashAfter(NotebookHistoryArchive.Step.FRESH_READY, expectRestarted = false)
+    fun aCrashAfterJournalingBeforeTheNewDocumentIsInPlaceKeepsTheOldDocument() =
+        crashAfter(NotebookHistoryArchive.Step.JOURNALED, expectMoved = false)
 
     @Test
-    fun aCrashWithTheOldHistoryMovedAsideFinishesTheRestart() =
-        crashAfter(NotebookHistoryArchive.Step.MOVED_ASIDE, expectRestarted = true)
+    fun aCrashWithTheNewDocumentWholeButNotIndexedFinishesTheMove() =
+        crashAfter(NotebookHistoryArchive.Step.SUCCESSOR_READY, expectMoved = true)
 
     @Test
-    fun aCrashBeforeCleanupKeepsTheRestart() = crashAfter(NotebookHistoryArchive.Step.SWAPPED, expectRestarted = true)
+    fun aCrashAfterTheIndexSwapFinishesTheMove() = crashAfter(NotebookHistoryArchive.Step.INDEXED, expectMoved = true)
 
     @Test
-    fun aCrashWithTheOldHistoryMovedAsideAndNoFreshDocumentPutsTheOldHistoryBack() {
+    fun aCrashAfterRetiringBeforeDeletingTheOldStorageFinishesTheMove() =
+        crashAfter(NotebookHistoryArchive.Step.RETIRED, expectMoved = true)
+
+    @Test
+    fun aCrashBeforeTheJournalIsRemovedFinishesTheMove() = crashAfter(NotebookHistoryArchive.Step.OLD_DELETED, expectMoved = true)
+
+    /** Earlier builds restarted histories in place; a crash there left the old chunks moved aside. */
+    @Test
+    fun anEarlierBuildsRestartWithTheOldHistoryMovedAsideAndNoFreshDocumentPutsTheOldHistoryBack() {
         val path = Files.createTempDirectory("notebook-crash-no-fresh-")
         val id = notebook(path)
         val key = id.key()
@@ -88,15 +115,13 @@ class NotebookHistoryArchiveRecoveryTest {
 
         NotebookLocalStore(path, "recovery-peer").use { store ->
             assertEquals("Kept text", store.read(id)!!.markdown)
-            assertTrue(!restarted(store, id))
         }
         assertEquals(emptyList(), debris(path, key))
     }
 
     /**
-     * The state older builds of this restart left after a crash: old chunks moved aside and an
-     * empty `snapshot/` directory created in their place. Recovery used to fail deleting the
-     * non-empty document directory, leaving the document unopenable for good.
+     * The state the earliest builds' restart left after a crash: old chunks moved aside and an
+     * empty `snapshot/` directory created in their place.
      */
     @Test
     fun theEmptySnapshotDirectoryOlderBuildsLeftIsReplacedByTheOldHistory() {
