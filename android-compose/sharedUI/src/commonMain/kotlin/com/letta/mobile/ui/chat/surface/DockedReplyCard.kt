@@ -1,48 +1,30 @@
 package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.style.TextAlign
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Maximize2
-import com.composables.icons.lucide.X
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_dismiss
-import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_expand
-import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.sharedui.resources.chat_surface_dock_empty
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
@@ -51,16 +33,15 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowContexts
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
-import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: the current exchange, floating above the docked chat bar so a prompt
- * sent from the canvas gets its reply on the canvas. It shows the newest turn (the latest
- * prompt and everything after it, approvals and tool cards included) with the same row
- * renderers as the full page, follows a streaming reply, and stays until dismissed or the
- * next prompt starts a new turn.
+ * letta-mobile-bglj6.1: the conversation inside the docked panel, so a prompt sent from the
+ * canvas gets its reply on the canvas. Newest at the bottom, drawn with the same row renderers
+ * as the full page: the current turn (approvals and tool cards included) when the panel is
+ * short, and as much earlier history as fits when it is taller. It follows a streaming reply
+ * while the person is at the bottom.
  */
 @Immutable
 internal class DockedReplyParams(
@@ -71,90 +52,43 @@ internal class DockedReplyParams(
     val host: ChatSurfaceHost,
     val appearance: ChatSurfaceAppearance,
     val onIntent: (ChatSurfaceIntent) -> Unit,
-    val maxHeight: Dp,
 )
 
 @Composable
 internal fun DockedReplyCard(params: DockedReplyParams, modifier: Modifier = Modifier) {
-    val turn = if (params.pagedTimeline != null) {
-        rememberPagedTurn(params.pagedTimeline)
+    val newestFirst = if (params.pagedTimeline != null) {
+        rememberPagedHistory(params.pagedTimeline)
     } else {
-        rememberMessageTurn(params.state, params.appearance)
+        rememberMessageHistory(params.state, params.appearance)
     }
-    var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
-    val turnKey = turn.firstOrNull()?.key
-    if (turn.isEmpty() || turnKey == dismissedTurn) return
-    Surface(
-        modifier = modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth().testTag(DOCKED_REPLY_TAG),
-        shape = RoundedCornerShape(LettaDimens.Radius.lg),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = ChatSurfaceDimens.dockedReplyElevation,
-        shadowElevation = ChatSurfaceDimens.dockedReplyElevation,
-    ) {
-        Column {
-            DockedReplyHeader(
-                agentName = params.state.agentName,
-                onExpand = { params.onIntent(ChatSurfaceIntent.Expand) },
-                onDismiss = { dismissedTurn = turnKey },
-            )
-            if (params.state.isStreaming) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md))
-            }
-            DockedReplyBody(turn, params)
-        }
-    }
-}
-
-@Composable
-private fun DockedReplyHeader(agentName: String, onExpand: () -> Unit, onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        Text(
-            text = agentName,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onExpand, modifier = Modifier.size(LettaDimens.Control.iconButtonLg)) {
-            Icon(
-                Lucide.Maximize2,
-                contentDescription = stringResource(Res.string.chat_surface_docked_reply_expand),
-                modifier = Modifier.size(LettaDimens.Control.icon),
+    if (newestFirst.isEmpty()) {
+        Box(modifier.testTag(DOCKED_REPLY_TAG), contentAlignment = Alignment.Center) {
+            Text(
+                text = stringResource(Res.string.chat_surface_dock_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(LettaDimens.Space.lg),
             )
         }
-        IconButton(onClick = onDismiss, modifier = Modifier.size(LettaDimens.Control.iconButtonLg)) {
-            Icon(
-                Lucide.X,
-                contentDescription = stringResource(Res.string.chat_surface_docked_reply_dismiss),
-                modifier = Modifier.size(LettaDimens.Control.icon),
-            )
-        }
+        return
     }
-}
-
-@Composable
-private fun DockedReplyBody(turn: List<ChatRenderItem>, params: DockedReplyParams) {
-    val scroll = rememberScrollState()
-    // Follow the reply as it streams in, like the full page's follow-latest.
-    LaunchedEffect(turn, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    val listState = rememberLazyListState()
+    // Follow the newest item while the person is reading the bottom of the conversation.
+    val newestKey = newestFirst.first().key
+    LaunchedEffect(newestKey) {
+        if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
+    }
     val contexts = rememberRowContexts(params.state, params.capabilities, params.appearance, rowFontScale(params.appearance))
     val callbacks = rememberRowCallbacks(params.actions, params.host) { _, _ -> params.onIntent(ChatSurfaceIntent.Expand) }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = params.maxHeight)
-            .verticalScroll(scroll)
-            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+    LazyColumn(
+        state = listState,
+        reverseLayout = true,
+        modifier = modifier.testTag(DOCKED_REPLY_TAG),
+        contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md, Alignment.Bottom),
     ) {
-        turn.forEach { item -> ChatRenderItemRow(item, contexts.forItem(item), callbacks) }
-        Spacer(Modifier.size(LettaDimens.Space.xs))
+        items(newestFirst, key = { it.key }) { item -> ChatRenderItemRow(item, contexts.forItem(item), callbacks) }
     }
 }
 
@@ -163,23 +97,23 @@ private fun rowFontScale(appearance: ChatSurfaceAppearance): Float =
     if (appearance.fontScaleAppliedByHost) 1f else appearance.fontScale
 
 @Composable
-private fun rememberMessageTurn(state: ChatUiState, appearance: ChatSurfaceAppearance): List<ChatRenderItem> {
+private fun rememberMessageHistory(state: ChatUiState, appearance: ChatSurfaceAppearance): List<ChatRenderItem> {
     val cache = remember(state.agentId) { IncrementalChatRenderItemsCache() }
     return remember(state.messages, appearance.displayMode) {
-        currentTurn(cache.renderItems(state.messages, appearance.displayMode, state.messageListChange, state.agentId))
+        cache.renderItems(state.messages, appearance.displayMode, state.messageListChange, state.agentId).take(HISTORY_LIMIT)
     }
 }
 
 /** The paged route: live rows (the turn in flight) over the newest settled rows. */
 @Composable
-private fun rememberPagedTurn(presentation: CanonicalTimelinePresentation): List<ChatRenderItem> {
+private fun rememberPagedHistory(presentation: CanonicalTimelinePresentation): List<ChatRenderItem> {
     val live by presentation.live.collectAsState()
     val settled = presentation.settled.collectAsLazyPagingItems()
     val snapshot = settled.itemSnapshotList
     return remember(live, snapshot) {
         val liveKeys = live.mapTo(HashSet()) { it.key }
-        val newestSettled = snapshot.items.take(TURN_LOOKBACK).map { it.item }.filter { it.key !in liveKeys }
-        currentTurn(live + newestSettled)
+        val newestSettled = snapshot.items.take(HISTORY_LIMIT).map { it.item }.filter { it.key !in liveKeys }
+        (live + newestSettled).take(HISTORY_LIMIT)
     }
 }
 
@@ -196,3 +130,6 @@ internal fun currentTurn(newestFirst: List<ChatRenderItem>): List<ChatRenderItem
 
 internal const val DOCKED_REPLY_TAG = "chat-docked-reply"
 private const val TURN_LOOKBACK = 12
+
+/** How far back the docked panel's history reaches; the full page has the rest. */
+private const val HISTORY_LIMIT = 60

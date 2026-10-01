@@ -22,6 +22,7 @@ import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
+import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
@@ -66,6 +67,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     var presentation by rememberSaveable(stateSaver = PresentationSaver) {
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
     }
+    // Where the docked panel sits; it opens as a full-width bottom panel on a phone.
+    var dockGeometry by rememberSaveable(stateSaver = DockGeometrySaver) { mutableStateOf(ChatDockGeometry.Default) }
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
     // Read live by the rings overlay, whose slot lambda is remembered with the platform.
     val currentSubagents by rememberUpdatedState(params.subagents)
@@ -112,6 +115,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             ),
             pagedTimeline = params.pagingPresentation?.canonical,
             canvas = canvas,
+            dockGeometry = dockGeometry,
+            onDockGeometryChange = { dockGeometry = it },
         )
         SharedChatSubagentSheet(
             state = subagentSheet,
@@ -192,4 +197,12 @@ private fun DictationButton(onDictated: (String) -> Unit) {
 private val PresentationSaver = Saver<ChatSurfacePresentation, String>(
     save = { it.mode.name },
     restore = { name -> ChatSurfacePresentation(mode = ChatSurfaceMode.valueOf(name)) },
+)
+
+/** The docked panel's placement across configuration changes and process death. */
+private val DockGeometrySaver = Saver<ChatDockGeometry, String>(
+    save = { kotlinx.serialization.json.Json.encodeToString(ChatDockGeometry.serializer(), it) },
+    restore = { saved ->
+        runCatching { kotlinx.serialization.json.Json.decodeFromString(ChatDockGeometry.serializer(), saved) }.getOrNull()
+    },
 )

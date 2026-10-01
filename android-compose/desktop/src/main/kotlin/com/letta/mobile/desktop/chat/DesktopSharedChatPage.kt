@@ -139,6 +139,7 @@ internal fun DesktopSharedChatPage(
             if (router.showRequests > 0) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
         }
     }
+    var dockGeometry by rememberDesktopChatDockGeometry()
     ChatSurface(
         port = port,
         presentation = presentation,
@@ -171,6 +172,8 @@ internal fun DesktopSharedChatPage(
         canvas = { actions ->
             if (hasConversation) DockedConversationCanvas(session, actions) else ChatCanvasPlaceholder()
         },
+        dockGeometry = dockGeometry,
+        onDockGeometryChange = { dockGeometry = it },
     )
 }
 

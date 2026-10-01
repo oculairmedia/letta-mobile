@@ -19,6 +19,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
+import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
@@ -76,6 +77,7 @@ class ChatSurfaceSnapshotTest {
         presentation: ChatSurfacePresentation,
         dark: Boolean,
         withCanvas: Boolean = false,
+        dock: ChatDockGeometry = ChatDockGeometry.Default,
     ) = runComposeUiTest {
         setContent {
             MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
@@ -90,6 +92,7 @@ class ChatSurfaceSnapshotTest {
                         } else {
                             null
                         },
+                        dockGeometry = dock,
                     )
                 }
             }
@@ -113,6 +116,24 @@ class ChatSurfaceSnapshotTest {
     @Test
     fun dockedUnderCanvas() =
         snapshot("docked-canvas", ChatSurfacePresentation.CanvasFirst, dark = false, withCanvas = true)
+
+    @Test
+    fun dockedPanelMovedAndResized() = snapshot(
+        "docked-panel-moved",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = true,
+        withCanvas = true,
+        dock = ChatDockGeometry(anchorX = 1f, anchorY = 0.3f, widthDp = 460f, heightDp = 520f),
+    )
+
+    @Test
+    fun dockedPanelCollapsed() = snapshot(
+        "docked-panel-collapsed",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = false,
+        withCanvas = true,
+        dock = ChatDockGeometry(anchorX = 0.1f, anchorY = 1f, widthDp = 520f, collapsed = true),
+    )
 
     @Test
     fun fullScreenOverCanvas() =

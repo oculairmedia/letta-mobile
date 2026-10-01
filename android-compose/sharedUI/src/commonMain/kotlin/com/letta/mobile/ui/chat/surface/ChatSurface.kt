@@ -1,11 +1,8 @@
 package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.ui.unit.Dp
-import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +24,7 @@ import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
+import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
@@ -45,7 +43,7 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * letta-mobile-bglj6.1: the ONE chat page, shared by Android and desktop.
  *
- * It renders [port] in the presentation's [ChatSurfaceMode]: a bar docked under the canvas
+ * It renders [port] in the presentation's [ChatSurfaceMode]: a panel docked over the canvas
  * (the default view), the full-screen page, or (reserved) a floating panel. Every mode binds
  * to the same [port], so the draft, queued follow-ups and the run are the same object in each.
  *
@@ -64,6 +62,9 @@ import org.jetbrains.compose.resources.stringResource
  * @param pagedTimeline the canonical paged timeline when the owner has one; otherwise the
  *   timeline renders `ChatUiState.messages`.
  * @param canvas the host's canvas for this conversation, or null when the host has none here.
+ * @param dockGeometry where the docked panel sits and how big it is; owned and persisted by the
+ *   host, changed through [onDockGeometryChange] as the person drags, resizes, minimises or
+ *   resets it. A host that does not hoist it gets a panel that still moves for the session.
  */
 @Composable
 fun ChatSurface(
@@ -76,6 +77,8 @@ fun ChatSurface(
     platform: ChatSurfacePlatform = ChatSurfacePlatform.Default,
     pagedTimeline: CanonicalTimelinePresentation? = null,
     canvas: (@Composable (ChatCanvasActions) -> Unit)? = null,
+    dockGeometry: ChatDockGeometry = ChatDockGeometry.Default,
+    onDockGeometryChange: (ChatDockGeometry) -> Unit = {},
 ) {
     val uiState by port.uiState.collectAsState()
     val composer by port.composer.collectAsState()
@@ -89,6 +92,7 @@ fun ChatSurface(
     // One scroll position per conversation (and paged presentation), kept across mode changes.
     val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
+    val dock = rememberChatDockState(dockGeometry, onDockGeometryChange)
     val frame = ChatSurfaceFrame(
         port = port,
         snackbars = snackbars,
@@ -108,12 +112,10 @@ fun ChatSurface(
             if (presentation.mode == ChatSurfaceMode.FullScreen) {
                 FullScreenPage(frame, Modifier.fillMaxSize(), opaque = false)
             } else {
-                BoxWithConstraints {
-                    DockedOverlay(frame, maxHeight * ChatSurfaceDimens.dockedReplyMaxHeightFraction, Modifier.align(Alignment.BottomCenter))
-                }
+                DockedOverlay(frame, dock, Modifier.fillMaxSize())
             }
         } else {
-            CanvasWithChat(frame, { canvas(canvasActions) }, Modifier)
+            CanvasWithChat(frame, dock, { canvas(canvasActions) }, Modifier)
         }
     }
 }
@@ -142,43 +144,48 @@ private class ChatSurfaceFrame(
 }
 
 /**
- * The canvas fills the whole area and is always composed. Docked, the chat bar and the
- * current reply float over its bottom edge; full screen, the page covers it.
+ * The canvas fills the whole area and is always composed. Docked, the chat panel floats over
+ * it wherever the person put it; full screen, the page covers it.
  */
 @Composable
-private fun CanvasWithChat(frame: ChatSurfaceFrame, canvas: @Composable () -> Unit, modifier: Modifier) {
+private fun CanvasWithChat(frame: ChatSurfaceFrame, dock: ChatDockState, canvas: @Composable () -> Unit, modifier: Modifier) {
     val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize()) {
         // Hidden from accessibility while the page covers it; it stays composed for its state.
         val canvasModifier = Modifier.fillMaxSize()
         Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
         if (fullScreen) {
             FullScreenPage(frame, Modifier.fillMaxSize(), opaque = true)
         } else {
-            DockedOverlay(frame, maxHeight * ChatSurfaceDimens.dockedReplyMaxHeightFraction, Modifier.align(Alignment.BottomCenter))
+            DockedOverlay(frame, dock, Modifier.fillMaxSize())
         }
     }
 }
 
-/** The floating reply card over the floating chat bar, bottom-centred over the canvas. */
+/** The movable, resizable chat panel: header, conversation, composer bar. */
 @Composable
-private fun DockedOverlay(frame: ChatSurfaceFrame, replyMaxHeight: Dp, modifier: Modifier) {
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        DockedReplyCard(
-            DockedReplyParams(
-                state = frame.uiState,
-                pagedTimeline = frame.pagedTimeline,
-                actions = frame.port.actions,
-                capabilities = frame.port.capabilities,
-                host = frame.host,
-                appearance = frame.appearance,
-                onIntent = frame.onIntent,
-                maxHeight = replyMaxHeight,
-            ),
-            Modifier.padding(horizontal = LettaDimens.Space.lg),
-        )
-        DockedComposer(frame, Modifier.fillMaxWidth())
-    }
+private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier: Modifier) {
+    val content = DockedPanelContent(
+        agentName = frame.uiState.agentName,
+        streaming = frame.uiState.isStreaming,
+        onOpenFullScreen = { frame.onIntent(ChatSurfaceIntent.Expand) },
+        conversation = { conversationModifier ->
+            DockedReplyCard(
+                DockedReplyParams(
+                    state = frame.uiState,
+                    pagedTimeline = frame.pagedTimeline,
+                    actions = frame.port.actions,
+                    capabilities = frame.port.capabilities,
+                    host = frame.host,
+                    appearance = frame.appearance,
+                    onIntent = frame.onIntent,
+                ),
+                conversationModifier,
+            )
+        },
+        composer = { DockedComposer(frame, Modifier.fillMaxWidth()) },
+    )
+    DockedChatPanel(dock, content, modifier)
 }
 
 @Composable

@@ -6,4 +6,9 @@
     <string name="chat_surface_docked_reply_expand">Open the full chat</string>
     <string name="chat_surface_docked_reply_dismiss">Hide this reply</string>
     <string name="chat_surface_canvas_pending">Send a message to start this conversation’s canvas</string>
+    <string name="chat_surface_dock_collapse">Minimise the chat to its bar</string>
+    <string name="chat_surface_dock_restore">Show the conversation</string>
+    <string name="chat_surface_dock_move">Move the chat. Double-click or double-tap to reset its place.</string>
+    <string name="chat_surface_dock_resize">Resize the chat</string>
+    <string name="chat_surface_dock_empty">Messages you send from the canvas appear here.</string>
 </resources>
