@@ -2,9 +2,12 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.desktop.data.DesktopSharedChatPageFlagStore
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 /** System property that forces the shared chat page on for one launch. */
 internal const val SHARED_CHAT_SYSTEM_PROPERTY = "letta.desktop.sharedChat"
@@ -40,6 +43,8 @@ internal data class SharedChatFlagEnvironment(
 internal class DesktopSharedChatPageFlag(
     private val store: DesktopSharedChatPageFlagStore = DesktopSharedChatPageFlagStore(),
     environment: SharedChatFlagEnvironment = SharedChatFlagEnvironment(),
+    /** Where the toggle file is written: never the UI thread. */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /** The launch environment forces the page on; the settings toggle cannot turn it off. */
     val forcedByEnvironment: Boolean = environment.forcesOn()
@@ -54,11 +59,14 @@ internal class DesktopSharedChatPageFlag(
     /** Whether the shared chat page is in use right now. */
     val enabled: StateFlow<Boolean> = effective.asStateFlow()
 
-    /** Saves the settings toggle. A failed write keeps the choice for this session. */
-    fun setPersistedEnabled(enabled: Boolean) {
+    /**
+     * Saves the settings toggle. The choice applies at once; the file is written on [ioDispatcher].
+     * A failed write keeps the choice for this session.
+     */
+    suspend fun setPersistedEnabled(enabled: Boolean) {
         persisted.value = enabled
         effective.value = forcedByEnvironment || enabled
-        runCatching { store.save(enabled) }
+        withContext(ioDispatcher) { runCatching { store.save(enabled) } }
     }
 
     companion object {

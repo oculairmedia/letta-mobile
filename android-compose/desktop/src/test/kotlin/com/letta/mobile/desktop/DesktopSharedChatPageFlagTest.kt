@@ -4,6 +4,7 @@ import com.letta.mobile.desktop.data.DesktopSharedChatPageFlagStore
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.writeText
+import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -63,7 +64,7 @@ class DesktopSharedChatPageFlagTest {
         )
         val flag = DesktopSharedChatPageFlag(DesktopSharedChatPageFlagStore(path), environment)
 
-        flag.setPersistedEnabled(false)
+        runBlocking { flag.setPersistedEnabled(false) }
 
         assertTrue(flag.enabled.value)
     }
@@ -72,14 +73,14 @@ class DesktopSharedChatPageFlagTest {
     fun toggleIsPersistedAcrossInstances() {
         val first = DesktopSharedChatPageFlag(DesktopSharedChatPageFlagStore(path), noEnvironment())
 
-        first.setPersistedEnabled(true)
+        runBlocking { first.setPersistedEnabled(true) }
 
         assertTrue(first.enabled.value)
         val reloaded = DesktopSharedChatPageFlag(DesktopSharedChatPageFlagStore(path), noEnvironment())
         assertTrue(reloaded.enabled.value)
         assertTrue(reloaded.persistedEnabled.value)
 
-        reloaded.setPersistedEnabled(false)
+        runBlocking { reloaded.setPersistedEnabled(false) }
 
         assertFalse(DesktopSharedChatPageFlagStore(path).load())
     }

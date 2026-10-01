@@ -411,6 +411,7 @@ internal fun DesktopSharedChatPageSettingsCard(
 ) {
     val persistedEnabled by flag.persistedEnabled.collectAsState()
     val sharedPageEnabled by flag.enabled.collectAsState()
+    val scope = rememberCoroutineScope()
     Card(
         colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
@@ -423,7 +424,7 @@ internal fun DesktopSharedChatPageSettingsCard(
             SharedChatPageToggleRow(
                 checked = persistedEnabled || flag.forcedByEnvironment,
                 enabled = !flag.forcedByEnvironment,
-                onCheckedChange = flag::setPersistedEnabled,
+                onCheckedChange = { enabled -> scope.launch { flag.setPersistedEnabled(enabled) } },
             )
             Text(
                 text = sharedChatPageSupportingText(flag.forcedByEnvironment),
