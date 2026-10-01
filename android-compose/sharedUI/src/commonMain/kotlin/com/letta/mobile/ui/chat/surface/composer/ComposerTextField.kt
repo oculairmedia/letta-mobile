@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.composer
 
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -126,7 +127,8 @@ internal fun ComposerTextField(
         singleLine = style.singleLine,
         maxLines = style.maxLines,
         decorationBox = { inner ->
-            Box(modifier = Modifier.fillMaxWidth()) {
+            // Centred in the field's height, so a one-line bar's text sits mid-bar, not at its top.
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                 if (fieldValue.text.isEmpty()) {
                     Text(
                         text = model.composer.placeholder ?: stringResource(Res.string.chat_surface_placeholder),

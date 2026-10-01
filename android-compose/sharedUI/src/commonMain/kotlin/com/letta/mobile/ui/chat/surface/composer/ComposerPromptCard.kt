@@ -67,7 +67,13 @@ internal fun ComposerPromptCard(model: ComposerModel, onAttachImage: () -> Unit)
         ),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+            // Tight under the controls: the row's own buttons already carry their touch padding.
+            modifier = Modifier.padding(
+                start = LettaDimens.Space.md,
+                end = LettaDimens.Space.md,
+                top = LettaDimens.Space.sm,
+                bottom = LettaDimens.Space.xs,
+            ),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             ComposerAttachmentStrip(attachments = model.composer.attachments, onRemove = model.actions::removeAttachment)
