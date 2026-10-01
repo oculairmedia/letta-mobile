@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -26,6 +27,7 @@ internal fun ChatRenderItemRow(
     callbacks: ChatRowCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    LocalRowComposed.current?.invoke(item.key)
     WithRowFontScale(context.fontScale) {
         Column(modifier = modifier.fillMaxWidth()) {
             when (item) {
@@ -46,6 +48,12 @@ internal fun ChatRenderItemRow(
 }
 
 private const val RUN_KEY_PREFIX = "run-"
+
+/**
+ * Test seam: told the item's key each time a row composes, so tests can prove what does not
+ * recompose it (a pinch frame). No host provides it.
+ */
+internal val LocalRowComposed = staticCompositionLocalOf<((key: String) -> Unit)?> { null }
 
 /** The page's timeline text scale (pinch / settings) applied to the row's text only. */
 @Composable
