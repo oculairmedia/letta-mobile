@@ -164,9 +164,10 @@ internal fun CompanionSeatOverlay(
                     // smaller): the renderer is never resized while the seat glides between them.
                     val scale = if (placeable.width > 0 && rect.width > 0f) rect.width / placeable.width else 1f
                     // Where the page hides its companion (Touch, at rest) it fades and sinks away.
-                    val shown = 1f - pageWeight().coerceIn(0f, 1f) * (1f - anchors.pageShown)
-                    // Gone, it is not placed at all: nothing invisible over the bar takes a tap.
-                    if (shown <= 0f) return@layout
+                    // Gone, it is still placed, at no size: an unplaced seat would leave its last
+                    // bounds published (whole, under reduced motion), and the mascot layer would go
+                    // on drawing it there and taking its taps over the bar.
+                    val shown = (1f - pageWeight().coerceIn(0f, 1f) * (1f - anchors.pageShown)).coerceAtLeast(0f)
                     placeable.placeWithLayer(
                         (rect.center.x - placeable.width / 2f - placement.origin.x).roundToInt(),
                         (rect.center.y - placeable.height / 2f - placement.origin.y).roundToInt(),
