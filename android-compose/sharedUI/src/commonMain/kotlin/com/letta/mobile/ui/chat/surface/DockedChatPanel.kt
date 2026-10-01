@@ -315,10 +315,8 @@ private fun BoxScope.ResizeHandles(state: ChatDockState, collapsed: Boolean) {
     ResizeHandle(state, ChatDockEdge.TopLeft, Modifier.align(Alignment.TopStart).offset(-corner, -corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomLeft, Modifier.align(Alignment.BottomStart).offset(-corner, corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomRight, Modifier.align(Alignment.BottomEnd).offset(corner, corner).size(corner))
-    // Straddling the bottom-right corner: half outside the panel, half over its rounded corner,
-    // which the composer's padding keeps clear of the send button.
-    val half = ChatSurfaceDimens.dockResizeGrip / 2
-    ResizeGrip(state, Modifier.align(Alignment.BottomEnd).offset(x = half, y = half))
+    // Overlaid on the panel's bottom-right corner, its marks tucked into the rounded corner.
+    ResizeGrip(state, Modifier.align(Alignment.BottomEnd))
 }
 
 @Composable
@@ -340,7 +338,7 @@ private fun ResizeGrip(state: ChatDockState, modifier: Modifier) {
     ) {
         // Three short diagonals in the corner, the familiar resize mark.
         val gap = LettaDimens.Space.hair.toPx() * 1.5f
-        val inset = LettaDimens.Space.xs.toPx()
+        val inset = LettaDimens.Space.sm.toPx()
         val stroke = LettaDimens.Stroke.hairline.toPx() * 2f
         for (step in 1..3) {
             val reach = step * gap
