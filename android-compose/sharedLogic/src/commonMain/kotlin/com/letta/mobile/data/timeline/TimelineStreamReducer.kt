@@ -269,7 +269,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 toolReturnIsErrorByCallId = (existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId).toTimelinePersistentMap(),
                 toolReturnTruncationByCallId = (existing.toolReturnTruncationByCallId + confirmed.toolReturnTruncationByCallId).toTimelinePersistentMap(),
                 approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
-                attachments = (existing.attachments + confirmed.attachments).distinct().toTimelinePersistentList(),
+                attachments = existing.attachments.mergeIncomingImages(confirmed.attachments).toTimelinePersistentList(),
                 source = existing.source,
                 seqId = latestSeqId(existing.seqId, confirmed.seqId),
             ),
