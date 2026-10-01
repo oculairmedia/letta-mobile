@@ -110,7 +110,9 @@ private const val PINNED_PROMPT_SCAN_LIMIT = 400
  * In a reversed list the visual top is the HIGHEST visible index, and a prompt's answer (newer)
  * sits at a LOWER index beneath it, so the owner is the first prompt at or above the topmost
  * visible row. Compose's stickyHeader cannot express this: in a reversed list it pins to the
- * bottom. Null while the prompt's own row is on screen, so it is never drawn twice.
+ * bottom. Null while the prompt's own row is on screen, so it is never drawn twice, and null while
+ * ANY prompt is on screen: the pinned copy would sit over it (two "You" bubbles overlapping), and
+ * a prompt in view already says what the rows below it answer.
  */
 @Composable
 internal fun rememberPinnedPrompt(
@@ -124,11 +126,9 @@ internal fun rememberPinnedPrompt(
         derivedStateOf {
             val visible = listState.layoutInfo.visibleItemsInfo
             val top = visible.maxOfOrNull { it.index } ?: return@derivedStateOf null
+            if (visible.any { row -> currentItemAt.value(row.index)?.isUserPrompt() == true }) return@derivedStateOf null
             val end = minOf(currentCount.value, top + PINNED_PROMPT_SCAN_LIMIT)
-            val owner = (top until end).firstNotNullOfOrNull { index ->
-                currentItemAt.value(index)?.takeIf(ChatRenderItem::isUserPrompt)?.let { index to it }
-            } ?: return@derivedStateOf null
-            owner.second.takeIf { visible.none { row -> row.index == owner.first } }
+            (top until end).firstNotNullOfOrNull { index -> currentItemAt.value(index)?.takeIf(ChatRenderItem::isUserPrompt) }
         }
     }
 }

@@ -131,3 +131,9 @@ internal fun ChatRenderItem.isUserPrompt(): Boolean =
     this is ChatRenderItem.Single && message.role == "user"
 
 internal fun TimelineRow.isUserPrompt(): Boolean = this is TimelineRow.Item && item.isUserPrompt()
+
+/** The newest message an item holds (a run block holds its steps in chat order). */
+internal fun ChatRenderItem.newestMessageId(): String? = when (this) {
+    is ChatRenderItem.Single -> message.id
+    is ChatRenderItem.RunBlock -> messages.lastOrNull()?.first?.id
+}

@@ -32,6 +32,14 @@ internal class TimelineRowContexts(
     private val newest: ChatRowContext? = newestMessageId?.let { base.copy(newestMessageId = it) }
     private val streamingNewest: ChatRowContext? = newestMessageId?.let { streaming?.copy(newestMessageId = it) }
 
+    /**
+     * These contexts with [id] as the conversation's newest message. A list whose newest row is
+     * not the owner state's last message (the paged route, whose live overlay leads) names its
+     * own, so a settled run's header never lingers over a newer prompt.
+     */
+    fun withNewest(id: String?): TimelineRowContexts =
+        if (id == newestMessageId) this else TimelineRowContexts(base, streaming, id)
+
     fun forItem(item: ChatRenderItem): ChatRowContext {
         val holdsNewest = newestMessageId != null && item.containsMessageId(newestMessageId)
         val streamingId = streaming?.streamingMessageId
@@ -66,6 +74,7 @@ internal fun rememberRowContexts(
         state.a2uiSurfaces,
         state.a2uiResolvedActionCounters,
         appearance.displayMode,
+        appearance.toolDetails,
         capabilities,
         fontScale,
     ) {
@@ -76,6 +85,7 @@ internal fun rememberRowContexts(
             displayMode = appearance.displayMode,
             capabilities = capabilities,
             fontScale = fontScale,
+            toolDetails = appearance.toolDetails,
         )
         TimelineRowContexts(base, streamingId?.let { base.copy(streamingMessageId = it) }, newestId)
     }

@@ -25,6 +25,7 @@ import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
 import com.letta.mobile.ui.mascot.MascotGazeSurface
@@ -104,7 +105,10 @@ internal fun TimelineListFrame(
                     .testTag(ChatTimelineTags.PINNED_PROMPT),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                TimelineItemRow(prompt, bindings, leadingSpace = false)
+                // A copy, never a send flight's landing spot: only the prompt's own row can be.
+                CompositionLocalProvider(LocalSendFlight provides null) {
+                    TimelineItemRow(prompt, bindings, leadingSpace = false)
+                }
             }
         }
         if (overlays.showScrollToLatest) {

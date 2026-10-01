@@ -118,11 +118,16 @@ private fun PagedTimelineBody(
     }
     val pinned by rememberPinnedPrompt(listState, rows.size, rows::itemAt)
     val today = rememberCurrentDate()
+    // The newest row is the live overlay's head, not necessarily the owner state's last message.
+    val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
+    val bindings = remember(params.bindings, newestId) {
+        TimelineRowBindings(params.bindings.contexts.withNewest(newestId), params.bindings.callbacks)
+    }
 
     Box(modifier) {
         TimelineListFrame(
             listState = listState,
-            bindings = params.bindings,
+            bindings = bindings,
             overlays = TimelineFrameOverlays(
                 pinnedPrompt = pinned,
                 showScrollToLatest = !following,
@@ -138,7 +143,7 @@ private fun PagedTimelineBody(
             ),
             modifier = Modifier.fillMaxSize(),
         ) {
-            pagedRows(PagedRowsScope(rows, settled, params, today))
+            pagedRows(PagedRowsScope(rows, settled, params, today, bindings))
         }
         presentation.missingTarget?.let { missing ->
             Text(
@@ -230,6 +235,7 @@ private class PagedRowsScope(
     val settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
     val params: PagedTimelineParams,
     val today: LocalDate,
+    val bindings: TimelineRowBindings,
 )
 
 private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
@@ -269,7 +275,7 @@ private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedR
         pagedBoundaryDate(item, older)?.let { date ->
             DayDividerRow(date, scope.today)
         }
-        TimelineItemRow(item, scope.params.bindings)
+        TimelineItemRow(item, scope.bindings)
     }
 }
 
