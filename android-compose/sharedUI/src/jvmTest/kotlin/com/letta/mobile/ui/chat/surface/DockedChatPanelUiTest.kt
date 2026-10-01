@@ -93,6 +93,34 @@ class DockedChatPanelUiTest {
     }
 
     @Test
+    fun noDockIsDrawnUntilTheSavedPlacementIsKnown() = runComposeUiTest {
+        var placement by mutableStateOf<ChatDockGeometry?>(null)
+        setContent {
+            MaterialTheme {
+                ChatSurface(
+                    port = FixturePort(),
+                    presentation = ChatSurfacePresentation.CanvasFirst,
+                    onIntent = {},
+                    host = ChatSurfaceHost(openCanvas = {}),
+                    canvas = { _ -> Box(Modifier.fillMaxSize().testTag(CANVAS_TAG)) },
+                    dockGeometry = placement,
+                    onDockGeometryChange = { placement = it },
+                )
+            }
+        }
+        waitForIdle()
+        onNodeWithTag(CANVAS_TAG).assertExists()
+        onNodeWithTag(DOCK_PANEL_TAG).assertDoesNotExist()
+
+        // The saved placement arrives: the panel appears there directly, never at the default first.
+        val saved = ChatDockGeometry(anchorX = 0.1f, anchorY = 0.2f, widthDp = 420f, heightDp = 380f)
+        placement = saved
+        waitForIdle()
+        onNodeWithTag(DOCK_PANEL_TAG).assertExists()
+        assertEquals(420f, onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot().width.value, 1f)
+    }
+
+    @Test
     fun draggingTheHeaderMovesThePanelAndReportsTheGeometry() = runComposeUiTest {
         val harness = show()
         val before = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()

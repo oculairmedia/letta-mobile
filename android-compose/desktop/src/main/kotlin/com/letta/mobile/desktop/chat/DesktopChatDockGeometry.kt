@@ -19,7 +19,8 @@ private const val DOCK_GEOMETRY_SAVE_DEBOUNCE_MS = 400L
 
 /**
  * letta-mobile-bglj6.1: the docked chat panel's placement, read from [store] off the UI thread
- * (the default placement shows until it arrives) and written back off it, debounced, whenever it
+ * (null until it arrives, so the page draws no dock rather than one that jumps; hosts remember
+ * this once per app session) and written back off it, debounced, whenever it
  * changes. A placement still waiting out the debounce when the page leaves is written then, so
  * the last move is never lost. One placement for every conversation: where the chat sits is a
  * property of the person's window, not of the conversation.
@@ -27,24 +28,23 @@ private const val DOCK_GEOMETRY_SAVE_DEBOUNCE_MS = 400L
 @Composable
 internal fun rememberDesktopChatDockGeometry(
     store: DesktopChatDockGeometryStore = remember { DesktopChatDockGeometryStore() },
-): MutableState<ChatDockGeometry> {
-    val geometry = remember(store) { mutableStateOf(ChatDockGeometry.Default) }
+): MutableState<ChatDockGeometry?> {
+    val geometry = remember(store) { mutableStateOf<ChatDockGeometry?>(null) }
     LaunchedEffect(store) {
         val loaded = withContext(Dispatchers.IO) { runCatching { store.load() }.getOrDefault(ChatDockGeometry.Default) }
-        // A panel the person already moved while the file was read keeps their placement.
-        if (geometry.value == ChatDockGeometry.Default) geometry.value = loaded
+        geometry.value = loaded
         // What the file holds, so an unmoved panel never writes.
         var saved = loaded
         try {
             snapshotFlow { geometry.value }.collectLatest { next ->
-                if (next == saved) return@collectLatest
+                if (next == null || next == saved) return@collectLatest
                 delay(DOCK_GEOMETRY_SAVE_DEBOUNCE_MS)
                 if (persistDockGeometry(store, next)) saved = next
             }
         } finally {
             // Leaving the page cancels the debounce: write the pending placement anyway.
             val pending = geometry.value
-            if (pending != saved) withContext(NonCancellable) { persistDockGeometry(store, pending) }
+            if (pending != null && pending != saved) withContext(NonCancellable) { persistDockGeometry(store, pending) }
         }
     }
     return geometry

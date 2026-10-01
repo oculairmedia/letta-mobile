@@ -81,6 +81,8 @@ import org.jetbrains.compose.resources.stringResource
  * @param dockGeometry where the docked panel sits and how big it is; owned and persisted by the
  *   host, changed through [onDockGeometryChange] as the person drags, resizes, minimises or
  *   resets it. A host that does not hoist it gets a panel that still moves for the session.
+ *   Null while the host is still reading the person's saved placement: the dock is not drawn
+ *   at all until it is known, so it never appears at the default spot and then jumps.
  */
 @Composable
 fun ChatSurface(
@@ -93,7 +95,7 @@ fun ChatSurface(
     platform: ChatSurfacePlatform = ChatSurfacePlatform.Default,
     pagedTimeline: CanonicalTimelinePresentation? = null,
     canvas: (@Composable (ChatCanvasActions) -> Unit)? = null,
-    dockGeometry: ChatDockGeometry = ChatDockGeometry.Default,
+    dockGeometry: ChatDockGeometry? = ChatDockGeometry.Default,
     onDockGeometryChange: (ChatDockGeometry) -> Unit = {},
 ) {
     // Lifecycle-aware on Android: a backgrounded app stops collecting, so the owner's
@@ -116,7 +118,8 @@ fun ChatSurface(
     val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
     ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
-    val dock = rememberChatDockState(dockGeometry, onDockGeometryChange)
+    val dockReady = dockGeometry != null
+    val dock = rememberChatDockState(dockGeometry ?: ChatDockGeometry.Default, onDockGeometryChange)
     val frame = ChatSurfaceFrame(
         port = port,
         snackbars = snackbars,
@@ -149,13 +152,13 @@ fun ChatSurface(
                 Box(Modifier.fillMaxSize()) {
                     if (fullScreen) {
                         PageLayerLocals(primary = true) { FullScreenPage(frame, Modifier.fillMaxSize()) }
-                    } else {
+                    } else if (dockReady) {
                         DockedOverlay(frame, dock, Modifier.fillMaxSize(), SurfaceMorph.Docked, primary = true)
                     }
-                    CompanionSeat(frame, companionAnchors) { if (fullScreen) 1f else 0f }
+                    if (fullScreen || dockReady) CompanionSeat(frame, companionAnchors) { if (fullScreen) 1f else 0f }
                 }
             } else {
-                CanvasWithChat(frame, dock, companionAnchors, { canvas(canvasActions) }, Modifier)
+                CanvasWithChat(frame, dock.takeIf { dockReady }, companionAnchors, { canvas(canvasActions) }, Modifier)
             }
         }
     }
@@ -197,7 +200,8 @@ private class ChatSurfaceFrame(
 @Composable
 private fun CanvasWithChat(
     frame: ChatSurfaceFrame,
-    dock: ChatDockState,
+    /** Null until the host knows where the person put the dock: then only the canvas shows. */
+    dock: ChatDockState?,
     companionAnchors: CompanionSeatAnchors,
     canvas: @Composable () -> Unit,
     modifier: Modifier,
@@ -216,6 +220,14 @@ private fun CanvasWithChat(
         val canvasModifier = Modifier.fillMaxSize()
         Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
         MorphBackdrop(fraction)
+        if (dock == null) {
+            // The saved placement is still loading: no panel yet (and no page unless full screen).
+            if (fullScreen) {
+                PageLayerLocals(primary = true) { FullScreenPage(frame, Modifier.fillMaxSize()) }
+                CompanionSeat(frame, companionAnchors) { 1f }
+            }
+            return@Box
+        }
         if (showPanel) DockedOverlay(frame, dock, Modifier.fillMaxSize(), morph, primary = panelPrimary)
         if (showPage) {
             PageLayerLocals(primary = !panelPrimary) {

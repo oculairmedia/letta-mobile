@@ -215,6 +215,8 @@ internal fun LettaDesktopApp(
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents
     var showBackgroundTasks by remember { mutableStateOf(false) }
+    // letta-mobile-bglj6.1: the docked chat's saved placement, read once per app session.
+    val chatDockGeometry = com.letta.mobile.desktop.chat.rememberDesktopChatDockGeometry()
     // Work | Play presentation lens over the same agents/memory/conversations.
     var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
     val libraries = rememberDesktopLibraryControllers(
@@ -826,6 +828,7 @@ internal fun LettaDesktopApp(
                                         selectedAgentId,
                                         selectedAgentName,
                                     ),
+                                    dockGeometry = chatDockGeometry,
                                     canvasHeaderTrailing = if (!showBackgroundTasks && subagentRepository != null) {
                                         {
                                             com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle(

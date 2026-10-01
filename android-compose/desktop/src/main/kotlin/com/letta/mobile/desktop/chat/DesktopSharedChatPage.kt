@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.ui.chat.session.ChatDockGeometry
+import androidx.compose.runtime.MutableState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,6 +111,11 @@ internal data class DesktopSharedChatPageState(
     val dockedCanvas: DesktopDockedCanvasRouter? = null,
     /** The shell's own control drawn at the end of the canvas header (background tasks). */
     val canvasHeaderTrailing: (@Composable () -> Unit)? = null,
+    /**
+     * Where the person put the docked panel, remembered by the app (read once per session); null
+     * until the saved placement is read, and the page draws no dock until then.
+     */
+    val dockGeometry: MutableState<ChatDockGeometry?>,
 )
 
 /**
@@ -141,7 +148,7 @@ internal fun DesktopSharedChatPage(
             if (router.showRequests > 0) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
         }
     }
-    var dockGeometry by rememberDesktopChatDockGeometry()
+    var dockGeometry by state.dockGeometry
     ChatSurface(
         port = port,
         presentation = presentation,
