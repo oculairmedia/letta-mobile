@@ -155,13 +155,6 @@ class ChatTimelineUiTest {
     }
 
     @Test
-    fun anErrorIsShownOnceThenCleared() = runComposeUiTest {
-        val actions = RecordingChatActions()
-        show(ready.copy(messages = conversation(2).toPersistentList(), error = "Send failed"), actions)
-        waitUntil(timeoutMillis = 10_000) { actions.clearedErrors == 1 }
-    }
-
-    @Test
     fun goalCardSendsGoalCommands() = runComposeUiTest {
         val actions = RecordingChatActions()
         val goal = GoalStatusUi(objective = "Ship the shared page", status = "active", tokensUsed = 10)

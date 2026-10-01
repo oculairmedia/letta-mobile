@@ -205,8 +205,8 @@ internal class DesktopChatActions(
 
     override fun reportComposerError(message: String) = controller.showComposerError(message)
 
-    /** Desktop's composer error is the surface error; it clears on the next attach/remove/send. */
-    override fun clearComposerError() = Unit
+    /** Desktop's composer error is the surface error (see hasComposerError). */
+    override fun clearComposerError() = controller.clearErrorMessage()
 
     override fun runComposerCommand(command: ChatComposerCommand) {
         commandsById()[command.id]?.run?.invoke()
@@ -249,7 +249,8 @@ internal class DesktopChatActions(
 
     override fun retryLoad() = controller.retryConnection()
 
-    override fun clearError() = Unit
+    /** The page showed the error in its snackbar; acknowledge it so it is not shown again. */
+    override fun clearError() = controller.clearErrorMessage()
 
     override fun setFontScale(scale: Float) = bindings.onSetFontScale(scale)
 

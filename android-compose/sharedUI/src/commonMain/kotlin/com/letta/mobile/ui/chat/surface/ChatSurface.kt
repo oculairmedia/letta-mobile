@@ -9,7 +9,10 @@ import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -34,7 +37,9 @@ import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightActions
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightState
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_share_failed
+import com.letta.mobile.ui.chat.surface.timeline.A2uiSurfaceStack
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
+import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -80,8 +85,10 @@ fun ChatSurface(
     val effectiveHost = remember(host, canvas != null, onIntent) {
         if (canvas == null) host else host.copy(openCanvas = { onIntent(ChatSurfaceIntent.OpenCanvas) })
     }
+    val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
     val frame = ChatSurfaceFrame(
         port = port,
+        snackbars = snackbars,
         uiState = uiState,
         composer = composer,
         presentation = presentation,
@@ -116,6 +123,7 @@ internal object ChatSurfaceTags {
 @Immutable
 private class ChatSurfaceFrame(
     val port: ChatSessionPort,
+    val snackbars: SnackbarHostState,
     val uiState: ChatUiState,
     val composer: ChatComposerUiState,
     val presentation: ChatSurfacePresentation,
@@ -211,8 +219,30 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
 @Composable
 private fun DockedComposer(frame: ChatSurfaceFrame, modifier: Modifier) = Composer(frame, modifier)
 
+/**
+ * The composer with what must stay visible in every mode above it: the page's one snackbar host
+ * and, while docked (no timeline on screen), the A2UI surfaces.
+ */
 @Composable
 private fun Composer(frame: ChatSurfaceFrame, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
+        if (frame.mode == ChatSurfaceMode.Docked) {
+            A2uiSurfaceStack(
+                surfaces = frame.uiState.a2uiSurfaces,
+                resolvedActionCounters = frame.uiState.a2uiResolvedActionCounters,
+                actions = frame.port.actions,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+            )
+        }
+        ComposerPanel(frame, Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun ComposerPanel(frame: ChatSurfaceFrame, modifier: Modifier) {
     ChatComposerPanel(
         composer = frame.composer,
         uiState = frame.uiState,

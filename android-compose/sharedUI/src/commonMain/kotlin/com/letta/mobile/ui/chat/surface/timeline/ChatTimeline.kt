@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -35,7 +33,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * list (paged when [pagedTimeline] is non-null, else `state.messages`), and every row.
  *
  * Owns the page-level overlays the rows ask for: the image viewer, the A2UI surface stack, the
- * goal card, the snackbars and the pinch read-out. Rows are drawn only through the row seam.
+ * goal card and the pinch read-out. Snackbars are the page's (ChatSurface), so they show in
+ * every mode. Rows are drawn only through the row seam.
  */
 @Composable
 internal fun ChatTimeline(
@@ -59,9 +58,6 @@ internal fun ChatTimeline(
     val rowFontScale = if (appearance.fontScaleAppliedByHost) fontScale / appearance.fontScale else fontScale
     val contexts = rememberRowContexts(state, capabilities, appearance, rowFontScale)
     val bindings = remember(contexts, callbacks) { TimelineRowBindings(contexts, callbacks) }
-    val snackbars = remember { SnackbarHostState() }
-    A2uiSnackbarEffect(state.a2uiActionSnackbar, snackbars, actions)
-    ErrorSnackbarEffect(state.error, snackbars, actions)
     var a2uiHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
     val bottomReserve = if (state.a2uiSurfaces.isNotEmpty()) a2uiHeight else 0.dp
@@ -90,7 +86,6 @@ internal fun ChatTimeline(
         if (pinch.isPinching) {
             PinchScaleIndicator(fontScale, Modifier.align(Alignment.TopCenter).padding(top = LettaDimens.Space.lg))
         }
-        SnackbarHost(snackbars, Modifier.align(Alignment.BottomCenter).padding(bottom = bottomReserve))
         viewer?.let { request ->
             ChatImageViewer(images = request.images, initialIndex = request.initialIndex, onDismiss = { viewer = null })
         }

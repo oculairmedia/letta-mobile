@@ -192,6 +192,31 @@ class DesktopChatSessionPortTest {
     }
 
     @Test
+    fun composerRefusalsGoToTheComposerAndPageErrorsToTheTimeline() = runTest {
+        val (controller, port) = startedPort()
+
+        controller.showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
+        runCurrent()
+        assertEquals(STOPPING_SEND_BLOCKED_MESSAGE, port.composer.value.error)
+        assertNull(port.uiState.value.error)
+
+        port.actions.clearComposerError()
+        runCurrent()
+        assertNull(port.composer.value.error)
+
+        controller.showComposerError("Message load failed")
+        runCurrent()
+        assertEquals("Message load failed", port.uiState.value.error)
+        assertNull(port.composer.value.error)
+
+        port.actions.clearError()
+        runCurrent()
+        assertNull(port.uiState.value.error)
+
+        controller.close()
+    }
+
+    @Test
     fun escapeCollapsesOnlyTheFullScreenPage() {
         assertTrue(escapeCollapsesToCanvas(ChatSurfaceMode.FullScreen, Key.Escape, KeyEventType.KeyDown))
         assertFalse(escapeCollapsesToCanvas(ChatSurfaceMode.FullScreen, Key.Escape, KeyEventType.KeyUp))

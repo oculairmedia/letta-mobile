@@ -818,6 +818,12 @@ class DesktopChatController(
         _state.update { it.copy(errorMessage = message) }
     }
 
+    /** The shared page acknowledged (showed or dismissed) the surface error. */
+    fun clearErrorMessage() {
+        if (closed) return
+        _state.update { it.copy(errorMessage = null) }
+    }
+
     /**
      * Inline reply from a notification toast: select the target conversation
      * and await the selection's remote load before sending.
@@ -973,7 +979,7 @@ class DesktopChatController(
         val conversationId = _state.value.selectedConversationId
         val coordinator = selectedCanonicalCoordinator()
         if (coordinator == null) {
-            showComposerError("This conversation cannot send on the canonical timeline route.")
+            showComposerError(CANONICAL_SEND_UNAVAILABLE_MESSAGE)
             return
         }
         titleCandidateForSend(conversationId, draft.text)?.let { title ->
@@ -1393,6 +1399,9 @@ private val ROSTER_REFRESHABLE_STATES = setOf(
     ChatConnectionState.Sending,
     ChatConnectionState.SendFailed,
 )
+
+/** Shown when a conversation cannot send on the canonical timeline route. */
+internal const val CANONICAL_SEND_UNAVAILABLE_MESSAGE = "This conversation cannot send on the canonical timeline route."
 
 /** letta-mobile-lgns8.19: shown when a send is attempted while a stop is pending. */
 internal const val STOPPING_SEND_BLOCKED_MESSAGE =

@@ -63,7 +63,8 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         isAgentTyping = inputs.presence.isAgentTyping,
         agentName = selected?.agentName.orEmpty(),
         agentId = selected?.agentId,
-        error = surface.errorMessage,
+        // A composer error is the composer's to show (next to the draft), not the page's.
+        error = surface.errorMessage.takeUnless { surface.hasComposerError() },
         collapsedRunIds = inputs.local.collapsedRunIds.toImmutableSet(),
         expandedReasoningMessageIds = inputs.local.expandedReasoningMessageIds.toImmutableSet(),
         isCancelling = surface.selectedConversationId != null &&
@@ -71,6 +72,17 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         sendQueue = inputs.sendQueue,
     )
 }
+
+/**
+ * Desktop keeps one errorMessage for the whole surface. It is a composer error when the runtime
+ * composer reports one (attachment limits) or it is a send the composer refused (stop pending).
+ */
+internal fun DesktopChatSurfaceState.hasComposerError(): Boolean {
+    val message = errorMessage ?: return false
+    return runtimeState.composer.error != null || message in ComposerRefusalMessages
+}
+
+private val ComposerRefusalMessages = setOf(STOPPING_SEND_BLOCKED_MESSAGE, CANONICAL_SEND_UNAVAILABLE_MESSAGE)
 
 /** Reuses the previous list instance when the content is unchanged, so the timeline skips work. */
 private fun nextMessages(previous: ImmutableList<UiMessage>?, next: List<UiMessage>): ImmutableList<UiMessage> =
@@ -107,9 +119,7 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
     return ChatComposerUiState(
         text = surface.composerText,
         attachments = surface.pendingImageAttachments.toImmutableList(),
-        // Desktop reports composer errors through the surface's single errorMessage, which the
-        // timeline also shows; it is not separable here, so the composer carries none.
-        error = null,
+        error = surface.errorMessage.takeIf { surface.hasComposerError() },
         canSend = surface.canSend,
         canQueueWhileStreaming = inputs.canQueueWhileStreaming,
         placeholder = inputs.host.placeholder,
