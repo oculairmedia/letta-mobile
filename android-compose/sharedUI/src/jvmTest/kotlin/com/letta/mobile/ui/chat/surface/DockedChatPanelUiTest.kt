@@ -19,10 +19,12 @@ import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import com.letta.mobile.data.model.UiMessage
@@ -69,8 +71,9 @@ class DockedChatPanelUiTest {
         var canvasClicks by mutableIntStateOf(0)
     }
 
-    private fun ComposeUiTest.show(port: FixturePort = FixturePort()): Harness {
+    private fun ComposeUiTest.show(port: FixturePort = FixturePort(), initial: ChatDockGeometry = ChatDockGeometry.Default): Harness {
         val harness = Harness()
+        harness.geometry = initial
         setContent {
             MaterialTheme {
                 ChatSurface(
@@ -163,6 +166,44 @@ class DockedChatPanelUiTest {
     }
 
     @Test
+    fun aResetThatLeavesThePanelInPlaceDoesNotSlowTheNextDrag() = runComposeUiTest {
+        // Not the default, but drawn exactly where the default is: the reset moves nothing.
+        show(initial = ChatDockGeometry(widthDp = ChatSurfaceDimens.dockDefaultWidth.value))
+        onNodeWithTag(DOCK_HEADER_TAG).performTouchInput { doubleClick(center) }
+        waitForIdle()
+        mainClock.autoAdvance = false
+        val step = with(density) { DRAG_STEP_DP.dp.toPx() }
+        // Past the touch slop first; then one more step must move the panel by exactly that step.
+        onNodeWithTag(DOCK_HEADER_TAG).performTouchInput {
+            down(center)
+            moveBy(Offset(-step, 0f))
+        }
+        mainClock.advanceTimeByFrame()
+        val before = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        onNodeWithTag(DOCK_HEADER_TAG).performTouchInput { moveBy(Offset(-step, 0f)) }
+        mainClock.advanceTimeByFrame()
+        val after = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        onNodeWithTag(DOCK_HEADER_TAG).performTouchInput { up() }
+        assertEquals(DRAG_STEP_DP, (before.left - after.left).value, 1f)
+    }
+
+    @Test
+    fun theTopRightCornerResizesTowardsItself() = runComposeUiTest {
+        show()
+        val before = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        val corner = ChatSurfaceDimens.dockResizeCorner / 2
+        val start = with(density) { Offset((before.right + corner).toPx(), (before.top - corner).toPx()) }
+        val reach = with(density) { DRAG_STEP_DP.dp.toPx() }
+        onRoot().performTouchInput { swipe(start, start + Offset(reach, -reach)) }
+        waitForIdle()
+        val after = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        assertTrue(after.width > before.width, "wider: $before -> $after")
+        assertTrue(after.height > before.height, "taller: $before -> $after")
+        assertEquals(before.left.value, after.left.value, 0.5f)
+        assertEquals(before.bottom.value, after.bottom.value, 0.5f)
+    }
+
+    @Test
     fun theResizeGripChangesTheSize() = runComposeUiTest {
         val harness = show()
         val before = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
@@ -251,5 +292,6 @@ class DockedChatPanelUiTest {
 
     private companion object {
         const val CANVAS_TAG = "test-canvas"
+        const val DRAG_STEP_DP = 60f
     }
 }

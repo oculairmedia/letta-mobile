@@ -176,11 +176,14 @@ internal class ChatDockState(initial: ChatDockGeometry) {
 
     fun drag(dxDp: Float, dyDp: Float) {
         val frame = frame ?: return
+        // The pointer takes over from a reset's glide: the dock follows it 1:1 from here.
+        snapping = false
         update(ChatDockGeometryMath.drag(geometry, dxDp, dyDp, frame))
     }
 
     fun resize(edge: ChatDockEdge, dxDp: Float, dyDp: Float) {
         val frame = frame ?: return
+        snapping = false
         update(ChatDockGeometryMath.resize(geometry, edge, dxDp, dyDp, frame))
     }
 
@@ -204,7 +207,10 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     fun reset() {
         val next = ChatDockGeometryMath.reset()
         if (next == geometry) return
-        snapping = true
+        // Only a reset that moves the open panel glides; one that leaves it where it is (a
+        // minimised dock at home opening) would start no glide to end the snapping.
+        val frame = frame
+        snapping = frame == null || openRect(next, frame) != openRect(geometry, frame)
         update(next)
     }
 
@@ -288,7 +294,7 @@ internal fun DockedChatPanel(
         val geometry = state.geometry
         val collapsed = geometry.collapsed
         // The open panel's rect (gliding on a reset); minimised, the dock ends at its bottom edge.
-        val open = animatedDockRect(ChatDockGeometryMath.rect(geometry.copy(collapsed = false), frame), state)
+        val open = animatedDockRect(openRect(geometry, frame), state)
         val openness = rememberDockOpenness(collapsed)
         val showPanel by remember(openness) { derivedStateOf { openness.value > 0f } }
         val showMinimised by remember(openness) { derivedStateOf { openness.value < 1f } }
@@ -541,6 +547,10 @@ private fun PanelTop(state: ChatDockState, content: DockedPanelContent, modifier
 internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect =
     ChatDockGeometryMath.rect(geometry, ChatDockFrame(widthDp, heightDp, DockLimits, collapsedHeightDp))
 
+/** Where the panel stands open for [geometry]: itself, or where a minimised dock would open. */
+private fun openRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect =
+    ChatDockGeometryMath.rect(geometry.copy(collapsed = false), frame)
+
 /** Drag to move, double-click / double-tap to reset; the panel's own controls sit on it. */
 private fun Modifier.moveHandle(state: ChatDockState): Modifier = this
     .pointerHoverIcon(movePointerIcon())
@@ -659,6 +669,7 @@ private fun BoxScope.ResizeHandles(state: ChatDockState) {
     ResizeHandle(state, ChatDockEdge.Top, Modifier.align(Alignment.TopCenter).offset(y = -edge).fillMaxWidth().height(edge))
     ResizeHandle(state, ChatDockEdge.Bottom, Modifier.align(Alignment.BottomCenter).offset(y = edge).fillMaxWidth().height(edge))
     ResizeHandle(state, ChatDockEdge.TopLeft, Modifier.align(Alignment.TopStart).offset(-corner, -corner).size(corner))
+    ResizeHandle(state, ChatDockEdge.TopRight, Modifier.align(Alignment.TopEnd).offset(corner, -corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomLeft, Modifier.align(Alignment.BottomStart).offset(-corner, corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomRight, Modifier.align(Alignment.BottomEnd).offset(corner, corner).size(corner))
     // Overlaid on the panel's bottom-right corner, its marks tucked into the rounded corner.
@@ -725,12 +736,16 @@ private fun animatedDockRect(target: ChatDockRect, state: ChatDockState): ChatDo
     val reducedMotion = LocalReducedMotion.current
     val animated = remember { Animatable(target, DockRectConverter) }
     LaunchedEffect(target) {
-        if (state.snapping && !reducedMotion) {
-            animated.animateTo(target, tween(ChatSurfaceDimens.dockSnapMillis))
-        } else {
-            animated.snapTo(target)
+        try {
+            if (state.snapping && !reducedMotion) {
+                animated.animateTo(target, tween(ChatSurfaceDimens.dockSnapMillis))
+            } else {
+                animated.snapTo(target)
+            }
+        } finally {
+            // Also when a gesture (or a new target) cuts the glide short.
+            state.snapping = false
         }
-        state.snapping = false
     }
     return if (state.snapping) animated.value else target
 }
