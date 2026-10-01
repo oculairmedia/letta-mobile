@@ -7,6 +7,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -111,6 +112,8 @@ internal data class DesktopSharedChatPageState(
     /** Where the conversation's board lives, and whose it is: the docked canvas. */
     val canvasStore: CanvasDocumentStore,
     val canvasOwner: DesktopCanvasOwner,
+    /** Routes the shell's canvas opens to this page's dock (one live session per board). */
+    val dockedCanvas: DesktopDockedCanvasRouter? = null,
 )
 
 /**
@@ -134,6 +137,15 @@ internal fun DesktopSharedChatPage(
     val host = rememberDesktopChatSurfaceHost(port, navigation)
     val ambientStatus = rememberDesktopAmbientStatus(state.isThinking, state.errorMessage)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
+    state.dockedCanvas?.let { router ->
+        DisposableEffect(router, session) {
+            router.dockedCanvasId = session?.canvasId
+            onDispose { router.dockedCanvasId = null }
+        }
+        LaunchedEffect(router, router.showRequests) {
+            if (router.showRequests > 0) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
+        }
+    }
     ChatSurface(
         port = port,
         presentation = presentation,

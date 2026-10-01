@@ -2,6 +2,7 @@ package com.letta.mobile.desktop.chat
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
@@ -256,6 +257,24 @@ class DesktopChatSessionPortTest {
         assertTrue(sent.attachments.isEmpty())
 
         controller.close()
+    }
+
+    @Test
+    fun theDockedBoardNeverOpensASecondSessionInTheSidePane() {
+        val docked = CanvasId("board-1")
+        val other = CanvasId("board-2")
+        val router = DesktopDockedCanvasRouter().apply { dockedCanvasId = docked }
+        val sidePane = mutableListOf<CanvasId>()
+
+        router.open(docked, sidePane::add)
+        router.open(other, sidePane::add)
+
+        assertEquals(1, router.showRequests)
+        assertEquals(listOf(other), sidePane)
+        assertFalse(showsCanvasSidePane(docked, docked))
+        assertTrue(showsCanvasSidePane(other, docked))
+        assertTrue(showsCanvasSidePane(other, null))
+        assertFalse(showsCanvasSidePane(null, docked))
     }
 
     @Test
