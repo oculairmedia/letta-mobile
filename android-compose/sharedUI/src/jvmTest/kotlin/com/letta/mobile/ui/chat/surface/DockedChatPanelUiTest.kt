@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -33,6 +34,7 @@ import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -42,7 +44,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class DockedChatPanelUiTest {
-    private class FixturePort : ChatSessionPort {
+    private class FixturePort(composer: ChatComposerUiState = ChatComposerUiState()) : ChatSessionPort {
         override val uiState: StateFlow<ChatUiState> = MutableStateFlow(
             ChatUiState(
                 conversationState = ConversationState.Ready("conv-1"),
@@ -55,8 +57,9 @@ class DockedChatPanelUiTest {
                 agentId = "agent-1",
             ),
         )
-        override val composer: StateFlow<ChatComposerUiState> = MutableStateFlow(ChatComposerUiState())
-        override val actions: ChatActions = RecordingChatActions()
+        override val composer: StateFlow<ChatComposerUiState> = MutableStateFlow(composer)
+        val recording = RecordingChatActions()
+        override val actions: ChatActions = recording
     }
 
     private class Harness {
@@ -65,12 +68,12 @@ class DockedChatPanelUiTest {
         var canvasClicks by mutableIntStateOf(0)
     }
 
-    private fun ComposeUiTest.show(): Harness {
+    private fun ComposeUiTest.show(port: FixturePort = FixturePort()): Harness {
         val harness = Harness()
         setContent {
             MaterialTheme {
                 ChatSurface(
-                    port = FixturePort(),
+                    port = port,
                     presentation = ChatSurfacePresentation.CanvasFirst,
                     onIntent = {},
                     host = ChatSurfaceHost(openCanvas = {}),
@@ -156,6 +159,39 @@ class DockedChatPanelUiTest {
         onNodeWithTag(DOCK_HEADER_TAG).performTouchInput { click(center) }
         waitForIdle()
         assertEquals(1, harness.canvasClicks)
+    }
+
+    @Test
+    fun theResizeHandlesNeverCoverTheSendButtonAtThePanelsEdge() = runComposeUiTest {
+        val port = FixturePort(ChatComposerUiState(text = "Add an island", canSend = true))
+        show(port)
+        // The outermost pixel of the send button, where an edge strip inside the panel would sit.
+        onNodeWithTag(ComposerTestTags.SEND).performTouchInput { click(Offset(width - 1f, centerY)) }
+        waitForIdle()
+        assertEquals(1, port.recording.count("send"))
+    }
+
+    @Test
+    fun theDockOffersPlacementActionsToAssistiveTechnology() = runComposeUiTest {
+        val harness = show()
+        val actions = onNodeWithTag(DOCK_PANEL_TAG).fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        fun run(label: String) = runOnIdle { actions.single { it.label == label }.action() }
+
+        run("Move the chat up")
+        waitForIdle()
+        assertTrue(harness.geometry.anchorY < 1f, "")
+
+        run("Make the chat bigger")
+        waitForIdle()
+        assertTrue(harness.geometry.widthDp != null && harness.geometry.heightDp != null, "")
+
+        run("Put the chat back in its place")
+        waitForIdle()
+        assertEquals(ChatDockGeometry.Default, harness.geometry)
+
+        run("Minimise the chat to its bar")
+        waitForIdle()
+        assertTrue(harness.geometry.collapsed)
     }
 
     private companion object {

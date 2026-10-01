@@ -25,14 +25,17 @@ object ChatSurfaceDimens {
     /** Space kept between the docked panel and the canvas edges. */
     val dockMargin: Dp = 8.dp
 
-    /** The invisible resize strip along each panel edge (mouse, pen). */
+    /** The invisible resize strip just outside each panel edge (mouse, pen). */
     val dockResizeEdge: Dp = 6.dp
 
-    /** The resize hit area at each panel corner. */
+    /** The resize hit area just outside each panel corner. */
     val dockResizeCorner: Dp = 16.dp
 
-    /** The visible bottom-right resize grip (touch). */
+    /** The visible resize grip (touch), just above the panel's top-right corner. */
     val dockResizeGrip: Dp = 24.dp
+
+    /** How far one accessibility move or resize action changes the docked panel. */
+    val dockAccessibilityStep: Dp = 32.dp
 
     /** The grip pill in the panel header. */
     val dockGripWidth: Dp = 32.dp

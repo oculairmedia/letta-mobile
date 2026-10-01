@@ -192,6 +192,7 @@ internal fun DockedChatPanel(state: ChatDockState, content: DockedPanelContent, 
                 .offset { IntOffset(shown.left.dp.roundToPx(), shown.top.dp.roundToPx()) }
                 .width(shown.width.dp)
                 .then(sized)
+                .dockSemantics(state, dockSemanticsLabels())
                 .testTag(DOCK_PANEL_TAG),
         ) {
             PanelSurface(state, content, Modifier.fillMaxWidth().then(if (geometry.collapsed) Modifier else Modifier.fillMaxHeight()))
@@ -328,20 +329,26 @@ private fun HeaderButton(
     }
 }
 
-/** Edge strips and corner squares for mouse and pen, plus a visible bottom-right grip for touch. */
+/**
+ * Edge strips and corner squares for mouse and pen, plus a visible grip for touch. All sit just
+ * OUTSIDE the panel, so they never cover its own controls (the composer's expand and send
+ * buttons sit at its edges); only the panel's surface takes input inside it.
+ */
 @Composable
 private fun BoxScope.ResizeHandles(state: ChatDockState, collapsed: Boolean) {
     val edge = ChatSurfaceDimens.dockResizeEdge
     val corner = ChatSurfaceDimens.dockResizeCorner
-    ResizeHandle(state, ChatDockEdge.Left, Modifier.align(Alignment.CenterStart).fillMaxHeight().width(edge))
-    ResizeHandle(state, ChatDockEdge.Right, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(edge))
+    ResizeHandle(state, ChatDockEdge.Left, Modifier.align(Alignment.CenterStart).offset(x = -edge).fillMaxHeight().width(edge))
+    ResizeHandle(state, ChatDockEdge.Right, Modifier.align(Alignment.CenterEnd).offset(x = edge).fillMaxHeight().width(edge))
     if (collapsed) return
-    ResizeHandle(state, ChatDockEdge.Top, Modifier.align(Alignment.TopCenter).fillMaxWidth().height(edge).padding(horizontal = corner))
-    ResizeHandle(state, ChatDockEdge.Bottom, Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(edge).padding(horizontal = corner))
-    ResizeHandle(state, ChatDockEdge.TopLeft, Modifier.align(Alignment.TopStart).size(corner))
-    ResizeHandle(state, ChatDockEdge.TopRight, Modifier.align(Alignment.TopEnd).size(corner))
-    ResizeHandle(state, ChatDockEdge.BottomLeft, Modifier.align(Alignment.BottomStart).size(corner))
-    ResizeGrip(state, Modifier.align(Alignment.BottomEnd))
+    ResizeHandle(state, ChatDockEdge.Top, Modifier.align(Alignment.TopCenter).offset(y = -edge).fillMaxWidth().height(edge))
+    ResizeHandle(state, ChatDockEdge.Bottom, Modifier.align(Alignment.BottomCenter).offset(y = edge).fillMaxWidth().height(edge))
+    ResizeHandle(state, ChatDockEdge.TopLeft, Modifier.align(Alignment.TopStart).offset(-corner, -corner).size(corner))
+    ResizeHandle(state, ChatDockEdge.BottomLeft, Modifier.align(Alignment.BottomStart).offset(-corner, corner).size(corner))
+    ResizeHandle(state, ChatDockEdge.BottomRight, Modifier.align(Alignment.BottomEnd).offset(corner, corner).size(corner))
+    // Above the top-right corner rather than in the bottom-right one, where the send button is;
+    // up there it also stays on screen when the panel sits full width along the bottom.
+    ResizeGrip(state, Modifier.align(Alignment.TopEnd).offset(y = -ChatSurfaceDimens.dockResizeGrip))
 }
 
 @Composable
@@ -356,12 +363,12 @@ private fun ResizeGrip(state: ChatDockState, modifier: Modifier) {
     Canvas(
         modifier
             .size(ChatSurfaceDimens.dockResizeGrip)
-            .pointerHoverIcon(resizePointerIcon(ResizeDirection.DiagonalDown))
-            .resizeDrag(state, ChatDockEdge.BottomRight)
+            .pointerHoverIcon(resizePointerIcon(ResizeDirection.DiagonalUp))
+            .resizeDrag(state, ChatDockEdge.TopRight)
             .semantics { contentDescription = label }
             .testTag(DOCK_RESIZE_GRIP_TAG),
     ) {
-        // Three short diagonals tucked into the panel's rounded corner.
+        // Three short diagonals pointing at the panel's top-right corner, just below them.
         val gap = LettaDimens.Space.hair.toPx() * 1.5f
         val inset = LettaDimens.Space.xs.toPx()
         val stroke = LettaDimens.Stroke.hairline.toPx() * 2f
