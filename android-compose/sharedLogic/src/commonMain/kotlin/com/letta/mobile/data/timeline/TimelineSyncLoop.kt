@@ -166,6 +166,15 @@ class TimelineSyncLoop(
         )
     }
 
+    private val imageRecovery by lazy {
+        TimelineImageRecovery(
+            conversationId = conversationId,
+            transport = messageApi,
+            timeline = { timelineProcessor.state.value.timeline },
+            restore = ::restoreImagePlaceholders,
+        )
+    }
+
     private val hydrator by lazy {
         TimelineHydrator(
             conversationId = conversationId,
@@ -875,8 +884,30 @@ class TimelineSyncLoop(
                 // backoff sweep as turnEnded if the immediate reconcile alone
                 // doesn't resolve everything, so there's always a terminal outcome.
                 danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
+                launchImageRecoveryIfNeeded()
             }
         }
+    }
+
+    /**
+     * letta-mobile-a02be: rows restored from a snapshot that kept an image only as its size get
+     * the bytes back from the server, in the background so the timeline never waits on it.
+     */
+    private fun launchImageRecoveryIfNeeded() {
+        val hasPlaceholder = timelineProcessor.state.value.timeline.events.any { event ->
+            event is TimelineEvent.Confirmed && event.attachments.any { it.isSizeOnlyPlaceholder }
+        }
+        if (hasPlaceholder) loopScope.launch(ioDispatcher) { recoverImagePlaceholders() }
+    }
+
+    /** Fetches the images of size-only placeholder rows from the server. Returns rows restored. */
+    suspend fun recoverImagePlaceholders(): Int = imageRecovery.recover()
+
+    private suspend fun restoreImagePlaceholders(serverId: String, images: List<MessageContentPart.Image>): Boolean {
+        val applied = timelineProcessor.submitMaintenanceMutation(TimelineMutation.RestoreImagePlaceholders(serverId, images))
+        val changed = (applied as? TimelineProcessorAck.Applied)?.result?.changed == true
+        if (changed) scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+        return changed
     }
 
     /**

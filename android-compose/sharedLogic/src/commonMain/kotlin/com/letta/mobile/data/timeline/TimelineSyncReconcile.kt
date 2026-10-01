@@ -78,6 +78,9 @@ fun Timeline.mergeServerMessages(
             )
             return@forEach
         }
+        // A row this device already holds may have kept an image only as a size pointer; the
+        // server copy carries the bytes, so fill them in before skipping it as known.
+        timeline = timeline.withImagePlaceholdersFilledBy(confirmed)
         if (timeline.containsIdentityFor(confirmed)) return@forEach
         val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
         if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {
