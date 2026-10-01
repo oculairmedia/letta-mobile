@@ -49,10 +49,6 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 
 /*
  * letta-mobile-bglj6.1 (stage 3, desktop): the Conversations destination rendered with the shared
@@ -61,7 +57,8 @@ import kotlinx.coroutines.cancel
 
 /**
  * The one [DesktopChatSessionPort] for [controller], alive as long as the controller is. Its flows
- * run in a child of the composition's scope that is cancelled when the controller changes.
+ * share in the composition's scope only while the page collects them (WhileSubscribed), so a
+ * replaced controller's port stops with its last collector.
  */
 @Composable
 internal fun rememberDesktopChatSessionPort(
@@ -70,15 +67,11 @@ internal fun rememberDesktopChatSessionPort(
 ): DesktopChatSessionPort {
     val latestA2uiAction by rememberUpdatedState(onA2uiAction)
     val latestFontScaleSetter by rememberUpdatedState(LocalDesktopChatFontScaleSetter.current)
-    val parentScope = rememberCoroutineScope()
-    val portScope = remember(controller) {
-        CoroutineScope(parentScope.coroutineContext + SupervisorJob(parentScope.coroutineContext[Job]))
-    }
-    DisposableEffect(portScope) { onDispose { portScope.cancel() } }
-    return remember(controller, portScope) {
+    val compositionScope = rememberCoroutineScope()
+    return remember(controller, compositionScope) {
         DesktopChatSessionPort(
             controller = controller,
-            scope = portScope,
+            scope = compositionScope,
             bindings = DesktopChatSessionBindings(
                 onA2uiAction = { latestA2uiAction(it) },
                 onSetFontScale = { latestFontScaleSetter(it) },

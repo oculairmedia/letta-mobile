@@ -15,6 +15,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -288,6 +289,9 @@ class DesktopChatSessionPortTest {
     private fun TestScope.startedPort(): Pair<DesktopChatController, DesktopChatSessionPort> {
         val controller = testController()
         val port = DesktopChatSessionPort(controller = controller, scope = backgroundScope)
+        // The page always collects both; the port shares only while it does.
+        backgroundScope.launch { port.uiState.collect {} }
+        backgroundScope.launch { port.composer.collect {} }
         controller.start()
         runCurrent()
         return controller to port

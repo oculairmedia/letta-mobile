@@ -66,11 +66,11 @@ internal class DesktopChatSessionPort(
     override val uiState: StateFlow<ChatUiState> = timelineInputs()
         .runningFold(null as ChatUiState?) { previous, inputs -> desktopChatUiState(inputs, previous) }
         .map { it ?: initialUiState() }
-        .stateIn(scope, SharingStarted.Eagerly, initialUiState())
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
     override val composer: StateFlow<ChatComposerUiState> = composerInputs()
         .map(::desktopChatComposerUiState)
-        .stateIn(scope, SharingStarted.Eagerly, desktopChatComposerUiState(currentComposerInputs()))
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), desktopChatComposerUiState(currentComposerInputs()))
 
     override val actions: ChatActions = DesktopChatActions(
         controller = controller,
@@ -170,6 +170,12 @@ internal class DesktopChatSessionPort(
         DesktopWorkingDirectoryInputs(supported = controller.supportsWorkingDirectory, path = path, loading = loading)
     }
 }
+
+/**
+ * The port's flows run only while the page collects them, so a port left behind by a controller
+ * change stops on its own instead of needing a scope of its own to cancel.
+ */
+private const val STOP_TIMEOUT_MS = 5_000L
 
 /** [ChatActions] forwarded to [DesktopChatController]; what desktop cannot do is a no-op. */
 internal class DesktopChatActions(
