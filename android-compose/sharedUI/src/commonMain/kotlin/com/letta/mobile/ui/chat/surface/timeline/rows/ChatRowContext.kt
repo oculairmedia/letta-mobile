@@ -29,6 +29,18 @@ internal data class ChatRowContext(
 )
 
 /**
+ * What a subagent row asks the host to open: the dispatch's activity (its todo sheet on
+ * Android) or, once the host resolves the subagent's conversation id, the conversation itself
+ * through [ChatSurfaceHost.viewSubagentConversation].
+ */
+@Immutable
+internal data class ChatSubagentTarget(
+    val toolCallId: String,
+    val description: String,
+    val subagentAgentId: String? = null,
+)
+
+/**
  * The row-level intents, bound once per page from [ChatActions] and [ChatSurfaceHost]. A
  * plain class held in `remember`, so its identity is stable and rows stay skippable.
  */
@@ -38,4 +50,15 @@ internal class ChatRowCallbacks(
     val host: ChatSurfaceHost,
     /** Opens the full-screen image viewer on [index] of [images]. */
     val onImageTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
+    /**
+     * Display name for an agent id in inter-agent provenance labels; null falls back to the
+     * short id label. Desktop's `LocalDesktopAgentMessageContext.resolveName`, as an input.
+     */
+    val resolveAgentName: (agentId: String) -> String? = { null },
+    /**
+     * Opens a dispatched subagent's activity. The row cannot resolve the subagent's
+     * conversation id (that is an async lookup the host owns), so it hands the host the
+     * dispatch identity instead. Null hides the affordance.
+     */
+    val openSubagent: ((ChatSubagentTarget) -> Unit)? = null,
 )
