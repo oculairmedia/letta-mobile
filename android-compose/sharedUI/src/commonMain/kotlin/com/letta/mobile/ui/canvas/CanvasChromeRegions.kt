@@ -7,7 +7,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 
 /**
  * The board's own controls, by where they are on screen.
@@ -27,6 +30,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
  * that appears with a selection, a panel that grows - stays accurate without re-registering.
  */
 class CanvasChromeRegions {
+    /**
+     * Where the board's scene root sits in the window.
+     *
+     * Controls drawn in the board use [androidx.compose.ui.layout.LayoutCoordinates.boundsInRoot],
+     * which is already the space the pen checks. A popup is its own layer: its root bounds are
+     * local to that layer, so they have to be shifted back into the scene by this origin.
+     */
+    var sceneRootInWindow: Offset = Offset.Zero
+
     private val regions = mutableListOf<() -> Rect?>()
 
     /** Registers [bounds]; call the returned function to remove it again. */
@@ -56,8 +68,27 @@ internal fun Modifier.canvasChrome(regions: CanvasChromeRegions?): Modifier {
         val unregister = regions.register { holder.bounds }
         onDispose { unregister() }
     }
-    return onGloballyPositioned { holder.bounds = it.boundsInRoot() }
+    return onGloballyPositioned { coordinates ->
+        val layerRoot = coordinates.findRootCoordinates().positionInWindow()
+        val sceneRoot = regions.sceneRootInWindow
+        val sameScene = (layerRoot - sceneRoot).getDistance() < 1f
+        holder.bounds = if (sameScene) {
+            coordinates.boundsInRoot()
+        } else {
+            val inWindow = coordinates.boundsInWindow()
+            Rect(
+                left = inWindow.left - sceneRoot.x,
+                top = inWindow.top - sceneRoot.y,
+                right = inWindow.right - sceneRoot.x,
+                bottom = inWindow.bottom - sceneRoot.y,
+            )
+        }
+    }
 }
+
+/** The board the control is drawn on, so a popup can register itself as chrome. */
+val LocalCanvasChromeRegions = androidx.compose.runtime.compositionLocalOf<CanvasChromeRegions?> { null }
+
 
 /** Where one control currently is. Plain, so moving a control does not recompose anything. */
 private class ChromeBounds {

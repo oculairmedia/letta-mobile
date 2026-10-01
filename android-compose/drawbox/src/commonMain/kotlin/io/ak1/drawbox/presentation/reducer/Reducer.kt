@@ -117,6 +117,9 @@ class Reducer(
         is Intent.SetLineBend -> state.copy(
             elements = useCase.setLineBend(state.elements, intent.id, intent.bend),
         )
+        is Intent.SmoothConnector -> state.copy(
+            elements = useCase.smoothConnector(state.elements, intent.id),
+        )
         is Intent.FinalizeArrowBindings -> state.copy(
             // Don't snapshot here — this intent is always dispatched at the END
             // of a gesture whose START already snapshotted (InsertNewShape for
