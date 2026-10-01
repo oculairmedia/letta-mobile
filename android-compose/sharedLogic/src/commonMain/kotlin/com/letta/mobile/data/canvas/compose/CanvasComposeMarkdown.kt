@@ -455,7 +455,7 @@ private class InlineReader(private val src: String, private val offsets: IntArra
     private val failed = HashSet<Long>()
 
     fun read(): MdText {
-        readUntil(0, null, src.length)
+        readUntil(0, null, src.length, depth = 0)
         val sorted = spans.sortedWith(compareBy<MdSpan>({ it.start }, { -it.end }, { it.style.ordinal }))
         return MdText(out.toString(), sorted)
     }
@@ -464,7 +464,7 @@ private class InlineReader(private val src: String, private val offsets: IntArra
      * Reads `[from, limit)` until [closer] (when given) closes the span that opened it. Returns the
      * index after the closer, the limit when [closer] is null, or -1 when the closer never comes.
      */
-    private fun readUntil(from: Int, closer: Delimiter?, limit: Int): Int {
+    private fun readUntil(from: Int, closer: Delimiter?, limit: Int, depth: Int): Int {
         var i = from
         while (i < limit) {
             val c = src[i]
@@ -485,13 +485,13 @@ private class InlineReader(private val src: String, private val offsets: IntArra
                     out.append(c)
                     i++
                 }
-                c == '[' -> i = link(i, limit)
+                c == '[' -> i = link(i, limit, depth)
                 c == '<' && HTML_OR_AUTOLINK.containsMatchIn(src.substring(i, minOf(limit, i + HTML_LOOKAHEAD))) -> {
                     problems.unsupported(offsets[i], "raw HTML or an autolink (write links as [text](url))")
                     out.append(c)
                     i++
                 }
-                else -> i = emphasis(i, limit) ?: run {
+                else -> i = emphasis(i, limit, depth) ?: run {
                     out.append(c)
                     i + 1
                 }
@@ -501,13 +501,15 @@ private class InlineReader(private val src: String, private val offsets: IntArra
     }
 
     /** An emphasis or strike span opening at [i]: the index after it, or null when [i] opens nothing. */
-    private fun emphasis(i: Int, limit: Int): Int? {
+    private fun emphasis(i: Int, limit: Int, depth: Int): Int? {
         val delimiter = DELIMITERS.firstOrNull { opens(it, i, limit) } ?: return null
+        // Real text never nests styles this deep; a long run of unmatched openers would, one stack frame each.
+        if (depth >= MAX_DEPTH) return null
         val key = (limit.toLong() shl 32) or (i.toLong() shl 3) or delimiter.ordinal.toLong()
         if (key in failed) return null
         val outMark = out.length
         val spanMark = spans.size
-        val end = readUntil(i + delimiter.token.length, delimiter, limit)
+        val end = readUntil(i + delimiter.token.length, delimiter, limit, depth + 1)
         if (end >= 0) {
             spans += MdSpan(delimiter.style, outMark, out.length)
             return end
@@ -563,7 +565,7 @@ private class InlineReader(private val src: String, private val offsets: IntArra
     }
 
     /** A `[text](url)` at [i]; refusals for the forms outside the subset; else `[` as text. */
-    private fun link(i: Int, limit: Int): Int {
+    private fun link(i: Int, limit: Int, depth: Int): Int {
         if (i + 1 < limit && src[i + 1] == '^') {
             problems.unsupported(offsets[i], "a footnote")
             out.append('[')
@@ -598,7 +600,7 @@ private class InlineReader(private val src: String, private val offsets: IntArra
             close == i + 1 -> problems.unsupported(offsets[i], "a link without text")
         }
         val start = out.length
-        readUntil(i + 1, null, close)
+        readUntil(i + 1, null, close, depth + 1)
         spans += MdSpan(MdSpanStyle.LINK, start, out.length, url = destination)
         return destinationEnd + 1
     }
@@ -654,6 +656,7 @@ private class InlineReader(private val src: String, private val offsets: IntArra
 
     private companion object {
         val DELIMITERS = Delimiter.entries
+        const val MAX_DEPTH = 16
 
         /**
          * What CommonMark would read as inline HTML (a tag, a comment, a declaration or processing
