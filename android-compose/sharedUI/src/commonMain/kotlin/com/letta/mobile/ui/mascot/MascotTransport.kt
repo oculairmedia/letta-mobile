@@ -5,7 +5,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -37,6 +40,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -92,18 +96,41 @@ internal data class MascotSeatInfo(
     val drawWidth: Float get() = if (layoutWidth > 0f) layoutWidth else bounds.width
 }
 
-/** The latest click / edit handlers of one seat; updated in place, never compared. */
+/**
+ * The latest click / edit handlers of one seat; updated in place, never compared. Only whether a
+ * seat has an edit or a drag handler at all is snapshot state: the layer installs its hover and
+ * drag input for those alone, so a seat with neither leaves every touch to what is under it.
+ */
 internal class SeatHandlers {
     var onClick: (() -> Unit)? = null
 
     /** Opens the agent's editor; every drawn mascot offers it as a pencil badge on hover. */
     var onEdit: (() -> Unit)? = null
+        set(value) {
+            field = value
+            if (editable != (value != null)) editable = value != null
+        }
 
     /**
      * A drag on the character, in dp; null leaves drags to whatever is under it. The layer draws
      * above every seat, so a seat that moves its surface (the chat dock) can only be grabbed here.
      */
     var onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null
+        set(value) {
+            field = value
+            if (draggable != (value != null)) draggable = value != null
+        }
+
+    /**
+     * Whether a drag starting now moves anything (the dock's companion only while it sits on the
+     * dock). Read as each gesture starts: a gesture it turns down is never consumed.
+     */
+    var dragEnabled: () -> Boolean = { true }
+
+    var editable: Boolean by mutableStateOf(false)
+        private set
+    var draggable: Boolean by mutableStateOf(false)
+        private set
 }
 
 /**
@@ -266,15 +293,10 @@ private fun TransportedMascot(
                 scaleX = scale
                 scaleY = scale
             }
-            .hoverable(hover)
-            .pointerInput(seat.handlers) {
-                // Read per event: the seat's handler changes in place (the dock only while seated).
-                detectDragGestures { change, amount ->
-                    val drag = seat.handlers.onDrag ?: return@detectDragGestures
-                    change.consume()
-                    drag(amount.x.toDp().value, amount.y.toDp().value)
-                }
-            },
+            // Hover (for the pencil) and drag only where the seat has them: a seat with neither
+            // takes no input at all, and what it stands over (the Touch chat head) keeps its own.
+            .then(if (seat.handlers.editable) Modifier.hoverable(hover) else Modifier)
+            .then(if (seat.handlers.draggable) Modifier.seatDrag(seat.handlers) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         MascotLive(agentId, identity, size = boxSize * seat.overscale, onClick = seat.onClick, sceneKey = sceneKey)
@@ -282,6 +304,27 @@ private fun TransportedMascot(
         // one way to edit the agent from any mascot, so no seat needs to travel to the editor.
         seat.onEdit?.let { onEdit ->
             if (hovered) MascotEditBadge(onEdit, Modifier.align(Alignment.BottomEnd))
+        }
+    }
+}
+
+/**
+ * Drags the character for [handlers]. A gesture is taken (its slop consumed) only when the seat's
+ * gate is open as it starts; otherwise it is left alone for whatever is under the layer.
+ */
+private fun Modifier.seatDrag(handlers: SeatHandlers): Modifier = pointerInput(handlers) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        if (!handlers.dragEnabled()) return@awaitEachGesture
+        val start = awaitTouchSlopOrCancellation(down.id) { change, overSlop ->
+            change.consume()
+            handlers.onDrag?.invoke(overSlop.x.toDp().value, overSlop.y.toDp().value)
+        } ?: return@awaitEachGesture
+        drag(start.id) { change ->
+            // Read per event: the seat's handler changes in place.
+            val amount = change.positionChange()
+            change.consume()
+            handlers.onDrag?.invoke(amount.x.toDp().value, amount.y.toDp().value)
         }
     }
 }

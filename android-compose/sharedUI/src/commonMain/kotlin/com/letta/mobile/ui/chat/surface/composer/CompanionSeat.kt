@@ -180,7 +180,9 @@ internal fun CompanionSeatOverlay(
             },
             onClick = onClick,
             onEdit = onEdit,
-            onDrag = onDockDrag?.let { drag -> { dx: Float, dy: Float -> if (pageWeight() <= 0f) drag(dx, dy) } },
+            onDrag = onDockDrag,
+            // Only seated on the dock: on (or growing into) the page the character moves nothing.
+            dragEnabled = { pageWeight() <= 0f },
             empty = {},
         )
     }
