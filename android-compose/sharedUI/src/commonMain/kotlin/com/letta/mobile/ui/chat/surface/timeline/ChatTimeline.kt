@@ -54,7 +54,9 @@ internal fun ChatTimeline(
         onCommit = actions::setFontScale,
     )
     val fontScale = pinch.effectiveScale(appearance.fontScale)
-    val contexts = rememberRowContexts(state, capabilities, appearance, fontScale)
+    // A host that already scales text (desktop, via density) leaves rows only the live pinch delta.
+    val rowFontScale = if (appearance.fontScaleAppliedByHost) fontScale / appearance.fontScale else fontScale
+    val contexts = rememberRowContexts(state, capabilities, appearance, rowFontScale)
     val bindings = remember(contexts, callbacks) { TimelineRowBindings(contexts, callbacks) }
     val snackbars = remember { SnackbarHostState() }
     A2uiSnackbarEffect(state.a2uiActionSnackbar, snackbars, actions)
