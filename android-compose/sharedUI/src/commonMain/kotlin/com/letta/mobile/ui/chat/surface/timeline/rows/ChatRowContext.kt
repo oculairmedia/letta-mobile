@@ -30,8 +30,8 @@ internal data class ChatRowContext(
 
 /**
  * What a subagent row asks the host to open: the dispatch's activity (its todo sheet on
- * Android) or, once the host resolves the subagent's conversation id, the conversation itself
- * through [ChatSurfaceHost.viewSubagentConversation].
+ * Android, which offers the conversation once the host resolves it), raised through
+ * [ChatSurfaceHost.openSubagent].
  */
 @Immutable
 internal data class ChatSubagentTarget(

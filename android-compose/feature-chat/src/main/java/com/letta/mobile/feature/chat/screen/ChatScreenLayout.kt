@@ -290,7 +290,7 @@ private data class ChatScreenComposerColumnParams(
     val modifier: Modifier = Modifier,
 )
 
-private data class ChatScreenSubagentTodoSheetParams(
+internal data class ChatScreenSubagentTodoSheetParams(
     val target: SubagentTodoSheetTarget?,
     val resolvedSubagentSource: ActiveSubagentSource,
     val resolvedSelfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource,
@@ -585,7 +585,7 @@ private fun ChatScreenComposerInputSection(
 }
 
 @Composable
-private fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParams) {
+internal fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParams) {
     params.target?.let { sheetTarget ->
         var todoState by remember(sheetTarget.toolCallId) {
             mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)

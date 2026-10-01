@@ -18,6 +18,8 @@ import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiSubagentDispatch
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
@@ -48,7 +50,11 @@ class ChatTimelineUiTest {
             IncrementalChatRenderItemsCache().renderItems(messages, ChatDisplayMode.Interactive, ChatMessageListChange.Full, null),
         ).size
 
-    private fun androidx.compose.ui.test.ComposeUiTest.show(state: ChatUiState, actions: RecordingChatActions) {
+    private fun androidx.compose.ui.test.ComposeUiTest.show(
+        state: ChatUiState,
+        actions: RecordingChatActions,
+        host: ChatSurfaceHost = ChatSurfaceHost(),
+    ) {
         setContent {
             MaterialTheme {
                 Box(Modifier.size(width = 420.dp, height = 640.dp)) {
@@ -57,7 +63,7 @@ class ChatTimelineUiTest {
                         pagedTimeline = null,
                         actions = actions,
                         capabilities = ChatSurfaceCapabilities.Default,
-                        host = ChatSurfaceHost(),
+                        host = host,
                         appearance = ChatSurfaceAppearance(),
                     )
                 }
@@ -162,5 +168,31 @@ class ChatTimelineUiTest {
         onNodeWithTag(ChatTimelineTags.GOAL).assertExists()
         onNodeWithText("Pause").performClick()
         assertEquals(listOf(GoalCommands.PAUSE), actions.sent)
+    }
+
+    @Test
+    fun subagentRowsOpenThroughTheHost() = runComposeUiTest {
+        val opened = mutableListOf<Triple<String, String?, String>>()
+        val dispatch = UiSubagentDispatch(
+            toolCallId = "agent-call-1",
+            description = "Audit the build",
+            subagentType = "general-purpose",
+            runInBackground = false,
+            prompt = "Look at gradle",
+            subagentAgentId = "agent-sub",
+        )
+        val call = UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch)
+        val messages = conversation(1) + UiMessage(
+            id = "m-dispatch",
+            role = "assistant",
+            content = "",
+            timestamp = "2026-09-12T12:01:00Z",
+            toolCalls = listOf(call),
+        )
+        val host = ChatSurfaceHost(openSubagent = { callId, agentId, description -> opened += Triple(callId, agentId, description) })
+        show(ready.copy(messages = messages.toPersistentList()), RecordingChatActions(), host)
+
+        onNodeWithText("Dispatched: Audit the build").performClick()
+        runOnIdle { assertEquals(listOf<Triple<String, String?, String>>(Triple("agent-call-1", "agent-sub", "Audit the build")), opened) }
     }
 }

@@ -123,7 +123,18 @@ data class ChatSurfaceCapabilities(
 data class ChatSurfaceHost(
     val openCanvas: (() -> Unit)? = null,
     val openAgent: ((agentId: String) -> Unit)? = null,
-    val viewSubagentConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
+    /**
+     * Display name for an agent id (inter-agent provenance labels). Null, or a null result,
+     * falls back to the short id label.
+     */
+    val resolveAgentName: ((agentId: String) -> String?)? = null,
+    /**
+     * Opens a dispatched subagent's activity (Android: its todo sheet, which offers the
+     * subagent's conversation once the host resolves it). The page knows only the dispatch, so
+     * it hands over the tool call id, the correlated subagent agent id when known, and the
+     * dispatch's description for the sheet's title. Null hides the affordance.
+     */
+    val openSubagent: ((toolCallId: String, subagentAgentId: String?, description: String) -> Unit)? = null,
     val openModelPicker: (() -> Unit)? = null,
     val pickWorkingDirectory: (() -> Unit)? = null,
     /**

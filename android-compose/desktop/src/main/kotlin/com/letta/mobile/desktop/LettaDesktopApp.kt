@@ -791,6 +791,7 @@ internal fun LettaDesktopApp(
                             DesktopCanvasOwner(chatState.selectedConversationId, selectedAgentId, selectedAgentName),
                         )
                     }
+                    val agentNamesById = remember(rosterAgents) { rosterAgents.associate { it.id.value to it.name } }
                     val sharedChatPage: (@Composable (Modifier) -> Unit)? = sharedChatPort?.let { port ->
                         { pageModifier ->
                             DesktopSharedChatPage(
@@ -824,6 +825,7 @@ internal fun LettaDesktopApp(
                                         shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
                                     },
                                     editAgent = { editAgentId = selectedAgentId },
+                                    agentNamesById = agentNamesById,
                                 ),
                                 modifier = pageModifier,
                             )
@@ -853,7 +855,7 @@ internal fun LettaDesktopApp(
                                     selectedAgentName,
                                 ),
                                 submittingApprovalRequestIds = submittingApprovals,
-                                agentNamesById = rosterAgents.associate { it.id.value to it.name },
+                                agentNamesById = agentNamesById,
                                 agentIdentitiesById = identityByAgentId,
                                 workingDirectory = selectedConversationWorkingDirectory,
                                 workingDirectorySupported = chatController.supportsWorkingDirectory,

@@ -87,6 +87,8 @@ internal data class DesktopSharedChatPageNavigation(
     val openAgentPane: (() -> Unit)? = null,
     /** The pencil on the mascot: open the selected agent's editor. */
     val editAgent: (() -> Unit)? = null,
+    /** Agent display names for provenance labels (the roster); desktop has no subagent opener. */
+    val agentNamesById: Map<String, String> = emptyMap(),
 )
 
 internal data class DesktopSharedChatPageState(
@@ -199,6 +201,7 @@ private fun rememberDesktopChatSurfaceHost(
             openCanvas = navigation.openCanvas,
             openAgent = navigation.openAgent,
             openModelPicker = navigation.openModelPicker,
+            resolveAgentName = navigation.agentNamesById::get,
             pickWorkingDirectory = if (supportsWorkingDirectory) ({ directoryPicker.launch() }) else null,
             openAgentPane = navigation.openAgentPane,
             editAgent = navigation.editAgent,

@@ -43,6 +43,8 @@ internal data class SharedChatPageParams(
     val pagingPresentation: ChatPagingPresentation?,
     /** "Open conversations on the canvas": the initial presentation only. */
     val openOnCanvas: Boolean = true,
+    /** Subagent dispatches open their todo sheet from these. */
+    val subagents: SharedChatSubagentInputs,
     /** The ambient agent glow, drawn behind the full-screen page. */
     val pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)? = null,
 )
@@ -63,7 +65,10 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     var presentation by rememberSaveable(stateSaver = PresentationSaver) {
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
     }
-    val host = remember(params.navigation) { params.navigation.toSurfaceHost() }
+    val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
+    val host = remember(params.navigation, subagentSheet) {
+        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch)
+    }
     val onIntent: (ChatSurfaceIntent) -> Unit = { intent ->
         if (canvasSlot == null && routesToCanvasNavigation(presentation, intent)) {
             host.openCanvas?.invoke()
@@ -100,6 +105,12 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             pagedTimeline = params.pagingPresentation?.canonical,
             canvas = canvas,
         )
+        SharedChatSubagentSheet(
+            state = subagentSheet,
+            inputs = params.subagents,
+            currentConversationId = target.conversationId,
+            navigation = params.navigation,
+        )
         ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
     }
 }
@@ -121,12 +132,14 @@ private fun rememberAdminChatSessionPort(
     }
 }
 
-private fun ChatScreenNavigationCallbacks.toSurfaceHost(): ChatSurfaceHost {
+private fun ChatScreenNavigationCallbacks.toSurfaceHost(
+    openSubagent: (toolCallId: String, subagentAgentId: String?, description: String) -> Unit,
+): ChatSurfaceHost {
     val openPane = onOpenAgentPane
     return ChatSurfaceHost(
         openCanvas = onOpenCanvas,
         openAgent = openPane?.let { { _: String -> it() } },
-        viewSubagentConversation = onViewSubagentConversation,
+        openSubagent = openSubagent,
         openModelPicker = null,
         // The composer companion mascot opens the agent drawer, as the legacy page's does.
         openAgentPane = openPane,

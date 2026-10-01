@@ -79,6 +79,26 @@ internal fun rememberRowCallbacks(
 ): ChatRowCallbacks {
     val currentTap = rememberUpdatedState(onImageTap)
     return remember(actions, host) {
-        ChatRowCallbacks(actions = actions, host = host, onImageTap = { images, index -> currentTap.value(images, index) })
+        rowCallbacksFor(actions, host) { images, index -> currentTap.value(images, index) }
     }
+}
+
+/**
+ * Binds the rows' host affordances: agent display names and the subagent opener come from
+ * [host]; a host without them leaves the short id label and hides the subagent affordance.
+ */
+internal fun rowCallbacksFor(
+    actions: ChatActions,
+    host: ChatSurfaceHost,
+    onImageTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
+): ChatRowCallbacks {
+    val resolveName = host.resolveAgentName
+    val open = host.openSubagent
+    return ChatRowCallbacks(
+        actions = actions,
+        host = host,
+        onImageTap = onImageTap,
+        resolveAgentName = resolveName ?: { null },
+        openSubagent = open?.let { { target -> it(target.toolCallId, target.subagentAgentId, target.description) } },
+    )
 }

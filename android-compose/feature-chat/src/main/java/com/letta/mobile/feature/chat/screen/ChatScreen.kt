@@ -116,6 +116,10 @@ internal fun ChatScreen(
                     hapticsEnabled = hapticsEnabled,
                     pagingPresentation = pagingPresentation,
                     openOnCanvas = openChatsOnCanvas,
+                    subagents = com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs(
+                        source = resolvedSubagentSource,
+                        selfTodoSource = resolvedSelfTodoSource,
+                    ),
                     pageBackground = { content ->
                         AmbientShaderAgentBackground(
                             agentStatus = ambient.status,
