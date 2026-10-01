@@ -45,6 +45,11 @@ data class ChatSurfacePlatform(
      * True where a hardware keyboard is the norm (desktop); false on touch-first hosts.
      */
     val showKeyboardHints: Boolean = true,
+    /**
+     * Drawn over the full-screen timeline (a top-aligned box over the list): host chrome
+     * the shared page does not own, such as Android's active-subagent rings.
+     */
+    val timelineOverlay: (@Composable () -> Unit)? = null,
 ) {
     companion object {
         val Default = ChatSurfacePlatform()

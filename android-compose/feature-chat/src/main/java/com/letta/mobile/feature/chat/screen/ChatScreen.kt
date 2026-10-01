@@ -119,6 +119,7 @@ internal fun ChatScreen(
                     subagents = com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs(
                         source = resolvedSubagentSource,
                         selfTodoSource = resolvedSelfTodoSource,
+                        barState = subagentBarState,
                     ),
                     pageBackground = { content ->
                         AmbientShaderAgentBackground(

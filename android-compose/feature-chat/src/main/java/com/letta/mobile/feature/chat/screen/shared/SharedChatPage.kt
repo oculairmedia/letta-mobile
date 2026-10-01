@@ -66,6 +66,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
     }
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
+    // Read live by the rings overlay, whose slot lambda is remembered with the platform.
+    val currentSubagents by rememberUpdatedState(params.subagents)
     val host = remember(params.navigation, subagentSheet) {
         params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch)
     }
@@ -101,7 +103,10 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             host = host,
             modifier = Modifier.fillMaxSize(),
             appearance = appearance,
-            platform = rememberAndroidChatSurfacePlatform(params.pageBackground),
+            platform = rememberAndroidChatSurfacePlatform(
+                pageBackground = params.pageBackground,
+                timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
+            ),
             pagedTimeline = params.pagingPresentation?.canonical,
             canvas = canvas,
         )
@@ -150,7 +155,9 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(
 @Composable
 private fun rememberAndroidChatSurfacePlatform(
     pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)?,
+    timelineOverlay: @Composable () -> Unit,
 ): ChatSurfacePlatform {
+    val currentOverlay by rememberUpdatedState(timelineOverlay)
     val activity = LocalContext.current as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
     return remember(isHiltHost, pageBackground) {
@@ -159,6 +166,7 @@ private fun rememberAndroidChatSurfacePlatform(
             pageBackground = pageBackground,
             // Touch first: the composer's keyboard-shortcut strip is desktop chrome.
             showKeyboardHints = false,
+            timelineOverlay = { currentOverlay() },
         )
     }
 }

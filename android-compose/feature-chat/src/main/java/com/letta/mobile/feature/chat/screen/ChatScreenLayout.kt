@@ -104,7 +104,10 @@ internal fun ChatScreenLayout(
         )
         ChatScreenSubagentRingsOverlay(
             params = ChatScreenSubagentRingsOverlayParams(
-                layoutParams = params,
+                barState = params.subagentBarState,
+                resolvedSubagentSource = params.resolvedSubagentSource,
+                navigation = params.navigation,
+                onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
                 openSubagentTarget = localState.openSubagentTarget,
                 onTargetChange = localState.onTappedSubagentTargetChange,
                 subagentNavigationScope = localState.subagentNavigationScope,
@@ -269,8 +272,11 @@ private fun ChatScreenErrorPhase(
     )
 }
 
-private data class ChatScreenSubagentRingsOverlayParams(
-    val layoutParams: ChatScreenLayoutParams,
+internal data class ChatScreenSubagentRingsOverlayParams(
+    val barState: ChatScreenSubagentBarState,
+    val resolvedSubagentSource: ActiveSubagentSource,
+    val navigation: ChatScreenNavigationCallbacks,
+    val onFloatingBannerMessageChange: (String) -> Unit,
     val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
     val onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
     val subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
@@ -310,11 +316,11 @@ private data class ChatScreenFloatingOverlaysParams(
 )
 
 @Composable
-private fun ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverlayParams) {
+internal fun ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverlayParams) {
     CompositionLocalProvider(LocalSubagentTodoSheetOpener provides params.openSubagentTarget) {
         ActiveSubagentRings(
-            subagents = params.layoutParams.subagentBarState.activeSubagents,
-            now = params.layoutParams.subagentBarState.lingerTick,
+            subagents = params.barState.activeSubagents,
+            now = params.barState.lingerTick,
             onRingClick = { subagent ->
                 params.onTargetChange(
                     SubagentTodoSheetTarget(
@@ -329,12 +335,12 @@ private fun ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverla
                 handleSubagentViewConversation(
                     SubagentViewConversationParams(
                         subagent = subagent,
-                        resolvedSubagentSource = params.layoutParams.resolvedSubagentSource,
-                        navigation = params.layoutParams.navigation,
+                        resolvedSubagentSource = params.resolvedSubagentSource,
+                        navigation = params.navigation,
                         subagentNavigationScope = params.subagentNavigationScope,
                         haptic = params.haptic,
                         onTargetChange = params.onTargetChange,
-                        onFloatingBannerMessageChange = params.layoutParams.onFloatingBannerMessageChange,
+                        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
                     ),
                 )
             },

@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -106,6 +107,11 @@ fun ChatSurface(
     }
 }
 
+/** Test tags for the page's own layers. */
+internal object ChatSurfaceTags {
+    const val TIMELINE_OVERLAY = "chat_surface_timeline_overlay"
+}
+
 /** One composition's worth of what every part of the page reads. */
 @Immutable
 private class ChatSurfaceFrame(
@@ -166,15 +172,7 @@ private fun DockedOverlay(frame: ChatSurfaceFrame, replyMaxHeight: Dp, modifier:
 private fun FullScreenPage(frame: ChatSurfaceFrame, modifier: Modifier, opaque: Boolean) {
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxSize()) {
-            ChatTimeline(
-                state = frame.uiState,
-                pagedTimeline = frame.pagedTimeline,
-                actions = frame.port.actions,
-                capabilities = frame.port.capabilities,
-                host = frame.host,
-                appearance = frame.appearance,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
+            TimelineWithOverlay(frame, Modifier.weight(1f).fillMaxWidth())
             Composer(frame, Modifier.fillMaxWidth())
         }
     }
@@ -186,6 +184,27 @@ private fun FullScreenPage(frame: ChatSurfaceFrame, modifier: Modifier, opaque: 
         }
         background != null -> Box(modifier) { background(content) }
         else -> Box(modifier) { content() }
+    }
+}
+
+/** The timeline, with the host's [ChatSurfacePlatform.timelineOverlay] drawn over its top. */
+@Composable
+private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
+    Box(modifier) {
+        ChatTimeline(
+            state = frame.uiState,
+            pagedTimeline = frame.pagedTimeline,
+            actions = frame.port.actions,
+            capabilities = frame.port.capabilities,
+            host = frame.host,
+            appearance = frame.appearance,
+            modifier = Modifier.fillMaxSize(),
+        )
+        frame.platform.timelineOverlay?.let { overlay ->
+            Box(Modifier.fillMaxSize().testTag(ChatSurfaceTags.TIMELINE_OVERLAY), contentAlignment = Alignment.TopCenter) {
+                overlay()
+            }
+        }
     }
 }
 
