@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_placeholder
+import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
@@ -63,6 +64,7 @@ internal fun ComposerTextField(
             .fillMaxWidth()
             .heightIn(min = LettaDimens.Space.xl, max = style.maxHeight)
             .testTag(style.testTag)
+            .then(rememberSendFlightSource())
             .onPreviewKeyEvent { event ->
                 composerEnterKeyHandled(
                     ComposerEnterKeyParams(

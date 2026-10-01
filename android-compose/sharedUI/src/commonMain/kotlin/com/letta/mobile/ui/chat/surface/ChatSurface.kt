@@ -28,6 +28,9 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
+import com.letta.mobile.ui.chat.surface.sendflight.SendFlightLayer
+import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightActions
+import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightState
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_share_failed
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
@@ -87,17 +90,20 @@ fun ChatSurface(
         platform = platform,
         pagedTimeline = pagedTimeline,
     )
-    if (canvas == null) {
-        if (presentation.mode == ChatSurfaceMode.FullScreen) {
-            FullScreenPage(frame, modifier.fillMaxSize(), opaque = false)
-        } else {
-            BoxWithConstraints(modifier) {
-                DockedOverlay(frame, maxHeight * ChatSurfaceDimens.dockedReplyMaxHeightFraction, Modifier.align(Alignment.BottomCenter))
+    // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
+    SendFlightLayer(rememberSendFlightState(), modifier) {
+        if (canvas == null) {
+            if (presentation.mode == ChatSurfaceMode.FullScreen) {
+                FullScreenPage(frame, Modifier.fillMaxSize(), opaque = false)
+            } else {
+                BoxWithConstraints {
+                    DockedOverlay(frame, maxHeight * ChatSurfaceDimens.dockedReplyMaxHeightFraction, Modifier.align(Alignment.BottomCenter))
+                }
             }
+        } else {
+            CanvasWithChat(frame, { canvas(canvasActions) }, Modifier)
         }
-        return
     }
-    CanvasWithChat(frame, { canvas(canvasActions) }, modifier)
 }
 
 /** One composition's worth of what every part of the page reads. */
@@ -191,7 +197,7 @@ private fun Composer(frame: ChatSurfaceFrame, modifier: Modifier) {
     ChatComposerPanel(
         composer = frame.composer,
         uiState = frame.uiState,
-        actions = frame.port.actions,
+        actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
         capabilities = frame.port.capabilities,
         host = frame.host,
         platform = frame.platform,

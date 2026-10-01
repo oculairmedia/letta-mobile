@@ -50,6 +50,7 @@ import com.letta.mobile.sharedui.resources.rows_expand_prompt
 import com.letta.mobile.sharedui.resources.rows_message_actions
 import com.letta.mobile.sharedui.resources.rows_not_sent
 import com.letta.mobile.sharedui.resources.rows_send_again
+import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightTarget
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
@@ -98,6 +99,7 @@ internal fun UserPromptRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = LettaDimens.Space.sm)
+                .then(rememberSendFlightTarget(message.id, message.content))
                 .testTag(ChatRowTestTags.USER_PROMPT)
                 .hoverable(hoverSource)
                 .clip(RoundedCornerShape(LettaDimens.Radius.md))
