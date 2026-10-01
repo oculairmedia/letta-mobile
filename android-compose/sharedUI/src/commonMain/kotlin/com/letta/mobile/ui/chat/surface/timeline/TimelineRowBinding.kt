@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.toChatRenderItemState
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -54,8 +55,24 @@ internal class TimelineRowContexts(
 }
 
 /** The newest assistant message while a run streams; null when idle. */
-internal fun streamingMessageIdOf(state: ChatUiState): String? =
-    if (state.isStreaming) state.messages.lastOrNull { it.role == "assistant" }?.id else null
+internal fun streamingMessageIdOf(state: ChatUiState): String? = streamingAssistantOf(state)?.id
+
+/**
+ * The reply the running turn is writing: an assistant message after the newest user prompt.
+ * Right after a send nothing answers that prompt yet, so this is null; picking the previous
+ * reply instead would mark it streaming and replay its reveal from an empty string.
+ */
+internal fun streamingAssistantOf(state: ChatUiState): UiMessage? {
+    if (!state.isStreaming) return null
+    for (i in state.messages.indices.reversed()) {
+        val message = state.messages[i]
+        when (message.role) {
+            "assistant" -> return message
+            "user" -> return null
+        }
+    }
+    return null
+}
 
 @Composable
 internal fun rememberRowContexts(
