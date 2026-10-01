@@ -4,14 +4,14 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.ChatTimelinePresentation
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 
 internal class RoutingSelectedChatRuntime(
     override val generation: Long,
     private val routes: Map<String, SelectedTimelineRoute>,
-    private val presentations: Map<String, ChatPagingPresentation>,
+    private val presentations: Map<String, ChatTimelinePresentation>,
     private val canonicalWriter: TimelineExternalTransportWriter,
     private val legacyWriter: TimelineExternalTransportWriter,
     parent: CoroutineScope,
@@ -135,7 +135,7 @@ internal class RoutingSelectedChatRuntime(
         conversationId: String,
         target: String?,
         scope: CoroutineScope,
-    ): ChatPagingPresentation {
+    ): ChatTimelinePresentation {
         check(ready(conversationId) == SelectedTimelineRoute.Canonical) {
             "Deferred conversations use the legacy observer, not canonical paging"
         }

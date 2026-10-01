@@ -2,7 +2,7 @@ package com.letta.mobile.di
 
 import com.letta.mobile.feature.chat.coordination.SelectedChatRuntime
 import com.letta.mobile.feature.chat.screen.ChatPagingHost
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.ChatTimelinePresentation
 import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -184,11 +184,7 @@ class SelectedRuntimeBindingTest {
     @Test fun capturedDeferredOpenAndSendUseLegacyWriterWithoutCanonicalWrites() = runTest {
         val canonicalWriter = FakeTimelineExternalTransportWriter()
         val legacyWriter = FakeTimelineExternalTransportWriter()
-        val presentation = ChatPagingPresentation(
-            settled = flowOf(androidx.paging.PagingData.empty()),
-            live = MutableStateFlow(emptyList()),
-            close = {},
-        )
+        val presentation = ChatTimelinePresentation(timeline = null, close = {})
         val binding = mockk<AndroidCanonicalTimelineRuntime.Binding>()
         every { binding.writer } returns canonicalWriter
         every { binding.bindPresentation(any()) } answers {
@@ -244,11 +240,7 @@ class SelectedRuntimeBindingTest {
     @Test fun capturedNormalizedOpenAndSendStayOnCanonicalTogether() = runTest {
         val canonicalWriter = FakeTimelineExternalTransportWriter()
         val legacyWriter = FakeTimelineExternalTransportWriter()
-        val presentation = ChatPagingPresentation(
-            settled = flowOf(androidx.paging.PagingData.empty()),
-            live = MutableStateFlow(emptyList()),
-            close = {},
-        )
+        val presentation = ChatTimelinePresentation(timeline = null, close = {})
         val binding = mockk<AndroidCanonicalTimelineRuntime.Binding>()
         every { binding.writer } returns canonicalWriter
         every { binding.bindPresentation(any()) } answers {

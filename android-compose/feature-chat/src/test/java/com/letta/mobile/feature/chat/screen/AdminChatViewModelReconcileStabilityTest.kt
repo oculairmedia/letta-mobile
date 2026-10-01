@@ -1,15 +1,12 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
 import com.letta.mobile.testutil.TestData
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -29,8 +26,8 @@ import org.robolectric.annotation.Config
  * reading; that re-publication used to bump [com.letta.mobile.data.chat.runtime.ChatSessionState]'s
  * `selectionGeneration`, which is exactly the key `beginTimelineObserver` compares to decide
  * whether its presentation is still current. A bumped generation retires the live presentation
- * (`_pagingPresentation.value = null`), publishes an `opening` placeholder — which
- * `PagedChatMessageList` renders as "Opening conversation..." **in place of the whole list** — and
+ * (`_timelinePresentation.value = null`), publishes an `opening` placeholder — which
+ * the chat page rendered as "Opening conversation..." **in place of the whole list** — and
  * then publishes a brand-new presentation, which `key(presentation)` rebuilds the LazyColumn and
  * its `rememberLazyListState` from. That is the flash, and every row re-composes with it.
  *
@@ -51,11 +48,7 @@ class AdminChatViewModelReconcileStabilityTest {
         try {
             var opens = 0
             var closes = 0
-            val presentation = ChatPagingPresentation(
-                settled = flowOf(PagingData.empty()),
-                live = MutableStateFlow(emptyList()),
-                close = { closes++ },
-            )
+            val presentation = ChatTimelinePresentation(timeline = null, close = { closes++ })
             val host = ChatPagingHost().apply {
                 openCanonical = { _, _, _, _ ->
                     opens++
@@ -65,10 +58,10 @@ class AdminChatViewModelReconcileStabilityTest {
             val vm = openedChatViewModel(host, TestData.agent("agent-reconcile", "Reconcile"), CONVERSATION_ID, "reconcile")
             viewModel = vm
             assertEquals("The conversation must be open before the reconcile", 1, opens)
-            assertSame(presentation, vm.pagingPresentation.value)
+            assertSame(presentation, vm.timelinePresentation.value)
 
-            val published = mutableListOf<ChatPagingPresentation?>()
-            val recorder = vm.viewModelScope.launch { vm.pagingPresentation.collect { published += it } }
+            val published = mutableListOf<ChatTimelinePresentation?>()
+            val recorder = vm.viewModelScope.launch { vm.timelinePresentation.collect { published += it } }
             // The reconcile: re-hydrate the conversation already on screen, exactly as the
             // post-send, run-completion and conversation-open paths all do.
             vm.loadMessages()
@@ -84,7 +77,7 @@ class AdminChatViewModelReconcileStabilityTest {
 
             assertEquals("The reconcile must not reopen the conversation", 1, opens)
             assertEquals("The reconcile must not retire the live presentation", 0, closes)
-            assertSame(presentation, vm.pagingPresentation.value)
+            assertSame(presentation, vm.timelinePresentation.value)
             assertTrue(
                 "The list must never be replaced by a teardown or an opening placeholder: $published",
                 published.all { it === presentation },

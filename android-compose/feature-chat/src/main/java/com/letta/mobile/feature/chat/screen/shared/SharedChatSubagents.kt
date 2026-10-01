@@ -95,7 +95,7 @@ internal fun SharedChatSubagentRings(
     }
 }
 
-/** The open sheet, if any; reuses the legacy layout's [ChatScreenSubagentTodoSheet]. */
+/** The open sheet, if any ([ChatScreenSubagentTodoSheet]). */
 @Composable
 internal fun SharedChatSubagentSheet(
     state: SharedChatSubagentSheetState,

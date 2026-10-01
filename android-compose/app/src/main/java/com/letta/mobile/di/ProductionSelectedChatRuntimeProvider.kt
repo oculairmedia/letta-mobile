@@ -11,7 +11,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.feature.chat.coordination.SelectedChatRuntime
 import com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider
 import com.letta.mobile.feature.chat.screen.ChatPagingHost
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.ChatTimelinePresentation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import javax.inject.Inject
@@ -148,7 +148,7 @@ internal class CapturedSelectedChatRuntime(
             com.letta.mobile.feature.chat.coordination.SelectedTimelineRoute.LegacyDeferred
     }
 
-    override suspend fun open(conversationId: String, target: String?, scope: CoroutineScope): ChatPagingPresentation {
+    override suspend fun open(conversationId: String, target: String?, scope: CoroutineScope): ChatTimelinePresentation {
         val bound = binding(conversationId) as? AndroidCanonicalTimelineRuntime.BindResult.Canonical
             ?: error("Deferred conversations use the legacy observer, not canonical paging")
         // Private host: never mutate the singleton presentation router.

@@ -1,31 +1,20 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.ui.common.LocalSnackbarDispatcher
-import com.letta.mobile.ui.common.SnackbarMessage
 import com.letta.mobile.ui.haptics.HapticEffects
 import kotlin.time.Duration.Companion.milliseconds
-
-// letta-mobile-gi9o0: minimum gap between reveal-synchronized streaming
-// haptics. Pulses are triggered by the smoothed text actually revealing (word
-// boundaries / small character buckets), not by an independent timer.
-internal const val STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS = 96L
 
 internal data class ChatScreenAmbientState(
     val status: String,
@@ -34,19 +23,11 @@ internal data class ChatScreenAmbientState(
     val onHadActiveRunChange: (Boolean) -> Unit,
 )
 
+/** The chat screen's ambient glow status and activity haptics; the shared page owns its feedback. */
 internal data class ChatScreenEffectsParams(
     val state: ChatUiState,
-    val composerState: ChatComposerState,
     val hapticsEnabled: Boolean,
-    val viewModel: AdminChatViewModel,
-    val floatingBannerMessage: String,
-    val onFloatingBannerMessageChange: (String) -> Unit,
     val ambient: ChatScreenAmbientState,
-    /**
-     * letta-mobile-bglj6.1: the shared chat page draws its own composer errors, error banner and
-     * A2UI snackbars (through ChatActions), so only the ambient and haptic effects run here.
-     */
-    val sharedChatPage: Boolean = false,
 )
 
 @Composable
@@ -64,8 +45,6 @@ internal fun rememberChatScreenAmbientState(): ChatScreenAmbientState {
 @Composable
 internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
     val view = LocalView.current
-
-    if (!params.sharedChatPage) ChatScreenFeedbackEffects(params)
 
     ChatScreenAmbientStatusEffect(state = params.state, ambient = params.ambient)
 
@@ -87,124 +66,6 @@ internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
         hapticsEnabled = params.hapticsEnabled,
         view = view,
     )
-}
-
-/** The legacy layout's composer-error banner, error snackbar and A2UI action snackbar. */
-@Composable
-private fun ChatScreenFeedbackEffects(params: ChatScreenEffectsParams) {
-    val snackbarDispatcher = LocalSnackbarDispatcher.current
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-
-    ChatScreenComposerErrorEffect(
-        state = ChatScreenComposerErrorEffectState(composerError = params.composerState.error),
-        haptics = ChatScreenComposerErrorEffectHaptics(haptic = haptic, view = view),
-        callbacks = ChatScreenComposerErrorEffectCallbacks(
-            onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
-            onClearComposerError = params.viewModel::clearComposerError,
-        ),
-    )
-
-    ChatScreenFloatingBannerDismissEffect(
-        floatingBannerMessage = params.floatingBannerMessage,
-        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
-    )
-
-    ChatScreenA2uiSnackbarEffect(
-        snackbar = params.state.a2uiActionSnackbar,
-        snackbarDispatcher = snackbarDispatcher,
-        onMarkShown = params.viewModel::markA2uiActionSnackbarShown,
-        onRetry = params.viewModel::submitA2uiAction,
-    )
-
-    ChatScreenErrorSnackbarEffect(
-        error = params.state.error,
-        hasMessages = params.state.messages.isNotEmpty(),
-        snackbarDispatcher = snackbarDispatcher,
-        onClearError = params.viewModel::clearError,
-    )
-}
-
-private data class ChatScreenComposerErrorEffectState(
-    val composerError: String?,
-)
-
-private data class ChatScreenComposerErrorEffectHaptics(
-    val haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
-    val view: android.view.View,
-)
-
-private data class ChatScreenComposerErrorEffectCallbacks(
-    val onFloatingBannerMessageChange: (String) -> Unit,
-    val onClearComposerError: () -> Unit,
-)
-
-@Composable
-private fun ChatScreenComposerErrorEffect(
-    state: ChatScreenComposerErrorEffectState,
-    haptics: ChatScreenComposerErrorEffectHaptics,
-    callbacks: ChatScreenComposerErrorEffectCallbacks,
-) {
-    LaunchedEffect(state.composerError) {
-        val message = state.composerError ?: return@LaunchedEffect
-        HapticEffects.reject(haptics.haptic, haptics.view)
-        callbacks.onFloatingBannerMessageChange(message)
-        callbacks.onClearComposerError()
-    }
-}
-
-@Composable
-private fun ChatScreenFloatingBannerDismissEffect(
-    floatingBannerMessage: String,
-    onFloatingBannerMessageChange: (String) -> Unit,
-) {
-    LaunchedEffect(floatingBannerMessage) {
-        if (floatingBannerMessage.isNotBlank()) {
-            kotlinx.coroutines.delay(2600.milliseconds)
-            onFloatingBannerMessageChange("")
-        }
-    }
-}
-
-@Composable
-private fun ChatScreenA2uiSnackbarEffect(
-    snackbar: com.letta.mobile.ui.chat.render.A2uiActionSnackbarUi?,
-    snackbarDispatcher: com.letta.mobile.ui.common.SnackbarDispatcher,
-    onMarkShown: (Long) -> Unit,
-    onRetry: (com.letta.mobile.data.a2ui.A2uiAction) -> Unit,
-) {
-    LaunchedEffect(snackbar) {
-        val current = snackbar ?: return@LaunchedEffect
-        snackbarDispatcher.dispatch(
-            SnackbarMessage(
-                message = current.message,
-                actionLabel = current.actionLabel,
-                duration = current.duration.toMaterialDuration(),
-                onAction = current.retryAction?.let { retry -> { onRetry(retry) } },
-            ),
-        )
-        onMarkShown(current.id)
-    }
-}
-
-@Composable
-private fun ChatScreenErrorSnackbarEffect(
-    error: String?,
-    hasMessages: Boolean,
-    snackbarDispatcher: com.letta.mobile.ui.common.SnackbarDispatcher,
-    onClearError: () -> Unit,
-) {
-    LaunchedEffect(error) {
-        val err = error ?: return@LaunchedEffect
-        if (!hasMessages) return@LaunchedEffect
-        snackbarDispatcher.dispatch(
-            SnackbarMessage(
-                message = err,
-                duration = SnackbarDuration.Long,
-            ),
-        )
-        onClearError()
-    }
 }
 
 @Composable
@@ -321,21 +182,4 @@ private fun isTerminalToolCall(toolCall: UiToolCall): Boolean {
     if (toolCall.result != null) return true
     if (toolCall.status == ToolReturnStatus.SUCCESS) return true
     return toolCall.status == "warning"
-}
-
-@Composable
-internal fun rememberStreamingRevealHapticPulse(
-    hapticsEnabled: Boolean,
-): () -> Unit {
-    val view = LocalView.current
-    var lastRevealHapticAt by remember { mutableLongStateOf(0L) }
-    return {
-        if (hapticsEnabled) {
-            val now = System.currentTimeMillis()
-            if (now - lastRevealHapticAt >= STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS) {
-                lastRevealHapticAt = now
-                HapticEffects.streamingPulse(view, enabled = true)
-            }
-        }
-    }
 }

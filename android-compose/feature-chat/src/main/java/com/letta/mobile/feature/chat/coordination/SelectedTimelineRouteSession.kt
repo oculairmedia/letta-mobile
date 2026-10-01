@@ -1,6 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.ChatTimelinePresentation
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -13,7 +13,7 @@ internal class SelectedTimelineRouteSession(
     private val stopLegacyObserver: suspend () -> Unit,
 ) {
     sealed class Presentation {
-        data class Canonical(val value: ChatPagingPresentation) : Presentation()
+        data class Canonical(val value: ChatTimelinePresentation) : Presentation()
         data object LegacyDeferred : Presentation()
     }
 
@@ -23,7 +23,7 @@ internal class SelectedTimelineRouteSession(
         target: String?,
         scope: CoroutineScope,
         agentId: String,
-        hostOpen: (suspend (String, String, String?, CoroutineScope) -> ChatPagingPresentation)?,
+        hostOpen: (suspend (String, String, String?, CoroutineScope) -> ChatTimelinePresentation)?,
     ): Presentation {
         val route = runtime?.ready(conversationId) ?: SelectedTimelineRoute.Canonical
         if (route == SelectedTimelineRoute.LegacyDeferred) return Presentation.LegacyDeferred

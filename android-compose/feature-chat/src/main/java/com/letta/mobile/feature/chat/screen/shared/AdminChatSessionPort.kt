@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.stateIn
  * letta-mobile-bglj6.1: Android's [ChatSessionPort], binding the shared chat page to the
  * existing [AdminChatViewModel] without moving any of its state.
  *
- * @param scope the ViewModel's scope; the derived composer flow lives exactly as long as it.
+ * @param scope the page's composition scope; the derived composer flow shares in it while collected.
  * @param onOpenBugReport see [AdminChatActions].
  */
 internal class AdminChatSessionPort(

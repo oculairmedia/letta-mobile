@@ -1,12 +1,9 @@
 package com.letta.mobile.feature.chat.coordination
 
-import androidx.paging.PagingData
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.ChatTimelinePresentation
 import io.mockk.coVerify
 import io.mockk.mockk
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -114,9 +111,5 @@ class SelectedTimelineRouteSessionTest {
         runtime.retire()
     }
 
-    private fun emptyPresentation() = ChatPagingPresentation(
-        settled = flowOf(PagingData.empty()),
-        live = MutableStateFlow(emptyList()),
-        close = {},
-    )
+    private fun emptyPresentation() = ChatTimelinePresentation(timeline = null, close = {})
 }

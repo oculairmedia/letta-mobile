@@ -1,8 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
-import com.letta.mobile.feature.chat.screen.ChatPagingBinding
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -223,25 +221,5 @@ class SelectedGenerationRetirementTest {
         assertFalse(events.contains("replacement-stopped"))
         replacement.cancelAndJoin()
         first.retire()
-    }
-
-    @Test fun delayedRetryAndTailOfOldPresentationDoNotJoinReplacement() {
-        val binding = ChatPagingBinding()
-        val created = mutableListOf<ChatPagingPresentation>()
-        var published: ChatPagingPresentation? = null
-        fun create(target: String?) = ChatPagingPresentation(
-            kotlinx.coroutines.flow.flowOf(androidx.paging.PagingData.empty()),
-            kotlinx.coroutines.flow.MutableStateFlow(emptyList()),
-            {},
-        ).also { created += it }
-        val first = binding.selectRoute("a", 1, null, { published = it }, ::create)
-        val replacement = binding.selectRoute("a", 2, null, { published = it }, ::create)
-        first.retryOpen()
-        first.requestTail()
-        org.junit.Assert.assertSame(replacement, binding.presentation)
-        org.junit.Assert.assertEquals(2, created.size)
-        replacement.requestTail()
-        org.junit.Assert.assertNotSame(replacement, published)
-        org.junit.Assert.assertEquals(3, created.size)
     }
 }

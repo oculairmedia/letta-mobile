@@ -1,6 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.ChatTimelinePresentation
 import kotlinx.coroutines.CoroutineScope
 
 /** App supplies captured backend storage/transport ownership. Null explicitly means legacy/local. */
@@ -19,7 +19,7 @@ interface SelectedChatRuntime {
      * Errors never silently fall back.
      */
     suspend fun ready(conversationId: String): SelectedTimelineRoute
-    suspend fun open(conversationId: String, target: String?, scope: CoroutineScope): ChatPagingPresentation
+    suspend fun open(conversationId: String, target: String?, scope: CoroutineScope): ChatTimelinePresentation
     suspend fun retire()
 }
 

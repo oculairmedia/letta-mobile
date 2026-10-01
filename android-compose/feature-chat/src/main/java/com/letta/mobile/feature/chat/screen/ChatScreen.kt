@@ -3,26 +3,26 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPage
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPageParams
+import com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.ui.ambient.VisibleAssistantStreamPulseState
 import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
 import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
+
 
 @Composable
 internal fun ChatScreen(
@@ -41,12 +41,9 @@ internal fun ChatScreen(
     val resolvedSubagentSource = activeSubagentSource ?: viewModel.activeSubagentSource
     val resolvedSelfTodoSource = selfTodoSource ?: viewModel.selfTodoSource
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val pagingPresentation by viewModel.pagingPresentation.collectAsStateWithLifecycle()
-    val composerState by viewModel.composerState.collectAsStateWithLifecycle()
+    val timelinePresentation by viewModel.timelinePresentation.collectAsStateWithLifecycle()
     val activeFontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
-    val sharedChatPageEnabled by viewModel.sharedChatPageEnabled.collectAsStateWithLifecycle()
-    // Subscribed alongside the gate above so both come from the same settings snapshot.
     val openChatsOnCanvas by viewModel.openChatsOnCanvas.collectAsStateWithLifecycle()
 
     val backgroundModifier = when (chatBackground) {
@@ -64,112 +61,51 @@ internal fun ChatScreen(
         )
     }
 
-    val committedFontScale = activeFontScale
-    LettaChatTheme(fontScale = committedFontScale ?: 1f) {
-        var floatingBannerMessage by remember { mutableStateOf("") }
-        val currentConversationId = viewModel.conversationId?.value
+    // The page waits for the persisted font scale so it never lays out at the wrong size.
+    val committedFontScale = activeFontScale ?: return
+    LettaChatTheme(fontScale = committedFontScale) {
         val subagentBarState = rememberChatScreenSubagentBarState(
             resolvedSubagentSource = resolvedSubagentSource,
             resolvedSelfTodoSource = resolvedSelfTodoSource,
-            currentConversationId = currentConversationId,
+            currentConversationId = viewModel.conversationId?.value,
         )
-        // letta-mobile-6237v.2: outer .imePadding() (line 103) shrinks the layout
-        // to the top of the keyboard when IME is open, so the composer
-        // Column has no bottom-padding work to do. Hardcoding 0.dp here
-        // makes the composer fill to the screen bottom edge when the
-        // keyboard is down — the home indicator gesture bar overlays the
-        // composer's bottom region, which is intended (composer bg is
-        // opaque, so the gesture bar is still visually distinct).
-        val bottomInsetDp = 0.dp
         val ambient = rememberChatScreenAmbientState()
         val streamActivityPulse = rememberVisibleAssistantStreamPulse(state)
-        val streamingRevealPulse = rememberStreamingRevealHapticPulse(hapticsEnabled)
 
         ChatScreenEffects(
             params = ChatScreenEffectsParams(
                 state = state,
-                composerState = composerState,
                 hapticsEnabled = hapticsEnabled,
-                viewModel = viewModel,
-                floatingBannerMessage = floatingBannerMessage,
-                onFloatingBannerMessageChange = { floatingBannerMessage = it },
                 ambient = ambient,
-                sharedChatPage = sharedChatPageEnabled,
             ),
         )
 
-        // letta-mobile-6237v.2: outer .imePadding() binds BOTH the
-        // shader canvas and the ChatScreenLayout to keyboard height so
-        // the shader shrinks with the keyboard. The Column inside still
-        // receives `bottomInsetDp` for navbar-clearance.
-        // The composer's height, as the layout measures it, so the glow can stay above it.
-        var composerHeight by remember { mutableStateOf(androidx.compose.ui.unit.Dp.Unspecified) }
-        if (committedFontScale != null && sharedChatPageEnabled) {
-            // letta-mobile-bglj6.1: the shared page draws the glow behind its own full-screen
-            // layer (it is opaque over the docked canvas), and its composer handles the IME.
-            SharedChatPage(
-                params = SharedChatPageParams(
-                    viewModel = viewModel,
-                    navigation = navigation,
-                    chatMode = chatMode,
-                    fontScale = committedFontScale,
-                    hapticsEnabled = hapticsEnabled,
-                    pagingPresentation = pagingPresentation,
-                    openOnCanvas = openChatsOnCanvas,
-                    subagents = com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs(
-                        source = resolvedSubagentSource,
-                        selfTodoSource = resolvedSelfTodoSource,
-                        barState = subagentBarState,
-                    ),
-                    pageBackground = { content ->
-                        AmbientShaderAgentBackground(
-                            agentStatus = ambient.status,
-                            streamActivityPulse = streamActivityPulse,
-                            composerHeight = { composerHeight },
-                            modifier = Modifier.fillMaxSize().then(backgroundModifier),
-                        ) { content() }
-                    },
+        // letta-mobile-bglj6.1: the shared page draws the glow behind its own full-screen layer
+        // (it is opaque over the docked canvas), and its composer handles the IME.
+        SharedChatPage(
+            params = SharedChatPageParams(
+                viewModel = viewModel,
+                navigation = navigation,
+                chatMode = chatMode,
+                fontScale = committedFontScale,
+                hapticsEnabled = hapticsEnabled,
+                timeline = timelinePresentation?.timeline,
+                openOnCanvas = openChatsOnCanvas,
+                subagents = SharedChatSubagentInputs(
+                    source = resolvedSubagentSource,
+                    selfTodoSource = resolvedSelfTodoSource,
+                    barState = subagentBarState,
                 ),
-                modifier = modifier.fillMaxSize().padding(contentPadding),
-            )
-            return@LettaChatTheme
-        }
-        AmbientShaderAgentBackground(
-            agentStatus = ambient.status,
-            streamActivityPulse = streamActivityPulse,
-            composerHeight = { composerHeight },
-            modifier = modifier
-                .fillMaxSize()
-                .imePadding()
-                .then(backgroundModifier),
-        ) {
-            if (committedFontScale != null) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalChatPagingPresentation provides pagingPresentation,
-                ) {
-                    ChatScreenLayout(
-                    params = ChatScreenLayoutParams(
-                        state = state,
-                        composerState = composerState,
-                        viewModel = viewModel,
-                        contentPadding = contentPadding,
-                        chatBackground = chatBackground,
-                        chatMode = chatMode,
-                        navigation = navigation,
-                        resolvedSubagentSource = resolvedSubagentSource,
-                        subagentBarState = subagentBarState,
-                        activeFontScale = committedFontScale,
-                        onActiveFontScaleChange = viewModel::setChatFontScale,
-                        bottomInsetDp = bottomInsetDp,
-                        floatingBannerMessage = floatingBannerMessage,
-                        onFloatingBannerMessageChange = { floatingBannerMessage = it },
-                        streamingRevealPulse = streamingRevealPulse,
-                        onComposerMeasured = { composerHeight = it },
-                    ),
-                )
-                }
-            }
-        }
+                pageBackground = { content ->
+                    AmbientShaderAgentBackground(
+                        agentStatus = ambient.status,
+                        streamActivityPulse = streamActivityPulse,
+                        modifier = Modifier.fillMaxSize().then(backgroundModifier),
+                    ) { content() }
+                },
+            ),
+            modifier = modifier.fillMaxSize().padding(contentPadding),
+        )
     }
 }
 

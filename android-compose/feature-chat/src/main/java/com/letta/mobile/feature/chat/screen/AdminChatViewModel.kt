@@ -187,9 +187,10 @@ internal class AdminChatViewModel @Inject constructor(
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
 
-    private val _pagingPresentation = MutableStateFlow<ChatPagingPresentation?>(null)
-    val pagingPresentation: StateFlow<ChatPagingPresentation?> = _pagingPresentation
-    private val pagingBinding = ChatPagingBinding()
+    private val _timelinePresentation = MutableStateFlow<ChatTimelinePresentation?>(null)
+
+    /** The open conversation's canonical timeline, once opened; the chat page pages through it. */
+    val timelinePresentation: StateFlow<ChatTimelinePresentation?> = _timelinePresentation
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
     /**
@@ -554,15 +555,6 @@ internal class AdminChatViewModel @Inject constructor(
     val hapticsEnabled: StateFlow<Boolean> = settingsRepository.getHapticsEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    /**
-     * letta-mobile-bglj6.1: render the shared KMP chat page instead of the legacy layout (preview).
-     * Starts false (the setting's default) so the legacy layout draws on the first frame; with the
-     * preview on, the shared page replaces it once the setting is read (a one-frame legacy flash,
-     * accepted: the settings store has no synchronous read).
-     */
-    val sharedChatPageEnabled: StateFlow<Boolean> = settingsRepository.getSharedChatPageEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
     /** letta-mobile-bglj6.1: open conversations canvas-first on the shared chat page (default on). */
     val openChatsOnCanvas: StateFlow<Boolean> = settingsRepository.getOpenChatsOnCanvas()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -841,13 +833,13 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun loadOlderMessages() {
-        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        if (canonicalRouteActive || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
         chatHistoryPager.loadOlderMessages(false)
     }
 
     /** See [ChatHistoryPager.releaseOlderMessages]. */
     fun releaseOlderMessages() {
-        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        if (canonicalRouteActive || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
         chatHistoryPager.releaseOlderMessages()
     }
 
@@ -898,11 +890,19 @@ internal class AdminChatViewModel @Inject constructor(
 
     private var canonicalPresentationJob: kotlinx.coroutines.Job? = null
     private var canonicalRoute: Triple<String, Long, String?>? = null
-    private val canonicalViewports = mutableMapOf<String, ChatPagingViewport>()
+
+    /** The conversation pages through the canonical timeline (opening or open), not the legacy pager. */
+    private var canonicalRouteActive = false
+
+    /** Search targets already opened once; reopening the conversation does not jump back to them. */
+    private val consumedRouteTargets = mutableSetOf<String>()
+
+    /** The search target the current presentation was opened at, if any. */
+    private var presentedRouteTarget: String? = null
 
     private val presentationSwitch = kotlinx.coroutines.sync.Mutex()
 
-    private var replacePresentation = false
+    private fun unconsumedRouteTarget(target: String?): String? = target?.takeUnless { it in consumedRouteTargets }
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
@@ -912,12 +912,12 @@ internal class AdminChatViewModel @Inject constructor(
     private suspend fun beginTimelineObserver(conversationId: String) {
         presentationSwitch.withLock {
             val generation = _sessionState.value.selectionGeneration
-            val force = replacePresentation.also { replacePresentation = false }
             val sameSelection = canonicalRoute?.first == conversationId &&
                 canonicalRoute?.second == generation &&
                 canonicalPresentationJob?.isActive == true
-            val fresh = pagingBinding.needsFreshCollection(scrollToMessageId, _pagingPresentation.value?.routeTarget)
-            if (!force && sameSelection && !fresh) {
+            // A new search route needs a fresh presentation even in the same generation.
+            val fresh = unconsumedRouteTarget(scrollToMessageId)?.let { it != presentedRouteTarget } ?: false
+            if (sameSelection && !fresh) {
                 return
             }
             stopTimelineObserverLocked()
@@ -933,26 +933,17 @@ internal class AdminChatViewModel @Inject constructor(
             }
             val route = Triple(conversationId, generation, scrollToMessageId)
             canonicalRoute = route
-            val target = pagingBinding.effectiveRoute(route.third)
-            pagingBinding.rememberRoute(target)
-            fun status(error: String? = null) = ChatPagingPresentation(
-                settled = kotlinx.coroutines.flow.flowOf(androidx.paging.PagingData.empty()),
-                live = MutableStateFlow(emptyList()), close = {}, opening = error == null, openError = error,
-                retryOpen = {
-                    replacePresentation = true
-                    startTimelineObserver(conversationId)
-                },
-            )
-            _pagingPresentation.value = status()
+            canonicalRouteActive = true
+            val target = unconsumedRouteTarget(route.third)
+            if (target != null) consumedRouteTargets += target
+            presentedRouteTarget = null
             val presentationJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
                 try {
-                    val viewport = canonicalViewports[conversationId]
-                    val seek = target ?: viewport?.takeUnless { it.following }?.messageId
                     when (
                         val decided = timelineRouteSession.decide(
                             runtime = capturedRuntime,
                             conversationId = conversationId,
-                            target = seek,
+                            target = target,
                             scope = this,
                             agentId = agentId.value,
                             hostOpen = hostOpen,
@@ -960,7 +951,7 @@ internal class AdminChatViewModel @Inject constructor(
                     ) {
                         com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.LegacyDeferred -> {
                             if (canonicalRoute != route) return@launch
-                            _pagingPresentation.value = null
+                            canonicalRouteActive = false
                             timelineRouteSession.activateDeferred(conversationId)
                             try {
                                 kotlinx.coroutines.awaitCancellation()
@@ -972,19 +963,8 @@ internal class AdminChatViewModel @Inject constructor(
                             val presentation = decided.value
                             try {
                                 if (canonicalRoute != route) return@launch
-                                presentation.hasBoundRoute = true
-                                presentation.routeTarget = target
-                                presentation.viewport = if (target == null) viewport else null
-                                presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
-                                presentation.clearViewport = { canonicalViewports.remove(conversationId) }
-                                presentation.requestTail = {
-                                    if (_pagingPresentation.value === presentation) {
-                                        canonicalViewports.remove(conversationId)
-                                        replacePresentation = true
-                                        startTimelineObserver(conversationId)
-                                    }
-                                }
-                                _pagingPresentation.value = presentation
+                                presentedRouteTarget = target
+                                _timelinePresentation.value = presentation
                                 kotlinx.coroutines.awaitCancellation()
                             } finally {
                                 presentation.close()
@@ -994,7 +974,9 @@ internal class AdminChatViewModel @Inject constructor(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: Exception) {
-                    if (canonicalRoute == route) _pagingPresentation.value = status(failure.message ?: "Could not open conversation")
+                    if (canonicalRoute == route) {
+                        chatBannerController.showError(failure.message ?: "Could not open conversation")
+                    }
                 }
             }
             canonicalPresentationJob = presentationJob
@@ -1010,20 +992,20 @@ internal class AdminChatViewModel @Inject constructor(
 
     private suspend fun stopTimelineObserverLocked() {
         canonicalRoute = null
+        canonicalRouteActive = false
         val job = canonicalPresentationJob
         canonicalPresentationJob = null
-        _pagingPresentation.value = null
-        pagingBinding.close()
+        _timelinePresentation.value = null
         job?.cancelAndJoin()
         timelineRouteSession.retirePresentation()
     }
 
     private fun abandonTimelineObserver() {
         canonicalRoute = null
+        canonicalRouteActive = false
         canonicalPresentationJob?.cancel()
         canonicalPresentationJob = null
-        _pagingPresentation.value = null
-        pagingBinding.close()
+        _timelinePresentation.value = null
         chatTimelineObserver.stop()
     }
 

@@ -1,7 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
@@ -10,7 +9,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.EffortSelection
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.ChatPagingHost
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.feature.chat.screen.ChatTimelinePresentation
 import com.letta.mobile.feature.chat.screen.openedChatViewModel
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
@@ -22,7 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -58,22 +56,6 @@ class AdminChatSessionPortTest {
             assertEquals(null, composer.workingDirectory)
             assertTrue(port.capabilities.value.search)
             assertFalse(port.capabilities.value.workingDirectory)
-        } finally {
-            viewModel?.viewModelScope?.cancel()
-            Dispatchers.resetMain()
-        }
-    }
-
-    @Test
-    fun `shared page flag starts on the legacy page until the setting is read`() = runTest {
-        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        var viewModel: AdminChatViewModel? = null
-        try {
-            val vm = openedChatViewModel(canonicalPagingHost(), TestData.agent("agent-flag", "Flag"), "conversation-flag", "flag")
-            viewModel = vm
-            assertEquals(false, vm.sharedChatPageEnabled.value)
-            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.sharedChatPageEnabled.collect {} }
-            assertEquals(false, vm.sharedChatPageEnabled.value)
         } finally {
             viewModel?.viewModelScope?.cancel()
             Dispatchers.resetMain()
@@ -203,11 +185,7 @@ class AdminChatSessionPortTest {
 
     /** The canonical route, so the fixture never starts the legacy observer over relaxed mocks. */
     private fun canonicalPagingHost(): ChatPagingHost {
-        val presentation = ChatPagingPresentation(
-            settled = flowOf(PagingData.empty()),
-            live = MutableStateFlow(emptyList()),
-            close = {},
-        )
+        val presentation = ChatTimelinePresentation(timeline = null, close = {})
         return ChatPagingHost().apply { openCanonical = { _, _, _, _ -> presentation } }
     }
 

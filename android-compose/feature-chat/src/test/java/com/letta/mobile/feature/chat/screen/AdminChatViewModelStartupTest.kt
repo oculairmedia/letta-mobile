@@ -1,15 +1,12 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -17,7 +14,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -34,11 +30,7 @@ class AdminChatViewModelStartupTest {
             var constructorReturned = false
             var opens = 0
             var closes = 0
-            val presentation = ChatPagingPresentation(
-                settled = flowOf(PagingData.empty()),
-                live = MutableStateFlow(emptyList()),
-                close = { closes++ },
-            )
+            val presentation = ChatTimelinePresentation(timeline = null, close = { closes++ })
             val host = ChatPagingHost().apply {
                 openCanonical = { agentId, conversationId, target, _ ->
                     if (opens == 0) {
@@ -58,18 +50,11 @@ class AdminChatViewModelStartupTest {
             constructorReturned = true
             assertEquals(1, opens)
             assertEquals(ConversationId("conversation-startup"), vm.conversationId)
-            assertSame(presentation, vm.pagingPresentation.value)
-            assertTrue(presentation.hasBoundRoute)
+            assertSame(presentation, vm.timelinePresentation.value)
 
-            // Exercise the initialized viewport map and retained route/job after
-            // construction. A late null initializer must not erase the live job.
-            presentation.saveViewport(ChatPagingViewport("message-1", 12))
-            presentation.clearViewport()
-            presentation.requestTail()
-            assertEquals(2, opens)
-            assertSame(presentation, vm.pagingPresentation.value)
+            // A late null initializer must not erase the live job: it still owns the presentation.
             vm.viewModelScope.cancel()
-            assertEquals("Both presentation jobs must remain owned", 2, closes)
+            assertEquals("The presentation job must remain owned", 1, closes)
         } finally {
             viewModel?.viewModelScope?.cancel()
             Dispatchers.resetMain()
@@ -140,11 +125,7 @@ class AdminChatViewModelStartupTest {
     }
 
     private fun createTestViewModel(agent: Agent, convId: String): AdminChatViewModel {
-        val presentation = ChatPagingPresentation(
-            settled = flowOf(PagingData.empty()),
-            live = MutableStateFlow(emptyList()),
-            close = { },
-        )
+        val presentation = ChatTimelinePresentation(timeline = null, close = { })
         val host = ChatPagingHost().apply {
             openCanonical = { _, _, _, _ -> presentation }
         }

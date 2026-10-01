@@ -1,5 +1,4 @@
 package com.letta.mobile.feature.chat
-import com.letta.mobile.feature.chat.render.*
 import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.AgentId
@@ -100,7 +99,7 @@ class AgentScaffoldHiltTest {
         projectBindings = mockk(relaxed = true)
         conversationRepository = mockk(relaxed = true)
         every { viewModel.uiState } returns uiFlow
-        every { viewModel.pagingPresentation } returns MutableStateFlow(null)
+        every { viewModel.timelinePresentation } returns MutableStateFlow(null)
         every { viewModel.chatBackground } returns bgFlow
         every { viewModel.composerState } returns composerFlow
         every { viewModel.chatFontScale } returns fontScaleFlow
@@ -112,6 +111,7 @@ class AgentScaffoldHiltTest {
         every { viewModel.activeBackendLabel } returns MutableStateFlow<String?>("letta.test")
         every { viewModel.llmModels } returns MutableStateFlow(emptyList())
         every { viewModel.hapticsEnabled } returns MutableStateFlow(false)
+        every { viewModel.openChatsOnCanvas } returns MutableStateFlow(true)
         every { viewModel.projectBindings } returns projectBindings
         every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null

@@ -13,8 +13,6 @@ import com.letta.mobile.data.chat.projection.backfillMissingAssistantRunIds
 import com.letta.mobile.data.chat.projection.deduplicateRenderKeys
 import com.letta.mobile.data.chat.projection.groupMessagesForRender
 import com.letta.mobile.data.chat.projection.runKey
-import com.letta.mobile.feature.chat.screen.RunTimelineStep
-import com.letta.mobile.feature.chat.screen.compactRunToolCallSteps
 
 /**
  * Pure-JVM tests for [groupMessagesForRender] â€” verifies that contiguous
@@ -510,113 +508,6 @@ class MessageGroupingTest {
         assertEquals(before.single().key, after.single().key)
         assertTrue(!before.single().key.startsWith("run-run-"))
         assertTrue(!after.single().key.startsWith("run-run-"))
-    }
-
-    @Test
-    fun `consecutive tool-call messages compact into one run timeline step`() {
-        val steps = compactRunToolCallSteps(
-            listOf(
-                assistantToolCall("tc1", command = "pwd"),
-                assistantToolCall("tc2", command = "ls"),
-                assistant("a1", runId = "r1"),
-            ),
-        )
-
-        assertEquals(2, steps.size)
-        val group = steps.first() as RunTimelineStep.ToolCallGroup
-        assertEquals(listOf("tc1", "tc2"), group.messages.map { it.id })
-        assertEquals(listOf("call-tc1", "call-tc2"), group.toolCalls.map { it.toolCallId })
-        assertEquals("a1", (steps[1] as RunTimelineStep.Message).message.id)
-    }
-
-    @Test
-    fun `tool-call group key stays stable as more calls append`() {
-        val initialGroup = compactRunToolCallSteps(
-            listOf(
-                assistantToolCall("tc1", command = "pwd"),
-                assistantToolCall("tc2", command = "ls"),
-            ),
-        ).single() as RunTimelineStep.ToolCallGroup
-
-        val appendedGroup = compactRunToolCallSteps(
-            listOf(
-                assistantToolCall("tc1", command = "pwd"),
-                assistantToolCall("tc2", command = "ls"),
-                assistantToolCall("tc3", command = "date"),
-            ),
-        ).single() as RunTimelineStep.ToolCallGroup
-
-        assertEquals(initialGroup.key, appendedGroup.key)
-    }
-
-    @Test
-    fun `consecutive tool-call compaction carries pending approval request`() {
-        val approval = UiApprovalRequest(
-            requestId = "approval-1",
-            toolCalls = listOf(
-                UiApprovalToolCall(
-                    toolCallId = "call-tc1",
-                    name = "Bash",
-                    arguments = """{"command":"pwd"}""",
-                ),
-                UiApprovalToolCall(
-                    toolCallId = "call-tc2",
-                    name = "Bash",
-                    arguments = """{"command":"ls"}""",
-                ),
-            ),
-        )
-
-        val steps = compactRunToolCallSteps(
-            listOf(
-                assistantToolCall("tc1", command = "pwd", approvalRequest = approval),
-                assistantToolCall("tc2", command = "ls"),
-            ),
-        )
-
-        val group = steps.single() as RunTimelineStep.ToolCallGroup
-        assertEquals(setOf("call-tc1", "call-tc2"), group.pendingApprovalToolCallIds)
-        assertEquals(listOf("approval-1"), group.approvalRequests.map { it.requestId })
-    }
-
-    @Test
-    fun `run tool-call compaction keeps one canonical group across assistant prose`() {
-        val steps = compactRunToolCallSteps(
-            listOf(
-                assistantToolCall("tc1", command = "pwd"),
-                assistantToolCall("tc2", command = "ls", content = "about to run ls"),
-                assistantToolCall("tc3", command = "cat file"),
-            ),
-        )
-
-        assertEquals(2, steps.size)
-        val group = steps[0] as RunTimelineStep.ToolCallGroup
-        val text = steps[1] as RunTimelineStep.Message
-        assertEquals(listOf("tc1", "tc2", "tc3"), group.messages.map { it.id })
-        assertEquals(listOf("call-tc1", "call-tc2", "call-tc3"), group.toolCalls.map { it.toolCallId })
-        assertEquals("about to run ls", text.message.content)
-        assertTrue(text.message.toolCalls.isNullOrEmpty())
-    }
-
-    @Test
-    fun `first tool-call message with preamble still joins following compact group`() {
-        val steps = compactRunToolCallSteps(
-            listOf(
-                assistantToolCall("tc1", command = "pwd", content = "I'll inspect the environment."),
-                assistantToolCall("tc2", command = "date"),
-                assistantToolCall("tc3", command = "whoami"),
-                assistant("a1", runId = "r1"),
-            ),
-        )
-
-        assertEquals(3, steps.size)
-        val group = steps[0] as RunTimelineStep.ToolCallGroup
-        val preamble = steps[1] as RunTimelineStep.Message
-        assertEquals("I'll inspect the environment.", preamble.message.content)
-        assertTrue(preamble.message.toolCalls.isNullOrEmpty())
-        assertEquals(listOf("tc1", "tc2", "tc3"), group.messages.map { it.id })
-        assertEquals(listOf("call-tc1", "call-tc2", "call-tc3"), group.toolCalls.map { it.toolCallId })
-        assertEquals("a1", (steps[2] as RunTimelineStep.Message).message.id)
     }
 
     // letta-mobile-y70m0 (defensive hardening): even if two distinct render

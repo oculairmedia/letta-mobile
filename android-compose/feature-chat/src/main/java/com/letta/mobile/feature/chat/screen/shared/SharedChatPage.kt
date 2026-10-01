@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -15,12 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
-import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
+import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
+import com.letta.mobile.feature.chat.screen.LocalAndroidAgentMessageContext
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
@@ -42,7 +43,8 @@ internal data class SharedChatPageParams(
     val chatMode: String,
     val fontScale: Float,
     val hapticsEnabled: Boolean,
-    val pagingPresentation: ChatPagingPresentation?,
+    /** The open conversation's canonical timeline, once opened. */
+    val timeline: CanonicalTimelinePresentation?,
     /** "Open conversations on the canvas": the initial presentation only. */
     val openOnCanvas: Boolean = true,
     /** Subagent dispatches open their todo sheet from these. */
@@ -53,7 +55,7 @@ internal data class SharedChatPageParams(
 
 /**
  * letta-mobile-bglj6.1: Android's binding of the shared KMP chat page (sharedUI [ChatSurface]),
- * drawn in place of the legacy chat layout while the "Shared chat page (preview)" setting is on.
+ * the app's chat page.
  *
  * With the app's canvas ([LocalChatCanvasSlot]) the conversation opens on its canvas with the
  * chat docked under it; expanding the dock gives the full-screen page, and swipe up on its
@@ -72,8 +74,14 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
     // Read live by the rings overlay, whose slot lambda is remembered with the platform.
     val currentSubagents by rememberUpdatedState(params.subagents)
+    // The scaffold's provenance context is rebuilt per recomposition; the host reads the latest.
+    val agentContext by rememberUpdatedState(LocalAndroidAgentMessageContext.current)
     val host = remember(params.navigation, subagentSheet) {
-        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch)
+        params.navigation.toSurfaceHost(
+            openSubagent = subagentSheet::openDispatch,
+            resolveAgentName = { id -> agentContext.resolveName(id) },
+            openAgent = { id -> agentContext.onAgentClick(id) },
+        )
     }
     // One instance for the page's lifetime: ChatScreen recomposes per keystroke, and a fresh
     // lambda here would reach every timeline row (letta-mobile-bglj6.1).
@@ -119,7 +127,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
                 pageBackground = params.pageBackground,
                 timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
             ),
-            pagedTimeline = params.pagingPresentation?.canonical,
+            pagedTimeline = params.timeline,
             canvas = canvas,
             dockGeometry = dockGeometry,
             onDockGeometryChange = { dockGeometry = it },
@@ -146,21 +154,27 @@ private fun rememberAdminChatSessionPort(
     onBugCommand: (() -> Unit)?,
 ): AdminChatSessionPort {
     val currentOnBugCommand by rememberUpdatedState(onBugCommand)
-    return remember(viewModel) {
-        AdminChatSessionPort(viewModel, viewModel.viewModelScope) { currentOnBugCommand?.invoke() }
+    // As on desktop: the port's flows share in the page's composition scope while it collects them.
+    val compositionScope = rememberCoroutineScope()
+    return remember(viewModel, compositionScope) {
+        AdminChatSessionPort(viewModel, compositionScope) { currentOnBugCommand?.invoke() }
     }
 }
 
 private fun ChatScreenNavigationCallbacks.toSurfaceHost(
     openSubagent: (toolCallId: String, subagentAgentId: String?, description: String) -> Unit,
+    resolveAgentName: (agentId: String) -> String?,
+    openAgent: (agentId: String) -> Unit,
 ): ChatSurfaceHost {
     val openPane = onOpenAgentPane
     return ChatSurfaceHost(
         openCanvas = onOpenCanvas,
-        openAgent = openPane?.let { { _: String -> it() } },
+        // An inter-agent provenance label switches to that agent's conversation.
+        openAgent = openAgent,
+        resolveAgentName = resolveAgentName,
         openSubagent = openSubagent,
         openModelPicker = null,
-        // The composer companion mascot opens the agent drawer, as the legacy page's does.
+        // The composer companion mascot opens the agent drawer.
         openAgentPane = openPane,
     )
 }
