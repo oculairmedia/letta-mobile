@@ -17,8 +17,10 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -127,9 +129,7 @@ internal fun BackendSettingsCard(
     )
 
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-        ),
+        colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -278,9 +278,7 @@ private val LettaConfig.Mode.label: String
 @Composable
 internal fun StartupReadinessCard(featureReadiness: List<DesktopFeatureReadiness>) {
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-        ),
+        colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -393,3 +391,64 @@ internal fun StatusPill(
         )
     }
 }
+
+/** The translucent container every settings card on this destination shares. */
+@Composable
+private fun desktopSettingsCardColors() = CardDefaults.cardColors(
+    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
+)
+
+/**
+ * letta-mobile-bglj6.1: opt-in for the shared KMP chat page. When the launch forces it on
+ * (system property / env), the switch shows on and is locked, saying why.
+ */
+@Composable
+internal fun DesktopSharedChatPageSettingsCard(
+    flag: DesktopSharedChatPageFlag = LocalDesktopSharedChatPageFlag.current,
+) {
+    val persistedEnabled by flag.persistedEnabled.collectAsState()
+    Card(
+        colors = desktopSettingsCardColors(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        ) {
+            Text("Chat", style = MaterialTheme.typography.titleLarge)
+            SharedChatPageToggleRow(
+                checked = persistedEnabled || flag.forcedByEnvironment,
+                enabled = !flag.forcedByEnvironment,
+                onCheckedChange = flag::setPersistedEnabled,
+            )
+            Text(
+                text = sharedChatPageSupportingText(flag.forcedByEnvironment),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SharedChatPageToggleRow(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Shared chat page (preview)", style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+    }
+}
+
+private fun sharedChatPageSupportingText(forcedByEnvironment: Boolean): String =
+    if (forcedByEnvironment) {
+        "Turned on for this launch by $SHARED_CHAT_SYSTEM_PROPERTY or $SHARED_CHAT_ENV_VARIABLE."
+    } else {
+        "Renders conversations with the chat page shared with Android. Still in preview."
+    }
