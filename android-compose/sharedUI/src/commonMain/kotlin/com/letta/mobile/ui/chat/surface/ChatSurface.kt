@@ -26,6 +26,7 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
+import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
@@ -82,6 +83,7 @@ fun ChatSurface(
 ) {
     val uiState by port.uiState.collectAsState()
     val composer by port.composer.collectAsState()
+    val capabilities by port.capabilities.collectAsState()
     val shareFailed = stringResource(Res.string.chat_surface_canvas_share_failed)
     // Hosts pass fresh lambdas per recomposition; these keep one instance so rows stay skippable.
     val stableOnIntent = rememberLatestIntent(onIntent)
@@ -103,6 +105,7 @@ fun ChatSurface(
         listState = listState,
         uiState = uiState,
         composer = composer,
+        capabilities = capabilities,
         presentation = presentation,
         onIntent = stableOnIntent,
         host = effectiveHost,
@@ -137,6 +140,7 @@ private class ChatSurfaceFrame(
     val listState: LazyListState,
     val uiState: ChatUiState,
     val composer: ChatComposerUiState,
+    val capabilities: ChatSurfaceCapabilities,
     val presentation: ChatSurfacePresentation,
     val onIntent: (ChatSurfaceIntent) -> Unit,
     val host: ChatSurfaceHost,
@@ -193,7 +197,7 @@ private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfac
                     state = frame.uiState,
                     pagedTimeline = frame.pagedTimeline,
                     actions = frame.port.actions,
-                    capabilities = frame.port.capabilities,
+                    capabilities = frame.capabilities,
                     host = frame.host,
                     appearance = frame.appearance,
                     onIntent = frame.onIntent,
@@ -235,7 +239,7 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
             state = frame.uiState,
             pagedTimeline = frame.pagedTimeline,
             actions = frame.port.actions,
-            capabilities = frame.port.capabilities,
+            capabilities = frame.capabilities,
             host = frame.host,
             appearance = frame.appearance,
             modifier = Modifier.fillMaxSize(),
@@ -277,7 +281,7 @@ private fun ComposerPanel(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifi
         composer = frame.composer,
         uiState = frame.uiState,
         actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
-        capabilities = frame.port.capabilities,
+        capabilities = frame.capabilities,
         host = frame.host,
         platform = frame.platform,
         mode = mode,

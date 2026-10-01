@@ -12,6 +12,7 @@ import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -38,7 +39,8 @@ internal class AdminChatSessionPort(
 
     override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport)
 
-    override val capabilities: ChatSurfaceCapabilities = Capabilities
+    /** Android's support does not change while the page is open. */
+    override val capabilities: StateFlow<ChatSurfaceCapabilities> = MutableStateFlow(Capabilities)
 
     private fun initialComposer(): ChatComposerUiState = composerSnapshot(
         viewModel.composerState.value,

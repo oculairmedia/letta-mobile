@@ -21,6 +21,10 @@ internal class FakeChatSessionPort : ChatSessionPort {
     override val uiState: StateFlow<ChatUiState> = ui
     override val composer: StateFlow<ChatComposerUiState> = composerState
 
+    /** Settable, as an owner whose support changes while the page is open. */
+    val capabilityState = MutableStateFlow(ChatSurfaceCapabilities.Default)
+    override val capabilities: StateFlow<ChatSurfaceCapabilities> = capabilityState
+
     override val actions: ChatActions = object : ChatActions {
         override fun updateComposerText(text: String) = composerState.update { it.copy(text = text) }
 

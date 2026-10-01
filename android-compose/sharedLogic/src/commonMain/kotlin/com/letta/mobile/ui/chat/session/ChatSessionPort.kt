@@ -1,7 +1,9 @@
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.ui.chat.render.ChatUiState
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * letta-mobile-bglj6.1: the one seam between a conversation owner and the shared chat page.
@@ -23,6 +25,13 @@ interface ChatSessionPort {
 
     val actions: ChatActions
 
-    val capabilities: ChatSurfaceCapabilities
-        get() = ChatSurfaceCapabilities.Default
+    /**
+     * What this owner supports. A flow, because it can change while the page is open (desktop:
+     * the gateway's approval support, the canonical paged route).
+     */
+    val capabilities: StateFlow<ChatSurfaceCapabilities>
+        get() = DefaultCapabilities
 }
+
+private val DefaultCapabilities: StateFlow<ChatSurfaceCapabilities> =
+    MutableStateFlow(ChatSurfaceCapabilities.Default).asStateFlow()

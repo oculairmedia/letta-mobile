@@ -109,7 +109,7 @@ class DesktopChatSessionPortTest {
     fun capabilitiesReflectWhatDesktopSupports() = runTest {
         val (controller, port) = startedPort()
 
-        val capabilities = port.capabilities
+        val capabilities = port.capabilities.value
         assertTrue(capabilities.attachImages)
         assertFalse(capabilities.rerun)
         assertFalse(capabilities.search)

@@ -56,8 +56,8 @@ class AdminChatSessionPortTest {
             assertEquals("hello shared page", composer.text)
             assertEquals(vm.attachmentLimits.maxAttachmentCount, composer.maxAttachments)
             assertEquals(null, composer.workingDirectory)
-            assertTrue(port.capabilities.search)
-            assertFalse(port.capabilities.workingDirectory)
+            assertTrue(port.capabilities.value.search)
+            assertFalse(port.capabilities.value.workingDirectory)
         } finally {
             viewModel?.viewModelScope?.cancel()
             Dispatchers.resetMain()

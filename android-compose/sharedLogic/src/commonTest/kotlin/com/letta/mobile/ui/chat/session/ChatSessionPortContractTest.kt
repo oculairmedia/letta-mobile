@@ -61,7 +61,7 @@ class ChatSessionPortContractTest {
 
     @Test
     fun defaultCapabilitiesHideHostSpecificControls() {
-        val caps = FakeChatSessionPort().capabilities
+        val caps = FakeChatSessionPort().capabilities.value
         assertFalse(caps.workingDirectory)
         assertFalse(caps.search)
         assertTrue(caps.attachImages)

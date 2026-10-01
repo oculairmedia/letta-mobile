@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -75,7 +76,6 @@ internal fun rememberDesktopChatSessionPort(
             bindings = DesktopChatSessionBindings(
                 onA2uiAction = { latestA2uiAction(it) },
                 onSetFontScale = { latestFontScaleSetter(it) },
-                canSubmitApprovals = { controller.canSubmitApprovals.value },
             ),
         )
     }
@@ -232,7 +232,7 @@ private fun rememberDesktopChatSurfaceHost(
     ) { directory ->
         directory?.let { port.actions.changeWorkingDirectory(it.file.absolutePath) }
     }
-    val supportsWorkingDirectory = port.capabilities.workingDirectory
+    val supportsWorkingDirectory = port.capabilities.collectAsState().value.workingDirectory
     // The shell rebuilds [navigation] with fresh lambdas on every recomposition (a stream token);
     // the host keeps one instance that forwards to the latest, so timeline rows stay skippable.
     val latest by rememberUpdatedState(navigation)

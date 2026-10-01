@@ -37,8 +37,7 @@ internal data class DesktopChatSessionBindings(
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Persists a pinch/zoom font scale through the desktop font-scale host. */
     val onSetFontScale: (Float) -> Unit = {},
-    /** Live read of whether the active gateway can answer approvals. */
-    val canSubmitApprovals: () -> Boolean = { true },
+
     val maxAttachments: Int = AttachmentLimits.Default.maxAttachmentCount,
 )
 
@@ -79,19 +78,23 @@ internal class DesktopChatSessionPort(
         localTimeline = localTimeline,
     )
 
-    /** Read live: approvals and the canonical (paged) route can change after construction. */
-    override val capabilities: ChatSurfaceCapabilities
-        get() = ChatSurfaceCapabilities(
-            attachImages = true,
-            rerun = false,
-            approvals = bindings.canSubmitApprovals(),
-            modelSwitch = true,
-            workingDirectory = controller.supportsWorkingDirectory,
-            search = false,
-            pagedHistory = controller.canonicalPresentation.value != null,
-            fontScale = true,
-            goals = false,
-        )
+    /**
+     * Follows the controller: approval support and the working directory follow the active
+     * gateway, and paged history the canonical (paged) route, all of which change after
+     * construction. The gateway has no flow of its own, so a state change re-reads it.
+     */
+    override val capabilities: StateFlow<ChatSurfaceCapabilities> = combine(
+        controller.canSubmitApprovals,
+        controller.canonicalPresentation,
+        controller.state.map { controller.supportsWorkingDirectory }.distinctUntilChanged(),
+    ) { approvals, canonical, workingDirectory -> desktopCapabilities(approvals, canonical != null, workingDirectory) }
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities())
+
+    private fun currentCapabilities(): ChatSurfaceCapabilities = desktopCapabilities(
+        approvals = controller.canSubmitApprovals.value,
+        paged = controller.canonicalPresentation.value != null,
+        workingDirectory = controller.supportsWorkingDirectory,
+    )
 
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
 
@@ -171,6 +174,18 @@ internal class DesktopChatSessionPort(
     }
 }
 
+internal fun desktopCapabilities(approvals: Boolean, paged: Boolean, workingDirectory: Boolean) = ChatSurfaceCapabilities(
+    attachImages = true,
+    rerun = false,
+    approvals = approvals,
+    modelSwitch = true,
+    workingDirectory = workingDirectory,
+    search = false,
+    pagedHistory = paged,
+    fontScale = true,
+    goals = false,
+)
+
 /**
  * The port's flows run only while the page collects them, so a port left behind by a controller
  * change stops on its own instead of needing a scope of its own to cancel.
@@ -233,7 +248,7 @@ internal class DesktopChatActions(
     override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) {
         // A second press while the first answer is in flight must not answer twice.
         if (requestId in controller.submittingApprovals.value) return
-        if (bindings.canSubmitApprovals()) controller.submitApproval(requestId, toolCallIds, approve, reason)
+        if (controller.canSubmitApprovals.value) controller.submitApproval(requestId, toolCallIds, approve, reason)
     }
 
     override fun submitA2uiAction(action: A2uiAction) = bindings.onA2uiAction(action)
