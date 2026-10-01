@@ -38,6 +38,7 @@ import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowPlacement
 import com.letta.mobile.ui.chat.surface.ambient.CHAT_AMBIENT_GLOW_TAG
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
+import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.test.Test
@@ -189,11 +190,47 @@ class ChatPanelAmbientGlowTest {
     }
 
     @Test
+    fun an_acknowledged_failure_is_not_a_completion() = runComposeUiTest {
+        var state by mutableStateOf(ChatUiState(isStreaming = true))
+        var status = AmbientMotionStatus.Idle
+        setContent { status = rememberChatAmbient(state).status }
+        waitForIdle()
+        assertEquals(AmbientMotionStatus.Running, status)
+        state = ChatUiState(error = "boom", runFailed = true)
+        waitForIdle()
+        assertEquals(AmbientMotionStatus.Failed, status)
+        // The page shows the error and clears it; the run still failed.
+        state = ChatUiState(runFailed = true)
+        waitForIdle()
+        assertEquals(AmbientMotionStatus.Failed, status)
+        // The next send clears the failure: back to rest, with no completion bloom on the way.
+        state = ChatUiState()
+        waitForIdle()
+        assertEquals(AmbientMotionStatus.Idle, status)
+    }
+
+    @Test
+    fun an_error_clearing_without_a_new_run_rests_instead_of_blooming() = runComposeUiTest {
+        var thinking by mutableStateOf(true)
+        var failed by mutableStateOf(false)
+        var status = AmbientMotionStatus.Idle
+        setContent { status = rememberChatAmbientStatus(thinking, failed) }
+        waitForIdle()
+        thinking = false
+        failed = true
+        waitForIdle()
+        assertEquals(AmbientMotionStatus.Failed, status)
+        failed = false
+        waitForIdle()
+        assertEquals(AmbientMotionStatus.Idle, status)
+    }
+
+    @Test
     fun the_status_follows_the_run_like_the_hosts() = runComposeUiTest {
         var thinking by mutableStateOf(false)
         var error by mutableStateOf<String?>(null)
         var status = AmbientMotionStatus.Idle
-        setContent { status = rememberChatAmbientStatus(thinking, error) }
+        setContent { status = rememberChatAmbientStatus(thinking, failed = error != null) }
         waitForIdle()
         assertEquals(AmbientMotionStatus.Idle, status)
         thinking = true

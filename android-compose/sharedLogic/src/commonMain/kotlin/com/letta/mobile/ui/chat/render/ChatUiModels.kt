@@ -314,6 +314,11 @@ data class ChatUiState(
      */
     val sendQueue: com.letta.mobile.data.chat.send.ConversationSendQueue =
         com.letta.mobile.data.chat.send.ConversationSendQueue(),
+    /**
+     * letta-mobile-bglj6.1: the last run failed and nothing has been sent since, whether or not
+     * the page has shown (and so cleared) [error]. The ambient glow stays "failed" while it holds.
+     */
+    val runFailed: Boolean = false,
 ) {
     /**
      * letta-mobile-lgns8.19: true only while a cancel is outstanding AND the
