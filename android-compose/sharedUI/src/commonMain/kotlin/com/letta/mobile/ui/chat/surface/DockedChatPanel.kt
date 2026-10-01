@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.AnimationVector4D
 import androidx.compose.animation.core.TwoWayConverter
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -90,6 +91,8 @@ import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon
+import com.letta.mobile.ui.mascot.LocalMascotTransport
+import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatMotionTokens
@@ -569,11 +572,16 @@ private fun PanelBadge(state: ChatDockState, agentId: String?, seated: Boolean, 
     if (!dockBadgeShown(agentId)) return
     val anchors = LocalCompanionSeatAnchors.current ?: return
     val scheme = MaterialTheme.colorScheme
+    // While the character stands elsewhere (the agent pane, the editor) the disc fades away
+    // rather than sitting empty; the anchor inside stays put so the character flies back here.
+    val transport = LocalMascotTransport.current
+    val present = agentId != null && transport.activeStage(agentId) == MascotStage.COMPOSER_COMPANION
+    val presence by animateFloatAsState(if (present) 1f else 0f, label = "dockBadgePresence")
     Box(
         modifier
             .offset(y = -ChatSurfaceDimens.dockBadgeOverhang)
             .size(ChatMascotDimens.dockBadge)
-            .graphicsLayer { this.alpha = alpha() }
+            .graphicsLayer { this.alpha = alpha() * presence }
             // No clip: the seat's spot inside is larger than the disc and must report whole.
             .shadow(ChatSurfaceDimens.dockBadgeElevation, CircleShape, clip = false)
             .background(scheme.surfaceContainerHigh, CircleShape)
