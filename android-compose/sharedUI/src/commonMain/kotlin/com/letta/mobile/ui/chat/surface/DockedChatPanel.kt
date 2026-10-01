@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
@@ -55,7 +54,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Measurable
@@ -71,8 +69,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ChevronDown
-import com.composables.icons.lucide.Lucide
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_dock_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_dock_move
@@ -88,6 +84,7 @@ import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon
@@ -145,33 +142,78 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     /** A reset is animating towards its target. */
     internal var snapping: Boolean by mutableStateOf(false)
 
+    /**
+     * Where the minimised dock stood as it began to open. Opening near the top, the panel stops
+     * at the top and grows down, so its bar is not where the minimised bar was: the fold starts
+     * from the minimised bar instead, and nothing jumps.
+     */
+    internal var foldFrom: ChatDockGeometry? by mutableStateOf(null)
+        private set
+
     internal var onChange: (ChatDockGeometry) -> Unit = {}
 
     /** The last laid-out frame; gestures resolve against it. */
     internal var frame: ChatDockFrame? = null
 
-    /** A value from the host (initial load, or a change it made itself). */
+    /** The host's value as last seen. */
+    private var lastFromHost: ChatDockGeometry = geometry
+
+    /** What this state reported that the host has not handed back yet, oldest first. */
+    private val unacknowledged = ArrayDeque<ChatDockGeometry>()
+
+    /**
+     * A value from the host (the saved placement arriving, or a change it made itself). Called
+     * as the page composes, so a placement that arrives late is drawn where it belongs on its
+     * very first frame. The host handing back what this state reported is not news: a gesture
+     * already past it must not be pulled back.
+     */
     internal fun sync(fromHost: ChatDockGeometry) {
-        geometry = ChatDockGeometryMath.sanitize(fromHost)
+        val next = ChatDockGeometryMath.sanitize(fromHost)
+        if (next == lastFromHost) return
+        lastFromHost = next
+        val echo = unacknowledged.indexOf(next)
+        if (echo >= 0) {
+            repeat(echo + 1) { unacknowledged.removeFirst() }
+            return
+        }
+        if (next != geometry) {
+            foldFrom = null
+            geometry = next
+        }
     }
 
     fun drag(dxDp: Float, dyDp: Float) {
         val frame = frame ?: return
+        // The pointer takes over from a reset's glide: the dock follows it 1:1 from here.
+        snapping = false
+        foldFrom = null
         update(ChatDockGeometryMath.drag(geometry, dxDp, dyDp, frame))
     }
 
     fun resize(edge: ChatDockEdge, dxDp: Float, dyDp: Float) {
         val frame = frame ?: return
+        snapping = false
+        foldFrom = null
         update(ChatDockGeometryMath.resize(geometry, edge, dxDp, dyDp, frame))
     }
 
     fun toggleCollapsed() {
-        update(if (geometry.collapsed) ChatDockGeometryMath.expand(geometry) else ChatDockGeometryMath.collapse(geometry))
+        if (geometry.collapsed) {
+            open()
+        } else {
+            foldFrom = null
+            update(ChatDockGeometryMath.collapse(geometry, frame))
+        }
     }
 
     /** Opens the panel again at its last expanded size; nothing when it is already open. */
     fun restore() {
-        if (geometry.collapsed) update(ChatDockGeometryMath.expand(geometry))
+        if (geometry.collapsed) open()
+    }
+
+    private fun open() {
+        foldFrom = geometry
+        update(ChatDockGeometryMath.expand(geometry, frame))
     }
 
     /**
@@ -185,14 +227,25 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     fun reset() {
         val next = ChatDockGeometryMath.reset()
         if (next == geometry) return
-        snapping = true
+        // Only a reset that moves the open panel glides; one that leaves it where it is (a
+        // minimised dock at home opening) would start no glide to end the snapping.
+        val frame = frame
+        snapping = frame == null || openRect(next, frame) != openRect(geometry, frame)
+        foldFrom = geometry.takeIf { it.collapsed }
         update(next)
     }
 
     private fun update(next: ChatDockGeometry) {
         if (next == geometry) return
         geometry = next
+        unacknowledged.addLast(next)
+        if (unacknowledged.size > MAX_UNACKNOWLEDGED) unacknowledged.removeFirst()
         onChange(next)
+    }
+
+    private companion object {
+        /** A drag reports every move; a host this far behind has dropped some, not queued them. */
+        const val MAX_UNACKNOWLEDGED = 64
     }
 }
 
@@ -201,7 +254,9 @@ internal class ChatDockState(initial: ChatDockGeometry) {
 internal fun rememberChatDockState(geometry: ChatDockGeometry, onChange: (ChatDockGeometry) -> Unit): ChatDockState {
     val state = remember { ChatDockState(geometry) }
     SideEffect { state.onChange = onChange }
-    LaunchedEffect(geometry) { if (ChatDockGeometryMath.sanitize(geometry) != state.geometry) state.sync(geometry) }
+    // In composition, not in an effect: an effect runs after the frame, which would draw the
+    // default placement once before the saved one.
+    state.sync(geometry)
     return state
 }
 
@@ -260,7 +315,7 @@ internal fun DockedChatPanel(
         val geometry = state.geometry
         val collapsed = geometry.collapsed
         // The open panel's rect (gliding on a reset); minimised, the dock ends at its bottom edge.
-        val open = animatedDockRect(ChatDockGeometryMath.rect(geometry.copy(collapsed = false), frame), state)
+        val open = animatedDockRect(openRect(geometry, frame), state)
         val openness = rememberDockOpenness(collapsed)
         val showPanel by remember(openness) { derivedStateOf { openness.value > 0f } }
         val showMinimised by remember(openness) { derivedStateOf { openness.value < 1f } }
@@ -279,7 +334,7 @@ internal fun DockedChatPanel(
                     val placed = dockPlacement(
                         measurable = measurable,
                         constraints = constraints,
-                        target = DockPlacementTarget(geometry, frame, open, wrapHeight, state.snapping),
+                        target = DockPlacementTarget(geometry, frame, open, wrapHeight, state.snapping, state.foldFrom),
                         openness = opennessValue(),
                         morphTo = Pair(fullWidthDp, fullHeightDp),
                         fraction = fraction(),
@@ -381,7 +436,13 @@ private class DockPlacementTarget(
     val open: ChatDockRect,
     val wrapHeight: Boolean,
     val snapping: Boolean,
-)
+    /** See [ChatDockState.foldFrom]. */
+    val foldFrom: ChatDockGeometry?,
+) {
+    /** The minimised dock's rect in [frame]: where it stood as it began to open, if it is opening. */
+    fun minimisedIn(frame: ChatDockFrame): ChatDockRect =
+        foldFrom?.let { ChatDockGeometryMath.rect(it, frame) } ?: minimisedRect(geometry, frame)
+}
 
 private class DockPlaced(val placeable: Placeable, val left: Int, val top: Int)
 
@@ -399,7 +460,7 @@ private fun MeasureScope.dockPlacement(
     morphTo: Pair<Float, Float>,
     fraction: Float,
 ): DockPlaced {
-    val minimised = ChatDockGeometryMath.rect(target.geometry.copy(collapsed = true), target.frame)
+    val minimised = target.minimisedIn(target.frame)
     val docked = when {
         openness >= 1f -> target.open
         openness <= 0f -> minimised
@@ -416,7 +477,7 @@ private fun MeasureScope.dockPlacement(
         rect
     } else {
         // Minimised by geometry or still on its way to opening: either way placed as the minimised dock.
-        ChatDockGeometryMath.rect(target.geometry.copy(collapsed = true), target.frame.copy(collapsedHeightDp = placeable.height.toDp().value))
+        target.minimisedIn(target.frame.copy(collapsedHeightDp = placeable.height.toDp().value))
     }
     return DockPlaced(placeable, measured.left.dp.roundToPx(), measured.top.dp.roundToPx())
 }
@@ -513,6 +574,14 @@ private fun PanelTop(state: ChatDockState, content: DockedPanelContent, modifier
 internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect =
     ChatDockGeometryMath.rect(geometry, ChatDockFrame(widthDp, heightDp, DockLimits, collapsedHeightDp))
 
+/** Where the panel stands open for [geometry]: itself, or where a minimised dock would open. */
+private fun openRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect =
+    ChatDockGeometryMath.rect(ChatDockGeometryMath.expand(geometry, frame), frame)
+
+/** Where the dock stands minimised for [geometry]: itself, or where an open panel's bar would fold to. */
+private fun minimisedRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect =
+    ChatDockGeometryMath.rect(ChatDockGeometryMath.collapse(geometry, frame), frame)
+
 /** Drag to move, double-click / double-tap to reset; the panel's own controls sit on it. */
 private fun Modifier.moveHandle(state: ChatDockState): Modifier = this
     .pointerHoverIcon(movePointerIcon())
@@ -555,8 +624,15 @@ private fun PanelHeader(state: ChatDockState, badged: Boolean) {
             )
         }
         Box(Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Space.sm)) {
-            HeaderButton(Lucide.ChevronDown, stringResource(Res.string.chat_surface_dock_collapse), DOCK_COLLAPSE_TAG) {
-                state.toggleCollapsed()
+            IconButton(
+                onClick = state::toggleCollapsed,
+                modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(DOCK_COLLAPSE_TAG),
+            ) {
+                DisclosureChevron(
+                    expanded = true,
+                    contentDescription = stringResource(Res.string.chat_surface_dock_collapse),
+                    opensUpward = true,
+                )
             }
         }
     }
@@ -605,18 +681,6 @@ private fun PanelBadge(state: ChatDockState, agentId: String?, seated: Boolean, 
     }
 }
 
-@Composable
-private fun HeaderButton(
-    icon: ImageVector,
-    label: String,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    IconButton(onClick = onClick, modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(tag)) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(LettaDimens.Control.icon))
-    }
-}
-
 /**
  * Edge strips and corner squares for mouse and pen, plus a visible grip for touch. All sit just
  * OUTSIDE the panel, so they never cover its own controls (the composer's expand and send
@@ -631,6 +695,7 @@ private fun BoxScope.ResizeHandles(state: ChatDockState) {
     ResizeHandle(state, ChatDockEdge.Top, Modifier.align(Alignment.TopCenter).offset(y = -edge).fillMaxWidth().height(edge))
     ResizeHandle(state, ChatDockEdge.Bottom, Modifier.align(Alignment.BottomCenter).offset(y = edge).fillMaxWidth().height(edge))
     ResizeHandle(state, ChatDockEdge.TopLeft, Modifier.align(Alignment.TopStart).offset(-corner, -corner).size(corner))
+    ResizeHandle(state, ChatDockEdge.TopRight, Modifier.align(Alignment.TopEnd).offset(corner, -corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomLeft, Modifier.align(Alignment.BottomStart).offset(-corner, corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomRight, Modifier.align(Alignment.BottomEnd).offset(corner, corner).size(corner))
     // Overlaid on the panel's bottom-right corner, its marks tucked into the rounded corner.
@@ -697,12 +762,16 @@ private fun animatedDockRect(target: ChatDockRect, state: ChatDockState): ChatDo
     val reducedMotion = LocalReducedMotion.current
     val animated = remember { Animatable(target, DockRectConverter) }
     LaunchedEffect(target) {
-        if (state.snapping && !reducedMotion) {
-            animated.animateTo(target, tween(ChatSurfaceDimens.dockSnapMillis))
-        } else {
-            animated.snapTo(target)
+        try {
+            if (state.snapping && !reducedMotion) {
+                animated.animateTo(target, tween(ChatSurfaceDimens.dockSnapMillis))
+            } else {
+                animated.snapTo(target)
+            }
+        } finally {
+            // Also when a gesture (or a new target) cuts the glide short.
+            state.snapping = false
         }
-        state.snapping = false
     }
     return if (state.snapping) animated.value else target
 }

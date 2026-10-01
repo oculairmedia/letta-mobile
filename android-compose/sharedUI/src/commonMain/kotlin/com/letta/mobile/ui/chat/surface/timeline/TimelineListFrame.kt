@@ -18,6 +18,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -25,6 +27,7 @@ import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
@@ -38,6 +41,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 internal class TimelineRowBindings(
     val contexts: TimelineRowContexts,
     val callbacks: ChatRowCallbacks,
+    /** The page's pinch: the list previews it in its draw layer while the rows keep their layout. */
+    val pinch: TimelinePinchScale? = null,
 )
 
 /** The list frame's overlays and their actions. */
@@ -46,14 +51,23 @@ internal class TimelineFrameOverlays(
     val pinnedPrompt: ChatRenderItem?,
     val showScrollToLatest: Boolean,
     val onScrollToLatest: () -> Unit,
+    /** The list's scroll-to-latest glide: the button stands down while it runs, its springback lifts the rows. */
+    val glide: NewestEdgeGlide,
     /** Reserve at the bottom so the newest row clears the stacked A2UI surfaces. */
     val bottomReserve: Dp,
+    /**
+     * Reserve at the top for host chrome floating over the list (ChatSurfacePlatform.topChromeInset):
+     * the oldest row rests below it, and the list still scrolls under it.
+     */
+    val topReserve: Dp = 0.dp,
 )
 
 /**
  * letta-mobile-bglj6.1: the reversed LazyColumn both timelines draw into, with the edge fades,
  * the pinned prompt and the scroll-to-latest button. The fade wraps ONLY the list, so the button
- * and the pinned card are never dimmed (desktop MessageList).
+ * and the pinned card are never dimmed (desktop MessageList). The button is desktop's quiet
+ * squircle centred over the reading area on Pointer, and Android's round FAB at the bottom end,
+ * just above the composer, on Touch (feature-chat ChatMessageList).
  */
 @Composable
 internal fun TimelineListFrame(
@@ -79,7 +93,19 @@ internal fun TimelineListFrame(
                 reverseLayout = true,
                 modifier = Modifier
                     .fillMaxSize()
-                    .timelineFadingEdges(fades)
+                    // The glide's springback lifts the rows inside the list's bounds and fades.
+                    .clipToBounds()
+                    // Under floating chrome the dissolve runs from the top edge through it (Android's
+                    // chat list fades over its top padding, ChatMessageListBody).
+                    .timelineFadingEdges(fades, topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve)
+                    .graphicsLayer {
+                        translationY = overlays.glide.overshootPx
+                        // A pinch in progress, read here only: it redraws the rows, never re-lays them out.
+                        val pinchScale = bindings.pinch?.layerScale ?: 1f
+                        scaleX = pinchScale
+                        scaleY = pinchScale
+                        transformOrigin = TimelinePinchOrigin
+                    }
                     // The conversation: the agent's mascot glances at it (letta-mobile-bglj6.1).
                     .mascotGazeTarget(MascotGazeSurface.TIMELINE)
                     .testTag(ChatTimelineTags.LIST),
@@ -89,7 +115,7 @@ internal fun TimelineListFrame(
                 contentPadding = PaddingValues(
                     start = ChatRowSpacing.contentPaddingHorizontal,
                     end = ChatRowSpacing.contentPaddingHorizontal,
-                    top = ChatRowSpacing.listEdge,
+                    top = ChatRowSpacing.listEdge + overlays.topReserve,
                     bottom = ChatRowSpacing.listEdge + overlays.bottomReserve,
                 ),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -101,6 +127,7 @@ internal fun TimelineListFrame(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    .padding(top = overlays.topReserve)
                     .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
                     .testTag(ChatTimelineTags.PINNED_PROMPT),
                 contentAlignment = Alignment.TopCenter,
@@ -111,7 +138,19 @@ internal fun TimelineListFrame(
                 }
             }
         }
-        if (overlays.showScrollToLatest) {
+        val showScrollToLatest = overlays.showScrollToLatest && !overlays.glide.isGliding
+        if (touchStyle()) {
+            TouchScrollToLatestButton(
+                visible = showScrollToLatest,
+                onClick = overlays.onScrollToLatest,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = ChatTimelineDimens.scrollToLatestTouchInset,
+                        bottom = ChatTimelineDimens.scrollToLatestTouchInset + overlays.bottomReserve,
+                    ),
+            )
+        } else if (showScrollToLatest) {
             ScrollToLatestButton(
                 onClick = overlays.onScrollToLatest,
                 modifier = Modifier

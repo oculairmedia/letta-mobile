@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,10 +46,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,6 +69,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
@@ -89,6 +94,7 @@ import com.letta.mobile.ui.theme.ChatHeadDimens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -130,6 +136,8 @@ internal fun TouchDockLayer(
     bar: TouchBarMetrics,
     morph: SurfaceMorph,
     head: TouchHeadContent?,
+    /** Host chrome over the canvas's top edge (ChatSurfacePlatform.topChromeInset): the head stays below it. */
+    topChromeInset: Dp = 0.dp,
     composer: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -145,7 +153,10 @@ internal fun TouchDockLayer(
                     val f = fraction()
                     if (f <= 0f) return@drawBehind
                     val top = (size.height - bar.heightPx) * (1f - f)
-                    drawRect(lerp(from, to, f), topLeft = Offset(0f, top), size = Size(size.width, size.height - top))
+                    // The bar's rounded top, squaring off as it reaches the page's top edge.
+                    val corner = CornerRadius(TouchComposerDimens.restingCorner.toPx() * (1f - f))
+                    val surface = RoundRect(Rect(0f, top, size.width, size.height), topLeft = corner, topRight = corner)
+                    drawPath(Path().apply { addRoundRect(surface) }, lerp(from, to, f))
                 },
             )
         }
@@ -153,7 +164,7 @@ internal fun TouchDockLayer(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .padding(bottom = with(density) { bar.heightPx.toDp() })
+                    .padding(top = topChromeInset, bottom = with(density) { bar.heightPx.toDp() })
                     // The head and its popup leave first: they float over the canvas the page covers.
                     .graphicsLayer { alpha = morphDockedAlpha(fraction() * HEAD_FADE_SPEED) }
                     .then(fade),
@@ -183,7 +194,7 @@ private fun TouchChatHead(content: TouchHeadContent) {
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     var hidden by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(turn.turnKey) { hidden = false }
-    val hasReply = turn.hasReply && turn.turnKey != dismissedTurn
+    val hasReply = turn.hasReply && turn.dismissKey != dismissedTurn
     val popupShown = hasReply && !hidden
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val lane = HeadLane(maxWidth.value, maxHeight.value)
@@ -198,7 +209,7 @@ private fun TouchChatHead(content: TouchHeadContent) {
                 agentName = content.agentName,
                 placement = PopupPlacement(lane, right, position),
                 onOpen = content.openChat,
-                onDismiss = { dismissedTurn = turn.turnKey },
+                onDismiss = { dismissedTurn = turn.dismissKey },
             )
         }
         ChatHead(
@@ -249,10 +260,14 @@ private fun ChatHead(
     onTap: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val reducedMotion = LocalReducedMotion.current
+    // The gesture detectors outlive a composition (they are keyed on the dock alone): whatever
+    // they read must be the latest, or a second drag snaps from where the head rested at first.
+    val reducedMotion by rememberUpdatedState(LocalReducedMotion.current)
     val currentLane by rememberUpdatedState(lane)
     val currentTap by rememberUpdatedState(onTap)
+    val currentPosition by rememberUpdatedState(position)
     val openAgent = content.openAgent
+    val currentOpenAgent by rememberUpdatedState(openAgent)
     val anchors = LocalCompanionSeatAnchors.current
     val mascot = anchors != null && mascotAvailable(content.agentId)
     val label = stringResource(Res.string.chat_surface_head, content.agentName)
@@ -269,12 +284,12 @@ private fun ChatHead(
                 if (openAgent != null) onLongClick(agentLabel) { openAgent(); true }
             }
             .pointerInput(content.dock) {
-                detectTapGestures(onTap = { currentTap() }, onLongPress = { openAgent?.invoke() })
+                detectTapGestures(onTap = { currentTap() }, onLongPress = { currentOpenAgent?.invoke() })
             }
             .pointerInput(content.dock) {
                 detectDragGestures(
                     onDragEnd = {
-                        val at = position()
+                        val at = currentPosition()
                         val (right, laneFraction) = currentLane.snap(at)
                         val target = currentLane.rest(right, laneFraction)
                         // The geometry moves the resting place at once; the head glides there.
@@ -377,7 +392,8 @@ private fun HeadPopup(
     }
     val announcement = listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working.takeIf { turn.working }).joinToString(" ")
     val lane = placement.lane
-    val tailAtTop = placement.tailAtTop()
+    // The head's place moves every frame of a drag; the popup recomposes only when it changes half.
+    val tailAtTop by remember(placement) { derivedStateOf { placement.tailAtTop() } }
     val shape = remember(placement.headOnRight, tailAtTop) {
         SpeechBubbleShape(
             radius = LettaDimens.Radius.lg,
@@ -464,6 +480,7 @@ private const val HALF = 0.5f
 private const val HEAD_FADE_SPEED = 2f
 
 internal const val TOUCH_DOCK_TAG = "chat-touch-dock"
+internal const val TOUCH_CANVAS_TAG = "chat-touch-canvas"
 internal const val TOUCH_HEAD_TAG = "chat-touch-head"
 internal const val TOUCH_POPUP_TAG = "chat-touch-popup"
 internal const val TOUCH_POPUP_DISMISS_TAG = "chat-touch-popup-dismiss"

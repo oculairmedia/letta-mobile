@@ -15,7 +15,12 @@ import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
 import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.MarkdownState
+import com.mikepenz.markdown.model.ReferenceLinkHandlerImpl
+import com.mikepenz.markdown.model.rememberMarkdownState
 import org.intellij.markdown.ast.ASTNode
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
+import org.intellij.markdown.parser.MarkdownParser
 
 fun interface MermaidDiagramRenderer {
     @Composable
@@ -105,10 +110,9 @@ fun SharedMarkdownText(
     // streaming keeps the no-flicker retained-state path.
     key(retentionKey) {
         Markdown(
-            content = repaired,
+            markdownState = rememberSharedMarkdownState(repaired, retainState),
             modifier = modifier.fillMaxWidth(),
             components = components,
-            retainState = retainState,
             colors = markdownColor(
                 text = textColor,
                 codeBackground = MaterialTheme.colorScheme.surfaceVariant,
@@ -127,6 +131,27 @@ fun SharedMarkdownText(
             ),
         )
     }
+}
+
+/**
+ * The parse of [text], kept for as long as the text is. The renderer's content overload builds its
+ * flavour, parser and link store as default arguments, new on every composition, and a new one
+ * re-parses: any recomposition of a row (a pinch's font scale, a colour, a parent re-reading
+ * state) dropped the text to the empty loading box until the parse came back off the UI thread.
+ * The text blinked, and a held selection, with its Copy / Select all toolbar, went with it.
+ */
+@Composable
+internal fun rememberSharedMarkdownState(text: String, retainState: Boolean): MarkdownState {
+    val flavour = remember { GFMFlavourDescriptor() }
+    val parser = remember(flavour) { MarkdownParser(flavour) }
+    val links = remember { ReferenceLinkHandlerImpl() }
+    return rememberMarkdownState(
+        content = text,
+        retainState = retainState,
+        flavour = flavour,
+        parser = parser,
+        referenceLinkHandler = links,
+    )
 }
 
 /**

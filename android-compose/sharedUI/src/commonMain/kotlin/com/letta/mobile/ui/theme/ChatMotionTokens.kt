@@ -3,6 +3,7 @@ package com.letta.mobile.ui.theme
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 
 /**
  * letta-mobile-cc25e: motion of the shared chat page.
@@ -84,5 +85,22 @@ object ChatMotionTokens {
 
         /** How fast the stream energy decays back to calm between deltas. */
         const val STREAM_ENERGY_DECAY_SECONDS: Float = 0.9f
+    }
+
+    /**
+     * letta-mobile-bglj6.1: the scroll-to-latest glide. A tap far up the history snaps to about
+     * [GLIDE_VIEWPORTS] from the newest edge, then one underdamped spring carries the list the
+     * rest of the way: it eases into the edge, runs a little past it (a lift of the rows, never a
+     * scroll past the end, so the platform's own overscroll is left alone) and settles back.
+     */
+    object ScrollToLatest {
+        /** Under 1, so the glide runs past the edge once and settles: by about 5% at this ratio. */
+        const val DAMPING_RATIO: Float = 0.7f
+
+        /** The whole glide reads as one short gesture, under half a second. */
+        const val STIFFNESS: Float = Spring.StiffnessMediumLow
+
+        /** How far the glide itself travels, in viewports; anything further is snapped first. */
+        const val GLIDE_VIEWPORTS: Float = 1f
     }
 }

@@ -39,7 +39,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -227,6 +229,19 @@ class CollapsedDockUiTest {
         onNodeWithTag(DOCK_COLLAPSED_NEEDS_INPUT_TAG).performClick()
         settle()
         assertFalse(harness.geometry.collapsed)
+    }
+
+    @Test
+    fun aFormWaitingBeforeAnyPromptShowsItsChipAndCanBeDismissed() = runComposeUiTest {
+        // No messages, so no turn: the bubble still has the form to tell.
+        val port = Port(emptyList())
+        val form = A2uiSurfaceState(surfaceId = "surface-1", rootComponentId = null, components = emptyMap())
+        port.update { it.copy(a2uiSurfaces = persistentMapOf("surface-1" to form)) }
+        show(port)
+        onNodeWithTag(DOCK_COLLAPSED_NEEDS_INPUT_TAG).assertExists()
+        onNodeWithTag(DOCK_COLLAPSED_DISMISS_TAG).performClick()
+        settle()
+        onNodeWithTag(DOCK_COLLAPSED_NEEDS_INPUT_TAG).assertDoesNotExist()
     }
 
     @Test

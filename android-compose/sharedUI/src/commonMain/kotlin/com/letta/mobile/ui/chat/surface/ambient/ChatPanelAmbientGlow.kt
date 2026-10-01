@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
@@ -67,7 +68,7 @@ import kotlinx.coroutines.flow.collectLatest
  * draw behind the full chat page: Android's AmbientShaderAgentBackground (AGSL) and desktop's
  * DesktopAmbientChatBackground (Skia). The shader source and the status -> motion table are the
  * shared ones in sharedLogic (AMBIENT_GLOW_SHADER_SOURCE, AmbientMotion); only compiling and
- * drawing it is per platform (rememberAmbientGlowShader).
+ * drawing it is per platform (createAmbientGlowShader), once per page (AmbientGlowShaders).
  *
  * It replaces the window's own animated working cues (the run header's pulsing orb, the
  * reasoning spinner, the streaming progress bar and the minimised dock's thinking dots), which
@@ -91,24 +92,32 @@ internal data class ChatAmbient(val status: AmbientMotionStatus, val streamPulse
 
 /**
  * The page's ambient status from [state], mapped the way both hosts map theirs (desktop
- * rememberDesktopAmbientStatus, Android's ChatScreen ambient effect): an error fails, a run in
+ * rememberDesktopAmbientStatus, Android's ChatScreen ambient effect): an error fails (and stays
+ * failed while [ChatUiState.runFailed] holds, after the page has shown and cleared it), a run in
  * flight (typing or streaming) runs, the end of a run blooms Completed and holds for exactly the
  * shared decay before going Idle.
  */
 @Composable
 internal fun rememberChatAmbient(state: ChatUiState): ChatAmbient {
-    val status = rememberChatAmbientStatus(isThinking = state.isAgentTyping || state.isStreaming, error = state.error)
+    val status = rememberChatAmbientStatus(
+        isThinking = state.isAgentTyping || state.isStreaming,
+        failed = state.error != null || state.runFailed,
+    )
     val pulse = rememberVisibleStreamPulse(state)
     return remember(status, pulse) { ChatAmbient(status, pulse) }
 }
 
 @Composable
-internal fun rememberChatAmbientStatus(isThinking: Boolean, error: String?): AmbientMotionStatus {
+internal fun rememberChatAmbientStatus(isThinking: Boolean, failed: Boolean): AmbientMotionStatus {
     var status by remember { mutableStateOf(AmbientMotionStatus.Idle) }
     var hadActiveRun by remember { mutableStateOf(false) }
-    LaunchedEffect(isThinking, error) {
+    LaunchedEffect(isThinking, failed) {
         when {
-            error != null -> status = AmbientMotionStatus.Failed
+            failed -> {
+                // The failure ended that run: clearing the error is not a completion to bloom for.
+                hadActiveRun = false
+                status = AmbientMotionStatus.Failed
+            }
             isThinking -> {
                 hadActiveRun = true
                 status = AmbientMotionStatus.Running
@@ -172,6 +181,8 @@ internal fun ChatPanelAmbientGlow(
     modifier: Modifier = Modifier,
 ) {
     val reducedMotion = LocalReducedMotion.current
+    // Outside the visible gate: the glow comes and goes with every run, its compiled shader stays.
+    val shaders = LocalAmbientGlowShaders.current ?: rememberAmbientGlowShaders()
     val status = ambient.status
     val spec = AmbientMotion.spec(status)
     val glide = if (reducedMotion) 0 else ChatMotionTokens.AmbientGlow.GLIDE_MILLIS
@@ -212,6 +223,7 @@ internal fun ChatPanelAmbientGlow(
         ),
         animate = !reducedMotion,
         placement = placement,
+        shaders = shaders,
         modifier = modifier,
     )
 }
@@ -227,9 +239,15 @@ private class GlowInputs(
 )
 
 @Composable
-private fun GlowLayer(inputs: GlowInputs, animate: Boolean, placement: AmbientGlowPlacement, modifier: Modifier) {
+private fun GlowLayer(
+    inputs: GlowInputs,
+    animate: Boolean,
+    placement: AmbientGlowPlacement,
+    shaders: AmbientGlowShaders,
+    modifier: Modifier,
+) {
     val motion = rememberGlowMotion(animate, inputs.speed, inputs.streamPulse)
-    val shader = rememberAmbientGlowShader()
+    val shader = remember(shaders) { shaders.get() }
     val settledFrames = rememberSettledRedraw(inputs, motion)
     Spacer(
         modifier
@@ -395,14 +413,53 @@ internal data class AmbientGlowUniforms(
 /** The platform's compiled ambient shader, drawing one frame over the whole draw scope. */
 internal interface AmbientGlowShader {
     fun DrawScope.drawGlow(uniforms: AmbientGlowUniforms)
+
+    /** Frees what the shader holds natively (desktop's Skia builder and paint); idempotent. */
+    fun release() {}
 }
 
 /**
  * The shared ambient shader compiled for this platform (Skia RuntimeEffect on desktop, AGSL
  * RuntimeShader on Android 13+), or null where it cannot run; the gradient fallback draws then.
+ * Compiling is the expensive part: see [AmbientGlowShaders].
  */
+internal expect fun createAmbientGlowShader(): AmbientGlowShader?
+
+/**
+ * The page's ambient shader, compiled the first time a glow shows and kept until the page goes,
+ * so a run starting does not compile it again (the glow itself leaves composition when idle).
+ * Released with the composition that remembers it: Skia's native objects are not left to the
+ * cleaner.
+ */
+@Stable
+internal class AmbientGlowShaders {
+    private var compiled = false
+    private var shader: AmbientGlowShader? = null
+
+    fun get(): AmbientGlowShader? {
+        if (!compiled) {
+            compiled = true
+            shader = createAmbientGlowShader()
+        }
+        return shader
+    }
+
+    fun release() {
+        shader?.release()
+        shader = null
+        compiled = false
+    }
+}
+
+/** The page's [AmbientGlowShaders]; null outside a chat page, where each glow keeps its own. */
+internal val LocalAmbientGlowShaders = staticCompositionLocalOf<AmbientGlowShaders?> { null }
+
 @Composable
-internal expect fun rememberAmbientGlowShader(): AmbientGlowShader?
+internal fun rememberAmbientGlowShaders(): AmbientGlowShaders {
+    val shaders = remember { AmbientGlowShaders() }
+    DisposableEffect(shaders) { onDispose { shaders.release() } }
+    return shaders
+}
 
 /**
  * The hosts' non-shader fallback: a radial gradient anchored at the bottom edge, breathing on the

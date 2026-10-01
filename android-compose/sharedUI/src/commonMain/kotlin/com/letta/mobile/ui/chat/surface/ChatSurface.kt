@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import com.letta.mobile.ui.chat.session.ChatDockRect
 import androidx.compose.foundation.lazy.LazyListState
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.TouchComposerDimens
+import com.letta.mobile.ui.canvas.LocalCanvasChromeBottomInset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,7 +29,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
+import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
+import com.letta.mobile.ui.chat.surface.ambient.rememberAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.chat.surface.composer.CompanionLayer
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchors
@@ -145,12 +149,15 @@ fun ChatSurface(
     // The page's one composer-companion seat; the composers only say where it should stand.
     val companionAnchors = remember { CompanionSeatAnchors() }
     val focusHandoff = remember { ComposerFocusHandoff() }
+    // The thinking glow's shader, compiled once for the page rather than at every run's start.
+    val glowShaders = rememberAmbientGlowShaders()
     // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
     CompositionLocalProvider(
         LocalComposerImageAttacher provides imageAttacher,
         LocalCompanionSeatAnchors provides companionAnchors,
         LocalComposerFocusHandoff provides focusHandoff,
         LocalChatPlatformStyle provides appearance.platformStyle,
+        LocalAmbientGlowShaders provides glowShaders,
     ) {
         SendFlightLayer(rememberSendFlightState(), modifier) {
             if (appearance.platformStyle == ChatPlatformStyle.Touch) {
@@ -248,7 +255,8 @@ private fun CanvasWithChat(
                 }
             }
         }
-        CompanionSeat(frame, companionAnchors, dock = dock, pageWeight = fraction)
+        // The character moves the dock only while it sits on the resting dock, never mid-morph.
+        CompanionSeat(frame, companionAnchors, dock = dock.takeIf { !fullScreen && !morph.morphing }, pageWeight = fraction)
     }
 }
 
@@ -282,12 +290,17 @@ private fun TouchCanvasWithChat(
     val density = LocalDensity.current
     Box(Modifier.fillMaxSize()) {
         if (canvas != null) {
-            // Laid out above the bar, so the canvas's own bottom tool bar sits on top of it, never
-            // under it; the bar's height is consumed from the canvas's insets so it does not pad twice.
+            // Laid out above the bar but for its rounded top, which the board runs on under so the
+            // bar's corners show the board, as on the full page they show the page. The bar is the
+            // canvas's bottom chrome, so its own foot (its tool bar) keeps above the whole bar; the
+            // part the canvas is laid out above is consumed from its insets so it does not pad twice.
             val barDp = with(density) { bar.heightPx.toDp() }
-            val clear = PaddingValues(bottom = barDp)
-            val canvasModifier = Modifier.fillMaxSize().padding(clear).consumeWindowInsets(clear)
-            Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
+            val reach = minOf(TouchComposerDimens.cornerReach, barDp)
+            val clear = PaddingValues(bottom = barDp - reach)
+            val canvasModifier = Modifier.fillMaxSize().padding(clear).consumeWindowInsets(clear).testTag(TOUCH_CANVAS_TAG)
+            Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) {
+                CompositionLocalProvider(LocalCanvasChromeBottomInset provides barDp) { canvas() }
+            }
         }
         MorphBackdrop(fraction)
         if (showBar) {
@@ -299,6 +312,7 @@ private fun TouchCanvasWithChat(
                 TouchDockLayer(
                     bar = bar,
                     morph = morph,
+                    topChromeInset = frame.platform.topChromeInset,
                     head = dock?.let { touchHeadContent(frame, it) },
                     composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
                 )
@@ -469,9 +483,13 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
             appearance = frame.appearance,
             modifier = Modifier.fillMaxSize(),
             listState = frame.listState,
+            topInset = frame.platform.topChromeInset,
         )
         frame.platform.timelineOverlay?.let { overlay ->
-            Box(Modifier.fillMaxSize().testTag(ChatSurfaceTags.TIMELINE_OVERLAY), contentAlignment = Alignment.TopCenter) {
+            Box(
+                Modifier.fillMaxSize().padding(top = frame.platform.topChromeInset).testTag(ChatSurfaceTags.TIMELINE_OVERLAY),
+                contentAlignment = Alignment.TopCenter,
+            ) {
                 overlay()
             }
         }

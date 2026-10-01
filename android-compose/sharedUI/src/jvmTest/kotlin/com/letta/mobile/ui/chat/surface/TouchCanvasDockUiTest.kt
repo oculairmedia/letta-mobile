@@ -5,13 +5,19 @@ package com.letta.mobile.ui.chat.surface
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipe
@@ -27,6 +33,9 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
+import com.letta.mobile.ui.mascot.FakeMascotHost
+import com.letta.mobile.ui.mascot.FakeMascotShell
+import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -137,6 +146,96 @@ class TouchCanvasDockUiTest {
     }
 
     @Test
+    fun aSecondDragSnapsFromWhereTheFirstLeftTheHead() = runComposeUiTest {
+        val harness = show(Port(), ChatSurfacePresentation.CanvasFirst)
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput {
+            swipe(start = center, end = Offset(center.x - DRAG_PX, center.y), durationMillis = 300)
+        }
+        waitForIdle()
+        assertEquals(0f, harness.geometries.last().anchorX)
+        // A nudge on the left: the head stays there, not back at the side it rested on at first.
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput {
+            swipe(start = center, end = Offset(center.x + NUDGE_PX, center.y), durationMillis = 200)
+        }
+        waitForIdle()
+        assertEquals(0f, harness.geometries.last().anchorX)
+        val head = onNodeWithTag(TOUCH_HEAD_TAG).fetchSemanticsNode().boundsInRoot
+        val page = onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue(head.center.x < page.center.x, "the head went back to the right: $head")
+    }
+
+    @Test
+    fun aLongPressOpensTheAgentPaneOnceTheHostOffersIt() = runComposeUiTest {
+        var host by mutableStateOf(ChatSurfaceHost(openCanvas = {}))
+        var opened = 0
+        setContent {
+            MaterialTheme {
+                ChatSurface(
+                    port = Port(),
+                    presentation = ChatSurfacePresentation.CanvasFirst,
+                    onIntent = {},
+                    host = host,
+                    modifier = Modifier.fillMaxSize(),
+                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                    platform = ChatSurfacePlatform(showKeyboardHints = false),
+                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                )
+            }
+        }
+        waitForIdle()
+        host = ChatSurfaceHost(openCanvas = {}, openAgentPane = { opened++ })
+        waitForIdle()
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { longClick() }
+        waitForIdle()
+        assertEquals(1, opened)
+    }
+
+    /**
+     * As the Android app draws the page: the window's mascot shell knows the agent, and no
+     * transport layer is mounted, so the page's one seat draws the character itself.
+     */
+    private fun ComposeUiTest.showWithoutALayer(shell: FakeMascotShell) {
+        // The live mascot keeps a frame loop running, so the page never idles: step the clock.
+        mainClock.autoAdvance = false
+        setContent {
+            shell.Provide {
+                MaterialTheme {
+                    ChatSurface(
+                        port = Port(),
+                        presentation = ChatSurfacePresentation.CanvasFirst,
+                        onIntent = {},
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                    )
+                }
+            }
+        }
+        mainClock.advanceTimeBy(SETTLE_MILLIS)
+        waitForIdle()
+    }
+
+    @Test
+    fun withoutAMascotLayerTheHeadDrawsTheAgentsMascot() = runComposeUiTest {
+        showWithoutALayer(FakeMascotShell("agent-1", layerMounted = false))
+        val surfaces = onAllNodesWithTag(FakeMascotHost.SURFACE_TAG, useUnmergedTree = true)
+        surfaces.assertCountEquals(1)
+        // The character stands on the head, in place of the sphere.
+        val head = onNodeWithTag(TOUCH_HEAD_TAG).fetchSemanticsNode().boundsInRoot
+        val mascot = surfaces[0].fetchSemanticsNode().boundsInRoot
+        assertTrue(head.contains(mascot.center), "the mascot is not on the head: $mascot vs $head")
+    }
+
+    @Test
+    fun anAgentWithoutAMascotKeepsTheSphere() = runComposeUiTest {
+        showWithoutALayer(FakeMascotShell("another-agent", layerMounted = false))
+        onNodeWithTag(TOUCH_HEAD_TAG).assertExists()
+        onAllNodesWithTag(FakeMascotHost.SURFACE_TAG, useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
     fun theFullPageDrawsThePhoneBar() = runComposeUiTest {
         show(Port(), ChatSurfacePresentation.ChatFirst, withCanvas = false)
         onNodeWithTag(ComposerTestTags.TOUCH_BAR).assertExists()
@@ -146,7 +245,47 @@ class TouchCanvasDockUiTest {
         onAllNodesWithTag(ComposerTestTags.HINT).assertCountEquals(0)
     }
 
+    @Test
+    fun theCanvasBarIsThePagesBarAndTheBoardRunsUnderItsCorners() = runComposeUiTest {
+        val port = Port()
+        port.composer.value = port.composer.value.copy(text = "Make the island longer")
+        var presentation by mutableStateOf(ChatSurfacePresentation.CanvasFirst)
+        setContent {
+            MaterialTheme {
+                ChatSurface(
+                    port = port,
+                    presentation = presentation,
+                    onIntent = {},
+                    host = ChatSurfaceHost(openCanvas = {}),
+                    modifier = Modifier.fillMaxSize(),
+                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                    platform = ChatSurfacePlatform(showKeyboardHints = false),
+                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                )
+            }
+        }
+        waitForIdle()
+        val root = onRoot().getBoundsInRoot()
+        val canvasBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
+        val board = onNodeWithTag(TOUCH_CANVAS_TAG).getBoundsInRoot()
+        // Flush with the screen's foot, and the board behind its rounded top rather than ending on it.
+        assertEquals(root.bottom, canvasBar.bottom)
+        assertEquals((canvasBar.top + TouchComposerDimens.cornerReach).value, board.bottom.value, DP_TOLERANCE)
+
+        presentation = ChatSurfacePresentation.ChatFirst
+        waitForIdle()
+        onAllNodesWithTag(ComposerTestTags.TOUCH_BAR).assertCountEquals(1)
+        val pageBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
+        // One bar in both modes: the same container, the same size for the same draft.
+        assertEquals(canvasBar.left to canvasBar.right, pageBar.left to pageBar.right)
+        assertEquals((canvasBar.bottom - canvasBar.top).value, (pageBar.bottom - pageBar.top).value, DP_TOLERANCE)
+        assertEquals(root.bottom, pageBar.bottom)
+    }
+
     private companion object {
+        const val DP_TOLERANCE = 0.5f
         const val DRAG_PX = 700f
+        const val NUDGE_PX = 40f
+        const val SETTLE_MILLIS = 2_000L
     }
 }
