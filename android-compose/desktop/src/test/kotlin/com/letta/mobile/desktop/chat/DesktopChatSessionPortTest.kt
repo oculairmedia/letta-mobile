@@ -5,6 +5,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
@@ -235,6 +236,27 @@ class DesktopChatSessionPortTest {
         timestamp = "2026-10-01T00:00:00Z",
         approvalRequest = UiApprovalRequest(requestId = requestId, toolCalls = emptyList()),
     )
+
+    @Test
+    fun sendTextKeepsTheDraftAndStagedImagesOutOfTheStarter() = runTest {
+        val (controller, port) = startedPort()
+        val image = MessageContentPart.Image(base64 = "aGVsbG8=", mediaType = "image/png")
+        port.actions.updateComposerText("half-written thought")
+        port.actions.attachImage(image)
+        runCurrent()
+
+        port.actions.sendText("How do I get started?")
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals("half-written thought", state.composerText)
+        assertEquals(listOf(image), state.pendingImageAttachments)
+        val sent = state.selectedMessages.last { it.role == "user" }
+        assertEquals("How do I get started?", sent.content)
+        assertTrue(sent.attachments.isEmpty())
+
+        controller.close()
+    }
 
     @Test
     fun escapeCollapsesOnlyTheFullScreenPage() {

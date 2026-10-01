@@ -188,16 +188,19 @@ internal class DesktopChatActions(
     override fun send() = controller.send()
 
     /**
-     * Desktop has no draft-free send path, so this sends [text] through the composer and puts the
-     * user's unfinished text back afterwards. Staged images go with it.
+     * Desktop has no draft-free send path, so this sends [text] through the composer alone: the
+     * user's staged images are set aside (a starter prompt never carries them) and, whether or not
+     * the send began (a pending stop refuses it), the draft and the images are put back.
      */
     override fun sendText(text: String) {
-        val draft = controller.state.value.composerText
+        val before = controller.state.value
+        val draft = before.composerText
+        val staged = before.pendingImageAttachments
+        staged.indices.reversed().forEach(controller::removeImageAttachment)
         controller.updateComposerText(text)
         controller.send()
-        if (draft.isNotBlank() && controller.state.value.composerText.isEmpty()) {
-            controller.updateComposerText(draft)
-        }
+        controller.updateComposerText(draft)
+        staged.forEach(controller::attachImage)
     }
 
     override fun attachImage(image: MessageContentPart.Image) = controller.attachImage(image)
