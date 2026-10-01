@@ -178,6 +178,16 @@ class ChatTimelineLogicTest {
         assertEquals(PagedOpening.Ready, pagedOpeningOf(states(LoadState.Error(IllegalStateException()), false), 0))
     }
 
+    @Test
+    fun aViewStillLoadingItsFirstPageReportsNoResidents() {
+        val rows = listOf(settledRow("s-0"))
+        // A freshly mounted pager's empty list would clear what the other views of it hold.
+        assertNull(residentReport(emptyList<CanonicalTimelinePresentation.Row>(), LoadState.Loading))
+        assertEquals(rows, residentReport(rows, LoadState.Loading))
+        // Loaded and empty is a real report: the conversation has no settled rows.
+        assertEquals(emptyList(), residentReport(emptyList<CanonicalTimelinePresentation.Row>(), LoadState.NotLoading(true)))
+    }
+
     private fun item(id: String): ChatRenderItem =
         ChatRenderItem.Single(UiMessage(id = id, role = "assistant", content = "body", timestamp = "2026-09-12T10:00:00Z"), GroupPosition.None)
 
