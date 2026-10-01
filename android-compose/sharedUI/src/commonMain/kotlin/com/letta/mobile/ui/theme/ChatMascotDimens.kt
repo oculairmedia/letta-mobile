@@ -19,10 +19,10 @@ object ChatMascotDimens {
      * top edge, with the companion inside instead of beside the bar (the bar keeps the panel's
      * whole width).
      */
-    val dockBadge: Dp = 60.dp
+    val dockBadge: Dp = 76.dp
 
     /** The companion's seat inside [dockBadge]: the body (~60 % of it) sits within the disc. */
-    val dockBadgeSeat: Dp = 80.dp
+    val dockBadgeSeat: Dp = 100.dp
 
     /** The fresh conversation's greeting: the agent at hero size above the starter prompts. */
     val welcomeHero: Dp = 220.dp
