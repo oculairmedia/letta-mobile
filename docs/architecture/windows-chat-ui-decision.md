@@ -6,10 +6,14 @@ Tracking bead: `letta-mobile-w1f7p`
 
 > **Superseded.** On 2026-09-30 Emmanuel decided to build one chat page in
 > `sharedUI/commonMain` for both Android and desktop, so chat can dock into the
-> canvas (the new default view). The new page is built behind a flag beside
-> both existing UIs, then the old ones are deleted. See bead
-> `letta-mobile-bglj6.1` and `sharedUI/.../ui/chat/surface/ChatSurface.kt`.
-> The text below is kept for history.
+> canvas (the new default view). The new page was built behind a preview flag
+> beside both existing UIs; the cutover (2026-10-01) removed the flag and
+> deleted the old Android `ChatScreenLayout` and desktop `ChatDetailPane`
+> stacks, so the shared page is the chat page on both platforms. "Open
+> conversations on the canvas" stays a setting: turned off, a conversation
+> opens in the traditional full-screen chat. See bead `letta-mobile-bglj6.1`
+> and `sharedUI/.../ui/chat/surface/ChatSurface.kt`. The text below is kept
+> for history.
 
 ## Decision
 
