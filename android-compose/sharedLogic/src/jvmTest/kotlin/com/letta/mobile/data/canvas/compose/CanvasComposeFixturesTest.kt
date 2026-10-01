@@ -34,8 +34,10 @@ class CanvasComposeFixturesTest {
     @Test
     fun everyFixtureFileIsCoveredHere() {
         val dir = File(checkNotNull(javaClass.getResource(DIR)).toURI())
-        // compiled-ops.json joins with the compiler (letta-mobile-bglj6.10) and its own test.
-        val files = dir.list()!!.filter { it.endsWith(".json") && it != "compiled-ops.json" }.toSet()
+        // compiled-ops.json joins with the compiler (letta-mobile-bglj6.10) and its own test;
+        // placement-golden.json is held by CanvasComposePlacementGoldenTest (letta-mobile-bglj6.9).
+        val ownTests = setOf("compiled-ops.json", "placement-golden.json")
+        val files = dir.list()!!.filter { it.endsWith(".json") && it !in ownTests }.toSet()
         assertEquals(REQUESTS.toSet() + REFUSED_REQUESTS + OUTPUTS.keys, files)
     }
 
