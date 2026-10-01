@@ -75,11 +75,17 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val host = remember(params.navigation, subagentSheet) {
         params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch)
     }
-    val onIntent: (ChatSurfaceIntent) -> Unit = { intent ->
-        if (canvasSlot == null && routesToCanvasNavigation(presentation, intent)) {
-            host.openCanvas?.invoke()
-        } else {
-            presentation = ChatSurfaceModeReducer.reduce(presentation, intent)
+    // One instance for the page's lifetime: ChatScreen recomposes per keystroke, and a fresh
+    // lambda here would reach every timeline row (letta-mobile-bglj6.1).
+    val currentHost by rememberUpdatedState(host)
+    val hasCanvasSlot = canvasSlot != null
+    val onIntent: (ChatSurfaceIntent) -> Unit = remember(hasCanvasSlot) {
+        { intent ->
+            if (!hasCanvasSlot && routesToCanvasNavigation(presentation, intent)) {
+                currentHost.openCanvas?.invoke()
+            } else {
+                presentation = ChatSurfaceModeReducer.reduce(presentation, intent)
+            }
         }
     }
     // Back from the full-screen page returns to the canvas, the default view.
@@ -166,12 +172,19 @@ private fun rememberAndroidChatSurfacePlatform(
     timelineOverlay: @Composable () -> Unit,
 ): ChatSurfacePlatform {
     val currentOverlay by rememberUpdatedState(timelineOverlay)
+    // ChatScreen hands a fresh glow lambda per recomposition; forward to the latest one.
+    val currentBackground by rememberUpdatedState(pageBackground)
     val activity = LocalContext.current as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
-    return remember(isHiltHost, pageBackground) {
+    val hasBackground = pageBackground != null
+    return remember(isHiltHost, hasBackground) {
         ChatSurfacePlatform(
             voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
-            pageBackground = pageBackground,
+            pageBackground = if (hasBackground) {
+                { content -> currentBackground?.invoke(content) ?: content() }
+            } else {
+                null
+            },
             // Touch first: the composer's keyboard-shortcut strip is desktop chrome.
             showKeyboardHints = false,
             timelineOverlay = { currentOverlay() },

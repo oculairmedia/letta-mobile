@@ -143,7 +143,7 @@ internal fun DesktopSharedChatPage(
     ChatSurface(
         port = port,
         presentation = presentation,
-        onIntent = { intent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) },
+        onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } },
         host = host,
         modifier = modifier
             .fillMaxSize()
@@ -233,15 +233,20 @@ private fun rememberDesktopChatSurfaceHost(
         directory?.let { port.actions.changeWorkingDirectory(it.file.absolutePath) }
     }
     val supportsWorkingDirectory = port.capabilities.workingDirectory
-    return remember(navigation, directoryPicker, supportsWorkingDirectory) {
+    // The shell rebuilds [navigation] with fresh lambdas on every recomposition (a stream token);
+    // the host keeps one instance that forwards to the latest, so timeline rows stay skippable.
+    val latest by rememberUpdatedState(navigation)
+    val hasAgentPane = navigation.openAgentPane != null
+    val hasEditAgent = navigation.editAgent != null
+    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent) {
         ChatSurfaceHost(
-            openCanvas = navigation.openCanvas,
-            openAgent = navigation.openAgent,
-            openModelPicker = navigation.openModelPicker,
-            resolveAgentName = navigation.agentNamesById::get,
+            openCanvas = { latest.openCanvas() },
+            openAgent = { agentId -> latest.openAgent(agentId) },
+            openModelPicker = { latest.openModelPicker() },
+            resolveAgentName = { agentId -> latest.agentNamesById[agentId] },
             pickWorkingDirectory = if (supportsWorkingDirectory) ({ directoryPicker.launch() }) else null,
-            openAgentPane = navigation.openAgentPane,
-            editAgent = navigation.editAgent,
+            openAgentPane = if (hasAgentPane) ({ latest.openAgentPane?.invoke() }) else null,
+            editAgent = if (hasEditAgent) ({ latest.editAgent?.invoke() }) else null,
         )
     }
 }

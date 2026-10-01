@@ -83,10 +83,14 @@ fun ChatSurface(
     val uiState by port.uiState.collectAsState()
     val composer by port.composer.collectAsState()
     val shareFailed = stringResource(Res.string.chat_surface_canvas_share_failed)
-    val canvasActions = remember(port, onIntent, shareFailed) { ChatCanvasActions(port.actions, onIntent, shareFailed) }
+    // Hosts pass fresh lambdas per recomposition; these keep one instance so rows stay skippable.
+    val stableOnIntent = rememberLatestIntent(onIntent)
+    val stableHost = rememberStableHost(host)
+    val stablePlatform = rememberStablePlatform(platform)
+    val canvasActions = remember(port, shareFailed) { ChatCanvasActions(port.actions, stableOnIntent, shareFailed) }
     // With a canvas in hand, "open canvas" is a mode change, not the host's navigation.
-    val effectiveHost = remember(host, canvas != null, onIntent) {
-        if (canvas == null) host else host.copy(openCanvas = { onIntent(ChatSurfaceIntent.OpenCanvas) })
+    val effectiveHost = remember(stableHost, canvas != null) {
+        if (canvas == null) stableHost else stableHost.copy(openCanvas = { stableOnIntent(ChatSurfaceIntent.OpenCanvas) })
     }
     val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
@@ -100,10 +104,10 @@ fun ChatSurface(
         uiState = uiState,
         composer = composer,
         presentation = presentation,
-        onIntent = onIntent,
+        onIntent = stableOnIntent,
         host = effectiveHost,
         appearance = appearance,
-        platform = platform,
+        platform = stablePlatform,
         pagedTimeline = pagedTimeline,
     )
     // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
