@@ -70,6 +70,9 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         agentId = selected?.agentId,
         // A composer error is the composer's to show (next to the draft), not the page's.
         error = surface.pageError(inputs.local.acknowledgedError),
+        // The controller keeps its error until the next send; the glow reads it, shown or not,
+        // as the host's own page background does (rememberDesktopAmbientStatus).
+        runFailed = surface.errorMessage != null,
         collapsedRunIds = inputs.local.collapsedRunIds.toImmutableSet(),
         expandedReasoningMessageIds = inputs.local.expandedReasoningMessageIds.toImmutableSet(),
         isCancelling = surface.selectedConversationId != null &&

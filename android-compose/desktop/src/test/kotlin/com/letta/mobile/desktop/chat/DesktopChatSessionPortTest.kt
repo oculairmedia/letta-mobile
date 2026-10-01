@@ -237,6 +237,7 @@ class DesktopChatSessionPortTest {
 
         assertNull(port.uiState.value.error, "the snackbar does not show it again")
         assertEquals("Send failed", controller.state.value.errorMessage, "the ambient glow still reads it")
+        assertTrue(port.uiState.value.runFailed, "the shared page's glow stays failed, not a completion")
 
         // Once the error clears, the same message later is a new error and is shown again.
         controller.sendSurface.setError(null)

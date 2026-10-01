@@ -91,24 +91,32 @@ internal data class ChatAmbient(val status: AmbientMotionStatus, val streamPulse
 
 /**
  * The page's ambient status from [state], mapped the way both hosts map theirs (desktop
- * rememberDesktopAmbientStatus, Android's ChatScreen ambient effect): an error fails, a run in
+ * rememberDesktopAmbientStatus, Android's ChatScreen ambient effect): an error fails (and stays
+ * failed while [ChatUiState.runFailed] holds, after the page has shown and cleared it), a run in
  * flight (typing or streaming) runs, the end of a run blooms Completed and holds for exactly the
  * shared decay before going Idle.
  */
 @Composable
 internal fun rememberChatAmbient(state: ChatUiState): ChatAmbient {
-    val status = rememberChatAmbientStatus(isThinking = state.isAgentTyping || state.isStreaming, error = state.error)
+    val status = rememberChatAmbientStatus(
+        isThinking = state.isAgentTyping || state.isStreaming,
+        failed = state.error != null || state.runFailed,
+    )
     val pulse = rememberVisibleStreamPulse(state)
     return remember(status, pulse) { ChatAmbient(status, pulse) }
 }
 
 @Composable
-internal fun rememberChatAmbientStatus(isThinking: Boolean, error: String?): AmbientMotionStatus {
+internal fun rememberChatAmbientStatus(isThinking: Boolean, failed: Boolean): AmbientMotionStatus {
     var status by remember { mutableStateOf(AmbientMotionStatus.Idle) }
     var hadActiveRun by remember { mutableStateOf(false) }
-    LaunchedEffect(isThinking, error) {
+    LaunchedEffect(isThinking, failed) {
         when {
-            error != null -> status = AmbientMotionStatus.Failed
+            failed -> {
+                // The failure ended that run: clearing the error is not a completion to bloom for.
+                hadActiveRun = false
+                status = AmbientMotionStatus.Failed
+            }
             isThinking -> {
                 hadActiveRun = true
                 status = AmbientMotionStatus.Running
