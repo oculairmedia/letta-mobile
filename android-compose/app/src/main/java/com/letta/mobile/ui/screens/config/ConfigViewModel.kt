@@ -23,6 +23,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
 import com.letta.mobile.ui.state.RetainedContentRefresh
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -186,6 +187,8 @@ class ConfigViewModel @Inject constructor(
                 if (RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) {
                     _uiState.value = UiState.Success(configUiState)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
                 when (
@@ -468,6 +471,8 @@ class ConfigViewModel @Inject constructor(
                 )
                 autoPersistLocalModelSelection()
                 onSuccess?.invoke(imported.fileName)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 val latest = (_uiState.value as? UiState.Success)?.data ?: state
                 _uiState.value = UiState.Success(latest.copy(isImportingLocalModel = false))
@@ -614,6 +619,8 @@ class ConfigViewModel @Inject constructor(
                     )
                 )
                 onSuccess()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _uiState.value = UiState.Success(state.copy(isSaving = false))
                 onError?.invoke(e.message ?: "Failed to save config")
