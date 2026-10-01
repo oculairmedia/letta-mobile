@@ -622,7 +622,7 @@ private fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParam
 }
 
 @Composable
-private fun ChatScreenVoiceOverlay(modifier: Modifier = Modifier) {
+internal fun ChatScreenVoiceOverlay(modifier: Modifier = Modifier) {
     val voiceActivity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
     val voiceIsHiltHost = voiceActivity is dagger.hilt.internal.GeneratedComponentManager<*>
     if (voiceIsHiltHost) {

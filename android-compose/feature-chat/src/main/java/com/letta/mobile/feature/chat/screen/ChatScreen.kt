@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.feature.chat.screen.shared.SharedChatPage
+import com.letta.mobile.feature.chat.screen.shared.SharedChatPageParams
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.ui.ambient.VisibleAssistantStreamPulseState
 import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
@@ -42,6 +45,7 @@ internal fun ChatScreen(
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val activeFontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
+    val sharedChatPageEnabled by viewModel.sharedChatPageEnabled.collectAsStateWithLifecycle()
 
     val backgroundModifier = when (chatBackground) {
         is ChatBackground.Default -> Modifier
@@ -88,6 +92,7 @@ internal fun ChatScreen(
                 floatingBannerMessage = floatingBannerMessage,
                 onFloatingBannerMessageChange = { floatingBannerMessage = it },
                 ambient = ambient,
+                sharedChatPage = sharedChatPageEnabled,
             ),
         )
 
@@ -106,7 +111,19 @@ internal fun ChatScreen(
                 .imePadding()
                 .then(backgroundModifier),
         ) {
-            if (committedFontScale != null) {
+            if (committedFontScale != null && sharedChatPageEnabled) {
+                SharedChatPage(
+                    params = SharedChatPageParams(
+                        viewModel = viewModel,
+                        navigation = navigation,
+                        chatMode = chatMode,
+                        fontScale = committedFontScale,
+                        hapticsEnabled = hapticsEnabled,
+                        pagingPresentation = pagingPresentation,
+                    ),
+                    modifier = Modifier.fillMaxSize().padding(contentPadding),
+                )
+            } else if (committedFontScale != null) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalChatPagingPresentation provides pagingPresentation,
                 ) {
