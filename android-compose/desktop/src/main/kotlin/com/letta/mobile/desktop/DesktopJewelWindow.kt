@@ -113,6 +113,9 @@ internal data class DesktopHeaderChromeState(
  * fit the two-line agent identity block (title over agent name). */
 private val TitleBarHeight = 48.dp
 
+/** Text-selection handles at twice the mouse-sized default, so a fingertip can take hold of them. */
+private const val TOUCH_HANDLE_SCALE = 2f
+
 /** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
 private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
 
@@ -342,12 +345,24 @@ internal fun DesktopJewelWindow(
                     // The window's own scope runs what a menu item chose: a popup is dismissed by
                     // being removed, so the action cannot belong to the popup.
                     val windowScope = rememberCoroutineScope()
+                    // Text selected by touch gets finger-sized handles and a Copy / Quote bar;
+                    // the mouse keeps its own, and the bar only shows just after a finger.
+                    val touchToolbar = remember {
+                        com.letta.mobile.ui.text.TouchTextToolbar {
+                            com.letta.mobile.desktop.touch.DesktopTouchOrigin.wasTouch(System.currentTimeMillis())
+                        }
+                    }
+                    val quoteSink = remember { com.letta.mobile.ui.text.QuoteSink() }
                     CompositionLocalProvider(
+                        com.letta.mobile.ui.text.LocalSelectionHandleScale provides TOUCH_HANDLE_SCALE,
+                        androidx.compose.ui.platform.LocalTextToolbar provides touchToolbar,
+                        com.letta.mobile.ui.text.LocalQuoteSink provides quoteSink,
                         LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
                         com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
                         LocalMenuActionScope provides windowScope,
                     ) {
                         content()
+                        com.letta.mobile.ui.text.TouchTextToolbarHost(touchToolbar, quoteSink)
                     }
                 }
             }

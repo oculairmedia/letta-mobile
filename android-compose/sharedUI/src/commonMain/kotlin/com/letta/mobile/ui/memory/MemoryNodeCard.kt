@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -150,7 +150,7 @@ private fun MemoryCardAction(icon: ImageVector, label: String, onClick: () -> Un
 @Composable
 private fun ColumnScope.MemoryNodeText(text: String, monospace: Boolean) {
     val shown = text.ifBlank { "(empty)" }
-    SelectionContainer(Modifier.weight(1f, fill = false)) {
+    LettaSelectionContainer(Modifier.weight(1f, fill = false)) {
         Text(
             shown,
             style = MaterialTheme.typography.bodyMedium,

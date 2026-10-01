@@ -29,7 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -644,7 +644,7 @@ internal fun AgentText(params: AgentTextParams) {
             .fillMaxWidth()
             .hoverable(hoverInteraction),
     ) {
-        SelectionContainer {
+        LettaSelectionContainer {
             com.letta.mobile.ui.markdown.SharedMarkdownText(
                 text = displayText,
                 modifier = Modifier.padding(end = LettaDimens.Space.xxl),
