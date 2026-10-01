@@ -65,6 +65,22 @@ class AdminChatSessionPortTest {
     }
 
     @Test
+    fun `shared page flag is unknown until the setting is read`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var viewModel: AdminChatViewModel? = null
+        try {
+            val vm = openedChatViewModel(canonicalPagingHost(), TestData.agent("agent-flag", "Flag"), "conversation-flag", "flag")
+            viewModel = vm
+            assertEquals(null, vm.sharedChatPageEnabled.value)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.sharedChatPageEnabled.collect {} }
+            assertEquals(false, vm.sharedChatPageEnabled.value)
+        } finally {
+            viewModel?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun `send submits the current draft through submitComposer`() {
         val vm = mockViewModel(ChatComposerState(inputText = "draft"))
         every { vm.submitComposer(any()) } returns null

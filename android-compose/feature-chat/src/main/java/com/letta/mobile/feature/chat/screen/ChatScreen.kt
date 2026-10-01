@@ -94,7 +94,7 @@ internal fun ChatScreen(
                 floatingBannerMessage = floatingBannerMessage,
                 onFloatingBannerMessageChange = { floatingBannerMessage = it },
                 ambient = ambient,
-                sharedChatPage = sharedChatPageEnabled,
+                sharedChatPage = sharedChatPageEnabled != false,
             ),
         )
 
@@ -104,7 +104,12 @@ internal fun ChatScreen(
         // receives `bottomInsetDp` for navbar-clearance.
         // The composer's height, as the layout measures it, so the glow can stay above it.
         var composerHeight by remember { mutableStateOf(androidx.compose.ui.unit.Dp.Unspecified) }
-        if (committedFontScale != null && sharedChatPageEnabled) {
+        if (sharedChatPageEnabled == null) {
+            // Which layout to draw is not known yet: only the background, never a one-frame flash.
+            androidx.compose.foundation.layout.Box(modifier.fillMaxSize().then(backgroundModifier))
+            return@LettaChatTheme
+        }
+        if (committedFontScale != null && sharedChatPageEnabled == true) {
             // letta-mobile-bglj6.1: the shared page draws the glow behind its own full-screen
             // layer (it is opaque over the docked canvas), and its composer handles the IME.
             SharedChatPage(

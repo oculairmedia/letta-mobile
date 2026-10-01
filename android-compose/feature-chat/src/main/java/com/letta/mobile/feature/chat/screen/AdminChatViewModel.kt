@@ -554,9 +554,12 @@ internal class AdminChatViewModel @Inject constructor(
     val hapticsEnabled: StateFlow<Boolean> = settingsRepository.getHapticsEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    /** letta-mobile-bglj6.1: render the shared KMP chat page instead of the legacy layout (preview). */
-    val sharedChatPageEnabled: StateFlow<Boolean> = settingsRepository.getSharedChatPageEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    /**
+     * letta-mobile-bglj6.1: render the shared KMP chat page instead of the legacy layout (preview).
+     * Null until the setting is read, so neither layout composes (and flashes) before it is known.
+     */
+    val sharedChatPageEnabled: StateFlow<Boolean?> = settingsRepository.getSharedChatPageEnabled()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /** letta-mobile-bglj6.1: open conversations canvas-first on the shared chat page (default on). */
     val openChatsOnCanvas: StateFlow<Boolean> = settingsRepository.getOpenChatsOnCanvas()
