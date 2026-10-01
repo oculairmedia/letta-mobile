@@ -50,6 +50,7 @@ import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.ambient.VisibleAssistantStreamPulseState
 import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.surface.timeline.streamingAssistantOf
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -129,7 +130,7 @@ internal fun rememberChatAmbientStatus(isThinking: Boolean, error: String?): Amb
 /** Counts visible growth of the streaming assistant reply (the shared reducer the hosts use). */
 @Composable
 private fun rememberVisibleStreamPulse(state: ChatUiState): Long {
-    val tail = if (state.isStreaming) state.messages.lastOrNull { it.role == "assistant" } else null
+    val tail = streamingAssistantOf(state)
     var pulse by remember { mutableStateOf(VisibleAssistantStreamPulseState()) }
     LaunchedEffect(state.isStreaming, tail?.id, tail?.content?.length) {
         pulse = reduceVisibleAssistantStreamPulse(pulse, state.isStreaming, tail?.id, tail?.content?.length ?: 0)

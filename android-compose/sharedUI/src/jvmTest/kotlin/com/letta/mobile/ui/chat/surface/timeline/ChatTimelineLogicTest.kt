@@ -99,9 +99,16 @@ class ChatTimelineLogicTest {
 
     @Test
     fun theStreamingIdIsTheNewestAssistantMessageWhileStreaming() {
-        val messages = persistentListOf(message("u1", "user"), message("a1"), message("a2"), message("u2", "user"))
+        val messages = persistentListOf(message("u1", "user"), message("a1"), message("a2"))
         assertEquals("a2", streamingMessageIdOf(ready.copy(messages = messages, isStreaming = true)))
         assertNull(streamingMessageIdOf(ready.copy(messages = messages, isStreaming = false)))
+    }
+
+    @Test
+    fun aFreshPromptLeavesThePreviousReplySettledWhileTheTurnStarts() {
+        // Just sent: the run streams but nothing answers u2 yet. a2 must not replay its reveal.
+        val sent = persistentListOf(message("u1", "user"), message("a1"), message("a2"), message("u2", "user"))
+        assertNull(streamingMessageIdOf(ready.copy(messages = sent, isStreaming = true)))
     }
 
     // Pinch
