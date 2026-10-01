@@ -27,6 +27,8 @@ import kotlinx.collections.immutable.toImmutableSet
 internal data class DesktopChatLocalTimelineState(
     val collapsedRunIds: Set<String> = emptySet(),
     val expandedReasoningMessageIds: Set<String> = emptySet(),
+    /** The page error the shared page has already shown, so it is not shown again. */
+    val acknowledgedError: String? = null,
 ) {
     fun toggleRun(runId: String) = copy(collapsedRunIds = collapsedRunIds.toggle(runId))
 
@@ -66,7 +68,7 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         agentName = selected?.agentName.orEmpty(),
         agentId = selected?.agentId,
         // A composer error is the composer's to show (next to the draft), not the page's.
-        error = surface.errorMessage.takeUnless { surface.hasComposerError() },
+        error = surface.pageError(inputs.local.acknowledgedError),
         collapsedRunIds = inputs.local.collapsedRunIds.toImmutableSet(),
         expandedReasoningMessageIds = inputs.local.expandedReasoningMessageIds.toImmutableSet(),
         isCancelling = surface.selectedConversationId != null &&
@@ -88,15 +90,12 @@ internal fun submittingApprovalOnScreen(submitting: Set<String>, messages: List<
 }
 
 /**
- * Desktop keeps one errorMessage for the whole surface. It is a composer error when the runtime
- * composer reports one (attachment limits) or it is a send the composer refused (stop pending).
+ * The page (snackbar) error: the surface error unless it is the composer's own error, which the
+ * composer shows, or the page already showed it ([acknowledged]). Acknowledging does not clear
+ * the controller's error, so the ambient glow keeps reading "failed" until the next send.
  */
-internal fun DesktopChatSurfaceState.hasComposerError(): Boolean {
-    val message = errorMessage ?: return false
-    return runtimeState.composer.error != null || message in ComposerRefusalMessages
-}
-
-private val ComposerRefusalMessages = setOf(STOPPING_SEND_BLOCKED_MESSAGE, CANONICAL_SEND_UNAVAILABLE_MESSAGE)
+internal fun DesktopChatSurfaceState.pageError(acknowledged: String?): String? =
+    errorMessage.takeUnless { it == composerErrorMessage || it == acknowledged }
 
 /** Reuses the previous list instance when the content is unchanged, so the timeline skips work. */
 private fun nextMessages(previous: ImmutableList<UiMessage>?, next: List<UiMessage>): ImmutableList<UiMessage> =
@@ -133,7 +132,7 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
     return ChatComposerUiState(
         text = surface.composerText,
         attachments = surface.pendingImageAttachments.toImmutableList(),
-        error = surface.errorMessage.takeIf { surface.hasComposerError() },
+        error = surface.composerErrorMessage,
         canSend = surface.canSend,
         canQueueWhileStreaming = inputs.canQueueWhileStreaming,
         placeholder = inputs.host.placeholder,

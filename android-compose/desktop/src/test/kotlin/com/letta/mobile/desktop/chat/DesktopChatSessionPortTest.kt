@@ -209,14 +209,41 @@ class DesktopChatSessionPortTest {
         runCurrent()
         assertNull(port.composer.value.error)
 
-        controller.showComposerError("Message load failed")
+        // Any composer error stays out of the page snackbar, whatever its text.
+        port.actions.reportComposerError("Attach up to 4 images.")
+        runCurrent()
+        assertEquals("Attach up to 4 images.", port.composer.value.error)
+        assertNull(port.uiState.value.error)
+        port.actions.removeAttachment(0)
+        runCurrent()
+        assertNull(port.composer.value.error)
+
+        controller.sendSurface.setError("Message load failed")
         runCurrent()
         assertEquals("Message load failed", port.uiState.value.error)
         assertNull(port.composer.value.error)
 
+        controller.close()
+    }
+
+    @Test
+    fun acknowledgingThePageErrorHidesItButKeepsTheFailedGlow() = runTest {
+        val (controller, port) = startedPort()
+
+        controller.sendSurface.setError("Send failed")
+        runCurrent()
         port.actions.clearError()
         runCurrent()
-        assertNull(port.uiState.value.error)
+
+        assertNull(port.uiState.value.error, "the snackbar does not show it again")
+        assertEquals("Send failed", controller.state.value.errorMessage, "the ambient glow still reads it")
+
+        // Once the error clears, the same message later is a new error and is shown again.
+        controller.sendSurface.setError(null)
+        runCurrent()
+        controller.sendSurface.setError("Send failed")
+        runCurrent()
+        assertEquals("Send failed", port.uiState.value.error)
 
         controller.close()
     }
@@ -257,6 +284,19 @@ class DesktopChatSessionPortTest {
         assertEquals("How do I get started?", sent.content)
         assertTrue(sent.attachments.isEmpty())
 
+        controller.close()
+    }
+
+    @Test
+    fun sendTextNeverTouchesTheComposerError() = runTest {
+        val (controller, port) = startedPort()
+        port.actions.reportComposerError("Attach up to 4 images.")
+        runCurrent()
+
+        port.actions.sendText("How do I get started?")
+        runCurrent()
+
+        assertEquals("Attach up to 4 images.", port.composer.value.error)
         controller.close()
     }
 

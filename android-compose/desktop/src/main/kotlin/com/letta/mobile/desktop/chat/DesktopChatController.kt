@@ -801,19 +801,33 @@ class DesktopChatController(
         if (closed) return
         _state.update { current ->
             val next = ChatSessionReducer.attachImage(current.runtimeState, image, attachmentLimits)
-            current.withRuntimeState(next).copy(errorMessage = next.composer.error?.toDesktopMessage(attachmentLimits))
+            val error = next.composer.error?.toDesktopMessage(attachmentLimits)
+            val attached = current.withRuntimeState(next).withoutComposerError()
+            if (error != null) attached.withComposerError(error) else attached
         }
     }
 
     fun removeImageAttachment(index: Int) {
         if (closed) return
         _state.update {
-            it.withRuntimeState(ChatSessionReducer.removeImageAttachment(it.runtimeState, index))
-                .copy(errorMessage = null)
+            it.withRuntimeState(ChatSessionReducer.removeImageAttachment(it.runtimeState, index)).withoutComposerError()
         }
     }
 
+    /** A composer error: the shared page shows it in the composer, not the page snackbar. */
     fun showComposerError(message: String) {
+        if (closed) return
+        _state.update { it.withComposerError(message) }
+    }
+
+    /** The composer's error was dismissed; a page error that differs from it stays. */
+    fun clearComposerError() {
+        if (closed) return
+        _state.update { it.withoutComposerError() }
+    }
+
+    /** An error about the page (not the draft), such as a starter prompt that could not send. */
+    private fun showPageError(message: String) {
         if (closed) return
         _state.update { it.copy(errorMessage = message) }
     }
@@ -924,28 +938,50 @@ class DesktopChatController(
 
     fun send() {
         if (closed) return
-        cancellingConversationId.value?.let { cancelling ->
-            if (cancelling == _state.value.selectedConversationId) {
-                showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
-                return
-            }
+        _state.update { it.withoutComposerError() }
+        if (stopBlocksSend()) {
+            showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
+            return
         }
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
+        // As before, a draft send with no connection is a no-op: the composer cannot send then.
+        dispatchSend(draft, onRefused = ::showComposerError, onNotConnected = {})
+    }
+
+    /**
+     * Sends [text] without touching the draft or its staged images (a starter prompt, "send
+     * again"), through the same route as [send]. A send that cannot start says so on the page.
+     */
+    fun sendText(text: String) {
+        if (closed || text.isBlank()) return
+        if (stopBlocksSend()) {
+            showPageError(STOPPING_SEND_BLOCKED_MESSAGE)
+            return
+        }
+        val draft = ChatComposerSendDraft(text = text.trim(), attachments = emptyList(), nextState = _state.value.composer)
+        dispatchSend(draft, onRefused = ::showPageError, onNotConnected = { showPageError(SEND_NOT_CONNECTED_MESSAGE) })
+    }
+
+    private fun stopBlocksSend(): Boolean {
+        val cancelling = cancellingConversationId.value ?: return false
+        return cancelling == _state.value.selectedConversationId
+    }
+
+    /** [draft]'s nextState is the composer after the send: emptied by [send], untouched by [sendText]. */
+    private fun dispatchSend(draft: ChatComposerSendDraft, onRefused: (String) -> Unit, onNotConnected: () -> Unit) {
         _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
         // The canonical route owns its own send. It deliberately runs no legacy loop, so falling
         // through to the loop check below would drop the message on the floor.
         if (_canonicalPresentation.value != null) {
-            launchCanonicalSend(draft)
+            launchCanonicalSend(draft, onRefused)
             return
         }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
-            _state.update {
-                if (it.connectionState == DesktopChatConnectionState.Demo) {
-                    it.sendLocalMessage()
-                } else {
-                    it
-                }
+            if (_state.value.connectionState == DesktopChatConnectionState.Demo) {
+                _state.update { it.sendLocalMessage(draft) }
+            } else {
+                onNotConnected()
             }
             return
         }
@@ -975,11 +1011,11 @@ class DesktopChatController(
     fun canonicalSendQueue(): com.letta.mobile.data.chat.send.ChatSendQueueControls? =
         selectedCanonicalCoordinator()?.sendQueue
 
-    private fun launchCanonicalSend(draft: ChatComposerSendDraft) {
+    private fun launchCanonicalSend(draft: ChatComposerSendDraft, onRefused: (String) -> Unit) {
         val conversationId = _state.value.selectedConversationId
         val coordinator = selectedCanonicalCoordinator()
         if (coordinator == null) {
-            showComposerError(CANONICAL_SEND_UNAVAILABLE_MESSAGE)
+            onRefused(CANONICAL_SEND_UNAVAILABLE_MESSAGE)
             return
         }
         titleCandidateForSend(conversationId, draft.text)?.let { title ->
@@ -1399,6 +1435,9 @@ private val ROSTER_REFRESHABLE_STATES = setOf(
     ChatConnectionState.Sending,
     ChatConnectionState.SendFailed,
 )
+
+/** Shown when a send finds no live connection to send on (outside the demo backend). */
+internal const val SEND_NOT_CONNECTED_MESSAGE = "Not connected: the message was not sent."
 
 /** Shown when a conversation cannot send on the canonical timeline route. */
 internal const val CANONICAL_SEND_UNAVAILABLE_MESSAGE = "This conversation cannot send on the canonical timeline route."

@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -115,6 +116,11 @@ internal class DesktopChatSessionPort(
         combine(localTimeline, controller.submittingApprovals, ::Pair),
     ) { surface, presence, cancelling, queue, (local, submitting) ->
         DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, submitting)
+    }.onEach { inputs ->
+        // Once the error is gone (a send cleared it), the same message later is a new error.
+        if (inputs.surface.errorMessage == null && inputs.local.acknowledgedError != null) {
+            localTimeline.update { it.copy(acknowledgedError = null) }
+        }
     }
 
     /**
@@ -208,21 +214,8 @@ internal class DesktopChatActions(
 
     override fun send() = controller.send()
 
-    /**
-     * Desktop has no draft-free send path, so this sends [text] through the composer alone: the
-     * user's staged images are set aside (a starter prompt never carries them) and, whether or not
-     * the send began (a pending stop refuses it), the draft and the images are put back.
-     */
-    override fun sendText(text: String) {
-        val before = controller.state.value
-        val draft = before.composerText
-        val staged = before.pendingImageAttachments
-        staged.indices.reversed().forEach(controller::removeImageAttachment)
-        controller.updateComposerText(text)
-        controller.send()
-        controller.updateComposerText(draft)
-        staged.forEach(controller::attachImage)
-    }
+    /** A draft-free send: the user's draft and staged images stay exactly as they are. */
+    override fun sendText(text: String) = controller.sendText(text)
 
     override fun attachImage(image: MessageContentPart.Image) = controller.attachImage(image)
 
@@ -230,8 +223,7 @@ internal class DesktopChatActions(
 
     override fun reportComposerError(message: String) = controller.showComposerError(message)
 
-    /** Desktop's composer error is the surface error (see hasComposerError). */
-    override fun clearComposerError() = controller.clearErrorMessage()
+    override fun clearComposerError() = controller.clearComposerError()
 
     override fun runComposerCommand(command: ChatComposerCommand) {
         commandsById()[command.id]?.run?.invoke()
@@ -276,8 +268,14 @@ internal class DesktopChatActions(
 
     override fun retryLoad() = controller.retryConnection()
 
-    /** The page showed the error in its snackbar; acknowledge it so it is not shown again. */
-    override fun clearError() = controller.clearErrorMessage()
+    /**
+     * The page showed the error in its snackbar: acknowledge it so it is not shown again, but
+     * leave the controller's error in place so the ambient glow stays "failed" until the next send.
+     */
+    override fun clearError() {
+        val shown = controller.state.value.errorMessage ?: return
+        localTimeline.update { it.copy(acknowledgedError = shown) }
+    }
 
     override fun setFontScale(scale: Float) = bindings.onSetFontScale(scale)
 
