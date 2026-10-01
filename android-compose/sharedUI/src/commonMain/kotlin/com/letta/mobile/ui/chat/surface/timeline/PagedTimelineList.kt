@@ -310,7 +310,12 @@ private fun LazyListScope.pagedLoadFooter(scope: PagedRowsScope) {
 
 /**
  * Only rows actually held by the list count as resident: this drains the live overlay. Every view
- * of a paged timeline (the full page and the docked panel) must run it, or the overlay never drains.
+ * of a paged timeline (the full page, the docked panel, the minimised dock's bubble) must run it,
+ * or the overlay never drains.
+ *
+ * Several views report the same pager and the last report wins, so a view that has not loaded yet
+ * stays quiet: a freshly mounted [LazyPagingItems] reports an empty list while its first page is
+ * still on its way, which would clear what the other views hold.
  */
 @Composable
 internal fun ObserveResidentRows(
@@ -318,9 +323,14 @@ internal fun ObserveResidentRows(
     settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
 ) {
     LaunchedEffect(presentation, settled) {
-        snapshotFlow { settled.itemSnapshotList.items }.collect(presentation::onResidentRows)
+        snapshotFlow { residentReport(settled.itemSnapshotList.items, settled.loadState.refresh) }
+            .collect { rows -> if (rows != null) presentation.onResidentRows(rows) }
     }
 }
+
+/** What a view reports as resident: nothing (null) while its first page is still loading. */
+internal fun <T> residentReport(rows: List<T>, refresh: LoadState): List<T>? =
+    rows.takeUnless { it.isEmpty() && refresh is LoadState.Loading }
 
 /**
  * Leaving the newest edge stops following; coming back resumes, but only once that edge is the
