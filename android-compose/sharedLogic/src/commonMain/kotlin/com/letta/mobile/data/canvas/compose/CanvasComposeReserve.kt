@@ -14,10 +14,11 @@ import kotlin.math.ceil
  *
  * The compose layer cannot measure text: the host has no fonts, and Android and Skiko measure the
  * same words differently. So it books a height that is an overestimate by construction, and the
- * renderer fits the real content WITHIN it (it shrinks the card to what it measured and never grows
- * past the booking; anything beyond scrolls inside the card). Pure arithmetic over characters, with
- * no font, density or Compose API, done in whole world units so every peer and every target books
- * the same number.
+ * renderer fits the real content WITHIN it (sharedUI `CanvasNoteAutoFit`, letta-mobile-bglj6.11: it
+ * shrinks the card to what it measured; content longer than the booking first gets smaller type,
+ * down to a floor, and only then a taller card, visually and never written back). Pure arithmetic
+ * over characters, with no font, density or Compose API, done in whole world units so every peer
+ * and every target books the same number.
  *
  * Why it is an overestimate:
  * - Every character is booked at a WORST-CASE advance for its class ([advanceEm]): 0.6 em for
@@ -33,7 +34,8 @@ import kotlin.math.ceil
  *   the editor's horizontal padding and each nesting level's indent.
  *
  * The only place it is knowingly short is [MAX_RESERVE]: a note longer than that is booked at the
- * cap and scrolls. The desktop measurement test of C6 holds the estimate to real renders.
+ * cap and the renderer grows it. The desktop measurement test of C6 (sharedUI
+ * `CanvasNoteAutoFitUiTest`) holds the estimate to real renders.
  */
 object CanvasComposeReserve {
     /** Booked heights are clamped to this range (TEXT has no floor beyond one line). */
@@ -132,7 +134,7 @@ object CanvasComposeReserve {
             val block = element as? JsonObject ?: return@forEach
             val type = block["type"] as? JsonObject
             val typeId = (type?.get("typeId") as? JsonPrimitive)?.contentOrNull
-            val level = (type?.get("level") as? JsonPrimitive)?.intOrNull ?: 1
+            val level = ReserveBlockType.headingLevel(typeId) ?: (type?.get("level") as? JsonPrimitive)?.intOrNull ?: 1
             val text = ((block["content"] as? JsonObject)?.get("text") as? JsonPrimitive)?.contentOrNull.orEmpty()
             into += ReserveBlock(ReserveBlockType.of(typeId), text, level, depth)
             collect(block["children"], depth + 1, into)
@@ -286,8 +288,23 @@ enum class ReserveBlockType {
     ;
 
     companion object {
+        private const val HEADING_PREFIX = "heading_"
+
+        /**
+         * The level of a cascade-editor heading `typeId`, which carries it (`heading_1` .. `heading_6`,
+         * as `BlockTypeCodec` 1.9.2 writes `BlockType.Heading(level)`); null for anything else.
+         */
+        fun headingLevel(typeId: String?): Int? =
+            typeId?.takeIf { it.startsWith(HEADING_PREFIX) }?.removePrefix(HEADING_PREFIX)?.toIntOrNull()
+
         /** The type of a Cascade `typeId`; anything unknown is booked as a paragraph. */
-        fun of(typeId: String?): ReserveBlockType = when (typeId) {
+        fun of(typeId: String?): ReserveBlockType = when {
+            headingLevel(typeId) != null -> HEADING
+            else -> ofPlain(typeId)
+        }
+
+        private fun ofPlain(typeId: String?): ReserveBlockType = when (typeId) {
+            // A bare "heading" with a separate level is not what the library writes; read as one anyway.
             "heading" -> HEADING
             "bullet_list" -> BULLET
             "numbered_list" -> NUMBERED

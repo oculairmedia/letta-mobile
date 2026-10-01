@@ -180,6 +180,21 @@ class CanvasComposeReserveTest {
         )
     }
 
+    /**
+     * cascade-editor 1.9.2 writes `BlockType.Heading(2)` as `{"typeId":"heading_2"}` (verified by
+     * encoding one with the library's DocumentSchema; letta-mobile-bglj6.11). Read that, and a bare
+     * `heading` with a `level` too, as headings at their level; never as a 16-px paragraph.
+     */
+    @Test
+    fun headingLevelsAreReadFromTheLibrarysTypeId() {
+        val library = """{"version":2,"blocks":[{"id":"h","type":{"typeId":"heading_2"},"content":{"kind":"text","version":1,"text":"Hi","spans":[]}}]}"""
+        assertEquals(listOf(ReserveBlock(ReserveBlockType.HEADING, "Hi", level = 2)), CanvasComposeReserve.blocksOf(library))
+        val bare = """{"version":2,"blocks":[{"id":"h","type":{"typeId":"heading","level":3},"content":{"kind":"text","version":1,"text":"Hi","spans":[]}}]}"""
+        assertEquals(listOf(ReserveBlock(ReserveBlockType.HEADING, "Hi", level = 3)), CanvasComposeReserve.blocksOf(bare))
+        assertEquals(ReserveBlockType.PARAGRAPH, ReserveBlockType.of("heading_x"))
+        assertEquals(6, ReserveBlockType.headingLevel("heading_6"))
+    }
+
     @Test
     fun headingsBookTheEditorsOwnSizes() {
         val one = CanvasComposeReserve.blockHeight(ReserveBlock(ReserveBlockType.HEADING, "Title", level = 1), 320.0)

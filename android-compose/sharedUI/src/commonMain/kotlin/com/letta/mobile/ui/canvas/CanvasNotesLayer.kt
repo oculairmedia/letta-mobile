@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,6 +55,9 @@ import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.compose.CanvasComposePlacement
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve
+import com.letta.mobile.data.canvas.compose.ComposeBounds
 import io.ak1.drawbox.domain.model.Viewport
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -66,7 +70,12 @@ import com.letta.mobile.ui.theme.LettaDimens
  *
  * Each card is dragged by its handle bar and resized from its corner; the frame is written to the
  * session when the gesture ends, so peers and the agent see the move as one op. A document that
- * was never placed gets a staggered default spot until someone moves it.
+ * was never placed (a legacy frameless note) gets the slot the shared placement engine gives it
+ * ([framelessFrames], from `CanvasComposePlacement.placeFrameless`), so two never overlap.
+ *
+ * How a card is sized follows its geometry owner (canvas.compose, letta-mobile-bglj6.11): an
+ * AUTO-owned or frameless note fits its content within its booked frame (see [NoteSizing]); an
+ * EXPLICIT or USER frame is drawn as stored. Fitting is local: it never writes geometry back.
  *
  * Tapping a card makes it the [activeNoteId]: that one shows the block editor's toolbar and block
  * handles. Its expand button asks the host, through [onExpand], to open it large; while
@@ -101,15 +110,29 @@ fun CanvasNotesLayer(
      * follow the card instead of trailing at the committed position.
      */
     onLiveFrame: (id: String, frame: CanvasDocumentFrame?) -> Unit = { _, _ -> },
+    /**
+     * Where each frameless document sits, by id (`CanvasComposePlacement.placeFrameless` over the
+     * board's content bounds). Null works it out from the notes alone, without the drawing.
+     */
+    framelessFrames: Map<String, CanvasDocumentFrame>? = null,
+    /**
+     * The height an auto-fitted card is shown at, in world units, or null once it is not fitted;
+     * a group move lands each note at the size it was shown at.
+     */
+    onFittedHeight: (id: String, height: Float?) -> Unit = { _, _ -> },
 ) {
+    val frameless = framelessFrames ?: remember(documents) {
+        framelessFramesOf(documents) { CanvasViewportFit.contentBounds(emptyList(), documents) }
+    }
     Box(modifier = modifier.fillMaxSize()) {
-        documents.forEachIndexed { index, document ->
+        documents.forEach { document ->
+          key(document.id) {
             val selected = document.id in selectedIds
             CanvasNoteCard(
                 session = session,
                 document = document,
                 viewport = viewport,
-                defaultFrame = defaultNoteFrame(index),
+                defaultFrame = frameless[document.id] ?: framelessFallbackFrame(),
                 active = document.id == activeNoteId,
                 expanded = document.id == expandedNoteId,
                 onActivate = { onActivate(document.id) },
@@ -125,7 +148,9 @@ fun CanvasNotesLayer(
                     onGroupDrag = onGroupDrag?.takeIf { selected },
                     onGroupDragEnd = onGroupDragEnd?.takeIf { selected },
                 ),
+                onFittedHeight = { height -> onFittedHeight(document.id, height) },
             )
+          }
         }
     }
 }
@@ -154,6 +179,7 @@ private fun CanvasNoteCard(
     eraseMode: Boolean = false,
     onErase: () -> Unit = {},
     onLiveFrame: (CanvasDocumentFrame?) -> Unit = {},
+    onFittedHeight: (Float?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val recorder = LocalCanvasDocumentRecorder.current
@@ -165,7 +191,8 @@ private fun CanvasNoteCard(
     // which reads as a bug rather than a scale.
     var resizeStartFrame by remember(document.id) { mutableStateOf<CanvasDocumentFrame?>(null) }
     LaunchedEffect(frame, gestureActive) { onLiveFrame(if (gestureActive) frame else null) }
-    LaunchedEffect(document.frame) {
+    // A frameless note's slot moves when the board's content does, so it is a key too.
+    LaunchedEffect(document.frame, defaultFrame) {
         if (!gestureActive) frame = document.frame ?: defaultFrame
     }
 
@@ -184,18 +211,50 @@ private fun CanvasNoteCard(
     } else {
         document.style
     }
-    val textModifier = if (isLabel) {
-        Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.xs)
-    } else {
-        Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs)
-    }
+    // One padding for what is drawn and what auto-fit measures, so the two cannot drift apart.
+    val textModifier = Modifier.fillMaxSize().padding(CanvasNoteChrome.bodyPadding(plain, isLabel))
     val cardColor = when {
         plain -> Color.Transparent
         else -> tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
     }
     val onCard = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurfaceVariant
+
+    // Auto-fit (letta-mobile-bglj6.11). The stored frame of an AUTO note is a booking; what the
+    // card is shown at is measured here, remembered per document, and never written back.
+    val sizing = noteSizing(document, isLabel)
+    var fit by remember(document.id) { mutableStateOf<NoteFit?>(null) }
+    // A person's move or resize of a fitted card takes it over at the size and type it was SHOWN
+    // at; until that op lands, the card stays at what the person left it at instead of refitting.
+    var gestureFitScale by remember(document.id) { mutableStateOf(1f) }
+    var userTook by remember(document.id) { mutableStateOf(false) }
+    LaunchedEffect(sizing) { if (sizing == NoteSizing.VERBATIM) userTook = false }
+    val fitting = sizing == NoteSizing.FIT && !gestureActive && !userTook
+    val shownFit = if (fitting) fit else null
+    val fitScale = when {
+        sizing != NoteSizing.FIT -> 1f
+        fitting -> shownFit?.fontScale ?: 1f
+        else -> gestureFitScale
+    }
+    val shownStyle = if (sizing == NoteSizing.FIT) CanvasNoteAutoFit.scaledStyle(textStyle, fitScale) else textStyle
+    LaunchedEffect(sizing, fit) { onFittedHeight(if (sizing == NoteSizing.FIT) fit?.height else null) }
+    // While it is typed into, the card keeps the type size it had and never gets shorter, so a
+    // deleted line or a type-size step never moves the text under the caret.
+    val activeFit = remember(document.id, active) { if (active) fit else null }
+    val storedFrame = document.frame ?: defaultFrame
+
     val widthDp = with(density) { frame.width.toDp() }
-    val heightDp = with(density) { frame.height.toDp() }
+    val heightDp = with(density) { (shownFit?.height ?: frame.height).toDp() }
+
+    /** A gesture on a fitted card starts from what is shown, not from the booking under it. */
+    fun beginGesture() {
+        if (!gestureActive && fitting) {
+            shownFit?.let {
+                frame = frame.copy(height = it.height)
+                gestureFitScale = it.fontScale
+            }
+        }
+        gestureActive = true
+    }
 
     // Drag deltas arrive in the card's own (unscaled) space because the scale is a graphics-layer
     // transform, so they are already world units.
@@ -205,7 +264,14 @@ private fun CanvasNoteCard(
         val started = resizeStartFrame
         resizeStartFrame = null
         // Scale the type by however much the box grew, height being what type is measured by.
-        val scaledStyle = computeScaledStyle(plain, started, committed, document.style)
+        // A fitted card set smaller to fit keeps that size once a person takes it over.
+        val fitStyle = if (sizing == NoteSizing.FIT && gestureFitScale != 1f) {
+            CanvasNoteAutoFit.scaledStyle(document.style, gestureFitScale)
+        } else {
+            null
+        }
+        val scaledStyle = computeScaledStyle(plain, started, committed, fitStyle ?: document.style) ?: fitStyle
+        if (sizing == NoteSizing.FIT && committed != document.frame) userTook = true
         scope.launch {
             recorder.recordingOrJust("moving a note") {
                 // One commit, not two. A frame op followed by a style op can half-succeed, leaving
@@ -265,11 +331,29 @@ private fun CanvasNoteCard(
                 transformOrigin = TransformOrigin(0f, 0f)
             },
     ) {
+    if (sizing == NoteSizing.FIT) {
+        // Measured at the STORED width and booking, not the live frame, so a drag never remeasures.
+        NoteFitMeasurer(
+            NoteFitRequest(
+                json = document.json,
+                style = textStyle,
+                onLightSurface = tint != null && !plain,
+                plain = plain,
+                width = storedFrame.width,
+                reserved = storedFrame.height,
+                fixedScale = activeFit?.fontScale,
+                minHeight = activeFit?.height ?: 0f,
+            ),
+        ) { measured -> if (fit != measured) fit = measured }
+    }
     Surface(
         modifier = Modifier
             .padding(chromeInset)
             .size(width = widthDp, height = heightDp)
-            .semantics { contentDescription = "Note ${document.id}" }
+            .semantics {
+                contentDescription = "Note ${document.id}"
+                if (sizing == NoteSizing.FIT) noteFontScale = fitScale
+            }
             // Taps and drags on the card belong to the note, never to the drawing beneath it; a
             // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
             // the active note.
@@ -316,7 +400,7 @@ private fun CanvasNoteCard(
                 title = document.title,
                 cardColor = cardColor,
                 onCard = onCard,
-                onDragStart = { if (groupDrag == null) gestureActive = true },
+                onDragStart = { if (groupDrag == null) beginGesture() },
                 onDrag = onMove,
                 onDragEnd = onMoveEnd,
                 onExpand = onExpand,
@@ -336,7 +420,7 @@ private fun CanvasNoteCard(
                     CanvasBlockPreview(
                         json = document.json,
                         onLightSurface = tint != null && !plain,
-                        style = textStyle,
+                        style = shownStyle,
                         modifier = textModifier,
                     )
                 } else {
@@ -347,7 +431,7 @@ private fun CanvasNoteCard(
                         active = active,
                         onLightSurface = tint != null && !plain,
                         onToolbar = onToolbar,
-                        style = textStyle,
+                        style = shownStyle,
                         centerVertically = isLabel,
                         modifier = textModifier,
                     )
@@ -355,7 +439,7 @@ private fun CanvasNoteCard(
                 if (plain && active && !isLabel) {
                     TextMoveGrip(
                         modifier = Modifier.align(Alignment.TopStart),
-                        onDragStart = { if (groupDrag == null) gestureActive = true },
+                        onDragStart = { if (groupDrag == null) beginGesture() },
                         onDrag = onMove,
                         onDragEnd = onMoveEnd,
                     )
@@ -373,8 +457,8 @@ private fun CanvasNoteCard(
                 contentWidth = widthDp,
                 contentHeight = heightDp,
                 onResize = { handle, delta ->
+                    beginGesture()
                     if (resizeStartFrame == null) resizeStartFrame = frame
-                    gestureActive = true
                     frame = frame.resizedBy(handle, delta)
                 },
                 onResizeEnd = ::commit,
@@ -479,12 +563,30 @@ private fun TextMoveGrip(
     }
 }
 
-/** Where the [index]th never-placed document lands: a stagger so several stay visible. */
-internal fun defaultNoteFrame(index: Int): CanvasDocumentFrame = CanvasDocumentFrame(
-    x = NOTE_DEFAULT_ORIGIN + index * NOTE_STAGGER,
-    y = NOTE_DEFAULT_ORIGIN + index * NOTE_STAGGER,
-    width = NOTE_DEFAULT_WIDTH,
-    height = NOTE_DEFAULT_HEIGHT,
+/**
+ * Where each never-placed (frameless) document of [documents] lands, by id: the shared placement
+ * engine's slots (`CanvasComposePlacement.placeFrameless`), laid out against [contentBounds] (the
+ * board's zoom-to-fit bounds, which agree with the engine's JSON reading of the same scene). The
+ * slots are deterministic over the scene, so every peer puts them in the same place, and they never
+ * overlap one another. Replaces the old stagger by list index, which stacked notes on each other.
+ */
+internal fun framelessFramesOf(
+    documents: List<CanvasSceneDocument>,
+    contentBounds: () -> androidx.compose.ui.geometry.Rect?,
+): Map<String, CanvasDocumentFrame> {
+    if (documents.none { it.frame == null }) return emptyMap()
+    val bounds = contentBounds()?.let { ComposeBounds(it.left, it.top, it.width, it.height) }
+    return CanvasComposePlacement.placeFrameless(documents, bounds).mapValues { (_, slot) ->
+        CanvasDocumentFrame(x = slot.x, y = slot.y, width = slot.width, height = slot.height)
+    }
+}
+
+/** A frameless document the placement has no slot for yet: the engine's empty-board origin. */
+internal fun framelessFallbackFrame(): CanvasDocumentFrame = CanvasDocumentFrame(
+    x = CanvasComposePlacement.ORIGIN,
+    y = CanvasComposePlacement.ORIGIN,
+    width = CanvasComposePlacement.FRAMELESS_WIDTH,
+    height = CanvasComposeReserve.MIN_RESERVE,
 )
 
 /**
@@ -533,7 +635,6 @@ internal const val NOTE_DEFAULT_WIDTH = 320f
 internal const val NOTE_DEFAULT_HEIGHT = 240f
 private const val TEXT_DEFAULT_WIDTH = 360f
 private const val TEXT_DEFAULT_HEIGHT = 120f
-private const val NOTE_DEFAULT_ORIGIN = 80f
 // Far enough that the note underneath keeps its first line clear of the new note's corner handle,
 // whose grab area is a shape handle's (see canvasSelectionStyle), not just the handle drawn.
 private const val NOTE_STAGGER = 64f

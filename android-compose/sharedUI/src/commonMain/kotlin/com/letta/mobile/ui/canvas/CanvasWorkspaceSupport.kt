@@ -239,7 +239,9 @@ internal object CanvasWorkspaceSupport {
     ): Boolean {
         if (activeNoteId == null || session == null) return false
         val note = documents.firstOrNull { it.id == activeNoteId } ?: return false
-        val baseFrame = note.frame ?: defaultNoteFrame(0)
+        val baseFrame = note.frame
+            ?: framelessFramesOf(documents) { CanvasViewportFit.contentBounds(emptyList(), documents) }[note.id]
+            ?: framelessFallbackFrame()
         val frame = baseFrame.copy(x = baseFrame.x + DUPLICATE_OFFSET, y = baseFrame.y + DUPLICATE_OFFSET)
         val id = "${note.id.substringBefore('-')}-${Clock.System.now().toEpochMilliseconds()}"
         onCreated(id, note, frame, session)
@@ -263,13 +265,20 @@ internal object CanvasWorkspaceSupport {
             rect.overlaps(Rect(f.x, f.y, f.x + f.width, f.y + f.height))
         }.map { it.id }.toSet()
 
+    /**
+     * Each selected note's frame moved by [offset]. A note shown auto-fitted lands at the height it
+     * was shown at ([shownHeights]), not the booking under it: the move makes it the person's.
+     */
     fun buildMoveFrames(
         documents: List<CanvasSceneDocument>,
         selectedIds: Set<String>,
         offset: Offset,
+        shownHeights: Map<String, Float> = emptyMap(),
     ): Map<String, CanvasDocumentFrame> =
         documents.filter { it.id in selectedIds }.mapNotNull { doc ->
-            doc.frame?.let { doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y) }
+            doc.frame?.let {
+                doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y, height = shownHeights[doc.id] ?: it.height)
+            }
         }.toMap()
 
     fun isPointInsideBounds(point: Offset, bounds: Rect): Boolean =

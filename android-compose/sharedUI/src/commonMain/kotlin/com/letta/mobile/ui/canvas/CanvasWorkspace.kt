@@ -155,6 +155,9 @@ fun CanvasWorkspace(
     // snapping worked on every drawn shape and on no note: shapes are read fresh from
     // controller.state, notes came from a list captured before they existed.
     val liveDocuments by rememberUpdatedState(documents)
+    // The height each auto-fitted note is SHOWN at (never stored; letta-mobile-bglj6.11). Read only
+    // when a group move commits, so it is a plain map and its updates recompose nothing.
+    val fittedNoteHeights = remember { HashMap<String, Float>() }
     val coroutineScope = rememberCoroutineScope()
 
     var statusMessage by remember { mutableStateOf("Ready") }
@@ -657,7 +660,7 @@ fun CanvasWorkspace(
         val offset = groupOffset
         groupOffset = Offset.Zero
         if (session == null || offset == Offset.Zero || selectedNoteIds.isEmpty()) return
-        val frames = CanvasWorkspaceSupport.buildMoveFrames(documents, selectedNoteIds, offset)
+        val frames = CanvasWorkspaceSupport.buildMoveFrames(documents, selectedNoteIds, offset, fittedNoteHeights)
         coroutineScope.launch {
             recordingDocuments("moving notes") { runCatching { session.moveDocuments(frames) } }
         }
@@ -1183,8 +1186,16 @@ fun CanvasWorkspace(
 
             // Block documents live on the board as note cards, in world coordinates.
             if (session != null && documents.isNotEmpty()) {
+                // A frameless note's slot comes from the shared placement engine, laid out against
+                // the same bounds zoom-to-fit uses (letta-mobile-bglj6.11). Only worked out when
+                // there is a frameless note at all.
+                val framelessFrames = remember(documents, state.elements) {
+                    framelessFramesOf(documents) { CanvasViewportFit.contentBounds(state.elements, documents) }
+                }
                 CanvasNotesLayer(
                     onLiveFrame = { id, frame -> if (frame == null) liveNoteFrames.remove(id) else liveNoteFrames[id] = frame },
+                    framelessFrames = framelessFrames,
+                    onFittedHeight = { id, height -> if (height == null) fittedNoteHeights.remove(id) else fittedNoteHeights[id] = height },
                     session = session,
                     documents = documents,
                     viewport = state.viewport,
