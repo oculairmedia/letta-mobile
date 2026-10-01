@@ -45,10 +45,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
@@ -90,6 +93,7 @@ import com.letta.mobile.ui.theme.ChatHeadDimens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -148,7 +152,10 @@ internal fun TouchDockLayer(
                     val f = fraction()
                     if (f <= 0f) return@drawBehind
                     val top = (size.height - bar.heightPx) * (1f - f)
-                    drawRect(lerp(from, to, f), topLeft = Offset(0f, top), size = Size(size.width, size.height - top))
+                    // The bar's rounded top, squaring off as it reaches the page's top edge.
+                    val corner = CornerRadius(TouchComposerDimens.restingCorner.toPx() * (1f - f))
+                    val surface = RoundRect(Rect(0f, top, size.width, size.height), topLeft = corner, topRight = corner)
+                    drawPath(Path().apply { addRoundRect(surface) }, lerp(from, to, f))
                 },
             )
         }
@@ -471,6 +478,7 @@ private const val HALF = 0.5f
 private const val HEAD_FADE_SPEED = 2f
 
 internal const val TOUCH_DOCK_TAG = "chat-touch-dock"
+internal const val TOUCH_CANVAS_TAG = "chat-touch-canvas"
 internal const val TOUCH_HEAD_TAG = "chat-touch-head"
 internal const val TOUCH_POPUP_TAG = "chat-touch-popup"
 internal const val TOUCH_POPUP_DISMISS_TAG = "chat-touch-popup-dismiss"

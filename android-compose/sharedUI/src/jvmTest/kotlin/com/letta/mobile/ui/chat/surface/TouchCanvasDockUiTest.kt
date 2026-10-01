@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -34,6 +35,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.mascot.FakeMascotHost
 import com.letta.mobile.ui.mascot.FakeMascotShell
+import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -243,7 +245,45 @@ class TouchCanvasDockUiTest {
         onAllNodesWithTag(ComposerTestTags.HINT).assertCountEquals(0)
     }
 
+    @Test
+    fun theCanvasBarIsThePagesBarAndTheBoardRunsUnderItsCorners() = runComposeUiTest {
+        val port = Port()
+        port.composer.value = port.composer.value.copy(text = "Make the island longer")
+        var presentation by mutableStateOf(ChatSurfacePresentation.CanvasFirst)
+        setContent {
+            MaterialTheme {
+                ChatSurface(
+                    port = port,
+                    presentation = presentation,
+                    onIntent = {},
+                    host = ChatSurfaceHost(openCanvas = {}),
+                    modifier = Modifier.fillMaxSize(),
+                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                    platform = ChatSurfacePlatform(showKeyboardHints = false),
+                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                )
+            }
+        }
+        waitForIdle()
+        val root = onRoot().getBoundsInRoot()
+        val canvasBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
+        val board = onNodeWithTag(TOUCH_CANVAS_TAG).getBoundsInRoot()
+        // Flush with the screen's foot, and the board behind its rounded top rather than ending on it.
+        assertEquals(root.bottom, canvasBar.bottom)
+        assertEquals((canvasBar.top + TouchComposerDimens.cornerReach).value, board.bottom.value, DP_TOLERANCE)
+
+        presentation = ChatSurfacePresentation.ChatFirst
+        waitForIdle()
+        onAllNodesWithTag(ComposerTestTags.TOUCH_BAR).assertCountEquals(1)
+        val pageBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
+        // One bar in both modes: the same container, the same size for the same draft.
+        assertEquals(canvasBar.left to canvasBar.right, pageBar.left to pageBar.right)
+        assertEquals((canvasBar.bottom - canvasBar.top).value, (pageBar.bottom - pageBar.top).value, DP_TOLERANCE)
+        assertEquals(root.bottom, pageBar.bottom)
+    }
+
     private companion object {
+        const val DP_TOLERANCE = 0.5f
         const val DRAG_PX = 700f
         const val NUDGE_PX = 40f
         const val SETTLE_MILLIS = 2_000L

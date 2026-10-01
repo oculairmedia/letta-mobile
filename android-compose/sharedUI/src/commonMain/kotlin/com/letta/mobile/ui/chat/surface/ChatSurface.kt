@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import com.letta.mobile.ui.chat.session.ChatDockRect
 import androidx.compose.foundation.lazy.LazyListState
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.TouchComposerDimens
+import com.letta.mobile.ui.canvas.LocalCanvasChromeBottomInset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -283,12 +285,17 @@ private fun TouchCanvasWithChat(
     val density = LocalDensity.current
     Box(Modifier.fillMaxSize()) {
         if (canvas != null) {
-            // Laid out above the bar, so the canvas's own bottom tool bar sits on top of it, never
-            // under it; the bar's height is consumed from the canvas's insets so it does not pad twice.
+            // Laid out above the bar but for its rounded top, which the board runs on under so the
+            // bar's corners show the board, as on the full page they show the page. The bar is the
+            // canvas's bottom chrome, so its own foot (its tool bar) keeps above the whole bar; the
+            // part the canvas is laid out above is consumed from its insets so it does not pad twice.
             val barDp = with(density) { bar.heightPx.toDp() }
-            val clear = PaddingValues(bottom = barDp)
-            val canvasModifier = Modifier.fillMaxSize().padding(clear).consumeWindowInsets(clear)
-            Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
+            val reach = minOf(TouchComposerDimens.cornerReach, barDp)
+            val clear = PaddingValues(bottom = barDp - reach)
+            val canvasModifier = Modifier.fillMaxSize().padding(clear).consumeWindowInsets(clear).testTag(TOUCH_CANVAS_TAG)
+            Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) {
+                CompositionLocalProvider(LocalCanvasChromeBottomInset provides barDp) { canvas() }
+            }
         }
         MorphBackdrop(fraction)
         if (showBar) {
