@@ -77,6 +77,9 @@ import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
+import com.letta.mobile.ui.mascot.mascotAvailable
+import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
+import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -100,8 +103,6 @@ internal class CollapsedDockContent(
     val editAgent: (() -> Unit)?,
     /** The newest turn as the bubble tells it. */
     val turn: @Composable () -> CollapsedTurn,
-    /** The prompt bar, without a companion of its own: the mascot here is the companion. */
-    val composer: @Composable () -> Unit,
 )
 
 /** The newest turn as the collapsed dock tells it: the reply so far and what the run is doing. */
@@ -178,12 +179,20 @@ internal fun rememberCollapsedTurn(params: DockedReplyParams): CollapsedTurn {
 }
 
 /**
- * The minimised dock: the mascot (the window's [MascotStage.COMPOSER_COMPANION] seat, so the
- * agent pane can still fly the character away and back) with its bubble, over the prompt bar.
- * Dragging the mascot or the bubble moves the dock; the area around them stays the canvas's.
+ * The minimised dock above its prompt bar: the mascot (the window's
+ * [MascotStage.COMPOSER_COMPANION] seat, so the agent pane can still fly the character away and
+ * back) with its bubble. The bar itself is the panel's ([DockedChatPanel] keeps it in place
+ * across the fold). Dragging the mascot or the bubble moves the dock; the area around them stays
+ * the canvas's.
  */
 @Composable
-internal fun CollapsedDock(state: ChatDockState, content: CollapsedDockContent, modifier: Modifier = Modifier) {
+internal fun CollapsedDock(
+    state: ChatDockState,
+    content: CollapsedDockContent,
+    modifier: Modifier = Modifier,
+    /** False while the dock opens back into the panel: the companion is on its way to the bar. */
+    seated: Boolean = true,
+) {
     val turn = content.turn()
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
@@ -194,7 +203,7 @@ internal fun CollapsedDock(state: ChatDockState, content: CollapsedDockContent, 
                 Modifier.padding(end = LettaDimens.Control.iconButtonLg + LettaDimens.Space.sm),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                CollapsedMascot(state, content)
+                CollapsedMascot(state, content, seated)
                 val beside = Modifier
                     .offset(x = -ChatSurfaceDimens.collapsedBubbleTuck)
                     .padding(bottom = ChatSurfaceDimens.collapsedBubbleLift)
@@ -213,13 +222,12 @@ internal fun CollapsedDock(state: ChatDockState, content: CollapsedDockContent, 
             }
             RestoreButton(state, Modifier.align(Alignment.BottomEnd))
         }
-        content.composer()
     }
 }
 
 /** The agent itself: its mascot, or a sphere for an agent without one. Tap opens the agent pane. */
 @Composable
-private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent) {
+private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent, seated: Boolean) {
     Box(
         Modifier
             .size(ChatMascotDimens.composerCompanion)
@@ -228,20 +236,33 @@ private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent)
             .testTag(DOCK_COLLAPSED_MASCOT_TAG),
         contentAlignment = Alignment.Center,
     ) {
-        MascotSeat(
-            agentId = content.agentId,
-            stage = MascotStage.COMPOSER_COMPANION,
-            size = ChatMascotDimens.composerCompanion,
-            onClick = content.openAgent,
-            onEdit = content.editAgent,
-        ) { vacancy ->
-            if (vacancy == MascotSeatVacancy.NO_MASCOT) {
-                val open = content.openAgent
-                AgentSphere(
-                    size = ChatMascotDimens.collapsedFallbackSphere,
-                    modifier = if (open != null) Modifier.clip(CircleShape).clickable(onClick = open) else Modifier,
-                )
-            }
+        // On the chat page the page's one companion seat stands here (it glides over from the
+        // bar's slot as the dock folds); this spot only tells it where.
+        val anchors = LocalCompanionSeatAnchors.current
+        if (anchors != null && mascotAvailable(content.agentId)) {
+            if (seated) CompanionSeatAnchor(anchors)
+        } else {
+            CollapsedOwnSeat(content)
+        }
+    }
+}
+
+/** Off the chat page, or for an agent without a mascot: a seat of its own, with the sphere stand-in. */
+@Composable
+private fun CollapsedOwnSeat(content: CollapsedDockContent) {
+    MascotSeat(
+        agentId = content.agentId,
+        stage = MascotStage.COMPOSER_COMPANION,
+        size = ChatMascotDimens.composerCompanion,
+        onClick = content.openAgent,
+        onEdit = content.editAgent,
+    ) { vacancy ->
+        if (vacancy == MascotSeatVacancy.NO_MASCOT) {
+            val open = content.openAgent
+            AgentSphere(
+                size = ChatMascotDimens.collapsedFallbackSphere,
+                modifier = if (open != null) Modifier.clip(CircleShape).clickable(onClick = open) else Modifier,
+            )
         }
     }
 }

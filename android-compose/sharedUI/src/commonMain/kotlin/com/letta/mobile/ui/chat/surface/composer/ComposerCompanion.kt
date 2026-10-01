@@ -47,14 +47,11 @@ internal val LocalComposerCompanion = staticCompositionLocalOf { true }
  */
 @Composable
 internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () -> Unit) {
-    if (!LocalComposerCompanion.current) {
-        content()
-        return
-    }
     val agentId = model.uiState.agentId
-    val available = mascotAvailable(agentId)
-    val present = available && agentId != null &&
-        LocalMascotTransport.current.activeStage(agentId) == MascotStage.COMPOSER_COMPANION
+    // One structure whether or not the companion sits here: the minimised dock turns it off and
+    // restoring turns it back on, and [content] (the prompt field) must stay the same instance.
+    val available = LocalComposerCompanion.current && agentId != null && mascotAvailable(agentId)
+    val present = available && LocalMascotTransport.current.activeStage(agentId!!) == MascotStage.COMPOSER_COMPANION
     val slot by animateDpAsState(
         targetValue = if (present) ChatMascotDimens.composerCompanionSlot else 0.dp,
         label = "composerCompanionSlot",
@@ -64,23 +61,35 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
         modifier = Modifier.widthIn(max = ChatColumnMaxWidth + slot).fillMaxWidth(),
         verticalAlignment = Alignment.Bottom,
     ) {
-        if (available && agentId != null) {
+        // Kept while it closes, so the bar widens smoothly when the companion leaves the row.
+        if (available || slot > 0.dp) {
             // Composed even while the slot is closed: the seat must stay declared for the
             // character to come back to it.
             Box(
                 Modifier.testTag(ComposerCompanionTags.SLOT).width(slot).padding(end = LettaDimens.Space.lg),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                MascotSeat(
-                    agentId = agentId,
-                    stage = MascotStage.COMPOSER_COMPANION,
-                    size = ChatMascotDimens.composerCompanion,
-                    onClick = model.host.openAgentPane,
-                    onEdit = model.host.editAgent,
-                    empty = {},
-                )
+                if (available) CompanionSeatHere(agentId!!, model)
             }
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) { content() }
+    }
+}
+
+/** On a chat page, a spot the page's one seat stands over; elsewhere, a seat of its own. */
+@Composable
+private fun CompanionSeatHere(agentId: String, model: ComposerModel) {
+    val anchors = LocalCompanionSeatAnchors.current
+    if (anchors != null) {
+        CompanionSeatAnchor(anchors)
+    } else {
+        MascotSeat(
+            agentId = agentId,
+            stage = MascotStage.COMPOSER_COMPANION,
+            size = ChatMascotDimens.composerCompanion,
+            onClick = model.host.openAgentPane,
+            onEdit = model.host.editAgent,
+            empty = {},
+        )
     }
 }

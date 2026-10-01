@@ -19,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -27,7 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -36,7 +35,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.session.ChatDockRect
 import com.letta.mobile.ui.theme.ChatMotionTokens
-import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.abs
@@ -44,12 +42,19 @@ import kotlin.math.roundToInt
 
 /*
  * letta-mobile-bglj6.1: the docked panel grows into the full-screen page, and shrinks back, as
- * one continuous transform instead of a jump. One progress (0 docked .. 1 full screen) drives a
- * single container: its rect goes from the panel's bounds to the whole area, its corners square
- * off, its shadow drops away and its fill turns from the panel's surface into the page
- * background, which also fades in over the canvas. Inside it the panel's own content fades out
- * as the page's fades in. At rest nothing of this is composed: the docked panel and the page
- * draw exactly as they always did.
+ * one continuous transform instead of a jump. One progress (0 docked .. 1 full screen) drives
+ * both layers of the page: the docked panel's rect goes from its own bounds to the whole area,
+ * its corners square off, its shadow drops away and its fill turns into the page background,
+ * which also fades in over the canvas; the page layer follows the same rect and fades in over
+ * the panel's content as that fades out.
+ *
+ * Each layer is composed at ONE place for as long as it is on screen, at rest and in motion
+ * alike. The old version swapped the resting panel and page for a separate morph layer at the
+ * start and end of every transition, so the panel's conversation, the composer, the mascot seat
+ * and the timeline were disposed and composed again on the frames the person was looking at:
+ * markdown came back blank for a frame, the mascot vanished, the companion slot closed and
+ * reopened. Now the panel stays composed until it has faded out (the page covers it), and the
+ * page from the moment it starts fading in.
  */
 
 /** Which of the three things the canvas page draws over its canvas right now. */
@@ -94,90 +99,83 @@ internal fun surfaceMorphPhase(progress: Animatable<Float, AnimationVector1D>, f
 
 private fun morphTarget(fullScreen: Boolean): Float = if (fullScreen) 1f else 0f
 
-/** What the morph cross-fades: the docked panel's inside and the full page's. */
+/**
+ * The morph as the layers read it. [fraction] is read at layout and draw time only, so a frame
+ * of the morph relayouts and redraws without recomposing; [morphing] changes at the two ends.
+ */
 @Immutable
-internal class SurfaceMorphContent(
-    val docked: @Composable () -> Unit,
-    val page: @Composable () -> Unit,
-)
+internal class SurfaceMorph(val fraction: () -> Float, val morphing: Boolean) {
+    companion object {
+        /** At rest in the docked mode: the panel is just the panel. */
+        val Docked = SurfaceMorph(fraction = { 0f }, morphing = false)
+    }
+}
+
+/** The panel's rect at [fraction] of the way from [from] to the whole [widthDp] x [heightDp] area. */
+internal fun morphRect(from: ChatDockRect, widthDp: Float, heightDp: Float, fraction: Float): ChatDockRect =
+    if (fraction <= 0f) from else lerpRect(from, ChatDockRect(0f, 0f, widthDp, heightDp), fraction)
+
+/** The page background fading in over the canvas; opaque once the page is up. */
+@Composable
+internal fun MorphBackdrop(fraction: () -> Float, modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.background
+    Box(modifier.fillMaxSize().drawBehind { drawRect(color, alpha = fraction()) })
+}
 
 /**
- * The transform itself, over the whole area. It starts from (or lands on) the rect [dock]
- * places the panel at, so the hand-off to the panel at rest does not move a pixel. Hidden from
- * accessibility: it is only ever on screen for a moment.
+ * The full-screen page's layer over the canvas: the whole area at rest; while the morph runs it
+ * follows the panel's rect (from where [dock] places it), clipped to its rounding, and fades in
+ * over the panel's content. It takes every touch inside it, as the opaque page always did.
+ * Hidden from accessibility while it is on its way.
  */
 @Composable
-internal fun SurfaceMorphLayer(
-    progress: Animatable<Float, AnimationVector1D>,
+internal fun MorphPageLayer(
     dock: ChatDockState,
-    content: SurfaceMorphContent,
+    morph: SurfaceMorph,
     modifier: Modifier = Modifier,
-    fromPanel: Boolean = true,
+    content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     // The panel rises above the keyboard (DockedChatPanel pads for it); the page does not.
     val imeDp = with(density) { WindowInsets.ime.getBottom(density).toDp().value }
-    val fraction = { progress.value }
-    // Plain layout, no BoxWithConstraints: the page's effects must not start mid-measure.
-    Box(modifier.fillMaxSize()) {
-        MorphBackdrop(fraction)
-        MorphContainer(MorphGeometry(dock, imeDp, fraction), fromPanel) { MorphCrossFade(fraction, content) }
-    }
-}
-
-/** Where the container is at the current progress, resolved against the area at layout time. */
-private class MorphGeometry(val dock: ChatDockState, val imeDp: Float, val fraction: () -> Float) {
-    fun rectIn(widthDp: Float, heightDp: Float): ChatDockRect {
-        val from = dock.rectIn(widthDp, (heightDp - imeDp).coerceAtLeast(0f))
-        val to = ChatDockRect(0f, 0f, widthDp, heightDp)
-        return lerpRect(from, to, fraction())
-    }
-}
-
-/** The page background fading in over the canvas. */
-@Composable
-private fun MorphBackdrop(fraction: () -> Float) {
-    val color = MaterialTheme.colorScheme.background
-    Box(Modifier.fillMaxSize().drawBehind { drawRect(color, alpha = fraction()) })
-}
-
-/**
- * [fromPanel] false: the docked end has no panel (the collapsed dock floats on the canvas), so
- * the container starts clear, with no shadow or hairline, and only the page fills in.
- */
-@Composable
-private fun MorphContainer(geometry: MorphGeometry, fromPanel: Boolean, content: @Composable () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val page = scheme.background
-    val panel = scheme.surfaceContainer
-    val outline = scheme.outlineVariant
-    val fraction = geometry.fraction
+    val fraction = morph.fraction
     Box(
-        Modifier
-            .morphBounds(geometry)
-            .testTag(SURFACE_MORPH_TAG)
+        modifier
+            .fillMaxSize()
+            .layout { measurable, constraints ->
+                val widthDp = constraints.maxWidth.toDp().value
+                val heightDp = constraints.maxHeight.toDp().value
+                val from = dock.rectIn(widthDp, (heightDp - imeDp).coerceAtLeast(0f))
+                val rect = lerpRect(from, ChatDockRect(0f, 0f, widthDp, heightDp), fraction())
+                val placeable = measurable.measure(
+                    Constraints.fixed(rect.width.dp.roundToPx().coerceAtLeast(0), rect.height.dp.roundToPx().coerceAtLeast(0)),
+                )
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    placeable.place(rect.left.dp.roundToPx(), rect.top.dp.roundToPx())
+                }
+            }
+            .then(if (morph.morphing) Modifier.testTag(SURFACE_MORPH_TAG) else Modifier)
             .graphicsLayer {
-                val rest = 1f - fraction()
-                // Neutral fill plus shadow, as the panel at rest: no tonal elevation tint.
-                shadowElevation = if (fromPanel) ChatSurfaceDimens.dockedReplyElevation.toPx() * rest else 0f
-                shape = RoundedCornerShape(LettaDimens.Radius.lg.toPx() * rest)
+                shape = RoundedCornerShape(LettaDimens.Radius.lg.toPx() * (1f - fraction()))
                 clip = true
             }
-            .drawBehind {
-                if (fromPanel) drawRect(lerp(panel, page, fraction())) else drawRect(page, alpha = fraction())
-            }
-            .drawWithContent {
-                drawContent()
-                if (fromPanel) drawFadingHairline(outline, 1f - fraction())
-            },
+            // Like the opaque Surface it replaces: nothing under the page takes a touch.
+            .pointerInput(Unit) {},
     ) {
-        CompositionLocalProvider(LocalContentColor provides scheme.onSurface) { content() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = morphPageAlpha(fraction()) }
+                .then(if (morph.morphing) Modifier.clearAndSetSemantics { } else Modifier),
+        ) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) { content() }
+        }
     }
 }
 
-/** The panel's hairline border, fading out as the corners square off. */
-private fun DrawScope.drawFadingHairline(color: Color, rest: Float) {
-    if (rest <= 0f) return
+/** The panel's hairline border, fading out (by [fade]) as the corners square off (by [rest]). */
+internal fun DrawScope.drawFadingHairline(color: Color, rest: Float, fade: Float = rest) {
+    if (rest <= 0f || fade <= 0f) return
     val stroke = LettaDimens.Stroke.hairline.toPx()
     val radius = LettaDimens.Radius.lg.toPx() * rest
     drawRoundRect(
@@ -185,18 +183,9 @@ private fun DrawScope.drawFadingHairline(color: Color, rest: Float) {
         topLeft = Offset(stroke / 2f, stroke / 2f),
         size = Size(size.width - stroke, size.height - stroke),
         cornerRadius = CornerRadius(radius),
-        alpha = LettaDimens.Alpha.hairline * rest,
+        alpha = LettaDimens.Alpha.hairline * fade,
         style = Stroke(stroke),
     )
-}
-
-/** Panel content out, page content in; they overlap in the middle so nothing pops. */
-@Composable
-private fun MorphCrossFade(fraction: () -> Float, content: SurfaceMorphContent) {
-    Box(Modifier.fillMaxSize().clearAndSetSemantics { }) {
-        Box(Modifier.fillMaxSize().graphicsLayer { alpha = morphDockedAlpha(fraction()) }) { content.docked() }
-        Box(Modifier.fillMaxSize().graphicsLayer { alpha = morphPageAlpha(fraction()) }) { content.page() }
-    }
 }
 
 internal fun morphDockedAlpha(fraction: Float): Float =
@@ -205,21 +194,6 @@ internal fun morphDockedAlpha(fraction: Float): Float =
 internal fun morphPageAlpha(fraction: Float): Float {
     val share = ChatMotionTokens.SurfaceMorph.CROSSFADE_FRACTION
     return ((fraction - (1f - share)) / share).coerceIn(0f, 1f)
-}
-
-/**
- * Takes the whole area its parent offers and places the container inside it at the current
- * rect. Modifiers after this one (the tag, the shape, the fill) see only the morphing rect.
- * Reads the progress at layout time, so a frame relayouts without recomposing.
- */
-private fun Modifier.morphBounds(geometry: MorphGeometry): Modifier = layout { measurable, constraints ->
-    val rect = geometry.rectIn(constraints.maxWidth.toDp().value, constraints.maxHeight.toDp().value)
-    val width = rect.width.dp.roundToPx().coerceAtLeast(0)
-    val height = rect.height.dp.roundToPx().coerceAtLeast(0)
-    val placeable = measurable.measure(Constraints.fixed(width, height))
-    layout(constraints.maxWidth, constraints.maxHeight) {
-        placeable.place(rect.left.dp.roundToPx(), rect.top.dp.roundToPx())
-    }
 }
 
 internal fun lerpRect(from: ChatDockRect, to: ChatDockRect, fraction: Float): ChatDockRect = ChatDockRect(
