@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import org.automerge.repo.DocumentId
 
@@ -11,7 +12,10 @@ import org.automerge.repo.DocumentId
  * [Dispatchers.IO]: callers on the UI thread (a remote op landing on an open board) otherwise
  * stalled rendering for the whole read. Lookups match on the canvas metadata alone and decode only
  * the board they return. */
-class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) : CanvasDocumentStore, CanvasDeletedElementStore {
+class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
+    CanvasDocumentStore, CanvasDeletedElementStore, CanvasStorageHealth {
+    override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = notebooks.storageFaults
+
     private suspend fun <T> locked(action: () -> T): T = withContext(Dispatchers.IO) { notebooks.withCanvasLock(action) }
 
     /** The notebook holding the first canvas whose metadata matches; boards are not decoded. */

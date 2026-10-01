@@ -13,10 +13,9 @@ import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -31,10 +30,17 @@ import org.automerge.repo.DocumentId
 import org.automerge.repo.PeerId
 import org.automerge.repo.Repo
 import org.automerge.repo.RepoConfig
+import org.automerge.repo.Storage
 import org.automerge.repo.storage.FileSystemStorage
 
 /** One peer's durable notebook documents, independent of App Server conversations. */
-class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
+class NotebookLocalStore(
+    directory: Path,
+    peerId: String,
+    budget: NotebookHistoryBudget = NotebookHistoryBudget(),
+    /** Wraps the repository's file storage; tests use it to inject failures. */
+    storage: (Storage) -> Storage = { it },
+) : AutoCloseable, CanvasStorageHealth {
     @Serializable
     private data class DocumentIndex(val ids: List<String>)
 
@@ -63,7 +69,7 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
 
     /** Indexed notebooks include local creations and explicitly registered remote documents. */
     @Synchronized
-    fun listDocuments(): List<DocumentId> = readIndex().map { key ->
+    fun listDocuments(): List<DocumentId> = health.awaitPrepared().let { readIndex() }.filterNot(health::isQuarantined).map { key ->
         DocumentId.fromBytes(key.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
     }
 
@@ -162,8 +168,8 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
                 if (previous != expected.markdown) return@withDocument false
                 if (currentTitle != expected.title) return@withDocument false
                 if (currentBoard != expected.sceneJson) return@withDocument false
-                tx.spliceText(textId, 0, previous.length.toLong(), content.markdown)
-                tx.set(ObjectId.ROOT, "title", content.title)
+                if (previous != content.markdown) tx.spliceText(textId, 0, previous.length.toLong(), content.markdown)
+                NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "title", content.title)
                 writeBoard(tx, content.board)
                 tx.commit()
                 true
@@ -171,9 +177,21 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
 
+    private val health = NotebookStorageHealth(directory, budget) { readIndex() }
+
+    /** Storage faults: logged at ERROR and kept here for the board to show. Nothing is thrown. */
+    val faults: NotebookStorageFaults get() = health.faults
+    override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = health.faults.faults
+
+    init {
+        // An over-budget document is archived and restarted (on a background thread) before the
+        // repository may open it, and one that cannot be is set aside, so it never loads either.
+        health.prepare()
+    }
+
     val repo: Repo = Repo.load(
         RepoConfig.builder()
-            .storage(FileSystemStorage(directory))
+            .storage(health.observe(storage(FileSystemStorage(directory))))
             .peerId(PeerId.fromString(peerId))
             .build(),
     )
@@ -188,7 +206,7 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
                 tx.set(ObjectId.ROOT, "initialTitle", title)
                 tx.set(ObjectId.ROOT, "markdown", ObjectType.TEXT)
                 tx.set(ObjectId.ROOT, "boardVersion", 1)
-                tx.set(ObjectId.ROOT, "board", "{\"schema\":\"notebook-board/1\",\"elements\":[]}")
+                tx.set(ObjectId.ROOT, "board", NotebookBoardStorage.EMPTY_BOARD)
                 tx.set(ObjectId.ROOT, "boardElements", ObjectType.MAP)
                 tx.set(ObjectId.ROOT, "boardTombstones", ObjectType.MAP)
                 tx.set(ObjectId.ROOT, "items", ObjectType.MAP)
@@ -199,8 +217,13 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         return handle.documentId
     }
 
-    fun open(id: DocumentId): DocHandle? =
-        repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
+    fun open(id: DocumentId): DocHandle? {
+        health.awaitPrepared()
+        if (health.isQuarantined(id.stableKey())) return null
+        return repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
+    }
+
+    private fun remember(id: DocumentId, doc: CanvasDocument) = health.rememberCanvas(id.stableKey(), doc.id)
 
     private fun checkAlreadyImported(
         tx: Transaction,
@@ -230,8 +253,7 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         if (tx.text(textId).orElseThrow().isNotEmpty()) return false
         val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
         if (tx.keys(itemsId).orElseThrow().isNotEmpty()) return false
-        val currentBoard = (tx.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
-        return currentBoard == "{\"schema\":\"notebook-board/1\",\"elements\":[]}"
+        return NotebookBoardStorage.isPristine(tx)
     }
 
     /** Claim a pristine, caller-selected notebook; never infer its ID from the canvas ID. */
@@ -267,110 +289,28 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
     fun putBoardElement(id: DocumentId, element: JsonObject) {
         val key = (element["id"] as? JsonPrimitive)?.content
         require(!key.isNullOrBlank()) { "Board element needs a stable id" }
-        val handle = requireNotNull(open(id))
-        handle.withDocument { document ->
-            document.startTransaction().use { tx ->
-                val elements = boardElements(tx)
-                val existing = (tx.get(elements, key).orElse(null) as? AmValue.Map)?.id
-                    ?: tx.set(elements, key, ObjectType.MAP)
-                for (field in tx.keys(existing).orElseThrow()) {
-                    if (field !in element) tx.delete(existing, field)
-                }
-                element.forEach { (field, value) -> tx.set(existing, field, value.toString()) }
-                val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)
-                if (tombstones != null && tx.get(tombstones.id, key).isPresent) tx.delete(tombstones.id, key)
-                tx.commit()
-            }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        mutate(id) { tx -> NotebookBoardStorage.putElement(tx, key, element) }
     }
 
     fun removeBoardElement(id: DocumentId, elementId: String) {
         require(elementId.isNotBlank())
-        requireNotNull(open(id)).withDocument { document ->
-            document.startTransaction().use { tx ->
-                val elements = boardElements(tx)
-                if (tx.get(elements, elementId).isPresent) tx.delete(elements, elementId)
-                val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)
-                val tombstoneId = tombstones?.id ?: tx.set(ObjectId.ROOT, "boardTombstones", ObjectType.MAP)
-                tx.set(tombstoneId, elementId, true)
-                tx.commit()
-            }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        mutate(id) { tx -> NotebookBoardStorage.deleteElement(tx, elementId) }
     }
 
     internal fun deletedBoardElements(id: DocumentId): List<CanvasDeletedElement> =
         requireNotNull(open(id)).withDocument { document ->
-            val snapshots = (document.get(ObjectId.ROOT, "boardDeletedElements").orElse(null) as? AmValue.Map)
-                ?: return@withDocument emptyList()
-            val live = Json.parseToJsonElement(boardFrom(document)).jsonObject["elements"] as? JsonArray
-            val liveIds = live.orEmpty().mapNotNull { (it as? JsonObject)?.get("id")?.jsonPrimitive?.content }.toSet()
-            document.keys(snapshots.id).orElseThrow().mapNotNull { key ->
-                if (key in liveIds) null else (document.get(snapshots.id, key).orElse(null) as? AmValue.Str)?.value?.let {
-                    CanvasDeletedElement(key, it)
-                }
-            }
+            NotebookBoardStorage.deletedElements(document)
         }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
-    private fun deletedElements(tx: Transaction): ObjectId =
-        (tx.get(ObjectId.ROOT, "boardDeletedElements").orElse(null) as? AmValue.Map)?.id
-            ?: tx.set(ObjectId.ROOT, "boardDeletedElements", ObjectType.MAP)
+    private fun writeBoard(tx: Transaction, boardJson: String) =
+        NotebookBoardStorage.writeBoard(tx, Json.parseToJsonElement(boardJson).jsonObject)
 
-    private fun boardElements(tx: Transaction): ObjectId =
-        (tx.get(ObjectId.ROOT, "boardElements").orElse(null) as? AmValue.Map)?.id
-            ?: tx.set(ObjectId.ROOT, "boardElements", ObjectType.MAP)
-
-    private fun parseIncomingElements(root: JsonObject): Map<String, JsonObject> =
-        (root["elements"] as? JsonArray).orEmpty().mapNotNull { value ->
-            (value as? JsonObject)?.let { obj ->
-                (obj["id"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }?.let { it to obj }
-            }
-        }.toMap()
-
-    private fun deleteMissingElements(tx: Transaction, elements: ObjectId, incomingKeys: Set<String>) {
-        for (key in tx.keys(elements).orElseThrow()) {
-            if (key !in incomingKeys) tx.delete(elements, key)
-        }
-    }
-
-    private fun writeBoard(tx: Transaction, boardJson: String) {
-        val root = Json.parseToJsonElement(boardJson).jsonObject
-        val elements = boardElements(tx)
-        val incoming = parseIncomingElements(root)
-        deleteMissingElements(tx, elements, incoming.keys)
-        incoming.forEach { (key, value) -> putElement(tx, key, value) }
-        // The envelope retains unknown metadata and non-addressable legacy entries.
-        tx.set(ObjectId.ROOT, "board", boardJson)
-    }
-
-    private fun boardFrom(read: Read): String {
-        val raw = (read.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
-        val elements = (read.get(ObjectId.ROOT, "boardElements").orElse(null) as? AmValue.Map) ?: return raw
-        val tombstones = (read.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)
-        val keys = read.keys(elements.id).orElseThrow().toSet()
-        val deleted = tombstones?.let { read.keys(it.id).orElseThrow().toSet() }.orEmpty()
-        if (keys.isEmpty() && deleted.isEmpty()) return raw
-        val root = Json.parseToJsonElement(raw).jsonObject
-        val legacy = (root["elements"] as? JsonArray).orEmpty().filter { value ->
-            ((value as? JsonObject)?.get("id") as? JsonPrimitive)?.content.isNullOrBlank()
-        }
-        val orderedKeys = (root["elements"] as? JsonArray).orEmpty().mapNotNull {
-            ((it as? JsonObject)?.get("id") as? JsonPrimitive)?.content
-        }.filter { it in keys && it !in deleted }.distinct() + (keys - deleted).sorted().filterNot { key ->
-            (root["elements"] as? JsonArray).orEmpty().any { ((it as? JsonObject)?.get("id") as? JsonPrimitive)?.content == key }
-        }
-        val values = orderedKeys.mapNotNull { key ->
-            val map = (read.get(elements.id, key).orElse(null) as? AmValue.Map)?.id ?: return@mapNotNull null
-            JsonObject(read.keys(map).orElseThrow().associateWith { field ->
-                Json.parseToJsonElement((read.get(map, field).orElseThrow() as AmValue.Str).value)
-            })
-        }
-        return JsonObject(root + ("elements" to JsonArray(legacy + values))).toString()
-    }
+    private fun boardFrom(read: Read): String = NotebookBoardStorage.boardJson(read)
 
     /** Canvas metadata and board live in the same Automerge transaction; notebook items are untouched. */
     internal fun canvasDocument(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
         canvasFrom(document)
-    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.also { remember(id, it) }
 
     /**
      * The canvas's identity and ownership without its board: [CanvasDocument.sceneJson] is not
@@ -379,7 +319,7 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
      */
     internal fun canvasMetadata(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
         (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
-    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { Json.decodeFromString<CanvasDocument>(it) }
+    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { Json.decodeFromString<CanvasDocument>(it) }?.also { remember(id, it) }
 
     private fun canvasFrom(read: Read): CanvasDocument? {
         val metadata = (read.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
@@ -387,10 +327,14 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         val doc = Json.decodeFromString<CanvasDocument>(metadata)
         val board = Json.parseToJsonElement(boardFrom(read)).jsonObject
         val scene = JsonObject(board.filterKeys { it != "schema" }).toString()
-        val base = (read.get(ObjectId.ROOT, "canvasSceneBase").orElse(null) as? AmValue.Str)?.value
-        return doc.copy(sceneJson = if (base == "" && scene == "{\"elements\":[]}") "" else scene)
+        val blankBase = NotebookBoardStorage.baseIsBlank(read) == true
+        return doc.copy(sceneJson = if (blankBase && scene == "{\"elements\":[]}") "" else scene)
     }
 
+    /**
+     * Write a canvas save. Only what differs from the canvas's previous save is written, so the
+     * document's history grows with the edit, not with the size of the board.
+     */
     internal fun writeCanvas(id: DocumentId, doc: CanvasDocument, expectedRevision: Long?): Boolean {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         return handle.withDocument { document ->
@@ -398,105 +342,25 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
                 val current = canvasFrom(tx)
                 if (expectedRevision != null && current?.revision != expectedRevision) return@withDocument false
                 if (current != null && current.id != doc.id) error("Notebook belongs to another canvas")
-                val base = (tx.get(ObjectId.ROOT, "canvasSceneBase").orElse(null) as? AmValue.Str)?.value
-                val incoming = sceneBoard(doc.sceneJson)
+                val base = NotebookBoardStorage.readSceneBase(tx)
+                val incoming = NotebookBoardStorage.sceneBoard(doc.sceneJson)
                 if (base == null || current?.sceneJson != doc.sceneJson) {
-                    if (base == null) writeBoard(tx, incoming.toString())
-                    else mergeCanvasBoard(tx, sceneBoard(base), incoming)
+                    if (base == null) NotebookBoardStorage.writeBoard(tx, incoming)
+                    else NotebookBoardStorage.mergeCanvasBoard(tx, base, incoming)
                 }
-                tx.set(ObjectId.ROOT, "canvasMetadata", Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = "")))
-                tx.set(ObjectId.ROOT, "canvasSceneBase", doc.sceneJson)
-                tx.set(ObjectId.ROOT, "title", doc.title)
+                val metadata = Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = ""))
+                NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "canvasMetadata", metadata)
+                NotebookBoardStorage.writeSceneBase(tx, NotebookBoardStorage.sceneBaseOf(doc.sceneJson))
+                NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "title", doc.title)
                 tx.commit()
                 true
             }
-        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-    }
-
-    private fun sceneBoard(scene: String): JsonObject {
-        val root = if (scene.isBlank()) JsonObject(mapOf("elements" to JsonArray(emptyList())))
-            else Json.parseToJsonElement(scene).jsonObject
-        require(root["elements"] is JsonArray) { "Canvas scene needs elements" }
-        return JsonObject(root + ("schema" to JsonPrimitive("notebook-board/1")))
-    }
-
-    private data class ElementSyncTransition(
-        val oldVal: JsonObject?,
-        val nextVal: JsonObject?,
-        val isLive: Boolean,
-    )
-
-    private fun syncElementDiff(
-        tx: Transaction,
-        key: String,
-        transition: ElementSyncTransition,
-    ) {
-        val (oldVal, nextVal, isLive) = transition
-        if (oldVal == nextVal) return
-        if (nextVal == null) {
-            removeElement(tx, key)
-        } else if (oldVal == null || isLive) {
-            putElement(tx, key, nextVal)
+        }.get(TIMEOUT_SECONDS, TimeUnit.SECONDS).also { written ->
+            if (written) {
+                remember(id, doc)
+                health.checkBudget(id.stableKey())
+            }
         }
-    }
-
-    private fun updateEnvelopeField(
-        envelope: MutableMap<String, JsonElement>,
-        key: String,
-        baseVal: JsonElement?,
-        incomingVal: JsonElement?,
-    ) {
-        if (baseVal == incomingVal) return
-        if (incomingVal != null) {
-            envelope[key] = incomingVal
-        } else {
-            envelope.remove(key)
-        }
-    }
-
-    private fun mergeCanvasBoard(tx: Transaction, base: JsonObject, incoming: JsonObject) {
-        val current = Json.parseToJsonElement(boardFrom(tx)).jsonObject
-        val liveIds = (current["elements"] as? JsonArray)
-            ?.mapNotNull { (it as? JsonObject)?.get("id")?.jsonPrimitive?.content }
-            ?.toSet()
-            .orEmpty()
-        val old = parseIncomingElements(base)
-        val next = parseIncomingElements(incoming)
-        // Only replace elements changed by this canvas write; unrelated notebook edits survive.
-        for (key in (old.keys + next.keys)) {
-            syncElementDiff(tx, key, ElementSyncTransition(old[key], next[key], key in liveIds))
-        }
-        val envelope = current.toMutableMap()
-        for (key in (base.keys + incoming.keys).filter { it != "elements" && it != "schema" }) {
-            updateEnvelopeField(envelope, key, base[key], incoming[key])
-        }
-        tx.set(ObjectId.ROOT, "board", JsonObject(envelope).toString())
-    }
-
-    private fun putElement(tx: Transaction, key: String, value: JsonObject) {
-        val elements = boardElements(tx)
-        val map = (tx.get(elements, key).orElse(null) as? AmValue.Map)?.id ?: tx.set(elements, key, ObjectType.MAP)
-        tx.keys(map).orElseThrow().filter { it !in value }.forEach { tx.delete(map, it) }
-        value.forEach { (field, fieldValue) -> tx.set(map, field, fieldValue.toString()) }
-        val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)
-        if (tombstones != null && tx.get(tombstones.id, key).isPresent) tx.delete(tombstones.id, key)
-        val deleted = (tx.get(ObjectId.ROOT, "boardDeletedElements").orElse(null) as? AmValue.Map)
-        if (deleted != null && tx.get(deleted.id, key).isPresent) tx.delete(deleted.id, key)
-    }
-
-    private fun removeElement(tx: Transaction, key: String) {
-        val elements = boardElements(tx)
-        val previous = (tx.get(elements, key).orElse(null) as? AmValue.Map)?.id
-        if (previous != null) {
-            val snapshot = JsonObject(tx.keys(previous).orElseThrow().associateWith { field ->
-                Json.parseToJsonElement((tx.get(previous, field).orElseThrow() as AmValue.Str).value)
-            })
-            tx.set(deletedElements(tx), key, snapshot.toString())
-            tx.delete(elements, key)
-        }
-        val tombstones = (tx.get(ObjectId.ROOT, "boardTombstones").orElse(null) as? AmValue.Map)?.id
-            ?: tx.set(ObjectId.ROOT, "boardTombstones", ObjectType.MAP)
-        tx.set(tombstones, key, true)
     }
 
     fun setBoard(id: DocumentId, boardJson: String) {
@@ -553,6 +417,7 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         stopPolling()
         poller.shutdownNow()
         repo.close()
+        health.close()
     }
 
     private fun DocumentId.stableKey(): String = getBytes().joinToString("") { byte ->
