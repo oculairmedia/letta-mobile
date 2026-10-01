@@ -39,4 +39,11 @@
     <string name="composer_working_directory_loading">Loading working directory…</string>
     <string name="composer_working_directory_unknown">Working directory unknown</string>
     <string name="composer_working_directory_change">Change…</string>
+    <!-- letta-mobile-bglj6.1.9: the Touch (phone) composer bar and its "+" sheet. -->
+    <string name="composer_touch_placeholder">Type a message…</string>
+    <string name="composer_actions_open">Add to message</string>
+    <string name="composer_actions_title">Add to message</string>
+    <string name="composer_attach_image">Attach image</string>
+    <string name="composer_restore_chat">Show the reply</string>
+    <string name="composer_open_chat">Open the chat</string>
 </resources>

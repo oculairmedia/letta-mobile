@@ -21,6 +21,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -67,6 +68,10 @@ internal fun ChatComposerPanel(
             onError = actions::reportComposerError,
         ),
     )
+    if (touchStyle()) {
+        TouchComposerPanel(model, attachImage, modifier)
+        return
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -90,6 +95,37 @@ internal fun ChatComposerPanel(
                 ComposerHintRow(visible = composerHintVisible(composer.text, composer.attachments.isNotEmpty()))
             }
         }
+    }
+}
+
+/**
+ * letta-mobile-bglj6.1.9: the Touch composer: what stacks above the prompt (inset from the screen
+ * edges), the companion above the bar while the agent works (full page only), then the flush bar
+ * across the whole width. On the canvas the bar leads with a chevron back up to the chat.
+ */
+@Composable
+private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, modifier: Modifier) {
+    Column(
+        modifier = modifier.fillMaxWidth().imePadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        ) {
+            ComposerAboveCard(model)
+        }
+        if (model.mode != ChatSurfaceMode.Docked) TouchCompanionSlot(model)
+        TouchComposerBar(
+            model = model,
+            onAttachImage = attachImage,
+            leading = if (model.mode == ChatSurfaceMode.Docked) {
+                { TouchOpenChatButton(onOpen = { model.onIntent(ChatSurfaceIntent.Expand) }) }
+            } else {
+                null
+            },
+        )
     }
 }
 

@@ -30,6 +30,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
+import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
@@ -111,6 +112,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             fontScaleRange = DefaultFontScaleRange,
             // Touch idiom: a tool summary opens its calls in a bottom sheet.
             toolDetails = ChatToolDetails.Sheet,
+            // The phone's idiom: the legacy composer bar, sheets, and the canvas's chat head.
+            platformStyle = ChatPlatformStyle.Touch,
         )
     }
     Box(modifier) {

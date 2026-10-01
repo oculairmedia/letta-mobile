@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import com.letta.mobile.sharedui.resources.composer_touch_placeholder
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,6 +70,10 @@ internal data class ComposerFieldStyle(
     val maxHeight: Dp,
     val singleLine: Boolean,
     val maxLines: Int,
+    /** The soft keyboard's action key sends (Touch); on a pointer host Enter does. */
+    val imeSend: Boolean = false,
+    /** The phone's placeholder copy ("Type a message…") when the owner gives none. */
+    val touchPlaceholder: Boolean = false,
 )
 
 /**
@@ -126,12 +134,16 @@ internal fun ComposerTextField(
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         singleLine = style.singleLine,
         maxLines = style.maxLines,
+        keyboardOptions = if (style.imeSend) KeyboardOptions(imeAction = ImeAction.Send) else KeyboardOptions.Default,
+        keyboardActions = KeyboardActions(onSend = { if (model.decisions.sendEnabled) model.actions.send() }),
         decorationBox = { inner ->
             // Centred in the field's height, so a one-line bar's text sits mid-bar, not at its top.
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                 if (fieldValue.text.isEmpty()) {
                     Text(
-                        text = model.composer.placeholder ?: stringResource(Res.string.chat_surface_placeholder),
+                        text = model.composer.placeholder ?: stringResource(
+                            if (style.touchPlaceholder) Res.string.composer_touch_placeholder else Res.string.chat_surface_placeholder,
+                        ),
                         style = textStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

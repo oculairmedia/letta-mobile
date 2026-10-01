@@ -343,7 +343,7 @@ private fun ReplyBubble(turn: CollapsedTurn, agentName: String, actions: BubbleA
 
 /** The reply's markdown, following the newest line while it streams. */
 @Composable
-private fun BubbleText(turn: CollapsedTurn) {
+internal fun BubbleText(turn: CollapsedTurn, maxHeight: Dp = ChatSurfaceDimens.collapsedBubbleMaxHeight) {
     val shown = if (turn.streaming) rememberSmoothedStreamingText(rawText = turn.text, isStreaming = true) else turn.text
     val scroll = rememberScrollState()
     LaunchedEffect(scroll, turn.streaming) {
@@ -351,7 +351,7 @@ private fun BubbleText(turn: CollapsedTurn) {
     }
     Box(
         Modifier
-            .heightIn(max = ChatSurfaceDimens.collapsedBubbleMaxHeight)
+            .heightIn(max = maxHeight)
             .verticalScroll(scroll)
             // The bubble announces the whole reply itself.
             .clearAndSetSemantics { },
@@ -367,7 +367,7 @@ private fun BubbleText(turn: CollapsedTurn) {
 
 /** Tool activity, summarised (the full cards are in the panel); the halo is its animation. */
 @Composable
-private fun WorkingLine(label: String) {
+internal fun WorkingLine(label: String) {
     Text(
         label,
         modifier = Modifier.clearAndSetSemantics { },
@@ -378,7 +378,7 @@ private fun WorkingLine(label: String) {
 
 /** An approval or a form is waiting: open the panel, where it can be answered. */
 @Composable
-private fun NeedsInputChip(onOpen: () -> Unit) {
+internal fun NeedsInputChip(onOpen: () -> Unit) {
     AssistChip(
         onClick = onOpen,
         label = { Text(stringResource(Res.string.chat_surface_collapsed_needs_input)) },
@@ -396,7 +396,7 @@ private fun NeedsInputChip(onOpen: () -> Unit) {
  * see. This only says so to a screen reader.
  */
 @Composable
-private fun ThinkingAnnouncement(agentName: String) {
+internal fun ThinkingAnnouncement(agentName: String) {
     val label = if (agentName.isBlank()) {
         stringResource(Res.string.chat_surface_collapsed_thinking_unnamed)
     } else {
@@ -466,19 +466,26 @@ internal class SpeechBubbleShape(
     private val radius: Dp,
     private val tailWidth: Dp,
     private val tailHeight: Dp,
+    /** The tail reaches out of the right edge instead of the left (towards a speaker on the right). */
+    private val tailAtEnd: Boolean = false,
+    /** The tail leaves from the top corner instead of the bottom one. */
+    private val tailAtTop: Boolean = false,
 ) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val r = with(density) { radius.toPx() }
         val tw = with(density) { tailWidth.toPx() }
         val th = with(density) { tailHeight.toPx() }
         val body = Path().apply {
-            addRoundRect(RoundRect(tw, 0f, size.width, size.height, CornerRadius(r)))
+            addRoundRect(RoundRect(if (tailAtEnd) 0f else tw, 0f, if (tailAtEnd) size.width - tw else size.width, size.height, CornerRadius(r)))
         }
+        // Drawn for a bottom-left tail, then mirrored into place.
+        val x: (Float) -> Float = { if (tailAtEnd) size.width - it else it }
+        val y: (Float) -> Float = { if (tailAtTop) size.height - it else it }
         val tail = Path().apply {
             // A short bubble (the thinking dots) keeps the tail in its lower part.
-            moveTo(tw, (size.height - r - th).coerceAtLeast(size.height * TAIL_MIN_TOP_FRACTION))
-            lineTo(0f, size.height)
-            lineTo(tw + r, size.height)
+            moveTo(x(tw), y((size.height - r - th).coerceAtLeast(size.height * TAIL_MIN_TOP_FRACTION)))
+            lineTo(x(0f), y(size.height))
+            lineTo(x(tw + r), y(size.height))
             close()
         }
         return Outline.Generic(Path().apply { op(body, tail, PathOperation.Union) })

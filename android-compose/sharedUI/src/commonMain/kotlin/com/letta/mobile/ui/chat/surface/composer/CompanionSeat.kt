@@ -10,6 +10,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +67,12 @@ internal class CompanionSeatAnchors {
         private set
     var page: Anchor? by mutableStateOf(null)
         private set
+
+    /**
+     * How much of the companion shows at the page's spot, 0..1 (letta-mobile-bglj6.1.9): the Touch
+     * page raises it above the bar only while the agent works, as the legacy Android composer did.
+     */
+    var pageShown: Float by mutableFloatStateOf(1f)
 
     /** Some spot has been reported: from then on the seat stays declared. */
     var anchored: Boolean by mutableStateOf(false)
@@ -154,12 +161,17 @@ internal fun CompanionSeatOverlay(
                     // The seat keeps its one size and is scaled to the anchor's (the badge's is
                     // smaller): the renderer is never resized while the seat glides between them.
                     val scale = if (placeable.width > 0 && rect.width > 0f) rect.width / placeable.width else 1f
+                    // Where the page hides its companion (Touch, at rest) it fades and sinks away.
+                    val shown = 1f - pageWeight().coerceIn(0f, 1f) * (1f - anchors.pageShown)
+                    // Gone, it is not placed at all: nothing invisible over the bar takes a tap.
+                    if (shown <= 0f) return@layout
                     placeable.placeWithLayer(
                         (rect.center.x - placeable.width / 2f - placement.origin.x).roundToInt(),
                         (rect.center.y - placeable.height / 2f - placement.origin.y).roundToInt(),
                     ) {
-                        scaleX = scale
-                        scaleY = scale
+                        scaleX = scale * (HIDDEN_SCALE + (1f - HIDDEN_SCALE) * shown)
+                        scaleY = scale * (HIDDEN_SCALE + (1f - HIDDEN_SCALE) * shown)
+                        alpha = shown
                     }
                 }
             },
@@ -169,6 +181,12 @@ internal fun CompanionSeatOverlay(
         )
     }
 }
+
+/**
+ * A hidden companion shrinks away into the bar (the mascot layer draws the character at the seat's
+ * bounds, so the size is what reaches it; legacy faded and scaled it out).
+ */
+private const val HIDDEN_SCALE = 0f
 
 /** Resolves the seat's rect from the anchors; keeps the last one for the frames between anchors. */
 @Stable

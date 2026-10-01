@@ -174,6 +174,14 @@ internal class ChatDockState(initial: ChatDockGeometry) {
         if (geometry.collapsed) update(ChatDockGeometryMath.expand(geometry))
     }
 
+    /**
+     * letta-mobile-bglj6.1.9: where the Touch chat head rests. It reuses the dock's anchors: [side]
+     * 0 is the left edge and 1 the right, [lane] 0..1 is its height in the free band.
+     */
+    fun placeHead(side: Float, lane: Float) {
+        update(geometry.copy(anchorX = side.coerceIn(0f, 1f), anchorY = lane.coerceIn(0f, 1f)))
+    }
+
     fun reset() {
         val next = ChatDockGeometryMath.reset()
         if (next == geometry) return
