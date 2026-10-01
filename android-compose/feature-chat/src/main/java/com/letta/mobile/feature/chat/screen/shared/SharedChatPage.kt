@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -54,6 +55,11 @@ internal data class SharedChatPageParams(
     val pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)? = null,
     /** The full-screen composer's measured height, for [pageBackground] to keep the glow above it. */
     val onComposerHeightChange: ((Dp) -> Unit)? = null,
+    /**
+     * The status bar and the chat screen's floating header, which the page draws under: the
+     * timeline and the canvas run edge to edge behind them; their content and chrome rest below.
+     */
+    val topChromeInset: Dp = 0.dp,
 )
 
 /**
@@ -101,8 +107,9 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         agentId = params.viewModel.agentId.value,
         conversationId = params.viewModel.conversationId?.value,
     )
+    val topChromeInset = params.topChromeInset
     val canvas: (@Composable (ChatCanvasActions) -> Unit)? =
-        canvasSlot?.let { slot -> { actions -> slot.content(target, actions) } }
+        canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
     val appearance = remember(params.chatMode, params.fontScale, params.hapticsEnabled) {
         ChatSurfaceAppearance(
             displayMode = params.chatMode.toChatDisplayMode(),
@@ -128,6 +135,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
                 pageBackground = params.pageBackground,
                 onComposerHeightChange = params.onComposerHeightChange,
                 timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
+                topChromeInset = topChromeInset,
             ),
             pagedTimeline = params.pagingPresentation?.canonical,
             canvas = canvas,
@@ -181,6 +189,7 @@ private fun rememberAndroidChatSurfacePlatform(
     pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)?,
     onComposerHeightChange: ((Dp) -> Unit)?,
     timelineOverlay: @Composable () -> Unit,
+    topChromeInset: Dp,
 ): ChatSurfacePlatform {
     val currentOnComposerHeight by rememberUpdatedState(onComposerHeightChange)
     val reportsComposerHeight = onComposerHeightChange != null
@@ -190,7 +199,7 @@ private fun rememberAndroidChatSurfacePlatform(
     val activity = LocalContext.current as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
     val hasBackground = pageBackground != null
-    return remember(isHiltHost, hasBackground, reportsComposerHeight) {
+    return remember(isHiltHost, hasBackground, reportsComposerHeight, topChromeInset) {
         ChatSurfacePlatform(
             voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
             pageBackground = if (hasBackground) {
@@ -200,6 +209,7 @@ private fun rememberAndroidChatSurfacePlatform(
             },
             // Touch first: the composer's keyboard-shortcut strip is desktop chrome.
             showKeyboardHints = false,
+            topChromeInset = topChromeInset,
             timelineOverlay = { currentOverlay() },
             onComposerHeightChange = if (reportsComposerHeight) {
                 { height -> currentOnComposerHeight?.invoke(height) }

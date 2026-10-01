@@ -65,6 +65,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
@@ -130,6 +131,8 @@ internal fun TouchDockLayer(
     bar: TouchBarMetrics,
     morph: SurfaceMorph,
     head: TouchHeadContent?,
+    /** Host chrome over the canvas's top edge (ChatSurfacePlatform.topChromeInset): the head stays below it. */
+    topChromeInset: Dp = 0.dp,
     composer: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -153,7 +156,7 @@ internal fun TouchDockLayer(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .padding(bottom = with(density) { bar.heightPx.toDp() })
+                    .padding(top = topChromeInset, bottom = with(density) { bar.heightPx.toDp() })
                     // The head and its popup leave first: they float over the canvas the page covers.
                     .graphicsLayer { alpha = morphDockedAlpha(fraction() * HEAD_FADE_SPEED) }
                     .then(fade),

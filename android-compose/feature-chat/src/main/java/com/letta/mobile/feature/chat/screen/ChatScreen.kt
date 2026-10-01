@@ -3,9 +3,7 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -132,10 +130,11 @@ internal fun ChatScreen(
                     },
                     // The shared composer reports its height so the glow keeps clear of it.
                     onComposerHeightChange = { composerHeight = it },
+                    // Edge to edge, as the legacy layout: the page draws under the status bar and the
+                    // floating header, and only rests its content (and the canvas's chrome) below them.
+                    topChromeInset = contentPadding.calculateTopPadding(),
                 ),
-                // The host already pads for its bars: consumed, so the canvas's own chrome (its
-                // actions pill, its tool bar) and the composer's insets do not pad for them again.
-                modifier = modifier.fillMaxSize().padding(contentPadding).consumeWindowInsets(contentPadding),
+                modifier = modifier.fillMaxSize(),
             )
             return@LettaChatTheme
         }

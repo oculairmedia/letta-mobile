@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
@@ -42,6 +43,8 @@ internal class LegacyTimelineParams(
     val listState: LazyListState,
     /** False while the agent's mascot shows its thinking beside the composer. */
     val showThinkingRow: Boolean = true,
+    /** Host chrome floating over the list's top (see TimelineFrameOverlays.topReserve). */
+    val topReserve: Dp = 0.dp,
 )
 
 private const val THINKING_KEY = "__thinking__"
@@ -90,6 +93,7 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
             showScrollToLatest = follow.showScrollToLatest,
             onScrollToLatest = follow.scrollToLatest,
             bottomReserve = params.bottomReserve,
+            topReserve = params.topReserve,
         ),
         modifier = modifier,
     ) {
