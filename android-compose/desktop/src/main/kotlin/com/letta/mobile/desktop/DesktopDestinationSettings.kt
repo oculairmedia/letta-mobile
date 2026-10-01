@@ -24,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.data.desktopConfigIdFor
+import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import com.letta.mobile.ui.theme.LettaDimens
@@ -405,8 +407,10 @@ private fun desktopSettingsCardColors() = CardDefaults.cardColors(
 @Composable
 internal fun DesktopSharedChatPageSettingsCard(
     flag: DesktopSharedChatPageFlag = LocalDesktopSharedChatPageFlag.current,
+    openOnCanvas: DesktopOpenChatsOnCanvas = LocalDesktopOpenChatsOnCanvas.current,
 ) {
     val persistedEnabled by flag.persistedEnabled.collectAsState()
+    val sharedPageEnabled by flag.enabled.collectAsState()
     Card(
         colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
@@ -426,6 +430,9 @@ internal fun DesktopSharedChatPageSettingsCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (sharedPageEnabled) {
+                OpenChatsOnCanvasToggle(openOnCanvas)
+            }
         }
     }
 }
@@ -444,6 +451,27 @@ private fun SharedChatPageToggleRow(
         Text("Shared chat page (preview)", style = MaterialTheme.typography.bodyMedium)
         Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
+}
+
+/** letta-mobile-bglj6.1: the canvas is the default view; full-screen chat is optional. */
+@Composable
+private fun OpenChatsOnCanvasToggle(preference: DesktopOpenChatsOnCanvas) {
+    val enabled by preference.enabled.collectAsState()
+    val scope = rememberCoroutineScope()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Open conversations on the canvas", style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = enabled, onCheckedChange = { checked -> scope.launch { preference.setEnabled(checked) } })
+    }
+    Text(
+        text = "Start each conversation on the canvas with the chat docked below. " +
+            "Turn off to open the traditional full-screen chat instead.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 private fun sharedChatPageSupportingText(forcedByEnvironment: Boolean): String =

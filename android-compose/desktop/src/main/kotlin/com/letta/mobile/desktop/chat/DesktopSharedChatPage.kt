@@ -23,6 +23,7 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.desktop.LocalDesktopChatFontScale
 import com.letta.mobile.desktop.LocalDesktopChatFontScaleSetter
+import com.letta.mobile.desktop.LocalDesktopOpenChatsOnCanvas
 import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.canvas.DesktopCanvasHostSync
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
@@ -109,7 +110,10 @@ internal fun DesktopSharedChatPage(
 ) {
     val port = state.port
     SideEffect { port.updateHostInputs(state.hostInputs) }
-    var presentation by remember { mutableStateOf(ChatSurfacePresentation.CanvasFirst) }
+    val openOnCanvas = LocalDesktopOpenChatsOnCanvas.current
+    var presentation by remember {
+        mutableStateOf(ChatSurfacePresentation.initial(openOnCanvas.enabled.value, hasCanvas = true))
+    }
     val host = rememberDesktopChatSurfaceHost(port, navigation)
     val ambientStatus = rememberDesktopAmbientStatus(state.isThinking, state.errorMessage)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
