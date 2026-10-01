@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
@@ -55,7 +54,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Measurable
@@ -71,8 +69,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ChevronDown
-import com.composables.icons.lucide.Lucide
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_dock_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_dock_move
@@ -88,6 +84,7 @@ import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon
@@ -627,8 +624,15 @@ private fun PanelHeader(state: ChatDockState, badged: Boolean) {
             )
         }
         Box(Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Space.sm)) {
-            HeaderButton(Lucide.ChevronDown, stringResource(Res.string.chat_surface_dock_collapse), DOCK_COLLAPSE_TAG) {
-                state.toggleCollapsed()
+            IconButton(
+                onClick = state::toggleCollapsed,
+                modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(DOCK_COLLAPSE_TAG),
+            ) {
+                DisclosureChevron(
+                    expanded = true,
+                    contentDescription = stringResource(Res.string.chat_surface_dock_collapse),
+                    opensUpward = true,
+                )
             }
         }
     }
@@ -674,18 +678,6 @@ private fun PanelBadge(state: ChatDockState, agentId: String?, seated: Boolean, 
         contentAlignment = Alignment.Center,
     ) {
         if (seated) CompanionSeatAnchor(anchors, size = ChatMascotDimens.dockBadgeSeat)
-    }
-}
-
-@Composable
-private fun HeaderButton(
-    icon: ImageVector,
-    label: String,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    IconButton(onClick = onClick, modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(tag)) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(LettaDimens.Control.icon))
     }
 }
 

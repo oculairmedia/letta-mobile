@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -23,7 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_open_chat
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -75,11 +73,11 @@ internal fun TouchOpenChatButton(onOpen: () -> Unit) {
             .testTag(ComposerTestTags.TOUCH_RESTORE),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            LettaIcons.ChevronUp,
-            contentDescription = stringResource(Res.string.composer_open_chat),
+        DisclosureChevron(
+            expanded = false,
             modifier = Modifier.size(LettaDimens.Space.xl),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            contentDescription = stringResource(Res.string.composer_open_chat),
+            opensUpward = true,
         )
     }
 }
