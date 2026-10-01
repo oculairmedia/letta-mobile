@@ -40,4 +40,26 @@ class DesktopTouchEchoFilterTest {
         assertFalse(DesktopTouchEchoFilter.isEcho(press(), touchCaused = { false }))
         assertFalse(DesktopTouchEchoFilter.isEcho(press(), touchCaused = null))
     }
+
+    private fun mouse(id: Int) = MouseEvent(source, id, 0L, 0, 10, 10, 0, false, MouseEvent.NOBUTTON)
+
+    @Test
+    fun anUnflaggedMoveWhereAFingerJustWasIsAnEcho() {
+        listOf(MouseEvent.MOUSE_MOVED, MouseEvent.MOUSE_DRAGGED, MouseEvent.MOUSE_ENTERED, MouseEvent.MOUSE_EXITED).forEach { id ->
+            assertTrue(DesktopTouchEchoFilter.isEcho(mouse(id), touchCaused = { false }, nearFinger = { true }), "event $id")
+            assertFalse(DesktopTouchEchoFilter.isEcho(mouse(id), touchCaused = { false }, nearFinger = { false }), "event $id")
+        }
+        // A real click away from any finger is not touched.
+        assertFalse(DesktopTouchEchoFilter.isEcho(press(), touchCaused = { false }, nearFinger = { true }))
+    }
+
+    @Test
+    fun aFingerIsNearOnlyWhereItWasAndJustAfter() {
+        DesktopTouchEchoFilter.forgetFingers()
+        DesktopTouchEchoFilter.noteFinger(java.awt.Point(500, 300), atMillis = 1_000L)
+        assertTrue(DesktopTouchEchoFilter.nearRecentFinger(java.awt.Point(506, 296), atMillis = 1_050L))
+        assertFalse(DesktopTouchEchoFilter.nearRecentFinger(java.awt.Point(540, 300), atMillis = 1_050L), "40 px away")
+        assertFalse(DesktopTouchEchoFilter.nearRecentFinger(java.awt.Point(500, 300), atMillis = 1_600L), "600 ms later")
+        DesktopTouchEchoFilter.forgetFingers()
+    }
 }

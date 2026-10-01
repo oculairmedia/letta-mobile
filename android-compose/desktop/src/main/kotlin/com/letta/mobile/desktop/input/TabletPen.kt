@@ -171,7 +171,11 @@ internal class TabletPen(
         val closingMirroredPress = awtMapper.down && isLift(sample.kind)
         val taken = offerToCanvas(sample)
         noteFirstStrokeSample(target, sample, batch.scale, taken)
-        val mirrors = closingMirroredPress || penSampleMirrorsToMouse(sample.tool, batch.windowMoved, lastPoseHadPressure)
+        // A pen hovering while a finger is down is not a pointer: mirrored as mouse moves it would
+        // flip the finger's text selection into mouse mode.
+        val hoverUnderFinger = touchContacts.isNotEmpty() && sample.force == 0f
+        val mirrors = closingMirroredPress ||
+            (!hoverUnderFinger && penSampleMirrorsToMouse(sample.tool, batch.windowMoved, lastPoseHadPressure))
         if (!taken && mirrors) awtMapper.dispatch(target, sample, batch.scale)
         if (isLift(sample.kind)) lastPoseHadPressure = false
     }

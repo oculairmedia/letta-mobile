@@ -82,15 +82,24 @@ internal expect fun KeepMenusAtDensity(density: Density, content: @Composable ()
  * touch: Compose asks its [TextToolbar] for one, and a desktop has none of its own. Show it with
  * [TouchTextToolbarHost], and hand it to text through `LocalTextToolbar`.
  *
- * [shouldShow] is asked each time a selection wants the bar, so a platform can keep it to touch
+ * [shouldShow] is asked when a selection first wants the bar, so a platform can keep it to touch
  * and leave the mouse with its right-click menu.
  */
 class TouchTextToolbar(private val shouldShow: () -> Boolean = { true }) : TextToolbar {
-    internal var request by mutableStateOf<Request?>(null)
+    /**
+     * What the bar shows: where, and which buttons. Only this is state. A selection asks for the
+     * bar again on every update with fresh callbacks, so keeping those in state recomposed and
+     * re-placed the bar on every ask, and it flickered; an ask that changes nothing visible now
+     * changes nothing.
+     */
+    internal var shown by mutableStateOf<Shown?>(null)
         private set
 
+    /** The latest callbacks for the buttons [shown] offers. */
+    private var handlers: Map<Action, () -> Unit> = emptyMap()
+
     override val status: TextToolbarStatus
-        get() = if (request != null) TextToolbarStatus.Shown else TextToolbarStatus.Hidden
+        get() = if (shown != null) TextToolbarStatus.Shown else TextToolbarStatus.Hidden
 
     override fun showMenu(
         rect: Rect,
@@ -99,31 +108,38 @@ class TouchTextToolbar(private val shouldShow: () -> Boolean = { true }) : TextT
         onCutRequested: (() -> Unit)?,
         onSelectAllRequested: (() -> Unit)?,
     ) {
-        if (!shouldShow()) {
-            request = null
-            return
+        // Compose asks again on every selection or layout update. Whether a finger is driving is a
+        // question for opening the bar, not for keeping it: asked each time, a reply streaming in
+        // three seconds later took the bar away.
+        if (shown == null && !shouldShow()) return
+        handlers = buildMap {
+            onCutRequested?.let { put(Action.CUT, it) }
+            onCopyRequested?.let { put(Action.COPY, it) }
+            onPasteRequested?.let { put(Action.PASTE, it) }
+            onSelectAllRequested?.let { put(Action.SELECT_ALL, it) }
         }
-        request = Request(rect, onCopyRequested, onPasteRequested, onCutRequested, onSelectAllRequested)
+        val next = Shown(rect, Action.entries.filter { it in handlers })
+        if (next != shown) shown = next
     }
 
     override fun hide() {
-        request = null
+        handlers = emptyMap()
+        if (shown != null) shown = null
     }
 
-    internal data class Request(
-        val rect: Rect,
-        val onCopy: (() -> Unit)?,
-        val onPaste: (() -> Unit)?,
-        val onCut: (() -> Unit)?,
-        val onSelectAll: (() -> Unit)?,
-    ) {
-        /** The bar's buttons, in the order phones put them, for the actions this selection allows. */
-        fun actions(): List<Pair<String, () -> Unit>> = listOfNotNull(
-            onCut?.let { "Cut" to it },
-            onCopy?.let { "Copy" to it },
-            onPaste?.let { "Paste" to it },
-            onSelectAll?.let { "Select all" to it },
-        )
+    /** Runs [action]'s latest callback. */
+    internal fun perform(action: Action) {
+        handlers[action]?.invoke()
+    }
+
+    /** The bar over [rect] with [offers], in the order phones put them. */
+    internal data class Shown(val rect: Rect, val offers: List<Action>)
+
+    internal enum class Action(val label: String) {
+        CUT("Cut"),
+        COPY("Copy"),
+        PASTE("Paste"),
+        SELECT_ALL("Select all"),
     }
 }
 
@@ -157,17 +173,16 @@ fun quoteIntoPrompt(prompt: String, quoted: String): String {
  */
 @Composable
 fun TouchTextToolbarHost(toolbar: TouchTextToolbar, quoteSink: QuoteSink? = null) {
-    val request = toolbar.request ?: return
+    val shown = toolbar.shown ?: return
     @Suppress("DEPRECATION") // The selection bar reads and restores text only; the suspend Clipboard adds nothing here.
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val quoteTarget = quoteSink?.target
-    val copy = request.onCopy
-    val quote: (() -> Unit)? = if (copy != null && quoteTarget != null) {
+    val quote: (() -> Unit)? = if (TouchTextToolbar.Action.COPY in shown.offers && quoteTarget != null) {
         {
             // Compose hands the bar a copy, not the text. Copy, read it, and put back whatever the
             // clipboard held before, so quoting does not cost the user their clipboard.
             val previous = clipboard.getText()
-            copy()
+            toolbar.perform(TouchTextToolbar.Action.COPY)
             val selected = clipboard.getText()?.text
             if (previous != null) clipboard.setText(previous)
             if (!selected.isNullOrBlank()) quoteTarget(selected)
@@ -175,10 +190,12 @@ fun TouchTextToolbarHost(toolbar: TouchTextToolbar, quoteSink: QuoteSink? = null
     } else {
         null
     }
-    val actions = request.actions() + listOfNotNull(quote?.let { "Quote" to it })
+    val actions = shown.offers.map { action -> action.label to { toolbar.perform(action) } } +
+        listOfNotNull(quote?.let { "Quote" to it })
     if (actions.isEmpty()) return
     val gap = with(LocalDensity.current) { TOOLBAR_GAP.roundToPx() }
-    Popup(popupPositionProvider = AboveSelection(request.rect, gap)) {
+    val position = remember(shown.rect, gap) { AboveSelection(shown.rect, gap) }
+    Popup(popupPositionProvider = position) {
         Surface(
             shape = RoundedCornerShape(TOOLBAR_CORNER),
             color = MaterialTheme.colorScheme.surfaceContainerHighest,

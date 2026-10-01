@@ -14,6 +14,7 @@ import java.awt.Point
 import java.awt.Window
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
+import kotlin.math.roundToInt
 
 /**
  * Hands desktop fingers to Compose as real touch pointers.
@@ -48,6 +49,7 @@ internal class ComposeTouchInjector private constructor(
     private val placedAt = HashMap<Int, Pair<Offset, Long>>()
 
     fun onSample(target: Component, sample: TabletPenDecoder.DecodedSample) {
+        if (sample.kind != TabletBridge.KIND_DOWN) noteFingerOnScreen(target, sample)
         when (sample.kind) {
             TabletBridge.KIND_DOWN -> placing += sample.contact
             TabletBridge.KIND_MOVE -> toScene(target, sample.x, sample.y)?.let { moveTo(sample.contact, it) }
@@ -55,6 +57,13 @@ internal class ComposeTouchInjector private constructor(
             // An Ink cancel is the Ink copy of a finger leaving, not this finger.
             TabletBridge.KIND_CANCEL -> Unit
         }
+    }
+
+    /** Tells the echo filter where this finger is, so AWT's unflagged copy of it is dropped. */
+    private fun noteFingerOnScreen(target: Component, sample: TabletPenDecoder.DecodedSample) {
+        val origin = runCatching { target.locationOnScreen }.getOrNull() ?: return
+        val screen = java.awt.Point(origin.x + sample.x.roundToInt(), origin.y + sample.y.roundToInt())
+        DesktopTouchEchoFilter.noteFinger(screen, System.currentTimeMillis())
     }
 
     /** The first move places a finger (the down was the previous pose); later ones move it. */
