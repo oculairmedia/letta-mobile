@@ -50,6 +50,7 @@ import com.letta.mobile.sharedui.resources.rows_role_not_sent
 import com.letta.mobile.sharedui.resources.rows_role_you
 import com.letta.mobile.sharedui.resources.rows_send_again
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightTarget
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
@@ -190,7 +191,13 @@ private fun PromptBody(
         )
         if (message.attachments.isNotEmpty()) {
             val images = remember(message.attachments) { message.attachments.toImmutableList() }
-            ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap))
+            // Touch draws them as the legacy Android bubble did: across the bubble's width, large
+            // enough to look at (letta-mobile-bglj6.1.9); desktop keeps its compact strip.
+            if (touchStyle()) {
+                ChatPromptImageGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())
+            } else {
+                ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap))
+            }
         }
         if (message.content.isNotBlank()) PromptText(message.content, state)
     }

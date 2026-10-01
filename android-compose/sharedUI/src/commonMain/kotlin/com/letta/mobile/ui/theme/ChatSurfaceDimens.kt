@@ -79,3 +79,54 @@ object ChatSurfaceDimens {
     /** The reset-placement snap. */
     const val dockSnapMillis: Int = 220
 }
+
+/**
+ * letta-mobile-bglj6.1.9: the Touch canvas's chat head, a Google-Messages-style bubble with the
+ * agent's mascot, snapped to a screen edge over the canvas, and the reply popup it speaks through.
+ */
+object ChatHeadDimens {
+    /** The head's disc. */
+    val head: Dp = 64.dp
+
+    /** The mascot's seat inside the disc (the character overflows the disc a little, as in the badge). */
+    val seat: Dp = 84.dp
+
+    /** The sphere drawn for an agent without a mascot. */
+    val fallbackSphere: Dp = 44.dp
+
+    /** Between the head and the screen edge it is snapped to. */
+    val edgeMargin: Dp = LettaDimens.Space.md
+
+    /**
+     * Kept clear above the head's lane: the canvas's actions pill sits in the top-right corner
+     * under the app bar.
+     */
+    val topClearance: Dp = 72.dp
+
+    /** Kept clear under the head's lane: the canvas's own tool bar rides on top of the chat bar. */
+    val bottomClearance: Dp = 76.dp
+
+    /** Between the head and its popup. */
+    val popupGap: Dp = LettaDimens.Space.xs
+
+    /** The popup is at most this share of the screen's width... */
+    const val popupMaxWidthFraction: Float = 0.8f
+
+    /** ...and this tall, then it scrolls. */
+    val popupMaxHeight: Dp = 320.dp
+
+    /** The head's lift off the canvas. */
+    val elevation: Dp = 6.dp
+
+    /** The snap to an edge after a drag. */
+    const val snapMillis: Int = 240
+
+    /** How far the thinking halo glows past the head's edge. */
+    val haloBleed: Dp = 22.dp
+
+    /** The halo's peak strength, the share of its radius held solid, and its breath. */
+    const val haloStrength: Float = 0.7f
+    const val haloSolidFraction: Float = 0.45f
+    const val haloBreathLow: Float = 0.55f
+    const val haloBreathMillis: Int = 1200
+}

@@ -21,4 +21,11 @@ object ComposerTestTags {
     const val EFFORT_CHIP = "composer-effort"
     const val CONTEXT_POPOVER = "composer-context-popover"
     const val WORKING_DIRECTORY = "composer-working-directory"
+
+    /** letta-mobile-bglj6.1.9: the Touch bar and its parts. */
+    const val TOUCH_BAR = "composer-touch-bar"
+    const val TOUCH_PLUS = "composer-touch-plus"
+    const val TOUCH_VOICE = "composer-touch-voice"
+    const val TOUCH_SHEET = "composer-touch-sheet"
+    const val TOUCH_RESTORE = "composer-touch-restore"
 }

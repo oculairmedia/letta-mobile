@@ -77,6 +77,35 @@ internal fun ChatImageAttachmentsGrid(
 }
 
 /**
+ * letta-mobile-bglj6.1.9: a prompt's images on a phone, as the legacy Android bubble drew them
+ * (feature-chat MessageAttachmentsGrid): one image across the bubble's width, two side by side,
+ * three or more three up, each opening the page's viewer.
+ */
+@Composable
+internal fun ChatPromptImageGrid(
+    tap: ImageTap,
+    modifier: Modifier = Modifier,
+) {
+    val images = tap.images
+    if (images.isEmpty()) return
+    val single = images.size == 1
+    Row(
+        modifier = modifier.testTag(ChatRowTestTags.IMAGE_GRID),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        images.take(ChatRowDimens.promptGridMaxImages).forEachIndexed { index, attachment ->
+            ChatAttachmentImage(
+                attachment = attachment,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(if (single) ChatRowDimens.imageSingleHeight else ChatRowDimens.promptGridCellHeight)
+                    .clickable { tap.open(index) },
+            )
+        }
+    }
+}
+
+/**
  * Compact thumbnails for the pinned prompt card, where a full grid would blow the fold out.
  */
 @Composable

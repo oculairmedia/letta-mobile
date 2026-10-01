@@ -1,7 +1,12 @@
 package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import com.letta.mobile.ui.chat.session.ChatDockRect
 import androidx.compose.foundation.lazy.LazyListState
 import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.layout.Column
@@ -145,9 +150,13 @@ fun ChatSurface(
         LocalComposerImageAttacher provides imageAttacher,
         LocalCompanionSeatAnchors provides companionAnchors,
         LocalComposerFocusHandoff provides focusHandoff,
+        LocalChatPlatformStyle provides appearance.platformStyle,
     ) {
         SendFlightLayer(rememberSendFlightState(), modifier) {
-            if (canvas == null) {
+            if (appearance.platformStyle == ChatPlatformStyle.Touch) {
+                // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
+                TouchCanvasWithChat(frame, dock.takeIf { dockReady }, companionAnchors, canvas?.let { { it(canvasActions) } })
+            } else if (canvas == null) {
                 val fullScreen = presentation.mode == ChatSurfaceMode.FullScreen
                 Box(Modifier.fillMaxSize()) {
                     if (fullScreen) {
@@ -230,23 +239,111 @@ private fun CanvasWithChat(
         }
         if (showPanel) DockedOverlay(frame, dock, Modifier.fillMaxSize(), morph, primary = panelPrimary)
         if (showPage) {
+            // The panel rises above the keyboard (DockedChatPanel pads for it); the page does not.
+            val density = LocalDensity.current
+            val imeDp = with(density) { WindowInsets.ime.getBottom(density).toDp().value }
             PageLayerLocals(primary = !panelPrimary) {
-                MorphPageLayer(dock, morph, Modifier.fillMaxSize()) { FullPageBody(frame, ChatSurfaceMode.FullScreen) }
+                MorphPageLayer({ w, h -> dock.rectIn(w, (h - imeDp).coerceAtLeast(0f)) }, morph, Modifier.fillMaxSize()) {
+                    FullPageBody(frame, ChatSurfaceMode.FullScreen)
+                }
             }
         }
-        CompanionSeat(frame, companionAnchors, fraction)
+        CompanionSeat(frame, companionAnchors, pageWeight = fraction)
     }
 }
 
+/**
+ * letta-mobile-bglj6.1.9: the Touch page. The canvas fills the area above a flush chat bar pinned
+ * to the bottom (the same draft and send as the full page); a chat head with the agent's mascot
+ * floats over the canvas, snapped to a side, and the reply pops out of it. Swiping the bar up (or
+ * its chevron) grows the bar into the full page; Back or swipe up on the page's bar comes back.
+ * Without a canvas there is only the bar and the head.
+ *
+ * As on desktop each layer stays composed for as long as it is on screen: the bar layer until the
+ * page covers it, the page from the first frame it fades in.
+ */
+@Composable
+private fun TouchCanvasWithChat(
+    frame: ChatSurfaceFrame,
+    /** Null until the host knows where the person put the head; the bar shows regardless. */
+    dock: ChatDockState?,
+    companionAnchors: CompanionSeatAnchors,
+    canvas: (@Composable () -> Unit)?,
+) {
+    val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
+    val progress = rememberSurfaceMorphProgress(fullScreen)
+    val phase = surfaceMorphPhase(progress, fullScreen)
+    val fraction: () -> Float = remember(progress) { { progress.value } }
+    val morph = remember(fraction, phase) { SurfaceMorph(fraction, morphing = phase == SurfaceMorphPhase.Morphing) }
+    val showBar by remember(progress, fullScreen) { derivedStateOf { !fullScreen || progress.value < 1f } }
+    val showPage by remember(progress, fullScreen) { derivedStateOf { fullScreen || progress.value > 0f } }
+    val barPrimary by remember(progress) { derivedStateOf { progress.value < PRIMARY_HANDOFF } }
+    val bar = remember { TouchBarMetrics() }
+    val density = LocalDensity.current
+    Box(Modifier.fillMaxSize()) {
+        if (canvas != null) {
+            // Laid out above the bar, so the canvas's own bottom tool bar sits on top of it, never
+            // under it; the bar's height is consumed from the canvas's insets so it does not pad twice.
+            val barDp = with(density) { bar.heightPx.toDp() }
+            val clear = PaddingValues(bottom = barDp)
+            val canvasModifier = Modifier.fillMaxSize().padding(clear).consumeWindowInsets(clear)
+            Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
+        }
+        MorphBackdrop(fraction)
+        if (showBar) {
+            CompositionLocalProvider(
+                LocalCompanionLayer provides CompanionLayer.Docked,
+                LocalComposerPrimary provides barPrimary,
+                LocalChatWorkingCueAnimated provides false,
+            ) {
+                TouchDockLayer(
+                    bar = bar,
+                    morph = morph,
+                    head = dock?.let { touchHeadContent(frame, it) },
+                    composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
+                )
+            }
+        }
+        if (showPage) {
+            PageLayerLocals(primary = !barPrimary) {
+                MorphPageLayer(
+                    from = { w, h ->
+                        val barHeight = with(density) { bar.heightPx.toDp().value }
+                        ChatDockRect(0f, (h - barHeight).coerceAtLeast(0f), w, barHeight)
+                    },
+                    morph = morph,
+                    modifier = Modifier.fillMaxSize(),
+                    rounded = false,
+                ) {
+                    FullPageBody(frame, ChatSurfaceMode.FullScreen)
+                }
+            }
+        }
+        CompanionSeat(frame, companionAnchors, interactive = fullScreen, pageWeight = fraction)
+    }
+}
+
+/** What the chat head shows and does, from the page's frame. */
+private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState): TouchHeadContent = TouchHeadContent(
+    dock = dock,
+    agentId = frame.uiState.agentId,
+    agentName = frame.uiState.agentName,
+    openChat = { frame.onIntent(ChatSurfaceIntent.Expand) },
+    openAgent = frame.host.openAgentPane,
+    turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
+    ambient = { rememberChatAmbient(frame.uiState) },
+)
+
 /** The page's one composer-companion seat, over both layers. */
 @Composable
-private fun CompanionSeat(frame: ChatSurfaceFrame, anchors: CompanionSeatAnchors, pageWeight: () -> Float) {
+private fun CompanionSeat(frame: ChatSurfaceFrame, anchors: CompanionSeatAnchors, interactive: Boolean = true, pageWeight: () -> Float) {
     CompanionSeatOverlay(
         anchors = anchors,
         agentId = frame.uiState.agentId,
         pageWeight = pageWeight,
-        onClick = frame.host.openAgentPane,
-        onEdit = frame.host.editAgent,
+        // Over the Touch chat head the character is the head's: its own gestures (drag, tap, long press) win.
+        onClick = frame.host.openAgentPane.takeIf { interactive },
+        onEdit = frame.host.editAgent.takeIf { interactive },
     )
 }
 

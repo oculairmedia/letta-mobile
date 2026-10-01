@@ -25,7 +25,32 @@ data class ChatSurfaceAppearance(
     val fontScaleRange: ClosedFloatingPointRange<Float> = DefaultFontScaleRange,
     /** Where a run's tool calls open from their "Ran 2 commands" line (Android: a sheet). */
     val toolDetails: ChatToolDetails = ChatToolDetails.Inline,
+    /**
+     * The host's input idiom (letta-mobile-bglj6.1.9). Touch draws the phone's chat: the flush
+     * full-width composer bar, the "+" action sheet, the canvas's bottom bar with a floating chat
+     * head. Pointer keeps the desktop card, the floating panel and the minimised mascot.
+     */
+    val platformStyle: ChatPlatformStyle = ChatPlatformStyle.Pointer,
 )
+
+/**
+ * letta-mobile-bglj6.1.9: which idiom the page is drawn in. Keyed off the platform, not the
+ * window width: a narrow desktop window is still driven by a pointer, a tablet still by touch.
+ */
+enum class ChatPlatformStyle {
+    /** Phones and tablets: the legacy Android composer bar, sheets, chat head over the canvas. */
+    Touch,
+
+    /** Desktop: the composer card, popup menus, the movable docked panel. */
+    Pointer,
+}
+
+/** The page's [ChatPlatformStyle], for parts that sit deep under the page (the composer, rows). */
+internal val LocalChatPlatformStyle = androidx.compose.runtime.staticCompositionLocalOf { ChatPlatformStyle.Pointer }
+
+/** True when the page is drawn in the [ChatPlatformStyle.Touch] idiom. */
+@Composable
+internal fun touchStyle(): Boolean = LocalChatPlatformStyle.current == ChatPlatformStyle.Touch
 
 /**
  * letta-mobile-bglj6.1: how a tool summary line ("Ran 2 commands") shows its calls.

@@ -13,6 +13,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.mascot.LocalMascotTransport
@@ -79,15 +80,15 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
 
 /** On a chat page, a spot the page's one seat stands over; elsewhere, a seat of its own. */
 @Composable
-private fun CompanionSeatHere(agentId: String, model: ComposerModel) {
+internal fun CompanionSeatHere(agentId: String, model: ComposerModel, size: Dp = ChatMascotDimens.composerCompanion) {
     val anchors = LocalCompanionSeatAnchors.current
     if (anchors != null) {
-        CompanionSeatAnchor(anchors)
+        CompanionSeatAnchor(anchors, size = size)
     } else {
         MascotSeat(
             agentId = agentId,
             stage = MascotStage.COMPOSER_COMPANION,
-            size = ChatMascotDimens.composerCompanion,
+            size = size,
             onClick = model.host.openAgentPane,
             onEdit = model.host.editAgent,
             empty = {},

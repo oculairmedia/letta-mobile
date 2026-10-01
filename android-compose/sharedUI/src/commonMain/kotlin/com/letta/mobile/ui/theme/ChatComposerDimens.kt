@@ -55,6 +55,64 @@ object ChatComposerDimens {
 }
 
 /**
+ * letta-mobile-bglj6.1.9: the Touch composer bar, lifted from the legacy Android composer
+ * (feature-chat ChatComposer + designsystem LettaInputBar) so the shared page draws the same bar.
+ */
+object TouchComposerDimens {
+    /** The "+" and send/stop slots: the rail's touch target. */
+    val actionTarget: Dp = LettaDimens.Orb.railSlotWidth
+
+    /** The "+" disc inside its target. */
+    val attachButton: Dp = LettaSpacingTokens.COMPOSER_ATTACH_BUTTON_SIZE.dp
+    val attachIcon: Dp = LettaSpacingTokens.COMPOSER_ATTACH_ICON_SIZE.dp
+
+    /** The send/stop glyph. */
+    val actionIcon: Dp = LettaDimens.Space.xl
+
+    /** The bar's top corners at rest, and once engaged (focused, typed in, holding an image). */
+    val restingCorner: Dp = LettaDimens.Space.xxl
+    val engagedCorner: Dp = LettaDimens.Space.xl
+
+    /** A hair of tonal lift once engaged. */
+    val engagedElevation: Dp = LettaDimens.Space.hair
+    val restingElevation: Dp = 0.dp
+
+    /** The bar's vertical padding at rest; it eases to [compactVerticalPadding] as the keyboard rises. */
+    val restingVerticalPadding: Dp = LettaDimens.Space.xl
+    val compactVerticalPadding: Dp = LettaDimens.Space.md
+
+    /** Keyboard inset, in px, at which the bar is fully compact. */
+    const val imeInsetForCompactPx: Float = 96f
+
+    val horizontalPadding: Dp = LettaSpacingTokens.SM.dp
+    val itemSpacing: Dp = LettaSpacingTokens.XS.dp
+
+    /** The field's own inner padding (Material's TextField: 16 dp on each side). */
+    val fieldPadding: Dp = LettaDimens.Space.lg
+
+    /** The "+" shrinks a touch while pressed. */
+    const val pressedScale: Float = 0.96f
+
+    /** Stop draws smaller than Send and beats gently while the run is live. */
+    const val stopScale: Float = 0.7f
+    const val stopPulseScale: Float = 1.04f
+    const val stopPulseMillis: Int = 800
+
+    /** The page's companion above the bar while the agent works (legacy ChatComposerCompanion). */
+    val companion: Dp = 64.dp
+
+    /** The action sheet's list caps at this height and scrolls. */
+    val sheetListMaxHeight: Dp = 320.dp
+
+    /** The leading icon of an action sheet row. */
+    val sheetIcon: Dp = LettaDimens.Space.xl
+
+    /** An action sheet row's tonal lift at rest and pressed. */
+    val sheetItemElevation: Dp = LettaElevationTokens.ACTION_SHEET_ITEM_RESTING.dp
+    val sheetItemCorner: Dp = LettaShapeTokens.ACTION_RADIUS.dp
+}
+
+/**
  * Fixed hues for the context-window breakdown: it needs one distinguishable colour per
  * section, and the M3 scheme only offers a handful of accents. Mid-saturation so they hold
  * up on light and dark surfaces. Lifted from desktop's DesktopComposerContextUsage.

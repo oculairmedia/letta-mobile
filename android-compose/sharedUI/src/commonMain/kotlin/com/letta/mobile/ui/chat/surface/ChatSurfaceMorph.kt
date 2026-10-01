@@ -130,14 +130,14 @@ internal fun MorphBackdrop(fraction: () -> Float, modifier: Modifier = Modifier)
  */
 @Composable
 internal fun MorphPageLayer(
-    dock: ChatDockState,
+    /** Where the morph starts in a (width, height) dp area: the docked panel, or the Touch bar. */
+    from: (widthDp: Float, heightDp: Float) -> ChatDockRect,
     morph: SurfaceMorph,
     modifier: Modifier = Modifier,
+    /** The panel's rounded corners square off as it grows; the Touch bar has none to lose. */
+    rounded: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val density = LocalDensity.current
-    // The panel rises above the keyboard (DockedChatPanel pads for it); the page does not.
-    val imeDp = with(density) { WindowInsets.ime.getBottom(density).toDp().value }
     val fraction = morph.fraction
     Box(
         modifier
@@ -145,8 +145,7 @@ internal fun MorphPageLayer(
             .layout { measurable, constraints ->
                 val widthDp = constraints.maxWidth.toDp().value
                 val heightDp = constraints.maxHeight.toDp().value
-                val from = dock.rectIn(widthDp, (heightDp - imeDp).coerceAtLeast(0f))
-                val rect = lerpRect(from, ChatDockRect(0f, 0f, widthDp, heightDp), fraction())
+                val rect = lerpRect(from(widthDp, heightDp), ChatDockRect(0f, 0f, widthDp, heightDp), fraction())
                 val placeable = measurable.measure(
                     Constraints.fixed(rect.width.dp.roundToPx().coerceAtLeast(0), rect.height.dp.roundToPx().coerceAtLeast(0)),
                 )
@@ -156,7 +155,7 @@ internal fun MorphPageLayer(
             }
             .then(if (morph.morphing) Modifier.testTag(SURFACE_MORPH_TAG) else Modifier)
             .graphicsLayer {
-                shape = RoundedCornerShape(LettaDimens.Radius.lg.toPx() * (1f - fraction()))
+                shape = RoundedCornerShape(if (rounded) LettaDimens.Radius.lg.toPx() * (1f - fraction()) else 0f)
                 clip = true
             }
             // Like the opaque Surface it replaces: nothing under the page takes a touch.

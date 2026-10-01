@@ -43,6 +43,10 @@ object ChatRowDimens {
     const val gridMaxImages: Int = 4
     const val stripMaxImages: Int = 6
 
+    /** A phone prompt's images (letta-mobile-bglj6.1.9): three up at most, each cell this tall. */
+    const val promptGridMaxImages: Int = 3
+    val promptGridCellHeight: Dp = 120.dp
+
     /** How long the copy affordance shows its "copied" check, in ms. */
     const val copiedFeedbackMillis: Long = 1200L
 }
