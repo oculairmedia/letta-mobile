@@ -79,7 +79,9 @@ internal fun ChatComposerPanel(
             DockedComposerBar(model, attachImage)
         } else {
             ComposerCompanionRow(model) { ComposerPromptCard(model, attachImage) }
-            ComposerHintRow(visible = composerHintVisible(composer.text, composer.attachments.isNotEmpty()))
+            if (platform.showKeyboardHints) {
+                ComposerHintRow(visible = composerHintVisible(composer.text, composer.attachments.isNotEmpty()))
+            }
         }
     }
 }

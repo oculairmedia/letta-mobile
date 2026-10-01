@@ -20,6 +20,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -74,6 +75,7 @@ class ChatComposerPanelUiTest {
         onIntent: (ChatSurfaceIntent) -> Unit = {},
         capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
         host: ChatSurfaceHost = ChatSurfaceHost(),
+        platform: ChatSurfacePlatform = ChatSurfacePlatform.Default,
     ) {
         MaterialTheme {
             ChatComposerPanel(
@@ -82,7 +84,7 @@ class ChatComposerPanelUiTest {
                 actions = actions,
                 capabilities = capabilities,
                 host = host,
-                platform = ChatSurfacePlatform.Default,
+                platform = platform,
                 mode = mode,
                 onIntent = onIntent,
             )
@@ -118,6 +120,24 @@ class ChatComposerPanelUiTest {
         onNodeWithText("Model").assertExists()
         onNodeWithTag(ComposerTestTags.SEND).assertExists().assertIsEnabled().performClick()
         runOnIdle { assertEquals(1, actions.count("send")) }
+    }
+
+    @Test
+    fun keyboardHintsShowWhereThePlatformAsksForThem() = runComposeUiTest {
+        setContent { Panel(composer = ready(text = ""), actions = RecordingChatActions()) }
+        assertEquals(1, onAllNodesWithTag(ComposerTestTags.HINT, useUnmergedTree = true).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun touchHostsHideTheKeyboardHints() = runComposeUiTest {
+        setContent {
+            Panel(
+                composer = ready(text = ""),
+                actions = RecordingChatActions(),
+                platform = ChatSurfacePlatform(showKeyboardHints = false),
+            )
+        }
+        assertEquals(0, onAllNodesWithTag(ComposerTestTags.HINT, useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
     @Test

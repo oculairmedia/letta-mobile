@@ -157,6 +157,8 @@ private fun rememberAndroidChatSurfacePlatform(
         ChatSurfacePlatform(
             voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
             pageBackground = pageBackground,
+            // Touch first: the composer's keyboard-shortcut strip is desktop chrome.
+            showKeyboardHints = false,
         )
     }
 }

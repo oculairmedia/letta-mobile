@@ -40,6 +40,11 @@ data class ChatSurfacePlatform(
      * canvas, the page must be opaque.
      */
     val pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)? = null,
+    /**
+     * Whether the composer shows its keyboard-shortcut strip ("Enter or Ctrl+Enter to send").
+     * True where a hardware keyboard is the norm (desktop); false on touch-first hosts.
+     */
+    val showKeyboardHints: Boolean = true,
 ) {
     companion object {
         val Default = ChatSurfacePlatform()

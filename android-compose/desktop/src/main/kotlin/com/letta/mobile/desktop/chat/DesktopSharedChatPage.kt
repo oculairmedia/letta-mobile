@@ -139,6 +139,7 @@ internal fun DesktopSharedChatPage(
                 pageBackground = { content ->
                     DesktopAmbientChatBackground(status = ambientStatus, modifier = Modifier.fillMaxSize()) { content() }
                 },
+                showKeyboardHints = true,
             )
         },
         pagedTimeline = state.pagedTimeline,
