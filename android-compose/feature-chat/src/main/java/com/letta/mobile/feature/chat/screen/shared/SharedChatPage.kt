@@ -31,6 +31,7 @@ import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
@@ -93,6 +94,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             displayMode = params.chatMode.toChatDisplayMode(),
             fontScale = params.fontScale,
             hapticsEnabled = params.hapticsEnabled,
+            // CachedSettingsRepository.setChatFontScale clamps to this range.
+            fontScaleRange = DefaultFontScaleRange,
         )
     }
     Box(modifier) {

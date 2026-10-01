@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -23,6 +24,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_font_scale_percent
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -31,27 +33,39 @@ import kotlin.math.roundToInt
  * Lifted from Android's ChatMessageListPinch + PinchScalePreviewController without the
  * Choreographer frame-budget sampler (Android-only telemetry). While pinching, [effectiveScale]
  * tracks the gesture and rows re-lay out at it; on release the snapped scale is reported once
- * through ChatActions.setFontScale and shown until the owner's committed scale catches up.
+ * through ChatActions.setFontScale and shown until the owner's committed scale moves (to it, or
+ * anywhere else: a host change such as desktop's Ctrl+scroll then wins).
  */
 @Stable
 internal class TimelinePinchScale(
-    private val minScale: Float = MIN_SCALE,
-    private val maxScale: Float = MAX_SCALE,
+    range: ClosedFloatingPointRange<Float> = MIN_SCALE..MAX_SCALE,
     private val step: Float = STEP,
 ) {
+    private val minScale = range.start
+    private val maxScale = range.endInclusive
+
     var isPinching by mutableStateOf(false)
         private set
     private var base by mutableFloatStateOf(1f)
     private var transient by mutableFloatStateOf(1f)
     private var pending by mutableStateOf<Float?>(null)
 
+    /** The owner's committed scale when the gesture began; [pending] holds only until it moves. */
+    private var committedAtBegin = 1f
+
     /** The scale rows draw at: the live gesture, else a just-committed value, else [committed]. */
     fun effectiveScale(committed: Float): Float = when {
         isPinching -> (base * transient).coerceIn(minScale, maxScale)
-        else -> pending?.takeUnless { it == committed } ?: committed
+        else -> pending?.takeIf { sameScale(committed, committedAtBegin) } ?: committed
+    }
+
+    /** The owner's committed scale changed: whatever it now is supersedes a pending commit. */
+    fun onCommittedChanged(committed: Float) {
+        if (pending != null && !sameScale(committed, committedAtBegin)) pending = null
     }
 
     fun begin(committed: Float) {
+        committedAtBegin = committed
         base = committed.coerceIn(minScale, maxScale)
         transient = 1f
         pending = null
@@ -78,10 +92,13 @@ internal class TimelinePinchScale(
     }
 
     companion object {
-        /** The settings store clamps to the same range (CachedSettingsRepository.setChatFontScale). */
+        /** Android's settings store range (CachedSettingsRepository.setChatFontScale). */
         const val MIN_SCALE: Float = 0.7f
         const val MAX_SCALE: Float = 1.6f
         const val STEP: Float = 0.02f
+        private const val EPSILON: Float = 0.0001f
+
+        private fun sameScale(a: Float, b: Float): Boolean = abs(a - b) < EPSILON
     }
 }
 
@@ -123,9 +140,11 @@ internal fun Modifier.timelinePinchZoom(
 internal fun rememberTimelinePinch(
     enabled: Boolean,
     committedScale: Float,
+    range: ClosedFloatingPointRange<Float>,
     onCommit: (Float) -> Unit,
 ): Pair<TimelinePinchScale, Modifier> {
-    val pinch = remember { TimelinePinchScale() }
+    val pinch = remember(range) { TimelinePinchScale(range) }
+    LaunchedEffect(pinch, committedScale) { pinch.onCommittedChanged(committedScale) }
     val committed by rememberUpdatedState(committedScale)
     val commit by rememberUpdatedState(onCommit)
     val modifier = Modifier.timelinePinchZoom(enabled, pinch, { committed }, { commit(it) })

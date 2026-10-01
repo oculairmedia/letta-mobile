@@ -119,6 +119,32 @@ class ChatTimelineLogicTest {
     }
 
     @Test
+    fun aHostScaleChangeAfterACommitWins() {
+        val pinch = TimelinePinchScale()
+        pinch.begin(committed = 1f)
+        pinch.applyZoom(1.25f)
+        val snapped = pinch.finish()
+        // The owner never stored the pinch, but the host moved the scale (desktop Ctrl+scroll).
+        pinch.onCommittedChanged(1.4f)
+        assertEquals(1.4f, pinch.effectiveScale(1.4f))
+        // ...and going back to the old value does not resurrect the stale pending scale.
+        pinch.onCommittedChanged(1f)
+        assertEquals(1f, pinch.effectiveScale(1f))
+        assertTrue(snapped > 1f)
+    }
+
+    @Test
+    fun pinchClampsToTheHostRange() {
+        val pinch = TimelinePinchScale(0.8f..2.0f)
+        pinch.begin(committed = 1f)
+        pinch.applyZoom(10f)
+        assertEquals(2.0f, pinch.finish(), 0.0001f)
+        pinch.begin(committed = 1f)
+        pinch.applyZoom(0.01f)
+        assertEquals(0.8f, pinch.finish(), 0.0001f)
+    }
+
+    @Test
     fun pinchIsClampedToTheSettingsRange() {
         val pinch = TimelinePinchScale()
         pinch.begin(committed = 1f)

@@ -51,6 +51,7 @@ internal fun ChatTimeline(
     val (pinch, pinchModifier) = rememberTimelinePinch(
         enabled = capabilities.fontScale,
         committedScale = appearance.fontScale,
+        range = appearance.fontScaleRange,
         onCommit = actions::setFontScale,
     )
     val fontScale = pinch.effectiveScale(appearance.fontScale)

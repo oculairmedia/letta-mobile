@@ -20,7 +20,12 @@ data class ChatSurfaceAppearance(
      */
     val fontScaleAppliedByHost: Boolean = false,
     val hapticsEnabled: Boolean = true,
+    /** The host's font-scale range: pinch-to-zoom clamps to it (Android 0.7–1.6, desktop 0.8–2.0). */
+    val fontScaleRange: ClosedFloatingPointRange<Float> = DefaultFontScaleRange,
 )
+
+/** Android's settings range, the default for hosts that do not set their own. */
+val DefaultFontScaleRange: ClosedFloatingPointRange<Float> = 0.7f..1.6f
 
 /**
  * What only a platform can provide, injected as slots so the page itself stays in commonMain.
