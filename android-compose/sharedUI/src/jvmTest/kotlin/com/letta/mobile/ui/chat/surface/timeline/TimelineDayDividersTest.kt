@@ -16,7 +16,6 @@ import kotlin.test.assertTrue
 class TimelineDayDividersTest {
 
     private val utc = TimeZone.UTC
-    private val fixedToday = { LocalDate(2026, 3, 4) }
 
     private fun item(id: String, timestamp: String) = ChatRenderItem.Single(
         message = UiMessage(id = id, role = "assistant", content = id, timestamp = timestamp),
@@ -28,11 +27,11 @@ class TimelineDayDividersTest {
     private fun List<TimelineRow>.dividerDates() = filterIsInstance<TimelineRow.DayDivider>().map { it.date }
 
     @Test
-    fun singleDayConversationGetsExactlyOneLeadingDivider() {
+    fun singleDayConversationGetsNoDivider() {
+        // As on Android: dividers mark a CHANGE of day, so the oldest day opens without one.
         val rows = withDayDividers(listOf(row("a", "2026-03-04T09:41:00Z"), row("b", "2026-03-04T18:02:00Z")), utc)
-        assertEquals(3, rows.size)
-        assertTrue(rows.first() is TimelineRow.DayDivider, "the divider leads the section it opens")
-        assertEquals(listOf(LocalDate(2026, 3, 4)), rows.dividerDates())
+        assertEquals(2, rows.size)
+        assertTrue(rows.dividerDates().isEmpty())
     }
 
     @Test
@@ -46,7 +45,8 @@ class TimelineDayDividersTest {
             ),
             utc,
         )
-        assertEquals(listOf(LocalDate(2026, 3, 4), LocalDate(2026, 3, 5), LocalDate(2026, 3, 7)), rows.dividerDates())
+        assertEquals(listOf(LocalDate(2026, 3, 5), LocalDate(2026, 3, 7)), rows.dividerDates())
+        assertTrue(rows[1] is TimelineRow.DayDivider, "the divider leads the day it opens")
         assertEquals(listOf("msg-a", "msg-b", "msg-c", "msg-d"), rows.filterIsInstance<TimelineRow.Item>().map { it.key })
     }
 
@@ -54,7 +54,7 @@ class TimelineDayDividersTest {
     fun dayBoundaryIsLocalNotUtc() {
         val tokyo = TimeZone.of("Asia/Tokyo")
         val rows = withDayDividers(listOf(row("a", "2026-03-04T10:00:00Z"), row("b", "2026-03-04T23:30:00Z")), tokyo)
-        assertEquals(listOf(LocalDate(2026, 3, 4), LocalDate(2026, 3, 5)), rows.dividerDates())
+        assertEquals(listOf(LocalDate(2026, 3, 5)), rows.dividerDates())
     }
 
     @Test
@@ -67,18 +67,18 @@ class TimelineDayDividersTest {
     @Test
     fun unparseableTimestampStaysInTheOpenSection() {
         val rows = withDayDividers(
-            listOf(row("a", "2026-03-04T09:41:00Z"), row("b", "not-a-timestamp"), row("c", "")),
+            listOf(row("x", "2026-03-03T09:41:00Z"), row("a", "2026-03-04T09:41:00Z"), row("b", "not-a-timestamp"), row("c", "")),
             utc,
         )
         assertEquals(listOf(LocalDate(2026, 3, 4)), rows.dividerDates())
-        assertEquals(4, rows.size)
+        assertEquals(5, rows.size)
     }
 
     @Test
-    fun conversationWithNoReadableTimestampsStillGetsAHeading() {
-        val rows = withDayDividers(listOf(row("a", ""), row("b", "")), utc, fixedToday)
-        assertEquals(listOf(fixedToday()), rows.dividerDates())
-        assertTrue(rows.first() is TimelineRow.DayDivider)
+    fun conversationWithNoReadableTimestampsGetsNoDivider() {
+        val rows = withDayDividers(listOf(row("a", ""), row("b", "")), utc)
+        assertTrue(rows.dividerDates().isEmpty())
+        assertEquals(2, rows.size)
     }
 
     @Test
@@ -104,7 +104,7 @@ class TimelineDayDividersTest {
             item("a", "2026-03-04T12:00:00Z"),
         )
         assertEquals(
-            listOf("msg-c", "__day__2026-03-05", "msg-b", "msg-a", "__day__2026-03-04"),
+            listOf("msg-c", "__day__2026-03-05", "msg-b", "msg-a"),
             timelineRowsNewestFirst(newestFirst, utc).map { it.key },
         )
     }
@@ -148,8 +148,8 @@ class TimelineDayDividersTest {
     }
 
     @Test
-    fun theOldestResidentRowStillCarriesItsDivider() {
-        assertEquals(LocalDate(2026, 9, 12), pagedBoundaryDate(item("a", "2026-09-12T09:00:00Z"), older = null, zone = utc))
+    fun theOldestResidentRowOpensNoDivider() {
+        assertNull(pagedBoundaryDate(item("a", "2026-09-12T09:00:00Z"), older = null, zone = utc))
     }
 
     @Test

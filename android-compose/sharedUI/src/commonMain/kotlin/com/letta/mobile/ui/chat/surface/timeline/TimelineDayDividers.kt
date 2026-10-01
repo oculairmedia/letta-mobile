@@ -27,14 +27,15 @@ import kotlin.time.Duration.Companion.milliseconds
  * letta-mobile-bglj6.1: day sections, lifted from desktop's DesktopChatDayDividers and rewritten on
  * kotlinx-datetime so it runs in commonMain.
  *
- * Inserts a [TimelineRow.DayDivider] ahead of the first row of each LOCAL day. Rows whose
- * timestamp is blank or unparseable emit no divider and stay in the open section, so a malformed
- * timestamp cannot tear a turn in half. Input and output are in chat order (oldest first).
+ * Inserts a [TimelineRow.DayDivider] where the LOCAL day changes, ahead of the new day's first
+ * row, as the Android timeline does: the oldest day opens with no divider, so a conversation that
+ * fits in one day shows none. Rows whose timestamp is blank or unparseable emit no divider and
+ * stay in the open section, so a malformed timestamp cannot tear a turn in half. Input and output
+ * are in chat order (oldest first).
  */
 internal fun withDayDividers(
     chatOrderRows: List<TimelineRow>,
     zone: TimeZone = TimeZone.currentSystemDefault(),
-    today: () -> LocalDate = { Clock.System.todayIn(zone) },
 ): List<TimelineRow> {
     if (chatOrderRows.isEmpty()) return chatOrderRows
     val out = ArrayList<TimelineRow>(chatOrderRows.size + 1)
@@ -42,29 +43,29 @@ internal fun withDayDividers(
     chatOrderRows.forEach { row ->
         val day = row.timestampOrNull()?.let { parseTimelineLocalDate(it, zone) }
         if (day != null && day != currentDay) {
+            if (currentDay != null) out += TimelineRow.DayDivider(day)
             currentDay = day
-            out += TimelineRow.DayDivider(day)
         }
         out += row
     }
-    // Every timestamp unreadable: still give the list its top marker.
-    if (currentDay == null) out.add(0, TimelineRow.DayDivider(today()))
     return out
 }
 
 /**
  * The date a paged row's divider names, or null when its older neighbour shares its day. Emitted
  * with the NEWER row so the paged route never has to materialize a day-grouped list. The oldest
- * resident row ([older] null) begins a day as far as the list can see, so it keeps its divider.
- * Lifted from desktop's canonicalBoundaryDate, compared in the reader's [zone].
+ * resident row ([older] null) opens no divider, as the oldest day does in [withDayDividers]; it
+ * gains one when older history that ends on another day loads beneath it. Lifted from desktop's
+ * canonicalBoundaryDate, compared in the reader's [zone].
  */
 internal fun pagedBoundaryDate(
     newer: ChatRenderItem,
     older: ChatRenderItem?,
     zone: TimeZone = TimeZone.currentSystemDefault(),
 ): LocalDate? {
+    if (older == null) return null
     val newerDay = parseTimelineLocalDate(newer.boundaryTimestamp, zone) ?: return null
-    val olderDay = older?.let { parseTimelineLocalDate(it.boundaryTimestamp, zone) }
+    val olderDay = parseTimelineLocalDate(older.boundaryTimestamp, zone)
     return newerDay.takeIf { it != olderDay }
 }
 
