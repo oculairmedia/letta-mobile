@@ -145,27 +145,41 @@ private class ChatSurfaceFrame(
 
 /**
  * The canvas fills the whole area and is always composed. Docked, the chat panel floats over
- * it wherever the person put it; full screen, the page covers it.
+ * it wherever the person put it; full screen, the page covers it. Between the two the panel
+ * grows into the page (and back) through [SurfaceMorphLayer].
  */
 @Composable
 private fun CanvasWithChat(frame: ChatSurfaceFrame, dock: ChatDockState, canvas: @Composable () -> Unit, modifier: Modifier) {
     val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
+    val progress = rememberSurfaceMorphProgress(fullScreen)
+    val phase = surfaceMorphPhase(progress, fullScreen)
     Box(modifier.fillMaxSize()) {
         // Hidden from accessibility while the page covers it; it stays composed for its state.
         val canvasModifier = Modifier.fillMaxSize()
         Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
-        if (fullScreen) {
-            FullScreenPage(frame, Modifier.fillMaxSize(), opaque = true)
-        } else {
-            DockedOverlay(frame, dock, Modifier.fillMaxSize())
+        when (phase) {
+            SurfaceMorphPhase.FullScreen -> FullScreenPage(frame, Modifier.fillMaxSize(), opaque = true)
+            SurfaceMorphPhase.Docked -> DockedOverlay(frame, dock, Modifier.fillMaxSize())
+            SurfaceMorphPhase.Morphing -> SurfaceMorphLayer(progress, dock, morphContent(frame, dock), Modifier.fillMaxSize())
         }
     }
 }
 
+/** Both ends of the morph, each drawn as it is at rest in its own mode. */
+private fun morphContent(frame: ChatSurfaceFrame, dock: ChatDockState): SurfaceMorphContent = SurfaceMorphContent(
+    docked = { DockedPanelBody(dock, dockedPanelContent(frame, ChatSurfaceMode.Docked), Modifier.fillMaxSize()) },
+    page = { FullPageBody(frame, ChatSurfaceMode.FullScreen) },
+)
+
 /** The movable, resizable chat panel: header, conversation, composer bar. */
 @Composable
 private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier: Modifier) {
-    val content = DockedPanelContent(
+    DockedChatPanel(dock, dockedPanelContent(frame, frame.mode), modifier)
+}
+
+/** The panel's content, with its composer drawn for [composerMode]. */
+private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode): DockedPanelContent =
+    DockedPanelContent(
         agentName = frame.uiState.agentName,
         streaming = frame.uiState.isStreaming,
         onOpenFullScreen = { frame.onIntent(ChatSurfaceIntent.Expand) },
@@ -183,28 +197,30 @@ private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier
                 conversationModifier,
             )
         },
-        composer = { DockedComposer(frame, Modifier.fillMaxWidth()) },
+        composer = { Composer(frame, composerMode, Modifier.fillMaxWidth()) },
     )
-    DockedChatPanel(dock, content, modifier)
-}
 
 @Composable
 private fun FullScreenPage(frame: ChatSurfaceFrame, modifier: Modifier, opaque: Boolean) {
+    if (opaque) {
+        // A Surface also stops touches reaching the canvas underneath.
+        Surface(modifier, color = MaterialTheme.colorScheme.background) { FullPageBody(frame, frame.mode) }
+    } else {
+        Box(modifier) { FullPageBody(frame, frame.mode) }
+    }
+}
+
+/** The timeline over the composer, inside the host's page background when it has one. */
+@Composable
+private fun FullPageBody(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode) {
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxSize()) {
             TimelineWithOverlay(frame, Modifier.weight(1f).fillMaxWidth())
-            Composer(frame, Modifier.fillMaxWidth())
+            Composer(frame, composerMode, Modifier.fillMaxWidth())
         }
     }
     val background = frame.platform.pageBackground
-    when {
-        // A Surface also stops touches reaching the canvas underneath.
-        opaque -> Surface(modifier, color = MaterialTheme.colorScheme.background) {
-            if (background != null) background(content) else content()
-        }
-        background != null -> Box(modifier) { background(content) }
-        else -> Box(modifier) { content() }
-    }
+    if (background != null) background(content) else content()
 }
 
 /** The timeline, with the host's [ChatSurfacePlatform.timelineOverlay] drawn over its top. */
@@ -229,18 +245,15 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
     }
 }
 
-@Composable
-private fun DockedComposer(frame: ChatSurfaceFrame, modifier: Modifier) = Composer(frame, modifier)
-
 /**
  * The composer with what must stay visible in every mode above it: the page's one snackbar host
  * and, while docked (no timeline on screen), the A2UI surfaces.
  */
 @Composable
-private fun Composer(frame: ChatSurfaceFrame, modifier: Modifier) {
+private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
-        if (frame.mode == ChatSurfaceMode.Docked) {
+        if (mode == ChatSurfaceMode.Docked) {
             A2uiSurfaceStack(
                 surfaces = frame.uiState.a2uiSurfaces,
                 resolvedActionCounters = frame.uiState.a2uiResolvedActionCounters,
@@ -250,12 +263,12 @@ private fun Composer(frame: ChatSurfaceFrame, modifier: Modifier) {
                     .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
             )
         }
-        ComposerPanel(frame, Modifier.fillMaxWidth())
+        ComposerPanel(frame, mode, Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun ComposerPanel(frame: ChatSurfaceFrame, modifier: Modifier) {
+private fun ComposerPanel(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
     ChatComposerPanel(
         composer = frame.composer,
         uiState = frame.uiState,
@@ -263,7 +276,7 @@ private fun ComposerPanel(frame: ChatSurfaceFrame, modifier: Modifier) {
         capabilities = frame.port.capabilities,
         host = frame.host,
         platform = frame.platform,
-        mode = frame.mode,
+        mode = mode,
         onIntent = frame.onIntent,
         modifier = modifier,
     )

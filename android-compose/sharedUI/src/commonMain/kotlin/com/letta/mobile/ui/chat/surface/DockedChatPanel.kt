@@ -202,7 +202,6 @@ internal fun DockedChatPanel(state: ChatDockState, content: DockedPanelContent, 
 
 @Composable
 private fun PanelSurface(state: ChatDockState, content: DockedPanelContent, modifier: Modifier) {
-    val collapsed = state.geometry.collapsed
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(LettaDimens.Radius.lg),
@@ -217,20 +216,33 @@ private fun PanelSurface(state: ChatDockState, content: DockedPanelContent, modi
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
-        Column {
-            if (collapsed) {
-                CollapsedHeader(state)
-            } else {
-                PanelHeader(state, content)
-                if (content.streaming) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md))
-                }
-                content.conversation(Modifier.weight(1f).fillMaxWidth())
-            }
-            content.composer()
-        }
+        DockedPanelBody(state, content)
     }
 }
+
+/** The panel's inside: its header, the conversation (unless minimised) and the composer bar. */
+@Composable
+internal fun DockedPanelBody(state: ChatDockState, content: DockedPanelContent, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        if (state.geometry.collapsed) {
+            CollapsedHeader(state)
+        } else {
+            PanelHeader(state, content)
+            if (content.streaming) {
+                LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md))
+            }
+            content.conversation(Modifier.weight(1f).fillMaxWidth())
+        }
+        content.composer()
+    }
+}
+
+/**
+ * Where the panel sits in a [widthDp] x [heightDp] area: the same rect [DockedChatPanel] lays
+ * it out at, so a morph that starts or ends here lines up with the panel at rest.
+ */
+internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect =
+    ChatDockGeometryMath.rect(geometry, ChatDockFrame(widthDp, heightDp, DockLimits, collapsedHeightDp))
 
 /** Drag to move, double-click / double-tap to reset; the panel's own controls sit on it. */
 private fun Modifier.moveHandle(state: ChatDockState): Modifier = this

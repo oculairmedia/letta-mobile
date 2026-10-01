@@ -21,7 +21,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.session.ChatActions
-import com.letta.mobile.ui.chat.surface.composer.RecordingChatActions
+import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.abs

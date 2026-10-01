@@ -10,6 +10,7 @@ object ComposerTestTags {
     const val DOCKED_BAR = "composer-docked"
     const val DOCKED_INPUT = "composer-docked-input"
     const val EXPAND = "composer-expand"
+    const val SHOW_CANVAS = "composer-show-canvas"
     const val ERROR = "composer-error"
     const val HINT = "composer-hint"
     const val COMMAND_SUGGESTIONS = "composer-commands"

@@ -22,7 +22,6 @@ import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
-import com.letta.mobile.ui.chat.surface.composer.RecordingChatActions
 import com.letta.mobile.ui.chat.surface.sendflight.SendFlightTestTags
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.theme.ChatMotionTokens

@@ -37,4 +37,23 @@ object ChatMotionTokens {
         /** The bubble's own fill grows in over the first part of the trip. */
         const val FILL_IN_FRACTION: Float = 0.6f
     }
+
+    /**
+     * letta-mobile-bglj6.1: the docked panel growing into the full-screen page and shrinking
+     * back. One eased progress drives the panel's rect, corner radius, shadow and the page
+     * background; the two layouts cross-fade inside it.
+     */
+    object SurfaceMorph {
+        /** Docked to full screen (and back). A reversal mid-way takes the remaining share. */
+        const val MILLIS: Int = 340
+
+        /** Ramps up and settles without overshoot. */
+        val easing: Easing = FastOutSlowInEasing
+
+        /**
+         * Each layout fades over this share of the trip: the panel's own content is gone by
+         * this point, the page's content starts this far from the end, so they overlap mid-way.
+         */
+        const val CROSSFADE_FRACTION: Float = 0.6f
+    }
 }

@@ -34,9 +34,11 @@ import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Maximize2
+import com.composables.icons.lucide.Minimize2
 import com.composables.icons.lucide.Palette
 import com.composables.icons.lucide.Square
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.chat_surface_show_canvas
 import com.letta.mobile.sharedui.resources.composer_attach
 import com.letta.mobile.sharedui.resources.composer_attach_images
 import com.letta.mobile.sharedui.resources.composer_expand
@@ -66,6 +68,7 @@ internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit)
         val usage = model.composer.contextUsage
         Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             ControlsRow {
+                if (model.offersOpenCanvas) ComposerShowCanvasButton(onShowCanvas = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
                 ComposerPlusButton(model, onAttachImage)
                 if (model.showModel) model.composer.model?.let { ComposerModelControls(it, model.actions, model.host) }
                 if (!narrow && usage != null) ComposerContextChip(usage)
@@ -155,6 +158,21 @@ internal fun ComposerExpandButton(onExpand: () -> Unit) {
         contentDescription = stringResource(Res.string.composer_expand),
         onClick = onExpand,
         modifier = Modifier.testTag(ComposerTestTags.EXPAND),
+    )
+}
+
+/**
+ * The full page's way back to the canvas, where the docked bar keeps its expand control:
+ * Minimize2 here, Maximize2 there, so the pair reads as one toggle. Raises
+ * [ChatSurfaceIntent.OpenCanvas], like the swipe up and the plus menu's item.
+ */
+@Composable
+internal fun ComposerShowCanvasButton(onShowCanvas: () -> Unit) {
+    ComposerIconButton(
+        icon = Lucide.Minimize2,
+        contentDescription = stringResource(Res.string.chat_surface_show_canvas),
+        onClick = onShowCanvas,
+        modifier = Modifier.testTag(ComposerTestTags.SHOW_CANVAS),
     )
 }
 
