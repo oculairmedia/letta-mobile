@@ -21,11 +21,23 @@ detekt {
     parallel = true
 }
 
+compose.resources {
+    // letta-mobile-bglj6.1: one generated Res for the shared chat page's strings.
+    packageOfResClass = "com.letta.mobile.sharedui.resources"
+    publicResClass = false
+    generateResClass = always
+}
+
 kotlin {
     android {
         namespace = "com.letta.mobile.sharedui"
         compileSdk = libs.versions.compileSdk.get().toInt()
         minSdk = libs.versions.minSdk.get().toInt()
+
+        // letta-mobile-bglj6.1: package the Compose Multiplatform strings into the APK.
+        androidResources {
+            enable = true
+        }
 
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -92,6 +104,12 @@ kotlin {
                 // Android, a file dialog on desktop. The same library the hosts already use.
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)
+                // letta-mobile-bglj6.1: the shared chat page's strings (Compose Multiplatform resources,
+                // so Android and desktop read one copy instead of R.string and literals).
+                implementation("org.jetbrains.compose.components:components-resources:1.10.0")
+                // The shared chat page's paged canonical timeline (LazyPagingItems over
+                // CanonicalTimelinePresentation.settled). KMP: android + jvm.
+                implementation(libs.androidx.paging.compose)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
             }

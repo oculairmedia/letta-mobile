@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-bglj6.1: the shared chat page's shell strings. -->
+    <string name="chat_surface_placeholder">Message…</string>
+</resources>
