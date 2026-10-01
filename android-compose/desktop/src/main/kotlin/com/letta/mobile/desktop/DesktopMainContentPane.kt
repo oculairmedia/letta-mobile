@@ -107,7 +107,8 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
             modifier = Modifier.fillMaxSize(),
         )
     }
-    if (!inputs.showBackgroundTasks && inputs.subagentRepository != null) {
+    // The shared page draws it in the canvas header (see LettaDesktopApp's canvasHeaderTrailing).
+    if (sharedChatPage == null && !inputs.showBackgroundTasks && inputs.subagentRepository != null) {
         DesktopBackgroundTasksToggle(
             runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
             onClick = actions.onShowBackgroundTasks,

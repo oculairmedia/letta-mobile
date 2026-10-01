@@ -71,7 +71,13 @@ internal fun ChatComposerPanel(
         modifier = modifier
             .fillMaxWidth()
             .imePadding()
-            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+            // Docked, the bar sits in the panel's corner: the same inset on the sides and the bottom.
+            .padding(
+                start = LettaDimens.Space.lg,
+                end = LettaDimens.Space.lg,
+                top = LettaDimens.Space.sm,
+                bottom = if (mode == ChatSurfaceMode.Docked) LettaDimens.Space.lg else LettaDimens.Space.sm,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {

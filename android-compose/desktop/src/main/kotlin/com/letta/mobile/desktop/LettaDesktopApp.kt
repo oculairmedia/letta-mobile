@@ -826,6 +826,17 @@ internal fun LettaDesktopApp(
                                         selectedAgentId,
                                         selectedAgentName,
                                     ),
+                                    canvasHeaderTrailing = if (!showBackgroundTasks && subagentRepository != null) {
+                                        {
+                                            com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle(
+                                                runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
+                                                onClick = { showBackgroundTasks = true },
+                                                inBar = true,
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
                                     dockedCanvas = dockedCanvas,
                                 ),
                                 navigation = DesktopSharedChatPageNavigation(

@@ -113,6 +113,11 @@ fun CanvasWorkspace(
     onShareToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
     /** False when the host already shows the canvas title and a way back, as the desktop side pane does. */
     showTitle: Boolean = true,
+    /**
+     * The host's own control at the end of the header bar (desktop: the background-tasks
+     * button), so the host never has to float one over the board's chrome.
+     */
+    headerTrailing: (@Composable () -> Unit)? = null,
     /** Phone or desktop chrome; [CanvasLayout.AUTO] decides by the board's width. */
     layout: CanvasLayout = CanvasLayout.AUTO,
 ) {
@@ -1404,6 +1409,7 @@ fun CanvasWorkspace(
                     null
                 },
             )
+            headerTrailing?.invoke()
             }
 
 

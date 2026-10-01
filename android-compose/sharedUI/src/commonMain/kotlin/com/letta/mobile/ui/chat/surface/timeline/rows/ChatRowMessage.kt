@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -138,15 +140,18 @@ internal fun AgentText(params: AgentTextParams) {
         SelectionContainer {
             SharedMarkdownText(
                 text = displayText,
-                modifier = Modifier.padding(end = LettaDimens.Space.xxl),
+                // The copy button's full width plus a gap, so it never overlaps the text.
+                modifier = Modifier.padding(end = LettaDimens.Control.actionButton + LettaDimens.Space.xs),
                 // Retaining the previous markdown AST while parsing an update can pair stale
                 // annotation offsets with a reshaped block (a Compose Desktop crash).
                 retainState = false,
                 textColor = if (params.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             )
         }
+        // Centred on the first line of text rather than hanging from the row's top edge.
+        val firstLine = with(LocalDensity.current) { MaterialTheme.typography.bodyMedium.lineHeight.toDp() }
         Surface(
-            modifier = Modifier.align(Alignment.TopEnd),
+            modifier = Modifier.align(Alignment.TopEnd).offset(y = (firstLine - LettaDimens.Control.actionButton) / 2),
             shape = CircleShape,
             color = if (hovered) {
                 MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = ChatRowAlpha.hoverSurface)

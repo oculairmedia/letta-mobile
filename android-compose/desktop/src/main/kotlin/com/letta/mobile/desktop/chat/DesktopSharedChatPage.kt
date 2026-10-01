@@ -107,6 +107,8 @@ internal data class DesktopSharedChatPageState(
     val canvasOwner: DesktopCanvasOwner,
     /** Routes the shell's canvas opens to this page's dock (one live session per board). */
     val dockedCanvas: DesktopDockedCanvasRouter? = null,
+    /** The shell's own control drawn at the end of the canvas header (background tasks). */
+    val canvasHeaderTrailing: (@Composable () -> Unit)? = null,
 )
 
 /**
@@ -170,7 +172,7 @@ internal fun DesktopSharedChatPage(
         },
         pagedTimeline = state.pagedTimeline,
         canvas = { actions ->
-            if (hasConversation) DockedConversationCanvas(session, actions) else ChatCanvasPlaceholder()
+            if (hasConversation) DockedConversationCanvas(session, actions, state.canvasHeaderTrailing) else ChatCanvasPlaceholder()
         },
         dockGeometry = dockGeometry,
         onDockGeometryChange = { dockGeometry = it },
@@ -206,7 +208,11 @@ private fun rememberConversationCanvasSession(
 }
 
 @Composable
-private fun DockedConversationCanvas(session: CanvasSession?, actions: ChatCanvasActions) {
+private fun DockedConversationCanvas(
+    session: CanvasSession?,
+    actions: ChatCanvasActions,
+    headerTrailing: (@Composable () -> Unit)?,
+) {
     if (session == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -219,6 +225,7 @@ private fun DockedConversationCanvas(session: CanvasSession?, actions: ChatCanva
         onNavigateBack = null,
         onShareToChat = actions::shareToChat,
         showTitle = false,
+        headerTrailing = headerTrailing,
         modifier = Modifier.fillMaxSize(),
     )
 }

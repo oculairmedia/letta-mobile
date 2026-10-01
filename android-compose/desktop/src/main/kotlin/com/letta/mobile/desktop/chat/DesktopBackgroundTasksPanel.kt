@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -313,6 +315,8 @@ internal fun DesktopBackgroundTasksToggle(
     runningCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Inside another bar (the canvas header): just the orb button, no surface of its own. */
+    inBar: Boolean = false,
 ) {
     // Icon-only: the labelled pill was wide enough to collide with the pinned
     // prompt card; the tooltip carries the words (and the running count).
@@ -323,6 +327,21 @@ internal fun DesktopBackgroundTasksToggle(
     val tooltip = if (runningCount > 0) "Background tasks · $runningCount running" else "Background tasks"
     Box(modifier = modifier) {
         com.letta.mobile.desktop.DesktopTooltip(text = tooltip) {
+            if (inBar) {
+                Box(
+                    modifier = Modifier
+                        .size(LettaDimens.Control.iconButtonLg)
+                        .clip(CircleShape)
+                        .clickable(onClick = onClick),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AgentActivityOrb(
+                        size = LettaDimens.Control.icon,
+                        activity = if (runningCount > 0) AgentActivity.Working else AgentActivity.Idle,
+                    )
+                }
+                return@DesktopTooltip
+            }
             Surface(
                 onClick = onClick,
                 shape = MaterialTheme.shapes.large,
