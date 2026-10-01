@@ -45,4 +45,6 @@
     <string name="timeline_goal_resume">Resume</string>
     <string name="timeline_goal_complete">Done</string>
     <string name="timeline_goal_clear">Clear</string>
+    <string name="timeline_goal_refresh">Refresh</string>
+    <string name="timeline_goal_continue">Continue</string>
 </resources>

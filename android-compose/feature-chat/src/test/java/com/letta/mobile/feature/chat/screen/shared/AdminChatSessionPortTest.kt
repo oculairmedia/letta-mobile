@@ -76,6 +76,19 @@ class AdminChatSessionPortTest {
     }
 
     @Test
+    fun `goal refresh and continue forward to the view model and the port offers goals`() {
+        val vm = mockViewModel(ChatComposerState())
+        val actions = AdminChatActions(vm, onOpenBugReport = {})
+
+        actions.refreshGoalStatus()
+        actions.continueGoal()
+
+        verify(exactly = 1) { vm.refreshGoalStatus() }
+        verify(exactly = 1) { vm.continueGoal() }
+        assertTrue(AdminChatSessionPort.Capabilities.goals)
+    }
+
+    @Test
     fun `bug report effect from the composer reaches the host`() {
         val vm = mockViewModel(ChatComposerState(inputText = "/bug"))
         every { vm.submitComposer(any()) } returns ChatComposerEffect.OpenBugReport

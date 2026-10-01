@@ -149,4 +149,8 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
     override fun updateSearchQuery(query: String) = record("updateSearchQuery")
 
     override fun clearSearch() = record("clearSearch")
+
+    override fun refreshGoalStatus() = record("refreshGoalStatus")
+
+    override fun continueGoal() = record("continueGoal")
 }

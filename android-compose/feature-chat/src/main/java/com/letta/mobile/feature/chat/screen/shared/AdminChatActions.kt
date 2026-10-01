@@ -106,4 +106,9 @@ internal class AdminChatActions(
     override fun updateSearchQuery(query: String) = viewModel.updateChatSearchQuery(query)
 
     override fun clearSearch() = viewModel.clearChatSearch()
+
+    // Goal
+    override fun refreshGoalStatus() = viewModel.refreshGoalStatus()
+
+    override fun continueGoal() = viewModel.continueGoal()
 }

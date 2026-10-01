@@ -69,7 +69,8 @@ internal fun ChatTimeline(
     Box(modifier = modifier.then(pinchModifier)) {
         Column(Modifier.fillMaxSize()) {
             state.goalStatus?.let { goal ->
-                GoalStatusCard(goal, state.isGoalStatusLoading, actions::sendText, Modifier.align(Alignment.CenterHorizontally))
+                val goalActions = remember(actions, capabilities.goals) { GoalCardActions.of(actions, capabilities) }
+                GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))
             }
             TimelineBody(
                 TimelineBodyParams(state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, host.editAgent),

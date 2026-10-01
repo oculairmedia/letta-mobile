@@ -94,6 +94,7 @@ internal class AdminChatSessionPort(
             search = true,
             pagedHistory = true,
             fontScale = true,
+            goals = true,
         )
     }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -36,6 +38,8 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_close_a2ui
 import com.letta.mobile.sharedui.resources.timeline_goal_clear
 import com.letta.mobile.sharedui.resources.timeline_goal_complete
+import com.letta.mobile.sharedui.resources.timeline_goal_continue
+import com.letta.mobile.sharedui.resources.timeline_goal_refresh
 import com.letta.mobile.sharedui.resources.timeline_goal_pause
 import com.letta.mobile.sharedui.resources.timeline_goal_resume
 import com.letta.mobile.sharedui.resources.timeline_goal_title
@@ -48,6 +52,7 @@ import com.letta.mobile.ui.chat.render.A2uiActionSnackbarUi
 import com.letta.mobile.ui.chat.render.ChatSnackbarDuration
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -143,11 +148,27 @@ private fun ChatSnackbarDuration.toMaterial(): SnackbarDuration = when (this) {
 }
 
 /**
- * letta-mobile-bglj6.1: the active goal (Android GoalStatusCard). Its controls are `/goal`
- * commands sent through the owner, so no goal-specific action is needed on the port.
+ * What the goal card's controls do. Pause/resume/done/clear are `/goal` commands sent through
+ * [onCommand]; refresh and continue are owner actions, null (hidden) when the owner has none.
  */
+@Immutable
+internal class GoalCardActions(
+    val onCommand: (String) -> Unit,
+    val onRefresh: (() -> Unit)? = null,
+    val onContinue: (() -> Unit)? = null,
+) {
+    companion object {
+        fun of(actions: ChatActions, capabilities: ChatSurfaceCapabilities): GoalCardActions = GoalCardActions(
+            onCommand = actions::sendText,
+            onRefresh = if (capabilities.goals) actions::refreshGoalStatus else null,
+            onContinue = if (capabilities.goals) actions::continueGoal else null,
+        )
+    }
+}
+
+/** letta-mobile-bglj6.1: the active goal (Android GoalStatusCard). */
 @Composable
-internal fun GoalStatusCard(goal: GoalStatusUi, loading: Boolean, onCommand: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun GoalStatusCard(goal: GoalStatusUi, loading: Boolean, actions: GoalCardActions, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier
             .widthIn(max = ChatColumnMaxWidth)
@@ -162,18 +183,30 @@ internal fun GoalStatusCard(goal: GoalStatusUi, loading: Boolean, onCommand: (St
             modifier = Modifier.padding(LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            Text(
-                text = if (loading) {
-                    stringResource(Res.string.timeline_goal_title)
-                } else {
-                    stringResource(Res.string.timeline_goal_title_status, goal.status)
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            GoalHeader(goal, loading, actions.onRefresh)
             GoalDetails(goal)
-            GoalActions(goal, onCommand)
+            GoalActions(goal, actions)
         }
+    }
+}
+
+@Composable
+private fun GoalHeader(goal: GoalStatusUi, loading: Boolean, onRefresh: (() -> Unit)?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (loading) {
+                stringResource(Res.string.timeline_goal_title)
+            } else {
+                stringResource(Res.string.timeline_goal_title_status, goal.status)
+            },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        onRefresh?.let { refresh -> TextButton(onClick = refresh) { Text(stringResource(Res.string.timeline_goal_refresh)) } }
     }
 }
 
@@ -201,7 +234,8 @@ internal object GoalCommands {
 }
 
 @Composable
-private fun GoalActions(goal: GoalStatusUi, onCommand: (String) -> Unit) {
+private fun GoalActions(goal: GoalStatusUi, actions: GoalCardActions) {
+    val onCommand = actions.onCommand
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -209,6 +243,9 @@ private fun GoalActions(goal: GoalStatusUi, onCommand: (String) -> Unit) {
         if (goal.status == "complete") {
             TextButton(onClick = { onCommand(GoalCommands.CLEAR) }) { Text(stringResource(Res.string.timeline_goal_clear)) }
             return@Row
+        }
+        actions.onContinue?.let { proceed ->
+            Button(onClick = proceed, enabled = goal.status == "active") { Text(stringResource(Res.string.timeline_goal_continue)) }
         }
         if (goal.status == "paused") {
             TextButton(onClick = { onCommand(GoalCommands.RESUME) }) { Text(stringResource(Res.string.timeline_goal_resume)) }

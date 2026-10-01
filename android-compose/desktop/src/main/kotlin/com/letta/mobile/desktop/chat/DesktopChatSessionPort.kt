@@ -90,6 +90,7 @@ internal class DesktopChatSessionPort(
             search = false,
             pagedHistory = controller.canonicalPresentation.value != null,
             fontScale = true,
+            goals = false,
         )
 
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
@@ -260,4 +261,9 @@ internal class DesktopChatActions(
     override fun updateSearchQuery(query: String) = Unit
 
     override fun clearSearch() = Unit
+
+    /** Desktop has no goal coordinator; the port reports `goals = false`. */
+    override fun refreshGoalStatus() = Unit
+
+    override fun continueGoal() = Unit
 }

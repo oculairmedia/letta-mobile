@@ -90,5 +90,9 @@ internal class FakeChatSessionPort : ChatSessionPort {
         override fun updateSearchQuery(query: String) = Unit
 
         override fun clearSearch() = Unit
+
+        override fun refreshGoalStatus() = Unit
+
+        override fun continueGoal() = Unit
     }
 }

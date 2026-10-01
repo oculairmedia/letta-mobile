@@ -90,6 +90,13 @@ interface ChatActions {
     fun updateSearchQuery(query: String)
 
     fun clearSearch()
+
+    // Goal (only when ChatSurfaceCapabilities.goals)
+    /** Re-reads the conversation's goal status. */
+    fun refreshGoalStatus()
+
+    /** Asks the agent to keep working on the active goal. */
+    fun continueGoal()
 }
 
 /**
@@ -106,6 +113,8 @@ data class ChatSurfaceCapabilities(
     val search: Boolean = false,
     val pagedHistory: Boolean = true,
     val fontScale: Boolean = true,
+    /** Goal refresh/continue ([ChatActions.refreshGoalStatus], [ChatActions.continueGoal]). */
+    val goals: Boolean = false,
 ) {
     companion object {
         val Default = ChatSurfaceCapabilities()

@@ -54,6 +54,7 @@ class ChatTimelineUiTest {
         state: ChatUiState,
         actions: RecordingChatActions,
         host: ChatSurfaceHost = ChatSurfaceHost(),
+        capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
     ) {
         setContent {
             MaterialTheme {
@@ -62,7 +63,7 @@ class ChatTimelineUiTest {
                         state = state,
                         pagedTimeline = null,
                         actions = actions,
-                        capabilities = ChatSurfaceCapabilities.Default,
+                        capabilities = capabilities,
                         host = host,
                         appearance = ChatSurfaceAppearance(),
                     )
@@ -168,6 +169,31 @@ class ChatTimelineUiTest {
         onNodeWithTag(ChatTimelineTags.GOAL).assertExists()
         onNodeWithText("Pause").performClick()
         assertEquals(listOf(GoalCommands.PAUSE), actions.sent)
+    }
+
+    @Test
+    fun goalRefreshAndContinueShowOnlyForOwnersWithGoals() = runComposeUiTest {
+        val goal = GoalStatusUi(objective = "Ship the shared page", status = "active", tokensUsed = 10)
+        show(ready.copy(messages = conversation(2).toPersistentList(), goalStatus = goal), RecordingChatActions())
+        onNodeWithText("Refresh").assertDoesNotExist()
+        onNodeWithText("Continue").assertDoesNotExist()
+    }
+
+    @Test
+    fun goalRefreshAndContinueReachTheOwner() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        val goal = GoalStatusUi(objective = "Ship the shared page", status = "active", tokensUsed = 10)
+        show(
+            ready.copy(messages = conversation(2).toPersistentList(), goalStatus = goal),
+            actions,
+            capabilities = ChatSurfaceCapabilities(goals = true),
+        )
+        onNodeWithText("Refresh").performClick()
+        onNodeWithText("Continue").performClick()
+        runOnIdle {
+            assertEquals(1, actions.count("refreshGoalStatus"))
+            assertEquals(1, actions.count("continueGoal"))
+        }
     }
 
     @Test
