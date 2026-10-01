@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.canvas.NotebookHistoryBudget
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import computer.iroh.Connection
@@ -41,7 +42,11 @@ class NotebookEndpointSession private constructor(
 
     /** Compatibility constructor for sessions that own their own store and projection poller. */
     constructor(directory: Path, endpoint: Endpoint, peers: Set<String>, scope: CoroutineScope) :
-        this(NotebookLocalStore(directory, IrohDiagnostics.endpointIdHex(endpoint.addr().id())), endpoint, peers, scope, true)
+        this(
+            // A synced store: an over-budget history is reported, not restarted under peers.
+            NotebookLocalStore(directory, IrohDiagnostics.endpointIdHex(endpoint.addr().id()), NotebookHistoryBudget(compactOversized = false)),
+            endpoint, peers, scope, true,
+        )
 
     private val protocol = AutomergeIrohRepoProtocol(store.repo, peers, scope, endpoint::connect)
     init {
