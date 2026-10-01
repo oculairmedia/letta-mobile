@@ -810,7 +810,7 @@
     <string name="screen_groups_shared_block_ids_input">Shared block IDs</string>
     <string name="screen_groups_hidden_input">Hide group from default lists</string>
     <string name="screen_groups_csv_helper">Enter comma-separated ids</string>
-    <string name="screen_providers_title">Providers</string>
+    <string name="screen_providers_title">Providers &amp; Models</string>
     <string name="screen_providers_search_hint">Search providers…</string>
     <string name="screen_providers_empty">No providers available</string>
     <string name="screen_providers_empty_search">No providers matching “%1$s”</string>
@@ -1053,7 +1053,6 @@
     <string name="screen_models_no_models">No models available</string>
     <string name="screen_models_tab_llm">LLM Models</string>
     <string name="screen_models_tab_embedding">Embedding Models</string>
-    <string name="screen_models_tab_exposure">Visibility</string>
     <string name="screen_models_detail_handle">Handle: %1$s</string>
     <string name="screen_models_detail_provider">Provider: %1$s</string>
     <string name="screen_models_detail_provider_name">Provider Name: %1$s</string>

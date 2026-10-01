@@ -128,7 +128,6 @@ fun ModelBrowserScreen(
                 onLlmModelClick = { viewModel.selectLlmModel(it) },
                 onEmbeddingModelClick = { viewModel.selectEmbeddingModel(it) },
                 onModelSelected = onModelSelected,
-                exposureContent = { ModelExposureTab(viewModel.exposure) },
                 modifier = Modifier.padding(paddingValues),
             )
         }
@@ -164,7 +163,6 @@ private fun ModelBrowserContent(
     onLlmModelClick: (LlmModel) -> Unit,
     onEmbeddingModelClick: (EmbeddingModel) -> Unit,
     onModelSelected: ((String) -> Unit)?,
-    exposureContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -179,15 +177,6 @@ private fun ModelBrowserContent(
                 onClick = { onTabSelect(ModelTab.EMBEDDING) },
                 text = { Text(stringResource(R.string.screen_models_tab_embedding)) },
             )
-            Tab(
-                selected = state.selectedTab == ModelTab.EXPOSURE,
-                onClick = { onTabSelect(ModelTab.EXPOSURE) },
-                text = { Text(stringResource(R.string.screen_models_tab_exposure)) },
-            )
-        }
-        if (state.selectedTab == ModelTab.EXPOSURE) {
-            exposureContent()
-            return@Column
         }
 
         LazyRow(
@@ -239,7 +228,6 @@ private fun ModelBrowserContent(
                     }
                 }
             }
-            ModelTab.EXPOSURE -> Unit
             ModelTab.EMBEDDING -> {
                 if (filteredEmbeddingModels.isEmpty()) {
                     EmptyState(
@@ -651,16 +639,3 @@ private fun EmbeddingModelDetailDialogPreview() {
 }
 
 // endregion
-
-/** Per-model exposure toggles, shared with desktop via [ModelExposurePane]. */
-@Composable
-private fun ModelExposureTab(controller: com.letta.mobile.data.repository.modelcontrol.ModelExposureController) {
-    val state by controller.state.collectAsStateWithLifecycle()
-    com.letta.mobile.ui.modelcontrol.ModelExposurePane(
-        state = state,
-        actions = com.letta.mobile.ui.modelcontrol.ModelExposureActions(
-            onQueryChange = controller::setQuery,
-            onExposedChange = controller::setExposed,
-        ),
-    )
-}
