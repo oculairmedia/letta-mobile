@@ -26,6 +26,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.paging.CombinedLoadStates
 import androidx.paging.ItemSnapshotList
 import androidx.paging.LoadState
@@ -60,6 +61,8 @@ internal class PagedTimelineParams(
     val listState: LazyListState,
     /** Drawn instead of the list when history is confirmed empty (the welcome / starter prompts). */
     val emptyContent: @Composable () -> Unit,
+    /** Host chrome floating over the list's top (see TimelineFrameOverlays.topReserve). */
+    val topReserve: Dp = 0.dp,
 )
 
 private const val THINKING_KEY = "__thinking__"
@@ -86,8 +89,8 @@ private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier
     ObserveResidentRows(presentation, settled)
 
     when (pagedOpeningOf(settled.loadState, rows.size - rows.leading)) {
-        PagedOpening.Loading -> TimelineLoading(params.agentId, modifier.fillMaxSize())
-        PagedOpening.Empty -> Box(modifier) { params.emptyContent() }
+        PagedOpening.Loading -> TimelineLoading(params.agentId, modifier.fillMaxSize().padding(top = params.topReserve))
+        PagedOpening.Empty -> Box(modifier.padding(top = params.topReserve)) { params.emptyContent() }
         PagedOpening.Ready -> PagedTimelineBody(params, settled, rows, modifier)
     }
 }
@@ -140,6 +143,7 @@ private fun PagedTimelineBody(
                     }
                 },
                 bottomReserve = params.bottomReserve,
+                topReserve = params.topReserve,
             ),
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -150,7 +154,7 @@ private fun PagedTimelineBody(
                 text = stringResource(Res.string.timeline_missing_target, missing),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.TopCenter).padding(LettaDimens.Space.sm),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = params.topReserve).padding(LettaDimens.Space.sm),
             )
         }
     }

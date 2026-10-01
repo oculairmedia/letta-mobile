@@ -48,6 +48,11 @@ internal class TimelineFrameOverlays(
     val onScrollToLatest: () -> Unit,
     /** Reserve at the bottom so the newest row clears the stacked A2UI surfaces. */
     val bottomReserve: Dp,
+    /**
+     * Reserve at the top for host chrome floating over the list (ChatSurfacePlatform.topChromeInset):
+     * the oldest row rests below it, and the list still scrolls under it.
+     */
+    val topReserve: Dp = 0.dp,
 )
 
 /**
@@ -79,7 +84,9 @@ internal fun TimelineListFrame(
                 reverseLayout = true,
                 modifier = Modifier
                     .fillMaxSize()
-                    .timelineFadingEdges(fades)
+                    // Under floating chrome the dissolve runs from the top edge through it (Android's
+                    // chat list fades over its top padding, ChatMessageListBody).
+                    .timelineFadingEdges(fades, topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve)
                     // The conversation: the agent's mascot glances at it (letta-mobile-bglj6.1).
                     .mascotGazeTarget(MascotGazeSurface.TIMELINE)
                     .testTag(ChatTimelineTags.LIST),
@@ -89,7 +96,7 @@ internal fun TimelineListFrame(
                 contentPadding = PaddingValues(
                     start = ChatRowSpacing.contentPaddingHorizontal,
                     end = ChatRowSpacing.contentPaddingHorizontal,
-                    top = ChatRowSpacing.listEdge,
+                    top = ChatRowSpacing.listEdge + overlays.topReserve,
                     bottom = ChatRowSpacing.listEdge + overlays.bottomReserve,
                 ),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -101,6 +108,7 @@ internal fun TimelineListFrame(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    .padding(top = overlays.topReserve)
                     .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
                     .testTag(ChatTimelineTags.PINNED_PROMPT),
                 contentAlignment = Alignment.TopCenter,

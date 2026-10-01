@@ -49,6 +49,12 @@ internal fun ChatTimeline(
     modifier: Modifier = Modifier,
     /** The page's scroll position; hoisted so it survives docking and expanding the chat. */
     listState: LazyListState = rememberLazyListState(),
+    /**
+     * Host chrome floating over the timeline's top edge (ChatSurfacePlatform.topChromeInset). The
+     * list scrolls under it; everything that rests at the top (the oldest row, the goal card, the
+     * loading, welcome and failure states) rests below it.
+     */
+    topInset: Dp = 0.dp,
 ) {
     var viewer by remember { mutableStateOf<ImageViewerRequest?>(null) }
     val callbacks = rememberRowCallbacks(actions, host) { images, index -> viewer = ImageViewerRequest(images, index) }
@@ -69,12 +75,23 @@ internal fun ChatTimeline(
 
     Box(modifier = modifier.then(pinchModifier)) {
         Column(Modifier.fillMaxSize()) {
-            state.goalStatus?.let { goal ->
+            val goal = state.goalStatus
+            if (goal != null) {
                 val goalActions = remember(actions, capabilities.goals) { GoalCardActions.of(actions, capabilities) }
-                GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))
+                GoalStatusCard(
+                    goal,
+                    state.isGoalStatusLoading,
+                    goalActions,
+                    Modifier.align(Alignment.CenterHorizontally).padding(top = topInset),
+                )
             }
+            // The goal card, when there is one, already rests below the chrome; the list starts under it.
+            val bodyTopInset = if (goal != null) 0.dp else topInset
             TimelineBody(
-                TimelineBodyParams(state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, listState, host.editAgent),
+                TimelineBodyParams(
+                    state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, listState, host.editAgent,
+                    topReserve = bodyTopInset,
+                ),
                 Modifier.weight(1f).fillMaxWidth(),
             )
         }
@@ -89,7 +106,7 @@ internal fun ChatTimeline(
                 .onSizeChanged { a2uiHeight = with(density) { it.height.toDp() } },
         )
         if (pinch.isPinching) {
-            PinchScaleIndicator(fontScale, Modifier.align(Alignment.TopCenter).padding(top = LettaDimens.Space.lg))
+            PinchScaleIndicator(fontScale, Modifier.align(Alignment.TopCenter).padding(top = topInset + LettaDimens.Space.lg))
         }
         viewer?.let { request ->
             ChatImageViewer(images = request.images, initialIndex = request.initialIndex, onDismiss = { viewer = null })
@@ -113,17 +130,21 @@ private class TimelineBodyParams(
     val listState: LazyListState,
     /** The mascot's pencil on the welcome hero. */
     val editAgent: (() -> Unit)? = null,
+    /** Host chrome floating over the body's top: the list scrolls under it, the other phases rest below it. */
+    val topReserve: Dp = 0.dp,
 )
 
 /** The one body the current [ChatTimelinePhase] calls for. */
 @Composable
 private fun TimelineBody(params: TimelineBodyParams, modifier: Modifier) {
     val state = params.state
+    // As Android's legacy page pads its loading, failure and starter phases (ChatScreenLayout).
+    val resting = modifier.padding(top = params.topReserve)
     when (val phase = chatTimelinePhaseOf(state, paged = params.pagedTimeline != null)) {
-        ChatTimelinePhase.Loading -> TimelineLoading(state.agentId, modifier)
-        is ChatTimelinePhase.Failed -> TimelineStatusPanel(phase.message, params.actions::retryLoad, modifier)
+        ChatTimelinePhase.Loading -> TimelineLoading(state.agentId, resting)
+        is ChatTimelinePhase.Failed -> TimelineStatusPanel(phase.message, params.actions::retryLoad, resting)
         is ChatTimelinePhase.Welcome ->
-            TimelineWelcome(state.agentName, phase.hasConversation, params.actions::sendText, modifier, state.agentId, params.editAgent)
+            TimelineWelcome(state.agentName, phase.hasConversation, params.actions::sendText, resting, state.agentId, params.editAgent)
         ChatTimelinePhase.Ready -> TimelineList(params, modifier)
     }
 }
@@ -144,6 +165,7 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
                 bottomReserve = params.bottomReserve,
                 listState = params.listState,
                 showThinkingRow = showThinkingRow,
+                topReserve = params.topReserve,
             ),
             modifier,
         )
@@ -167,6 +189,7 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
                     onEditAgent = params.editAgent,
                 )
             },
+            topReserve = params.topReserve,
         ),
         modifier,
     )

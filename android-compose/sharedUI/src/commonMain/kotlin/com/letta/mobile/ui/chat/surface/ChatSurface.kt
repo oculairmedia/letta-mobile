@@ -299,6 +299,7 @@ private fun TouchCanvasWithChat(
                 TouchDockLayer(
                     bar = bar,
                     morph = morph,
+                    topChromeInset = frame.platform.topChromeInset,
                     head = dock?.let { touchHeadContent(frame, it) },
                     composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
                 )
@@ -469,9 +470,13 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
             appearance = frame.appearance,
             modifier = Modifier.fillMaxSize(),
             listState = frame.listState,
+            topInset = frame.platform.topChromeInset,
         )
         frame.platform.timelineOverlay?.let { overlay ->
-            Box(Modifier.fillMaxSize().testTag(ChatSurfaceTags.TIMELINE_OVERLAY), contentAlignment = Alignment.TopCenter) {
+            Box(
+                Modifier.fillMaxSize().padding(top = frame.platform.topChromeInset).testTag(ChatSurfaceTags.TIMELINE_OVERLAY),
+                contentAlignment = Alignment.TopCenter,
+            ) {
                 overlay()
             }
         }

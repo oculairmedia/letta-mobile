@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +61,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
@@ -135,8 +137,16 @@ fun CanvasWorkspace(
      * several at once without a mouse. Off, it opens the board menu, as a phone's does.
      */
     longPressDrawsSelectionBox: Boolean = false,
+    /**
+     * Host chrome floating over the board's top edge, measured from that edge (the phone's shared
+     * chat header over the status bar). The board draws under it; its own chrome keeps below it.
+     */
+    chromeTopInset: Dp = 0.dp,
 ) {
     val state by controller.state.collectAsState()
+    // What the board's chrome keeps clear of: the system bars and the keyboard, and the host's chrome.
+    val systemInsets = WindowInsets.safeDrawing
+    val chromeInsets = remember(systemInsets, chromeTopInset) { systemInsets.union(WindowInsets(top = chromeTopInset)) }
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
     val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
@@ -571,7 +581,7 @@ fun CanvasWorkspace(
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val safeBottom by rememberUpdatedState(WindowInsets.safeDrawing.getBottom(LocalDensity.current))
     val chromeInsetPx = with(LocalDensity.current) { CHROME_INSET.toPx() }
-    val topReserve = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this) + KEYBOARD_TOP_RESERVE.roundToPx() }
+    val topReserve = with(LocalDensity.current) { chromeInsets.getTop(this) + KEYBOARD_TOP_RESERVE.roundToPx() }
     val typingTarget: Rect? = when {
         expandedNoteId != null -> null
         activeNoteId != null -> documents.firstOrNull { it.id == activeNoteId }?.frame?.toRect()
@@ -1431,7 +1441,7 @@ fun CanvasWorkspace(
             // just the actions, as a compact pill in the top-right corner over an uncovered board.
             CanvasHeaderBar(
                 modifier = (if (showTitle) Modifier.align(Alignment.TopCenter).fillMaxWidth() else Modifier.align(Alignment.TopEnd))
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .windowInsetsPadding(chromeInsets)
                     .padding(CHROME_INSET).canvasChrome(chromeRegions),
             ) {
             if (showTitle) {
@@ -1724,7 +1734,7 @@ fun CanvasWorkspace(
                 )
             }
             if (!typingOnPhone && (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null))) {
-                val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
+                val topInset = with(LocalDensity.current) { chromeInsets.getTop(this).toDp() }
                 AnchoredToSelection(
                     anchor = CanvasWorkspaceSupport.barAnchor(
                         BarAnchorParams(
@@ -1760,7 +1770,7 @@ fun CanvasWorkspace(
                     onAddNote = onAddNote,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .windowInsetsPadding(chromeInsets)
                         .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
                         .canvasChrome(chromeRegions),
                 )
@@ -1776,6 +1786,7 @@ fun CanvasWorkspace(
                     onToolbar = { noteToolbar = it },
                     chromeRegions = chromeRegions,
                     compact = compact,
+                    insets = chromeInsets,
                     actions = NoteEditorActions(
                         canUndo = canUndo || historyCanUndo,
                         canRedo = canRedo || historyCanRedo,
