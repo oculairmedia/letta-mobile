@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
@@ -269,14 +270,54 @@ class ChatRowInteractionUiTest {
                 UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch),
             ),
         )
-        setContent { MaterialTheme { RenderRow(single(msg), rowContext(), rowCallbacks(openSubagent = { opened = it })) } }
+        setContent {
+            MaterialTheme {
+                RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Sheet), rowCallbacks(openSubagent = { opened = it }))
+            }
+        }
 
-        // The call reads as one summary line; its cards open from it.
+        // The call reads as one summary line; on a touch host its cards open in a sheet.
         onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_DETAILS).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
         onNodeWithText("Dispatched: Audit the build").performClick()
         runOnIdle { assertEquals(ChatSubagentTarget("agent-call-1", "Audit the build", "agent-sub"), opened) }
         onNodeWithText("Show prompt").performClick()
         onNodeWithText("Look at gradle").assertExists()
+    }
+
+    @Test
+    fun toolSummaryExpandsItsCardsInPlaceOnAPointerHost() = runComposeUiTest {
+        val msg = message("m-1", "assistant", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello")))
+        setContent { MaterialTheme { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Inline)) } }
+
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
+        onNodeWithContentDescription("Show command details").assertExists()
+
+        // A disclosure, not a sheet: the cards open under the line, inside the timeline.
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_DETAILS).assertDoesNotExist()
+        onNodeWithContentDescription("Hide command details").assertExists()
+        val line = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
+        val cards = onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).fetchSemanticsNode().boundsInRoot
+        assertTrue(cards.top >= line.bottom, "the cards sit under the line ($cards vs $line)")
+
+        // Tapping the line again folds them away.
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
+    }
+
+    @Test
+    fun toolSummaryOpensASheetOnATouchHost() = runComposeUiTest {
+        val msg = message("m-1", "assistant", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello")))
+        setContent { MaterialTheme { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Sheet)) } }
+
+        onNodeWithContentDescription("Open command details").assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_DETAILS).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
     }
 
     @Test

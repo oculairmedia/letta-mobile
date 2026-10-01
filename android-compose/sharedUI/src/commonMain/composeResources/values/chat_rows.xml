@@ -66,6 +66,8 @@
     <string name="rows_tool_run_approval">Approval needed - %1$s</string>
     <string name="rows_tool_run_default_name">tool</string>
     <string name="rows_tool_run_open">Open command details</string>
+    <string name="rows_tool_run_show">Show command details</string>
+    <string name="rows_tool_run_hide">Hide command details</string>
     <string name="rows_tool_run_summary">Tool run summary</string>
     <string name="rows_tool_run_state">%1$d tools, %2$d failed, %3$d awaiting approval</string>
     <string name="rows_role_you">You</string>

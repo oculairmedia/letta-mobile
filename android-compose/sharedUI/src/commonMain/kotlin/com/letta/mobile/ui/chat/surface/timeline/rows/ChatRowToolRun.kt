@@ -1,8 +1,14 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,15 +51,19 @@ import com.letta.mobile.sharedui.resources.rows_step_running
 import com.letta.mobile.sharedui.resources.rows_tool_run_approval
 import com.letta.mobile.sharedui.resources.rows_tool_run_default_name
 import com.letta.mobile.sharedui.resources.rows_tool_run_failed
+import com.letta.mobile.sharedui.resources.rows_tool_run_hide
 import com.letta.mobile.sharedui.resources.rows_tool_run_open
 import com.letta.mobile.sharedui.resources.rows_tool_run_ran
 import com.letta.mobile.sharedui.resources.rows_tool_run_running
+import com.letta.mobile.sharedui.resources.rows_tool_run_show
 import com.letta.mobile.sharedui.resources.rows_tool_run_state
 import com.letta.mobile.sharedui.resources.rows_tool_run_summary
+import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.delay
@@ -65,8 +75,10 @@ import kotlin.time.Clock
  * letta-mobile-bglj6.1: a run's (or a message's) tool calls as ONE quiet summary line, as the
  * Android timeline draws them (feature-chat ProjectedToolTimelineGroupCard / ToolRunSummaryRow):
  * "Ran 2 commands", "2 ran - 1 failed" in the error tint, "Running Bash - 1 command - 0:12" while
- * one runs. Tapping it opens the calls in a sheet, each as a full [ToolCard] (command, output,
- * copy). Approvals that wait on the user show their controls under the line.
+ * one runs. Tapping it shows each call as a full [ToolCard] (command, output, copy): in a bottom
+ * sheet on a touch host ([ChatToolDetails.Sheet]), or expanded in place under the line, as a
+ * disclosure, on a pointer host ([ChatToolDetails.Inline]). Approvals that wait on the user show
+ * their controls under the line.
  */
 @Composable
 internal fun ToolRunGroup(
@@ -79,6 +91,8 @@ internal fun ToolRunGroup(
 ) {
     if (toolCalls.isEmpty()) return
     var detailsOpen by remember { mutableStateOf(false) }
+    val inline = context.toolDetails == ChatToolDetails.Inline
+    val reducedMotion = LocalReducedMotion.current
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
@@ -86,13 +100,35 @@ internal fun ToolRunGroup(
         ToolRunSummaryRow(
             summary = remember(toolCalls, approvals) { summarizeToolRun(toolCalls, approvals) },
             startedAtEpochMs = remember(startedAtTimestamp) { startedAtTimestamp?.let(::parseTimestampEpochMillis) },
-            onClick = { detailsOpen = true },
+            disclosure = if (inline) ToolRunDisclosure.Inline(expanded = detailsOpen) else ToolRunDisclosure.Sheet,
+            onClick = { detailsOpen = if (inline) !detailsOpen else true },
         )
+        if (inline) {
+            AnimatedVisibility(
+                visible = detailsOpen,
+                enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
+                exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+            ) {
+                ToolRunCards(
+                    toolCalls = toolCalls,
+                    callbacks = callbacks,
+                    modifier = Modifier.testTag(ChatRowTestTags.TOOL_RUN_INLINE).padding(bottom = LettaDimens.Space.xs),
+                )
+            }
+        }
         approvals.filter { it.requiresUserInput() }.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
-    if (detailsOpen) {
+    if (detailsOpen && !inline) {
         ToolRunDetailsSheet(toolCalls, callbacks) { detailsOpen = false }
     }
+}
+
+/** What the summary line's chevron promises: a sheet, or an in-place disclosure and its state. */
+@Immutable
+private sealed interface ToolRunDisclosure {
+    data object Sheet : ToolRunDisclosure
+
+    data class Inline(val expanded: Boolean) : ToolRunDisclosure
 }
 
 /** What one summary line says. */
@@ -119,15 +155,29 @@ internal fun summarizeToolRun(toolCalls: List<UiToolCall>, approvals: List<UiApp
 }
 
 @Composable
-private fun ToolRunSummaryRow(summary: ToolRunSummary, startedAtEpochMs: Long?, onClick: () -> Unit) {
+private fun ToolRunSummaryRow(
+    summary: ToolRunSummary,
+    startedAtEpochMs: Long?,
+    disclosure: ToolRunDisclosure,
+    onClick: () -> Unit,
+) {
     val elapsed by rememberElapsedSeconds(summary.running, startedAtEpochMs)
+    val click = rememberQuietClick()
     val color = when {
         summary.failureCount > 0 -> MaterialTheme.colorScheme.error
         summary.awaitingApprovalCount > 0 -> MaterialTheme.colorScheme.secondary
+        click.lifted -> MaterialTheme.colorScheme.onSurface
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val description = stringResource(Res.string.rows_tool_run_summary)
     val state = stringResource(Res.string.rows_tool_run_state, summary.toolCount, summary.failureCount, summary.awaitingApprovalCount)
+    val expanded = (disclosure as? ToolRunDisclosure.Inline)?.expanded == true
+    val chevronLabel = stringResource(
+        when (disclosure) {
+            ToolRunDisclosure.Sheet -> Res.string.rows_tool_run_open
+            is ToolRunDisclosure.Inline -> if (expanded) Res.string.rows_tool_run_hide else Res.string.rows_tool_run_show
+        },
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -136,7 +186,8 @@ private fun ToolRunSummaryRow(summary: ToolRunSummary, startedAtEpochMs: Long?, 
                 contentDescription = description
                 stateDescription = state
             }
-            .clickable(onClick = onClick)
+            // No hover block: the label lifts instead (the Android line has no inset).
+            .quietClickable(click, onClick = onClick)
             // Shares the Thought rows' leading edge: no horizontal inset.
             .padding(vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -149,9 +200,9 @@ private fun ToolRunSummaryRow(summary: ToolRunSummary, startedAtEpochMs: Long?, 
             modifier = Modifier.weight(1f),
         )
         DisclosureChevron(
-            expanded = false,
-            indicates = ChevronIndication.Sheet,
-            contentDescription = stringResource(Res.string.rows_tool_run_open),
+            expanded = expanded,
+            indicates = if (disclosure == ToolRunDisclosure.Sheet) ChevronIndication.Sheet else ChevronIndication.Expansion,
+            contentDescription = chevronLabel,
         )
     }
 }
@@ -208,12 +259,20 @@ private fun ToolRunDetailsSheet(toolCalls: ImmutableList<UiToolCall>, callbacks:
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            toolCalls.forEachIndexed { index, call ->
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                    Box(modifier = Modifier.padding(top = LettaDimens.Space.sm)) { StepStatusCircle(call.stepState()) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        ToolCard(call, call.disclosureKey().ifBlank { "sheet:$index" }, callbacks)
-                    }
+            ToolRunCards(toolCalls, callbacks)
+        }
+    }
+}
+
+/** Each call as a full [ToolCard], led by its step status: the sheet's body, or the inline disclosure's. */
+@Composable
+private fun ToolRunCards(toolCalls: ImmutableList<UiToolCall>, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        toolCalls.forEachIndexed { index, call ->
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+                Box(modifier = Modifier.padding(top = LettaDimens.Space.sm)) { StepStatusCircle(call.stepState()) }
+                Box(modifier = Modifier.weight(1f)) {
+                    ToolCard(call, call.disclosureKey().ifBlank { "sheet:$index" }, callbacks)
                 }
             }
         }

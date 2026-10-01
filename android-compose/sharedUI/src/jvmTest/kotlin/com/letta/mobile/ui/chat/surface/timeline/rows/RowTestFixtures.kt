@@ -5,6 +5,7 @@ import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import kotlinx.collections.immutable.toImmutableSet
 
@@ -14,8 +15,10 @@ internal fun rowContext(
     expandedReasoning: Set<String> = emptySet(),
     activeApprovalRequestId: String? = null,
     newestMessageId: String? = null,
+    toolDetails: ChatToolDetails = ChatToolDetails.Inline,
 ): ChatRowContext = ChatRowContext(
     newestMessageId = newestMessageId,
+    toolDetails = toolDetails,
     itemState = ChatRenderItemState(
         isStreaming = false,
         activeApprovalRequestId = activeApprovalRequestId,

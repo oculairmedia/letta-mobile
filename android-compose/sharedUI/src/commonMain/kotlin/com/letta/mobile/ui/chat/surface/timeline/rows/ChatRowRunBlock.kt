@@ -17,7 +17,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -295,13 +294,15 @@ private fun RunActivityHeader(
         },
     )
     val clickLabel = stringResource(if (collapsed) Res.string.rows_work_expand else Res.string.rows_work_collapse)
+    val click = rememberQuietClick()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ChatRowTestTags.RUN_HEADER)
             .heightIn(min = if (onToggle != null) LettaDimens.Orb.railSlotHeight else LettaDimens.Space.xxl)
             .semantics(mergeDescendants = true) { stateDescription = stateText }
-            .then(if (onToggle != null) Modifier.clickable(onClickLabel = clickLabel, onClick = onToggle) else Modifier)
+            // No hover block: the title lifts instead (the Android disclosure has no inset).
+            .then(if (onToggle != null) Modifier.quietClickable(click, onClickLabel = clickLabel, onClick = onToggle) else Modifier)
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -310,10 +311,10 @@ private fun RunActivityHeader(
         Text(
             text = runActivityTitle(activity),
             style = MaterialTheme.typography.labelMedium,
-            color = if (activity.isActive) {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.workingTitle)
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+            color = when {
+                activity.isActive -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.workingTitle)
+                onToggle != null && click.lifted -> MaterialTheme.colorScheme.onSurface
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
         if (activity.toolCount > 0) {

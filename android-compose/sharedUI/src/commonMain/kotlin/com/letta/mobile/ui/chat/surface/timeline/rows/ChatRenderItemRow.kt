@@ -78,6 +78,7 @@ internal object ChatRowTestTags {
     const val TOOL_RESULT_PREVIEW = "tool-result-preview"
     const val TOOL_RUN_SUMMARY = "tool-run-summary-row"
     const val TOOL_RUN_DETAILS = "tool-run-details-sheet"
+    const val TOOL_RUN_INLINE = "tool-run-details-inline"
     const val DIFF_BLOCK = "tool-diff"
     const val COMPLETED_ACTIVITY_SUMMARY = "completed-activity-summary"
     const val SUBAGENT_DISPATCH = "subagent-dispatch"

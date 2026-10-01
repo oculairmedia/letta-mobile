@@ -42,6 +42,8 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
+import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineSnapshot
 import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -104,7 +106,13 @@ class SharedTimelineParityScreenshotTest {
                     Pane("legacy Android", Modifier.weight(1f)) { LegacyTimeline(state) }
                     Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outline))
                     Pane("shared", Modifier.weight(1f)) {
-                        ChatTimelineSnapshot(state = state, actions = NoOpChatActions, modifier = Modifier.fillMaxSize())
+                        // Android's appearance: a tool summary opens a sheet.
+                        ChatTimelineSnapshot(
+                            state = state,
+                            actions = NoOpChatActions,
+                            appearance = ChatSurfaceAppearance(toolDetails = ChatToolDetails.Sheet),
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                 }
             }

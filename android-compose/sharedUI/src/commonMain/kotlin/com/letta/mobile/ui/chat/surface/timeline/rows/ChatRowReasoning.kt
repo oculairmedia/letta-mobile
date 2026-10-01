@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -74,6 +73,7 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
         },
     )
     val clickLabel = stringResource(if (collapsed) Res.string.rows_reasoning_expand else Res.string.rows_reasoning_collapse)
+    val click = rememberQuietClick()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -88,8 +88,9 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
                 .then(
                     if (canToggle) {
                         // The same tap-target floor as the run header, so the two rows measure alike.
+                        // No hover block: the title lifts instead (the Android row has no inset).
                         Modifier
-                            .clickable(onClickLabel = clickLabel) { callbacks.actions.toggleReasoningExpanded(message.id) }
+                            .quietClickable(click, onClickLabel = clickLabel) { callbacks.actions.toggleReasoningExpanded(message.id) }
                             .heightIn(min = LettaDimens.Orb.railSlotHeight)
                             .padding(vertical = LettaDimens.Space.hair)
                     } else {
@@ -109,10 +110,10 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
             Text(
                 text = reasoningTitle(message, isActive),
                 style = ChatRowType.sectionTitle,
-                color = if (isActive) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = ChatRowAlpha.reasoningActiveTitle)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                color = when {
+                    isActive -> MaterialTheme.colorScheme.primary.copy(alpha = ChatRowAlpha.reasoningActiveTitle)
+                    click.lifted -> MaterialTheme.colorScheme.onSurface
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
             val emptyPreview = stringResource(Res.string.rows_reasoning_empty)

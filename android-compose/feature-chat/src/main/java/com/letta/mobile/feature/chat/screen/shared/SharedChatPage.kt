@@ -33,6 +33,7 @@ import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 
@@ -108,6 +109,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             hapticsEnabled = params.hapticsEnabled,
             // CachedSettingsRepository.setChatFontScale clamps to this range.
             fontScaleRange = DefaultFontScaleRange,
+            // Touch idiom: a tool summary opens its calls in a bottom sheet.
+            toolDetails = ChatToolDetails.Sheet,
         )
     }
     Box(modifier) {
