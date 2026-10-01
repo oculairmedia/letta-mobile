@@ -53,15 +53,26 @@ data class ProviderManagementState(
 
     private fun narrow(section: ProviderSection): VisibleSection? {
         val needle = query.trim()
-        val rows = section.models.filter { filter.admits(it) && (needle.isBlank() || it.matches(needle)) }
-        val nameMatches = needle.isNotBlank() && section.displayName.contains(needle, ignoreCase = true)
-        if (needle.isNotBlank() && rows.isEmpty() && !nameMatches) return null
-        if (filter != ModelVisibilityFilter.ALL && rows.isEmpty()) return null
-        return VisibleSection(section, rows)
+        val rows = section.models.filter { filter.admits(it) && it.matches(needle) }
+        return if (keeps(section, rows, needle)) VisibleSection(section, rows) else null
     }
 
+    /**
+     * A section with matching rows always stays. Without rows it stays only
+     * under the All filter: always when not searching, or when the search
+     * names the provider itself.
+     */
+    private fun keeps(section: ProviderSection, rows: List<CatalogRow>, needle: String): Boolean = when {
+        rows.isNotEmpty() -> true
+        filter != ModelVisibilityFilter.ALL -> false
+        needle.isBlank() -> true
+        else -> section.displayName.contains(needle, ignoreCase = true)
+    }
+
+    /** A blank search matches every row. */
     private fun CatalogRow.matches(needle: String): Boolean =
-        handle.value.contains(needle, ignoreCase = true) ||
+        needle.isBlank() ||
+            handle.value.contains(needle, ignoreCase = true) ||
             model.model.displayName.contains(needle, ignoreCase = true) ||
             identity.contains(needle, ignoreCase = true)
 }
