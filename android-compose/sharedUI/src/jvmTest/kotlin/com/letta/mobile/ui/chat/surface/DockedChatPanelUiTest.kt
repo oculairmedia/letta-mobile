@@ -240,6 +240,33 @@ class DockedChatPanelUiTest {
     }
 
     @Test
+    fun theMinimisedDockMovesToTheTopAndOpensDownwardFromThere() = runComposeUiTest {
+        val harness = show()
+        onNodeWithTag(DOCK_COLLAPSE_TAG).performClick()
+        waitForIdle()
+        onNodeWithTag(DOCK_COLLAPSED_MASCOT_TAG).performTouchInput { swipe(center, center + Offset(0f, -5000f)) }
+        waitForIdle()
+        val page = onRoot().getBoundsInRoot()
+        val minimised = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        // Into the upper half: its own top stops at the margin, not the open panel's.
+        assertTrue(minimised.bottom < page.bottom / 2, "minimised at $minimised in $page")
+        assertEquals(0f, harness.geometry.anchorY)
+
+        // Opening there: no room above, so the panel grows down from the top, on the canvas.
+        mainClock.autoAdvance = false
+        onNodeWithTag(DOCK_RESTORE_TAG).performClick()
+        mainClock.advanceTimeByFrame()
+        val firstFrame = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        assertTrue(firstFrame.bottom <= minimised.bottom + 1.dp, "the fold starts at the bar: $minimised -> $firstFrame")
+        mainClock.autoAdvance = true
+        waitForIdle()
+        val open = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        assertFalse(harness.geometry.collapsed)
+        assertTrue(open.top >= page.top && open.bottom <= page.bottom, "open on the canvas: $open in $page")
+        assertTrue(open.bottom > minimised.bottom, "grew downward: $minimised -> $open")
+    }
+
+    @Test
     fun theCanvasStillReceivesClicksOutsideThePanelButNotInsideIt() = runComposeUiTest {
         val harness = show()
         onNodeWithTag(CANVAS_TAG).performTouchInput { click(Offset(20f, 20f)) }

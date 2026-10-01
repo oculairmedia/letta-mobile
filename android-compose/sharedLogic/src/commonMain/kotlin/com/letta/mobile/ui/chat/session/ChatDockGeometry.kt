@@ -12,6 +12,9 @@ import kotlinx.serialization.Serializable
  * right / bottom margin, 0.5 = centred). Size is in dp; a null size means "the default for this
  * container" (see [ChatDockLimits]), so a fresh panel fits a phone and a wide window alike.
  * [collapsed] shows only the composer bar; the expanded size is kept for when it opens again.
+ * Collapsed, [anchorY] places the bar itself in the container's free height, so the bar moves
+ * anywhere on the canvas, the top included; [ChatDockGeometryMath.collapse] and
+ * [ChatDockGeometryMath.expand] convert it so the bar stays where the open panel's bar was.
  *
  * The host owns and persists it; [ChatDockGeometryMath] derives every change from it.
  */
@@ -99,25 +102,25 @@ object ChatDockGeometryMath {
     )
 
     /**
-     * Where the panel is drawn in [frame]. Collapsed, it is the expanded panel's composer bar: the
-     * bottom of the expanded rectangle, so opening it again grows the panel upward in place.
+     * Where the panel is drawn in [frame]. Collapsed, it is the composer bar alone, as wide as the
+     * expanded panel and placed by its own anchor in the free height (see [ChatDockGeometry]).
      */
     fun rect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect {
         val area = Area(frame)
         val expanded = expandedRect(geometry, area)
         if (!geometry.collapsed) return expanded
-        val height = frame.collapsedHeightDp.coerceIn(0f, area.height)
-        val top = (expanded.bottom - height).coerceIn(area.top, (area.bottom - height).coerceAtLeast(area.top))
+        val height = barHeight(frame, area)
+        val top = area.top + sanitize(geometry).anchorY * (area.height - height).coerceAtLeast(0f)
         return expanded.copy(top = top, height = height)
     }
 
     /**
-     * Moves the panel by ([dx], [dy]) dp, stopping at the container edges. A collapsed bar moves
-     * its expanded panel, so the anchor stays the expanded panel's and expanding never jumps.
+     * Moves the panel by ([dx], [dy]) dp, stopping at the container edges. A collapsed bar stops
+     * at its own edges, not the expanded panel's: minimised it goes anywhere on the canvas.
      */
     fun drag(geometry: ChatDockGeometry, dx: Float, dy: Float, frame: ChatDockFrame): ChatDockGeometry {
         val area = Area(frame)
-        val current = expandedRect(geometry, area)
+        val current = rect(geometry, frame)
         return geometry.copy(
             anchorX = anchorFor(current.left + dx, current.width, area.left, area.width, geometry.anchorX),
             anchorY = anchorFor(current.top + dy, current.height, area.top, area.height, geometry.anchorY),
@@ -153,11 +156,39 @@ object ChatDockGeometryMath {
         return next
     }
 
-    /** Shows only the composer bar; the expanded size and the anchor are kept. */
-    fun collapse(geometry: ChatDockGeometry): ChatDockGeometry = geometry.copy(collapsed = true)
+    /**
+     * Shows only the composer bar, where the open panel's bar was in [frame]; the expanded size
+     * is kept. Without a frame (nothing laid out yet) only the flag changes.
+     */
+    fun collapse(geometry: ChatDockGeometry, frame: ChatDockFrame? = null): ChatDockGeometry {
+        if (geometry.collapsed) return geometry
+        if (frame == null) return geometry.copy(collapsed = true)
+        val area = Area(frame)
+        val open = expandedRect(geometry, area)
+        val height = barHeight(frame, area)
+        return geometry.copy(
+            collapsed = true,
+            anchorY = anchorFor(open.bottom - height, height, area.top, area.height, geometry.anchorY),
+        )
+    }
 
-    /** Opens the panel again at its last expanded size. */
-    fun expand(geometry: ChatDockGeometry): ChatDockGeometry = geometry.copy(collapsed = false)
+    /**
+     * Opens the panel again at its last expanded size, its composer bar where the collapsed bar
+     * is in [frame]. Where there is no room above the bar for the panel, the panel stops at the
+     * top and grows downward instead: it never opens off the canvas. Without a frame only the
+     * flag changes.
+     */
+    fun expand(geometry: ChatDockGeometry, frame: ChatDockFrame? = null): ChatDockGeometry {
+        if (!geometry.collapsed) return geometry
+        if (frame == null) return geometry.copy(collapsed = false)
+        val area = Area(frame)
+        val bar = rect(geometry, frame)
+        val height = expandedHeight(geometry, area)
+        return geometry.copy(
+            collapsed = false,
+            anchorY = anchorFor(bar.bottom - height, height, area.top, area.height, geometry.anchorY),
+        )
+    }
 
     /** Back to the default placement: bottom-centre, default size, expanded. */
     fun reset(): ChatDockGeometry = Default
@@ -182,6 +213,8 @@ object ChatDockGeometryMath {
     private fun expandedHeight(geometry: ChatDockGeometry, area: Area): Float =
         (sanitize(geometry).heightDp ?: (area.containerHeight * area.limits.defaultHeightFraction))
             .coerceIn(area.minHeight, area.maxHeight)
+
+    private fun barHeight(frame: ChatDockFrame, area: Area): Float = frame.collapsedHeightDp.coerceIn(0f, area.height)
 
     /** The anchor fraction that puts a [size]-long panel's start at [start] in a [span] from [origin]. */
     private fun anchorFor(start: Float, size: Float, origin: Float, span: Float, fallback: Float): Float {

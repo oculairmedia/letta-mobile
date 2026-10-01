@@ -102,10 +102,10 @@ class ChatDockGeometryMathTest {
     }
 
     @Test
-    fun draggingACollapsedBarKeepsTheExpandedPanelsAnchor() {
+    fun aDraggedCollapsedBarOpensWithItsComposerBarWhereItWas() {
         val f = frame(collapsed = 60f)
         val sized = ChatDockGeometry(anchorX = 0.5f, anchorY = 1f, heightDp = 400f)
-        val collapsed = ChatDockGeometryMath.collapse(sized)
+        val collapsed = ChatDockGeometryMath.collapse(sized, f)
         val bar = ChatDockGeometryMath.rect(collapsed, f)
 
         val moved = ChatDockGeometryMath.drag(collapsed, 0f, -200f, f)
@@ -113,9 +113,47 @@ class ChatDockGeometryMathTest {
         assertEquals(bar.top - 200f, movedBar.top, EPS)
 
         // Opening it again puts the panel's composer bar exactly where the collapsed bar was.
-        val open = ChatDockGeometryMath.rect(ChatDockGeometryMath.expand(moved), f)
+        val open = ChatDockGeometryMath.rect(ChatDockGeometryMath.expand(moved, f), f)
         assertEquals(400f, open.height, EPS)
         assertEquals(movedBar.bottom, open.bottom, EPS)
+        assertInside(open, f)
+    }
+
+    @Test
+    fun collapsingLeavesTheBarWhereTheOpenPanelsBarWas() {
+        val f = frame(collapsed = 60f)
+        val sized = ChatDockGeometry(anchorX = 0.2f, anchorY = 0.3f, heightDp = 400f)
+        val open = ChatDockGeometryMath.rect(sized, f)
+        val bar = ChatDockGeometryMath.rect(ChatDockGeometryMath.collapse(sized, f), f)
+        assertEquals(60f, bar.height, EPS)
+        assertEquals(open.bottom, bar.bottom, EPS)
+        assertEquals(open.left, bar.left, EPS)
+        assertEquals(open.width, bar.width, EPS)
+    }
+
+    @Test
+    fun aCollapsedBarMovesAllTheWayToTheTop() {
+        val f = frame(collapsed = 60f)
+        val collapsed = ChatDockGeometryMath.collapse(ChatDockGeometry(heightDp = 400f), f)
+        val top = ChatDockGeometryMath.rect(ChatDockGeometryMath.drag(collapsed, 0f, -5000f, f), f)
+        // Its own top edge stops at the margin, not the expanded panel's.
+        assertEquals(limits.marginDp, top.top, EPS)
+        assertInside(top, f)
+    }
+
+    @Test
+    fun aBarNearTheTopOpensDownwardOnTheCanvas() {
+        val f = frame(collapsed = 60f)
+        val collapsed = ChatDockGeometryMath.collapse(ChatDockGeometry(heightDp = 400f), f)
+        val atTop = ChatDockGeometryMath.drag(collapsed, 0f, -5000f, f)
+        val bar = ChatDockGeometryMath.rect(atTop, f)
+        val opened = ChatDockGeometryMath.expand(atTop, f)
+        assertFalse(opened.collapsed)
+        assertEquals(0f, opened.anchorY, EPS)
+        val open = ChatDockGeometryMath.rect(opened, f)
+        // No room above the bar: the panel's top stays at the bar's and it grows down.
+        assertEquals(bar.top, open.top, EPS)
+        assertEquals(400f, open.height, EPS)
         assertInside(open, f)
     }
 
@@ -152,18 +190,21 @@ class ChatDockGeometryMathTest {
     }
 
     @Test
-    fun collapseThenExpandRestoresTheLastSize() {
+    fun collapseThenExpandRestoresTheLastSizeAndPlace() {
         val f = frame()
         val sized = ChatDockGeometry(anchorX = 0.2f, anchorY = 0.7f, widthDp = 640f, heightDp = 480f)
-        val collapsed = ChatDockGeometryMath.collapse(sized)
+        val collapsed = ChatDockGeometryMath.collapse(sized, f)
         assertTrue(collapsed.collapsed)
         assertEquals(60f, ChatDockGeometryMath.rect(collapsed, f).height, EPS)
-        val expanded = ChatDockGeometryMath.expand(collapsed)
+        val expanded = ChatDockGeometryMath.expand(collapsed, f)
         assertFalse(expanded.collapsed)
-        assertEquals(sized, expanded)
+        assertEquals(sized.anchorY, expanded.anchorY, EPS)
         val rect = ChatDockGeometryMath.rect(expanded, f)
+        assertEquals(ChatDockGeometryMath.rect(sized, f).top, rect.top, EPS)
         assertEquals(640f, rect.width, EPS)
         assertEquals(480f, rect.height, EPS)
+        // Without a frame (nothing laid out yet) only the flag changes.
+        assertEquals(sized, ChatDockGeometryMath.expand(ChatDockGeometryMath.collapse(sized)))
     }
 
     @Test

@@ -145,6 +145,14 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     /** A reset is animating towards its target. */
     internal var snapping: Boolean by mutableStateOf(false)
 
+    /**
+     * Where the minimised dock stood as it began to open. Opening near the top, the panel stops
+     * at the top and grows down, so its bar is not where the minimised bar was: the fold starts
+     * from the minimised bar instead, and nothing jumps.
+     */
+    internal var foldFrom: ChatDockGeometry? by mutableStateOf(null)
+        private set
+
     internal var onChange: (ChatDockGeometry) -> Unit = {}
 
     /** The last laid-out frame; gestures resolve against it. */
@@ -171,29 +179,44 @@ internal class ChatDockState(initial: ChatDockGeometry) {
             repeat(echo + 1) { unacknowledged.removeFirst() }
             return
         }
-        if (next != geometry) geometry = next
+        if (next != geometry) {
+            foldFrom = null
+            geometry = next
+        }
     }
 
     fun drag(dxDp: Float, dyDp: Float) {
         val frame = frame ?: return
         // The pointer takes over from a reset's glide: the dock follows it 1:1 from here.
         snapping = false
+        foldFrom = null
         update(ChatDockGeometryMath.drag(geometry, dxDp, dyDp, frame))
     }
 
     fun resize(edge: ChatDockEdge, dxDp: Float, dyDp: Float) {
         val frame = frame ?: return
         snapping = false
+        foldFrom = null
         update(ChatDockGeometryMath.resize(geometry, edge, dxDp, dyDp, frame))
     }
 
     fun toggleCollapsed() {
-        update(if (geometry.collapsed) ChatDockGeometryMath.expand(geometry) else ChatDockGeometryMath.collapse(geometry))
+        if (geometry.collapsed) {
+            open()
+        } else {
+            foldFrom = null
+            update(ChatDockGeometryMath.collapse(geometry, frame))
+        }
     }
 
     /** Opens the panel again at its last expanded size; nothing when it is already open. */
     fun restore() {
-        if (geometry.collapsed) update(ChatDockGeometryMath.expand(geometry))
+        if (geometry.collapsed) open()
+    }
+
+    private fun open() {
+        foldFrom = geometry
+        update(ChatDockGeometryMath.expand(geometry, frame))
     }
 
     /**
@@ -211,6 +234,7 @@ internal class ChatDockState(initial: ChatDockGeometry) {
         // minimised dock at home opening) would start no glide to end the snapping.
         val frame = frame
         snapping = frame == null || openRect(next, frame) != openRect(geometry, frame)
+        foldFrom = geometry.takeIf { it.collapsed }
         update(next)
     }
 
@@ -313,7 +337,7 @@ internal fun DockedChatPanel(
                     val placed = dockPlacement(
                         measurable = measurable,
                         constraints = constraints,
-                        target = DockPlacementTarget(geometry, frame, open, wrapHeight, state.snapping),
+                        target = DockPlacementTarget(geometry, frame, open, wrapHeight, state.snapping, state.foldFrom),
                         openness = opennessValue(),
                         morphTo = Pair(fullWidthDp, fullHeightDp),
                         fraction = fraction(),
@@ -415,7 +439,13 @@ private class DockPlacementTarget(
     val open: ChatDockRect,
     val wrapHeight: Boolean,
     val snapping: Boolean,
-)
+    /** See [ChatDockState.foldFrom]. */
+    val foldFrom: ChatDockGeometry?,
+) {
+    /** The minimised dock's rect in [frame]: where it stood as it began to open, if it is opening. */
+    fun minimisedIn(frame: ChatDockFrame): ChatDockRect =
+        foldFrom?.let { ChatDockGeometryMath.rect(it, frame) } ?: minimisedRect(geometry, frame)
+}
 
 private class DockPlaced(val placeable: Placeable, val left: Int, val top: Int)
 
@@ -433,7 +463,7 @@ private fun MeasureScope.dockPlacement(
     morphTo: Pair<Float, Float>,
     fraction: Float,
 ): DockPlaced {
-    val minimised = ChatDockGeometryMath.rect(target.geometry.copy(collapsed = true), target.frame)
+    val minimised = target.minimisedIn(target.frame)
     val docked = when {
         openness >= 1f -> target.open
         openness <= 0f -> minimised
@@ -450,7 +480,7 @@ private fun MeasureScope.dockPlacement(
         rect
     } else {
         // Minimised by geometry or still on its way to opening: either way placed as the minimised dock.
-        ChatDockGeometryMath.rect(target.geometry.copy(collapsed = true), target.frame.copy(collapsedHeightDp = placeable.height.toDp().value))
+        target.minimisedIn(target.frame.copy(collapsedHeightDp = placeable.height.toDp().value))
     }
     return DockPlaced(placeable, measured.left.dp.roundToPx(), measured.top.dp.roundToPx())
 }
@@ -549,7 +579,11 @@ internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect
 
 /** Where the panel stands open for [geometry]: itself, or where a minimised dock would open. */
 private fun openRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect =
-    ChatDockGeometryMath.rect(geometry.copy(collapsed = false), frame)
+    ChatDockGeometryMath.rect(ChatDockGeometryMath.expand(geometry, frame), frame)
+
+/** Where the dock stands minimised for [geometry]: itself, or where an open panel's bar would fold to. */
+private fun minimisedRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect =
+    ChatDockGeometryMath.rect(ChatDockGeometryMath.collapse(geometry, frame), frame)
 
 /** Drag to move, double-click / double-tap to reset; the panel's own controls sit on it. */
 private fun Modifier.moveHandle(state: ChatDockState): Modifier = this
