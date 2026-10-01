@@ -61,7 +61,11 @@ internal data class NoteFit(val height: Float, val fontScale: Float) {
     fun grewPast(reserved: Float): Boolean = height > reserved
 }
 
-/** The note card's chrome, the one source the renderer draws and measures with. */
+/**
+ * The note card's chrome, the one source the renderer draws and measures with. The values are
+ * [Dp] because the card is composed under [CanvasWorldDensity], where one dp is one world unit:
+ * `handleHeight.value` IS the handle's height in world units, on every display.
+ */
 internal object CanvasNoteChrome {
     /** The handle bar over a (non-plain) note's body. */
     val handleHeight: Dp get() = LettaDimens.Control.iconButton
@@ -144,7 +148,7 @@ internal data class NoteFitRequest(
     val style: CanvasTextStyle?,
     val onLightSurface: Boolean,
     val plain: Boolean,
-    /** The card's width and booked height, in world units (one world unit is one px before the board's zoom). */
+    /** The card's width and booked height, in world units (one px before the board's zoom; see CanvasWorldDensity). */
     val width: Float,
     val reserved: Float,
     /** Only this scale, while the card is being typed into: the type does not change size mid-sentence. */
@@ -159,8 +163,11 @@ internal data class NoteFitRequest(
  * list that fills whatever it is given, so it has no height of its own, as in `VerticallyCentred`)
  * at the card's width and the card's padding, at each candidate font scale until one fits.
  *
- * It all happens in the layout phase: a pan or zoom is a placement change and never remeasures, and
- * [onFit] is only called with a new value when the text, width, style or booking changed.
+ * Measured in world units ([InWorldUnits]), like the card it measures for, so the fit is the same
+ * on every display and at every system font scale. It all happens in the layout phase, in a node
+ * outside the zoomed card whose constraints never change with the zoom: a pan or zoom never
+ * remeasures it, and [onFit] is only called with a new value when the text, width, style or
+ * booking changed.
  */
 @OptIn(ExperimentalCascadePreviewApi::class)
 @Composable
@@ -169,6 +176,19 @@ internal fun NoteFitMeasurer(request: NoteFitRequest, onFit: (NoteFit) -> Unit) 
     val registry = rememberCanvasBlockRegistry()
     val padding = CanvasNoteChrome.bodyPadding(request.plain, isLabel = false)
     val chrome = if (request.plain) null else CanvasNoteChrome.handleHeight
+    InWorldUnits { NoteFitLayout(request, blocks, registry, padding, chrome, onFit) }
+}
+
+@OptIn(ExperimentalCascadePreviewApi::class)
+@Composable
+private fun NoteFitLayout(
+    request: NoteFitRequest,
+    blocks: List<Block>,
+    registry: io.github.linreal.cascade.editor.registry.BlockRegistry,
+    padding: PaddingValues,
+    chrome: Dp?,
+    onFit: (NoteFit) -> Unit,
+) {
     SubcomposeLayout(Modifier.clearAndSetSemantics {}) { _ ->
         val widthPx = request.width.toInt().coerceAtLeast(1)
         val loose = Constraints(minWidth = widthPx, maxWidth = widthPx, minHeight = 0, maxHeight = Constraints.Infinity)
