@@ -41,6 +41,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 internal class TimelineRowBindings(
     val contexts: TimelineRowContexts,
     val callbacks: ChatRowCallbacks,
+    /** The page's pinch: the list previews it in its draw layer while the rows keep their layout. */
+    val pinch: TimelinePinchScale? = null,
 )
 
 /** The list frame's overlays and their actions. */
@@ -96,7 +98,14 @@ internal fun TimelineListFrame(
                     // Under floating chrome the dissolve runs from the top edge through it (Android's
                     // chat list fades over its top padding, ChatMessageListBody).
                     .timelineFadingEdges(fades, topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve)
-                    .graphicsLayer { translationY = overlays.glide.overshootPx }
+                    .graphicsLayer {
+                        translationY = overlays.glide.overshootPx
+                        // A pinch in progress, read here only: it redraws the rows, never re-lays them out.
+                        val pinchScale = bindings.pinch?.layerScale ?: 1f
+                        scaleX = pinchScale
+                        scaleY = pinchScale
+                        transformOrigin = TimelinePinchOrigin
+                    }
                     // The conversation: the agent's mascot glances at it (letta-mobile-bglj6.1).
                     .mascotGazeTarget(MascotGazeSurface.TIMELINE)
                     .testTag(ChatTimelineTags.LIST),

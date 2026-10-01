@@ -125,7 +125,7 @@ private fun PagedTimelineBody(
     // The newest row is the live overlay's head, not necessarily the owner state's last message.
     val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
     val bindings = remember(params.bindings, newestId) {
-        TimelineRowBindings(params.bindings.contexts.withNewest(newestId), params.bindings.callbacks)
+        TimelineRowBindings(params.bindings.contexts.withNewest(newestId), params.bindings.callbacks, params.bindings.pinch)
     }
 
     Box(modifier) {
