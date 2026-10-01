@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasStorageFault
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.time.ExperimentalTime
@@ -34,6 +33,8 @@ internal fun canvasStorageFaultText(fault: CanvasStorageFault, timeZone: TimeZon
         CanvasStorageFault.Kind.QUARANTINED -> "A notebook was too large to open safely and was set aside at $time"
         CanvasStorageFault.Kind.NEAR_BUDGET -> "This board's history is growing large"
         CanvasStorageFault.Kind.COMPACTED -> "This board's older history was archived"
+        CanvasStorageFault.Kind.OVER_BUDGET -> "This board's history is over its size budget and may fail to save"
+        CanvasStorageFault.Kind.READ_ONLY -> "Changes since $time are not being saved; this board is read-only"
     }
     val size = fault.documentBytes?.let { bytes ->
         val tenths = bytes * 10 / (1024L * 1024L)
@@ -52,10 +53,12 @@ internal fun CanvasStorageFaultBanner(faults: List<CanvasStorageFault>, modifier
     val fault = faults.maxByOrNull { it.atEpochMs } ?: return
     val text = canvasStorageFaultText(fault)
     Surface(
-        modifier = modifier.widthIn(max = 560.dp).semantics { liveRegion = LiveRegionMode.Assertive },
+        // One merged node, so the live region announces the headline and detail, not nothing.
+        modifier = modifier.widthIn(max = LettaDimens.Pane.noticeMaxWidth)
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Assertive },
         shape = RoundedCornerShape(LettaDimens.Radius.md),
         color = MaterialTheme.colorScheme.errorContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
+        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
     ) {
         Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
             Text(

@@ -10,6 +10,8 @@ import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -43,14 +45,19 @@ class NotebookEndpointSession private constructor(
     /** Compatibility constructor for sessions that own their own store and projection poller. */
     constructor(directory: Path, endpoint: Endpoint, peers: Set<String>, scope: CoroutineScope) :
         this(
-            // A synced store: an over-budget history is reported, not restarted under peers.
-            NotebookLocalStore(directory, IrohDiagnostics.endpointIdHex(endpoint.addr().id()), NotebookHistoryBudget(compactOversized = false)),
+            // A synced store: an over-budget history is reported, never restarted under peers.
+            NotebookLocalStore(directory, IrohDiagnostics.endpointIdHex(endpoint.addr().id()), NotebookHistoryBudget()),
             endpoint, peers, scope, true,
         )
 
-    private val protocol = AutomergeIrohRepoProtocol(store.repo, peers, scope, endpoint::connect)
+    // repoForSync refuses a store that restarts histories, and marks the directory as synced so
+    // that no later store restarts one either.
+    private val protocol = AutomergeIrohRepoProtocol(store.repoForSync(), peers, scope, endpoint::connect)
     init {
         if (ownsStore) store.startPolling(1_000)
+        // Boards in a layout newer than this build are read-only here, with a fault on the board,
+        // so this build never writes back fields it cannot see. Writes re-check as documents arrive.
+        scope.launch(Dispatchers.IO) { runCatching { store.checkLayouts() } }
     }
     override val alpn: ByteArray get() = protocol.alpn
     override fun authorize(remoteEndpointId: String): Boolean = protocol.authorize(remoteEndpointId)

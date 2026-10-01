@@ -1858,8 +1858,8 @@ fun CanvasWorkspace(
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
 
-/** Below the header bar, so the storage-fault banner never covers the title or actions. */
-private val STORAGE_FAULT_TOP = 64.dp
+/** Below the header bar (and its inset), so the storage-fault banner never covers the title or actions. */
+private val STORAGE_FAULT_TOP = CHROME_INSET + CanvasHeaderBarHeight + LettaDimens.Space.sm
 /** How long before asking the host again for an asset it did not have yet. */
 private const val ASSET_RETRY_MS = 10_000L
 

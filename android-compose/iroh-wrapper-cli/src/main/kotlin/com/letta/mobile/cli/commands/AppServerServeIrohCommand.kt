@@ -469,13 +469,10 @@ class AppServerServeIrohCommand : CliktCommand(
             "Notebook sync requires --iroh-secret-key-file for stable peer identity"
         }
         val peerId = IrohNodeIdentity.nodeIdHexFromSecretBytes(FileIrohSecretKeyStore(keyFile).loadOrCreate())
-        // This store syncs with peers: an over-budget history is reported, not restarted.
-        val store = NotebookLocalStore(
-            java.nio.file.Path.of(requireNotNull(notebookDir)),
-            peerId,
-            com.letta.mobile.data.canvas.NotebookHistoryBudget(compactOversized = false),
-        )
-        val protocol = AutomergeIrohRepoProtocol(store.repo, peers, scope) { remote, alpn ->
+        // This store syncs with peers: an over-budget history is reported, never restarted
+        // (repoForSync refuses a store that would, and marks the directory as synced).
+        val store = NotebookLocalStore(java.nio.file.Path.of(requireNotNull(notebookDir)), peerId)
+        val protocol = AutomergeIrohRepoProtocol(store.repoForSync(), peers, scope) { remote, alpn ->
             checkNotNull(endpointProvider()) { "Iroh endpoint not started" }.connect(remote, alpn)
         }
         return store to protocol

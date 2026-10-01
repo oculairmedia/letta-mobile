@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.Telemetry
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
@@ -18,18 +20,46 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
 
     private suspend fun <T> locked(action: () -> T): T = withContext(Dispatchers.IO) { notebooks.withCanvasLock(action) }
 
+    /**
+     * Which notebook last held each canvas. Only a hint: a hit is checked against that notebook's
+     * metadata (one small read) and falls back to the full scan if it no longer matches, so a
+     * remote edit or a set-aside document can never make it answer wrongly.
+     */
+    private val notebookOf = ConcurrentHashMap<CanvasId, DocumentId>()
+
     /** The notebook holding the first canvas whose metadata matches; boards are not decoded. */
     private fun find(match: (CanvasDocument) -> Boolean): DocumentId? =
         notebooks.listDocuments().firstOrNull { id -> notebooks.canvasMetadata(id)?.let(match) == true }
 
+    /** [find] by canvas id, answering from [notebookOf] when its hint still holds. */
+    private fun findCanvas(id: CanvasId): DocumentId? {
+        notebookOf[id]?.let { hint ->
+            if (notebooks.canvasMetadata(hint)?.id == id) return hint
+            notebookOf.remove(id, hint)
+        }
+        return find { it.id == id }?.also { notebookOf[id] = it }
+    }
+
+    /**
+     * A write the store refused because it is read-only. The board already shows why (a
+     * READ_ONLY fault, logged at ERROR when it was raised); the session keeps the edit in memory.
+     */
+    private fun refused(canvasId: CanvasId, error: NotebookReadOnlyException) {
+        Telemetry.event(
+            NotebookStorageFaults.TAG, "write_refused",
+            "canvasId" to canvasId.value, "reason" to error.message,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
     override suspend fun deletedElements(id: CanvasId): List<CanvasDeletedElement> = locked {
-        find { it.id == id }?.let(notebooks::deletedBoardElements) ?: emptyList()
+        findCanvas(id)?.let(notebooks::deletedBoardElements) ?: emptyList()
     }
 
     private fun all(): List<CanvasDocument> = notebooks.listDocuments().mapNotNull { notebooks.canvasDocument(it) }
 
     override suspend fun get(id: CanvasId): CanvasDocument? = locked {
-        find { it.id == id }?.let(notebooks::canvasDocument)
+        findCanvas(id)?.let(notebooks::canvasDocument)
     }
 
     override suspend fun getForConversation(conversationId: String): CanvasDocument? = locked {
@@ -37,22 +67,37 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
     }
 
     override suspend fun upsert(doc: CanvasDocument) = locked {
-        val target = find { it.id == doc.id } ?: notebooks.create(doc.title)
-        notebooks.writeCanvas(target, doc, null)
+        try {
+            val target = findCanvas(doc.id) ?: notebooks.create(doc.title)
+            notebookOf[doc.id] = target
+            notebooks.writeCanvas(target, doc, null)
+        } catch (error: NotebookReadOnlyException) {
+            refused(doc.id, error)
+        }
         Unit
     }
 
     override suspend fun upsertIfRevision(doc: CanvasDocument, expectedRevision: Long): Boolean = locked {
-        val target = find { it.id == doc.id } ?: return@locked false
-        notebooks.writeCanvas(target, doc, expectedRevision)
+        val target = findCanvas(doc.id) ?: return@locked false
+        try {
+            notebooks.writeCanvas(target, doc, expectedRevision)
+        } catch (error: NotebookReadOnlyException) {
+            refused(doc.id, error)
+            false
+        }
     }
 
     override suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument = locked {
         val conversation = requireNotNull(doc.conversationId) { "createForConversationIfAbsent needs a conversationId" }
         find { it.conversationId == conversation }?.let(notebooks::canvasDocument) ?: run {
-            require(find { it.id == doc.id } == null) { "Canvas ID already belongs to another conversation" }
-            val target = notebooks.create(doc.title)
-            notebooks.writeCanvas(target, doc, null)
+            require(findCanvas(doc.id) == null) { "Canvas ID already belongs to another conversation" }
+            try {
+                val target = notebooks.create(doc.title)
+                notebookOf[doc.id] = target
+                notebooks.writeCanvas(target, doc, null)
+            } catch (error: NotebookReadOnlyException) {
+                refused(doc.id, error)
+            }
             doc
         }
     }

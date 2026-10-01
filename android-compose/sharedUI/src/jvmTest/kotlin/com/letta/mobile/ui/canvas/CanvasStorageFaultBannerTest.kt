@@ -25,6 +25,17 @@ class CanvasStorageFaultBannerTest {
     }
 
     @Test
+    fun aReadOnlyStoreAndAnOverBudgetHistoryAreShownAsErrors() {
+        val readOnly = fault(CanvasStorageFault.Kind.READ_ONLY, null)
+        val over = fault(CanvasStorageFault.Kind.OVER_BUDGET, "board")
+        assertEquals(
+            "Changes since 13:07 are not being saved; this board is read-only",
+            canvasStorageFaultText(readOnly, TimeZone.UTC).headline,
+        )
+        assertEquals(listOf(readOnly, over), listOf(readOnly, over).affecting(CanvasId("board")))
+    }
+
+    @Test
     fun aBoardShowsItsOwnFaultsAndUnattributedOnesButNotBudgetNotes() {
         val faults = listOf(
             fault(CanvasStorageFault.Kind.SAVE_FAILED, "board"),

@@ -1,27 +1,45 @@
 package com.letta.mobile.data.canvas
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.ForkJoinWorkerThread
+import org.automerge.repo.Repo
 import org.automerge.repo.Storage
 import org.automerge.repo.StorageKey
 
 /**
  * Keeps one notebook repository's storage healthy and its failures visible: the history budget
- * at open, storage failures and repository-thread errors as [CanvasStorageFault]s, and the
- * documents set aside because they could not be opened safely.
+ * at open, storage failures and repository-thread errors as [CanvasStorageFault]s, the documents
+ * set aside because they could not be opened safely, and the read-only state the store falls back
+ * to when it cannot vouch for itself.
  */
 internal class NotebookStorageHealth(
-    storageRoot: Path,
+    private val storageRoot: Path,
     private val budget: NotebookHistoryBudget,
     private val documentKeys: () -> List<String>,
+    /** The repository's cross-process canvas lock; restarts and recovery run under it. */
+    private val lock: (() -> Unit) -> Unit,
+    private val archive: NotebookHistoryArchive = NotebookHistoryArchive(storageRoot),
 ) : AutoCloseable {
     val faults = NotebookStorageFaults()
-    private val archive = NotebookHistoryArchive(storageRoot)
     private val quarantined = ConcurrentHashMap.newKeySet<String>()
     private val canvases = ConcurrentHashMap<String, CanvasId>()
     private val budgetLevel = ConcurrentHashMap<String, Int>()
     private val storageNames = ConcurrentHashMap<String, String>()
-    private val guard: (Thread, Throwable) -> Unit = ::onRepositoryError
+    private val layoutRefused = ConcurrentHashMap.newKeySet<String>()
+    private val syncMarker = storageRoot.resolve(SYNC_MARKER)
+
+    @Volatile
+    private var repositoryPool: ExecutorService? = null
+
+    @Volatile
+    private var readOnlyReason: String? = null
+
+    private val guard = AutomergeFaultGuard.Listener(owns = ::ownsThread, onError = ::onRepositoryError)
 
     init {
         AutomergeFaultGuard.register(guard)
@@ -31,48 +49,68 @@ internal class NotebookStorageHealth(
     private var preparing: Thread? = null
 
     /**
-     * Apply the history budget to every indexed document. Sizes are checked here, which is cheap.
-     * Restarting an over-budget document (seconds for tens of MB) runs on its own thread, and
-     * [awaitPrepared] holds back every open until it is done, so the repository never loads a
-     * document mid-restart. Android builds the store on its main thread, which must not wait.
+     * Recover interrupted restarts and apply the history budget to every indexed document, on a
+     * background thread: reading the index and walking each document's files is disk I/O, and
+     * Android builds the store on its main thread. [awaitPrepared] holds back every open until it
+     * is done, so the repository never loads a document mid-restart.
      */
     fun prepare() {
+        val thread = Thread(::scan, "notebook-history-compactor").apply { isDaemon = true }
+        preparing = thread
+        thread.start()
+    }
+
+    /** Wait for [prepare]; every repository open goes through here. */
+    fun awaitPrepared() {
+        preparing?.takeIf { it !== Thread.currentThread() }?.join()
+    }
+
+    /** Whether this repository was ever handed to peer sync, by this process or an earlier one. */
+    fun everSynced(): Boolean = Files.exists(syncMarker, NOFOLLOW_LINKS)
+
+    /**
+     * Record, durably, that this repository syncs with peers. From then on no store restarts its
+     * documents, whatever its budget asks for: a peer may hold any document's old history.
+     */
+    fun markSynced() {
+        lock {
+            if (!everSynced()) Files.writeString(syncMarker, "Documents here sync with peers; histories are never restarted.\n", UTF_8)
+        }
+    }
+
+    private fun scan() {
         val keys = try {
             documentKeys()
         } catch (error: Exception) {
             record(CanvasStorageFault.Kind.LOAD_FAILED, null, null, "Notebook index unreadable", error)
             return
         }
-        val oversized = keys.mapNotNull { key -> sizeChecked(key)?.takeIf { it > budget.maxDocumentBytes }?.let { key to it } }
-        if (oversized.isEmpty()) return
-        if (!budget.compactOversized) {
-            oversized.forEach { (key, bytes) -> nearBudget(key, bytes, OVER) }
-            return
+        for (key in keys) {
+            try {
+                lock {
+                    archive.recoverInterrupted(key)
+                    // Measured under the lock: no other store can restart it between here and the move.
+                    val bytes = archive.documentBytes(key)
+                    when {
+                        bytes > budget.maxDocumentBytes && mayRestart() -> restart(key, bytes)
+                        bytes > budget.maxDocumentBytes -> nearBudget(key, bytes, OVER)
+                        bytes >= budget.warnBytes -> nearBudget(key, bytes, WARNED)
+                    }
+                }
+            } catch (error: Exception) {
+                record(CanvasStorageFault.Kind.LOAD_FAILED, key, null, "Notebook storage could not be inspected", error)
+            }
         }
-        preparing = Thread({ oversized.forEach { (key, bytes) -> restart(key, bytes) } }, "notebook-history-compactor")
-            .apply { isDaemon = true; start() }
     }
 
-    /** Wait for [prepare]'s restarts; every repository open goes through here. */
-    fun awaitPrepared() {
-        preparing?.takeIf { it !== Thread.currentThread() }?.join()
-    }
-
-    /** Finish an interrupted restart, warn near the budget, and return the size; null if unreadable. */
-    private fun sizeChecked(key: String): Long? = try {
-        archive.recoverInterrupted(key)
-        archive.documentBytes(key).also { bytes ->
-            if (bytes >= budget.warnBytes && bytes <= budget.maxDocumentBytes) nearBudget(key, bytes, WARNED)
-        }
-    } catch (error: Exception) {
-        record(CanvasStorageFault.Kind.LOAD_FAILED, key, null, "Notebook storage could not be inspected", error)
-        null
-    }
+    private fun mayRestart(): Boolean = budget.compactOversized && !everSynced()
 
     private fun restart(key: String, bytes: Long) {
         try {
             compact(key, bytes)
         } catch (error: Throwable) {
+            // Put back whatever the failed restart moved; the document stays as it was.
+            runCatching { archive.recoverInterrupted(key) }.exceptionOrNull()?.let(error::addSuppressed)
             // A document too large to restart is too large for the repository to save: set it
             // aside so this process does not die on it. Its files stay where they are.
             val tooLarge = bytes > budget.maxDocumentBytes * QUARANTINE_FACTOR
@@ -103,12 +141,15 @@ internal class NotebookStorageHealth(
     private fun nearBudget(key: String, bytes: Long, level: Int) {
         if ((budgetLevel[key] ?: 0) >= level) return
         budgetLevel[key] = level
-        val note = if (level == OVER) {
-            if (budget.compactOversized) "it will be archived and restarted the next time the notebook store opens"
-            else "this repository syncs with peers, so it is not restarted automatically"
-        } else "${(budget.warnFraction * PERCENT).toInt()}% of it"
+        val note = when {
+            level != OVER -> "${(budget.warnFraction * PERCENT).toInt()}% of it"
+            mayRestart() -> "it will be archived and restarted the next time the notebook store opens"
+            budget.compactOversized -> "this repository has synced with peers, so it is not restarted " +
+                "(a fresh history would conflict with theirs)"
+            else -> "this repository does or may sync with peers, so it is not restarted automatically"
+        }
         record(
-            CanvasStorageFault.Kind.NEAR_BUDGET,
+            if (level == OVER) CanvasStorageFault.Kind.OVER_BUDGET else CanvasStorageFault.Kind.NEAR_BUDGET,
             key,
             bytes,
             "Notebook history is ${mb(bytes)} of a ${mb(budget.maxDocumentBytes)} budget; $note",
@@ -132,6 +173,37 @@ internal class NotebookStorageHealth(
 
     fun observe(storage: Storage): Storage = ObservedStorage(storage, ::onStorageFailure)
 
+    /** Learn [repo]'s document pool, so errors on its worker threads are recognised as its own. */
+    fun attach(repo: Repo) {
+        repositoryPool = documentPoolOf(repo)
+    }
+
+    private fun ownsThread(thread: Thread): Boolean {
+        if (AutomergeFaultGuard.isRepositoryThreadName(thread.name)) return true
+        val pool = repositoryPool ?: return false
+        return thread is ForkJoinWorkerThread && thread.pool === pool
+    }
+
+    /** Throw if the store is read-only; the fault is already on the board. */
+    fun checkWritable() {
+        readOnlyReason?.let { throw NotebookReadOnlyException("Notebook store is read-only: $it") }
+    }
+
+    val isReadOnly: Boolean get() = readOnlyReason != null
+
+    /**
+     * [key]'s board layout is newer than this build: refuse to write it, so an older reader does
+     * not overwrite fields it cannot see, and say so once.
+     */
+    fun refuseLayout(key: String, version: Long): NotebookReadOnlyException {
+        val message = "Board layout $version is newer than this build reads (${NotebookBoardStorage.LAYOUT_VERSION}); " +
+            "the notebook is read-only here so this build cannot overwrite what it does not understand. Update the app"
+        if (layoutRefused.add(key)) {
+            record(CanvasStorageFault.Kind.READ_ONLY, key, runCatching { archive.documentBytes(key) }.getOrNull(), message)
+        }
+        return NotebookReadOnlyException(message)
+    }
+
     private fun onStorageFailure(operation: String, storageKey: StorageKey, bytes: Long?, error: Throwable) {
         val key = documentKeyOf(storageKey)
         val load = operation.startsWith("load")
@@ -146,9 +218,10 @@ internal class NotebookStorageHealth(
     }
 
     /**
-     * An error escaped the repository's own threads, and [AutomergeFaultGuard] kept it from ending
-     * the process. The repository does not say which document it was saving; the largest one is
-     * named, as an oversized snapshot is what such failures have been.
+     * An [Error] escaped one of the repository's threads, and [AutomergeFaultGuard] kept it from
+     * ending the process. The repository does not say which document it was saving, so the
+     * largest one is named (an oversized snapshot is what such failures have been). Its state can
+     * no longer be vouched for, so the store turns read-only rather than carrying on as if healthy.
      */
     private fun onRepositoryError(thread: Thread, error: Throwable) {
         val suspect = runCatching {
@@ -161,6 +234,20 @@ internal class NotebookStorageHealth(
             "The notebook repository failed on ${thread.name}; the largest document is named. " +
                 "Changes since this time may not be on disk",
             error,
+        )
+        degrade("${error::class.java.simpleName} on ${thread.name}")
+    }
+
+    private fun degrade(reason: String) {
+        synchronized(this) {
+            if (readOnlyReason != null) return
+            readOnlyReason = reason
+        }
+        record(
+            CanvasStorageFault.Kind.READ_ONLY,
+            null,
+            null,
+            "The notebook store hit $reason and is read-only until the app restarts; changes since this time are not saved",
         )
     }
 
@@ -193,12 +280,27 @@ internal class NotebookStorageHealth(
 
     private fun mb(bytes: Long): String = "%.1f MB".format(bytes / (KIB * KIB).toDouble())
 
-    private companion object {
-        const val WARNED = 1
-        const val OVER = 2
-        const val KIB = 1024L
-        const val PERCENT = 100
+    companion object {
+        private const val WARNED = 1
+        private const val OVER = 2
+        private const val KIB = 1024L
+        private const val PERCENT = 100
+
         /** Past this many budgets, a document that could not be restarted is not opened at all. */
-        const val QUARANTINE_FACTOR = 4
+        private const val QUARANTINE_FACTOR = 4
+
+        /** Present once the repository was handed to peer sync; never removed. */
+        const val SYNC_MARKER = "notebook-synced"
+
+        /**
+         * The repository's document pool (RepoRuntime runs document work on a work-stealing pool
+         * whose threads carry default names). Read reflectively; app/proguard-rules.pro keeps
+         * `org.automerge.**`. Null if this version of the library is laid out differently, and
+         * then only the named `automerge-*` threads are recognised.
+         */
+        fun documentPoolOf(repo: Repo): ExecutorService? = runCatching {
+            val runtime = Repo::class.java.getDeclaredField("runtime").apply { isAccessible = true }.get(repo)
+            runtime.javaClass.getDeclaredField("documentExecutor").apply { isAccessible = true }.get(runtime) as ExecutorService
+        }.getOrNull()
     }
 }
