@@ -20,10 +20,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Storage failures are non-fatal but loud; over-budget histories are archived, not lost. */
+/** Storage failures are non-fatal but loud; over-budget histories are archived and moved, not lost. */
 class NotebookStorageFaultsTest {
     private fun waitFor(timeoutMs: Long = 10_000, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
@@ -41,11 +43,16 @@ class NotebookStorageFaultsTest {
 
     private val bloatedScene = """{"bgColor":"#ffffffff","elements":[{"id":"a","type":"Path","points":["1,2"]}]}"""
 
-    /** A canvas whose history is bloated the way the old storage did it: one large string rewritten many times. */
+    /**
+     * A canvas whose history is bloated the way the old storage did it: one large string rewritten
+     * many times. Element `b` was deleted, so it has a tombstone and a restore-list entry.
+     */
     private fun bloatedCanvas(path: Path, canvasId: CanvasId): DocumentId = runBlocking {
         NotebookLocalStore(path, "budget-peer").use { notebooks ->
             val store = NotebookCanvasDocumentStore(notebooks)
-            store.upsert(CanvasDocument(canvasId, title = "Bloated", sceneJson = bloatedScene))
+            val withB = bloatedScene.removeSuffix("]}") + """,{"id":"b","type":"Rect"}]}"""
+            store.upsert(CanvasDocument(canvasId, conversationId = "conversation-${canvasId.value}", title = "Bloated", sceneJson = withB))
+            store.upsert(CanvasDocument(canvasId, conversationId = "conversation-${canvasId.value}", title = "Bloated", revision = 1, sceneJson = bloatedScene))
             val id = notebooks.listDocuments().single()
             notebooks.insertMarkdown(id, 0, "Kept text")
             repeat(60) { round ->
@@ -172,36 +179,58 @@ class NotebookStorageFaultsTest {
         }
     }
 
+    private fun DocumentId.root(notebooks: NotebookLocalStore, key: String): AmValue? = notebooks.open(this)!!.withDocument { document ->
+        document.get(ObjectId.ROOT, key).orElse(null)
+    }.get(5, TimeUnit.SECONDS)
+
+    private fun archivesOf(path: Path, key: String): List<String> =
+        Files.list(NotebookHistoryArchive(path).archiveRoot.resolve(key)).use { s -> s.iterator().asSequence().map { it.name }.toList() }
+
     @Test
-    fun anOverBudgetHistoryIsArchivedAndTheDocumentContinuesFromItsCurrentState() = runBlocking {
+    fun anOverBudgetHistoryInASyncedStoreIsArchivedAndTheBoardMovesToANewDocument() = runBlocking {
         val path = Files.createTempDirectory("notebook-budget-")
         val canvasId = CanvasId("bloated")
-        val budget = smallBudget.copy(compactOversized = true)
         val id = bloatedCanvas(path, canvasId)
         val key = id.key()
         val archive = NotebookHistoryArchive(path)
         val before = archive.documentBytes(key)
-        assertTrue(before > budget.maxDocumentBytes, "history only reached $before bytes")
+        assertTrue(before > smallBudget.maxDocumentBytes, "history only reached $before bytes")
 
-        NotebookLocalStore(path, "budget-peer", budget).use { notebooks ->
-            // Restarting runs in the background; listing waits for it, as every open does.
-            notebooks.listDocuments()
+        NotebookLocalStore(path, "budget-peer", smallBudget).use { notebooks ->
+            // A store that syncs with peers: the move never touches the id they hold.
+            notebooks.repoForSync()
+            val moved = notebooks.listDocuments().single()
+            assertNotEquals(id, moved)
             val compacted = notebooks.faults.faults.value.single { it.kind == CanvasStorageFault.Kind.COMPACTED }
-            assertEquals(key, compacted.documentId)
-            assertTrue(archive.documentBytes(key) < before / 4, "restarted at ${archive.documentBytes(key)} of $before")
-            // Same document id, same canvas, same content.
-            assertEquals(listOf(id), notebooks.listDocuments())
+            assertEquals(moved.key(), compacted.documentId)
+            assertEquals(canvasId, compacted.canvasId)
+            assertFalse(compacted.isError)
+            assertTrue(notebooks.faults.faults.value.none { it.isError }, notebooks.faults.faults.value.toString())
+            assertTrue(archive.documentBytes(moved.key()) < before / 4, "moved at ${archive.documentBytes(moved.key())} of $before")
+            // The old id is retired: not opened, its storage deleted, recorded durably, never registered again.
+            assertNull(notebooks.open(id))
+            assertFalse(Files.exists(archive.documentDirectory(key)))
+            assertTrue(key in NotebookDocumentIndex(path).retired())
+            assertFalse(notebooks.registerDocument(id))
+            assertEquals(listOf(moved), notebooks.listDocuments())
+            // The same canvas, found by id and by conversation, with the same content.
             val store = NotebookCanvasDocumentStore(notebooks)
             val doc = store.get(canvasId)!!
+            assertEquals(doc, store.getForConversation("conversation-bloated"))
             assertEquals(Json.parseToJsonElement(bloatedScene), Json.parseToJsonElement(doc.sceneJson))
-            assertEquals("Kept text", notebooks.read(id)!!.markdown)
-            // The restarted document names its archive, and the archive holds the full history.
-            val entry = notebooks.open(id)!!.withDocument { document ->
+            assertEquals("Kept text", notebooks.read(moved)!!.markdown)
+            // The deleted element is still restorable; its tombstone did not come along.
+            assertEquals(listOf("b"), store.deletedElements(canvasId).map { it.elementId })
+            val tombstones = (moved.root(notebooks, "boardTombstones") as AmValue.Map).id
+            assertTrue(notebooks.open(moved)!!.withDocument { it.keys(tombstones).orElseThrow().isEmpty() }.get(5, TimeUnit.SECONDS))
+            // It names the document it replaced and its archive, and the archive holds the full history.
+            assertEquals(key, (moved.root(notebooks, NotebookHistoryArchive.PREVIOUS_DOCUMENT) as AmValue.Str).value)
+            val entry = notebooks.open(moved)!!.withDocument { document ->
                 val list = (document.get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE).orElseThrow() as AmValue.List).id
                 (document.listItems(list).orElseThrow().single() as AmValue.Str).value
-            }.get(5, TimeUnit.SECONDS)
-            val file = Json.parseToJsonElement(entry).jsonObject.getValue("file").jsonPrimitive.content
-            val archived = archive.archiveRoot.resolve(key).resolve(file)
+            }.get(5, TimeUnit.SECONDS).let { Json.parseToJsonElement(it).jsonObject }
+            assertEquals(key, entry.getValue("document").jsonPrimitive.content)
+            val archived = archive.archiveRoot.resolve(key).resolve(entry.getValue("file").jsonPrimitive.content)
             val history = GZIPInputStream(Files.newInputStream(archived)).use { it.readBytes() }
             assertEquals(before, history.size.toLong())
             val old = Document.load(history)
@@ -214,98 +243,74 @@ class NotebookStorageFaultsTest {
             // And it keeps working.
             assertTrue(store.upsertIfRevision(doc.copy(revision = doc.revision + 1, sceneJson = bloatedScene.replace("1,2", "5,6")), doc.revision))
         }
-        NotebookLocalStore(path, "budget-peer", budget).use { notebooks ->
-            assertTrue(NotebookCanvasDocumentStore(notebooks).get(canvasId)!!.sceneJson.contains("5,6"))
-            assertTrue(notebooks.faults.faults.value.none { it.isError })
-            assertEquals(1, Files.list(archive.archiveRoot.resolve(key)).use { s -> s.iterator().asSequence().count { it.name.endsWith(".gz") } })
-        }
-    }
-
-    @Test
-    fun byDefaultAnOverBudgetHistoryIsReportedLoudlyAndNeverRestarted() = runBlocking {
-        val path = Files.createTempDirectory("notebook-budget-default-")
-        val canvasId = CanvasId("synced")
-        val id = bloatedCanvas(path, canvasId)
         NotebookLocalStore(path, "budget-peer", smallBudget).use { notebooks ->
-            val doc = NotebookCanvasDocumentStore(notebooks).get(canvasId)!!
+            assertTrue(NotebookCanvasDocumentStore(notebooks).get(canvasId)!!.sceneJson.contains("5,6"))
+            assertEquals(1, notebooks.listDocuments().size)
+            assertTrue(notebooks.faults.faults.value.none { it.isError || it.kind == CanvasStorageFault.Kind.COMPACTED })
+            assertEquals(1, archivesOf(path, key).size, archivesOf(path, key).toString())
+        }
+    }
+
+    @Test
+    fun anOverBudgetHistoryThatCannotBeMovedStaysAsItIsAndSaysSoLoudly() {
+        val path = Files.createTempDirectory("notebook-budget-unmovable-")
+        val id = NotebookLocalStore(path, "budget-peer").use { it.create("Unmovable") }
+        val key = id.key()
+        val directory = NotebookHistoryArchive(path).documentDirectory(key)
+        // A chunk that is not Automerge: the history cannot be loaded to copy its state.
+        Files.write(Files.createDirectories(directory.resolve("snapshot")).resolve("ee".repeat(32)), ByteArray(12 * 1024) { 7 })
+        val size = bytesUnder(directory)
+        NotebookLocalStore(path, "budget-peer", NotebookHistoryBudget(maxDocumentBytes = 8 * 1024)).use { notebooks ->
+            assertEquals(listOf(id), notebooks.listDocuments())
             val over = notebooks.faults.faults.value.single { it.kind == CanvasStorageFault.Kind.OVER_BUDGET }
-            // An error, so the board shows it, not a log line.
             assertTrue(over.isError)
-            assertEquals(id.key(), over.documentId)
-            assertTrue(over in notebooks.faults.faults.value.affecting(canvasId))
-            assertTrue(over.message.contains("may sync with peers"), over.message)
+            assertEquals(key, over.documentId)
+            assertTrue(over.message.contains("could not be archived and moved"), over.message)
             assertTrue(notebooks.faults.faults.value.none { it.kind == CanvasStorageFault.Kind.COMPACTED })
-            assertEquals(Json.parseToJsonElement(bloatedScene), Json.parseToJsonElement(doc.sceneJson))
         }
-        assertNotRestarted(path, id)
-    }
-
-    /** The full history is still live (no archive, no restart entry, still over budget). */
-    private fun assertNotRestarted(path: Path, id: DocumentId) {
-        val archive = NotebookHistoryArchive(path)
-        assertFalse(Files.exists(archive.archiveRoot.resolve(id.key())))
-        assertTrue(archive.documentBytes(id.key()) > smallBudget.maxDocumentBytes)
-        NotebookLocalStore(path, "budget-peer").use { notebooks ->
-            val entry = notebooks.open(id)!!.withDocument { document ->
-                document.get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE).orElse(null)
-            }.get(5, TimeUnit.SECONDS)
-            assertEquals(null, entry)
-        }
+        assertEquals(size, bytesUnder(directory))
+        assertTrue(NotebookDocumentIndex(path).retired().isEmpty())
+        assertTrue(archivesOf(path, key).none { !it.endsWith(".automerge.gz") }, archivesOf(path, key).toString())
     }
 
     @Test
-    fun aRepositoryThatEverSyncedIsNeverRestartedEvenWhenAStoreOptsIn() = runBlocking {
-        val path = Files.createTempDirectory("notebook-budget-synced-")
-        val id = bloatedCanvas(path, CanvasId("synced"))
-        NotebookLocalStore(path, "budget-peer").use { it.repoForSync() }
-        NotebookLocalStore(path, "budget-peer", smallBudget.copy(compactOversized = true)).use { notebooks ->
-            notebooks.listDocuments()
-            val over = notebooks.faults.faults.value.single { it.kind == CanvasStorageFault.Kind.OVER_BUDGET }
-            assertTrue(over.message.contains("has synced with peers"), over.message)
-            assertTrue(notebooks.faults.faults.value.none { it.kind == CanvasStorageFault.Kind.COMPACTED })
-            // And this store, having opted in, may not be handed to sync itself.
-            assertFailsWith<IllegalStateException> { notebooks.repoForSync() }
-        }
-        assertNotRestarted(path, id)
-    }
-
-    @Test
-    fun twoStoresOpeningAtOnceRestartADocumentOnlyOnce() = runBlocking {
+    fun twoStoresOpeningAtOnceMoveADocumentOnlyOnce() = runBlocking {
         val path = Files.createTempDirectory("notebook-budget-race-")
         val id = bloatedCanvas(path, CanvasId("raced"))
-        val budget = smallBudget.copy(compactOversized = true)
-        val first = NotebookLocalStore(path, "budget-peer", budget)
-        val second = NotebookLocalStore(path, "budget-peer", budget)
-        try {
-            first.listDocuments()
-            second.listDocuments()
+        val first = NotebookLocalStore(path, "budget-peer", smallBudget)
+        val second = NotebookLocalStore(path, "budget-peer", smallBudget)
+        val moved = try {
+            val moved = first.listDocuments().single()
+            // The second re-reads the index under the lock and finds the document already moved.
+            assertEquals(listOf(moved), second.listDocuments())
+            assertNotEquals(id, moved)
+            assertNull(second.open(id))
             val compactions = (first.faults.faults.value + second.faults.faults.value).count { it.kind == CanvasStorageFault.Kind.COMPACTED }
-            // The second re-measures under the lock and finds the restarted, small history.
             assertEquals(1, compactions)
-            val archives = Files.list(NotebookHistoryArchive(path).archiveRoot.resolve(id.key())).use { s ->
-                s.iterator().asSequence().map { it.name }.toList()
-            }
+            val archives = archivesOf(path, id.key())
             assertEquals(1, archives.count { it.endsWith(".gz") }, archives.toString())
             assertEquals(archives.size, archives.count { it.endsWith(".gz") }, archives.toString())
+            moved
         } finally {
             first.close()
             second.close()
         }
         NotebookLocalStore(path, "budget-peer").use { notebooks ->
-            assertEquals("Kept text", notebooks.read(id)!!.markdown)
+            assertEquals(listOf(moved), notebooks.listDocuments())
+            assertEquals("Kept text", notebooks.read(moved)!!.markdown)
         }
     }
 
     @Test
-    fun aDocumentTooLargeToRestartIsSetAsideNotOpened() {
+    fun aDocumentTooLargeToMoveIsSetAsideNotOpened() {
         val path = Files.createTempDirectory("notebook-quarantine-")
         val id = NotebookLocalStore(path, "quarantine-peer").use { it.create("Broken") }
         val key = id.key()
         val directory = NotebookHistoryArchive(path).documentDirectory(key)
-        // A chunk that is not Automerge and far over the budget: it cannot be archived and restarted.
+        // A chunk that is not Automerge and far over the budget: it cannot be archived and moved.
         Files.write(Files.createDirectories(directory.resolve("snapshot")).resolve("ff".repeat(32)), ByteArray(64 * 1024) { 7 })
         val size = bytesUnder(directory)
-        val budget = NotebookHistoryBudget(maxDocumentBytes = 8 * 1024, compactOversized = true)
+        val budget = NotebookHistoryBudget(maxDocumentBytes = 8 * 1024)
         NotebookLocalStore(path, "quarantine-peer", budget).use { notebooks ->
             notebooks.listDocuments()
             val fault = notebooks.faults.faults.value.single { it.kind == CanvasStorageFault.Kind.QUARANTINED }
@@ -314,12 +319,12 @@ class NotebookStorageFaultsTest {
             assertTrue(notebooks.listDocuments().isEmpty())
             assertEquals(null, notebooks.open(id))
         }
-        // The files are untouched for manual recovery, and the failed restart left nothing behind.
+        // The files are untouched for manual recovery, and the failed move left nothing behind.
         assertEquals(size, bytesUnder(directory))
         val leftovers = NotebookHistoryArchive(path).archiveRoot.resolve(key).let { dir ->
             if (!Files.isDirectory(dir)) emptyList() else Files.list(dir).use { s -> s.iterator().asSequence().map { it.name }.toList() }
         }
-        assertTrue(leftovers.none { it.endsWith(".fresh") || it.endsWith(".replaced") || it.endsWith(".building") }, leftovers.toString())
+        assertTrue(leftovers.none { it.endsWith(".successor") || it.endsWith(".building") }, leftovers.toString())
     }
 
     @Test
