@@ -169,8 +169,7 @@ internal object NotebookBoardStorage {
     fun putElement(tx: Transaction, key: String, value: JsonObject) {
         val elements = elementsMap(tx)
         val map = (tx.get(elements, key).orElse(null) as? AmValue.Map)?.id ?: tx.set(elements, key, ObjectType.MAP)
-        tx.keys(map).orElseThrow().filter { it !in value }.forEach { tx.delete(map, it) }
-        value.forEach { (field, fieldValue) -> setStringIfChanged(tx, map, field, fieldValue.toString()) }
+        putStrings(tx, map, value)
         val tombstones = (tx.get(ObjectId.ROOT, TOMBSTONES).orElse(null) as? AmValue.Map)
         if (tombstones != null && tx.get(tombstones.id, key).isPresent) tx.delete(tombstones.id, key)
         val deleted = (tx.get(ObjectId.ROOT, DELETED).orElse(null) as? AmValue.Map)
@@ -254,26 +253,28 @@ internal object NotebookBoardStorage {
         if (layoutVersion(tx) < LAYOUT_VERSION) tx.set(ObjectId.ROOT, LAYOUT, LAYOUT_VERSION)
         if (writesFields) {
             val fields = existingFields ?: tx.set(ObjectId.ROOT, FIELDS, ObjectType.MAP)
-            tx.keys(fields).orElseThrow().filter { it !in objectFields }.forEach { tx.delete(fields, it) }
-            objectFields.forEach { (key, value) ->
-                val map = (tx.get(fields, key).orElse(null) as? AmValue.Map)?.id ?: tx.set(fields, key, ObjectType.MAP)
-                tx.keys(map).orElseThrow().filter { it !in value }.forEach { tx.delete(map, it) }
-                value.forEach { (entry, entryValue) -> setStringIfChanged(tx, map, entry, entryValue.toString()) }
-            }
+            writeMaps(tx, fields, objectFields) { map, value -> putStrings(tx, map, value) }
         }
         if (writesArrays) {
             val arrays = existingArrays ?: tx.set(ObjectId.ROOT, ARRAYS, ObjectType.MAP)
-            tx.keys(arrays).orElseThrow().filter { it !in arrayFields }.forEach { tx.delete(arrays, it) }
-            arrayFields.forEach { (key, entries) ->
-                val map = (tx.get(arrays, key).orElse(null) as? AmValue.Map)?.id ?: tx.set(arrays, key, ObjectType.MAP)
-                tx.keys(map).orElseThrow().filter { it !in entries }.forEach { tx.delete(map, it) }
-                entries.forEach { (id, entry) ->
-                    val entryMap = (tx.get(map, id).orElse(null) as? AmValue.Map)?.id ?: tx.set(map, id, ObjectType.MAP)
-                    tx.keys(entryMap).orElseThrow().filter { it !in entry }.forEach { tx.delete(entryMap, it) }
-                    entry.forEach { (field, fieldValue) -> setStringIfChanged(tx, entryMap, field, fieldValue.toString()) }
-                }
+            writeMaps(tx, arrays, arrayFields) { map, entries ->
+                writeMaps(tx, map, entries) { entryMap, entry -> putStrings(tx, entryMap, entry) }
             }
         }
+    }
+
+    /** [parent] holds one map per key of [values], written by [write]; other keys are dropped. */
+    private fun <T> writeMaps(tx: Transaction, parent: ObjectId, values: Map<String, T>, write: (ObjectId, T) -> Unit) {
+        tx.keys(parent).orElseThrow().filter { it !in values }.forEach { tx.delete(parent, it) }
+        values.forEach { (key, value) ->
+            write((tx.get(parent, key).orElse(null) as? AmValue.Map)?.id ?: tx.set(parent, key, ObjectType.MAP), value)
+        }
+    }
+
+    /** [map] holds [value]'s fields as JSON strings, writing only those that changed. */
+    private fun putStrings(tx: Transaction, map: ObjectId, value: JsonObject) {
+        tx.keys(map).orElseThrow().filter { it !in value }.forEach { tx.delete(map, it) }
+        value.forEach { (field, fieldValue) -> setStringIfChanged(tx, map, field, fieldValue.toString()) }
     }
 
     /**
