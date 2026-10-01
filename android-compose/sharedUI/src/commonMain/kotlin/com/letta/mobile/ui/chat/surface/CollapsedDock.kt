@@ -1,12 +1,12 @@
 package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,6 +71,9 @@ import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_dismiss
 import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
+import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowPlacement
+import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
+import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.MascotSeat
@@ -103,6 +105,8 @@ internal class CollapsedDockContent(
     val editAgent: (() -> Unit)?,
     /** The newest turn as the bubble tells it. */
     val turn: @Composable () -> CollapsedTurn,
+    /** What the agent is doing: a halo glows around the mascot and its bubble while it works. */
+    val ambient: ChatAmbient = ChatAmbient.Idle,
 )
 
 /** The newest turn as the collapsed dock tells it: the reply so far and what the run is doing. */
@@ -194,33 +198,41 @@ internal fun CollapsedDock(
     seated: Boolean = true,
 ) {
     val turn = content.turn()
+    Column(modifier.testTag(DOCK_COLLAPSED_TAG)) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg)) {
+            // The thinking cue: the agent's ambient glow as a soft halo behind the mascot and its
+            // bubble (no animated dots or spinner of its own).
+            Box(Modifier.padding(end = LettaDimens.Control.iconButtonLg + LettaDimens.Space.sm)) {
+                ChatPanelAmbientGlow(content.ambient, AmbientGlowPlacement.Halo, Modifier.matchParentSize())
+                CollapsedTurnRow(state, content, seated, turn)
+            }
+            RestoreButton(state, Modifier.align(Alignment.BottomEnd))
+        }
+    }
+}
+
+/** The mascot and, beside it, the reply bubble (or, while it thinks, only its announcement). */
+@Composable
+private fun CollapsedTurnRow(state: ChatDockState, content: CollapsedDockContent, seated: Boolean, turn: CollapsedTurn) {
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     val showReply = turn.hasReply && turn.turnKey != dismissedTurn
-    Column(modifier.testTag(DOCK_COLLAPSED_TAG)) {
-        Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg)) {
-            Row(
-                Modifier.padding(end = LettaDimens.Control.iconButtonLg + LettaDimens.Space.sm),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                CollapsedMascot(state, content, seated)
-                val beside = Modifier
-                    .offset(x = -ChatSurfaceDimens.collapsedBubbleTuck)
-                    .padding(bottom = ChatSurfaceDimens.collapsedBubbleLift)
-                when {
-                    showReply -> ReplyBubble(
-                        turn = turn,
-                        agentName = content.agentName,
-                        actions = BubbleActions(
-                            open = state::restore,
-                            dismiss = { dismissedTurn = turn.turnKey },
-                        ),
-                        modifier = Modifier.weight(1f, fill = false).then(beside).dockDrag(state),
-                    )
-                    turn.busy && !turn.hasReply -> ThinkingBubble(content.agentName, beside.dockDrag(state))
-                }
-            }
-            RestoreButton(state, Modifier.align(Alignment.BottomEnd))
+    Row(verticalAlignment = Alignment.Bottom) {
+        CollapsedMascot(state, content, seated)
+        val beside = Modifier
+            .offset(x = -ChatSurfaceDimens.collapsedBubbleTuck)
+            .padding(bottom = ChatSurfaceDimens.collapsedBubbleLift)
+        when {
+            showReply -> ReplyBubble(
+                turn = turn,
+                agentName = content.agentName,
+                actions = BubbleActions(
+                    open = state::restore,
+                    dismiss = { dismissedTurn = turn.turnKey },
+                ),
+                modifier = Modifier.weight(1f, fill = false).then(beside).dockDrag(state),
+            )
+            turn.busy && !turn.hasReply -> ThinkingAnnouncement(content.agentName)
         }
     }
 }
@@ -353,21 +365,15 @@ private fun BubbleText(turn: CollapsedTurn) {
     }
 }
 
-/** Tool activity, summarised: the full cards are in the panel. */
+/** Tool activity, summarised (the full cards are in the panel); the halo is its animation. */
 @Composable
 private fun WorkingLine(label: String) {
-    Row(
-        Modifier.clearAndSetSemantics { },
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-            strokeWidth = LettaDimens.Stroke.hairline * 2,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    Text(
+        label,
+        modifier = Modifier.clearAndSetSemantics { },
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** An approval or a form is waiting: open the panel, where it can be answered. */
@@ -385,40 +391,25 @@ private fun NeedsInputChip(onOpen: () -> Unit) {
     )
 }
 
-/** Sent, nothing back yet: three dots beside the thinking mascot. */
+/**
+ * Sent, nothing back yet: the halo behind the mascot shows it thinking, so there is no bubble to
+ * see. This only says so to a screen reader.
+ */
 @Composable
-private fun ThinkingBubble(agentName: String, modifier: Modifier) {
+private fun ThinkingAnnouncement(agentName: String) {
     val label = if (agentName.isBlank()) {
         stringResource(Res.string.chat_surface_collapsed_thinking_unnamed)
     } else {
         stringResource(Res.string.chat_surface_collapsed_thinking, agentName)
     }
-    BubbleSurface(
-        modifier
+    Spacer(
+        Modifier
             .semantics {
                 contentDescription = label
                 liveRegion = LiveRegionMode.Polite
             }
             .testTag(DOCK_COLLAPSED_THINKING_TAG),
-    ) {
-        Row(
-            Modifier.padding(
-                start = ChatSurfaceDimens.collapsedBubbleTailWidth + LettaDimens.Space.md,
-                end = LettaDimens.Space.md,
-                top = LettaDimens.Space.md,
-                bottom = LettaDimens.Space.md,
-            ),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-        ) {
-            repeat(THINKING_DOTS) {
-                Box(
-                    Modifier
-                        .size(ChatSurfaceDimens.collapsedThinkingDot)
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant, CircleShape),
-                )
-            }
-        }
-    }
+    )
 }
 
 /** The bubble itself: the chat's neutral surface, lifted by its shadow, tail towards the mascot. */
@@ -500,7 +491,6 @@ private val BubbleShape = SpeechBubbleShape(
     tailHeight = ChatSurfaceDimens.collapsedBubbleTailHeight,
 )
 
-private const val THINKING_DOTS = 3
 private const val TAIL_MIN_TOP_FRACTION = 0.45f
 
 internal const val DOCK_COLLAPSED_TAG = "chat-dock-collapsed"

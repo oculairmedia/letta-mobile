@@ -61,8 +61,11 @@ object ChatSurfaceDimens {
     val collapsedBubbleTailWidth: Dp = 10.dp
     val collapsedBubbleTailHeight: Dp = 14.dp
 
-    /** The thinking bubble's dots. */
-    val collapsedThinkingDot: Dp = 6.dp
+    /**
+     * How far the minimised dock's ambient halo reaches past the mascot and its bubble, so the
+     * glow fades out on the canvas instead of ending at their edges.
+     */
+    val collapsedHaloBleed: Dp = 28.dp
 
     /** The reset-placement snap. */
     const val dockSnapMillis: Int = 220

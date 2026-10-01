@@ -21,6 +21,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
+import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
+import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.chat.surface.composer.CompanionLayer
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchors
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatOverlay
@@ -253,18 +256,21 @@ private fun PageLayerLocals(primary: Boolean, content: @Composable () -> Unit) {
 private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier: Modifier, morph: SurfaceMorph, primary: Boolean) {
     // While it grows into the page it keeps its own docked composer.
     val composerMode = if (frame.mode == ChatSurfaceMode.FullScreen) ChatSurfaceMode.Docked else frame.mode
+    // The canvas chat window's thinking cue is the ambient glow, so its rows keep still.
+    val ambient = rememberChatAmbient(frame.uiState)
     CompositionLocalProvider(
         LocalCompanionLayer provides CompanionLayer.Docked,
         LocalComposerPrimary provides primary,
+        LocalChatWorkingCueAnimated provides false,
     ) {
-        DockedChatPanel(dock, dockedPanelContent(frame, composerMode), modifier, morph)
+        DockedChatPanel(dock, dockedPanelContent(frame, composerMode, ambient), modifier, morph)
     }
 }
 
 /** The panel's content, with its composer drawn for [composerMode]. */
-private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode): DockedPanelContent =
+private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode, ambient: ChatAmbient): DockedPanelContent =
     DockedPanelContent(
-        streaming = frame.uiState.isStreaming,
+        ambient = ambient,
         conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
         composer = { collapsed -> DockComposer(frame, composerMode, collapsed) },
         collapsed = CollapsedDockContent(
@@ -273,6 +279,7 @@ private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfac
             openAgent = frame.host.openAgentPane,
             editAgent = frame.host.editAgent,
             turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
+            ambient = ambient,
         ),
     )
 

@@ -69,6 +69,7 @@ import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
+import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -307,7 +308,8 @@ private fun RunActivityHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        if (activity.isActive) WorkingOrb()
+        // Docked over the canvas the panel's ambient glow is the working cue, not the orb.
+        if (activity.isActive && LocalChatWorkingCueAnimated.current) WorkingOrb()
         Text(
             text = runActivityTitle(activity),
             style = MaterialTheme.typography.labelMedium,

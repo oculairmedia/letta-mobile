@@ -159,6 +159,46 @@ class ChatSurfaceSnapshotTest {
         uiState = state.copy(messages = persistentListOf(messages[0], messages[1])),
     )
 
+    /** Docked while the agent works: the panel's ambient glow is the thinking cue. */
+    @Test
+    fun dockedThinkingDark() = snapshot(
+        "docked-thinking-dark",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = true,
+        withCanvas = true,
+        uiState = state.copy(isAgentTyping = true),
+    )
+
+    @Test
+    fun dockedThinkingLight() = snapshot(
+        "docked-thinking-light",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = false,
+        withCanvas = true,
+        uiState = state.copy(isAgentTyping = true),
+    )
+
+    /** A failed run: the glow takes the error tint. */
+    @Test
+    fun dockedFailedDark() = snapshot(
+        "docked-failed-dark",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = true,
+        withCanvas = true,
+        uiState = state.copy(error = "The run failed"),
+    )
+
+    /** Minimised while the agent thinks: the halo around the mascot, no bubble. */
+    @Test
+    fun dockedCollapsedThinkingDark() = snapshot(
+        "docked-collapsed-thinking-dark",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = true,
+        withCanvas = true,
+        dock = ChatDockGeometry(anchorX = 0.1f, anchorY = 1f, widthDp = 520f, collapsed = true),
+        uiState = state.copy(isAgentTyping = true),
+    )
+
     @Test
     fun fullScreenOverCanvas() =
         snapshot("full-screen-canvas", ChatSurfacePresentation.ChatFirst, dark = true, withCanvas = true)

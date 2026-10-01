@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
@@ -66,6 +65,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.Lucide
@@ -79,6 +79,9 @@ import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatDockGeometryMath
 import com.letta.mobile.ui.chat.session.ChatDockLimits
 import com.letta.mobile.ui.chat.session.ChatDockRect
+import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowPlacement
+import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
+import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon
@@ -187,7 +190,8 @@ internal fun rememberChatDockState(geometry: ChatDockGeometry, onChange: (ChatDo
 /** What the panel shows; the panel itself owns only its frame and gestures. */
 @Immutable
 internal class DockedPanelContent(
-    val streaming: Boolean,
+    /** What the agent is doing: the panel glows while it works (see ChatPanelAmbientGlow). */
+    val ambient: ChatAmbient,
     val conversation: @Composable (Modifier) -> Unit,
     /**
      * The composer bar, open (`false`) or minimised (`true`). It is the same bar in both, at the
@@ -281,6 +285,14 @@ internal fun DockedChatPanel(
                 openness = opennessValue,
                 fraction = fraction,
                 takesTouches = showPanel,
+                glow = { glowModifier ->
+                    // Minimised, the halo around the mascot glows instead.
+                    if (showPanel) ChatPanelAmbientGlow(
+                        ambient = content.ambient,
+                        placement = AmbientGlowPlacement.AboveComposer { state.barDp.takeUnless { it.isNaN() }?.dp ?: Dp.Unspecified },
+                        modifier = glowModifier,
+                    )
+                },
                 modifier = Modifier.matchParentSize(),
             )
             Column(
@@ -404,7 +416,13 @@ private fun rememberDockOpenness(collapsed: Boolean): Animatable<Float, Animatio
  * never reaches the canvas underneath; minimised the canvas around the mascot stays live.
  */
 @Composable
-private fun PanelChrome(openness: () -> Float, fraction: () -> Float, takesTouches: Boolean, modifier: Modifier) {
+private fun PanelChrome(
+    openness: () -> Float,
+    fraction: () -> Float,
+    takesTouches: Boolean,
+    glow: @Composable (Modifier) -> Unit,
+    modifier: Modifier,
+) {
     val scheme = MaterialTheme.colorScheme
     val page = scheme.background
     val panel = scheme.surfaceContainer
@@ -440,7 +458,11 @@ private fun PanelChrome(openness: () -> Float, fraction: () -> Float, takesTouch
                     drawFadingHairline(outline, 1f - fraction())
                 }
                 .then(if (takesTouches) Modifier.pointerInput(Unit) {} else Modifier),
-        )
+        ) {
+            // The thinking glow, on the fill and under the conversation, clipped to the panel's
+            // corners; it gives way to the page's own background as the morph runs.
+            glow(Modifier.matchParentSize().graphicsLayer { alpha = 1f - fraction() })
+        }
     }
 }
 
@@ -448,10 +470,8 @@ private fun PanelChrome(openness: () -> Float, fraction: () -> Float, takesTouch
 @Composable
 private fun PanelTop(state: ChatDockState, content: DockedPanelContent, modifier: Modifier) {
     Column(modifier.testTag(DOCK_SURFACE_TAG)) {
+        // No progress bar: the panel's ambient glow says the agent is working.
         PanelHeader(state)
-        if (content.streaming) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md))
-        }
         content.conversation(Modifier.weight(1f).fillMaxWidth())
     }
 }

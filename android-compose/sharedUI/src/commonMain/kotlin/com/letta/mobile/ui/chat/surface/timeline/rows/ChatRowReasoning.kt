@@ -47,6 +47,7 @@ import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
+import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
@@ -100,7 +101,8 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            AnimatedVisibility(visible = isActive, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+            // Docked over the canvas the panel's ambient glow is the thinking cue, not the spinner.
+            AnimatedVisibility(visible = isActive && LocalChatWorkingCueAnimated.current, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(LettaDimens.Control.icon),
                     color = MaterialTheme.colorScheme.primary,

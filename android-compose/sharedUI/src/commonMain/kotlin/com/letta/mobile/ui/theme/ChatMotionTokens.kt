@@ -65,4 +65,24 @@ object ChatMotionTokens {
     object DockCollapse {
         const val MILLIS: Int = 180
     }
+
+    /**
+     * letta-mobile-bglj6.1: the ambient thinking glow in the docked panel and around the
+     * minimised dock. The same glides as the hosts' page glow (desktop
+     * DesktopAmbientChatBackground, Android AmbientShaderAgentBackground), so a status change
+     * eases the tint, breath rate and agitation instead of popping.
+     */
+    object AmbientGlow {
+        /** Tint, speed and agitation glide between statuses over this long. */
+        const val GLIDE_MILLIS: Int = 600
+
+        /** A frame longer than this (a stall, a backgrounded window) advances the glow no further. */
+        const val MAX_FRAME_DELTA_SECONDS: Float = 0.1f
+
+        /** What one visible stream delta adds to the stream energy (0..1). */
+        const val STREAM_IMPULSE: Float = 0.35f
+
+        /** How fast the stream energy decays back to calm between deltas. */
+        const val STREAM_ENERGY_DECAY_SECONDS: Float = 0.9f
+    }
 }
