@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.compose.CanvasComposeContract
+import com.letta.mobile.data.canvas.compose.CanvasComposeSchema
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -38,6 +40,11 @@ object CanvasToolContract {
     const val EXPORT_SVG = "canvas.export_svg"
     const val LIST = "canvas.list"
     const val RENDER_PREVIEW = "canvas.render_preview"
+    const val COMPOSE = "canvas.compose"
+    const val COMPOSE_GUIDE = "canvas.compose_guide"
+
+    /** The upper bound on [compose]'s description: the format itself is [composeGuide]'s answer. */
+    const val COMPOSE_DESCRIPTION_MAX_CHARS = 700
 
     /**
      * What export_svg answers until a real exporter runs where the tools do (letta-mobile-qsq7v).
@@ -49,11 +56,10 @@ object CanvasToolContract {
             "Use canvas.get_scene to read the canvas."
 
     /** How every canvas-reading tool is told which canvas: optional, defaulting to the conversation's. */
-    private val canvasIdParam = ToolParam(
-        "canvas_id",
-        description = "The canvas to use. Omit it to use the canvas of the conversation you are in " +
-            "(created on first use); only name one to reach a different canvas from canvas.list.",
-    )
+    const val CANVAS_ID_DESCRIPTION = "The canvas to use. Omit it to use the canvas of the conversation you are in " +
+        "(created on first use); only name one to reach a different canvas from canvas.list."
+
+    private val canvasIdParam = ToolParam("canvas_id", description = CANVAS_ID_DESCRIPTION)
 
     /** Checks a write without making it (letta-mobile-qygvv.30). */
     private val dryRunParam = ToolParam(
@@ -165,6 +171,40 @@ object CanvasToolContract {
             "tools use the current canvas when given no canvas_id.",
         objectSchema(ToolParam("conversation_id")),
     )
+
+    /**
+     * canvas.compose v1 (letta-mobile-bglj6.6): notes, checklists, cards, text and groups by
+     * meaning, placed and sized by the board. Its input is [CanvasComposeSchema.input], strict at
+     * every level, so a refusal's JSON-pointer path names a place in the schema the model saw.
+     */
+    val compose = CanvasToolDefinition(
+        COMPOSE,
+        "Put notes, checklists, cards, text and groups on a canvas in one call (with no canvas_id, the canvas " +
+            "of the conversation you are in). Each item has a \"kind\": NOTE {markdown}, CHECKLIST " +
+            "{items: [{text, checked?}]}, CARD {title, fields?: [{label, value}], markdown?}, TEXT " +
+            "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes " +
+            "everything. All or nothing: a refusal lists each problem with a JSON-pointer path " +
+            "(e.g. /items/2/markdown) and nothing is published. Call $COMPOSE_GUIDE for the format, caps and " +
+            "markdown subset. Pass dry_run: true to see the receipt without publishing.",
+        CanvasComposeSchema.input,
+    )
+
+    /** The whole canvas.compose format ([com.letta.mobile.data.canvas.compose.CanvasComposeGuide]); no input. */
+    val composeGuide = CanvasToolDefinition(
+        COMPOSE_GUIDE,
+        "Describe the $COMPOSE format (${CanvasComposeContract.CATALOG} version ${CanvasComposeContract.VERSION}): " +
+            "the kinds and their fields, the caps, the markdown subset, the colours, the error codes and a full " +
+            "example. Takes no input.",
+        objectSchema(),
+    )
+
+    /**
+     * The compose pair, defined here so both hosts take one contract, and not yet in [all]: no
+     * host answers them until the compiler and the wiring land (letta-mobile-bglj6.10, .12), and a
+     * tool offered before it works only costs an agent turns. The wiring bead moves them into [all]
+     * and points [applyOps]' description at [COMPOSE].
+     */
+    val composeTools: List<CanvasToolDefinition> = listOf(compose, composeGuide)
 
     /**
      * The tools offered to agents. [exportSvg] is not among them until it renders the real canvas: a

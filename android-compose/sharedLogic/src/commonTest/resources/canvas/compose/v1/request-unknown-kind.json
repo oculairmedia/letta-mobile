@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "items": [
+    { "kind": "NOTE", "key": "ok", "markdown": "This one is fine." },
+    { "kind": "STICKY", "key": "sticky", "text": "Stickies are NOTEs." }
+  ]
+}
