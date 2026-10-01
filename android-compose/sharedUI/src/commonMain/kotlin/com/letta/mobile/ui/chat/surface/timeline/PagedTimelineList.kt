@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,6 +52,8 @@ internal class PagedTimelineParams(
     val thinking: Boolean,
     val bindings: TimelineRowBindings,
     val bottomReserve: Dp,
+    /** The page's hoisted scroll position for this presentation. */
+    val listState: LazyListState,
     /** Drawn instead of the list when history is confirmed empty (the welcome / starter prompts). */
     val emptyContent: @Composable () -> Unit,
 )
@@ -95,11 +96,11 @@ private fun PagedTimelineBody(
     modifier: Modifier,
 ) {
     val presentation = params.presentation
-    val listState = rememberLazyListState()
+    val listState = params.listState
     val scope = rememberCoroutineScope()
     val anchoredTarget by presentation.target.collectAsState()
     val restoreAnchor = remember(presentation) { presentation.viewport }
-    var following by remember(presentation) { mutableStateOf(restoreAnchor == null) }
+    var following by remember(presentation) { mutableStateOf(restoreAnchor == null && listState.isAtNewestEdge()) }
     var anchorRestored by remember(presentation) { mutableStateOf(restoreAnchor == null) }
 
     FollowTheNewestEdge(listState, settled.loadState.prepend.endOfPaginationReached) { following = it }

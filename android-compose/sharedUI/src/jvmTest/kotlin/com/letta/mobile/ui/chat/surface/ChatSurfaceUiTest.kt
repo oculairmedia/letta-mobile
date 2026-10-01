@@ -11,6 +11,10 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
@@ -25,6 +29,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.Test
@@ -102,6 +107,35 @@ class ChatSurfaceUiTest {
         val surface = A2uiSurfaceState(surfaceId = "surface-1", rootComponentId = null, components = emptyMap())
         show(TestPort(ready.copy(a2uiSurfaces = persistentMapOf("surface-1" to surface))), ChatSurfacePresentation.CanvasFirst)
         onNodeWithTag(ChatTimelineTags.A2UI_STACK).assertExists()
+    }
+
+    @Test
+    fun scrollPositionSurvivesDockingAndExpanding() = runComposeUiTest {
+        val messages = (0 until 120).map { i ->
+            UiMessage(
+                id = "m$i",
+                role = if (i % 2 == 0) "user" else "assistant",
+                content = "message $i",
+                timestamp = "2026-09-30T%02d:%02d:00Z".format(i / 60, i % 60),
+            )
+        }
+        val port = TestPort(ready.copy(messages = messages.toPersistentList()))
+        var presentation by mutableStateOf(ChatSurfacePresentation.ChatFirst)
+        setContent {
+            MaterialTheme {
+                Box(Modifier.size(width = 480.dp, height = 720.dp)) {
+                    ChatSurface(port = port, presentation = presentation, onIntent = {}, host = ChatSurfaceHost(), canvas = { _ -> Text("CANVAS") })
+                }
+            }
+        }
+        onNodeWithTag(ChatTimelineTags.LIST).performScrollToIndex(60)
+        onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertExists()
+
+        runOnIdle { presentation = ChatSurfacePresentation.CanvasFirst }
+        runOnIdle { presentation = ChatSurfacePresentation.ChatFirst }
+
+        // Still reading where the user left off, not snapped back to the newest message.
+        onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertExists()
     }
 
     @Test

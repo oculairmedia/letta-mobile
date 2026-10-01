@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -45,6 +47,8 @@ internal fun ChatTimeline(
     host: ChatSurfaceHost,
     appearance: ChatSurfaceAppearance,
     modifier: Modifier = Modifier,
+    /** The page's scroll position; hoisted so it survives docking and expanding the chat. */
+    listState: LazyListState = rememberLazyListState(),
 ) {
     var viewer by remember { mutableStateOf<ImageViewerRequest?>(null) }
     val callbacks = rememberRowCallbacks(actions, host) { images, index -> viewer = ImageViewerRequest(images, index) }
@@ -70,7 +74,7 @@ internal fun ChatTimeline(
                 GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))
             }
             TimelineBody(
-                TimelineBodyParams(state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, host.editAgent),
+                TimelineBodyParams(state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, listState, host.editAgent),
                 Modifier.weight(1f).fillMaxWidth(),
             )
         }
@@ -106,6 +110,7 @@ private class TimelineBodyParams(
     val appearance: ChatSurfaceAppearance,
     val bindings: TimelineRowBindings,
     val bottomReserve: Dp,
+    val listState: LazyListState,
     /** The mascot's pencil on the welcome hero. */
     val editAgent: (() -> Unit)? = null,
 )
@@ -137,6 +142,7 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
                 appearance = params.appearance,
                 bindings = params.bindings,
                 bottomReserve = params.bottomReserve,
+                listState = params.listState,
                 showThinkingRow = showThinkingRow,
             ),
             modifier,
@@ -150,6 +156,7 @@ private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
             thinking = params.state.isAgentTyping && showThinkingRow,
             bindings = params.bindings,
             bottomReserve = params.bottomReserve,
+            listState = params.listState,
             emptyContent = {
                 TimelineWelcome(
                     params.state.agentName,

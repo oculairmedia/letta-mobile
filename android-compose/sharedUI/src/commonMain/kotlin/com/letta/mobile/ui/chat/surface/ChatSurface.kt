@@ -3,13 +3,13 @@ package com.letta.mobile.ui.chat.surface
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
@@ -39,7 +40,6 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_share_failed
 import com.letta.mobile.ui.chat.surface.timeline.A2uiSurfaceStack
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
-import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -86,9 +86,13 @@ fun ChatSurface(
         if (canvas == null) host else host.copy(openCanvas = { onIntent(ChatSurfaceIntent.OpenCanvas) })
     }
     val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
+    // One scroll position per conversation (and paged presentation), kept across mode changes.
+    val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
+    val listState = remember(conversationId, pagedTimeline) { LazyListState() }
     val frame = ChatSurfaceFrame(
         port = port,
         snackbars = snackbars,
+        listState = listState,
         uiState = uiState,
         composer = composer,
         presentation = presentation,
@@ -124,6 +128,7 @@ internal object ChatSurfaceTags {
 private class ChatSurfaceFrame(
     val port: ChatSessionPort,
     val snackbars: SnackbarHostState,
+    val listState: LazyListState,
     val uiState: ChatUiState,
     val composer: ChatComposerUiState,
     val presentation: ChatSurfacePresentation,
@@ -207,6 +212,7 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
             host = frame.host,
             appearance = frame.appearance,
             modifier = Modifier.fillMaxSize(),
+            listState = frame.listState,
         )
         frame.platform.timelineOverlay?.let { overlay ->
             Box(Modifier.fillMaxSize().testTag(ChatSurfaceTags.TIMELINE_OVERLAY), contentAlignment = Alignment.TopCenter) {

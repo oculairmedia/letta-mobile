@@ -37,6 +37,7 @@ internal class LegacyTimelineParams(
     val appearance: ChatSurfaceAppearance,
     val bindings: TimelineRowBindings,
     val bottomReserve: Dp,
+    val listState: LazyListState,
     /** False while the agent's mascot shows its thinking beside the composer. */
     val showThinkingRow: Boolean = true,
 )
@@ -58,7 +59,7 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
     }
     val rows = remember(items) { timelineRowsNewestFirst(items) }
     val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
-    val listState = remember(conversationId) { LazyListState() }
+    val listState = params.listState
     val thinking = state.isAgentTyping && params.showThinkingRow
     val leading = if (thinking) 1 else 0
 
@@ -146,7 +147,8 @@ private fun rememberLegacyFollow(
     thinking: Boolean,
 ): TimelineFollow {
     val scope = rememberCoroutineScope()
-    var following by remember(conversationId) { mutableStateOf(true) }
+    // A hoisted list may come back scrolled up (the chat was docked): follow only at the edge.
+    var following by remember(conversationId) { mutableStateOf(listState.isAtNewestEdge()) }
     val isDragged by listState.interactionSource.collectIsDraggedAsState()
     val dragged by rememberUpdatedState(isDragged)
     LaunchedEffect(listState) {
@@ -179,6 +181,9 @@ private fun FollowTailEffect(
         }
     }
 }
+
+/** Reversed layout: item 0 is the newest, so the newest edge is the very top of the list state. */
+internal fun LazyListState.isAtNewestEdge(): Boolean = firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0
 
 /** A NEW user prompt at the tail is the user's own send: always land on it (Android). */
 @Composable
