@@ -66,6 +66,11 @@ import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.letta.mobile.desktop.chat.DesktopChatController
+import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
+import com.letta.mobile.desktop.chat.DesktopSharedChatPage
+import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
+import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
+import com.letta.mobile.desktop.chat.rememberDesktopChatSessionPort
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration.Companion.seconds
 import java.awt.Window
@@ -309,6 +314,13 @@ internal fun LettaDesktopApp(
             action
         }
         sessionGraph.channelTransport.sendA2uiAction(resolvedAction)
+    }
+    // letta-mobile-bglj6.1: the shared KMP chat page's port, built only while the preview flag is on.
+    val sharedChatEnabled by LocalDesktopSharedChatPageFlag.current.enabled.collectAsState()
+    val sharedChatPort = if (sharedChatEnabled) {
+        rememberDesktopChatSessionPort(chatController, ::dispatchA2uiAction)
+    } else {
+        null
     }
     LaunchedEffect(sessionGraph, chatState.connectionState) {
         runCatching {
@@ -774,6 +786,35 @@ internal fun LettaDesktopApp(
                         settled = !isThinkingSelected && !isStreamingReplySelected,
                         repository = dataBindings.sessionGraphProvider.current.agentRepository,
                     )
+                    val openConversationCanvas = {
+                        canvasShell.openForConversation(
+                            DesktopCanvasOwner(chatState.selectedConversationId, selectedAgentId, selectedAgentName),
+                        )
+                    }
+                    val sharedChatPage: (@Composable (Modifier) -> Unit)? = sharedChatPort?.let { port ->
+                        { pageModifier ->
+                            DesktopSharedChatPage(
+                                state = DesktopSharedChatPageState(
+                                    port = port,
+                                    pagedTimeline = canonicalPresentation,
+                                    hostInputs = DesktopChatComposerHostInputs(
+                                        commands = composerCommands,
+                                        mentionables = mentionables,
+                                        contextUsage = contextUsage,
+                                        placeholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
+                                    ),
+                                    isThinking = isThinkingSelected,
+                                    errorMessage = chatState.errorMessage,
+                                ),
+                                navigation = DesktopSharedChatPageNavigation(
+                                    openCanvas = { openConversationCanvas() },
+                                    openAgent = ::openAgent,
+                                    openModelPicker = { overlays.modelPicker = true },
+                                ),
+                                modifier = pageModifier,
+                            )
+                        }
+                    }
                     DesktopMainContentPane(
                         inputs = DesktopMainContentInputs(
                             editingAgentId = editAgentId,
@@ -835,6 +876,7 @@ internal fun LettaDesktopApp(
                             subagentRepository = subagentRepository,
                             activeSubagents = activeSubagents,
                             activeCanvasSession = canvasShell.activeSession,
+                            sharedChatPage = sharedChatPage,
                         ),
                         actions = DesktopMainContentActions(
                             onEditAgentClose = { editAgentId = null },
@@ -856,11 +898,7 @@ internal fun LettaDesktopApp(
                                     canSubmitApprovals = canSubmitApprovals,
                                     onA2uiAction = ::dispatchA2uiAction,
                                     onAttachImage = { pickerLauncher.launch() },
-                                    onOpenCanvas = {
-                                        canvasShell.openForConversation(
-                                            DesktopCanvasOwner(chatState.selectedConversationId, selectedAgentId, selectedAgentName),
-                                        )
-                                    },
+                                    onOpenCanvas = { openConversationCanvas() },
                                     onOpenModelPicker = { overlays.modelPicker = true },
                                     onSetPersona = { editAgentId = selectedAgentId },
                                     onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },

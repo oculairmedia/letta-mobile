@@ -42,6 +42,11 @@ internal data class DesktopMainContentInputs(
     val subagentRepository: SubagentRepository?,
     val activeSubagents: List<SubagentEntry>,
     val activeCanvasSession: CanvasSession? = null,
+    /**
+     * letta-mobile-bglj6.1: the shared KMP chat page, set only while DesktopSharedChatPageFlag is
+     * on. Null keeps [ChatDetailPane], the default.
+     */
+    val sharedChatPage: (@Composable (Modifier) -> Unit)? = null,
 )
 
 internal data class DesktopMainContentActions(
@@ -89,11 +94,16 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
         )
         return
     }
-    ChatDetailPane(
-        state = inputs.chatDetailState,
-        actions = actions.chatDetailActions,
-        modifier = Modifier.fillMaxSize(),
-    )
+    val sharedChatPage = inputs.sharedChatPage
+    if (sharedChatPage != null) {
+        sharedChatPage(Modifier.fillMaxSize())
+    } else {
+        ChatDetailPane(
+            state = inputs.chatDetailState,
+            actions = actions.chatDetailActions,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
     if (!inputs.showBackgroundTasks && inputs.subagentRepository != null) {
         DesktopBackgroundTasksToggle(
             runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
