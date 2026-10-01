@@ -127,6 +127,8 @@ class ChatSurfacePhoneSnapshotTest {
         val composer: ChatComposerUiState? = null,
         /** Starts in the other mode and stops this far (ms) into the morph to [presentation]. */
         val morphMillis: Long? = null,
+        /** False draws as Android does: no transport layer, each seat draws its character itself. */
+        val transportLayer: Boolean = true,
     )
 
     private fun snapshot(shot: Shot) = runDesktopComposeUiTest(width = PHONE_WIDTH_DP * SCALE, height = PHONE_HEIGHT_DP * SCALE) {
@@ -138,7 +140,7 @@ class ChatSurfacePhoneSnapshotTest {
         setContent {
             CompositionLocalProvider(LocalDensity provides Density(SCALE.toFloat(), 1f)) {
                 MaterialTheme(colorScheme = if (shot.dark) darkColorScheme() else lightColorScheme()) {
-                    WithMascot {
+                    WithMascot(shot.transportLayer) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             ChatSurface(
                                 port = port,
@@ -182,11 +184,11 @@ class ChatSurfacePhoneSnapshotTest {
     }
 
     @Composable
-    private fun WithMascot(content: @Composable () -> Unit) {
-        val shell = FakeMascotShell("agent-1")
+    private fun WithMascot(transportLayer: Boolean, content: @Composable () -> Unit) {
+        val shell = FakeMascotShell("agent-1", layerMounted = transportLayer)
         shell.Provide {
             CompositionLocalProvider(LocalMascotHost provides StandInMascotHost) {
-                MascotTransportLayer { content() }
+                if (transportLayer) MascotTransportLayer { content() } else content()
             }
         }
     }
@@ -243,6 +245,11 @@ class ChatSurfacePhoneSnapshotTest {
 
     @Test
     fun canvasReplyPopup() = snapshot(Shot("phone-canvas-reply-popup", ChatSurfacePresentation.CanvasFirst, withCanvas = true))
+
+    @Test
+    fun canvasReplyPopupWithoutALayer() = snapshot(
+        Shot("phone-canvas-reply-popup-no-layer", ChatSurfacePresentation.CanvasFirst, withCanvas = true, transportLayer = false),
+    )
 
     @Test
     fun canvasReplyPopupLight() =

@@ -32,6 +32,8 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
+import com.letta.mobile.ui.mascot.FakeMascotHost
+import com.letta.mobile.ui.mascot.FakeMascotShell
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -186,6 +188,51 @@ class TouchCanvasDockUiTest {
         assertEquals(1, opened)
     }
 
+    /**
+     * As the Android app draws the page: the window's mascot shell knows the agent, and no
+     * transport layer is mounted, so the page's one seat draws the character itself.
+     */
+    private fun ComposeUiTest.showWithoutALayer(shell: FakeMascotShell) {
+        // The live mascot keeps a frame loop running, so the page never idles: step the clock.
+        mainClock.autoAdvance = false
+        setContent {
+            shell.Provide {
+                MaterialTheme {
+                    ChatSurface(
+                        port = Port(),
+                        presentation = ChatSurfacePresentation.CanvasFirst,
+                        onIntent = {},
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                    )
+                }
+            }
+        }
+        mainClock.advanceTimeBy(SETTLE_MILLIS)
+        waitForIdle()
+    }
+
+    @Test
+    fun withoutAMascotLayerTheHeadDrawsTheAgentsMascot() = runComposeUiTest {
+        showWithoutALayer(FakeMascotShell("agent-1", layerMounted = false))
+        val surfaces = onAllNodesWithTag(FakeMascotHost.SURFACE_TAG, useUnmergedTree = true)
+        surfaces.assertCountEquals(1)
+        // The character stands on the head, in place of the sphere.
+        val head = onNodeWithTag(TOUCH_HEAD_TAG).fetchSemanticsNode().boundsInRoot
+        val mascot = surfaces[0].fetchSemanticsNode().boundsInRoot
+        assertTrue(head.contains(mascot.center), "the mascot is not on the head: $mascot vs $head")
+    }
+
+    @Test
+    fun anAgentWithoutAMascotKeepsTheSphere() = runComposeUiTest {
+        showWithoutALayer(FakeMascotShell("another-agent", layerMounted = false))
+        onNodeWithTag(TOUCH_HEAD_TAG).assertExists()
+        onAllNodesWithTag(FakeMascotHost.SURFACE_TAG, useUnmergedTree = true).assertCountEquals(0)
+    }
+
     @Test
     fun theFullPageDrawsThePhoneBar() = runComposeUiTest {
         show(Port(), ChatSurfacePresentation.ChatFirst, withCanvas = false)
@@ -199,5 +246,6 @@ class TouchCanvasDockUiTest {
     private companion object {
         const val DRAG_PX = 700f
         const val NUDGE_PX = 40f
+        const val SETTLE_MILLIS = 2_000L
     }
 }
