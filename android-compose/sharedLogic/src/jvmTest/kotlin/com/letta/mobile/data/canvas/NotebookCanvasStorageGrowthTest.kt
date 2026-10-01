@@ -13,6 +13,7 @@ import org.automerge.AmValue
 import org.automerge.ObjectId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -168,6 +169,86 @@ class NotebookCanvasStorageGrowthTest {
         }
     }
 
+    private fun noteText(id: String, words: Int, typed: String = ""): String = JsonObject(
+        mapOf(
+            "blocks" to JsonArray((0 until words).map { JsonPrimitive("word $it of note $id") } + JsonPrimitive(typed)),
+        ),
+    ).toString()
+
+    private fun noteFrame(index: Int, dx: Float = 0f) =
+        CanvasDocumentFrame(x = 40f * index + dx, y = 30f * index, width = 320f, height = 240f)
+
+    /**
+     * Notes as the board makes them: [notes] notes written through [CanvasSession], so the scene
+     * holds the projector's own `_documents` (an array of entries ordered by id), then [moves]
+     * moves of one note and [edits] keystrokes in one note's text, one save each.
+     */
+    private fun simulateNotes(path: Path, notes: Int, moves: Int = 0, edits: Int = 0): Run = runBlocking {
+        val canvasId = CanvasId("notes")
+        var saves = 0
+        val lastScene = NotebookLocalStore(path, "notes-peer").use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            store.upsert(CanvasDocument(id = canvasId, title = "Notes", sceneJson = scene(listOf(image("img", 100.0)))))
+            val session = CanvasSession(canvasId, store)
+            session.load()
+            for (i in 0 until notes) {
+                assertNotNull(session.setDocument("note-$i", noteText("note-$i", 60), frame = noteFrame(i)))
+                saves++
+            }
+            for (i in 0 until moves) {
+                assertNotNull(session.moveDocument("note-2", noteFrame(2, dx = i + 1f)))
+                saves++
+            }
+            for (i in 0 until edits) {
+                assertNotNull(session.setDocument("note-2", noteText("note-2", 60, typed = "x".repeat(i + 1))))
+                saves++
+            }
+            session.sceneJsonOrEmpty()
+        }
+        Run(lastScene, saves, directoryBytes(path))
+    }
+
+    private fun assertReloads(path: Path, scene: String, canvasId: CanvasId = CanvasId("notes")) {
+        NotebookLocalStore(path, "notes-peer").use { notebooks ->
+            runBlocking {
+                val reloaded = NotebookCanvasDocumentStore(notebooks).get(canvasId)!!
+                assertEquals(Json.parseToJsonElement(scene), Json.parseToJsonElement(reloaded.sceneJson))
+            }
+        }
+    }
+
+    /**
+     * The projector writes `_documents` as an array, so the per-entry saving has to cover arrays
+     * of id'd entries too: moving one of [NOTES] notes rewrites that note's frame, and a keystroke
+     * rewrites that note, not the whole `_documents` array.
+     */
+    @Test
+    fun movingOrEditingOneOfManyProjectedNotesWritesOnlyThatNote() {
+        val base = simulateNotes(Files.createTempDirectory("canvas-notes-base-"), NOTES)
+        val scene = Json.parseToJsonElement(base.lastScene).jsonObject
+        assertTrue(scene["_documents"] is JsonArray, "the projector's _documents is an array")
+        val allNotes = scene["_documents"].toString().length
+        val oneNote = allNotes / NOTES
+
+        val movePath = Files.createTempDirectory("canvas-notes-move-")
+        val moved = simulateNotes(movePath, NOTES, moves = SAVES)
+        val perMove = (moved.storedBytes - base.storedBytes) / SAVES
+        report("move one of $NOTES notes", moved, base.storedBytes)
+        assertReloads(movePath, moved.lastScene)
+
+        val editPath = Files.createTempDirectory("canvas-notes-edit-")
+        val edited = simulateNotes(editPath, NOTES, edits = SAVES)
+        val perEdit = (edited.storedBytes - base.storedBytes) / SAVES
+        report("edit one of $NOTES notes", edited, base.storedBytes)
+        assertReloads(editPath, edited.lastScene)
+
+        println("canvas growth [notes]: one note ~$oneNote bytes, all $NOTES notes ~$allNotes bytes; $perMove bytes/move, $perEdit bytes/edit")
+        // Before: 10680 bytes/move and 3644 bytes/edit, the whole `_documents` array each save.
+        // Now a move writes the note's frame and provenance, and a keystroke that note's text.
+        assertTrue(perMove < 256, "moving one note cost $perMove bytes per save (one note is $oneNote bytes, all notes $allNotes)")
+        assertTrue(perEdit < oneNote / 4, "editing one note cost $perEdit bytes per save (one note is $oneNote bytes, all notes $allNotes)")
+    }
+
     /**
      * An image still carrying its bytes inline (no asset store, or not adopted yet) is written
      * once; moving it rewrites its geometry, not its bytes. (Excalidraw keeps such bytes in a
@@ -231,5 +312,46 @@ class NotebookCanvasStorageGrowthTest {
             }.get(5, TimeUnit.SECONDS)
         }
         Unit
+    }
+
+    /** A layout-2 board kept its notes inline in `board`; it reads as is and the next write moves them out. */
+    @Test
+    fun aBoardWithItsNotesInlineReadsAndMovesThemOut() = runBlocking {
+        val path = Files.createTempDirectory("canvas-notes-inline-")
+        val canvasId = CanvasId("inline-notes")
+        val notes = """[{"id":"n1","json":"{\"a\":1}","_lamport":1},{"id":"n2","json":"{}","_lamport":2}]"""
+        val inlineScene = """{"bgColor":"#ffffffff","elements":[{"id":"a","type":"Path"}],"_documents":$notes}"""
+        NotebookLocalStore(path, "inline-peer").use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            store.upsert(CanvasDocument(canvasId, title = "Inline", sceneJson = """{"elements":[{"id":"a","type":"Path"}]}"""))
+            val id = notebooks.listDocuments().single()
+            notebooks.open(id)!!.withDocument { document ->
+                document.startTransaction().use { tx ->
+                    val board = """{"bgColor":"#ffffffff","elements":[{"id":"a"}],"_documents":$notes,"schema":"notebook-board/1"}"""
+                    tx.set(ObjectId.ROOT, "board", board)
+                    tx.set(ObjectId.ROOT, "boardVersion", 2)
+                    tx.commit()
+                }
+            }.get(5, TimeUnit.SECONDS)
+            val inline = store.get(canvasId)!!
+            assertEquals(Json.parseToJsonElement(inlineScene), Json.parseToJsonElement(inline.sceneJson))
+            val edited = inlineScene.replace("\"_lamport\":2", "\"_lamport\":3")
+            assertTrue(store.upsertIfRevision(inline.copy(revision = inline.revision + 1, sceneJson = edited), inline.revision))
+            assertEquals(Json.parseToJsonElement(edited), Json.parseToJsonElement(store.get(canvasId)!!.sceneJson))
+            notebooks.open(id)!!.withDocument { document ->
+                val raw = (document.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
+                assertEquals("""{"bgColor":"#ffffffff","elements":[{"id":"a"}],"_documents":[{"id":"n1"},{"id":"n2"}],"schema":"notebook-board/1"}""", raw)
+                assertEquals(NotebookBoardStorage.LAYOUT_VERSION.toLong(), NotebookBoardStorage.layoutVersion(document))
+                val arrays = (document.get(ObjectId.ROOT, "boardArrays").orElseThrow() as AmValue.Map).id
+                val documents = (document.get(arrays, "_documents").orElseThrow() as AmValue.Map).id
+                assertEquals(listOf("n1", "n2"), document.keys(documents).orElseThrow().toList())
+            }.get(5, TimeUnit.SECONDS)
+        }
+        Unit
+    }
+
+    private companion object {
+        const val NOTES = 20
+        const val SAVES = 100
     }
 }
