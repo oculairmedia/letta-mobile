@@ -111,9 +111,10 @@ object CanvasToolContract {
             "add_element {elementId, elementJson} adds one element and update_element {elementId, elementJson} " +
             "replaces it whole (elementJson is one element as a JSON string, in the scene format below); " +
             "remove_element {elementId}; set_background {colorHex \"#rrggbbaa\"}; " +
-            "set_document {documentId, documentJson, frame?, color?, style?} places a block-document note on the board " +
+            "set_document {documentId, documentJson, frame?, color?, style?, owner?} places a block-document note on the board " +
             "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
-            "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}) and " +
+            "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}, " +
+            "owner: explicit (default when a frame is given) | user | auto) and " +
             "remove_document {documentId} takes it off. opId, actorId and lamport are filled in by the host. " +
             "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
             "drawn or the board it leaves is inconsistent (update_element/remove_element/remove_document of an id " +

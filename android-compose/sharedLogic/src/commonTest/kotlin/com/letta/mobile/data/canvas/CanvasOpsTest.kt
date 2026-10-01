@@ -2,8 +2,11 @@ package com.letta.mobile.data.canvas
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.SerializationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CanvasOpsTest {
@@ -136,5 +139,38 @@ class CanvasOpsTest {
         val listResult = CanvasListResult(ids = listOf("canvas-1", "canvas-2"))
         assertEquals(listArgs, json.decodeFromString<CanvasListArgs>(json.encodeToString(listArgs)))
         assertEquals(listResult, json.decodeFromString<CanvasListResult>(json.encodeToString(listResult)))
+    }
+
+    /** letta-mobile-bglj6.7: owner and compose provenance on set_document, and logs written before them. */
+    @Test
+    fun setDocumentOwnerAndProvenanceRoundTripAndOldOpsStillDecode() {
+        val op = CanvasOp.SetDocumentOp(
+            opId = "op-1",
+            actorId = "agent-1",
+            lamport = 3L,
+            documentId = "cmp-weekend-plan-meals",
+            documentJson = """{"version":2,"blocks":[]}""",
+            frame = CanvasDocumentFrame(424f, 152f, 320f, 318f),
+            owner = CanvasGeometryOwner.AUTO,
+            compose = CanvasComposeProvenance("weekend-plan", "meals", "NOTE", "letta.canvas.compose", 1),
+        )
+        val serialized = json.encodeToString<CanvasOp>(op)
+        assertTrue("\"owner\":\"auto\"" in serialized, serialized)
+        assertTrue("\"compose\":{\"artifactId\":\"weekend-plan\"" in serialized, serialized)
+        assertEquals(op, json.decodeFromString<CanvasOp>(serialized))
+
+        val old = """{"type":"set_document","opId":"o","actorId":"a","lamport":1,"documentId":"n","documentJson":"{}"}"""
+        val decoded = json.decodeFromString<CanvasOp>(old) as CanvasOp.SetDocumentOp
+        assertNull(decoded.owner)
+        assertNull(decoded.compose)
+
+        assertEquals(
+            CanvasGeometryOwner.USER,
+            (json.decodeFromString<CanvasOp>(old.dropLast(1) + ",\"owner\":\"user\"}") as CanvasOp.SetDocumentOp).owner,
+        )
+        val refused = assertFailsWith<SerializationException> {
+            json.decodeFromString<CanvasOp>(old.dropLast(1) + ",\"owner\":\"sideways\"}")
+        }
+        assertTrue("sideways" in refused.message.orEmpty(), refused.message)
     }
 }

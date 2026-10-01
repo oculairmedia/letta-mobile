@@ -308,6 +308,8 @@ class CanvasSession(
         color: String? = null,
         style: CanvasTextStyle? = null,
         title: String? = null,
+        owner: CanvasGeometryOwner? = null,
+        compose: CanvasComposeProvenance? = null,
     ): CanvasDocument? {
         val op = CanvasOp.SetDocumentOp(
             opId = CanvasOpDiffer.generateOpId("doc"),
@@ -319,6 +321,8 @@ class CanvasSession(
             color = color,
             style = style,
             title = title,
+            owner = owner,
+            compose = compose,
         )
         val existing = documents().firstOrNull { it.id == documentId }
         return if (existing != null && existing.alreadyHas(op)) null else applyLocal(op)
@@ -327,7 +331,7 @@ class CanvasSession(
     /** Whether writing [op] would leave this document as it is: the same text, and nothing [op] sets differs. */
     private fun CanvasSceneDocument.alreadyHas(op: CanvasOp.SetDocumentOp): Boolean =
         json == op.documentJson && keeps(op.frame, frame) && keeps(op.color, color) && keeps(op.style, style) &&
-            (op.title == null || op.title.ifBlank { null } == title)
+            (op.title == null || op.title.ifBlank { null } == title) && keeps(op.owner, owner) && keeps(op.compose, compose)
 
     /** A field [op] leaves out ([wanted] null) keeps what the document has. */
     private fun <T> keeps(wanted: T?, current: T?): Boolean = wanted == null || wanted == current
@@ -362,7 +366,10 @@ class CanvasSession(
         return setDocument(documentId, existing.json, actorId, color = colorHex)
     }
 
-    /** Moves or resizes a block document without replacing text edited since the drag began. */
+    /**
+     * Moves or resizes a block document without replacing text edited since the drag began. A
+     * person's move: the document becomes [CanvasGeometryOwner.USER]-owned and is never auto-fitted again.
+     */
     suspend fun moveDocument(
         documentId: String,
         frame: CanvasDocumentFrame,
@@ -380,6 +387,7 @@ class CanvasSession(
                 documentJson = existing.json,
                 frame = frame,
                 style = style,
+                owner = CanvasGeometryOwner.USER,
             ),
         )
     }
@@ -504,7 +512,8 @@ class CanvasSession(
     /**
      * Moves several block documents at once, as one batch with one set_document op per document,
      * so a group drag lands as a single revision and peers see the notes move together. Documents
-     * that are not there, or already at their frame, are skipped; nothing to do returns null.
+     * that are not there, or already at their frame, are skipped; nothing to do returns null. Each
+     * moved document becomes [CanvasGeometryOwner.USER]-owned, as with [moveDocument].
      */
     suspend fun moveDocuments(
         frames: Map<String, CanvasDocumentFrame>,
@@ -521,6 +530,7 @@ class CanvasSession(
                 documentId = id,
                 documentJson = doc.json,
                 frame = frame,
+                owner = CanvasGeometryOwner.USER,
             )
         }
         if (ops.isEmpty()) return@withLock null

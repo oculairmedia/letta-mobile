@@ -181,6 +181,30 @@ class CanvasExternalToolsTest {
         )
     }
 
+    /** letta-mobile-bglj6.7: the app path decodes set_document's owner and refuses one outside the enum. */
+    @Test
+    fun applyOpsOnTheAppPathTakesADocumentOwnerAndRefusesAnUnknownOne() = runTest {
+        val canvasId = CanvasId("canvas-owner")
+        store.upsert(openDocument(canvasId))
+        val tool = CanvasApplyOpsTool(store, sessions)
+        fun note(owner: String) = buildJsonObject {
+            put("canvas_id", canvasId.value)
+            put(
+                "ops",
+                json.parseToJsonElement(
+                    """[{"type":"set_document","opId":"o","actorId":"a","lamport":1,"documentId":"n",""" +
+                        """"documentJson":"{\"version\":2,\"blocks\":[]}","owner":"$owner"}]""",
+                ),
+            )
+        }
+
+        assertIs<ExternalToolResult.Success>(tool.invoke(note("user"), agentId = "agent-1"))
+        assertEquals(CanvasGeometryOwner.USER, CanvasOpProjector.documentsOf(store.get(canvasId)!!.sceneJson).single().owner)
+
+        val refused = assertIs<ExternalToolResult.Error>(tool.invoke(note("sideways"), agentId = "agent-1"))
+        assertTrue("sideways" in refused.error, refused.error)
+    }
+
     @Test
     fun applyOpsRefusesUnrenderableDocumentsAndElementsWithoutCommitting() = runTest {
         val canvasId = CanvasId("canvas-validation")
