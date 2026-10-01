@@ -65,13 +65,13 @@ class AdminChatSessionPortTest {
     }
 
     @Test
-    fun `shared page flag is unknown until the setting is read`() = runTest {
+    fun `shared page flag starts on the legacy page until the setting is read`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         var viewModel: AdminChatViewModel? = null
         try {
             val vm = openedChatViewModel(canonicalPagingHost(), TestData.agent("agent-flag", "Flag"), "conversation-flag", "flag")
             viewModel = vm
-            assertEquals(null, vm.sharedChatPageEnabled.value)
+            assertEquals(false, vm.sharedChatPageEnabled.value)
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.sharedChatPageEnabled.collect {} }
             assertEquals(false, vm.sharedChatPageEnabled.value)
         } finally {

@@ -556,10 +556,12 @@ internal class AdminChatViewModel @Inject constructor(
 
     /**
      * letta-mobile-bglj6.1: render the shared KMP chat page instead of the legacy layout (preview).
-     * Null until the setting is read, so neither layout composes (and flashes) before it is known.
+     * Starts false (the setting's default) so the legacy layout draws on the first frame; with the
+     * preview on, the shared page replaces it once the setting is read (a one-frame legacy flash,
+     * accepted: the settings store has no synchronous read).
      */
-    val sharedChatPageEnabled: StateFlow<Boolean?> = settingsRepository.getSharedChatPageEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val sharedChatPageEnabled: StateFlow<Boolean> = settingsRepository.getSharedChatPageEnabled()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /** letta-mobile-bglj6.1: open conversations canvas-first on the shared chat page (default on). */
     val openChatsOnCanvas: StateFlow<Boolean> = settingsRepository.getOpenChatsOnCanvas()
