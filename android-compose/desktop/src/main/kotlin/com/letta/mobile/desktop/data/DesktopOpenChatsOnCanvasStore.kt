@@ -12,7 +12,7 @@ import java.util.Properties
  * letta-mobile-bglj6.1: the persisted "Open conversations on the canvas" preference.
  *
  * The canvas is the default view; turning this off opens conversations in the traditional
- * full-screen chat instead. Same pattern as [DesktopSharedChatPageFlagStore]: a non-secret
+ * full-screen chat instead. A non-secret
  * preference in its own atomically written properties file, not namespaced by backend.
  * Missing or unreadable reads as on (the default).
  */

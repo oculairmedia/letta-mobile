@@ -381,16 +381,6 @@ open class CachedSettingsRepository(
         }
     }
 
-    override fun getSharedChatPageEnabled(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
-        prefs.getBoolean(SettingsPreferenceKeys.SHARED_CHAT_PAGE) ?: false
-    }
-
-    override suspend fun setSharedChatPageEnabled(enabled: Boolean) {
-        preferencesStore.edit { prefs ->
-            prefs.putBoolean(SettingsPreferenceKeys.SHARED_CHAT_PAGE, enabled)
-        }
-    }
-
     override fun getOpenChatsOnCanvas(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
         prefs.getBoolean(SettingsPreferenceKeys.OPEN_CHATS_ON_CANVAS) ?: true
     }

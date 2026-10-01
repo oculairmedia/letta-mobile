@@ -579,22 +579,6 @@ class ConfigViewModelTest {
     }
 
     @Test
-    fun updateSharedChatPageEnabled_updatesStateAndPersists() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
-
-        viewModel.updateSharedChatPageEnabled(true)
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals(true, successState.sharedChatPageEnabled)
-        }
-        assertEquals(true, fakeRepository.getSharedChatPageEnabled().first())
-    }
-
-    @Test
     fun openChatsOnCanvas_defaultsOn_andUpdatePersists() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()

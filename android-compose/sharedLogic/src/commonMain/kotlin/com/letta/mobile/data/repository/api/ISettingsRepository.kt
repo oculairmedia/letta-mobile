@@ -86,13 +86,6 @@ interface ISettingsRepository {
     fun getHapticsEnabled(): Flow<Boolean>
 
     /**
-     * letta-mobile-bglj6.1: renders the shared KMP chat page (sharedUI `ChatSurface`)
-     * instead of the legacy Android chat layout. Defaults to disabled.
-     */
-    fun getSharedChatPageEnabled(): Flow<Boolean>
-    suspend fun setSharedChatPageEnabled(enabled: Boolean)
-
-    /**
      * letta-mobile-bglj6.1: whether the shared chat page opens a conversation on the canvas
      * (canvas-first) rather than the traditional full-screen chat. Only the initial
      * presentation; the user's later surface mode still wins. Defaults to enabled.

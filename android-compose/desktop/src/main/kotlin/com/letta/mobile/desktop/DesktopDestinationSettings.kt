@@ -400,18 +400,11 @@ private fun desktopSettingsCardColors() = CardDefaults.cardColors(
     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
 )
 
-/**
- * letta-mobile-bglj6.1: opt-in for the shared KMP chat page. When the launch forces it on
- * (system property / env), the switch shows on and is locked, saying why.
- */
+/** letta-mobile-bglj6.1: the chat page's settings. */
 @Composable
-internal fun DesktopSharedChatPageSettingsCard(
-    flag: DesktopSharedChatPageFlag = LocalDesktopSharedChatPageFlag.current,
+internal fun DesktopChatSettingsCard(
     openOnCanvas: DesktopOpenChatsOnCanvas = LocalDesktopOpenChatsOnCanvas.current,
 ) {
-    val persistedEnabled by flag.persistedEnabled.collectAsState()
-    val sharedPageEnabled by flag.enabled.collectAsState()
-    val scope = rememberCoroutineScope()
     Card(
         colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
@@ -421,36 +414,8 @@ internal fun DesktopSharedChatPageSettingsCard(
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text("Chat", style = MaterialTheme.typography.titleLarge)
-            SharedChatPageToggleRow(
-                checked = persistedEnabled || flag.forcedByEnvironment,
-                enabled = !flag.forcedByEnvironment,
-                onCheckedChange = { enabled -> scope.launch { flag.setPersistedEnabled(enabled) } },
-            )
-            Text(
-                text = sharedChatPageSupportingText(flag.forcedByEnvironment),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (sharedPageEnabled) {
-                OpenChatsOnCanvasToggle(openOnCanvas)
-            }
+            OpenChatsOnCanvasToggle(openOnCanvas)
         }
-    }
-}
-
-@Composable
-private fun SharedChatPageToggleRow(
-    checked: Boolean,
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Shared chat page (preview)", style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
@@ -474,10 +439,3 @@ private fun OpenChatsOnCanvasToggle(preference: DesktopOpenChatsOnCanvas) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
-private fun sharedChatPageSupportingText(forcedByEnvironment: Boolean): String =
-    if (forcedByEnvironment) {
-        "Turned on for this launch by $SHARED_CHAT_SYSTEM_PROPERTY or $SHARED_CHAT_ENV_VARIABLE."
-    } else {
-        "Renders conversations with the chat page shared with Android. Still in preview."
-    }
