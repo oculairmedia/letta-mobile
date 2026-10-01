@@ -19,13 +19,16 @@ class ChatCanvasActions internal constructor(
 ) {
     /**
      * Attaches the exported board to the draft and opens the full-screen page to finish the
-     * message. An image that cannot be prepared reports a composer error instead.
+     * message. An image that cannot be prepared reports a composer error and leaves the person
+     * on the canvas (the docked composer shows the error).
      */
     fun shareToChat(bytes: ByteArray, mimeType: String) {
         CanvasShare.packageForChat(bytes, CanvasMimeType.fromValue(mimeType))
-            .onSuccess(actions::attachImage)
+            .onSuccess { image ->
+                actions.attachImage(image)
+                onIntent(ChatSurfaceIntent.Expand)
+            }
             .onFailure { actions.reportComposerError(shareFailedMessage) }
-        onIntent(ChatSurfaceIntent.Expand)
     }
 
     /** The canvas's own back control: back to the conversation. */
