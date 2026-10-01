@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.paging.CombinedLoadStates
+import androidx.paging.ItemSnapshotList
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -159,6 +160,13 @@ internal fun pagedOpeningOf(load: CombinedLoadStates, residentRows: Int): PagedO
     else -> PagedOpening.Loading
 }
 
+/** The two sources [PagedRows] is read from, compared by value to key effects on either. */
+@Immutable
+internal data class PagedRowsIdentity(
+    val live: List<ChatRenderItem>,
+    val settled: ItemSnapshotList<CanonicalTimelinePresentation.Row>,
+)
+
 /**
  * The thinking row, the live overlay and the settled pages as one index space, read from one
  * snapshot of each source (TimelineRowAssembly). Settled rows are read with `peek` here, because
@@ -170,7 +178,7 @@ internal class PagedRows(
     val assembly: TimelineRowAssembly,
     private val settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
     /** Changes whenever either source does, so effects keyed on it re-run exactly then. */
-    val identity: Any,
+    val identity: PagedRowsIdentity,
 ) {
     val size: Int get() = leading + assembly.size
     val liveCount: Int get() = assembly.liveCount
@@ -199,7 +207,7 @@ private fun rememberPagedRows(
     val snapshot = settled.itemSnapshotList
     return remember(live, snapshot, leading) {
         val assembly = TimelineRowAssembly.assemble(live, snapshot.map { it?.item?.key })
-        PagedRows(leading, assembly, settled, identity = Pair(live, snapshot))
+        PagedRows(leading, assembly, settled, identity = PagedRowsIdentity(live, snapshot))
     }
 }
 
