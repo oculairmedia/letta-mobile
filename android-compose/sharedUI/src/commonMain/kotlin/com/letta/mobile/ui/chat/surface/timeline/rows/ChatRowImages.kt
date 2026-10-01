@@ -15,7 +15,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -26,10 +25,9 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_attached_image
 import com.letta.mobile.sharedui.resources.rows_image_not_loaded
 import com.letta.mobile.sharedui.resources.rows_more_count
-import com.letta.mobile.ui.image.decodeImageBitmap
+import com.letta.mobile.ui.chat.surface.rememberDecodedImage
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
-import kotlin.io.encoding.Base64
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.stringResource
 
@@ -39,13 +37,7 @@ import org.jetbrains.compose.resources.stringResource
  */
 @Composable
 internal fun rememberAttachmentBitmap(attachment: UiImageAttachment): ImageBitmap? =
-    remember(attachment.base64) {
-        if (attachment.base64.isBlank()) {
-            null
-        } else {
-            runCatching { decodeImageBitmap(Base64.Mime.decode(attachment.base64)) }.getOrNull()
-        }
-    }
+    rememberDecodedImage(attachment.base64)
 
 /** Tap target for an image inside a row: opens the page's viewer on [index] of [images]. */
 @Stable

@@ -35,10 +35,9 @@ import com.letta.mobile.sharedui.resources.composer_close
 import com.letta.mobile.sharedui.resources.composer_preview_attachment
 import com.letta.mobile.sharedui.resources.composer_remove_attachment
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.image.decodeImageBitmap
+import com.letta.mobile.ui.chat.surface.rememberDecodedImage
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
-import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import org.jetbrains.compose.resources.stringResource
 
@@ -142,6 +141,4 @@ private fun AttachmentPreviewDialog(image: MessageContentPart.Image, onDismiss: 
 
 @OptIn(ExperimentalEncodingApi::class)
 @Composable
-private fun rememberAttachmentBitmap(base64: String): ImageBitmap? = remember(base64) {
-    runCatching { decodeImageBitmap(Base64.Default.decode(base64.filterNot(Char::isWhitespace))) }.getOrNull()
-}
+private fun rememberAttachmentBitmap(base64: String): ImageBitmap? = rememberDecodedImage(base64)
