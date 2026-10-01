@@ -109,7 +109,7 @@ class ChatPanelAmbientGlowTest {
     }
 
     @Test
-    fun the_minimised_dock_glows_around_its_mascot_while_thinking() = runComposeUiTest {
+    fun the_minimised_dock_draws_no_glow_while_thinking() = runComposeUiTest {
         setContent {
             StillTheme {
                 ChatSurface(
@@ -123,9 +123,9 @@ class ChatPanelAmbientGlowTest {
             }
         }
         waitForIdle()
-        // The halo only: the folded panel's own glow is not composed.
-        onAllNodesWithTag(CHAT_AMBIENT_GLOW_TAG, useUnmergedTree = true).assertCountEquals(1)
-        // Still announced to a screen reader, with nothing drawn but the halo.
+        // No glow at all: neither the folded panel's nor a halo behind the mascot (its motion is the cue).
+        onAllNodesWithTag(CHAT_AMBIENT_GLOW_TAG, useUnmergedTree = true).assertCountEquals(0)
+        // Still announced to a screen reader.
         onNodeWithTag(DOCK_COLLAPSED_THINKING_TAG).assertExists()
     }
 

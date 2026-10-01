@@ -60,13 +60,7 @@ object ChatSurfaceDimens {
     /** ...and this tall; a longer reply scrolls inside it. */
     val collapsedBubbleMaxHeight: Dp = 280.dp
 
-    /** How far above the mascot tile's foot the bubble sits, so its tail points at the head. */
-    val collapsedBubbleLift: Dp = 56.dp
-
-    /** How far the bubble tucks over the mascot tile's empty margin, so its tail nearly touches the body. */
-    val collapsedBubbleTuck: Dp = 16.dp
-
-    /** The bubble's tail: how far it reaches out towards the mascot, and how tall its base is. */
+    /** The bubble's tail, hanging from its bottom edge down to the mascot: half its base, and its height. */
     val collapsedBubbleTailWidth: Dp = 10.dp
     val collapsedBubbleTailHeight: Dp = 14.dp
 

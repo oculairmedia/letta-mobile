@@ -5,6 +5,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -35,6 +36,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -96,6 +98,12 @@ internal class SeatHandlers {
 
     /** Opens the agent's editor; every drawn mascot offers it as a pencil badge on hover. */
     var onEdit: (() -> Unit)? = null
+
+    /**
+     * A drag on the character, in dp; null leaves drags to whatever is under it. The layer draws
+     * above every seat, so a seat that moves its surface (the chat dock) can only be grabbed here.
+     */
+    var onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null
 }
 
 /**
@@ -258,7 +266,15 @@ private fun TransportedMascot(
                 scaleX = scale
                 scaleY = scale
             }
-            .hoverable(hover),
+            .hoverable(hover)
+            .pointerInput(seat.handlers) {
+                // Read per event: the seat's handler changes in place (the dock only while seated).
+                detectDragGestures { change, amount ->
+                    val drag = seat.handlers.onDrag ?: return@detectDragGestures
+                    change.consume()
+                    drag(amount.x.toDp().value, amount.y.toDp().value)
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         MascotLive(agentId, identity, size = boxSize * seat.overscale, onClick = seat.onClick, sceneKey = sceneKey)

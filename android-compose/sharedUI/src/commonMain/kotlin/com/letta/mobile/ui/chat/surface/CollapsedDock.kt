@@ -5,11 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -71,9 +69,7 @@ import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_dismiss
 import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
-import com.letta.mobile.ui.chat.surface.ambient.AmbientGlowPlacement
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
-import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.MascotSeat
@@ -200,28 +196,34 @@ internal fun CollapsedDock(
     val turn = content.turn()
     Column(modifier.testTag(DOCK_COLLAPSED_TAG)) {
         Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg)) {
-            // The thinking cue: the agent's ambient glow as a soft halo behind the mascot and its
-            // bubble (no animated dots or spinner of its own).
-            Box(Modifier.padding(end = LettaDimens.Control.iconButtonLg + LettaDimens.Space.sm)) {
-                ChatPanelAmbientGlow(content.ambient, AmbientGlowPlacement.Halo, Modifier.matchParentSize())
-                CollapsedTurnRow(state, content, seated, turn)
-            }
+            // Even insets on both sides keep the mascot over the bar's centre and the bubble clear
+            // of the restore control. The mascot's own motion is the thinking cue: no glow here.
+            val sides = LettaDimens.Control.iconButtonLg + LettaDimens.Space.sm
+            CollapsedTurnColumn(
+                state,
+                content,
+                seated,
+                turn,
+                Modifier.align(Alignment.BottomCenter).padding(horizontal = sides),
+            )
             RestoreButton(state, Modifier.align(Alignment.BottomEnd))
         }
     }
 }
 
-/** The mascot and, beside it, the reply bubble (or, while it thinks, only its announcement). */
+/** The mascot over the bar's centre and above it the reply bubble (or, while it thinks, only its announcement). */
 @Composable
-private fun CollapsedTurnRow(state: ChatDockState, content: CollapsedDockContent, seated: Boolean, turn: CollapsedTurn) {
+private fun CollapsedTurnColumn(
+    state: ChatDockState,
+    content: CollapsedDockContent,
+    seated: Boolean,
+    turn: CollapsedTurn,
+    modifier: Modifier,
+) {
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     val showReply = turn.hasReply && turn.turnKey != dismissedTurn
-    Row(verticalAlignment = Alignment.Bottom) {
-        CollapsedMascot(state, content, seated)
-        val beside = Modifier
-            .offset(x = -ChatSurfaceDimens.collapsedBubbleTuck)
-            .padding(bottom = ChatSurfaceDimens.collapsedBubbleLift)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         when {
             showReply -> ReplyBubble(
                 turn = turn,
@@ -230,10 +232,11 @@ private fun CollapsedTurnRow(state: ChatDockState, content: CollapsedDockContent
                     open = state::restore,
                     dismiss = { dismissedTurn = turn.turnKey },
                 ),
-                modifier = Modifier.weight(1f, fill = false).then(beside).dockDrag(state),
+                modifier = Modifier.dockDrag(state),
             )
             turn.busy && !turn.hasReply -> ThinkingAnnouncement(content.agentName)
         }
+        CollapsedMascot(state, content, seated)
     }
 }
 
@@ -311,10 +314,10 @@ private fun ReplyBubble(turn: CollapsedTurn, agentName: String, actions: BubbleA
                     }
                     .testTag(DOCK_COLLAPSED_BUBBLE_TAG)
                     .padding(
-                        start = ChatSurfaceDimens.collapsedBubbleTailWidth + LettaDimens.Space.md,
+                        start = LettaDimens.Space.md,
                         end = LettaDimens.Space.md + LettaDimens.Control.iconButtonSm,
                         top = LettaDimens.Space.sm,
-                        bottom = LettaDimens.Space.sm,
+                        bottom = LettaDimens.Space.sm + ChatSurfaceDimens.collapsedBubbleTailHeight,
                     ),
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
@@ -412,7 +415,7 @@ internal fun ThinkingAnnouncement(agentName: String) {
     )
 }
 
-/** The bubble itself: the chat's neutral surface, lifted by its shadow, tail towards the mascot. */
+/** The bubble itself: the chat's neutral surface, lifted by its shadow, tail down to the mascot. */
 @Composable
 private fun BubbleSurface(modifier: Modifier, content: @Composable () -> Unit) {
     Surface(
@@ -492,7 +495,26 @@ internal class SpeechBubbleShape(
     }
 }
 
-private val BubbleShape = SpeechBubbleShape(
+/** A rounded rectangle with a short tail from the middle of its bottom edge, down to the mascot below. */
+internal class BottomTailBubbleShape(private val radius: Dp, private val tailWidth: Dp, private val tailHeight: Dp) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val r = with(density) { radius.toPx() }
+        val tw = with(density) { tailWidth.toPx() }
+        val th = with(density) { tailHeight.toPx() }
+        val bottom = size.height - th
+        val body = Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, bottom, CornerRadius(r))) }
+        val mid = size.width / 2f
+        val tail = Path().apply {
+            moveTo(mid - tw, bottom - 1f)
+            lineTo(mid, size.height)
+            lineTo(mid + tw, bottom - 1f)
+            close()
+        }
+        return Outline.Generic(Path().apply { op(body, tail, PathOperation.Union) })
+    }
+}
+
+private val BubbleShape = BottomTailBubbleShape(
     radius = LettaDimens.Radius.lg,
     tailWidth = ChatSurfaceDimens.collapsedBubbleTailWidth,
     tailHeight = ChatSurfaceDimens.collapsedBubbleTailHeight,

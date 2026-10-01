@@ -164,7 +164,7 @@ fun ChatSurface(
                     } else if (dockReady) {
                         DockedOverlay(frame, dock, Modifier.fillMaxSize(), SurfaceMorph.Docked, primary = true)
                     }
-                    if (fullScreen || dockReady) CompanionSeat(frame, companionAnchors) { if (fullScreen) 1f else 0f }
+                    if (fullScreen || dockReady) CompanionSeat(frame, companionAnchors, dock = dock.takeIf { !fullScreen }) { if (fullScreen) 1f else 0f }
                 }
             } else {
                 CanvasWithChat(frame, dock.takeIf { dockReady }, companionAnchors, { canvas(canvasActions) }, Modifier)
@@ -248,7 +248,7 @@ private fun CanvasWithChat(
                 }
             }
         }
-        CompanionSeat(frame, companionAnchors, pageWeight = fraction)
+        CompanionSeat(frame, companionAnchors, dock = dock, pageWeight = fraction)
     }
 }
 
@@ -336,7 +336,14 @@ private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState): Touc
 
 /** The page's one composer-companion seat, over both layers. */
 @Composable
-private fun CompanionSeat(frame: ChatSurfaceFrame, anchors: CompanionSeatAnchors, interactive: Boolean = true, pageWeight: () -> Float) {
+private fun CompanionSeat(
+    frame: ChatSurfaceFrame,
+    anchors: CompanionSeatAnchors,
+    interactive: Boolean = true,
+    /** The movable dock: grabbing the character where it sits on the dock moves the dock. */
+    dock: ChatDockState? = null,
+    pageWeight: () -> Float,
+) {
     CompanionSeatOverlay(
         anchors = anchors,
         agentId = frame.uiState.agentId,
@@ -344,6 +351,7 @@ private fun CompanionSeat(frame: ChatSurfaceFrame, anchors: CompanionSeatAnchors
         // Over the Touch chat head the character is the head's: its own gestures (drag, tap, long press) win.
         onClick = frame.host.openAgentPane.takeIf { interactive },
         onEdit = frame.host.editAgent.takeIf { interactive },
+        onDockDrag = dock?.let { it::drag },
     )
 }
 

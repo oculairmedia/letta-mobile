@@ -111,7 +111,8 @@ class ChatSurfaceContinuityTest {
             raise(ChatSurfaceIntent.Expand)
             capture("expand", MORPH_FRAMES)
             raise(ChatSurfaceIntent.Collapse)
-            capture("collapse", MORPH_FRAMES)
+            // The mascot glides back to the centre of the bar, a longer way than the morph itself.
+            capture("collapse", FOLD_FRAMES)
             assertEquals(1, timeline.created, "timeline $timeline")
         }
         rig.writeReport()
