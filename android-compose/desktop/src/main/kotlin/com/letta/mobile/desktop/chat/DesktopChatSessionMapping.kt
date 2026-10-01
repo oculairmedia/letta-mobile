@@ -44,6 +44,8 @@ internal data class DesktopChatTimelineInputs(
     val cancellingConversationId: String?,
     val sendQueue: ConversationSendQueue,
     val local: DesktopChatLocalTimelineState,
+    /** Approval request ids whose answer is in flight (the controller's submittingApprovals). */
+    val submittingApprovals: Set<String> = emptySet(),
 )
 
 /**
@@ -70,7 +72,19 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         isCancelling = surface.selectedConversationId != null &&
             inputs.cancellingConversationId == surface.selectedConversationId,
         sendQueue = inputs.sendQueue,
+        activeApprovalRequestId = submittingApprovalOnScreen(inputs.submittingApprovals, messages),
     )
+}
+
+/**
+ * The approval being answered, so its row disables its buttons until the answer lands. The page
+ * tracks one; the newest on-screen request in flight is the one the user can still press.
+ */
+internal fun submittingApprovalOnScreen(submitting: Set<String>, messages: List<UiMessage>): String? {
+    if (submitting.isEmpty()) return null
+    return messages.asReversed().firstNotNullOfOrNull { message ->
+        message.approvalRequest?.requestId?.takeIf { it in submitting }
+    }
 }
 
 /**

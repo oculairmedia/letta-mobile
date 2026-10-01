@@ -5,6 +5,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
@@ -215,6 +217,24 @@ class DesktopChatSessionPortTest {
 
         controller.close()
     }
+
+    @Test
+    fun theNewestOnScreenApprovalInFlightIsTheActiveOne() {
+        val older = approvalMessage("m-1", "req-1")
+        val newer = approvalMessage("m-2", "req-2")
+        assertNull(submittingApprovalOnScreen(emptySet(), listOf(older, newer)))
+        assertEquals("req-1", submittingApprovalOnScreen(setOf("req-1"), listOf(older, newer)))
+        assertEquals("req-2", submittingApprovalOnScreen(setOf("req-1", "req-2"), listOf(older, newer)))
+        assertNull(submittingApprovalOnScreen(setOf("req-other"), listOf(older, newer)))
+    }
+
+    private fun approvalMessage(id: String, requestId: String) = UiMessage(
+        id = id,
+        role = "assistant",
+        content = "",
+        timestamp = "2026-10-01T00:00:00Z",
+        approvalRequest = UiApprovalRequest(requestId = requestId, toolCalls = emptyList()),
+    )
 
     @Test
     fun escapeCollapsesOnlyTheFullScreenPage() {

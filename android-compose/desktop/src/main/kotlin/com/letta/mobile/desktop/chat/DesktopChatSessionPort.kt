@@ -101,6 +101,7 @@ internal class DesktopChatSessionPort(
         cancellingConversationId = controller.cancellingConversationId.value,
         sendQueue = ConversationSendQueue(),
         local = localTimeline.value,
+        submittingApprovals = controller.submittingApprovals.value,
     )
 
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
@@ -108,9 +109,9 @@ internal class DesktopChatSessionPort(
         controller.replyPresence,
         controller.cancellingConversationId,
         selectedSendQueue(),
-        localTimeline,
-    ) { surface, presence, cancelling, queue, local ->
-        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local)
+        combine(localTimeline, controller.submittingApprovals, ::Pair),
+    ) { surface, presence, cancelling, queue, (local, submitting) ->
+        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, submitting)
     }
 
     /**
@@ -221,6 +222,8 @@ internal class DesktopChatActions(
     override fun rerun(message: UiMessage) = Unit
 
     override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) {
+        // A second press while the first answer is in flight must not answer twice.
+        if (requestId in controller.submittingApprovals.value) return
         if (bindings.canSubmitApprovals()) controller.submitApproval(requestId, toolCallIds, approve, reason)
     }
 
