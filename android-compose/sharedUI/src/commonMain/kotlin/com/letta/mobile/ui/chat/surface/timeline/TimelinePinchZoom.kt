@@ -1,0 +1,150 @@
+package com.letta.mobile.ui.chat.surface.timeline
+
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.timeline_font_scale_percent
+import com.letta.mobile.ui.theme.LettaDimens
+import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
+
+/**
+ * letta-mobile-bglj6.1: pinch-to-zoom of the timeline's text scale, in common pointer input.
+ *
+ * Lifted from Android's ChatMessageListPinch + PinchScalePreviewController without the
+ * Choreographer frame-budget sampler (Android-only telemetry). While pinching, [effectiveScale]
+ * tracks the gesture and rows re-lay out at it; on release the snapped scale is reported once
+ * through ChatActions.setFontScale and shown until the owner's committed scale catches up.
+ */
+@Stable
+internal class TimelinePinchScale(
+    private val minScale: Float = MIN_SCALE,
+    private val maxScale: Float = MAX_SCALE,
+    private val step: Float = STEP,
+) {
+    var isPinching by mutableStateOf(false)
+        private set
+    private var base by mutableFloatStateOf(1f)
+    private var transient by mutableFloatStateOf(1f)
+    private var pending by mutableStateOf<Float?>(null)
+
+    /** The scale rows draw at: the live gesture, else a just-committed value, else [committed]. */
+    fun effectiveScale(committed: Float): Float = when {
+        isPinching -> (base * transient).coerceIn(minScale, maxScale)
+        else -> pending?.takeUnless { it == committed } ?: committed
+    }
+
+    fun begin(committed: Float) {
+        base = committed.coerceIn(minScale, maxScale)
+        transient = 1f
+        pending = null
+        isPinching = true
+    }
+
+    fun applyZoom(zoom: Float) {
+        transient = (base * transient * zoom).coerceIn(minScale, maxScale) / base
+    }
+
+    /** Ends the gesture; returns the snapped scale to commit. */
+    fun finish(): Float {
+        val snapped = (((base * transient).coerceIn(minScale, maxScale) / step).roundToInt() * step)
+            .coerceIn(minScale, maxScale)
+        pending = snapped
+        isPinching = false
+        transient = 1f
+        return snapped
+    }
+
+    fun cancel() {
+        isPinching = false
+        transient = 1f
+    }
+
+    companion object {
+        /** The settings store clamps to the same range (CachedSettingsRepository.setChatFontScale). */
+        const val MIN_SCALE: Float = 0.7f
+        const val MAX_SCALE: Float = 1.6f
+        const val STEP: Float = 0.02f
+    }
+}
+
+/**
+ * Watches every gesture on the Initial pass and only consumes it once a second finger is down, so
+ * one-finger scroll and taps still reach the list and rows. [enabled] false is a no-op modifier.
+ */
+internal fun Modifier.timelinePinchZoom(
+    enabled: Boolean,
+    pinch: TimelinePinchScale,
+    committedScale: () -> Float,
+    onCommit: (Float) -> Unit,
+): Modifier {
+    if (!enabled) return this
+    return pointerInput(pinch) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var pinching = false
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.count { it.pressed } >= 2) {
+                    if (!pinching) {
+                        pinching = true
+                        pinch.begin(committedScale())
+                    }
+                    val zoom = event.calculateZoom()
+                    if (zoom != 1f) {
+                        event.changes.forEach { it.consume() }
+                        pinch.applyZoom(zoom)
+                    }
+                }
+            } while (event.changes.any { it.pressed })
+            if (pinching) onCommit(pinch.finish()) else pinch.cancel()
+        }
+    }
+}
+
+@Composable
+internal fun rememberTimelinePinch(
+    enabled: Boolean,
+    committedScale: Float,
+    onCommit: (Float) -> Unit,
+): Pair<TimelinePinchScale, Modifier> {
+    val pinch = remember { TimelinePinchScale() }
+    val committed by rememberUpdatedState(committedScale)
+    val commit by rememberUpdatedState(onCommit)
+    val modifier = Modifier.timelinePinchZoom(enabled, pinch, { committed }, { commit(it) })
+    return pinch to modifier
+}
+
+/** The live "112%" read-out while pinching (Android's pinch indicator). */
+@Composable
+internal fun PinchScaleIndicator(scale: Float, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.testTag(ChatTimelineTags.FONT_SCALE),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+    ) {
+        Text(
+            text = stringResource(Res.string.timeline_font_scale_percent, (scale * 100).roundToInt()),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+        )
+    }
+}

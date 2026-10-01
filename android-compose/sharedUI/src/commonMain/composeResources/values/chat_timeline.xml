@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-bglj6.1: the shared chat timeline's strings. Every name starts with timeline_. -->
+
+    <!-- Content phases -->
+    <string name="timeline_loading_conversation">Loading conversation…</string>
+    <string name="timeline_error_title">Something went wrong</string>
+    <string name="timeline_retry">Retry</string>
+    <string name="timeline_no_messages">No messages yet</string>
+    <string name="timeline_welcome_greeting">Hi, I’m %1$s</string>
+    <string name="timeline_welcome_default_agent">your agent</string>
+    <string name="timeline_welcome_subtitle">Ask a question, paste an error, or point me at a repo.</string>
+    <string name="timeline_no_conversation_title">Start a conversation</string>
+    <string name="timeline_starter_help">What can you help me with?</string>
+    <string name="timeline_starter_capabilities">Tell me about your capabilities</string>
+    <string name="timeline_starter_get_started">How do I get started?</string>
+    <string name="timeline_starter_limitations">What are your limitations?</string>
+
+    <!-- Paged history -->
+    <string name="timeline_history_error">History could not be loaded</string>
+    <string name="timeline_retry_history">Retry history</string>
+    <string name="timeline_missing_target">Message %1$s was not found. Showing recent history.</string>
+
+    <!-- List chrome -->
+    <string name="timeline_scroll_to_latest">Scroll to latest message</string>
+    <string name="timeline_thinking">Thinking…</string>
+    <string name="timeline_today">Today</string>
+    <string name="timeline_yesterday">Yesterday</string>
+    <string name="timeline_tool_calls_count">%1$d tool calls</string>
+    <string name="timeline_tool_group_expand">Expand tool calls</string>
+    <string name="timeline_tool_group_collapse">Collapse tool calls</string>
+    <string name="timeline_expanded">Expanded</string>
+    <string name="timeline_collapsed">Collapsed</string>
+    <string name="timeline_font_scale_percent">%1$d%</string>
+
+    <!-- A2UI -->
+    <string name="timeline_close_a2ui">Close A2UI surface</string>
+
+    <!-- Goal card -->
+    <string name="timeline_goal_title">Goal</string>
+    <string name="timeline_goal_title_status">Goal • %1$s</string>
+    <string name="timeline_goal_usage">Tokens %1$d • active %2$ds</string>
+    <string name="timeline_goal_usage_budget">Tokens %1$d / %2$d • active %3$ds</string>
+    <string name="timeline_goal_pause">Pause</string>
+    <string name="timeline_goal_resume">Resume</string>
+    <string name="timeline_goal_complete">Done</string>
+    <string name="timeline_goal_clear">Clear</string>
+</resources>
