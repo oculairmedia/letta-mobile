@@ -1306,9 +1306,12 @@ fun CanvasWorkspace(
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
-            // One bar across the top: back and title, the sync status, then the board's actions.
+            // With a title: one bar across the top (back and title, the sync status, then the
+            // board's actions). Without one (the canvas is the page, e.g. under the shared chat):
+            // just the actions, as a compact pill in the top-right corner over an uncovered board.
             CanvasHeaderBar(
-                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing)
+                modifier = (if (showTitle) Modifier.align(Alignment.TopCenter).fillMaxWidth() else Modifier.align(Alignment.TopEnd))
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
                     .padding(CHROME_INSET).canvasChrome(chromeRegions),
             ) {
             if (showTitle) {
@@ -1327,7 +1330,7 @@ fun CanvasWorkspace(
             }
 
             syncHealth?.let { health -> CanvasSyncStatusBadge(health = health) }
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+            if (showTitle) androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
 
             CanvasActionsPill(
                 zoom = CanvasZoom(

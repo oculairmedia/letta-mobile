@@ -111,7 +111,7 @@ class ChatSurfaceMorphUiTest {
         show()
         val panel = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
         val full = onNodeWithTag(ROOT_TAG).getBoundsInRoot()
-        onNodeWithTag(DOCK_FULL_SCREEN_TAG).performClick()
+        onNodeWithTag(ComposerTestTags.EXPAND).performClick()
         halfway()
         assertStrictlyBetween(morphBounds(), panel, full)
         settle()

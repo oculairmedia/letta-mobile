@@ -74,9 +74,11 @@ fun CanvasScreen(
     canvasId: String,
     conversationId: String? = null,
     agentId: String? = null,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)?,
     onShareToChat: ((ByteArray, String) -> Unit)? = null,
     viewModel: CanvasViewModel = hiltViewModel(),
+    /** False when the canvas is the page itself (under the shared chat): no title bar or back. */
+    showTitle: Boolean = true,
 ) {
     LaunchedEffect(canvasId, conversationId, agentId) {
         viewModel.initSession(canvasId, conversationId, agentId)
@@ -91,6 +93,7 @@ fun CanvasScreen(
             assets = viewModel.assets,
             onNavigateBack = onNavigateBack,
             onShareToChat = onShareToChat,
+            showTitle = showTitle,
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

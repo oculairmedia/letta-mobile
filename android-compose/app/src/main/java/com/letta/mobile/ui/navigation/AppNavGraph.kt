@@ -76,9 +76,11 @@ private val AppChatCanvasSlot = ChatCanvasSlot { target, actions ->
                 canvasId = "",
                 conversationId = target.conversationId,
                 agentId = target.agentId,
-                onNavigateBack = actions::back,
+                // The canvas is the page: no title bar or back arrow, just its actions pill.
+                onNavigateBack = null,
                 onShareToChat = actions::shareToChat,
                 viewModel = hiltViewModel(key = canvasKey),
+                showTitle = false,
             )
         }
     }

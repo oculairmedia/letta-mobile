@@ -189,9 +189,7 @@ private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier
 /** The panel's content, with its composer drawn for [composerMode]. */
 private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode): DockedPanelContent =
     DockedPanelContent(
-        agentName = frame.uiState.agentName,
         streaming = frame.uiState.isStreaming,
-        onOpenFullScreen = { frame.onIntent(ChatSurfaceIntent.Expand) },
         conversation = { conversationModifier ->
             DockedReplyCard(
                 DockedReplyParams(

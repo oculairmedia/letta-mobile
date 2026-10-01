@@ -30,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,14 +52,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronUp
-import com.composables.icons.lucide.GripHorizontal
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Maximize2
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_dock_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_dock_move
@@ -152,9 +148,7 @@ internal fun rememberChatDockState(geometry: ChatDockGeometry, onChange: (ChatDo
 /** What the panel shows; the panel itself owns only its frame and gestures. */
 @Immutable
 internal class DockedPanelContent(
-    val agentName: String,
     val streaming: Boolean,
-    val onOpenFullScreen: () -> Unit,
     val conversation: @Composable (Modifier) -> Unit,
     val composer: @Composable () -> Unit,
 )
@@ -225,10 +219,8 @@ private fun PanelSurface(state: ChatDockState, content: DockedPanelContent, modi
 @Composable
 internal fun DockedPanelBody(state: ChatDockState, content: DockedPanelContent, modifier: Modifier = Modifier) {
     Column(modifier) {
-        if (state.geometry.collapsed) {
-            CollapsedHeader(state)
-        } else {
-            PanelHeader(state, content)
+        PanelHeader(state)
+        if (!state.geometry.collapsed) {
             if (content.streaming) {
                 LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md))
             }
@@ -256,44 +248,15 @@ private fun Modifier.moveHandle(state: ChatDockState): Modifier = this
     }
     .pointerInput(state) { detectTapGestures(onDoubleTap = { state.reset() }) }
 
+/**
+ * The panel's top edge: a slim drag strip with a centred grip pill (drag to move, double-click
+ * or double-tap to reset) and the minimise / restore control at its end. No title: the agent's
+ * mascot beside the composer already says who this is, and the composer's own expand control
+ * opens the full chat.
+ */
 @Composable
-private fun PanelHeader(state: ChatDockState, content: DockedPanelContent) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .moveHandle(state)
-            .testTag(DOCK_HEADER_TAG)
-            .padding(start = LettaDimens.Space.md, end = LettaDimens.Space.xs, top = LettaDimens.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        val moveLabel = stringResource(Res.string.chat_surface_dock_move)
-        Icon(
-            Lucide.GripHorizontal,
-            contentDescription = moveLabel,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-        )
-        Text(
-            text = content.agentName,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        HeaderButton(Lucide.ChevronDown, stringResource(Res.string.chat_surface_dock_collapse), DOCK_COLLAPSE_TAG) {
-            state.toggleCollapsed()
-        }
-        HeaderButton(Lucide.Maximize2, stringResource(Res.string.chat_surface_docked_reply_expand), DOCK_FULL_SCREEN_TAG) {
-            content.onOpenFullScreen()
-        }
-    }
-}
-
-/** Minimised: a slim grip strip over the composer bar, still a move handle. */
-@Composable
-private fun CollapsedHeader(state: ChatDockState) {
+private fun PanelHeader(state: ChatDockState) {
+    val collapsed = state.geometry.collapsed
     val moveLabel = stringResource(Res.string.chat_surface_dock_move)
     Box(
         Modifier
@@ -310,8 +273,14 @@ private fun CollapsedHeader(state: ChatDockState) {
                 .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(LettaDimens.Radius.sm)),
         )
         Box(Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Space.sm)) {
-            HeaderButton(Lucide.ChevronUp, stringResource(Res.string.chat_surface_dock_restore), DOCK_RESTORE_TAG) {
-                state.toggleCollapsed()
+            if (collapsed) {
+                HeaderButton(Lucide.ChevronUp, stringResource(Res.string.chat_surface_dock_restore), DOCK_RESTORE_TAG) {
+                    state.toggleCollapsed()
+                }
+            } else {
+                HeaderButton(Lucide.ChevronDown, stringResource(Res.string.chat_surface_dock_collapse), DOCK_COLLAPSE_TAG) {
+                    state.toggleCollapsed()
+                }
             }
         }
     }
@@ -346,9 +315,10 @@ private fun BoxScope.ResizeHandles(state: ChatDockState, collapsed: Boolean) {
     ResizeHandle(state, ChatDockEdge.TopLeft, Modifier.align(Alignment.TopStart).offset(-corner, -corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomLeft, Modifier.align(Alignment.BottomStart).offset(-corner, corner).size(corner))
     ResizeHandle(state, ChatDockEdge.BottomRight, Modifier.align(Alignment.BottomEnd).offset(corner, corner).size(corner))
-    // Above the top-right corner rather than in the bottom-right one, where the send button is;
-    // up there it also stays on screen when the panel sits full width along the bottom.
-    ResizeGrip(state, Modifier.align(Alignment.TopEnd).offset(y = -ChatSurfaceDimens.dockResizeGrip))
+    // Straddling the bottom-right corner: half outside the panel, half over its rounded corner,
+    // which the composer's padding keeps clear of the send button.
+    val half = ChatSurfaceDimens.dockResizeGrip / 2
+    ResizeGrip(state, Modifier.align(Alignment.BottomEnd).offset(x = half, y = half))
 }
 
 @Composable
@@ -363,12 +333,12 @@ private fun ResizeGrip(state: ChatDockState, modifier: Modifier) {
     Canvas(
         modifier
             .size(ChatSurfaceDimens.dockResizeGrip)
-            .pointerHoverIcon(resizePointerIcon(ResizeDirection.DiagonalUp))
-            .resizeDrag(state, ChatDockEdge.TopRight)
+            .pointerHoverIcon(resizePointerIcon(ChatDockEdge.BottomRight.direction))
+            .resizeDrag(state, ChatDockEdge.BottomRight)
             .semantics { contentDescription = label }
             .testTag(DOCK_RESIZE_GRIP_TAG),
     ) {
-        // Three short diagonals pointing at the panel's top-right corner, just below them.
+        // Three short diagonals in the corner, the familiar resize mark.
         val gap = LettaDimens.Space.hair.toPx() * 1.5f
         val inset = LettaDimens.Space.xs.toPx()
         val stroke = LettaDimens.Stroke.hairline.toPx() * 2f
@@ -425,5 +395,4 @@ internal const val DOCK_PANEL_TAG = "chat-dock-panel"
 internal const val DOCK_HEADER_TAG = "chat-dock-header"
 internal const val DOCK_COLLAPSE_TAG = "chat-dock-collapse"
 internal const val DOCK_RESTORE_TAG = "chat-dock-restore"
-internal const val DOCK_FULL_SCREEN_TAG = "chat-dock-full-screen"
 internal const val DOCK_RESIZE_GRIP_TAG = "chat-dock-resize-grip"

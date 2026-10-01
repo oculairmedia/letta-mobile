@@ -215,8 +215,10 @@ private fun DockedConversationCanvas(session: CanvasSession?, actions: ChatCanva
         session = session,
         presenceTransport = DesktopCanvasHostSync.presenceTransport,
         assets = DesktopCanvasHostSync.assets,
-        onNavigateBack = actions::back,
+        // The canvas is the page: no title bar or back arrow, just its actions pill.
+        onNavigateBack = null,
         onShareToChat = actions::shareToChat,
+        showTitle = false,
         modifier = Modifier.fillMaxSize(),
     )
 }
