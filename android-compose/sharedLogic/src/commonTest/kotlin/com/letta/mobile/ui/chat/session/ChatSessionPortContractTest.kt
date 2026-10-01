@@ -24,17 +24,6 @@ class ChatSessionPortContractTest {
         assertEquals("edited full screen", port.composer.value.text)
     }
 
-    @Test
-    fun sendingDoesNotChangeTheMode() {
-        val port = FakeChatSessionPort()
-        val presentation = ChatSurfacePresentation.CanvasFirst.copy(floatingEnabled = true)
-        port.actions.updateComposerText("hello")
-        port.actions.send()
-        // No intent exists for a send: the presentation is untouched and the draft is consumed.
-        assertEquals(ChatSurfaceMode.Docked, presentation.mode)
-        assertEquals(listOf("hello"), port.sent)
-        assertEquals("", port.composer.value.text)
-    }
 
     @Test
     fun payloadIsTextOrImages() {

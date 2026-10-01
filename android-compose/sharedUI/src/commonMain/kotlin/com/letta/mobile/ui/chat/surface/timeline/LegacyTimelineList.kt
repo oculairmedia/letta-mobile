@@ -26,6 +26,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import kotlinx.coroutines.launch
 
 /** Everything the legacy list reads. */
@@ -99,8 +100,11 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
  * Newest-first rows for the reversed list. Folding and day sections are computed in chat order
  * (where "the first row of a day" means what it says) and then flipped.
  */
-internal fun timelineRowsNewestFirst(newestFirstItems: List<ChatRenderItem>): List<TimelineRow> =
-    withDayDividers(groupToolCallRows(newestFirstItems.asReversed())).asReversed()
+internal fun timelineRowsNewestFirst(
+    newestFirstItems: List<ChatRenderItem>,
+    zone: TimeZone = TimeZone.currentSystemDefault(),
+): List<TimelineRow> =
+    withDayDividers(groupToolCallRows(newestFirstItems.asReversed()), zone).asReversed()
 
 private fun LazyListScope.legacyRows(
     rows: List<TimelineRow>,

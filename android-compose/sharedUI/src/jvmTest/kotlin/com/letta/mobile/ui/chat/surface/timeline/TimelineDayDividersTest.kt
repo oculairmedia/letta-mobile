@@ -97,7 +97,7 @@ class TimelineDayDividersTest {
     fun newestFirstRowsPutEachDividerAboveItsDay() {
         // The reversed list: index 0 is the newest row; a day's divider sits at the index just past
         // that day's OLDEST row, which a reverse layout draws above it.
-        // Midday UTC so the system zone (which this function uses) cannot move a day boundary.
+        // Read in UTC, so the machine's zone cannot move a day boundary.
         val newestFirst = listOf(
             item("c", "2026-03-05T12:00:00Z"),
             item("b", "2026-03-04T13:00:00Z"),
@@ -105,7 +105,7 @@ class TimelineDayDividersTest {
         )
         assertEquals(
             listOf("msg-c", "__day__2026-03-05", "msg-b", "msg-a", "__day__2026-03-04"),
-            timelineRowsNewestFirst(newestFirst).map { it.key },
+            timelineRowsNewestFirst(newestFirst, utc).map { it.key },
         )
     }
 

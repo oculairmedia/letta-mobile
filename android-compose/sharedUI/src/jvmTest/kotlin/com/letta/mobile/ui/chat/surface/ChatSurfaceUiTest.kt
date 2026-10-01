@@ -90,6 +90,7 @@ class ChatSurfaceUiTest {
     fun anErrorIsShownOnceThenClearedInFullScreen() = runComposeUiTest {
         val port = TestPort(ready.copy(error = "Send failed"))
         show(port, ChatSurfacePresentation.ChatFirst)
+        outlastTheSnackbar()
         waitUntil(timeoutMillis = 10_000) { port.recording.clearedErrors == 1 }
     }
 
@@ -99,7 +100,20 @@ class ChatSurfaceUiTest {
         show(port, ChatSurfacePresentation.CanvasFirst)
         runOnIdle { port.ui.value = ready.copy(error = "Send failed") }
         onNodeWithText("Send failed").assertExists()
+        outlastTheSnackbar()
         waitUntil(timeoutMillis = 10_000) { port.recording.clearedErrors == 1 }
+    }
+
+    /**
+     * A short snackbar stays about 4 s. Advance the test clock past it rather than waiting in real
+     * time; the waits that follow then return at once.
+     */
+    private fun ComposeUiTest.outlastTheSnackbar() {
+        mainClock.advanceTimeBy(SNACKBAR_SHORT_OUTLAST_MS)
+    }
+
+    private companion object {
+        const val SNACKBAR_SHORT_OUTLAST_MS = 6_000L
     }
 
     @Test
