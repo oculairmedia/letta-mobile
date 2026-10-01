@@ -1,6 +1,11 @@
 package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.theme.ChatSurfaceDimens
+import com.letta.mobile.ui.theme.LettaDimens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -86,7 +91,9 @@ fun ChatSurface(
         if (presentation.mode == ChatSurfaceMode.FullScreen) {
             FullScreenPage(frame, modifier.fillMaxSize(), opaque = false)
         } else {
-            Box(modifier) { DockedComposer(frame, Modifier.align(Alignment.BottomCenter)) }
+            BoxWithConstraints(modifier) {
+                DockedOverlay(frame, maxHeight * ChatSurfaceDimens.dockedReplyMaxHeightFraction, Modifier.align(Alignment.BottomCenter))
+            }
         }
         return
     }
@@ -109,18 +116,43 @@ private class ChatSurfaceFrame(
     val mode: ChatSurfaceMode get() = presentation.mode
 }
 
-/** The canvas, always composed, with the dock under it or the full-screen page over it. */
+/**
+ * The canvas fills the whole area and is always composed. Docked, the chat bar and the
+ * current reply float over its bottom edge; full screen, the page covers it.
+ */
 @Composable
 private fun CanvasWithChat(frame: ChatSurfaceFrame, canvas: @Composable () -> Unit, modifier: Modifier) {
     val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
-    Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            // Hidden from accessibility while the page covers it; it stays composed for its state.
-            val canvasModifier = Modifier.weight(1f).fillMaxWidth()
-            Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
-            if (!fullScreen) DockedComposer(frame, Modifier.fillMaxWidth())
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        // Hidden from accessibility while the page covers it; it stays composed for its state.
+        val canvasModifier = Modifier.fillMaxSize()
+        Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
+        if (fullScreen) {
+            FullScreenPage(frame, Modifier.fillMaxSize(), opaque = true)
+        } else {
+            DockedOverlay(frame, maxHeight * ChatSurfaceDimens.dockedReplyMaxHeightFraction, Modifier.align(Alignment.BottomCenter))
         }
-        if (fullScreen) FullScreenPage(frame, Modifier.fillMaxSize(), opaque = true)
+    }
+}
+
+/** The floating reply card over the floating chat bar, bottom-centred over the canvas. */
+@Composable
+private fun DockedOverlay(frame: ChatSurfaceFrame, replyMaxHeight: Dp, modifier: Modifier) {
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        DockedReplyCard(
+            DockedReplyParams(
+                state = frame.uiState,
+                pagedTimeline = frame.pagedTimeline,
+                actions = frame.port.actions,
+                capabilities = frame.port.capabilities,
+                host = frame.host,
+                appearance = frame.appearance,
+                onIntent = frame.onIntent,
+                maxHeight = replyMaxHeight,
+            ),
+            Modifier.padding(horizontal = LettaDimens.Space.lg),
+        )
+        DockedComposer(frame, Modifier.fillMaxWidth())
     }
 }
 

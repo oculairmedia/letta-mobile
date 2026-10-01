@@ -3,4 +3,6 @@
     <!-- letta-mobile-bglj6.1: the shared chat page's shell strings. -->
     <string name="chat_surface_placeholder">Message…</string>
     <string name="chat_surface_canvas_share_failed">Couldn’t attach the canvas to the message</string>
+    <string name="chat_surface_docked_reply_expand">Open the full chat</string>
+    <string name="chat_surface_docked_reply_dismiss">Hide this reply</string>
 </resources>
