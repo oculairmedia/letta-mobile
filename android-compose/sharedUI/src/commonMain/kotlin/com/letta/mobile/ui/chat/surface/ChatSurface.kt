@@ -36,6 +36,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.rememberComposerImageAttacher
+import com.letta.mobile.ui.chat.surface.composer.LocalComposerCompanion
 import com.letta.mobile.ui.chat.surface.sendflight.SendFlightLayer
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightActions
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightState
@@ -180,18 +181,34 @@ private fun CanvasWithChat(frame: ChatSurfaceFrame, dock: ChatDockState, canvas:
         when (phase) {
             SurfaceMorphPhase.FullScreen -> FullScreenPage(frame, Modifier.fillMaxSize(), opaque = true)
             SurfaceMorphPhase.Docked -> DockedOverlay(frame, dock, Modifier.fillMaxSize())
-            SurfaceMorphPhase.Morphing -> SurfaceMorphLayer(progress, dock, morphContent(frame, dock), Modifier.fillMaxSize())
+            SurfaceMorphPhase.Morphing -> SurfaceMorphLayer(
+                progress = progress,
+                dock = dock,
+                content = morphContent(frame, dock),
+                modifier = Modifier.fillMaxSize(),
+                // Minimised there is no panel: the page grows from the mascot and its bar.
+                fromPanel = !dock.geometry.collapsed,
+            )
         }
     }
 }
 
-/** Both ends of the morph, each drawn as it is at rest in its own mode. */
+/**
+ * Both ends of the morph, each drawn as it is at rest in its own mode. Minimised, the docked end
+ * is just the bar at the bottom: the mascot is the page composer's companion by then.
+ */
 private fun morphContent(frame: ChatSurfaceFrame, dock: ChatDockState): SurfaceMorphContent = SurfaceMorphContent(
-    docked = { DockedPanelBody(dock, dockedPanelContent(frame, ChatSurfaceMode.Docked), Modifier.fillMaxSize()) },
+    docked = {
+        if (dock.geometry.collapsed) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) { CollapsedComposer(frame) }
+        } else {
+            DockedPanelBody(dock, dockedPanelContent(frame, ChatSurfaceMode.Docked), Modifier.fillMaxSize())
+        }
+    },
     page = { FullPageBody(frame, ChatSurfaceMode.FullScreen) },
 )
 
-/** The movable, resizable chat panel: header, conversation, composer bar. */
+/** The movable, resizable chat panel: header, conversation, composer bar; or, minimised, the mascot over its bar. */
 @Composable
 private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier: Modifier) {
     DockedChatPanel(dock, dockedPanelContent(frame, frame.mode), modifier)
@@ -201,22 +218,41 @@ private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier
 private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode): DockedPanelContent =
     DockedPanelContent(
         streaming = frame.uiState.isStreaming,
-        conversation = { conversationModifier ->
-            DockedReplyCard(
-                DockedReplyParams(
-                    state = frame.uiState,
-                    pagedTimeline = frame.pagedTimeline,
-                    actions = frame.port.actions,
-                    capabilities = frame.capabilities,
-                    host = frame.host,
-                    appearance = frame.appearance,
-                    onIntent = frame.onIntent,
-                ),
-                conversationModifier,
-            )
-        },
+        conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
         composer = { Composer(frame, composerMode, Modifier.fillMaxWidth()) },
+        collapsed = CollapsedDockContent(
+            agentId = frame.uiState.agentId,
+            agentName = frame.uiState.agentName,
+            openAgent = frame.host.openAgentPane,
+            editAgent = frame.host.editAgent,
+            turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
+            composer = { CollapsedComposer(frame) },
+        ),
     )
+
+private fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams = DockedReplyParams(
+    state = frame.uiState,
+    pagedTimeline = frame.pagedTimeline,
+    actions = frame.port.actions,
+    capabilities = frame.capabilities,
+    host = frame.host,
+    appearance = frame.appearance,
+    onIntent = frame.onIntent,
+)
+
+/**
+ * The minimised dock's bar: the docked composer without its companion (the mascot stands above
+ * it) and without the A2UI stack (the bubble's "needs your input" chip opens the panel for it).
+ */
+@Composable
+private fun CollapsedComposer(frame: ChatSurfaceFrame) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
+        CompositionLocalProvider(LocalComposerCompanion provides false) {
+            ComposerPanel(frame, ChatSurfaceMode.Docked, Modifier.fillMaxWidth())
+        }
+    }
+}
 
 @Composable
 private fun FullScreenPage(frame: ChatSurfaceFrame, modifier: Modifier, opaque: Boolean) {

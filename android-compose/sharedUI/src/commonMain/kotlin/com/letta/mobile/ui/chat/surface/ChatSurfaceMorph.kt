@@ -112,6 +112,7 @@ internal fun SurfaceMorphLayer(
     dock: ChatDockState,
     content: SurfaceMorphContent,
     modifier: Modifier = Modifier,
+    fromPanel: Boolean = true,
 ) {
     val density = LocalDensity.current
     // The panel rises above the keyboard (DockedChatPanel pads for it); the page does not.
@@ -120,7 +121,7 @@ internal fun SurfaceMorphLayer(
     // Plain layout, no BoxWithConstraints: the page's effects must not start mid-measure.
     Box(modifier.fillMaxSize()) {
         MorphBackdrop(fraction)
-        MorphContainer(MorphGeometry(dock, imeDp, fraction)) { MorphCrossFade(fraction, content) }
+        MorphContainer(MorphGeometry(dock, imeDp, fraction), fromPanel) { MorphCrossFade(fraction, content) }
     }
 }
 
@@ -140,11 +141,15 @@ private fun MorphBackdrop(fraction: () -> Float) {
     Box(Modifier.fillMaxSize().drawBehind { drawRect(color, alpha = fraction()) })
 }
 
+/**
+ * [fromPanel] false: the docked end has no panel (the collapsed dock floats on the canvas), so
+ * the container starts clear, with no shadow or hairline, and only the page fills in.
+ */
 @Composable
-private fun MorphContainer(geometry: MorphGeometry, content: @Composable () -> Unit) {
+private fun MorphContainer(geometry: MorphGeometry, fromPanel: Boolean, content: @Composable () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    val panel = scheme.surfaceContainer
     val page = scheme.background
+    val panel = scheme.surfaceContainer
     val outline = scheme.outlineVariant
     val fraction = geometry.fraction
     Box(
@@ -154,14 +159,16 @@ private fun MorphContainer(geometry: MorphGeometry, content: @Composable () -> U
             .graphicsLayer {
                 val rest = 1f - fraction()
                 // Neutral fill plus shadow, as the panel at rest: no tonal elevation tint.
-                shadowElevation = ChatSurfaceDimens.dockedReplyElevation.toPx() * rest
+                shadowElevation = if (fromPanel) ChatSurfaceDimens.dockedReplyElevation.toPx() * rest else 0f
                 shape = RoundedCornerShape(LettaDimens.Radius.lg.toPx() * rest)
                 clip = true
             }
-            .drawBehind { drawRect(lerp(panel, page, fraction())) }
+            .drawBehind {
+                if (fromPanel) drawRect(lerp(panel, page, fraction())) else drawRect(page, alpha = fraction())
+            }
             .drawWithContent {
                 drawContent()
-                drawFadingHairline(outline, 1f - fraction())
+                if (fromPanel) drawFadingHairline(outline, 1f - fraction())
             },
     ) {
         CompositionLocalProvider(LocalContentColor provides scheme.onSurface) { content() }

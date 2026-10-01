@@ -56,4 +56,15 @@ object ChatMotionTokens {
          */
         const val CROSSFADE_FRACTION: Float = 0.6f
     }
+
+    /**
+     * letta-mobile-bglj6.1: the docked panel folding down to the mascot and its bar, and back.
+     * The arriving layout fades and scales up from just below full size, anchored at its foot.
+     */
+    object DockCollapse {
+        const val MILLIS: Int = 180
+
+        /** The arriving layout's starting scale. */
+        const val START_SCALE: Float = 0.96f
+    }
 }

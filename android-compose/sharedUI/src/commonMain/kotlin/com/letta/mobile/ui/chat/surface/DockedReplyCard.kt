@@ -57,11 +57,7 @@ internal class DockedReplyParams(
 
 @Composable
 internal fun DockedReplyCard(params: DockedReplyParams, modifier: Modifier = Modifier) {
-    val newestFirst = if (params.pagedTimeline != null) {
-        rememberPagedHistory(params.pagedTimeline)
-    } else {
-        rememberMessageHistory(params.state, params.appearance)
-    }
+    val newestFirst = rememberDockedHistory(params)
     if (newestFirst.isEmpty()) {
         Box(modifier.testTag(DOCKED_REPLY_TAG), contentAlignment = Alignment.Center) {
             Text(
@@ -92,6 +88,15 @@ internal fun DockedReplyCard(params: DockedReplyParams, modifier: Modifier = Mod
         items(newestFirst, key = { it.key }) { item -> ChatRenderItemRow(item, contexts.forItem(item), callbacks) }
     }
 }
+
+/** The conversation's newest items, newest first: the paged route's, or the message list's. */
+@Composable
+internal fun rememberDockedHistory(params: DockedReplyParams): List<ChatRenderItem> =
+    if (params.pagedTimeline != null) {
+        rememberPagedHistory(params.pagedTimeline)
+    } else {
+        rememberMessageHistory(params.state, params.appearance)
+    }
 
 /** A host that scales text itself (desktop) leaves the rows at 1. */
 private fun rowFontScale(appearance: ChatSurfaceAppearance): Float =

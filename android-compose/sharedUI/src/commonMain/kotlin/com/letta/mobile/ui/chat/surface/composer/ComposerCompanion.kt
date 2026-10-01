@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -28,6 +29,13 @@ internal object ComposerCompanionTags {
 }
 
 /**
+ * False where the agent's mascot already stands somewhere else on the same surface (the
+ * collapsed dock seats it above the bar): the composer then draws no companion slot, so the
+ * [MascotStage.COMPOSER_COMPANION] seat is declared exactly once.
+ */
+internal val LocalComposerCompanion = staticCompositionLocalOf { true }
+
+/**
  * letta-mobile-bglj6.1: the agent keeps the user company at the prompt. Its mascot hangs off the
  * left edge of [content] (the full card or the docked bar) in a [MascotStage.COMPOSER_COMPANION]
  * seat of the window's mascot transport, so opening the agent pane or the editor flies the
@@ -39,6 +47,10 @@ internal object ComposerCompanionTags {
  */
 @Composable
 internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () -> Unit) {
+    if (!LocalComposerCompanion.current) {
+        content()
+        return
+    }
     val agentId = model.uiState.agentId
     val available = mascotAvailable(agentId)
     val present = available && agentId != null &&

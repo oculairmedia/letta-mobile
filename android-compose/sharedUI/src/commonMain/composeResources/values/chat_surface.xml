@@ -21,4 +21,11 @@
     <string name="chat_surface_dock_grow">Make the chat bigger</string>
     <string name="chat_surface_dock_shrink">Make the chat smaller</string>
     <string name="chat_surface_dock_reset">Put the chat back in its place</string>
+    <!-- The collapsed dock: the agent's mascot over its bar, its reply in a speech bubble. -->
+    <string name="chat_surface_collapsed_reply">%1$s replied: %2$s</string>
+    <string name="chat_surface_collapsed_reply_unnamed">The agent replied: %1$s</string>
+    <string name="chat_surface_collapsed_thinking">%1$s is thinking</string>
+    <string name="chat_surface_collapsed_thinking_unnamed">The agent is thinking</string>
+    <string name="chat_surface_collapsed_working">Working…</string>
+    <string name="chat_surface_collapsed_needs_input">Needs your input — open</string>
 </resources>

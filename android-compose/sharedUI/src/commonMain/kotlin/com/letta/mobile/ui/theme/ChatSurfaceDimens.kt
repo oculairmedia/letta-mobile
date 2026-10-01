@@ -2,6 +2,7 @@ package com.letta.mobile.ui.theme
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
 /** letta-mobile-bglj6.1: the shared chat page's shell tokens (the docked panel over the canvas). */
 object ChatSurfaceDimens {
@@ -41,8 +42,27 @@ object ChatSurfaceDimens {
     val dockGripWidth: Dp = 32.dp
     val dockGripHeight: Dp = 4.dp
 
-    /** The collapsed bar's height before it is first measured. */
-    val dockCollapsedHeightEstimate: Dp = 96.dp
+    /** The collapsed dock's height (the mascot over its bar) before it is first measured. */
+    val dockCollapsedHeightEstimate: Dp = 180.dp
+
+    /** The collapsed dock's reply bubble: at most this wide (a share of the chat column)... */
+    val collapsedBubbleMaxWidth: Dp = ChatColumnMaxWidth * 0.6f
+
+    /** ...and this tall; a longer reply scrolls inside it. */
+    val collapsedBubbleMaxHeight: Dp = 280.dp
+
+    /** How far above the mascot tile's foot the bubble sits, so its tail points at the head. */
+    val collapsedBubbleLift: Dp = 56.dp
+
+    /** How far the bubble tucks over the mascot tile's empty margin, so its tail nearly touches the body. */
+    val collapsedBubbleTuck: Dp = 16.dp
+
+    /** The bubble's tail: how far it reaches out towards the mascot, and how tall its base is. */
+    val collapsedBubbleTailWidth: Dp = 10.dp
+    val collapsedBubbleTailHeight: Dp = 14.dp
+
+    /** The thinking bubble's dots. */
+    val collapsedThinkingDot: Dp = 6.dp
 
     /** The reset-placement snap. */
     const val dockSnapMillis: Int = 220

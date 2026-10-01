@@ -78,12 +78,13 @@ class ChatSurfaceSnapshotTest {
         dark: Boolean,
         withCanvas: Boolean = false,
         dock: ChatDockGeometry = ChatDockGeometry.Default,
+        uiState: ChatUiState = state,
     ) = runComposeUiTest {
         setContent {
             MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     ChatSurface(
-                        port = FixturePort(state, composer),
+                        port = FixturePort(uiState, composer),
                         presentation = presentation,
                         onIntent = {},
                         host = ChatSurfaceHost(openCanvas = {}),
@@ -126,6 +127,7 @@ class ChatSurfaceSnapshotTest {
         dock = ChatDockGeometry(anchorX = 1f, anchorY = 0.3f, widthDp = 460f, heightDp = 520f),
     )
 
+    /** Minimised just after a send: the agent thinking over its bar, no panel. */
     @Test
     fun dockedPanelCollapsed() = snapshot(
         "docked-panel-collapsed",
@@ -133,6 +135,28 @@ class ChatSurfaceSnapshotTest {
         dark = false,
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 0.1f, anchorY = 1f, widthDp = 520f, collapsed = true),
+        uiState = state.copy(isAgentTyping = true),
+    )
+
+    /** Minimised with the reply in: the bubble beside the agent, tail towards it. */
+    @Test
+    fun dockedCollapsedBubble() = snapshot(
+        "docked-collapsed-bubble",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = false,
+        withCanvas = true,
+        dock = ChatDockGeometry(anchorX = 0.5f, anchorY = 1f, widthDp = 640f, collapsed = true),
+        uiState = state.copy(messages = persistentListOf(messages[0], messages[1])),
+    )
+
+    @Test
+    fun dockedCollapsedBubbleDark() = snapshot(
+        "docked-collapsed-bubble-dark",
+        ChatSurfacePresentation.CanvasFirst,
+        dark = true,
+        withCanvas = true,
+        dock = ChatDockGeometry(anchorX = 0.5f, anchorY = 1f, widthDp = 640f, collapsed = true),
+        uiState = state.copy(messages = persistentListOf(messages[0], messages[1])),
     )
 
     @Test

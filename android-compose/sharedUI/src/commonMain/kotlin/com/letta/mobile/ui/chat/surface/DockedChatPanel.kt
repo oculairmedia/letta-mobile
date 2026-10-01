@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -44,6 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -55,14 +58,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronDown
-import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.Lucide
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_dock_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_dock_move
 import com.letta.mobile.sharedui.resources.chat_surface_dock_resize
-import com.letta.mobile.sharedui.resources.chat_surface_dock_restore
-import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_expand
 import com.letta.mobile.ui.chat.session.ChatDockEdge
 import com.letta.mobile.ui.chat.session.ChatDockFrame
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
@@ -72,6 +72,7 @@ import com.letta.mobile.ui.chat.session.ChatDockRect
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.components.resizePointerIcon
+import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -80,7 +81,8 @@ import org.jetbrains.compose.resources.stringResource
 /*
  * letta-mobile-bglj6.1: the docked chat as a floating panel over the canvas. The person drags it
  * by its header, resizes it from its edges and corners (or the bottom-right grip on touch),
- * minimises it to the composer bar and double-clicks / double-taps the header to put it back
+ * minimises it to the agent's mascot over the composer bar (CollapsedDock: no panel, the reply
+ * arrives as a speech bubble) and double-clicks / double-taps the header to put it back
  * bottom-centre. Its placement is a ChatDockGeometry the host owns and persists.
  *
  * Only the panel takes pointer input: the area around it is left to the canvas underneath.
@@ -122,6 +124,11 @@ internal class ChatDockState(initial: ChatDockGeometry) {
         update(if (geometry.collapsed) ChatDockGeometryMath.expand(geometry) else ChatDockGeometryMath.collapse(geometry))
     }
 
+    /** Opens the panel again at its last expanded size; nothing when it is already open. */
+    fun restore() {
+        if (geometry.collapsed) update(ChatDockGeometryMath.expand(geometry))
+    }
+
     fun reset() {
         val next = ChatDockGeometryMath.reset()
         if (next == geometry) return
@@ -151,6 +158,8 @@ internal class DockedPanelContent(
     val streaming: Boolean,
     val conversation: @Composable (Modifier) -> Unit,
     val composer: @Composable () -> Unit,
+    /** What the dock shows minimised: the agent's mascot over its bar, see [CollapsedDock]. */
+    val collapsed: CollapsedDockContent,
 )
 
 private val DockLimits = ChatDockLimits(
@@ -189,10 +198,41 @@ internal fun DockedChatPanel(state: ChatDockState, content: DockedPanelContent, 
                 .dockSemantics(state, dockSemanticsLabels())
                 .testTag(DOCK_PANEL_TAG),
         ) {
-            PanelSurface(state, content, Modifier.fillMaxWidth().then(if (geometry.collapsed) Modifier else Modifier.fillMaxHeight()))
-            Box(Modifier.matchParentSize()) { ResizeHandles(state, collapsed = geometry.collapsed) }
+            val fold = rememberDockFold(geometry.collapsed)
+            val arriving = Modifier.graphicsLayer {
+                val progress = fold.value
+                alpha = progress
+                val scale = ChatMotionTokens.DockCollapse.START_SCALE +
+                    (1f - ChatMotionTokens.DockCollapse.START_SCALE) * progress
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin(0.5f, 1f)
+            }
+            if (geometry.collapsed) {
+                // No panel and no handles: the mascot and the bar float on the canvas.
+                CollapsedDock(state, content.collapsed, Modifier.fillMaxWidth().then(arriving))
+            } else {
+                PanelSurface(state, content, Modifier.fillMaxSize().then(arriving))
+                Box(Modifier.matchParentSize()) { ResizeHandles(state) }
+            }
         }
     }
+}
+
+/**
+ * 1 at rest; after the dock folds down to its mascot (or opens back into the panel) it runs from
+ * 0 to 1 for the arriving layout's fade and scale. Reduced motion snaps.
+ */
+@Composable
+private fun rememberDockFold(collapsed: Boolean): State<Float> {
+    val reducedMotion = LocalReducedMotion.current
+    var settled by remember { mutableStateOf(collapsed) }
+    val progress = remember(collapsed) { Animatable(if (collapsed == settled || reducedMotion) 1f else 0f) }
+    LaunchedEffect(collapsed) {
+        progress.animateTo(1f, tween(ChatMotionTokens.DockCollapse.MILLIS))
+        settled = collapsed
+    }
+    return progress.asState()
 }
 
 @Composable
@@ -211,21 +251,19 @@ private fun PanelSurface(state: ChatDockState, content: DockedPanelContent, modi
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
         ),
     ) {
-        DockedPanelBody(state, content)
+        DockedPanelBody(state, content, Modifier.testTag(DOCK_SURFACE_TAG))
     }
 }
 
-/** The panel's inside: its header, the conversation (unless minimised) and the composer bar. */
+/** The open panel's inside: its header, the conversation and the composer bar. */
 @Composable
 internal fun DockedPanelBody(state: ChatDockState, content: DockedPanelContent, modifier: Modifier = Modifier) {
     Column(modifier) {
         PanelHeader(state)
-        if (!state.geometry.collapsed) {
-            if (content.streaming) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md))
-            }
-            content.conversation(Modifier.weight(1f).fillMaxWidth())
+        if (content.streaming) {
+            LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md))
         }
+        content.conversation(Modifier.weight(1f).fillMaxWidth())
         content.composer()
     }
 }
@@ -240,23 +278,25 @@ internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect
 /** Drag to move, double-click / double-tap to reset; the panel's own controls sit on it. */
 private fun Modifier.moveHandle(state: ChatDockState): Modifier = this
     .pointerHoverIcon(movePointerIcon())
-    .pointerInput(state) {
-        detectDragGestures { change, amount ->
-            change.consume()
-            state.drag(amount.x.toDp().value, amount.y.toDp().value)
-        }
-    }
+    .dockDrag(state)
     .pointerInput(state) { detectTapGestures(onDoubleTap = { state.reset() }) }
+
+/** Dragging this moves the dock (the panel, or the collapsed mascot and its bubble). */
+internal fun Modifier.dockDrag(state: ChatDockState): Modifier = pointerInput(state) {
+    detectDragGestures { change, amount ->
+        change.consume()
+        state.drag(amount.x.toDp().value, amount.y.toDp().value)
+    }
+}
 
 /**
  * The panel's top edge: a slim drag strip with a centred grip pill (drag to move, double-click
- * or double-tap to reset) and the minimise / restore control at its end. No title: the agent's
- * mascot beside the composer already says who this is, and the composer's own expand control
- * opens the full chat.
+ * or double-tap to reset) and the minimise control at its end. No title: the agent's mascot
+ * beside the composer already says who this is, and the composer's own expand control opens the
+ * full chat. Minimised there is no header at all; [CollapsedDock] has its own restore control.
  */
 @Composable
 private fun PanelHeader(state: ChatDockState) {
-    val collapsed = state.geometry.collapsed
     val moveLabel = stringResource(Res.string.chat_surface_dock_move)
     Box(
         Modifier
@@ -273,14 +313,8 @@ private fun PanelHeader(state: ChatDockState) {
                 .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(LettaDimens.Radius.sm)),
         )
         Box(Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Space.sm)) {
-            if (collapsed) {
-                HeaderButton(Lucide.ChevronUp, stringResource(Res.string.chat_surface_dock_restore), DOCK_RESTORE_TAG) {
-                    state.toggleCollapsed()
-                }
-            } else {
-                HeaderButton(Lucide.ChevronDown, stringResource(Res.string.chat_surface_dock_collapse), DOCK_COLLAPSE_TAG) {
-                    state.toggleCollapsed()
-                }
+            HeaderButton(Lucide.ChevronDown, stringResource(Res.string.chat_surface_dock_collapse), DOCK_COLLAPSE_TAG) {
+                state.toggleCollapsed()
             }
         }
     }
@@ -304,12 +338,11 @@ private fun HeaderButton(
  * buttons sit at its edges); only the panel's surface takes input inside it.
  */
 @Composable
-private fun BoxScope.ResizeHandles(state: ChatDockState, collapsed: Boolean) {
+private fun BoxScope.ResizeHandles(state: ChatDockState) {
     val edge = ChatSurfaceDimens.dockResizeEdge
     val corner = ChatSurfaceDimens.dockResizeCorner
     ResizeHandle(state, ChatDockEdge.Left, Modifier.align(Alignment.CenterStart).offset(x = -edge).fillMaxHeight().width(edge))
     ResizeHandle(state, ChatDockEdge.Right, Modifier.align(Alignment.CenterEnd).offset(x = edge).fillMaxHeight().width(edge))
-    if (collapsed) return
     ResizeHandle(state, ChatDockEdge.Top, Modifier.align(Alignment.TopCenter).offset(y = -edge).fillMaxWidth().height(edge))
     ResizeHandle(state, ChatDockEdge.Bottom, Modifier.align(Alignment.BottomCenter).offset(y = edge).fillMaxWidth().height(edge))
     ResizeHandle(state, ChatDockEdge.TopLeft, Modifier.align(Alignment.TopStart).offset(-corner, -corner).size(corner))
@@ -391,6 +424,7 @@ private fun animatedDockRect(target: ChatDockRect, state: ChatDockState): ChatDo
 
 internal const val DOCK_PANEL_TAG = "chat-dock-panel"
 internal const val DOCK_HEADER_TAG = "chat-dock-header"
+internal const val DOCK_SURFACE_TAG = "chat-dock-surface"
 internal const val DOCK_COLLAPSE_TAG = "chat-dock-collapse"
 internal const val DOCK_RESTORE_TAG = "chat-dock-restore"
 internal const val DOCK_RESIZE_GRIP_TAG = "chat-dock-resize-grip"

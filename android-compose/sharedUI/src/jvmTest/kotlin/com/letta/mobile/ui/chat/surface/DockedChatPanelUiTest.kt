@@ -131,13 +131,18 @@ class DockedChatPanelUiTest {
     }
 
     @Test
-    fun collapsingHidesTheConversationAndExpandingRestoresTheSize() = runComposeUiTest {
+    fun collapsingLeavesTheMascotOverTheBarAndExpandingRestoresTheSize() = runComposeUiTest {
         val harness = show()
         val before = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
         onNodeWithTag(DOCKED_REPLY_TAG).assertExists()
         onNodeWithTag(DOCK_COLLAPSE_TAG).performClick()
         waitForIdle()
+        // No panel, no header: the mascot and the bar float on the canvas.
         onNodeWithTag(DOCKED_REPLY_TAG).assertDoesNotExist()
+        onNodeWithTag(DOCK_SURFACE_TAG).assertDoesNotExist()
+        onNodeWithTag(DOCK_HEADER_TAG).assertDoesNotExist()
+        onNodeWithTag(DOCK_COLLAPSED_MASCOT_TAG).assertExists()
+        onNodeWithTag(ComposerTestTags.DOCKED_BAR).assertExists()
         assertTrue(harness.geometry.collapsed)
         val collapsed = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
         assertTrue(collapsed.height < before.height)
@@ -192,6 +197,12 @@ class DockedChatPanelUiTest {
         run("Minimise the chat to its bar")
         waitForIdle()
         assertTrue(harness.geometry.collapsed)
+
+        // Minimised, the same node offers the way back.
+        val collapsedActions = onNodeWithTag(DOCK_PANEL_TAG).fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        runOnIdle { collapsedActions.single { it.label == "Show the conversation" }.action() }
+        waitForIdle()
+        assertFalse(harness.geometry.collapsed)
     }
 
     private companion object {

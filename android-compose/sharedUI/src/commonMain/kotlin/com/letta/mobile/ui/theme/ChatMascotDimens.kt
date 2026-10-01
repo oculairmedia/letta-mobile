@@ -19,4 +19,7 @@ object ChatMascotDimens {
 
     /** The stand-in sphere a welcome shows for an agent without a mascot. */
     val welcomeFallbackSphere: Dp = 96.dp
+
+    /** The stand-in sphere the collapsed dock shows for an agent without a mascot. */
+    val collapsedFallbackSphere: Dp = 72.dp
 }
