@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -163,14 +162,12 @@ private fun ModelRow(option: ChatModelOption, selected: Boolean, onClick: () -> 
             )
         }
         if (selected) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = LettaIcons.Check,
-                    contentDescription = stringResource(Res.string.composer_model_selected),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(LettaDimens.Control.icon),
-                )
-            }
+            Icon(
+                imageVector = LettaIcons.Check,
+                contentDescription = stringResource(Res.string.composer_model_selected),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(LettaDimens.Control.icon),
+            )
         }
     }
 }
