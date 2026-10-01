@@ -150,9 +150,28 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     /** The last laid-out frame; gestures resolve against it. */
     internal var frame: ChatDockFrame? = null
 
-    /** A value from the host (initial load, or a change it made itself). */
+    /** The host's value as last seen. */
+    private var lastFromHost: ChatDockGeometry = geometry
+
+    /** What this state reported that the host has not handed back yet, oldest first. */
+    private val unacknowledged = ArrayDeque<ChatDockGeometry>()
+
+    /**
+     * A value from the host (the saved placement arriving, or a change it made itself). Called
+     * as the page composes, so a placement that arrives late is drawn where it belongs on its
+     * very first frame. The host handing back what this state reported is not news: a gesture
+     * already past it must not be pulled back.
+     */
     internal fun sync(fromHost: ChatDockGeometry) {
-        geometry = ChatDockGeometryMath.sanitize(fromHost)
+        val next = ChatDockGeometryMath.sanitize(fromHost)
+        if (next == lastFromHost) return
+        lastFromHost = next
+        val echo = unacknowledged.indexOf(next)
+        if (echo >= 0) {
+            repeat(echo + 1) { unacknowledged.removeFirst() }
+            return
+        }
+        if (next != geometry) geometry = next
     }
 
     fun drag(dxDp: Float, dyDp: Float) {
@@ -192,7 +211,14 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     private fun update(next: ChatDockGeometry) {
         if (next == geometry) return
         geometry = next
+        unacknowledged.addLast(next)
+        if (unacknowledged.size > MAX_UNACKNOWLEDGED) unacknowledged.removeFirst()
         onChange(next)
+    }
+
+    private companion object {
+        /** A drag reports every move; a host this far behind has dropped some, not queued them. */
+        const val MAX_UNACKNOWLEDGED = 64
     }
 }
 
@@ -201,7 +227,9 @@ internal class ChatDockState(initial: ChatDockGeometry) {
 internal fun rememberChatDockState(geometry: ChatDockGeometry, onChange: (ChatDockGeometry) -> Unit): ChatDockState {
     val state = remember { ChatDockState(geometry) }
     SideEffect { state.onChange = onChange }
-    LaunchedEffect(geometry) { if (ChatDockGeometryMath.sanitize(geometry) != state.geometry) state.sync(geometry) }
+    // In composition, not in an effect: an effect runs after the frame, which would draw the
+    // default placement once before the saved one.
+    state.sync(geometry)
     return state
 }
 

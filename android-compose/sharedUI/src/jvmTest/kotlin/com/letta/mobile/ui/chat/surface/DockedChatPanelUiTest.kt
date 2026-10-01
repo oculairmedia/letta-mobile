@@ -114,10 +114,15 @@ class DockedChatPanelUiTest {
         onNodeWithTag(DOCK_PANEL_TAG).assertDoesNotExist()
 
         // The saved placement arrives: the panel appears there directly, never at the default first.
+        // One frame at a time, so the first frame it is drawn in is the one checked.
+        mainClock.autoAdvance = false
         val saved = ChatDockGeometry(anchorX = 0.1f, anchorY = 0.2f, widthDp = 420f, heightDp = 380f)
         placement = saved
-        waitForIdle()
+        mainClock.advanceTimeByFrame()
         onNodeWithTag(DOCK_PANEL_TAG).assertExists()
+        assertEquals(420f, onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot().width.value, 1f)
+        mainClock.autoAdvance = true
+        waitForIdle()
         assertEquals(420f, onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot().width.value, 1f)
     }
 
