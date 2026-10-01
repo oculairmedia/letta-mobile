@@ -2,8 +2,10 @@ package com.letta.mobile.ui.chat.surface.sendflight
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -11,7 +13,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -22,9 +26,15 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.rows_role_you
+import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatMotionTokens
+import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.ui.theme.ChatRowType
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 /** letta-mobile-cc25e: test tags of the send flight. */
@@ -62,16 +72,17 @@ fun SendFlightLayer(state: SendFlightState, modifier: Modifier = Modifier, conte
 }
 
 /**
- * The flying prompt: the sent text on the row's card, placed on the eased path between the
- * field and the row. It reads as the field's text at take-off and as the row's card on landing.
+ * The flying prompt, placed on the eased path between the field and the row. It morphs from the
+ * field's text at take-off into the new prompt bubble on landing, drawn as UserPromptRow draws
+ * it: the primaryContainer fill on the user bubble shape, the bubble's padding, the "You" label
+ * over the text, and the text in the bubble's style and colour. Landed, it is the bubble.
  */
 @Composable
 private fun SendFlightGhost(flight: SendFlight, modifier: Modifier) {
     val progress = flight.progress
     val typography = MaterialTheme.typography
-    val fill = MaterialTheme.colorScheme.surfaceContainerLow
+    val scheme = MaterialTheme.colorScheme
     val fillAlpha = (progress / ChatMotionTokens.SendFlight.FILL_IN_FRACTION).coerceIn(0f, 1f)
-    val shape = RoundedCornerShape(LettaDimens.Radius.md)
     Box(modifier) {
         Box(
             Modifier
@@ -79,23 +90,41 @@ private fun SendFlightGhost(flight: SendFlight, modifier: Modifier) {
                 .graphicsLayer { alpha = flight.ghostAlpha }
                 // Hidden from accessibility: the real row already announces the prompt.
                 .clearAndSetSemantics { testTag = SendFlightTestTags.GHOST }
-                .background(fill.copy(alpha = fillAlpha), shape),
+                .clip(ChatBubbleShapes.user())
+                .background(scheme.primaryContainer.copy(alpha = scheme.primaryContainer.alpha * fillAlpha)),
         ) {
-            Text(
-                text = flight.text,
-                style = lerp(typography.bodyLarge, typography.bodyMedium, progress),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = ChatRowDimens.promptCollapsedMaxLines,
-                overflow = TextOverflow.Ellipsis,
+            Column(
                 modifier = Modifier.padding(
-                    start = LettaDimens.Space.lg * progress,
-                    end = LettaDimens.Space.sm * progress,
-                    top = LettaDimens.Space.md * progress,
-                    bottom = LettaDimens.Space.md * progress,
+                    horizontal = ChatRowSpacing.bubblePaddingHorizontal * progress,
+                    vertical = ChatRowSpacing.bubblePaddingVertical * progress,
                 ),
-            )
+            ) {
+                // The label grows in above the text: its height opens with the trip, so at
+                // take-off the text sits where the field drew it.
+                Text(
+                    text = stringResource(Res.string.rows_role_you),
+                    style = ChatRowType.roleLabel,
+                    color = scheme.onPrimaryContainer.copy(alpha = ChatRowAlpha.userRoleLabel * progress),
+                    maxLines = 1,
+                    modifier = Modifier.growIn(progress),
+                )
+                Spacer(Modifier.height(ChatRowSpacing.messagePart * progress))
+                Text(
+                    text = flight.text,
+                    style = lerp(typography.bodyLarge, typography.bodyMedium, progress),
+                    color = lerp(scheme.onSurface, scheme.onPrimaryContainer, progress),
+                    maxLines = ChatRowDimens.promptCollapsedMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
+}
+
+/** Measures at full size but reports [fraction] of the height, so the content below rises with it. */
+private fun Modifier.growIn(fraction: Float): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    layout(placeable.width, (placeable.height * fraction).roundToInt()) { placeable.place(0, 0) }
 }
 
 /** The ghost's bounds right now: the source until a row claims it, then along the path. */

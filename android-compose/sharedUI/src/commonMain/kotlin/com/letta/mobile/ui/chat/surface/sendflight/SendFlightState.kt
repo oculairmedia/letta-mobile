@@ -58,7 +58,11 @@ class SendFlight internal constructor(
     var insert: Float by mutableFloatStateOf(0f)
         internal set
 
-    internal var claimant: SendFlightRowKey? = null
+    /**
+     * The row standing in as the landing spot. Snapshot state: the claimant's alpha and height
+     * are read in its draw and layout, which must re-run the moment it claims.
+     */
+    internal var claimant: SendFlightRowKey? by mutableStateOf(null)
 }
 
 /**
@@ -107,15 +111,23 @@ class SendFlightState {
         if (current.claimant === row.key) current.target = boundsInRoot.translate(-layerOrigin)
     }
 
-    internal fun rowAlpha(key: SendFlightRowKey): Float = claimed(key)?.rowAlpha ?: 1f
+    internal fun rowAlpha(row: SendFlightRow): Float = standingIn(row)?.rowAlpha ?: 1f
 
-    internal fun rowInsert(key: SendFlightRowKey): Float = claimed(key)?.insert ?: 1f
+    internal fun rowInsert(row: SendFlightRow): Float = standingIn(row)?.insert ?: 1f
 
     internal fun finish(done: SendFlight) {
         if (flight === done) flight = null
     }
 
-    private fun claimed(key: SendFlightRowKey): SendFlight? = flight?.takeIf { it.claimant === key }
+    /**
+     * The flight [row] is the landing spot of: the one it claimed, or the waiting one it is about
+     * to claim. A new prompt row is hidden (and its slot closed) from its very first frame, before
+     * its first layout reports it, so the real bubble never shows under the ghost.
+     */
+    private fun standingIn(row: SendFlightRow): SendFlight? = flight?.takeIf { current ->
+        val claimant = current.claimant
+        claimant === row.key || (claimant == null && row.canClaim(current))
+    }
 }
 
 /** One composed prompt row's identity; compared by reference, so a recomposed slot is a new row. */

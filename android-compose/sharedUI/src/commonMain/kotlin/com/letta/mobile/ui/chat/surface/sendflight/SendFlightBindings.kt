@@ -41,10 +41,10 @@ internal fun rememberSendFlightTarget(rowId: String, text: String): Modifier {
     val row = remember(key, bornAt, text) { SendFlightRow(key, bornAt, text) }
     return remember(state, row) {
         Modifier
-            .graphicsLayer { alpha = state.rowAlpha(key) }
+            .graphicsLayer { alpha = state.rowAlpha(row) }
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints)
-                val height = (placeable.height * state.rowInsert(key)).roundToInt()
+                val height = (placeable.height * state.rowInsert(row)).roundToInt()
                 layout(placeable.width, height) { placeable.place(0, 0) }
             }
             .onGloballyPositioned { state.reportTarget(row, it.unclippedBoundsInRoot()) }

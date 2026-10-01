@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
  * 1. Hold at the prompt until the row claims the flight, at most
  *    [ChatMotionTokens.SendFlight.TARGET_WAIT_MILLIS]; otherwise fade out where it stands.
  * 2. Open the row's slot (eased insert) while the ghost travels to it on the eased path.
- * 3. Cross-fade: the ghost out, the real row in.
+ * 3. Hand off: the real row shows under the landed ghost, which fades out over it.
  */
 internal suspend fun SendFlight.fly() {
     if (!awaitTarget(ChatMotionTokens.SendFlight.TARGET_WAIT_MILLIS)) {
@@ -30,11 +30,12 @@ internal suspend fun SendFlight.fly() {
         }
         tweenTo(ChatMotionTokens.SendFlight.FLIGHT_MILLIS, ChatMotionTokens.SendFlight.flightEasing) { progress = it }
     }
+    // The ghost has landed drawn exactly as the row's bubble, so the row shows at once beneath
+    // it and only the ghost fades: a cross-fade of two identical layers would dip the bubble's
+    // opacity mid-way, and the eye reads that dip as a second bubble.
     phase = SendFlightPhase.HandingOff
-    tweenTo(ChatMotionTokens.SendFlight.HANDOFF_MILLIS) {
-        rowAlpha = it
-        ghostAlpha = 1f - it
-    }
+    rowAlpha = 1f
+    tweenTo(ChatMotionTokens.SendFlight.HANDOFF_MILLIS) { ghostAlpha = 1f - it }
 }
 
 /** True once a row has claimed the flight; false after [timeoutMillis] of frames without one. */

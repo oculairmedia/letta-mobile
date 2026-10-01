@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.chat.surface.sendflight
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,9 +16,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -61,6 +66,8 @@ class SendFlightChoreographyTest {
                                             .fillMaxWidth()
                                             .then(rememberSendFlightTarget(ROW, harness.rowText))
                                             .height(ROW_HEIGHT.dp)
+                                            // A colour the ghost never draws, so a frame shows whether the row is visible.
+                                            .background(ROW_PAINT)
                                             .testTag(ROW),
                                     )
                                 }
@@ -119,8 +126,49 @@ class SendFlightChoreographyTest {
         mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.HANDOFF_MILLIS + FRAME_SLACK)
         assertNull(harness.state.flight, "the flight ends after the hand-off")
         assertEquals(0, ghostCount(), "the ghost is gone")
-        assertEquals(1f, harness.state.rowAlpha(SendFlightRowKey()), "rows outside a flight are fully shown")
+        assertEquals(1f, harness.state.rowAlpha(SendFlightRow(SendFlightRowKey(), 0, SENT)), "rows outside a flight are fully shown")
         assertClose(ROW_HEIGHT.toFloat() * density.density, bounds(ROW).height, "the row has its full height")
+    }
+
+    /**
+     * Frame captures of the whole layer: the new row is drawn on NO frame while the ghost stands in
+     * for it (from the send's very first frame, before its first layout claims the flight), and is
+     * drawn from the landing on, so the hand-off never shows two prompts.
+     */
+    @Test
+    fun theNewRowIsNeverDrawnUnderTheGhostUntilItLands() = runComposeUiTest {
+        val harness = Harness()
+        mount(harness)
+
+        send(harness)
+        frames(1)
+        assertEquals(0, rowPixels(), "the new row is hidden on the send's first frame")
+        frames(1)
+        assertEquals(0, rowPixels(), "and on the frame its layout claims the flight")
+
+        mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.FLIGHT_MILLIS / 2L)
+        assertEquals(SendFlightPhase.Flying, harness.state.flight?.phase)
+        assertEquals(0, rowPixels(), "and while the ghost travels")
+
+        mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.FLIGHT_MILLIS / 2L + FRAME_SLACK)
+        assertEquals(SendFlightPhase.HandingOff, harness.state.flight?.phase)
+        assertTrue(rowPixels() > 0, "landed, the row shows beneath the fading ghost")
+
+        mainClock.advanceTimeBy(ChatMotionTokens.SendFlight.HANDOFF_MILLIS + FRAME_SLACK)
+        assertNull(harness.state.flight)
+        assertTrue(rowPixels() > 0, "and stays after the hand-off")
+    }
+
+    /** Pixels of the stand-in row's paint in a capture of the whole layer. */
+    private fun ComposeUiTest.rowPixels(): Int {
+        val pixels = onRoot().captureToImage().toPixelMap()
+        var count = 0
+        for (x in 0 until pixels.width) {
+            for (y in 0 until pixels.height) {
+                if (pixels[x, y] == ROW_PAINT) count++
+            }
+        }
+        return count
     }
 
     @Test
@@ -191,5 +239,6 @@ class SendFlightChoreographyTest {
         const val FRAME_SLACK = 64L
         const val TIMEOUT_MARGIN = 100L
         const val PIXEL_TOLERANCE = 1.5f
+        val ROW_PAINT = Color(0xFFFF00FF)
     }
 }
