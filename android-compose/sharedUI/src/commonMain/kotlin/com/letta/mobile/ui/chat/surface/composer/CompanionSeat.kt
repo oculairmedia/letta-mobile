@@ -138,6 +138,8 @@ internal fun CompanionSeatOverlay(
     onClick: (() -> Unit)?,
     onEdit: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    /** Moves the docked chat when the character is grabbed while seated on it (not on the page). */
+    onDockDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null,
 ) {
     if (agentId == null || !mascotAvailable(agentId) || !anchors.anchored) return
     val glide = rememberDockedGlide()
@@ -177,6 +179,7 @@ internal fun CompanionSeatOverlay(
             },
             onClick = onClick,
             onEdit = onEdit,
+            onDrag = onDockDrag?.let { drag -> { dx: Float, dy: Float -> if (pageWeight() <= 0f) drag(dx, dy) } },
             empty = {},
         )
     }
