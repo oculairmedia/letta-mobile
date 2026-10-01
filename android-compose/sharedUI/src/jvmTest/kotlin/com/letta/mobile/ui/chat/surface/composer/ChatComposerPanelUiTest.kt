@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.chat.surface.composer
 
+import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme

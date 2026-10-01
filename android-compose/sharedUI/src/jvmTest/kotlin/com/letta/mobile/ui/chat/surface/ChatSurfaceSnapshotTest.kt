@@ -23,7 +23,6 @@ import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.surface.timeline.RecordingChatActions
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test

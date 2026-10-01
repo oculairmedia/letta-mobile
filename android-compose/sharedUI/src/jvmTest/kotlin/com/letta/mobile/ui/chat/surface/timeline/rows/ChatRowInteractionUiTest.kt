@@ -2,6 +2,7 @@
 
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
