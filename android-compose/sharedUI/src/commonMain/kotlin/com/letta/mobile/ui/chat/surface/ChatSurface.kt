@@ -248,7 +248,8 @@ private fun CanvasWithChat(
                 }
             }
         }
-        CompanionSeat(frame, companionAnchors, dock = dock, pageWeight = fraction)
+        // The character moves the dock only while it sits on the resting dock, never mid-morph.
+        CompanionSeat(frame, companionAnchors, dock = dock.takeIf { !fullScreen && !morph.morphing }, pageWeight = fraction)
     }
 }
 
