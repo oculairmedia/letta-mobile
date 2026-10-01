@@ -372,6 +372,15 @@ class NotebookLocalStore(directory: Path, peerId: String) : AutoCloseable {
         canvasFrom(document)
     }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
+    /**
+     * The canvas's identity and ownership without its board: [CanvasDocument.sceneJson] is not
+     * built. Lookups by id or conversation match on this, so finding one canvas no longer
+     * decodes every board in the repository.
+     */
+    internal fun canvasMetadata(id: DocumentId): CanvasDocument? = open(id)?.withDocument { document ->
+        (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
+    }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { Json.decodeFromString<CanvasDocument>(it) }
+
     private fun canvasFrom(read: Read): CanvasDocument? {
         val metadata = (read.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
             ?: return null
