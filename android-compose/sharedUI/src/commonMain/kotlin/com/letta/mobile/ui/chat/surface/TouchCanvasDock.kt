@@ -249,10 +249,14 @@ private fun ChatHead(
     onTap: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val reducedMotion = LocalReducedMotion.current
+    // The gesture detectors outlive a composition (they are keyed on the dock alone): whatever
+    // they read must be the latest, or a second drag snaps from where the head rested at first.
+    val reducedMotion by rememberUpdatedState(LocalReducedMotion.current)
     val currentLane by rememberUpdatedState(lane)
     val currentTap by rememberUpdatedState(onTap)
+    val currentPosition by rememberUpdatedState(position)
     val openAgent = content.openAgent
+    val currentOpenAgent by rememberUpdatedState(openAgent)
     val anchors = LocalCompanionSeatAnchors.current
     val mascot = anchors != null && mascotAvailable(content.agentId)
     val label = stringResource(Res.string.chat_surface_head, content.agentName)
@@ -269,12 +273,12 @@ private fun ChatHead(
                 if (openAgent != null) onLongClick(agentLabel) { openAgent(); true }
             }
             .pointerInput(content.dock) {
-                detectTapGestures(onTap = { currentTap() }, onLongPress = { openAgent?.invoke() })
+                detectTapGestures(onTap = { currentTap() }, onLongPress = { currentOpenAgent?.invoke() })
             }
             .pointerInput(content.dock) {
                 detectDragGestures(
                     onDragEnd = {
-                        val at = position()
+                        val at = currentPosition()
                         val (right, laneFraction) = currentLane.snap(at)
                         val target = currentLane.rest(right, laneFraction)
                         // The geometry moves the resting place at once; the head glides there.

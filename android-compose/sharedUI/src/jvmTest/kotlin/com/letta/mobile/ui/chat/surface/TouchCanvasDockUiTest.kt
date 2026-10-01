@@ -5,13 +5,18 @@ package com.letta.mobile.ui.chat.surface
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipe
@@ -137,6 +142,51 @@ class TouchCanvasDockUiTest {
     }
 
     @Test
+    fun aSecondDragSnapsFromWhereTheFirstLeftTheHead() = runComposeUiTest {
+        val harness = show(Port(), ChatSurfacePresentation.CanvasFirst)
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput {
+            swipe(start = center, end = Offset(center.x - DRAG_PX, center.y), durationMillis = 300)
+        }
+        waitForIdle()
+        assertEquals(0f, harness.geometries.last().anchorX)
+        // A nudge on the left: the head stays there, not back at the side it rested on at first.
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput {
+            swipe(start = center, end = Offset(center.x + NUDGE_PX, center.y), durationMillis = 200)
+        }
+        waitForIdle()
+        assertEquals(0f, harness.geometries.last().anchorX)
+        val head = onNodeWithTag(TOUCH_HEAD_TAG).fetchSemanticsNode().boundsInRoot
+        val page = onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue(head.center.x < page.center.x, "the head went back to the right: $head")
+    }
+
+    @Test
+    fun aLongPressOpensTheAgentPaneOnceTheHostOffersIt() = runComposeUiTest {
+        var host by mutableStateOf(ChatSurfaceHost(openCanvas = {}))
+        var opened = 0
+        setContent {
+            MaterialTheme {
+                ChatSurface(
+                    port = Port(),
+                    presentation = ChatSurfacePresentation.CanvasFirst,
+                    onIntent = {},
+                    host = host,
+                    modifier = Modifier.fillMaxSize(),
+                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                    platform = ChatSurfacePlatform(showKeyboardHints = false),
+                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                )
+            }
+        }
+        waitForIdle()
+        host = ChatSurfaceHost(openCanvas = {}, openAgentPane = { opened++ })
+        waitForIdle()
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { longClick() }
+        waitForIdle()
+        assertEquals(1, opened)
+    }
+
+    @Test
     fun theFullPageDrawsThePhoneBar() = runComposeUiTest {
         show(Port(), ChatSurfacePresentation.ChatFirst, withCanvas = false)
         onNodeWithTag(ComposerTestTags.TOUCH_BAR).assertExists()
@@ -148,5 +198,6 @@ class TouchCanvasDockUiTest {
 
     private companion object {
         const val DRAG_PX = 700f
+        const val NUDGE_PX = 40f
     }
 }
