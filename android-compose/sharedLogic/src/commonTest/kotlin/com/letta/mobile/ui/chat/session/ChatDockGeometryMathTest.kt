@@ -90,6 +90,24 @@ class ChatDockGeometryMathTest {
     }
 
     @Test
+    fun draggingACollapsedBarKeepsTheExpandedPanelsAnchor() {
+        val f = frame(collapsed = 60f)
+        val sized = ChatDockGeometry(anchorX = 0.5f, anchorY = 1f, heightDp = 400f)
+        val collapsed = ChatDockGeometryMath.collapse(sized)
+        val bar = ChatDockGeometryMath.rect(collapsed, f)
+
+        val moved = ChatDockGeometryMath.drag(collapsed, 0f, -200f, f)
+        val movedBar = ChatDockGeometryMath.rect(moved, f)
+        assertEquals(bar.top - 200f, movedBar.top, EPS)
+
+        // Opening it again puts the panel's composer bar exactly where the collapsed bar was.
+        val open = ChatDockGeometryMath.rect(ChatDockGeometryMath.expand(moved), f)
+        assertEquals(400f, open.height, EPS)
+        assertEquals(movedBar.bottom, open.bottom, EPS)
+        assertInside(open, f)
+    }
+
+    @Test
     fun resizeKeepsTheOppositeEdgeAndHonoursMinAndMax() {
         val f = frame()
         val start = ChatDockGeometryMath.rect(ChatDockGeometry.Default, f)

@@ -93,24 +93,26 @@ object ChatDockGeometryMath {
         heightDp = geometry.heightDp?.takeIf { it.isFinite() && it > 0f },
     )
 
-    /** Where the panel is drawn in [frame]. */
+    /**
+     * Where the panel is drawn in [frame]. Collapsed, it is the expanded panel's composer bar: the
+     * bottom of the expanded rectangle, so opening it again grows the panel upward in place.
+     */
     fun rect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect {
         val area = Area(frame)
-        val width = expandedWidth(geometry, area)
-        val height = if (geometry.collapsed) frame.collapsedHeightDp.coerceIn(0f, area.height) else expandedHeight(geometry, area)
-        val clean = sanitize(geometry)
-        return ChatDockRect(
-            left = area.left + clean.anchorX * (area.width - width).coerceAtLeast(0f),
-            top = area.top + clean.anchorY * (area.height - height).coerceAtLeast(0f),
-            width = width,
-            height = height,
-        )
+        val expanded = expandedRect(geometry, area)
+        if (!geometry.collapsed) return expanded
+        val height = frame.collapsedHeightDp.coerceIn(0f, area.height)
+        val top = (expanded.bottom - height).coerceIn(area.top, (area.bottom - height).coerceAtLeast(area.top))
+        return expanded.copy(top = top, height = height)
     }
 
-    /** Moves the panel by ([dx], [dy]) dp, stopping at the container edges. */
+    /**
+     * Moves the panel by ([dx], [dy]) dp, stopping at the container edges. A collapsed bar moves
+     * its expanded panel, so the anchor stays the expanded panel's and expanding never jumps.
+     */
     fun drag(geometry: ChatDockGeometry, dx: Float, dy: Float, frame: ChatDockFrame): ChatDockGeometry {
         val area = Area(frame)
-        val current = rect(geometry, frame)
+        val current = expandedRect(geometry, area)
         return geometry.copy(
             anchorX = anchorFor(current.left + dx, current.width, area.left, area.width, geometry.anchorX),
             anchorY = anchorFor(current.top + dy, current.height, area.top, area.height, geometry.anchorY),
@@ -156,6 +158,18 @@ object ChatDockGeometryMath {
     fun reset(): ChatDockGeometry = Default
 
     private val Default = ChatDockGeometry.Default
+
+    private fun expandedRect(geometry: ChatDockGeometry, area: Area): ChatDockRect {
+        val width = expandedWidth(geometry, area)
+        val height = expandedHeight(geometry, area)
+        val clean = sanitize(geometry)
+        return ChatDockRect(
+            left = area.left + clean.anchorX * (area.width - width).coerceAtLeast(0f),
+            top = area.top + clean.anchorY * (area.height - height).coerceAtLeast(0f),
+            width = width,
+            height = height,
+        )
+    }
 
     private fun expandedWidth(geometry: ChatDockGeometry, area: Area): Float =
         (sanitize(geometry).widthDp ?: area.limits.defaultWidthDp).coerceIn(area.minWidth, area.maxWidth)
