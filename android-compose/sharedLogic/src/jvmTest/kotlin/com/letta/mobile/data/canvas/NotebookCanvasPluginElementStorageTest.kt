@@ -3,7 +3,6 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
 import java.nio.file.Files
-import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
@@ -45,12 +44,6 @@ class NotebookCanvasPluginElementStorageTest {
     private fun <T> NotebookLocalStore.readDocument(block: (org.automerge.Document) -> T): T =
         open(listDocuments().single())!!.withDocument { document -> block(document) }.get(5, TimeUnit.SECONDS)
 
-    private fun directoryBytes(path: Path): Long = Files.walk(path).use { files ->
-        files.iterator().asSequence()
-            .filter { Files.isRegularFile(it) && it.fileName.toString() != "notebook-canvas.lock" }
-            .sumOf { Files.size(it) }
-    }
-
     @Test
     fun pluginElementsSurviveTheNotebookAndARestartWithNoLayoutChange(): Unit = runBlocking {
         val path = Files.createTempDirectory("canvas-plugin-storage-")
@@ -86,7 +79,7 @@ class NotebookCanvasPluginElementStorageTest {
                 val arrays = (read.get(ObjectId.ROOT, "boardArrays").orElse(null) as AmValue.Map).id
                 assertTrue(CanvasPluginElements.KEY in read.keys(arrays).orElseThrow().toList(), "kept entry by entry")
                 val entries = (read.get(arrays, CanvasPluginElements.KEY).orElseThrow() as AmValue.Map).id
-                assertEquals(listOf(fixtures.ID, "pe-gone"), read.keys(entries).orElseThrow().toList().sorted(), "the tombstone is an entry")
+                assertEquals(listOf("pe-gone", fixtures.ID), read.keys(entries).orElseThrow().toList().sorted(), "the tombstone is an entry")
             }
         }
     }
@@ -125,18 +118,17 @@ class NotebookCanvasPluginElementStorageTest {
 
     @Test
     fun manyStateUpdatesKeepTheHistoryBounded(): Unit = runBlocking {
-        fun grow(updates: Int): Pair<Long, String> {
-            val path = Files.createTempDirectory("canvas-plugin-growth-")
-            val scene = NotebookLocalStore(path, "growth-peer").use { notebooks ->
+        // The whole history as Automerge saves it: what the files on disk add up to once
+        // compacted, independent of when the repository last compacted them.
+        fun grow(updates: Int): Pair<Long, String> =
+            NotebookLocalStore(Files.createTempDirectory("canvas-plugin-growth-"), "growth-peer").use { notebooks ->
                 runBlocking {
                     val session = session(notebooks, CanvasId("plugin-growth"))
                     session.applyAgentBatch((0 until ELEMENTS).map { fixtures.place(0, id = "pe-$it") }, fixtures.AGENT)
                     repeat(updates) { i -> session.applyAgentBatch(listOf(fixtures.progress(0, i / 1000.0, id = "pe-3")), fixtures.AGENT) }
-                    session.sceneJsonOrEmpty()
+                    notebooks.readDocument { it.save().size.toLong() } to session.sceneJsonOrEmpty()
                 }
             }
-            return directoryBytes(path) to scene
-        }
         val (baseline, _) = grow(0)
         val (grown, scene) = grow(UPDATES)
         val oneEntry = Json.parseToJsonElement(scene).jsonObject[CanvasPluginElements.KEY]!!.jsonArray.first().toString().length
