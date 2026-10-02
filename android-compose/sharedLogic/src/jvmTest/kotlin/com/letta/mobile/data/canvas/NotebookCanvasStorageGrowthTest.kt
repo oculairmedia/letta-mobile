@@ -23,14 +23,15 @@ import kotlin.test.assertTrue
  * save wrote the whole scene twice (`board` and `canvasSceneBase`).
  */
 class NotebookCanvasStorageGrowthTest {
-    private fun stroke(id: String, seed: Int, points: Int, dx: Double = 0.0): JsonObject = JsonObject(
+    /** Stroke `s[seed]`, [STROKE_POINTS] points long, shifted right by [dx]. */
+    private fun stroke(seed: Int, dx: Double = 0.0): JsonObject = JsonObject(
         mapOf(
-            "id" to JsonPrimitive(id),
+            "id" to JsonPrimitive("s$seed"),
             "type" to JsonPrimitive("Path"),
             "zIndex" to JsonPrimitive(seed),
             "strokeColor" to JsonPrimitive("#ff202020"),
             "strokeWidth" to JsonPrimitive(4.0),
-            "points" to JsonArray((0 until points).map { i ->
+            "points" to JsonArray((0 until STROKE_POINTS).map { i ->
                 JsonPrimitive("${100.0 + dx + seed * 3 + i * 1.37},${200.0 + seed * 5 + (i * 7 % 113) * 0.91}")
             }),
         ),
@@ -94,13 +95,13 @@ class NotebookCanvasStorageGrowthTest {
                 store.upsert(doc)
             }
             for (i in 0 until strokes) {
-                elements += stroke("s$i", i, 160)
+                elements += stroke(i)
                 save()
             }
             for (i in 0 until moves) {
                 elements[0] = image("img", 100.0 + i)
                 val index = 1 + i % strokes
-                elements[index] = stroke("s${index - 1}", index - 1, 160, dx = i * 2.5)
+                elements[index] = stroke(index - 1, dx = i * 2.5)
                 save()
             }
             for (i in 0 until noteEdits) {
@@ -143,7 +144,7 @@ class NotebookCanvasStorageGrowthTest {
         val run = runBlocking {
             NotebookLocalStore(path, "growth-peer").use { notebooks ->
                 val store = NotebookCanvasDocumentStore(notebooks)
-                val scene = scene((0 until 40).map { stroke("s$it", it, 160) } + image("img", 100.0))
+                val scene = scene((0 until 40).map { stroke(it) } + image("img", 100.0))
                 var doc = CanvasDocument(id = CanvasId("growth"), title = "Growth", sceneJson = scene)
                 store.upsert(doc)
                 repeat(500) { doc = doc.copy(revision = it + 1L, updatedAtEpochMs = 1_000L + it); store.upsert(doc) }
@@ -169,21 +170,27 @@ class NotebookCanvasStorageGrowthTest {
         }
     }
 
-    private fun noteText(id: String, words: Int, typed: String = ""): String = JsonObject(
-        mapOf(
-            "blocks" to JsonArray((0 until words).map { JsonPrimitive("word $it of note $id") } + JsonPrimitive(typed)),
-        ),
-    ).toString()
+    /** Note [id]'s text: [NOTE_WORDS] words, then what was [typed]. */
+    private class NoteText(private val id: String, private val typed: String = "") {
+        fun json(): String = JsonObject(
+            mapOf(
+                "blocks" to JsonArray((0 until NOTE_WORDS).map { JsonPrimitive("word $it of note $id") } + JsonPrimitive(typed)),
+            ),
+        ).toString()
+    }
 
-    private fun noteFrame(index: Int, dx: Float = 0f) =
-        CanvasDocumentFrame(x = 40f * index + dx, y = 30f * index, width = 320f, height = 240f)
+    private fun noteFrame(index: Int) = CanvasDocumentFrame(x = 40f * index, y = 30f * index, width = 320f, height = 240f)
+
+    /** How many notes to write, then how many moves of one note and keystrokes in one note's text. */
+    private class NoteWork(val notes: Int, val moves: Int = 0, val edits: Int = 0)
 
     /**
-     * Notes as the board makes them: [notes] notes written through [CanvasSession], so the scene
-     * holds the projector's own `_documents` (an array of entries ordered by id), then [moves]
-     * moves of one note and [edits] keystrokes in one note's text, one save each.
+     * Notes as the board makes them: [NoteWork.notes] notes written through [CanvasSession], so the
+     * scene holds the projector's own `_documents` (an array of entries ordered by id), then
+     * [NoteWork.moves] moves of one note and [NoteWork.edits] keystrokes in one note's text, one
+     * save each.
      */
-    private fun simulateNotes(path: Path, notes: Int, moves: Int = 0, edits: Int = 0): Run = runBlocking {
+    private fun simulateNotes(path: Path, work: NoteWork): Run = runBlocking {
         val canvasId = CanvasId("notes")
         var saves = 0
         val lastScene = NotebookLocalStore(path, "notes-peer").use { notebooks ->
@@ -191,16 +198,16 @@ class NotebookCanvasStorageGrowthTest {
             store.upsert(CanvasDocument(id = canvasId, title = "Notes", sceneJson = scene(listOf(image("img", 100.0)))))
             val session = CanvasSession(canvasId, store)
             session.load()
-            for (i in 0 until notes) {
-                assertNotNull(session.setDocument("note-$i", noteText("note-$i", 60), frame = noteFrame(i)))
+            for (i in 0 until work.notes) {
+                assertNotNull(session.setDocument("note-$i", NoteText("note-$i").json(), frame = noteFrame(i)))
                 saves++
             }
-            for (i in 0 until moves) {
-                assertNotNull(session.moveDocument("note-2", noteFrame(2, dx = i + 1f)))
+            for (i in 0 until work.moves) {
+                assertNotNull(session.moveDocument("note-2", noteFrame(2).let { it.copy(x = it.x + i + 1f) }))
                 saves++
             }
-            for (i in 0 until edits) {
-                assertNotNull(session.setDocument("note-2", noteText("note-2", 60, typed = "x".repeat(i + 1))))
+            for (i in 0 until work.edits) {
+                assertNotNull(session.setDocument("note-2", NoteText("note-2", typed = "x".repeat(i + 1)).json()))
                 saves++
             }
             session.sceneJsonOrEmpty()
@@ -208,7 +215,9 @@ class NotebookCanvasStorageGrowthTest {
         Run(lastScene, saves, directoryBytes(path))
     }
 
-    private fun assertReloads(path: Path, scene: String, canvasId: CanvasId = CanvasId("notes")) {
+    /** The store at [path] reads back [run]'s last scene. */
+    private fun assertReloads(path: Path, run: Run, canvasId: CanvasId = CanvasId("notes")) {
+        val scene = run.lastScene
         NotebookLocalStore(path, "notes-peer").use { notebooks ->
             runBlocking {
                 val reloaded = NotebookCanvasDocumentStore(notebooks).get(canvasId)!!
@@ -224,23 +233,23 @@ class NotebookCanvasStorageGrowthTest {
      */
     @Test
     fun movingOrEditingOneOfManyProjectedNotesWritesOnlyThatNote() {
-        val base = simulateNotes(Files.createTempDirectory("canvas-notes-base-"), NOTES)
+        val base = simulateNotes(Files.createTempDirectory("canvas-notes-base-"), NoteWork(NOTES))
         val scene = Json.parseToJsonElement(base.lastScene).jsonObject
         assertTrue(scene["_documents"] is JsonArray, "the projector's _documents is an array")
         val allNotes = scene["_documents"].toString().length
         val oneNote = allNotes / NOTES
 
         val movePath = Files.createTempDirectory("canvas-notes-move-")
-        val moved = simulateNotes(movePath, NOTES, moves = SAVES)
+        val moved = simulateNotes(movePath, NoteWork(NOTES, moves = SAVES))
         val perMove = (moved.storedBytes - base.storedBytes) / SAVES
         report("move one of $NOTES notes", moved, base.storedBytes)
-        assertReloads(movePath, moved.lastScene)
+        assertReloads(movePath, moved)
 
         val editPath = Files.createTempDirectory("canvas-notes-edit-")
-        val edited = simulateNotes(editPath, NOTES, edits = SAVES)
+        val edited = simulateNotes(editPath, NoteWork(NOTES, edits = SAVES))
         val perEdit = (edited.storedBytes - base.storedBytes) / SAVES
         report("edit one of $NOTES notes", edited, base.storedBytes)
-        assertReloads(editPath, edited.lastScene)
+        assertReloads(editPath, edited)
 
         println("canvas growth [notes]: one note ~$oneNote bytes, all $NOTES notes ~$allNotes bytes; $perMove bytes/move, $perEdit bytes/edit")
         // Before: 10680 bytes/move and 3644 bytes/edit, the whole `_documents` array each save.
@@ -352,6 +361,8 @@ class NotebookCanvasStorageGrowthTest {
 
     private companion object {
         const val NOTES = 20
+        const val STROKE_POINTS = 160
+        const val NOTE_WORDS = 60
         const val SAVES = 100
     }
 }
