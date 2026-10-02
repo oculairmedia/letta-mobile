@@ -16,6 +16,7 @@ internal object TabletPenDecoder {
         val rawY: Float,
         val force: Float,
         val tool: Int,
+        val contact: Int = 0,
     )
 
     fun decodeSample(events: FloatArray, index: Int, scale: Double): DecodedSample {
@@ -29,6 +30,7 @@ internal object TabletPenDecoder {
             rawY = rawY,
             force = events[index + 3],
             tool = events[index + 4].toInt(),
+            contact = events[index + 5].toInt(),
         )
     }
 

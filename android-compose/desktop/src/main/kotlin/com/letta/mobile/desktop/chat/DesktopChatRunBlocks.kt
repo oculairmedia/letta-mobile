@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
@@ -109,7 +109,7 @@ internal fun ReasoningRow(text: String) {
             )
         }
         if (open) {
-            SelectionContainer {
+            LettaSelectionContainer {
                 Text(
                     text = text.trim(),
                     style = MaterialTheme.typography.bodySmall,

@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -106,7 +106,7 @@ private fun ToolOutputViewport(
 ) {
     val scrollScope = rememberCoroutineScope()
     Box {
-        SelectionContainer {
+        LettaSelectionContainer {
             Column(
                 modifier = Modifier
                     .toolOutputKeyboardScroll(horizontalScrollState) { destination ->
@@ -196,7 +196,7 @@ internal fun DiffBlock(text: String) {
         shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        SelectionContainer {
+        LettaSelectionContainer {
             Column(modifier = Modifier.padding(vertical = LettaDimens.Space.sm)) {
                 lines.take(200).forEach { line ->
                     DiffBlockRow(line = line, added = added, removed = removed)

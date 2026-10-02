@@ -281,6 +281,15 @@ sealed class Element {
          */
         val bend: Offset = Offset.Zero,
         /**
+         * The curve's handle at `points[0]`, as an offset from that point. With [endHandle]
+         * it makes the line/arrow a cubic bezier that leaves its start along this handle and
+         * arrives along [endHandle], so a connector meets both shapes square to their sides.
+         * Null for none; [bend] draws when either handle is missing. LINE/ARROW only.
+         */
+        val startHandle: Offset? = null,
+        /** The curve's handle at `points.last()`, as an offset from that point. See [startHandle]. */
+        val endHandle: Offset? = null,
+        /**
          * ID of the element this arrow's start endpoint is bound to. When set
          * and the bound element moves/resizes/rotates, the arrow's start point
          * follows. Only honored for [ShapeType.ARROW].

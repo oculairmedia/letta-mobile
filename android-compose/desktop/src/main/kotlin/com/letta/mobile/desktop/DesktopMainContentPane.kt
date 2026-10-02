@@ -152,6 +152,8 @@ private fun CanvasSidePane(session: CanvasSession, actions: DesktopMainContentAc
             assets = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.assets,
             onNavigateBack = actions.onCloseCanvas,
             onShareToChat = actions.onShareCanvasToChat,
+            // No right button on a finger: holding one on open board is how it picks several.
+            longPressDrawsSelectionBox = true,
             modifier = Modifier.fillMaxSize(),
         )
     }

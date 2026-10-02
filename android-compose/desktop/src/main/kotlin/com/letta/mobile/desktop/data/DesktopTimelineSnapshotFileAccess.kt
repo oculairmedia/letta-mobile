@@ -13,11 +13,30 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Store-specific steps that must run under the same scope lock as the snapshot replacement. */
+internal interface DesktopSnapshotWriteHooks {
+    /** May carry durable facts forward from [existing] into [candidate] before the revision check. */
+    fun prepare(existing: StoredTimelineEnvelope?, candidate: StoredTimelineEnvelope): StoredTimelineEnvelope =
+        candidate
+
+    /** Runs after [written] has replaced the snapshot. Must not throw. */
+    fun written(written: StoredTimelineEnvelope) = Unit
+
+    object None : DesktopSnapshotWriteHooks
+}
+
 /** Owns blocking snapshot file access, revision arbitration, and atomic replacement. */
 internal class DesktopTimelineSnapshotFileAccess(
     private val snapshotFile: (TimelineScope) -> Path,
+    private val hooks: DesktopSnapshotWriteHooks = DesktopSnapshotWriteHooks.None,
 ) {
-    private val scopeWriteLocks = ConcurrentHashMap<String, Any>()
+    private class ScopeLock
+
+    private val scopeWriteLocks = ConcurrentHashMap<String, ScopeLock>()
+
+    /** Serializes [block] with snapshot writes for the same scope. Blocking; call on an IO dispatcher. */
+    fun <T> withScopeLock(scope: TimelineScope, block: () -> T): T =
+        synchronized(scopeWriteLocks.computeIfAbsent(scope.storageKey) { ScopeLock() }) { block() }
 
     suspend fun read(scope: TimelineScope): StoredTimelineEnvelope? = withContext(Dispatchers.IO) {
         val startedAtMillis = timelineCurrentTimeMillis()
@@ -30,15 +49,14 @@ internal class DesktopTimelineSnapshotFileAccess(
         val scope = envelope.scope
         val file = snapshotFile(scope)
         val parent = requireNotNull(file.parent)
-        val scopeLock = scopeWriteLocks.computeIfAbsent(scope.storageKey) { Any() }
-
-        synchronized(scopeLock) {
+        withScopeLock(scope) {
             runCatching {
                 Files.createDirectories(parent)
-                val candidate = envelope.withWriteTimestamp()
-                ExistingSnapshot.from(file)
-                    .dispositionFor(candidate)
+                val existing = ExistingSnapshot.from(file)
+                val candidate = hooks.prepare(existing.envelope, envelope.withWriteTimestamp())
+                existing.dispositionFor(candidate)
                     .persist(file, scope)
+                    .also { written -> if (written) hooks.written(candidate) }
             }.getOrElse { error ->
                 Telemetry.error("DesktopTimelineStore", "writeSnapshot.failed", error, "scope" to scope.storageKey)
                 false
@@ -110,14 +128,18 @@ internal class DesktopTimelineSnapshotFileAccess(
     }
 
     private sealed interface ExistingSnapshot {
+        val envelope: StoredTimelineEnvelope?
+
         fun dispositionFor(candidate: StoredTimelineEnvelope): SnapshotWriteDisposition
 
         data object Replaceable : ExistingSnapshot {
+            override val envelope: StoredTimelineEnvelope? = null
+
             override fun dispositionFor(candidate: StoredTimelineEnvelope): SnapshotWriteDisposition =
                 SnapshotWriteDisposition.Persist(candidate)
         }
 
-        data class Current(private val envelope: StoredTimelineEnvelope) : ExistingSnapshot {
+        data class Current(override val envelope: StoredTimelineEnvelope) : ExistingSnapshot {
             override fun dispositionFor(candidate: StoredTimelineEnvelope): SnapshotWriteDisposition =
                 if (envelope.revision >= candidate.revision) {
                     SnapshotWriteDisposition.Stale(candidate, envelope)
