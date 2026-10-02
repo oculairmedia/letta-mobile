@@ -33,6 +33,14 @@ class ArchitectureGraphPlugin : Plugin<Project> {
             contractDirectory.convention(project.layout.buildDirectory.dir("reports/architecture/contract"))
         }
 
+        project.tasks.register("checkArchitectureBoundaries", ArchitectureBoundaryCheckTask::class.java) {
+            group = "verification"
+            description = "Fails on module-boundary violations in the exported graph that the baseline does not name."
+            graphFile.set(exportTask.flatMap { it.outputFile })
+            baselineFile.convention(project.layout.projectDirectory.file("architecture-tests/boundary-baseline.txt"))
+            reportFile.convention(project.layout.buildDirectory.file("reports/architecture/boundaries.txt"))
+        }
+
         project.gradle.projectsEvaluated {
             exportTask.configure {
                 records.set(collectRecords(project, androidVariants))
@@ -95,40 +103,51 @@ private class ArchitectureRecordCollector(
         }
     }
 
+    // Project edges come from EVERY configuration: the boundary gate must see an
+    // edge into :app however it is declared (kapt, lintChecks, kover, a custom
+    // configuration). External dependencies stay limited to architecture
+    // configurations to keep the graph readable.
     private fun dependencyRecords(project: Project): List<String> = buildList {
         project.configurations.sortedBy { it.name }
-            .filter { it.dependencies.isNotEmpty() && isArchitectureConfiguration(it.name) }
+            .filter { it.dependencies.isNotEmpty() }
             .forEach { configuration ->
+                val architectural = isArchitectureConfiguration(configuration.name)
                 configuration.dependencies
                     .sortedWith(compareBy({ it.group.orEmpty() }, { it.name }, { it.version.orEmpty() }))
                     .forEach { dependency ->
-                        when (dependency) {
-                            is ProjectDependency -> add(
-                                JsonLine.record(
-                                    "projectEdge",
-                                    "from" to project.path,
-                                    "to" to dependency.path,
-                                    "configuration" to configuration.name,
-                                ),
-                            )
-                            is ExternalModuleDependency -> add(
-                                JsonLine.record(
-                                    "externalDependency",
-                                    "module" to project.path,
-                                    "configuration" to configuration.name,
-                                    "group" to dependency.group,
-                                    "name" to dependency.name,
-                                    "version" to dependency.version,
-                                ),
-                            )
+                        when {
+                            // AGP adds every module to its own test classpaths; a self edge is not a module edge.
+                            dependency is ProjectDependency && dependency.path == project.path -> Unit
+                            dependency is ProjectDependency -> add(projectEdge(project, dependency, configuration.name))
+                            dependency is ExternalModuleDependency && architectural ->
+                                add(externalDependency(project, dependency, configuration.name))
                         }
                     }
             }
     }
 
+    private fun projectEdge(project: Project, dependency: ProjectDependency, configuration: String): String =
+        JsonLine.record(
+            "projectEdge",
+            "from" to project.path,
+            "to" to dependency.path,
+            "configuration" to configuration,
+        )
+
+    private fun externalDependency(project: Project, dependency: ExternalModuleDependency, configuration: String): String =
+        JsonLine.record(
+            "externalDependency",
+            "module" to project.path,
+            "configuration" to configuration,
+            "group" to dependency.group,
+            "name" to dependency.name,
+            "version" to dependency.version,
+        )
+
     private fun projectKind(project: Project): String = when {
         project.pluginManager.hasPlugin("com.android.application") -> "android-application"
         project.pluginManager.hasPlugin("com.android.library") -> "android-library"
+        project.pluginManager.hasPlugin("com.android.test") -> "android-test"
         project.pluginManager.hasPlugin("com.android.kotlin.multiplatform.library") -> "android-kmp-library"
         project.pluginManager.hasPlugin("org.jetbrains.kotlin.multiplatform") -> "kotlin-multiplatform"
         project.pluginManager.hasPlugin("org.jetbrains.kotlin.jvm") -> "kotlin-jvm"
