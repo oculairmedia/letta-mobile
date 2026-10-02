@@ -42,7 +42,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 data class ModelPickerActions(
     val onSelect: (ModelPickerEntry) -> Unit,
     val onQueryChange: (String) -> Unit,
-    val onToggleGroup: (key: String) -> Unit,
+    val onToggleGroup: (ModelPickerGroup) -> Unit,
     val onRefresh: () -> Unit,
     /** Opens the Models sheet; null hides "Edit Models…" (a backend without exposure). */
     val onEditModels: (() -> Unit)?,
@@ -99,7 +99,7 @@ fun ColumnScope.ModelPickerContent(
         ModelSearchField(
             query = state.query,
             onQueryChange = actions.onQueryChange,
-            testTag = ModelPickerTags.SEARCH,
+            fieldModifier = Modifier.testTag(ModelPickerTags.SEARCH),
             autoFocus = autoFocusSearch,
         )
         val visible = state.visible
@@ -141,7 +141,7 @@ private fun LazyListScope.pickerEmptyState(state: ModelPickerState, visible: Lis
 }
 
 private fun LazyListScope.pickerGroup(group: ModelPickerGroup, collapsed: Boolean, actions: ModelPickerActions) {
-    item("group-${group.key}") { GroupHeader(group, collapsed, onToggle = { actions.onToggleGroup(group.key) }) }
+    item("group-${group.key}") { GroupHeader(group, collapsed, onToggle = { actions.onToggleGroup(group) }) }
     if (collapsed) return
     // Live catalogs can repeat a handle AND an id; the index keeps every key unique.
     itemsIndexed(group.entries, key = { index, entry -> "row-${group.key}-$index-${entry.value}" }) { _, entry ->

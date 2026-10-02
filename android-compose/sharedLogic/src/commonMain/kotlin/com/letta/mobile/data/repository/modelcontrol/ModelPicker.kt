@@ -104,6 +104,18 @@ object ModelPickerCatalog {
         displayName.contains(needle, ignoreCase = true) || handle.value.contains(needle, ignoreCase = true)
 }
 
+/** How a picker load reads the host. */
+enum class ModelLoad {
+    /** The host may answer from its availability cache (opening an empty picker). */
+    CACHED,
+
+    /** The host re-queries every provider ("Refresh Models": `model.list {force: true}`). */
+    REQUERY,
+    ;
+
+    val force: Boolean get() = this == REQUERY
+}
+
 /** What the picker lists and how it re-reads the host. */
 interface ModelPickerSource {
     val providers: Flow<List<ConnectableProvider>>
@@ -112,43 +124,24 @@ interface ModelPickerSource {
     /** True while exposure can be edited from the picker ("Edit Models…"). */
     val canEditModels: Flow<Boolean>
 
-    /** Re-reads the catalog; [force] asks the host to re-query its providers. */
-    suspend fun load(force: Boolean)
+    suspend fun load(mode: ModelLoad)
 
     companion object {
         /**
          * The App Server catalog with exposure: hidden models stay out of the
          * picker, a toggle in the Models sheet shows up here at once (same
-         * repository), and a forced load is `model.list {force: true}`, which
-         * bypasses the host's availability cache and re-fetches every provider.
+         * repository), and [ModelLoad.REQUERY] is `model.list {force: true}`,
+         * which bypasses the host's availability cache and re-fetches every
+         * provider.
          */
         fun catalog(providers: ProviderConnectionRepository, catalog: ModelCatalogRepository): ModelPickerSource =
-            object : ModelPickerSource {
-                override val providers: Flow<List<ConnectableProvider>> = providers.providers
-                override val models: Flow<List<CatalogModel>> = catalog.models
-                override val canEditModels: Flow<Boolean> = flowOf(true)
-
-                /** Provider rows only name the groups, so a failed `provider.list` does not fail the load. */
-                override suspend fun load(force: Boolean) = coroutineScope {
-                    launch {
-                        try {
-                            providers.refresh()
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (_: Exception) {
-                            // Groups fall back to their route keys.
-                        }
-                    }
-                    launch { catalog.refresh(force) }
-                    Unit
-                }
-            }
+            CatalogPickerSource(providers, catalog)
 
         /**
          * A backend without the admin catalog (no exposure, no provider rows):
          * every model is listed and grouped by its route prefix.
          */
-        fun of(models: Flow<List<LlmModel>>, reload: suspend (force: Boolean) -> Unit): ModelPickerSource =
+        fun of(models: Flow<List<LlmModel>>, reload: suspend (ModelLoad) -> Unit): ModelPickerSource =
             object : ModelPickerSource {
                 override val providers: Flow<List<ConnectableProvider>> = flowOf(emptyList())
                 override val models: Flow<List<CatalogModel>> = models.map { list ->
@@ -156,7 +149,7 @@ interface ModelPickerSource {
                 }
                 override val canEditModels: Flow<Boolean> = flowOf(false)
 
-                override suspend fun load(force: Boolean) = reload(force)
+                override suspend fun load(mode: ModelLoad) = reload(mode)
             }
 
         /**
@@ -166,28 +159,53 @@ interface ModelPickerSource {
          * Models…". A primary that answers again takes over again.
          */
         fun withFallback(primary: ModelPickerSource, fallback: ModelPickerSource): ModelPickerSource =
-            object : ModelPickerSource {
-                private val primaryWorks = MutableStateFlow(true)
-                override val providers: Flow<List<ConnectableProvider>> =
-                    combine(primaryWorks, primary.providers, fallback.providers) { ok, p, f -> if (ok) p else f }
-                override val models: Flow<List<CatalogModel>> =
-                    combine(primaryWorks, primary.models, fallback.models) { ok, p, f -> if (ok) p else f }
-                override val canEditModels: Flow<Boolean> =
-                    combine(primaryWorks, primary.canEditModels) { ok, editable -> ok && editable }
-
-                override suspend fun load(force: Boolean) {
-                    try {
-                        primary.load(force)
-                        primaryWorks.value = true
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        primaryWorks.value = false
-                        fallback.load(force)
-                    }
-                }
-            }
+            FallbackPickerSource(primary, fallback)
     }
+}
+
+private class CatalogPickerSource(
+    private val providerRepository: ProviderConnectionRepository,
+    private val catalog: ModelCatalogRepository,
+) : ModelPickerSource {
+    override val providers: Flow<List<ConnectableProvider>> = providerRepository.providers
+    override val models: Flow<List<CatalogModel>> = catalog.models
+    override val canEditModels: Flow<Boolean> = flowOf(true)
+
+    /** Provider rows only name the groups, so a failed `provider.list` does not fail the load. */
+    override suspend fun load(mode: ModelLoad) = coroutineScope {
+        launch { attempt { providerRepository.refresh() } }
+        launch { catalog.refresh(mode.force) }
+        Unit
+    }
+}
+
+private class FallbackPickerSource(
+    private val primary: ModelPickerSource,
+    private val fallback: ModelPickerSource,
+) : ModelPickerSource {
+    private val primaryWorks = MutableStateFlow(true)
+    override val providers: Flow<List<ConnectableProvider>> = preferPrimary(primary.providers, fallback.providers)
+    override val models: Flow<List<CatalogModel>> = preferPrimary(primary.models, fallback.models)
+    override val canEditModels: Flow<Boolean> =
+        combine(primaryWorks, primary.canEditModels) { works, editable -> works && editable }
+
+    override suspend fun load(mode: ModelLoad) {
+        primaryWorks.value = attempt { primary.load(mode) }
+        if (!primaryWorks.value) fallback.load(mode)
+    }
+
+    private fun <T> preferPrimary(fromPrimary: Flow<T>, fromFallback: Flow<T>): Flow<T> =
+        combine(primaryWorks, fromPrimary, fromFallback) { works, p, f -> if (works) p else f }
+}
+
+/** Runs [block]; false when it failed (cancellation still propagates). */
+private suspend fun attempt(block: suspend () -> Unit): Boolean = try {
+    block()
+    true
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    false
 }
 
 /** Screen state of the model picker. */
@@ -204,6 +222,12 @@ data class ModelPickerState(
     val canEditModels: Boolean = false,
 ) {
     val searching: Boolean get() = query.isNotBlank()
+
+    /** A load of either kind is running. */
+    val busy: Boolean get() = loading || refreshing
+
+    /** Opening on an empty catalog with nothing in flight. */
+    val needsFirstLoad: Boolean get() = groups.isEmpty() && !busy
 
     val visible: List<ModelPickerGroup> get() = ModelPickerCatalog.filter(groups, query)
 
@@ -243,46 +267,46 @@ class ModelPickerController(
 
     fun setQuery(query: String) = _state.update { it.copy(query = query) }
 
-    fun toggleGroup(key: String) = _state.update {
+    fun toggleGroup(group: ModelPickerGroup) = _state.update {
+        val key = group.key
         it.copy(collapsed = if (key in it.collapsed) it.collapsed - key else it.collapsed + key)
     }
 
     /** Loads the catalog when the picker opens on an empty one; a no-op otherwise. */
     fun ensureLoaded() {
-        val current = _state.value
-        if (current.groups.isNotEmpty() || current.loading || current.refreshing) return
-        _state.update { it.copy(loading = true, error = null) }
-        scope.launch {
-            try {
-                source.load(force = false)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _state.update { it.copy(error = failure("Couldn't load models", e)) }
-            } finally {
-                _state.update { it.copy(loading = false) }
-            }
-        }
+        if (_state.value.needsFirstLoad) load(ModelLoad.CACHED)
     }
 
     /** "Refresh Models": re-queries the host's providers; the old list stays until the new one lands. */
     fun refresh() {
-        if (_state.value.refreshing) return
-        _state.update { it.copy(refreshing = true, error = null) }
-        scope.launch {
-            try {
-                source.load(force = true)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _state.update { it.copy(error = failure("Couldn't refresh models", e)) }
-            } finally {
-                _state.update { it.copy(refreshing = false) }
-            }
-        }
+        if (!_state.value.refreshing) load(ModelLoad.REQUERY)
     }
 
     fun clearError() = _state.update { it.copy(error = null) }
 
-    private fun failure(prefix: String, e: Exception): String = "$prefix: ${e.message ?: e::class.simpleName}"
+    private fun load(mode: ModelLoad) {
+        _state.update { it.marked(mode, running = true).copy(error = null) }
+        scope.launch {
+            try {
+                source.load(mode)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = "${mode.failure}: ${e.message ?: e::class.simpleName}") }
+            } finally {
+                _state.update { it.marked(mode, running = false) }
+            }
+        }
+    }
+
+    private fun ModelPickerState.marked(mode: ModelLoad, running: Boolean): ModelPickerState = when (mode) {
+        ModelLoad.CACHED -> copy(loading = running)
+        ModelLoad.REQUERY -> copy(refreshing = running)
+    }
+
+    private val ModelLoad.failure: String
+        get() = when (this) {
+            ModelLoad.CACHED -> "Couldn't load models"
+            ModelLoad.REQUERY -> "Couldn't refresh models"
+        }
 }

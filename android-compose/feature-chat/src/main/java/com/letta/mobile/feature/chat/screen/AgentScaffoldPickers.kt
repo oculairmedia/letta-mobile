@@ -1,17 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
-import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
-import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
-import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
-import com.letta.mobile.ui.modelcontrol.ModelControlModal
-import com.letta.mobile.ui.modelcontrol.ModelControlPresentation
-import com.letta.mobile.ui.modelcontrol.ModelPickerActions
-import com.letta.mobile.ui.modelcontrol.ModelPickerContent
-import com.letta.mobile.ui.modelcontrol.ModelsEditActions
-import com.letta.mobile.ui.modelcontrol.ModelsEditContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
@@ -81,8 +68,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.LettaCardDefaults
@@ -741,84 +726,6 @@ internal fun ModelInfoCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-    }
-}
-
-/**
- * The composer's model picker on Android (letta-mobile-w4q4p.6.1): the shared
- * [ModelPickerContent] in a bottom sheet — "Search models", exposed models
- * under collapsible provider headers with their reasoning tier, the current
- * one marked, and "Refresh Models" / "Edit Models…". On an Iroh host
- * [catalogSource] is the App Server catalog (exposure, provider names,
- * re-query on refresh); otherwise, or when the host does not answer it, the
- * picker lists [models] as before. A pick goes to [onModelSelected] with the
- * model's handle, which keeps the per-conversation switch semantics.
- */
-@Composable
-internal fun ModelPickerSheet(
-    models: List<LlmModel>,
-    currentModel: String?,
-    onDismiss: () -> Unit,
-    onModelSelected: (String) -> Unit,
-    onRefresh: () -> Unit,
-    catalogSource: ModelPickerSource? = null,
-    onEditModels: (() -> Unit)? = null,
-) {
-    val reasoning = LocalModelPickerReasoning.current
-    val latestModels = rememberUpdatedState(models)
-    val latestRefresh = rememberUpdatedState(onRefresh)
-    val scope = rememberCoroutineScope()
-    val controller = remember(catalogSource) {
-        val fallback = ModelPickerSource.of(snapshotFlow { latestModels.value }) { latestRefresh.value() }
-        ModelPickerController(scope, catalogSource?.let { ModelPickerSource.withFallback(it, fallback) } ?: fallback)
-    }
-    LaunchedEffect(controller, currentModel) { controller.setSelected(currentModel) }
-    LaunchedEffect(controller) { controller.ensureLoaded() }
-    val state by controller.state.collectAsState()
-    var picked by remember { mutableStateOf(false) }
-    val actions = remember(controller, onEditModels) {
-        ModelPickerActions.bind(
-            controller = controller,
-            onSelect = { entry ->
-                if (!picked) {
-                    picked = true
-                    if (!entry.selected) onModelSelected(entry.handle.value)
-                    onDismiss()
-                }
-            },
-            onEditModels = onEditModels,
-            onEffortSelected = { entry, effort ->
-                if (!picked) {
-                    picked = true
-                    reasoning.onEffortSelected(entry.handle.value, effort)
-                }
-            },
-        )
-    }
-    ModelControlModal(ModelControlPresentation.Sheet, onDismiss = onDismiss) {
-        ModelPickerContent(
-            state = state,
-            actions = actions,
-            modifier = Modifier.testTag(AgentScaffoldTestTags.MODEL_PICKER_SHEET),
-        )
-    }
-}
-
-/**
- * "Models" (letta-mobile-w4q4p.6.1): show or hide each model of the host in
- * the picker. "Add provider…" opens the Providers screen.
- */
-@Composable
-internal fun ModelsEditSheet(
-    controller: ProviderManagementController,
-    onDismiss: () -> Unit,
-    onAddProvider: (() -> Unit)?,
-) {
-    LaunchedEffect(controller) { if (controller.state.value.sections.isEmpty()) controller.refresh() }
-    val state by controller.state.collectAsState()
-    val actions = remember(controller, onAddProvider) { ModelsEditActions.bind(controller, onClose = onDismiss, onAddProvider = onAddProvider) }
-    ModelControlModal(ModelControlPresentation.Sheet, onDismiss = onDismiss) {
-        ModelsEditContent(state = state, actions = actions)
     }
 }
 

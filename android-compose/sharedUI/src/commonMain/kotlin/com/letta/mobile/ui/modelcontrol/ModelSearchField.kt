@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.ui.icons.LettaIcons
@@ -28,15 +27,15 @@ import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * The borderless "Search models" row at the top of the picker and the Models
- * sheet, with a hairline under it. [autoFocus] puts the caret in it on open
+ * sheet, with a hairline under it. [fieldModifier] goes on the text field
+ * itself (tags, semantics); [autoFocus] puts the caret in it on open
  * (desktop), so typing filters at once.
  */
 @Composable
 internal fun ModelSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
-    testTag: String,
-    modifier: Modifier = Modifier,
+    fieldModifier: Modifier = Modifier,
     autoFocus: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -44,7 +43,7 @@ internal fun ModelSearchField(
         LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     }
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
@@ -61,11 +60,10 @@ internal fun ModelSearchField(
             singleLine = true,
             textStyle = textStyle,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            modifier = Modifier
+            modifier = fieldModifier
                 .weight(1f)
                 .focusRequester(focusRequester)
-                .semantics { contentDescription = ModelControlStrings.SEARCH_MODELS }
-                .testTag(testTag),
+                .semantics { contentDescription = ModelControlStrings.SEARCH_MODELS },
             decorationBox = { inner ->
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) {

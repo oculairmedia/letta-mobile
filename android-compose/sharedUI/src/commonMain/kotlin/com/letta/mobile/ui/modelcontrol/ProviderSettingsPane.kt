@@ -23,6 +23,10 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -91,34 +95,47 @@ object ProviderSettingsTags {
 fun ProviderSettingsPane(
     state: ProviderManagementState,
     actions: ProviderSettingsActions,
-    page: ProviderSettingsPage,
-    onPageChange: (ProviderSettingsPage) -> Unit,
     modifier: Modifier = Modifier,
+    initialPage: ProviderSettingsPage = ProviderSettingsPage.ACCOUNTS,
 ) {
+    var page by rememberSaveable { mutableStateOf(initialPage) }
+    val context = ProviderPageContext(state, actions, onPageChange = { page = it })
     BoxWithConstraints(modifier = modifier.fillMaxSize().testTag(ProviderSettingsTags.PANE)) {
         if (maxWidth >= LettaDimens.Pane.wideBreakpoint) {
             Row(modifier = Modifier.fillMaxSize()) {
-                SettingsNav(page, onPageChange, modifier = Modifier.width(LettaDimens.Pane.navWidth).fillMaxHeight())
+                SettingsNav(page, context.onPageChange, modifier = Modifier.width(LettaDimens.Pane.navWidth).fillMaxHeight())
                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                PageColumn(state, actions, page, onPageChange, modifier = Modifier.weight(1f))
+                PageColumn(context, page, modifier = Modifier.weight(1f))
             }
         } else {
             Column(modifier = Modifier.fillMaxSize()) {
-                PrimaryScrollableTabRow(selectedTabIndex = page.ordinal, edgePadding = LettaDimens.Space.lg) {
-                    ProviderSettingsPage.entries.forEach { entry ->
-                        Tab(
-                            selected = entry == page,
-                            onClick = { onPageChange(entry) },
-                            text = { Text(entry.label) },
-                            modifier = Modifier.testTag("${ProviderSettingsTags.NAV_PREFIX}${entry.name.lowercase()}"),
-                        )
-                    }
-                }
-                PageColumn(state, actions, page, onPageChange, modifier = Modifier.weight(1f))
+                SettingsTabs(page, context.onPageChange)
+                PageColumn(context, page, modifier = Modifier.weight(1f))
             }
         }
     }
     PaneDialogs(state, actions, page)
+}
+
+/** What every settings page reads and does: the pane's state, its actions, and page navigation. */
+internal class ProviderPageContext(
+    val state: ProviderManagementState,
+    val actions: ProviderSettingsActions,
+    val onPageChange: (ProviderSettingsPage) -> Unit,
+)
+
+@Composable
+private fun SettingsTabs(page: ProviderSettingsPage, onPageChange: (ProviderSettingsPage) -> Unit) {
+    PrimaryScrollableTabRow(selectedTabIndex = page.ordinal, edgePadding = LettaDimens.Space.lg) {
+        ProviderSettingsPage.entries.forEach { entry ->
+            Tab(
+                selected = entry == page,
+                onClick = { onPageChange(entry) },
+                text = { Text(entry.label) },
+                modifier = Modifier.testTag("${ProviderSettingsTags.NAV_PREFIX}${entry.name.lowercase()}"),
+            )
+        }
+    }
 }
 
 @Composable
@@ -132,53 +149,60 @@ private fun SettingsNav(page: ProviderSettingsPage, onPageChange: (ProviderSetti
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm).semantics { heading() },
         )
-        ProviderSettingsPage.entries.forEach { entry ->
-            val selected = entry == page
-            Surface(
-                color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(selected = selected, role = Role.Tab, onClick = { onPageChange(entry) })
-                    .testTag("${ProviderSettingsTags.NAV_PREFIX}${entry.name.lowercase()}"),
-            ) {
-                Text(
-                    text = entry.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
-                )
-            }
-        }
+        ProviderSettingsPage.entries.forEach { entry -> NavEntry(entry, selected = entry == page, onClick = { onPageChange(entry) }) }
     }
 }
 
 @Composable
-private fun PageColumn(
-    state: ProviderManagementState,
-    actions: ProviderSettingsActions,
-    page: ProviderSettingsPage,
-    onPageChange: (ProviderSettingsPage) -> Unit,
-    modifier: Modifier,
-) {
+private fun NavEntry(entry: ProviderSettingsPage, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .testTag("${ProviderSettingsTags.NAV_PREFIX}${entry.name.lowercase()}"),
+    ) {
+        Text(
+            text = entry.label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+        )
+    }
+}
+
+@Composable
+private fun PageColumn(context: ProviderPageContext, page: ProviderSettingsPage, modifier: Modifier) {
     Column(modifier = modifier.fillMaxHeight()) {
         if (page == ProviderSettingsPage.MODELS) {
             // The full Providers & Models pane already has its own toolbar, progress and dialogs.
-            ProviderManagementPane(state = state, actions = actions.management)
-            return@Column
+            ProviderManagementPane(state = context.state, actions = context.actions.management)
+        } else {
+            PageHeader(page, context.state, context.actions.management.onRefresh)
+            PageStatus(context.state)
+            PageBody(context, page)
         }
-        PageHeader(page, state, actions.management.onRefresh)
-        if (state.loading || state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        if (state.signIn == null) ModelControlNotice(error = state.error.takeIf { state.form == null }, message = state.message)
-        val lists = state.settingsLists
-        // widthIn before fillMaxSize: the cap has to narrow the constraints before they are filled.
-        val pageModifier = Modifier.widthIn(max = LettaDimens.Pane.contentMaxWidth).fillMaxSize()
-        when (page) {
-            ProviderSettingsPage.ACCOUNTS -> AccountsPage(lists, state, actions, onPageChange, pageModifier)
-            ProviderSettingsPage.API_KEYS -> CredentialsPage(CredentialsKind.API_KEYS, lists.apiKeys, state, actions, pageModifier)
-            ProviderSettingsPage.ENDPOINTS -> CredentialsPage(CredentialsKind.ENDPOINTS, lists.endpoints, state, actions, pageModifier)
-            ProviderSettingsPage.MODELS -> Unit
-        }
+    }
+}
+
+/** Progress, then the last outcome; the sign-in dialog and an open form show their own. */
+@Composable
+private fun PageStatus(state: ProviderManagementState) {
+    if (state.loading || state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    if (state.signIn == null) ModelControlNotice(error = state.error.takeIf { state.form == null }, message = state.message)
+}
+
+@Composable
+private fun PageBody(context: ProviderPageContext, page: ProviderSettingsPage) {
+    val lists = context.state.settingsLists
+    // widthIn before fillMaxSize: the cap has to narrow the constraints before they are filled.
+    val pageModifier = Modifier.widthIn(max = LettaDimens.Pane.contentMaxWidth).fillMaxSize()
+    when (page) {
+        ProviderSettingsPage.ACCOUNTS -> AccountsPage(lists, context, pageModifier)
+        ProviderSettingsPage.API_KEYS -> CredentialsPage(CredentialsKind.API_KEYS, lists.apiKeys, context, pageModifier)
+        ProviderSettingsPage.ENDPOINTS -> CredentialsPage(CredentialsKind.ENDPOINTS, lists.endpoints, context, pageModifier)
+        ProviderSettingsPage.MODELS -> Unit
     }
 }
 

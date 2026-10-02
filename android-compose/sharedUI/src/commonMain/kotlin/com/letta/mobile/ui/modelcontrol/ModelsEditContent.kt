@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.HorizontalDivider
@@ -80,67 +81,86 @@ fun ColumnScope.ModelsEditContent(
     autoFocusSearch: Boolean = false,
 ) {
     Column(modifier = modifier.weight(1f, fill = false).testTag(ModelsEditTags.SHEET)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.xs, top = LettaDimens.Space.xs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = ModelControlStrings.MODELS_TITLE,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f).semantics { heading() },
-            )
-            IconButton(onClick = actions.onClose, modifier = Modifier.testTag(ModelsEditTags.CLOSE)) {
-                Icon(LettaIcons.Close, contentDescription = ModelControlStrings.CLOSE)
-            }
-        }
+        TitleBar(onClose = actions.onClose)
         ModelSearchField(
             query = state.query,
             onQueryChange = actions.onQueryChange,
-            testTag = ModelsEditTags.SEARCH,
+            fieldModifier = Modifier.testTag(ModelsEditTags.SEARCH),
             autoFocus = autoFocusSearch,
         )
         if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         ModelControlNotice(error = state.error, message = null)
-        val sections = state.visible.filter { it.rows.isNotEmpty() }
         LazyColumn(modifier = Modifier.weight(1f, fill = false).fillMaxWidth()) {
-            if (sections.isEmpty() && !state.loading) {
-                item("empty") {
-                    Text(
-                        text = if (state.searching) ModelControlStrings.noMatch(state.query.trim()) else ModelControlStrings.NO_PROVIDER_MODELS,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(LettaDimens.Space.xl),
-                    )
-                }
-            }
-            sections.forEach { visible ->
-                val section = visible.section
-                item("section-${section.key}") {
-                    ProviderCapsTitle(
-                        title = section.displayName,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .semantics { heading() }
-                            .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs)
-                            .testTag("${ModelsEditTags.SECTION_PREFIX}${section.key}"),
-                    )
-                }
-                itemsIndexed(visible.rows, key = { index, row -> "row-${section.key}-$index-${row.handle.value}" }) { _, row ->
-                    ExposureRow(row, actions.onExposedChange)
-                }
-            }
+            exposureSections(state, actions.onExposedChange)
         }
-        actions.onAddProvider?.let { onAdd ->
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            TextButton(
-                onClick = onAdd,
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs).testTag(ModelsEditTags.ADD_PROVIDER),
-            ) {
-                Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
-                Spacer(Modifier.size(LettaDimens.Space.sm))
-                Text(ModelControlStrings.ADD_PROVIDER)
-            }
+        actions.onAddProvider?.let { AddProviderFooter(it) }
+    }
+}
+
+@Composable
+private fun TitleBar(onClose: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.xs, top = LettaDimens.Space.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = ModelControlStrings.MODELS_TITLE,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        IconButton(onClick = onClose, modifier = Modifier.testTag(ModelsEditTags.CLOSE)) {
+            Icon(LettaIcons.Close, contentDescription = ModelControlStrings.CLOSE)
         }
+    }
+}
+
+/** Each provider with models: its caps heading, then a switch row per model. */
+private fun LazyListScope.exposureSections(state: ProviderManagementState, onExposedChange: (ExposureChange) -> Unit) {
+    val sections = state.visible.filter { it.rows.isNotEmpty() }
+    if (sections.isEmpty() && !state.loading) {
+        item("empty") { EmptyHint(if (state.searching) ModelControlStrings.noMatch(state.query.trim()) else ModelControlStrings.NO_PROVIDER_MODELS) }
+    }
+    sections.forEach { visible ->
+        val section = visible.section
+        item("section-${section.key}") { SectionHeading(section.key, section.displayName) }
+        itemsIndexed(visible.rows, key = { index, row -> "row-${section.key}-$index-${row.handle.value}" }) { _, row ->
+            ExposureRow(row, onExposedChange)
+        }
+    }
+}
+
+@Composable
+private fun EmptyHint(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(LettaDimens.Space.xl),
+    )
+}
+
+@Composable
+private fun SectionHeading(key: String, title: String) {
+    ProviderCapsTitle(
+        title = title,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { heading() }
+            .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs)
+            .testTag("${ModelsEditTags.SECTION_PREFIX}$key"),
+    )
+}
+
+@Composable
+private fun AddProviderFooter(onAdd: () -> Unit) {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    TextButton(
+        onClick = onAdd,
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs).testTag(ModelsEditTags.ADD_PROVIDER),
+    ) {
+        Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+        Spacer(Modifier.size(LettaDimens.Space.sm))
+        Text(ModelControlStrings.ADD_PROVIDER)
     }
 }
 

@@ -34,6 +34,7 @@ import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ExposureChange
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerGroup
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import kotlin.test.Test
@@ -51,7 +52,7 @@ class ModelControlUiTest {
         selected: MutableList<ModelPickerEntry> = mutableListOf(),
         refreshes: MutableList<Unit> = mutableListOf(),
         edits: MutableList<Unit> = mutableListOf(),
-        toggles: MutableList<String> = mutableListOf(),
+        toggles: MutableList<ModelPickerGroup> = mutableListOf(),
     ) = ModelPickerActions(
         onSelect = { selected += it },
         onQueryChange = {},
@@ -77,7 +78,7 @@ class ModelControlUiTest {
 
     @Test
     fun aRunningRefreshSpinsAndCannotBeStartedTwice() = runComposeUiTest {
-        setContent { Frame { Column { ModelPickerContent(ModelControlUiFixtures.pickerState(refreshing = true), pickerActions()) } } }
+        setContent { Frame { Column { ModelPickerContent(ModelControlUiFixtures.pickerState().copy(refreshing = true), pickerActions()) } } }
 
         onNodeWithTag(ModelPickerTags.REFRESH).assertIsNotEnabled()
         onNodeWithTag(ModelPickerTags.REFRESH_PROGRESS, useUnmergedTree = true).assertExists()
@@ -86,7 +87,7 @@ class ModelControlUiTest {
 
     @Test
     fun aFailedRefreshShowsItsError() = runComposeUiTest {
-        val state = ModelControlUiFixtures.pickerState(error = "Couldn't refresh models: upstream timed out")
+        val state = ModelControlUiFixtures.pickerState().copy(error = "Couldn't refresh models: upstream timed out")
         setContent { Frame { Column { ModelPickerContent(state, pickerActions()) } } }
 
         onNodeWithTag(ModelPickerTags.ERROR).assertIsDisplayed()
@@ -95,7 +96,7 @@ class ModelControlUiTest {
 
     @Test
     fun editModelsIsHiddenWhenTheHostHasNoExposure() = runComposeUiTest {
-        setContent { Frame { Column { ModelPickerContent(ModelControlUiFixtures.pickerState(canEditModels = false), pickerActions()) } } }
+        setContent { Frame { Column { ModelPickerContent(ModelControlUiFixtures.pickerState().copy(canEditModels = false), pickerActions()) } } }
 
         onNodeWithTag(ModelPickerTags.EDIT).assertDoesNotExist()
         onNodeWithTag(ModelPickerTags.REFRESH).assertIsDisplayed()
@@ -116,7 +117,7 @@ class ModelControlUiTest {
     @Test
     fun providerHeadersAreHeadingsThatFoldTheirGroup() = runComposeUiTest {
         var state by mutableStateOf(ModelControlUiFixtures.pickerState())
-        val actions = pickerActions().copy(onToggleGroup = { key -> state = state.copy(collapsed = state.collapsed + key) })
+        val actions = pickerActions().copy(onToggleGroup = { group -> state = state.copy(collapsed = state.collapsed + group.key) })
         setContent { Frame { Column { ModelPickerContent(state, actions) } } }
 
         onNodeWithTag("${ModelPickerTags.GROUP_PREFIX}minimax").assert(isHeading())
@@ -191,12 +192,7 @@ class ModelControlUiTest {
     @Test
     fun accountsListsAccountsToConnectTheConnectedOnesAndTheRest() = runComposeUiTest {
         val recorder = SettingsRecorder()
-        var page by mutableStateOf(ProviderSettingsPage.ACCOUNTS)
-        setContent {
-            Frame(height = 1400) {
-                ProviderSettingsPane(ModelControlUiFixtures.managementState(), recorder.actions, page, onPageChange = { page = it })
-            }
-        }
+        setContent { Frame(height = 1400) { ProviderSettingsPane(ModelControlUiFixtures.managementState(), recorder.actions) } }
 
         listOf(ModelControlStrings.CONNECT_ACCOUNT, ModelControlStrings.CONNECTED, ModelControlStrings.OTHER_PROVIDERS).forEach {
             onNode(hasText(it) and isHeading()).assertExists()
@@ -213,7 +209,8 @@ class ModelControlUiTest {
         assertEquals(1, recorder.refreshes.size)
 
         onNodeWithTag(ProviderSettingsTags.HAVE_KEY).performClick()
-        assertEquals(ProviderSettingsPage.API_KEYS, page)
+        onNode(hasText(ProviderSettingsPage.API_KEYS.label) and isHeading()).assertExists()
+        onNodeWithText(ModelControlStrings.API_KEYS_SUBTITLE).assertIsDisplayed()
     }
 
     @Test
@@ -223,7 +220,7 @@ class ModelControlUiTest {
         val state: ProviderManagementState = ModelControlUiFixtures.managementState().copy(
             form = ProviderConnectForm(anthropic).withValue("apiKey", "sk-ant-secret"),
         )
-        setContent { Frame { ProviderSettingsPane(state, recorder.actions, ProviderSettingsPage.API_KEYS, onPageChange = {}) } }
+        setContent { Frame { ProviderSettingsPane(state, recorder.actions, initialPage = ProviderSettingsPage.API_KEYS) } }
 
         onNodeWithTag(ProviderSettingsTags.INLINE_FORM).assertIsDisplayed()
         val field = onNodeWithTag("provider_field_apiKey")

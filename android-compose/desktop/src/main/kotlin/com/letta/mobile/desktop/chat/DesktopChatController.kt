@@ -678,11 +678,7 @@ class DesktopChatController(
         }
     }
 
-    /**
-     * Re-reads the chat's model list (letta-mobile-w4q4p.6.1) after the shared
-     * picker refreshed the host catalog or the Models sheet changed what is
-     * shown, so composer labels and model routing see the same models.
-     */
+    /** Re-reads the chat's model list after the host catalog changed (letta-mobile-w4q4p.6.1). */
     suspend fun reloadModelCatalog() {
         if (closed) return
         val extras = gatewayExtras ?: return
@@ -715,22 +711,11 @@ class DesktopChatController(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            rollbackConversationModel(conversationId, model, previousOverride, previousLabel)
+            val restored = conversationModels.rollback(conversationId, model, previousOverride)
+            if (restored && _state.value.selectedConversationId == conversationId) {
+                _state.update { it.copy(composerModelLabel = previousLabel) }
+            }
             _state.update { it.copy(errorMessage = t.message ?: "Could not change model") }
-        }
-    }
-
-    private fun rollbackConversationModel(
-        conversationId: String,
-        model: String,
-        previousOverride: String?,
-        previousLabel: String,
-    ) {
-        // An earlier failed request must not undo a newer pick.
-        if (conversationModels[conversationId] != model) return
-        conversationModels.record(conversationId, previousOverride)
-        if (_state.value.selectedConversationId == conversationId) {
-            _state.update { it.copy(composerModelLabel = previousLabel) }
         }
     }
 

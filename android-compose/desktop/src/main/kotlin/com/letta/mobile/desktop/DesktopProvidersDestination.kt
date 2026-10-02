@@ -4,14 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsActions
-import com.letta.mobile.ui.modelcontrol.ProviderSettingsPage
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsPane
 
 /**
@@ -28,6 +25,5 @@ internal fun ProvidersDestinationContent(session: ModelControlSession, modifier:
     LaunchedEffect(controller) { controller.refresh() }
     val state by controller.state.collectAsState()
     val actions = remember(controller) { ProviderSettingsActions.bind(controller) }
-    var page by remember { mutableStateOf(ProviderSettingsPage.ACCOUNTS) }
-    ProviderSettingsPane(state = state, actions = actions, page = page, onPageChange = { page = it }, modifier = modifier)
+    ProviderSettingsPane(state = state, actions = actions, modifier = modifier)
 }

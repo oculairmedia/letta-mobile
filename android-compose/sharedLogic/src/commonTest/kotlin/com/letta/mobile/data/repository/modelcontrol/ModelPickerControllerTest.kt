@@ -24,6 +24,8 @@ class ModelPickerControllerTest {
 
     private fun host(scope: CoroutineScope, invoker: RecordingInvoker = ProviderControlFixtures.invoker()) = Host(scope, invoker)
 
+    private fun ModelPickerController.group(key: String) = state.value.groups.single { it.key == key }
+
     @Test
     fun opensOnAnEmptyCatalogByLoadingItWithoutForcing() = runTest(UnconfinedTestDispatcher()) {
         val host = host(backgroundScope)
@@ -85,7 +87,7 @@ class ModelPickerControllerTest {
     fun aSearchMatchesNamesHandlesAndProviderTitlesAndUnfoldsGroups() = runTest(UnconfinedTestDispatcher()) {
         val host = host(backgroundScope)
         host.picker.ensureLoaded()
-        host.picker.toggleGroup("openai")
+        host.picker.toggleGroup(host.picker.group("openai"))
         assertTrue(host.picker.state.value.isCollapsed(host.picker.state.value.groups.single { it.key == "openai" }))
 
         host.picker.setQuery("sol")
@@ -107,9 +109,9 @@ class ModelPickerControllerTest {
         host.picker.ensureLoaded()
         val lmstudio = { host.picker.state.value.groups.single { it.key == "lmstudio" } }
 
-        host.picker.toggleGroup("lmstudio")
+        host.picker.toggleGroup(lmstudio())
         assertTrue(host.picker.state.value.isCollapsed(lmstudio()))
-        host.picker.toggleGroup("lmstudio")
+        host.picker.toggleGroup(lmstudio())
         assertFalse(host.picker.state.value.isCollapsed(lmstudio()))
     }
 
@@ -187,12 +189,12 @@ class ModelPickerControllerTest {
                 LlmModel(id = "openai/gpt", name = "GPT", handle = "openai/gpt", providerType = "openai"),
             ),
         )
-        val reloads = mutableListOf<Boolean>()
+        val reloads = mutableListOf<ModelLoad>()
         val picker = ModelPickerController(backgroundScope, ModelPickerSource.of(models) { reloads += it })
 
         picker.refresh()
 
-        assertEquals(listOf(true), reloads)
+        assertEquals(listOf(ModelLoad.REQUERY), reloads)
         assertFalse(picker.state.value.canEditModels)
         assertEquals(listOf("anthropic", "openai"), picker.state.value.groups.map { it.key }.sorted())
     }

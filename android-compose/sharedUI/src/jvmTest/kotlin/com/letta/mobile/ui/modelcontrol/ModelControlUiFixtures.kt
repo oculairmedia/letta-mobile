@@ -22,89 +22,71 @@ internal object ModelControlUiFixtures {
     private val optionalKey = apiKey.copy(required = false)
     private val baseUrl = ProviderField(key = "baseUrl", label = "Base URL", placeholder = "http://127.0.0.1:1234/v1", required = true)
 
-    private fun provider(
-        id: String,
-        name: String,
-        type: String,
-        description: String = "",
-        oauth: Boolean = false,
-        fields: List<ProviderField> = emptyList(),
-        connection: ProviderConnection? = null,
-        providerName: String = id,
-    ) = ConnectableProvider(
+    private fun provider(id: String, name: String, type: String) = ConnectableProvider(
         id = id,
         displayName = name,
-        description = description,
+        description = "",
         providerType = type,
-        providerName = providerName,
-        isOauth = oauth,
-        requiresApiKey = fields.any { it.required && it.secret },
-        authMethods = if (fields.isEmpty()) emptyList() else listOf(ProviderAuthMethod(id = null, label = "API key", fields = fields)),
-        connections = listOfNotNull(connection),
+        providerName = id,
+        isOauth = false,
+        requiresApiKey = false,
+        authMethods = emptyList(),
+        connections = emptyList(),
     )
+
+    private fun ConnectableProvider.subscription(alias: String) = copy(isOauth = true, providerName = alias)
+
+    private fun ConnectableProvider.taking(vararg fields: ProviderField) = copy(
+        requiresApiKey = fields.any { it.required && it.secret },
+        authMethods = listOf(ProviderAuthMethod(id = null, label = "API key", fields = fields.toList())),
+    )
+
+    private fun ConnectableProvider.connectedAs(connection: ProviderConnection) = copy(connections = listOf(connection))
 
     val providers: List<ConnectableProvider> = listOf(
-        provider(
-            id = "openai-codex-oauth", name = "OpenAI Codex", type = "chatgpt_oauth", oauth = true, providerName = "chatgpt-plus-pro",
-            description = "Connect a subscription account",
-            connection = ProviderConnection("chatgpt-plus-pro", "chatgpt_oauth", "oauth", null),
-        ),
-        provider(
-            id = "lmstudio", name = "LM Studio (local)", type = "lmstudio_openai", fields = listOf(baseUrl.copy(required = false), optionalKey),
-            description = "Connect LM Studio at http://127.0.0.1:1234/v1 or a remote URL",
-            connection = ProviderConnection("lc-lmstudio", "lmstudio", "api", "http://192.168.50.90:8082/v1"),
-        ),
-        provider(id = "anthropic-oauth", name = "Anthropic (Claude Pro/Max)", type = "anthropic", oauth = true, providerName = "anthropic"),
-        provider(id = "anthropic", name = "Anthropic", type = "anthropic", description = "Connect a Anthropic API key", fields = listOf(apiKey)),
-        provider(
-            id = "minimax", name = "MiniMax", type = "minimax", description = "Connect a MiniMax API key", fields = listOf(apiKey),
-            connection = ProviderConnection("minimax", "minimax", "api", null),
-        ),
-        provider(
-            id = "openai-compatible", name = "OpenAI-compatible API", type = "openai",
-            description = "Connect an OpenAI-compatible Chat Completions endpoint", fields = listOf(optionalKey, baseUrl),
-        ),
+        provider("openai-codex-oauth", "OpenAI Codex", "chatgpt_oauth")
+            .subscription("chatgpt-plus-pro")
+            .connectedAs(ProviderConnection("chatgpt-plus-pro", "chatgpt_oauth", "oauth", null)),
+        provider("lmstudio", "LM Studio (local)", "lmstudio_openai")
+            .taking(baseUrl.copy(required = false), optionalKey)
+            .connectedAs(ProviderConnection("lc-lmstudio", "lmstudio", "api", "https://lmstudio.lan.example/v1")),
+        provider("anthropic-oauth", "Anthropic (Claude Pro/Max)", "anthropic").subscription("anthropic"),
+        provider("anthropic", "Anthropic", "anthropic").taking(apiKey).copy(description = "Connect a Anthropic API key"),
+        provider("minimax", "MiniMax", "minimax")
+            .taking(apiKey)
+            .connectedAs(ProviderConnection("minimax", "minimax", "api", null)),
+        provider("openai-compatible", "OpenAI-compatible API", "openai")
+            .taking(optionalKey, baseUrl)
+            .copy(description = "Connect an OpenAI-compatible Chat Completions endpoint"),
     )
 
-    private fun model(handle: String, label: String, exposed: Boolean = true, effort: String? = null, efforts: List<String> = emptyList()) =
-        CatalogModel(
-            model = LlmModel(id = handle, name = label, handle = handle, displayNameOverride = label, providerType = handle.substringBefore('/')),
-            exposed = exposed,
-            reasoningEfforts = efforts,
-            reasoningEffort = effort,
-        )
+    private fun model(handle: String, label: String, effort: String? = null) = CatalogModel(
+        model = LlmModel(id = handle, name = label, handle = handle, displayNameOverride = label, providerType = handle.substringBefore('/')),
+        exposed = true,
+        reasoningEfforts = emptyList(),
+        reasoningEffort = effort,
+    )
+
+    private fun CatalogModel.hidden() = copy(exposed = false)
 
     val models: List<CatalogModel> = listOf(
         model("chatgpt-plus-pro/gpt-5.5", "GPT-5.5", effort = "medium"),
         model("chatgpt-plus-pro/gpt-5.5-codex", "GPT-5.5 Codex", effort = "high"),
-        model("chatgpt-plus-pro/gpt-5.5-mini", "GPT-5.5 Mini", exposed = false),
+        model("chatgpt-plus-pro/gpt-5.5-mini", "GPT-5.5 Mini").hidden(),
         model("minimax/minimax-m3", "MiniMax M3", effort = "medium"),
         model("minimax/minimax-m3-lightning", "MiniMax M3 Lightning"),
         model("lmstudio/qwen3-coder-30b", "qwen3-coder-30b"),
-        model("lmstudio/gemma-4-27b", "gemma-4-27b", exposed = false),
+        model("lmstudio/gemma-4-27b", "gemma-4-27b").hidden(),
         model("lmstudio/gpt-oss-120b", "gpt-oss-120b", effort = "low"),
     )
 
     const val SELECTED = "chatgpt-plus-pro/gpt-5.5"
 
-    fun pickerState(
-        selected: String? = SELECTED,
-        refreshing: Boolean = false,
-        error: String? = null,
-        canEditModels: Boolean = true,
-        collapsed: Set<String> = emptySet(),
-        query: String = "",
-    ) = ModelPickerState(
-        groups = ModelPickerCatalog.groups(providers, models, selected),
-        refreshing = refreshing,
-        error = error,
-        canEditModels = canEditModels,
-        collapsed = collapsed,
-        query = query,
+    /** The picker over the fixture host with [SELECTED] current; tests `copy` the rest. */
+    fun pickerState() = ModelPickerState(
+        groups = ModelPickerCatalog.groups(providers, models, SELECTED),
+        canEditModels = true,
     )
 
-    fun managementState(query: String = "") = ProviderManagementState(
-        sections = ProviderCatalogComposer.compose(providers, models),
-        query = query,
-    )
+    fun managementState() = ProviderManagementState(sections = ProviderCatalogComposer.compose(providers, models))
 }

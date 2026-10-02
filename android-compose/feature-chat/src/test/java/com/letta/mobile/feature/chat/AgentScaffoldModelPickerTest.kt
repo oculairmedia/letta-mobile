@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
 import com.letta.mobile.feature.chat.screen.ModelInfoCard
 import com.letta.mobile.feature.chat.screen.ModelPickerSheet
+import com.letta.mobile.feature.chat.screen.ModelPickerSheetCallbacks
 import com.letta.mobile.ui.modelcontrol.ModelPickerTags
 import com.letta.mobile.ui.theme.LettaTheme
 import org.junit.Assert.assertEquals
@@ -53,9 +54,7 @@ class AgentScaffoldModelPickerTest {
                 ModelPickerSheet(
                     models = models,
                     currentModel = "gpt-4",
-                    onDismiss = {},
-                    onModelSelected = { selectedModel = it },
-                    onRefresh = {},
+                    callbacks = ModelPickerSheetCallbacks(onDismiss = {}, onModelSelected = { selectedModel = it }, onRefresh = {}),
                 )
             }
         }
@@ -99,9 +98,7 @@ class AgentScaffoldModelPickerTest {
                 ModelPickerSheet(
                     models = models,
                     currentModel = "gpt-4",
-                    onDismiss = {},
-                    onModelSelected = { selectedModel = it },
-                    onRefresh = {},
+                    callbacks = ModelPickerSheetCallbacks(onDismiss = {}, onModelSelected = { selectedModel = it }, onRefresh = {}),
                 )
             }
         }

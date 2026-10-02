@@ -75,7 +75,7 @@ class ModelControlSnapshotTest {
     fun pickerRefreshing() = render("picker-refreshing", Form.DESKTOP, dark = true) { form ->
         Modal(form) {
             ModelPickerContent(
-                ModelControlUiFixtures.pickerState(refreshing = true, error = "Couldn't refresh models: upstream timed out"),
+                ModelControlUiFixtures.pickerState().copy(refreshing = true, error = "Couldn't refresh models: upstream timed out"),
                 noPicker,
             )
         }
@@ -88,19 +88,19 @@ class ModelControlSnapshotTest {
 
     @Test
     fun providersAccounts() = renderAll("providers-accounts") {
-        ProviderSettingsPane(ModelControlUiFixtures.managementState(), noSettings, ProviderSettingsPage.ACCOUNTS, onPageChange = {})
+        ProviderSettingsPane(ModelControlUiFixtures.managementState(), noSettings)
     }
 
     @Test
     fun providersApiKeys() = renderAll("providers-apikeys") {
         val anthropic = ModelControlUiFixtures.providers.single { it.id == "anthropic" }
         val state = ModelControlUiFixtures.managementState().copy(form = ProviderConnectForm(anthropic).withValue("apiKey", "sk-ant-api03"))
-        ProviderSettingsPane(state, noSettings, ProviderSettingsPage.API_KEYS, onPageChange = {})
+        ProviderSettingsPane(state, noSettings, initialPage = ProviderSettingsPage.API_KEYS)
     }
 
     @Test
     fun providersEndpoints() = renderAll("providers-endpoints") {
-        ProviderSettingsPane(ModelControlUiFixtures.managementState(), noSettings, ProviderSettingsPage.ENDPOINTS, onPageChange = {})
+        ProviderSettingsPane(ModelControlUiFixtures.managementState(), noSettings, initialPage = ProviderSettingsPage.ENDPOINTS)
     }
 
     private fun renderAll(name: String, content: @Composable (Form) -> Unit) {

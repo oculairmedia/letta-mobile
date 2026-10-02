@@ -9,10 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -20,7 +17,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsActions
-import com.letta.mobile.ui.modelcontrol.ProviderSettingsPage
 import com.letta.mobile.ui.modelcontrol.ProviderSettingsPane
 
 /**
@@ -37,7 +33,6 @@ fun ProviderAdminScreen(
     val controller = viewModel.controller
     val state by controller.state.collectAsStateWithLifecycle()
     val actions = remember(controller) { ProviderSettingsActions.bind(controller) }
-    var page by rememberSaveable { mutableStateOf(ProviderSettingsPage.ACCOUNTS) }
     Scaffold(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
@@ -51,12 +46,6 @@ fun ProviderAdminScreen(
             )
         },
     ) { padding ->
-        ProviderSettingsPane(
-            state = state,
-            actions = actions,
-            page = page,
-            onPageChange = { page = it },
-            modifier = Modifier.padding(padding),
-        )
+        ProviderSettingsPane(state = state, actions = actions, modifier = Modifier.padding(padding))
     }
 }

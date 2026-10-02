@@ -27,8 +27,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
+import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectMethod
-import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.data.repository.modelcontrol.ProviderSettingsLists
 import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.connectedBaseUrl
@@ -39,47 +39,38 @@ private val pagePadding = PaddingValues(horizontal = LettaDimens.Space.lg, verti
 
 /** "Connect an account", "Connected" and "Other providers". */
 @Composable
-internal fun AccountsPage(
-    lists: ProviderSettingsLists,
-    state: ProviderManagementState,
-    actions: ProviderSettingsActions,
-    onPageChange: (ProviderSettingsPage) -> Unit,
-    modifier: Modifier,
-) {
+internal fun AccountsPage(lists: ProviderSettingsLists, context: ProviderPageContext, modifier: Modifier) {
     LazyColumn(modifier = modifier, contentPadding = pagePadding, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        item("connect-title") {
-            SectionTitle(ModelControlStrings.CONNECT_ACCOUNT, subtitle = ModelControlStrings.CONNECT_ACCOUNT_SUBTITLE)
-        }
-        if (lists.accounts.isEmpty()) {
-            item("accounts-empty") { Hint(ModelControlStrings.NO_ACCOUNTS_LEFT) }
-        }
-        items(lists.accounts, key = { "account-${it.id}" }) { provider ->
-            ProviderCard(
-                provider = provider,
-                description = ModelControlStrings.METHOD_TERMINAL,
-                leading = LettaIcons.Terminal,
-                busy = state.busy,
-                onClick = { actions.onOpenSignIn(provider) },
-            )
-        }
-        item("browser-note") { Hint(ModelControlStrings.METHOD_BROWSER_UNSUPPORTED) }
-        item("have-key") {
-            TextButton(
-                onClick = { onPageChange(ProviderSettingsPage.API_KEYS) },
-                modifier = Modifier.testTag(ProviderSettingsTags.HAVE_KEY),
-            ) { Text(ModelControlStrings.HAVE_API_KEY) }
-        }
-        connectedSection(lists.connected, state, actions, onPageChange)
-        otherSection(lists.other, state, actions)
+        accountsSection(lists.accounts, context)
+        connectedSection(lists.connected, context)
+        otherSection(lists.other, context)
     }
 }
 
-private fun LazyListScope.connectedSection(
-    connected: List<ConnectableProvider>,
-    state: ProviderManagementState,
-    actions: ProviderSettingsActions,
-    onPageChange: (ProviderSettingsPage) -> Unit,
-) {
+private fun LazyListScope.accountsSection(accounts: List<ConnectableProvider>, context: ProviderPageContext) {
+    item("connect-title") {
+        SectionTitle(ModelControlStrings.CONNECT_ACCOUNT, subtitle = ModelControlStrings.CONNECT_ACCOUNT_SUBTITLE)
+    }
+    if (accounts.isEmpty()) item("accounts-empty") { Hint(ModelControlStrings.NO_ACCOUNTS_LEFT) }
+    items(accounts, key = { "account-${it.id}" }) { provider ->
+        ProviderCard(
+            provider = provider,
+            description = ModelControlStrings.METHOD_TERMINAL,
+            leading = LettaIcons.Terminal,
+            busy = context.state.busy,
+            onClick = { context.actions.onOpenSignIn(provider) },
+        )
+    }
+    item("browser-note") { Hint(ModelControlStrings.METHOD_BROWSER_UNSUPPORTED) }
+    item("have-key") {
+        TextButton(
+            onClick = { context.onPageChange(ProviderSettingsPage.API_KEYS) },
+            modifier = Modifier.testTag(ProviderSettingsTags.HAVE_KEY),
+        ) { Text(ModelControlStrings.HAVE_API_KEY) }
+    }
+}
+
+private fun LazyListScope.connectedSection(connected: List<ConnectableProvider>, context: ProviderPageContext) {
     item("connected-title") { SectionTitle(ModelControlStrings.CONNECTED) }
     if (connected.isEmpty()) item("connected-empty") { Hint(ModelControlStrings.NOTHING_CONNECTED) }
     items(connected, key = { "connected-${it.id}" }) { provider ->
@@ -87,22 +78,25 @@ private fun LazyListScope.connectedSection(
             provider = provider,
             description = connectedDescription(provider),
             leading = methodIcon(provider),
-            busy = state.busy,
+            busy = context.state.busy,
             connected = true,
-            onRemove = { actions.management.onDisconnect(provider) },
-            onClick = {
-                when (provider.connectMethod) {
-                    ProviderConnectMethod.TERMINAL_SIGN_IN -> actions.onOpenSignIn(provider)
-                    ProviderConnectMethod.API_KEY -> onPageChange(ProviderSettingsPage.API_KEYS)
-                    ProviderConnectMethod.ENDPOINT -> onPageChange(ProviderSettingsPage.ENDPOINTS)
-                    ProviderConnectMethod.NONE -> Unit
-                }
-            },
+            onRemove = { context.actions.management.onDisconnect(provider) },
+            onClick = { openConnected(provider, context) },
         )
     }
 }
 
-private fun LazyListScope.otherSection(other: List<ConnectableProvider>, state: ProviderManagementState, actions: ProviderSettingsActions) {
+/** A connected card leads to where its connection is managed. */
+private fun openConnected(provider: ConnectableProvider, context: ProviderPageContext) {
+    when (provider.connectMethod) {
+        ProviderConnectMethod.TERMINAL_SIGN_IN -> context.actions.onOpenSignIn(provider)
+        ProviderConnectMethod.API_KEY -> context.onPageChange(ProviderSettingsPage.API_KEYS)
+        ProviderConnectMethod.ENDPOINT -> context.onPageChange(ProviderSettingsPage.ENDPOINTS)
+        ProviderConnectMethod.NONE -> Unit
+    }
+}
+
+private fun LazyListScope.otherSection(other: List<ConnectableProvider>, context: ProviderPageContext) {
     if (other.isEmpty()) return
     item("other-title") { SectionTitle(ModelControlStrings.OTHER_PROVIDERS) }
     items(other, key = { "other-${it.id}" }) { provider ->
@@ -110,8 +104,8 @@ private fun LazyListScope.otherSection(other: List<ConnectableProvider>, state: 
             provider = provider,
             description = provider.description.ifBlank { methodLabel(provider) },
             leading = methodIcon(provider),
-            busy = state.busy,
-            onClick = { actions.management.onConnect(provider) },
+            busy = context.state.busy,
+            onClick = { context.actions.management.onConnect(provider) },
         )
     }
 }
@@ -120,80 +114,78 @@ private fun LazyListScope.otherSection(other: List<ConnectableProvider>, state: 
 internal enum class CredentialsKind(val subtitle: String, val addLabel: String, val replaceLabel: String) {
     API_KEYS(ModelControlStrings.API_KEYS_SUBTITLE, ModelControlStrings.ADD_KEY, ModelControlStrings.REPLACE_KEY),
     ENDPOINTS(ModelControlStrings.ENDPOINTS_SUBTITLE, ModelControlStrings.ADD_ENDPOINT, ModelControlStrings.EDIT),
+    ;
+
+    /** The card's second line: whether it is connected and, for an endpoint, where to. */
+    fun detail(provider: ConnectableProvider): String = when {
+        !provider.isConnected -> ModelControlStrings.NOT_CONNECTED
+        this == ENDPOINTS -> provider.connectedBaseUrl ?: ModelControlStrings.CONNECTED
+        else -> ModelControlStrings.KEY_SAVED
+    }
 }
 
 @Composable
 internal fun CredentialsPage(
     kind: CredentialsKind,
     providers: List<ConnectableProvider>,
-    state: ProviderManagementState,
-    actions: ProviderSettingsActions,
+    context: ProviderPageContext,
     modifier: Modifier,
 ) {
     LazyColumn(modifier = modifier, contentPadding = pagePadding, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         item("subtitle") { Hint(kind.subtitle) }
-        items(providers, key = { "cred-${it.id}" }) { provider ->
-            CredentialCard(kind, provider, state, actions)
-        }
+        items(providers, key = { "cred-${it.id}" }) { provider -> CredentialCard(kind, provider, context) }
         if (kind == CredentialsKind.ENDPOINTS) item("named-note") { Hint(ModelControlStrings.NAMED_ENDPOINTS_UNSUPPORTED) }
     }
 }
 
 @Composable
-private fun CredentialCard(kind: CredentialsKind, provider: ConnectableProvider, state: ProviderManagementState, actions: ProviderSettingsActions) {
-    val form = state.form?.takeIf { it.provider.id == provider.id }
+private fun CredentialCard(kind: CredentialsKind, provider: ConnectableProvider, context: ProviderPageContext) {
+    val form = context.state.form?.takeIf { it.provider.id == provider.id }
+    val busy = context.state.busy
     CardSurface(provider) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             MethodIcon(methodIcon(provider))
             Column(modifier = Modifier.weight(1f)) {
                 CardTitle(provider.displayName)
-                val detail = when {
-                    !provider.isConnected -> ModelControlStrings.NOT_CONNECTED
-                    kind == CredentialsKind.ENDPOINTS -> provider.connectedBaseUrl ?: ModelControlStrings.CONNECTED
-                    else -> ModelControlStrings.KEY_SAVED
-                }
                 if (provider.isConnected) ConnectedBadge()
-                CardDescription(detail)
+                CardDescription(kind.detail(provider))
             }
-            if (form == null) {
-                val label = if (provider.isConnected) kind.replaceLabel else kind.addLabel
-                OutlinedButton(
-                    onClick = {
-                        if (provider.isConnected && kind == CredentialsKind.ENDPOINTS) actions.onEdit(provider) else actions.management.onConnect(provider)
-                    },
-                    enabled = !state.busy,
-                    modifier = Modifier.testTag(
-                        "${if (provider.isConnected) ProviderSettingsTags.EDIT_PREFIX else ProviderSettingsTags.ADD_PREFIX}${provider.id}",
-                    ),
-                ) { Text(label) }
-            }
-            if (provider.isConnected) RemoveButton(provider, enabled = !state.busy) { actions.management.onDisconnect(provider) }
+            if (form == null) CredentialAction(kind, provider, context)
+            if (provider.isConnected) RemoveButton(provider, enabled = !busy) { context.actions.management.onDisconnect(provider) }
         }
-        if (form != null) InlineForm(kind, form, state, actions)
+        if (form != null) InlineForm(kind, form, context)
     }
 }
 
+/** "Add key" / "Replace key", "Add endpoint" / "Edit": an edit keeps the endpoint's base URL. */
 @Composable
-private fun InlineForm(
-    kind: CredentialsKind,
-    form: com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm,
-    state: ProviderManagementState,
-    actions: ProviderSettingsActions,
-) {
+private fun CredentialAction(kind: CredentialsKind, provider: ConnectableProvider, context: ProviderPageContext) {
+    val connected = provider.isConnected
+    val editsEndpoint = connected && kind == CredentialsKind.ENDPOINTS
+    OutlinedButton(
+        onClick = { if (editsEndpoint) context.actions.onEdit(provider) else context.actions.management.onConnect(provider) },
+        enabled = !context.state.busy,
+        modifier = Modifier.testTag("${if (connected) ProviderSettingsTags.EDIT_PREFIX else ProviderSettingsTags.ADD_PREFIX}${provider.id}"),
+    ) { Text(if (connected) kind.replaceLabel else kind.addLabel) }
+}
+
+@Composable
+private fun InlineForm(kind: CredentialsKind, form: ProviderConnectForm, context: ProviderPageContext) {
+    val formActions = context.actions.management.form
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.md).testTag(ProviderSettingsTags.INLINE_FORM),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        ProviderFormFields(form, actions.management.form.onChange)
+        ProviderFormFields(form, formActions.onChange)
         if (kind == CredentialsKind.ENDPOINTS && form.provider.isConnected) Hint(ModelControlStrings.ENDPOINT_KEY_HINT)
-        state.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        context.state.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             Button(
-                onClick = actions.management.form.onSubmit,
-                enabled = form.canSubmit && !state.busy,
+                onClick = formActions.onSubmit,
+                enabled = form.canSubmit && !context.state.busy,
                 modifier = Modifier.testTag(ProviderPaneTags.SUBMIT),
             ) { Text(if (kind == CredentialsKind.API_KEYS) ModelControlStrings.SAVE_AND_VERIFY else ModelControlStrings.SAVE) }
-            TextButton(onClick = actions.management.form.onDismiss) { Text(ModelControlStrings.CANCEL) }
+            TextButton(onClick = formActions.onDismiss) { Text(ModelControlStrings.CANCEL) }
         }
     }
 }

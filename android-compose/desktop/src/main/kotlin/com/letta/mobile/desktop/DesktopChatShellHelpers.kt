@@ -20,6 +20,8 @@ import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.desktop.chat.DesktopModelControlHost
+import com.letta.mobile.desktop.data.DesktopDataBindings
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
@@ -536,7 +538,8 @@ internal data class CreateDesktopOverlayActionsParams(
     val chatController: DesktopChatController,
     val onSelectDestination: (DesktopDestination) -> Unit,
     val onOpenAgent: (String) -> Unit,
-    val agentRepository: IAgentRepository,
+    /** The agent repository (new-agent defaults) and the host's model control live here. */
+    val dataBindings: DesktopDataBindings,
     val selectedAgentId: String?,
     val onIrohIdentityReset: () -> Unit,
     val onNewCanvas: () -> Unit = {},
@@ -545,8 +548,12 @@ internal data class CreateDesktopOverlayActionsParams(
 internal fun createDesktopOverlayActions(
     params: CreateDesktopOverlayActionsParams,
 ): DesktopOverlayActions = DesktopOverlayActions(
-    onModelSelected = params.chatController::setConversationModel,
-    reloadChatModels = params.chatController::reloadModelCatalog,
+    modelControl = DesktopModelControlHost(
+        session = params.dataBindings.modelControl,
+        chatModels = params.chatController.availableModels,
+        reloadChatModels = params.chatController::reloadModelCatalog,
+        onModelSelected = params.chatController::setConversationModel,
+    ),
     onSelectConversation = {
         params.chatController.selectConversation(it)
         params.onSelectDestination(DesktopDestination.Conversations)
@@ -556,7 +563,7 @@ internal fun createDesktopOverlayActions(
     onNewCanvas = params.onNewCanvas,
     onCreateAgent = { name, modelValue ->
         val (model, embedding) = resolveNewAgentDefaults(
-            agentRepository = params.agentRepository,
+            agentRepository = params.dataBindings.sessionGraphProvider.current.agentRepository,
             templateAgentId = params.selectedAgentId,
             modelValue = modelValue,
         )
