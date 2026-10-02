@@ -14,7 +14,7 @@ internal object CanvasSceneSchemaText {
         append("Every element needs a unique string id and a type, one of ${schema.allowedTypes.joinToString("|")}. ")
         schema.elementTypes.forEach { append(typeLine(schema, it)).append(' ') }
         append("There are no other element types: a line or arrow is a Shape, and a note or document is not an element ")
-        append("(use canvas.apply_ops set_document). ")
+        append("(use canvas_apply_ops set_document). ")
         append("Example scene: ").append(encode(schema.sceneExample))
     }
 
@@ -22,7 +22,7 @@ internal object CanvasSceneSchemaText {
         append("Elements: ")
         append(schema.elementTypes.joinToString("; ") { "${it.type} {${it.required.joinToString(", ")}}" })
         append(". shapeType ${schema.shapeTypes.joinToString("|")}; points \"x,y\"; colors #rrggbbaa. ")
-        append("Full format and examples in the canvas.replace_scene description.")
+        append("Full format and examples in the canvas_replace_scene description.")
     }
 
     /**
@@ -34,9 +34,9 @@ internal object CanvasSceneSchemaText {
         append(if (problems.size == 1) "this write." else "${problems.size} parts of this write.")
         problems.forEach { append("\n- ").append(subject(it)).append(' ').append(it.reason) }
         append("\nAllowed element types: ${CanvasSceneSchema.allowedTypes.joinToString(", ")}. ")
-        append("Lines and arrows are Shapes (shapeType LINE|ARROW); notes/documents are canvas.apply_ops set_document, not elements.")
+        append("Lines and arrows are Shapes (shapeType LINE|ARROW); notes/documents are canvas_apply_ops set_document, not elements.")
         problems.map { it.suggested }.distinct().forEach { append("\n${it.type} example: ${encode(it.example)}") }
-        append("\nScene: {\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}. See canvas.replace_scene's description for every field.")
+        append("\nScene: {\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}. See canvas_replace_scene's description for every field.")
     }
 
     private fun subject(problem: CanvasElementProblem): String =
