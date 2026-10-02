@@ -226,3 +226,12 @@ class ChatTimelineLogicTest {
         assertNull(canonicalRowIndex(listOf(item("live-0")), listOf(settledRow("s-0")), "gone"))
     }
 }
+
+// The pinch model takes the owner's scale as a TextScale; these keep the pinch tests in plain floats.
+private fun TimelinePinchScale.begin(committed: Float) = begin(TextScale(committed))
+
+private fun TimelinePinchScale.restingScale(committed: Float): Float = restingScale(TextScale(committed))
+
+private fun TimelinePinchScale.effectiveScale(committed: Float): Float = effectiveScale(TextScale(committed))
+
+private fun TimelinePinchScale.onCommittedChanged(committed: Float) = onCommittedChanged(TextScale(committed))

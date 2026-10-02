@@ -87,6 +87,10 @@ enum class ChatDockEdge(val left: Boolean, val top: Boolean, val right: Boolean,
     val vertical: Boolean get() = top || bottom
 }
 
+/** How far a drag moved, in dp. */
+@Immutable
+data class ChatDockDelta(val dx: Float, val dy: Float)
+
 /**
  * Pure geometry for the docked panel. Every function takes the container size in dp; the
  * resolved rectangle always lies inside the container (less [ChatDockLimits.marginDp]), so a
@@ -122,36 +126,26 @@ object ChatDockGeometryMath {
         val area = Area(frame)
         val current = rect(geometry, frame)
         return geometry.copy(
-            anchorX = anchorFor(current.left + dx, current.width, area.left, area.width, geometry.anchorX),
-            anchorY = anchorFor(current.top + dy, current.height, area.top, area.height, geometry.anchorY),
+            anchorX = area.horizontal.anchorFor(current.left + dx, current.width, geometry.anchorX),
+            anchorY = area.vertical.anchorFor(current.top + dy, current.height, geometry.anchorY),
         )
     }
 
     /**
-     * Moves [edge] by ([dx], [dy]) dp. The opposite edge stays put; the size stays within the
+     * Moves [edge] by [delta] dp. The opposite edge stays put; the size stays within the
      * limits and the container. A collapsed panel only resizes its width.
      */
-    fun resize(geometry: ChatDockGeometry, edge: ChatDockEdge, dx: Float, dy: Float, frame: ChatDockFrame): ChatDockGeometry {
+    fun resize(geometry: ChatDockGeometry, edge: ChatDockEdge, delta: ChatDockDelta, frame: ChatDockFrame): ChatDockGeometry {
         val area = Area(frame)
         val current = rect(geometry, frame)
         var next = geometry
         if (edge.horizontal) {
-            val (left, right) = resizeSpan(
-                Span(current.left, current.right, edge.left, edge.right),
-                dx,
-                SpanBounds(area.left, area.right, area.minWidth, area.maxWidth),
-            )
-            val width = right - left
-            next = next.copy(widthDp = width, anchorX = anchorFor(left, width, area.left, area.width, geometry.anchorX))
+            val (left, width) = area.horizontal.resize(Span(current.left, current.right, edge.left, edge.right), delta.dx)
+            next = next.copy(widthDp = width, anchorX = area.horizontal.anchorFor(left, width, geometry.anchorX))
         }
         if (edge.vertical && !geometry.collapsed) {
-            val (top, bottom) = resizeSpan(
-                Span(current.top, current.bottom, edge.top, edge.bottom),
-                dy,
-                SpanBounds(area.top, area.bottom, area.minHeight, area.maxHeight),
-            )
-            val height = bottom - top
-            next = next.copy(heightDp = height, anchorY = anchorFor(top, height, area.top, area.height, geometry.anchorY))
+            val (top, height) = area.vertical.resize(Span(current.top, current.bottom, edge.top, edge.bottom), delta.dy)
+            next = next.copy(heightDp = height, anchorY = area.vertical.anchorFor(top, height, geometry.anchorY))
         }
         return next
     }
@@ -161,15 +155,7 @@ object ChatDockGeometryMath {
      * is kept. Without a frame (nothing laid out yet) only the flag changes.
      */
     fun collapse(geometry: ChatDockGeometry, frame: ChatDockFrame? = null): ChatDockGeometry {
-        if (geometry.collapsed) return geometry
-        if (frame == null) return geometry.copy(collapsed = true)
-        val area = Area(frame)
-        val open = expandedRect(geometry, area)
-        val height = barHeight(frame, area)
-        return geometry.copy(
-            collapsed = true,
-            anchorY = anchorFor(open.bottom - height, height, area.top, area.height, geometry.anchorY),
-        )
+        return switchCollapsed(geometry, collapsed = true, frame = frame)
     }
 
     /**
@@ -179,15 +165,20 @@ object ChatDockGeometryMath {
      * flag changes.
      */
     fun expand(geometry: ChatDockGeometry, frame: ChatDockFrame? = null): ChatDockGeometry {
-        if (!geometry.collapsed) return geometry
-        if (frame == null) return geometry.copy(collapsed = false)
-        val area = Area(frame)
-        val bar = rect(geometry, frame)
-        val height = expandedHeight(geometry, area)
-        return geometry.copy(
-            collapsed = false,
-            anchorY = anchorFor(bar.bottom - height, height, area.top, area.height, geometry.anchorY),
-        )
+        return switchCollapsed(geometry, collapsed = false, frame = frame)
+    }
+
+    /**
+     * Flips [ChatDockGeometry.collapsed] to [collapsed], keeping the composer bar's bottom edge
+     * where it is in [frame]: the bar is the bottom of the open panel and the whole collapsed one.
+     */
+    private fun switchCollapsed(geometry: ChatDockGeometry, collapsed: Boolean, frame: ChatDockFrame?): ChatDockGeometry {
+        if (geometry.collapsed == collapsed) return geometry
+        val target = geometry.copy(collapsed = collapsed)
+        if (frame == null) return target
+        val barBottom = rect(geometry, frame).bottom
+        val height = rect(target, frame).height
+        return target.copy(anchorY = Area(frame).vertical.anchorFor(barBottom - height, height, geometry.anchorY))
     }
 
     /** Back to the default placement: bottom-centre, default size, expanded. */
@@ -216,27 +207,31 @@ object ChatDockGeometryMath {
 
     private fun barHeight(frame: ChatDockFrame, area: Area): Float = frame.collapsedHeightDp.coerceIn(0f, area.height)
 
-    /** The anchor fraction that puts a [size]-long panel's start at [start] in a [span] from [origin]. */
-    private fun anchorFor(start: Float, size: Float, origin: Float, span: Float, fallback: Float): Float {
-        val free = span - size
-        if (free <= 0f) return fallback.fractionOr(Default.anchorX)
-        return ((start - origin) / free).coerceIn(0f, 1f)
-    }
-
     private class Span(val start: Float, val end: Float, val movesStart: Boolean, val movesEnd: Boolean)
 
-    private class SpanBounds(val min: Float, val max: Float, val minSize: Float, val maxSize: Float)
+    /** One axis of the usable area: where it starts, how long it is, and the panel size limits along it. */
+    private class AreaAxis(val origin: Float, val length: Float, val minSize: Float, val maxSize: Float) {
+        private val max: Float get() = origin + length
 
-    private fun resizeSpan(span: Span, delta: Float, bounds: SpanBounds): Pair<Float, Float> {
-        var start = span.start
-        var end = span.end
-        if (span.movesEnd) {
-            end = (end + delta).coerceIn(start + bounds.minSize, minOf(start + bounds.maxSize, bounds.max))
+        /** The anchor fraction that puts a [size]-long panel's start at [start] on this axis. */
+        fun anchorFor(start: Float, size: Float, fallback: Float): Float {
+            val free = length - size
+            if (free <= 0f) return fallback.fractionOr(Default.anchorX)
+            return ((start - origin) / free).coerceIn(0f, 1f)
         }
-        if (span.movesStart) {
-            start = (start + delta).coerceIn(maxOf(end - bounds.maxSize, bounds.min), end - bounds.minSize)
+
+        /** Moves [span]'s moving ends by [delta] within this axis; returns the new start and size. */
+        fun resize(span: Span, delta: Float): Pair<Float, Float> {
+            var start = span.start
+            var end = span.end
+            if (span.movesEnd) {
+                end = (end + delta).coerceIn(start + minSize, minOf(start + maxSize, max))
+            }
+            if (span.movesStart) {
+                start = (start + delta).coerceIn(maxOf(end - maxSize, origin), end - minSize)
+            }
+            return start to (end - start)
         }
-        return start to end
     }
 
     /** The usable area: the container less its margin (and top inset), and the size limits that fit in it. */
@@ -249,12 +244,12 @@ object ChatDockGeometryMath {
         val top: Float = (limits.marginDp + limits.topInsetDp.coerceAtLeast(0f)).coerceAtMost(containerHeight / 2f)
         val width: Float = (containerWidth - 2f * left).coerceAtLeast(0f)
         val height: Float = (containerHeight - top - bottomMargin).coerceAtLeast(0f)
-        val right: Float get() = left + width
-        val bottom: Float get() = top + height
         val maxWidth: Float = minOf(limits.maxWidthDp, width)
         val maxHeight: Float = minOf(limits.maxHeightDp, height)
         val minWidth: Float = minOf(limits.minWidthDp, maxWidth)
         val minHeight: Float = minOf(limits.minHeightDp, maxHeight)
+        val horizontal: AreaAxis = AreaAxis(left, width, minWidth, maxWidth)
+        val vertical: AreaAxis = AreaAxis(top, height, minHeight, maxHeight)
     }
 
     private fun Float.fractionOr(fallback: Float): Float = if (isFinite()) coerceIn(0f, 1f) else fallback

@@ -11,21 +11,26 @@ import kotlinx.collections.immutable.toImmutableSet
 
 internal fun rowContext(
     capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
-    collapsedRunIds: Set<String> = emptySet(),
-    expandedReasoning: Set<String> = emptySet(),
-    activeApprovalRequestId: String? = null,
+    itemState: ChatRenderItemState = renderState(),
     newestMessageId: String? = null,
     toolDetails: ChatToolDetails = ChatToolDetails.Inline,
 ): ChatRowContext = ChatRowContext(
     newestMessageId = newestMessageId,
     toolDetails = toolDetails,
-    itemState = ChatRenderItemState(
-        isStreaming = false,
-        activeApprovalRequestId = activeApprovalRequestId,
-        collapsedRunIds = collapsedRunIds.toImmutableSet(),
-        expandedReasoningMessageIds = expandedReasoning.toImmutableSet(),
-    ),
+    itemState = itemState,
     capabilities = capabilities,
+)
+
+/** A settled (not streaming) page's owner state: which runs are collapsed, which reasoning is open. */
+internal fun renderState(
+    collapsedRunIds: Set<String> = emptySet(),
+    expandedReasoning: Set<String> = emptySet(),
+    activeApprovalRequestId: String? = null,
+): ChatRenderItemState = ChatRenderItemState(
+    isStreaming = false,
+    activeApprovalRequestId = activeApprovalRequestId,
+    collapsedRunIds = collapsedRunIds.toImmutableSet(),
+    expandedReasoningMessageIds = expandedReasoning.toImmutableSet(),
 )
 
 internal fun rowCallbacks(

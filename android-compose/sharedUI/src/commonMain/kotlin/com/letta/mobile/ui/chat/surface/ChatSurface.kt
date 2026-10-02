@@ -25,7 +25,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -59,6 +58,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
+import com.letta.mobile.ui.chat.surface.composer.ComposerInputs
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.rememberComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerCompanion
@@ -129,14 +129,7 @@ fun ChatSurface(
     // With a canvas in hand, "open canvas" is a mode change, not the host's navigation, and
     // "show on canvas" also frames the artifact on this page's own board (letta-mobile-bglj6.13).
     val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
-        if (canvas == null) {
-            stableHost
-        } else {
-            stableHost.copy(
-                openCanvas = { stableOnIntent(ChatSurfaceIntent.OpenCanvas) },
-                showOnCanvas = canvasActions::showArtifact,
-            )
-        }
+        pageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
     }
     val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
@@ -145,6 +138,11 @@ fun ChatSurface(
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
     val dockReady = dockGeometry != null
     val dock = rememberChatDockState(dockGeometry ?: ChatDockGeometry.Default, onDockGeometryChange)
+    // Picked images encode in the page's scope: a mode switch composes a different composer
+    // panel, and the encode must outlive the one that started it.
+    val imageAttacher = rememberComposerImageAttacher()
+    // The page's one composer-companion seat; the composers only say where it should stand.
+    val companionAnchors = remember { CompanionSeatAnchors() }
     val frame = ChatSurfaceFrame(
         port = port,
         snackbars = snackbars,
@@ -158,12 +156,9 @@ fun ChatSurface(
         appearance = appearance,
         platform = stablePlatform,
         pagedTimeline = pagedTimeline,
+        companionAnchors = companionAnchors,
+        dock = dock.takeIf { dockReady },
     )
-    // Picked images encode in the page's scope: a mode switch composes a different composer
-    // panel, and the encode must outlive the one that started it.
-    val imageAttacher = rememberComposerImageAttacher()
-    // The page's one composer-companion seat; the composers only say where it should stand.
-    val companionAnchors = remember { CompanionSeatAnchors() }
     val focusHandoff = remember { ComposerFocusHandoff() }
     // The thinking glow's shader, compiled once for the page rather than at every run's start.
     val glowShaders = rememberAmbientGlowShaders()
@@ -178,21 +173,46 @@ fun ChatSurface(
         SendFlightLayer(rememberSendFlightState(), modifier) {
             if (appearance.platformStyle == ChatPlatformStyle.Touch) {
                 // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
-                TouchCanvasWithChat(frame, dock.takeIf { dockReady }, companionAnchors, canvas?.let { { it(canvasActions) } })
+                TouchCanvasWithChat(frame, canvas?.let { { it(canvasActions) } })
             } else if (canvas == null) {
-                val fullScreen = presentation.mode == ChatSurfaceMode.FullScreen
-                Box(Modifier.fillMaxSize()) {
-                    if (fullScreen) {
-                        PageLayerLocals(primary = true) { FullScreenPage(frame, Modifier.fillMaxSize()) }
-                    } else if (dockReady) {
-                        DockedOverlay(frame, dock, Modifier.fillMaxSize(), SurfaceMorph.Docked, primary = true)
-                    }
-                    if (fullScreen || dockReady) CompanionSeat(frame, companionAnchors, dock = dock.takeIf { !fullScreen }) { if (fullScreen) 1f else 0f }
-                }
+                PageWithoutCanvas(frame)
             } else {
-                CanvasWithChat(frame, dock.takeIf { dockReady }, companionAnchors, { canvas(canvasActions) }, Modifier)
+                CanvasWithChat(frame, { canvas(canvasActions) })
             }
         }
+    }
+}
+
+/**
+ * [host] as the page binds it. With a canvas in hand ([hasCanvas]), "open canvas" is a mode
+ * change, not the host's navigation, and "show on canvas" also frames the artifact on this page's
+ * own board (letta-mobile-bglj6.13).
+ */
+private fun pageHost(
+    host: ChatSurfaceHost,
+    hasCanvas: Boolean,
+    canvasActions: ChatCanvasActions,
+    onIntent: (ChatSurfaceIntent) -> Unit,
+): ChatSurfaceHost {
+    if (!hasCanvas) return host
+    return host.copy(
+        openCanvas = { onIntent(ChatSurfaceIntent.OpenCanvas) },
+        showOnCanvas = canvasActions::showArtifact,
+    )
+}
+
+/** The page where the host has no canvas: the docked panel, or the full-screen page, alone. */
+@Composable
+private fun PageWithoutCanvas(frame: ChatSurfaceFrame) {
+    val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
+    val dock = frame.dock
+    Box(Modifier.fillMaxSize()) {
+        if (fullScreen) {
+            PageLayerLocals(primary = true) { FullScreenPage(frame, Modifier.fillMaxSize()) }
+        } else if (dock != null) {
+            DockedOverlay(frame, dock, SurfaceMorph.Docked, primary = true)
+        }
+        if (fullScreen || dock != null) CompanionSeat(frame, dock = dock.takeIf { !fullScreen }) { if (fullScreen) 1f else 0f }
     }
 }
 
@@ -216,6 +236,10 @@ private class ChatSurfaceFrame(
     val appearance: ChatSurfaceAppearance,
     val platform: ChatSurfacePlatform,
     val pagedTimeline: CanonicalTimelinePresentation?,
+    /** The page's one composer-companion seat. */
+    val companionAnchors: CompanionSeatAnchors,
+    /** Null until the host knows where the person put the dock (or, on Touch, the head). */
+    val dock: ChatDockState?,
 ) {
     val mode: ChatSurfaceMode get() = presentation.mode
 }
@@ -230,50 +254,48 @@ private class ChatSurfaceFrame(
  * to fade in. Nothing the person is looking at is disposed and composed again at either end.
  */
 @Composable
-private fun CanvasWithChat(
-    frame: ChatSurfaceFrame,
-    /** Null until the host knows where the person put the dock: then only the canvas shows. */
-    dock: ChatDockState?,
-    companionAnchors: CompanionSeatAnchors,
-    canvas: @Composable () -> Unit,
-    modifier: Modifier,
-) {
-    val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
-    val progress = rememberSurfaceMorphProgress(fullScreen)
-    val phase = surfaceMorphPhase(progress, fullScreen)
-    val fraction: () -> Float = remember(progress) { { progress.value } }
-    val morph = remember(fraction, phase) { SurfaceMorph(fraction, morphing = phase == SurfaceMorphPhase.Morphing) }
-    // Read every frame, but each flips only once per trip.
-    val showPanel by remember(progress, fullScreen) { derivedStateOf { !fullScreen || progress.value < 1f } }
-    val showPage by remember(progress, fullScreen) { derivedStateOf { fullScreen || progress.value > 0f } }
-    val panelPrimary by remember(progress) { derivedStateOf { progress.value < PRIMARY_HANDOFF } }
-    Box(modifier.fillMaxSize()) {
+private fun CanvasWithChat(frame: ChatSurfaceFrame, canvas: @Composable () -> Unit) {
+    val layers = rememberSurfaceMorphLayers(frame.mode)
+    Box(Modifier.fillMaxSize()) {
         // Hidden from accessibility while the page covers it; it stays composed for its state.
-        val canvasModifier = Modifier.fillMaxSize()
-        Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) { canvas() }
-        MorphBackdrop(fraction)
-        if (dock == null) {
-            // The saved placement is still loading: no panel yet (and no page unless full screen).
-            if (fullScreen) {
-                PageLayerLocals(primary = true) { FullScreenPage(frame, Modifier.fillMaxSize()) }
-                CompanionSeat(frame, companionAnchors) { 1f }
-            }
-            return@Box
-        }
-        if (showPanel) DockedOverlay(frame, dock, Modifier.fillMaxSize(), morph, primary = panelPrimary)
-        if (showPage) {
-            // The panel rises above the keyboard (DockedChatPanel pads for it); the page does not.
-            val density = LocalDensity.current
-            val imeDp = with(density) { WindowInsets.ime.getBottom(density).toDp().value }
-            PageLayerLocals(primary = !panelPrimary) {
-                MorphPageLayer({ w, h -> dock.rectIn(w, (h - imeDp).coerceAtLeast(0f)) }, morph, Modifier.fillMaxSize()) {
-                    FullPageBody(frame, ChatSurfaceMode.FullScreen)
-                }
-            }
-        }
-        // The character moves the dock only while it sits on the resting dock, never mid-morph.
-        CompanionSeat(frame, companionAnchors, dock = dock.takeIf { !fullScreen && !morph.morphing }, pageWeight = fraction)
+        Box(coveredByPage(frame, Modifier.fillMaxSize())) { canvas() }
+        CanvasChatLayers(frame, layers)
     }
+}
+
+/** Over the canvas: the page background, the panel (once the dock is known), the page and the companion. */
+@Composable
+private fun CanvasChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers) {
+    val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
+    val morph = layers.morph
+    MorphBackdrop(morph.fraction)
+    val dock = frame.dock
+    if (dock == null) {
+        // The saved placement is still loading: no panel yet (and no page unless full screen).
+        if (fullScreen) {
+            PageLayerLocals(primary = true) { FullScreenPage(frame, Modifier.fillMaxSize()) }
+            CompanionSeat(frame) { 1f }
+        }
+        return
+    }
+    if (layers.showDocked) DockedOverlay(frame, dock, morph, primary = layers.dockedPrimary)
+    if (layers.showPage) {
+        // The panel rises above the keyboard (DockedChatPanel pads for it); the page does not.
+        val density = LocalDensity.current
+        val imeDp = with(density) { WindowInsets.ime.getBottom(density).toDp().value }
+        PageLayerLocals(primary = !layers.dockedPrimary) {
+            MorphPageLayer({ w, h -> dock.rectIn(w, (h - imeDp).coerceAtLeast(0f)) }, morph, Modifier.fillMaxSize()) {
+                FullPageBody(frame, ChatSurfaceMode.FullScreen)
+            }
+        }
+    }
+    // The character moves the dock only while it sits on the resting dock, never mid-morph.
+    CompanionSeat(frame, dock = dock.takeIf { !fullScreen && !morph.morphing }, pageWeight = morph.fraction)
+}
+
+/** [modifier], hidden from accessibility while the full-screen page covers it. */
+private fun coveredByPage(frame: ChatSurfaceFrame, modifier: Modifier): Modifier {
+    return if (frame.mode == ChatSurfaceMode.FullScreen) modifier.clearAndSetSemantics { } else modifier
 }
 
 /**
@@ -281,27 +303,15 @@ private fun CanvasWithChat(
  * to the bottom (the same draft and send as the full page); a chat head with the agent's mascot
  * floats over the canvas, snapped to a side, and the reply pops out of it. Swiping the bar up (or
  * its chevron) grows the bar into the full page; Back or swipe up on the page's bar comes back.
- * Without a canvas there is only the bar and the head.
+ * Without a canvas there is only the bar and the head. The head waits for the dock's geometry
+ * ([ChatSurfaceFrame.dock]); the bar shows regardless.
  *
  * As on desktop each layer stays composed for as long as it is on screen: the bar layer until the
  * page covers it, the page from the first frame it fades in.
  */
 @Composable
-private fun TouchCanvasWithChat(
-    frame: ChatSurfaceFrame,
-    /** Null until the host knows where the person put the head; the bar shows regardless. */
-    dock: ChatDockState?,
-    companionAnchors: CompanionSeatAnchors,
-    canvas: (@Composable () -> Unit)?,
-) {
-    val fullScreen = frame.mode == ChatSurfaceMode.FullScreen
-    val progress = rememberSurfaceMorphProgress(fullScreen)
-    val phase = surfaceMorphPhase(progress, fullScreen)
-    val fraction: () -> Float = remember(progress) { { progress.value } }
-    val morph = remember(fraction, phase) { SurfaceMorph(fraction, morphing = phase == SurfaceMorphPhase.Morphing) }
-    val showBar by remember(progress, fullScreen) { derivedStateOf { !fullScreen || progress.value < 1f } }
-    val showPage by remember(progress, fullScreen) { derivedStateOf { fullScreen || progress.value > 0f } }
-    val barPrimary by remember(progress) { derivedStateOf { progress.value < PRIMARY_HANDOFF } }
+private fun TouchCanvasWithChat(frame: ChatSurfaceFrame, canvas: (@Composable () -> Unit)?) {
+    val layers = rememberSurfaceMorphLayers(frame.mode)
     val bar = remember { TouchBarMetrics() }
     val density = LocalDensity.current
     Box(Modifier.fillMaxSize()) {
@@ -317,46 +327,54 @@ private fun TouchCanvasWithChat(
             // The top of the board is clear: the host's header is not shown over it, and the board's
             // actions join its tool bar; the agent switcher and menu are in the board's menu.
             val hostChrome = rememberTouchCanvasChrome(frame.host)
-            Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) {
+            Box(coveredByPage(frame, canvasModifier)) {
                 CompositionLocalProvider(
                     LocalCanvasChromeBottomInset provides barDp,
                     LocalCanvasHostChrome provides hostChrome,
                 ) { canvas() }
             }
         }
-        MorphBackdrop(fraction)
-        if (showBar) {
-            CompositionLocalProvider(
-                LocalCompanionLayer provides CompanionLayer.Docked,
-                LocalComposerPrimary provides barPrimary,
-                LocalChatWorkingCueAnimated provides false,
-            ) {
-                TouchDockLayer(
-                    bar = bar,
-                    morph = morph,
-                    topChromeInset = frame.platform.topChromeInset,
-                    head = dock?.let { touchHeadContent(frame, it) },
-                    composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
-                )
-            }
-        }
-        if (showPage) {
-            PageLayerLocals(primary = !barPrimary) {
-                MorphPageLayer(
-                    from = { w, h ->
-                        val barHeight = with(density) { bar.heightPx.toDp().value }
-                        ChatDockRect(0f, (h - barHeight).coerceAtLeast(0f), w, barHeight)
-                    },
-                    morph = morph,
-                    modifier = Modifier.fillMaxSize(),
-                    rounded = false,
-                ) {
-                    FullPageBody(frame, ChatSurfaceMode.FullScreen)
-                }
-            }
-        }
-        CompanionSeat(frame, companionAnchors, interactive = fullScreen, pageWeight = fraction)
+        TouchChatLayers(frame, layers, bar)
     }
+}
+
+/** Over the Touch canvas: the page background, the bar and its head, the page and the companion. */
+@Composable
+private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers, bar: TouchBarMetrics) {
+    val morph = layers.morph
+    val density = LocalDensity.current
+    MorphBackdrop(morph.fraction)
+    if (layers.showDocked) {
+        CompositionLocalProvider(
+            LocalCompanionLayer provides CompanionLayer.Docked,
+            LocalComposerPrimary provides layers.dockedPrimary,
+            LocalChatWorkingCueAnimated provides false,
+        ) {
+            TouchDockLayer(
+                bar = bar,
+                morph = morph,
+                topChromeInset = frame.platform.topChromeInset,
+                head = frame.dock?.let { touchHeadContent(frame, it) },
+                composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
+            )
+        }
+    }
+    if (layers.showPage) {
+        PageLayerLocals(primary = !layers.dockedPrimary) {
+            MorphPageLayer(
+                from = { w, h ->
+                    val barHeight = with(density) { bar.heightPx.toDp().value }
+                    ChatDockRect(0f, (h - barHeight).coerceAtLeast(0f), w, barHeight)
+                },
+                morph = morph,
+                modifier = Modifier.fillMaxSize(),
+                rounded = false,
+            ) {
+                FullPageBody(frame, ChatSurfaceMode.FullScreen)
+            }
+        }
+    }
+    CompanionSeat(frame, interactive = frame.mode == ChatSurfaceMode.FullScreen, pageWeight = morph.fraction)
 }
 
 /**
@@ -381,27 +399,30 @@ private fun rememberTouchCanvasChrome(host: ChatSurfaceHost): CanvasHostChrome {
 }
 
 /** What the chat head shows and does, from the page's frame. */
-private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState): TouchHeadContent = TouchHeadContent(
-    dock = dock,
-    agentId = frame.uiState.agentId,
-    agentName = frame.uiState.agentName,
-    openChat = { frame.onIntent(ChatSurfaceIntent.Expand) },
-    openAgent = frame.host.openAgentPane,
-    turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
-)
+private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState): TouchHeadContent {
+    return TouchHeadContent(
+        dock = dock,
+        agentId = frame.uiState.agentId,
+        agentName = frame.uiState.agentName,
+        openChat = { frame.onIntent(ChatSurfaceIntent.Expand) },
+        openAgent = frame.host.openAgentPane,
+        turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
+    )
+}
 
-/** The page's one composer-companion seat, over both layers. */
+/**
+ * The page's one composer-companion seat, over both layers. [dock] is the movable dock: grabbing
+ * the character where it sits on the dock moves the dock.
+ */
 @Composable
 private fun CompanionSeat(
     frame: ChatSurfaceFrame,
-    anchors: CompanionSeatAnchors,
     interactive: Boolean = true,
-    /** The movable dock: grabbing the character where it sits on the dock moves the dock. */
     dock: ChatDockState? = null,
     pageWeight: () -> Float,
 ) {
     CompanionSeatOverlay(
-        anchors = anchors,
+        anchors = frame.companionAnchors,
         agentId = frame.uiState.agentId,
         pageWeight = pageWeight,
         // Over the Touch chat head the character is the head's: its own gestures (drag, tap, long press) win.
@@ -426,7 +447,7 @@ private fun PageLayerLocals(primary: Boolean, content: @Composable () -> Unit) {
  * mascot over its bar. [morph] grows it into the page.
  */
 @Composable
-private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier: Modifier, morph: SurfaceMorph, primary: Boolean) {
+private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, morph: SurfaceMorph, primary: Boolean) {
     // While it grows into the page it keeps its own docked composer.
     val composerMode = if (frame.mode == ChatSurfaceMode.FullScreen) ChatSurfaceMode.Docked else frame.mode
     // The canvas chat window's thinking cue is the ambient glow, so its rows keep still.
@@ -436,13 +457,13 @@ private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, modifier
         LocalComposerPrimary provides primary,
         LocalChatWorkingCueAnimated provides false,
     ) {
-        DockedChatPanel(dock, dockedPanelContent(frame, composerMode, ambient), modifier, morph)
+        DockedChatPanel(dock, dockedPanelContent(frame, composerMode, ambient), Modifier.fillMaxSize(), morph)
     }
 }
 
 /** The panel's content, with its composer drawn for [composerMode]. */
-private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode, ambient: ChatAmbient): DockedPanelContent =
-    DockedPanelContent(
+private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode, ambient: ChatAmbient): DockedPanelContent {
+    return DockedPanelContent(
         ambient = ambient,
         conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
         composer = { collapsed -> DockComposer(frame, composerMode, collapsed) },
@@ -455,16 +476,19 @@ private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfac
             ambient = ambient,
         ),
     )
+}
 
-private fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams = DockedReplyParams(
-    state = frame.uiState,
-    pagedTimeline = frame.pagedTimeline,
-    actions = frame.port.actions,
-    capabilities = frame.capabilities,
-    host = frame.host,
-    appearance = frame.appearance,
-    onIntent = frame.onIntent,
-)
+private fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams {
+    return DockedReplyParams(
+        state = frame.uiState,
+        pagedTimeline = frame.pagedTimeline,
+        actions = frame.port.actions,
+        capabilities = frame.capabilities,
+        host = frame.host,
+        appearance = frame.appearance,
+        onIntent = frame.onIntent,
+    )
+}
 
 /**
  * The dock's composer bar, open or minimised: one composition either way, so folding the dock
@@ -567,20 +591,16 @@ private fun DockedA2uiStack(frame: ChatSurfaceFrame) {
 @Composable
 private fun ComposerPanel(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
     ChatComposerPanel(
-        composer = frame.composer,
-        uiState = frame.uiState,
-        actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
-        capabilities = frame.capabilities,
-        host = frame.host,
-        platform = frame.platform,
-        mode = mode,
-        onIntent = frame.onIntent,
+        inputs = ComposerInputs(
+            composer = frame.composer,
+            uiState = frame.uiState,
+            actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
+            capabilities = frame.capabilities,
+            host = frame.host,
+            platform = frame.platform,
+            mode = mode,
+            onIntent = frame.onIntent,
+        ),
         modifier = modifier,
     )
 }
-
-/**
- * Past this share of the morph the page's prompt field is the one the person is arriving at: it,
- * not the panel's, tells the send flight and the mascot's gaze where the prompt is.
- */
-private const val PRIMARY_HANDOFF = 0.5f

@@ -39,13 +39,28 @@ internal data class ComposerDecisions(
 ) {
     companion object {
         fun of(composer: ChatComposerUiState, uiState: ChatUiState): ComposerDecisions {
-            val streaming = uiState.isStreaming
+            val run = ComposerRun.of(uiState)
             return ComposerDecisions(
-                sendEnabled = composerSendEnabled(composer, streaming),
-                action = composerAction(composer, streaming, uiState.isCancellingRun),
-                stopping = uiState.isCancellingRun,
+                sendEnabled = composerSendEnabled(composer, run),
+                action = composerAction(composer, run),
+                stopping = run.cancelling,
                 autocomplete = composerAutocompleteUi(composer),
             )
+        }
+    }
+}
+
+/** Where the conversation's run stands, as the composer reads it. */
+@Immutable
+internal data class ComposerRun(
+    /** A run is streaming. */
+    val streaming: Boolean,
+    /** A stop was requested and the terminal frame has not landed. */
+    val cancelling: Boolean,
+) {
+    companion object {
+        fun of(uiState: ChatUiState): ComposerRun {
+            return ComposerRun(streaming = uiState.isStreaming, cancelling = uiState.isCancellingRun)
         }
     }
 }
@@ -54,20 +69,18 @@ internal data class ComposerDecisions(
  * A draft can be sent when there is something in it and the owner takes it now, or, during a
  * run, when the owner queues follow-ups behind the run.
  */
-internal fun composerSendEnabled(composer: ChatComposerUiState, streaming: Boolean): Boolean =
-    composer.hasPayload && (composer.canSend || (streaming && composer.canQueueWhileStreaming))
+internal fun composerSendEnabled(composer: ChatComposerUiState, run: ComposerRun): Boolean {
+    if (!composer.hasPayload) return false
+    return composer.canSend || (run.streaming && composer.canQueueWhileStreaming)
+}
 
 /**
  * The action button stops the run only when there is nothing to queue: with a draft in the
  * field during a run it sends (queues) instead, and Stop returns once the field is empty.
  * A pending stop keeps the Stop button so a second press can force-clear.
  */
-internal fun composerAction(
-    composer: ChatComposerUiState,
-    streaming: Boolean,
-    cancelling: Boolean,
-): ComposerAction {
-    val stops = streaming && (cancelling || !composer.canQueueWhileStreaming || !composer.hasPayload)
+internal fun composerAction(composer: ChatComposerUiState, run: ComposerRun): ComposerAction {
+    val stops = run.streaming && (run.cancelling || !composer.canQueueWhileStreaming || !composer.hasPayload)
     return if (stops) ComposerAction.Stop else ComposerAction.Send
 }
 
@@ -75,8 +88,9 @@ internal fun composerAction(
  * Whether the keyboard-affordance strip under the composer is showing: discovery copy for an
  * empty composer that fades as soon as there is something to send.
  */
-internal fun composerHintVisible(text: String, hasAttachments: Boolean): Boolean =
-    text.isBlank() && !hasAttachments
+internal fun composerHintVisible(composer: ChatComposerUiState): Boolean {
+    return composer.text.isBlank() && composer.attachments.isEmpty()
+}
 
 @Immutable
 internal data class ComposerAutocompleteUi(
@@ -118,18 +132,23 @@ internal fun draftAfterCommand(text: String, token: ActiveToken?, command: ChatC
 }
 
 /** Server slash commands carry their `/`; app commands do not. Either way it is shown once. */
-internal fun slashed(value: String): String = if (value.startsWith("/")) value else "/$value"
+internal fun slashed(value: String): String {
+    return if (value.startsWith("/")) value else "/$value"
+}
 
 /** The draft after choosing [mention] for the `@` [token]. */
-internal fun draftAfterMention(text: String, token: ActiveToken, mention: Mentionable): String =
-    ComposerAutocomplete.replaceToken(text, token, "@${mention.insertText} ")
+internal fun draftAfterMention(text: String, token: ActiveToken, mention: Mentionable): String {
+    return ComposerAutocomplete.replaceToken(text, token, "@${mention.insertText} ")
+}
 
 /** Dictated text joins the draft after a space, or becomes the draft when it is empty. */
-internal fun draftAfterDictation(draft: String, dictated: String): String = when {
-    dictated.isBlank() -> draft
-    draft.isBlank() -> dictated
-    draft.last().isWhitespace() -> draft + dictated
-    else -> "$draft $dictated"
+internal fun draftAfterDictation(draft: String, dictated: String): String {
+    return when {
+        dictated.isBlank() -> draft
+        draft.isBlank() -> dictated
+        draft.last().isWhitespace() -> draft + dictated
+        else -> "$draft $dictated"
+    }
 }
 
 /**
@@ -137,12 +156,10 @@ internal fun draftAfterDictation(draft: String, dictated: String): String = when
  * it; adopts the owner's text with the caret at the end only when it actually changed (a reset
  * after send, a command fill, dictation).
  */
-internal fun reconcileComposerFieldValue(current: TextFieldValue, externalText: String): TextFieldValue =
-    if (current.text == externalText) {
-        current
-    } else {
-        TextFieldValue(text = externalText, selection = TextRange(externalText.length))
-    }
+internal fun reconcileComposerFieldValue(current: TextFieldValue, externalText: String): TextFieldValue {
+    if (current.text == externalText) return current
+    return TextFieldValue(text = externalText, selection = TextRange(externalText.length))
+}
 
 /** One key event at the prompt, with what Enter would do. */
 internal data class ComposerEnterKeyParams(

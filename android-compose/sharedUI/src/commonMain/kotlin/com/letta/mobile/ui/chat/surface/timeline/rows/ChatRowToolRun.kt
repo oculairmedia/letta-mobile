@@ -12,6 +12,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -83,21 +85,20 @@ import kotlin.time.Clock
  */
 @Composable
 internal fun ToolRunGroup(
-    toolCalls: ImmutableList<UiToolCall>,
+    calls: ToolRunCalls,
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
     modifier: Modifier = Modifier,
-    approvals: ImmutableList<UiApprovalRequest> = persistentListOf(),
-    startedAtTimestamp: String? = null,
 ) {
+    val toolCalls = calls.toolCalls
+    val approvals = calls.approvals
     if (toolCalls.isEmpty()) return
     // Saved by the run's first call (it stays first as the run adds more), so a disclosure the
     // person opened survives scrolling it away.
     var detailsOpen by rememberSaveable(toolCalls.first().disclosureKey()) { mutableStateOf(false) }
     val inline = context.toolDetails == ChatToolDetails.Inline
-    val reducedMotion = LocalReducedMotion.current
     val summary = remember(toolCalls, approvals) { summarizeToolRun(toolCalls, approvals) }
-    val startedAtEpochMs = remember(startedAtTimestamp) { startedAtTimestamp?.let(::parseTimestampEpochMillis) }
+    val startedAtEpochMs = remember(calls.startedAtTimestamp) { calls.startedAtTimestamp?.let(::parseTimestampEpochMillis) }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
@@ -105,26 +106,50 @@ internal fun ToolRunGroup(
         ToolRunSummaryRow(
             summary = summary,
             startedAtEpochMs = startedAtEpochMs,
-            disclosure = if (inline) ToolRunDisclosure.Inline(expanded = detailsOpen) else ToolRunDisclosure.Sheet,
+            disclosure = toolRunDisclosure(inline, detailsOpen),
             onClick = { detailsOpen = if (inline) !detailsOpen else true },
         )
-        if (inline) {
-            AnimatedVisibility(
-                visible = detailsOpen,
-                enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
-                exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
-            ) {
-                ToolRunCards(
-                    toolCalls = toolCalls,
-                    callbacks = callbacks,
-                    modifier = Modifier.testTag(ChatRowTestTags.TOOL_RUN_INLINE).padding(bottom = LettaDimens.Space.xs),
-                )
-            }
-        }
+        if (inline) ToolRunInlineCards(visible = detailsOpen, toolCalls, callbacks)
         approvals.filter { it.requiresUserInput() }.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
     if (detailsOpen && !inline) {
         ToolRunDetailsSheet(toolCalls, ToolRunSheetHeading(summary, startedAtEpochMs), callbacks) { detailsOpen = false }
+    }
+}
+
+/**
+ * The calls one summary line folds: every call, the approvals among them, and when the first of
+ * them started (the running clock's origin; null or unparseable counts from first shown).
+ */
+@Immutable
+internal data class ToolRunCalls(
+    val toolCalls: ImmutableList<UiToolCall>,
+    val approvals: ImmutableList<UiApprovalRequest> = persistentListOf(),
+    val startedAtTimestamp: String? = null,
+)
+
+private fun toolRunDisclosure(inline: Boolean, detailsOpen: Boolean): ToolRunDisclosure {
+    return if (inline) ToolRunDisclosure.Inline(expanded = detailsOpen) else ToolRunDisclosure.Sheet
+}
+
+/** The pointer host's in-place disclosure: the calls in full under the summary line. */
+@Composable
+private fun ColumnScope.ToolRunInlineCards(
+    visible: Boolean,
+    toolCalls: ImmutableList<UiToolCall>,
+    callbacks: ChatRowCallbacks,
+) {
+    val reducedMotion = LocalReducedMotion.current
+    AnimatedVisibility(
+        visible = visible,
+        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
+        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+    ) {
+        ToolRunCards(
+            toolCalls = toolCalls,
+            callbacks = callbacks,
+            modifier = Modifier.testTag(ChatRowTestTags.TOOL_RUN_INLINE).padding(bottom = LettaDimens.Space.xs),
+        )
     }
 }
 
@@ -172,12 +197,7 @@ private fun ToolRunSummaryRow(
 ) {
     val elapsed by rememberElapsedSeconds(summary.running, startedAtEpochMs)
     val click = rememberQuietClick()
-    val color = when {
-        summary.failureCount > 0 -> MaterialTheme.colorScheme.error
-        summary.awaitingApprovalCount > 0 -> MaterialTheme.colorScheme.secondary
-        click.lifted -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val color = toolRunColor(summary, click.lifted)
     val description = stringResource(Res.string.rows_tool_run_summary)
     val state = stringResource(Res.string.rows_tool_run_state, summary.toolCount, summary.failureCount, summary.awaitingApprovalCount)
     val expanded = (disclosure as? ToolRunDisclosure.Inline)?.expanded == true
@@ -213,6 +233,17 @@ private fun ToolRunSummaryRow(
             indicates = if (disclosure == ToolRunDisclosure.Sheet) ChevronIndication.Sheet else ChevronIndication.Expansion,
             contentDescription = chevronLabel,
         )
+    }
+}
+
+/** The error tint on a failure, the secondary one while an approval waits, else the quiet label lifting under a pointer. */
+@Composable
+private fun toolRunColor(summary: ToolRunSummary, lifted: Boolean): Color {
+    return when {
+        summary.failureCount > 0 -> MaterialTheme.colorScheme.error
+        summary.awaitingApprovalCount > 0 -> MaterialTheme.colorScheme.secondary
+        lifted -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 }
 

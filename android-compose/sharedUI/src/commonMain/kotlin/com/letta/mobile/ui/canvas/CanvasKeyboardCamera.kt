@@ -79,12 +79,17 @@ internal class CanvasKeyboardCamera {
     }
 }
 
+/** The board's own foot in px: its tool bar and formatting riding on the keyboard, and a margin above them. */
+internal data class CanvasBoardFoot(
+    val heightPx: Float,
+    val marginPx: Float,
+)
+
 /**
- * The band of a board [frame] left visible over an [obstruction] px tall at the window's foot,
- * less the board's own foot ([footPx], its tool bar and formatting riding on the obstruction) and
- * a [marginPx], below a [topReserve]; in board px.
+ * The band of a board [frame] left visible over the [keyboard]'s obstruction at the window's foot,
+ * less the board's own [foot], below the keyboard frame's top reserve; in board px.
  */
-internal fun keyboardBand(frame: CanvasBoardFrame, obstruction: Int, footPx: Float, marginPx: Float, topReserve: Int): Rect {
-    val visibleBottom = frame.rootHeight - obstruction - frame.top
-    return Rect(0f, topReserve.toFloat(), frame.width, visibleBottom - footPx - marginPx)
+internal fun keyboardBand(frame: CanvasBoardFrame, keyboard: CanvasKeyboardFrame, foot: CanvasBoardFoot): Rect {
+    val visibleBottom = frame.rootHeight - keyboard.obstruction - frame.top
+    return Rect(0f, keyboard.topReserve.toFloat(), frame.width, visibleBottom - foot.heightPx - foot.marginPx)
 }
