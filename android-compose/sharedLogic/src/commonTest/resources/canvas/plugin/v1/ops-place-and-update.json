@@ -1,0 +1,30 @@
+{
+  "description": "A first write, a plugin state update (57) and a person's move (41) whose lamport is older than the update: both survive, in either arrival order of the update and the move.",
+  "ops": [
+    {
+      "type": "set_plugin_element", "opId": "op-place", "actorId": "agent:agent-123", "lamport": 30,
+      "elementId": "pe-widget-7f3a", "elementType": "ext:letta.example/widget", "v": 1,
+      "frame": { "x": 600.0, "y": 80.0, "width": 320.0, "height": 240.0 },
+      "ref": "job:3d7c2e3e",
+      "props": { "status": "queued", "progress": 0, "label": "Nightly render" },
+      "snapshot": {
+        "assetRef": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "mediaType": "image/png", "width": 1024, "height": 1024, "rev": 3, "takenAtEpochMs": 1770000000000
+      },
+      "fallback": { "title": "Nightly render", "subtitle": "Example · running 42%", "icon": "image", "openUrl": "https://example.test/jobs/3d7c2e3e" },
+      "meta": { "pluginId": "letta.example", "createdBy": "agent:agent-123", "toolCallId": "call_9" }
+    },
+    {
+      "type": "set_plugin_element", "opId": "op-progress", "actorId": "plugin:letta.example", "lamport": 57,
+      "elementId": "pe-widget-7f3a",
+      "props": { "status": "running", "progress": 0.42, "label": "Nightly render" }
+    },
+    {
+      "type": "set_plugin_element", "opId": "op-move", "actorId": "local_user", "lamport": 41,
+      "elementId": "pe-widget-7f3a",
+      "frame": { "x": 1200.0, "y": 80.0, "width": 320.0, "height": 240.0 }, "owner": "user"
+    }
+  ],
+  "orders": [[0, 1, 2], [0, 2, 1], [2, 1, 0], [1, 2, 0]],
+  "expected": "element-widget.json"
+}

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+
 /** One refused op of a batch: where it is ([opIndex], `2` or `2.0` inside a batch op), what it is and the rule it breaks. */
 data class CanvasBatchViolation(val opIndex: String, val op: String, val violation: CanvasStateViolation) {
     override fun toString(): String = "op $opIndex ($op): ${violation.detail} [${violation.invariant.wire} on '${violation.subject}']"
@@ -27,9 +29,9 @@ sealed interface CanvasBatchCheck {
  * this check existed) must still accept the writes that repair it.
  */
 object CanvasBatchValidator {
-    fun check(sceneJson: String, ops: List<CanvasOp>): CanvasBatchCheck {
-        val shaped = ops.mapIndexed { index, op -> index to CanvasSceneValidator.ops(listOf(op)) }
-        val shapeProblems = shaped.mapNotNull { (index, check) -> (check as? CanvasOpsCheck.Invalid)?.let { shapeViolation(index, ops[index], it) } }
+    fun check(sceneJson: String, ops: List<CanvasOp>, kinds: PluginKindCatalog = PluginKindCatalog.Empty): CanvasBatchCheck {
+        val shaped = ops.mapIndexed { index, op -> index to CanvasSceneValidator.ops(listOf(op), kinds) }
+        val shapeProblems = shaped.flatMap { (index, check) -> (check as? CanvasOpsCheck.Invalid)?.let { shapeViolations(index, ops[index], it) }.orEmpty() }
         if (shapeProblems.isNotEmpty()) return CanvasBatchCheck.Invalid(shapeProblems)
         val normalised = shaped.flatMap { (_, check) -> (check as CanvasOpsCheck.Valid).ops }
         val projection = CanvasBatchProjection(sceneJson, CanvasBatchSteps.of(normalised, CanvasOpProjector.maxLamport(sceneJson)))
@@ -44,11 +46,20 @@ object CanvasBatchValidator {
         append("Fix them and send the whole batch again; pass dry_run: true to check a batch without publishing it.")
     }
 
-    private fun shapeViolation(index: Int, op: CanvasOp, check: CanvasOpsCheck.Invalid) = CanvasBatchViolation(
-        index.toString(), CanvasBatchSteps.describe(op),
-        CanvasStateViolation(
-            if (op is CanvasOp.SetDocumentOp) CanvasStateInvariant.DOCUMENT_DECODES else CanvasStateInvariant.ELEMENT_SHAPE,
-            CanvasBatchSteps.subjectOf(op), check.message,
-        ),
-    )
+    private fun shapeViolations(index: Int, op: CanvasOp, check: CanvasOpsCheck.Invalid): List<CanvasBatchViolation> {
+        val located = check.problems.filter { it.path != null }
+        if (op !is CanvasOp.SetPluginElementOp || located.isEmpty()) {
+            return listOf(violation(index, op, CanvasStateViolation(shapeInvariant(op), CanvasBatchSteps.subjectOf(op), check.message)))
+        }
+        // One per rule broken, each named by where it is: `pe-1/fallback/title`.
+        return located.map { problem ->
+            violation(index, op, CanvasStateViolation(CanvasStateInvariant.PLUGIN_ELEMENT_SHAPE, op.elementId + problem.path, "${problem.path} ${problem.reason}"))
+        }
+    }
+
+    private fun shapeInvariant(op: CanvasOp): CanvasStateInvariant =
+        if (op is CanvasOp.SetDocumentOp) CanvasStateInvariant.DOCUMENT_DECODES else CanvasStateInvariant.ELEMENT_SHAPE
+
+    private fun violation(index: Int, op: CanvasOp, violation: CanvasStateViolation) =
+        CanvasBatchViolation(index.toString(), CanvasBatchSteps.describe(op), violation)
 }

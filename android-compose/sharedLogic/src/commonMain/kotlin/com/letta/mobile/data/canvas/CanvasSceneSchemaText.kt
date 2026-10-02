@@ -33,14 +33,33 @@ internal object CanvasSceneSchemaText {
         append("Nothing was published: the apps cannot draw ")
         append(if (problems.size == 1) "this write." else "${problems.size} parts of this write.")
         problems.forEach { append("\n- ").append(subject(it)).append(' ').append(it.reason) }
+        val suggested = problems.mapNotNull { it.suggested }.distinct()
+        if (suggested.isNotEmpty()) drawnHints(suggested)
+        if (problems.any { it.path != null }) append("\n").append(PLUGIN_OPS)
+    }
+
+    private fun StringBuilder.drawnHints(suggested: List<CanvasElementSpec>) {
         append("\nAllowed element types: ${CanvasSceneSchema.allowedTypes.joinToString(", ")}. ")
         append("Lines and arrows are Shapes (shapeType LINE|ARROW); notes/documents are canvas_apply_ops set_document, not elements.")
-        problems.map { it.suggested }.distinct().forEach { append("\n${it.type} example: ${encode(it.example)}") }
+        suggested.forEach { append("\n${it.type} example: ${encode(it.example)}") }
         append("\nScene: {\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}. See canvas_replace_scene's description for every field.")
     }
 
-    private fun subject(problem: CanvasElementProblem): String =
-        problem.elementId?.let { "element '$it'" } ?: "the scene (or an element without an id)"
+    private fun subject(problem: CanvasElementProblem): String = when {
+        problem.path != null -> "plugin element '${problem.elementId}' at ${problem.path}"
+        problem.elementId != null -> "element '${problem.elementId}'"
+        else -> "the scene (or an element without an id)"
+    }
+
+    /** The plugin element ops in a paragraph, for canvas_apply_ops' description and a plugin element refusal. */
+    const val PLUGIN_OPS: String =
+        "set_plugin_element {elementId, elementType \"ext:<pluginId>/<kind>\", v, frame?, owner?, ref?, props?, snapshot?, " +
+            "fallback?, meta?} places or updates a plugin's element (frame in world units; props and meta flat scalars, " +
+            "props at most 4 KiB; snapshot {assetRef \"sha256:...\", mediaType?, width?, height?, rev?}; fallback " +
+            "{title, subtitle?, icon?, openUrl? http(s)|meridian:} is the card every app draws without the plugin). " +
+            "Null fields keep what the element has; a move and a state update never overwrite each other. The first " +
+            "write needs elementType, v, fallback.title and a snapshot or fallback.openUrl. " +
+            "remove_plugin_element {elementId} takes it off."
 
     private fun typeLine(schema: CanvasSceneSchema, spec: CanvasElementSpec): String =
         "${spec.type}: requires ${spec.required.joinToString(", ") { field(schema, it) }}; " +

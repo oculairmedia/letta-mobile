@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -7,8 +8,8 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * A projected scene read once for the state checks: its elements (in order, duplicates kept), its
- * live documents and the label-owner and connector-binding tables the projector keeps beside
- * them. [of] is null when the scene is not a JSON object with an `elements` array.
+ * live documents, its plugin element entries and the label-owner and connector-binding tables the
+ * projector keeps beside them. [of] is null when the scene is not a JSON object with an `elements` array.
  */
 internal class CanvasSceneIndex private constructor(
     /** Each element, or null where the array holds something that is not an object. */
@@ -16,13 +17,18 @@ internal class CanvasSceneIndex private constructor(
     val documents: List<CanvasSceneDocument>,
     val labelOwners: Map<String, String>,
     val arrowBindings: Map<String, CanvasArrowBinding>,
+    /** The plugin element entries that carry a type (tombstones and partial entries left out), decodable or not. */
+    val pluginEntries: List<JsonObject> = emptyList(),
 ) {
     val elementIds: Set<String> = elements.mapNotNull { it?.idOrNull() }.toSet()
     val documentIds: Set<String> = documents.map { it.id }.toSet()
+    val pluginElementIds: Set<String> = pluginEntries.mapNotNull { it.idOrNull() }.toSet()
 
     fun hasElement(id: String): Boolean = id in elementIds
 
     fun hasDocument(id: String): Boolean = id in documentIds
+
+    fun hasPluginElement(id: String): Boolean = id in pluginElementIds
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
@@ -36,6 +42,7 @@ internal class CanvasSceneIndex private constructor(
                 documents = CanvasOpProjector.documentsOf(source),
                 labelOwners = CanvasOpProjector.labelOwnersOf(source),
                 arrowBindings = CanvasOpProjector.arrowBindingsOf(source),
+                pluginEntries = CanvasPluginElements.typedEntries(root),
             )
         }
 
