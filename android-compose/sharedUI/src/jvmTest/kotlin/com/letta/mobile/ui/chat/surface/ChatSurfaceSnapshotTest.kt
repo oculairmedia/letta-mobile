@@ -86,15 +86,20 @@ class ChatSurfaceSnapshotTest {
         model = ChatModelUiState(currentHandle = "anthropic/claude-sonnet", currentLabel = "Sonnet"),
     )
 
-    private fun snapshot(
-        name: String,
-        presentation: ChatSurfacePresentation,
-        dark: Boolean,
-        withCanvas: Boolean = false,
-        dock: ChatDockGeometry = ChatDockGeometry.Default,
-        uiState: ChatUiState = state,
-        withMascot: Boolean = false,
-    ) = runComposeUiTest {
+    /** One page to draw and save: its name, presentation, theme, canvas, dock, state and mascot. */
+    private data class Scene(
+        val name: String,
+        val presentation: ChatSurfacePresentation,
+        val dark: Boolean,
+        val withCanvas: Boolean = false,
+        val dock: ChatDockGeometry = ChatDockGeometry.Default,
+        /** Null draws the fixture's [state]. */
+        val uiState: ChatUiState? = null,
+        val withMascot: Boolean = false,
+    )
+
+    private fun Scene.snapshot() = runComposeUiTest {
+        val uiState = this@snapshot.uiState ?: state
         // The mascot's layer keeps a frame loop running, so the page never idles: step the clock.
         if (withMascot) mainClock.autoAdvance = false
         setContent {
@@ -167,42 +172,42 @@ class ChatSurfaceSnapshotTest {
     }
 
     @Test
-    fun fullScreenLight() = snapshot("full-screen-light", ChatSurfacePresentation.ChatFirst, dark = false)
+    fun fullScreenLight() = Scene("full-screen-light", ChatSurfacePresentation.ChatFirst, dark = false).snapshot()
 
     @Test
-    fun fullScreenDark() = snapshot("full-screen-dark", ChatSurfacePresentation.ChatFirst, dark = true)
+    fun fullScreenDark() = Scene("full-screen-dark", ChatSurfacePresentation.ChatFirst, dark = true).snapshot()
 
     @Test
-    fun dockedLight() = snapshot("docked-light", ChatSurfacePresentation.CanvasFirst, dark = false)
+    fun dockedLight() = Scene("docked-light", ChatSurfacePresentation.CanvasFirst, dark = false).snapshot()
 
     @Test
     fun dockedUnderCanvas() =
-        snapshot("docked-canvas", ChatSurfacePresentation.CanvasFirst, dark = false, withCanvas = true, withMascot = true)
+        Scene("docked-canvas", ChatSurfacePresentation.CanvasFirst, dark = false, withCanvas = true, withMascot = true).snapshot()
 
     @Test
-    fun dockedPanelMovedAndResized() = snapshot(
+    fun dockedPanelMovedAndResized() = Scene(
         "docked-panel-moved",
         ChatSurfacePresentation.CanvasFirst,
         dark = true,
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 1f, anchorY = 0.3f, widthDp = 460f, heightDp = 520f),
         withMascot = true,
-    )
+    ).snapshot()
 
     /** Dragged against the canvas's top edge: the badge above the panel stays on the canvas. */
     @Test
-    fun dockedPanelAtTheTopKeepsItsBadge() = snapshot(
+    fun dockedPanelAtTheTopKeepsItsBadge() = Scene(
         "docked-panel-top",
         ChatSurfacePresentation.CanvasFirst,
         dark = false,
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 0f, anchorY = 0f, widthDp = 420f, heightDp = 360f),
         withMascot = true,
-    )
+    ).snapshot()
 
     /** Minimised just after a send: the agent thinking over its bar, no panel. */
     @Test
-    fun dockedPanelCollapsed() = snapshot(
+    fun dockedPanelCollapsed() = Scene(
         "docked-panel-collapsed",
         ChatSurfacePresentation.CanvasFirst,
         dark = false,
@@ -210,70 +215,70 @@ class ChatSurfaceSnapshotTest {
         dock = ChatDockGeometry(anchorX = 0.1f, anchorY = 1f, widthDp = 520f, collapsed = true),
         uiState = state.copy(isAgentTyping = true),
         withMascot = true,
-    )
+    ).snapshot()
 
     /** Minimised with the reply in: the bubble beside the agent, tail towards it. */
     @Test
-    fun dockedCollapsedBubble() = snapshot(
+    fun dockedCollapsedBubble() = Scene(
         "docked-collapsed-bubble",
         ChatSurfacePresentation.CanvasFirst,
         dark = false,
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 0.5f, anchorY = 1f, widthDp = 640f, collapsed = true),
         uiState = state.copy(messages = persistentListOf(messages[0], messages[1])),
-    )
+    ).snapshot()
 
     @Test
-    fun dockedCollapsedBubbleDark() = snapshot(
+    fun dockedCollapsedBubbleDark() = Scene(
         "docked-collapsed-bubble-dark",
         ChatSurfacePresentation.CanvasFirst,
         dark = true,
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 0.5f, anchorY = 1f, widthDp = 640f, collapsed = true),
         uiState = state.copy(messages = persistentListOf(messages[0], messages[1])),
-    )
+    ).snapshot()
 
     /** Docked while the agent works: the panel's ambient glow is the thinking cue. */
     @Test
-    fun dockedThinkingDark() = snapshot(
+    fun dockedThinkingDark() = Scene(
         "docked-thinking-dark",
         ChatSurfacePresentation.CanvasFirst,
         dark = true,
         withCanvas = true,
         uiState = state.copy(isAgentTyping = true),
-    )
+    ).snapshot()
 
     @Test
-    fun dockedThinkingLight() = snapshot(
+    fun dockedThinkingLight() = Scene(
         "docked-thinking-light",
         ChatSurfacePresentation.CanvasFirst,
         dark = false,
         withCanvas = true,
         uiState = state.copy(isAgentTyping = true),
-    )
+    ).snapshot()
 
     /** A failed run: the glow takes the error tint. */
     @Test
-    fun dockedFailedDark() = snapshot(
+    fun dockedFailedDark() = Scene(
         "docked-failed-dark",
         ChatSurfacePresentation.CanvasFirst,
         dark = true,
         withCanvas = true,
         uiState = state.copy(error = "The run failed"),
-    )
+    ).snapshot()
 
     /** Minimised while the agent thinks: the halo around the mascot, no bubble. */
     @Test
-    fun dockedCollapsedThinkingDark() = snapshot(
+    fun dockedCollapsedThinkingDark() = Scene(
         "docked-collapsed-thinking-dark",
         ChatSurfacePresentation.CanvasFirst,
         dark = true,
         withCanvas = true,
         dock = ChatDockGeometry(anchorX = 0.1f, anchorY = 1f, widthDp = 520f, collapsed = true),
         uiState = state.copy(isAgentTyping = true),
-    )
+    ).snapshot()
 
     @Test
     fun fullScreenOverCanvas() =
-        snapshot("full-screen-canvas", ChatSurfacePresentation.ChatFirst, dark = true, withCanvas = true, withMascot = true)
+        Scene("full-screen-canvas", ChatSurfacePresentation.ChatFirst, dark = true, withCanvas = true, withMascot = true).snapshot()
 }

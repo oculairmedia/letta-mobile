@@ -193,17 +193,14 @@ private fun TouchChatHead(content: TouchHeadContent) {
         if (popupShown) {
             HeadPopup(
                 turn = turn,
-                agentName = content.agentName,
+                content = content,
                 placement = PopupPlacement(lane, right, position),
-                onOpen = content.openChat,
                 onDismiss = { dismissedTurn = turn.dismissKey },
             )
         }
         ChatHead(
             content = content,
-            position = position,
-            drag = drag,
-            lane = lane,
+            place = HeadPlace(lane, drag, position),
             onTap = { if (hasReply) hidden = !hidden else content.openChat() },
         )
         if (turn.busy && !turn.hasReply) ThinkingAnnouncement(content.agentName)
@@ -231,24 +228,24 @@ private class HeadLane(val widthDp: Float, val heightDp: Float) {
     }
 }
 
+/** Where the head is: its lane, its drag off the resting place, and its top-left now. */
+@Stable
+private class HeadPlace(val lane: HeadLane, val drag: Animatable<Offset, *>, val position: () -> Offset)
+
 /**
  * The disc with the agent: its mascot (the page's one companion seat stands over it, scaled to
  * the disc) or, without one, the agent's sphere. Drag it anywhere; let go and it snaps to the
  * nearer edge. Nothing glows around it: the mascot's animation says the agent is working.
  */
 @Composable
-private fun ChatHead(
-    content: TouchHeadContent,
-    position: () -> Offset,
-    drag: Animatable<Offset, *>,
-    lane: HeadLane,
-    onTap: () -> Unit,
-) {
+private fun ChatHead(content: TouchHeadContent, place: HeadPlace, onTap: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val position = place.position
+    val drag = place.drag
     // The gesture detectors outlive a composition (they are keyed on the dock alone): whatever
     // they read must be the latest, or a second drag snaps from where the head rested at first.
     val reducedMotion by rememberUpdatedState(LocalReducedMotion.current)
-    val currentLane by rememberUpdatedState(lane)
+    val currentLane by rememberUpdatedState(place.lane)
     val currentTap by rememberUpdatedState(onTap)
     val currentPosition by rememberUpdatedState(position)
     val openAgent = content.openAgent
@@ -319,22 +316,7 @@ private class PopupPlacement(val lane: HeadLane, val headOnRight: Boolean, val h
  * chat; the x hides it until the next prompt.
  */
 @Composable
-private fun HeadPopup(
-    turn: CollapsedTurn,
-    agentName: String,
-    placement: PopupPlacement,
-    onOpen: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val openLabel = stringResource(Res.string.chat_surface_docked_reply_expand)
-    val working = stringResource(Res.string.chat_surface_collapsed_working)
-    val reply = if (agentName.isBlank()) {
-        stringResource(Res.string.chat_surface_collapsed_reply_unnamed, turn.text)
-    } else {
-        stringResource(Res.string.chat_surface_collapsed_reply, agentName, turn.text)
-    }
-    val announcement = listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working.takeIf { turn.working }).joinToString(" ")
-    val lane = placement.lane
+private fun HeadPopup(turn: CollapsedTurn, content: TouchHeadContent, placement: PopupPlacement, onDismiss: () -> Unit) {
     // The head's place moves every frame of a drag; the popup recomposes only when it changes half.
     val tailAtTop by remember(placement) { derivedStateOf { placement.tailAtTop() } }
     val shape = remember(placement.headOnRight, tailAtTop) {
@@ -346,32 +328,8 @@ private fun HeadPopup(
             tailAtTop = tailAtTop,
         )
     }
-    val tail = ChatSurfaceDimens.collapsedBubbleTailWidth
-    // Beside the head, a compact bubble: what is left between the head and the far margin, at most
-    // a share of the screen and a fixed cap.
-    val besideHead = lane.widthDp - lane.size - 2 * ChatHeadDimens.edgeMargin.value - ChatHeadDimens.popupGap.value
-    val maxWidth = minOf(besideHead, lane.widthDp * ChatHeadDimens.popupMaxWidthFraction, ChatHeadDimens.popupMaxWidth.value)
     Surface(
-        modifier = Modifier
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(
-                    Constraints(maxWidth = maxWidth.dp.roundToPx(), maxHeight = constraints.maxHeight),
-                )
-                layout(constraints.maxWidth, constraints.maxHeight) {
-                    val head = placement.head()
-                    val gap = ChatHeadDimens.popupGap.toPx()
-                    val headLeft = head.x.dp.toPx()
-                    val headTop = head.y.dp.toPx()
-                    val headSize = lane.size.dp.toPx()
-                    val x = if (placement.headOnRight) headLeft - gap - placeable.width else headLeft + headSize + gap
-                    val y = if (tailAtTop) headTop else headTop + headSize - placeable.height
-                    placeable.place(
-                        x.roundToInt(),
-                        y.roundToInt().coerceIn(0, (constraints.maxHeight - placeable.height).coerceAtLeast(0)),
-                    )
-                }
-            }
-            .testTag(TOUCH_POPUP_TAG),
+        modifier = popupLayout(placement, tailAtTop).testTag(TOUCH_POPUP_TAG),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -379,50 +337,109 @@ private fun HeadPopup(
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
     ) {
         Box {
-            Column(
-                Modifier
-                    .clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
-                    .semantics {
-                        contentDescription = announcement
-                        if (!turn.streaming) liveRegion = LiveRegionMode.Polite
-                    }
-                    .padding(
-                        start = ChatHeadDimens.popupPaddingHorizontal + tail * (if (placement.headOnRight) 0f else 1f),
-                        end = ChatHeadDimens.popupPaddingHorizontal + LettaDimens.Control.iconButtonSm + tail * (if (placement.headOnRight) 1f else 0f),
-                        top = ChatHeadDimens.popupPaddingVertical,
-                        bottom = ChatHeadDimens.popupPaddingVertical,
-                    ),
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-            ) {
-                if (turn.text.isNotBlank()) {
-                    BubbleText(
-                        turn = turn,
-                        maxHeight = ChatHeadDimens.popupMaxHeight,
-                        // A size down from the timeline's body: a bubble's aside, in sp so it scales with the font.
-                        textStyle = MaterialTheme.typography.bodySmall,
-                        fadeLength = ChatHeadDimens.popupFadeLength,
-                    )
-                }
-                if (turn.working) WorkingLine(working)
-                if (turn.needsInput) NeedsInputChip(onOpen)
-            }
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = tail * (if (placement.headOnRight) 1f else 0f))
-                    .padding(LettaDimens.Space.xs)
-                    .size(LettaDimens.Control.iconButtonSm)
-                    .testTag(TOUCH_POPUP_DISMISS_TAG),
-            ) {
-                Icon(
-                    Lucide.X,
-                    contentDescription = stringResource(Res.string.chat_surface_docked_reply_dismiss),
-                    modifier = Modifier.size(LettaDimens.Control.iconSm),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            PopupReply(turn, content, placement)
+            PopupDismiss(placement, onDismiss, Modifier.align(Alignment.TopEnd))
         }
+    }
+}
+
+/**
+ * Lays the popup out beside the head: what is left between the head and the far margin, at most a
+ * share of the screen and a fixed cap, its foot on the head's foot ([tailAtTop] false) or its top
+ * on the head's top, kept on screen.
+ */
+@Composable
+private fun popupLayout(placement: PopupPlacement, tailAtTop: Boolean): Modifier {
+    val lane = placement.lane
+    val besideHead = lane.widthDp - lane.size - 2 * ChatHeadDimens.edgeMargin.value - ChatHeadDimens.popupGap.value
+    val maxWidth = minOf(besideHead, lane.widthDp * ChatHeadDimens.popupMaxWidthFraction, ChatHeadDimens.popupMaxWidth.value)
+    return Modifier.layout { measurable, constraints ->
+        val placeable = measurable.measure(
+            Constraints(maxWidth = maxWidth.dp.roundToPx(), maxHeight = constraints.maxHeight),
+        )
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val head = placement.head()
+            val gap = ChatHeadDimens.popupGap.toPx()
+            val headLeft = head.x.dp.toPx()
+            val headTop = head.y.dp.toPx()
+            val headSize = lane.size.dp.toPx()
+            val x = if (placement.headOnRight) headLeft - gap - placeable.width else headLeft + headSize + gap
+            val y = if (tailAtTop) headTop else headTop + headSize - placeable.height
+            placeable.place(
+                x.roundToInt(),
+                y.roundToInt().coerceIn(0, (constraints.maxHeight - placeable.height).coerceAtLeast(0)),
+            )
+        }
+    }
+}
+
+/** What the popup says, as one announcement: the reply (with who says it) and the working line. */
+@Composable
+private fun popupAnnouncement(turn: CollapsedTurn, agentName: String): String {
+    val working = stringResource(Res.string.chat_surface_collapsed_working)
+    val reply = if (agentName.isBlank()) {
+        stringResource(Res.string.chat_surface_collapsed_reply_unnamed, turn.text)
+    } else {
+        stringResource(Res.string.chat_surface_collapsed_reply, agentName, turn.text)
+    }
+    return listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working.takeIf { turn.working }).joinToString(" ")
+}
+
+/** The popup's reply, working line and input chip; a tap opens the chat. */
+@Composable
+private fun PopupReply(turn: CollapsedTurn, content: TouchHeadContent, placement: PopupPlacement) {
+    val openLabel = stringResource(Res.string.chat_surface_docked_reply_expand)
+    val working = stringResource(Res.string.chat_surface_collapsed_working)
+    val announcement = popupAnnouncement(turn, content.agentName)
+    val onOpen = content.openChat
+    val tail = ChatSurfaceDimens.collapsedBubbleTailWidth
+    Column(
+        Modifier
+            .clickable(onClickLabel = openLabel, role = Role.Button, onClick = onOpen)
+            .semantics {
+                contentDescription = announcement
+                if (!turn.streaming) liveRegion = LiveRegionMode.Polite
+            }
+            .padding(
+                start = ChatHeadDimens.popupPaddingHorizontal + tail * (if (placement.headOnRight) 0f else 1f),
+                end = ChatHeadDimens.popupPaddingHorizontal + LettaDimens.Control.iconButtonSm + tail * (if (placement.headOnRight) 1f else 0f),
+                top = ChatHeadDimens.popupPaddingVertical,
+                bottom = ChatHeadDimens.popupPaddingVertical,
+            ),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        if (turn.text.isNotBlank()) {
+            BubbleText(
+                turn = turn,
+                maxHeight = ChatHeadDimens.popupMaxHeight,
+                // A size down from the timeline's body: a bubble's aside, in sp so it scales with the font.
+                textStyle = MaterialTheme.typography.bodySmall,
+                fadeLength = ChatHeadDimens.popupFadeLength,
+            )
+        }
+        if (turn.working) WorkingLine(working)
+        if (turn.needsInput) NeedsInputChip(onOpen)
+    }
+}
+
+/** The popup's x: hides it until the next prompt. */
+@Composable
+private fun PopupDismiss(placement: PopupPlacement, onDismiss: () -> Unit, modifier: Modifier) {
+    val tail = ChatSurfaceDimens.collapsedBubbleTailWidth
+    IconButton(
+        onClick = onDismiss,
+        modifier = modifier
+            .padding(end = tail * (if (placement.headOnRight) 1f else 0f))
+            .padding(LettaDimens.Space.xs)
+            .size(LettaDimens.Control.iconButtonSm)
+            .testTag(TOUCH_POPUP_DISMISS_TAG),
+    ) {
+        Icon(
+            Lucide.X,
+            contentDescription = stringResource(Res.string.chat_surface_docked_reply_dismiss),
+            modifier = Modifier.size(LettaDimens.Control.iconSm),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
