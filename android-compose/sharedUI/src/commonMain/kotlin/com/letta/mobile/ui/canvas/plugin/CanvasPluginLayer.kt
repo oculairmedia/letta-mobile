@@ -47,7 +47,7 @@ import com.letta.mobile.ui.canvas.chromeMargin
 import com.letta.mobile.ui.canvas.dragHandle
 import com.letta.mobile.ui.canvas.insideChromeMargin
 import com.letta.mobile.ui.canvas.onBoard
-import com.letta.mobile.ui.canvas.recordingOrJust
+import com.letta.mobile.ui.canvas.recordingStep
 import io.ak1.drawbox.domain.model.ResizeHandle
 import io.ak1.drawbox.domain.model.Viewport
 import kotlinx.coroutines.CoroutineScope
@@ -94,7 +94,7 @@ fun rememberPluginBoard(session: CanvasSession, revision: CanvasDocument?, asset
  * core is always the [PluginFallbackCard]. A press selects it ([PluginBoardSelection.onSelect]); the selected one wears
  * the board's selection chrome and resizes from its handles; a drag on its handle bar moves it.
  * Moves and resizes are written when the gesture ends, as one op that carries only the frame,
- * owned by USER, through the board's history recorder.
+ * owned by USER, and recorded as one undoable step in the board's history.
  *
  * Board content, so laid out in world units ([InWorldUnits]); the [viewport] is read in layout and
  * draw only, so a pan or zoom recomposes no element. Each element is its own keyed group with its
@@ -228,7 +228,7 @@ private fun rememberPluginChrome(
     }
 }
 
-/** The writes a person makes to element [id], each through the board's history recorder. */
+/** The writes a person makes to element [id], each recorded as one step in the board's history. */
 private class ElementEdits(
     private val session: CanvasSession,
     private val id: String,
@@ -236,11 +236,11 @@ private class ElementEdits(
     private val recorder: CanvasDocumentRecorder?,
 ) {
     fun move(frame: CanvasDocumentFrame) {
-        scope.launch { recorder.recordingOrJust("moving a plugin element") { runCatching { PluginElementEdits.move(session, id, frame) } } }
+        scope.launch { recorder.recordingStep { runCatching { PluginElementEdits.move(session, id, frame) }.getOrNull() } }
     }
 
     fun remove() {
-        scope.launch { recorder.recordingOrJust("deleting a plugin element") { runCatching { PluginElementEdits.remove(session, id) } } }
+        scope.launch { recorder.recordingStep { runCatching { PluginElementEdits.remove(session, id) }.getOrNull() } }
     }
 }
 

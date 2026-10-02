@@ -33,6 +33,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.test.swipe
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
+import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSession
@@ -40,6 +41,8 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
 import com.letta.mobile.data.storage.AssetStore
 import com.letta.mobile.data.storage.InMemoryAssetStore
+import com.letta.mobile.ui.canvas.CanvasDocumentRecorder
+import com.letta.mobile.ui.canvas.LocalCanvasDocumentRecorder
 import com.letta.mobile.ui.canvas.LocalNoteCompositionProbe
 import io.ak1.drawbox.domain.model.Viewport
 import kotlin.test.Test
@@ -68,6 +71,14 @@ class CanvasPluginLayerUiTest {
         val probe: ((String) -> Unit)? = null,
     ) {
         val opened = mutableListOf<String>()
+        val steps = mutableListOf<CanvasHistory.Step.Documents>()
+        val recorder = object : CanvasDocumentRecorder {
+            override suspend fun recording(label: String, block: suspend () -> Unit) = block()
+
+            override fun record(step: CanvasHistory.Step.Documents) {
+                steps += step
+            }
+        }
         val uriHandler = object : UriHandler {
             override fun openUri(uri: String) {
                 opened += uri
@@ -81,6 +92,7 @@ class CanvasPluginLayerUiTest {
             CompositionLocalProvider(
                 LocalNoteCompositionProbe provides host.probe,
                 LocalUriHandler provides host.uriHandler,
+                LocalCanvasDocumentRecorder provides host.recorder,
                 LocalPluginAvailability provides host.availability,
                 LocalPluginElementRenderers provides host.renderers,
             ) {
@@ -155,7 +167,8 @@ class CanvasPluginLayerUiTest {
     @Test
     fun aDragOnTheHandleBarIsWrittenAsOneUserFrameOp() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val fixture = PluginCardFixtures.board()
-        show(fixture.session, fixture.assets, Host())
+        val host = Host()
+        show(fixture.session, fixture.assets, host)
         val before = fixture.session.element("pe-render")
         val opsBefore = runBlocking { fixture.session.opLog.getOps(fixture.session.canvasId) }.size
 
@@ -177,6 +190,11 @@ class CanvasPluginLayerUiTest {
         val move = ops.last() as CanvasOp.SetPluginElementOp
         assertEquals(CanvasSession.LOCAL_USER_ACTOR_ID, move.actorId)
         assertEquals(listOf(null, null, null, null, null, null, null), listOf(move.elementType, move.v, move.ref, move.props, move.snapshot, move.fallback, move.meta))
+
+        // One step in the board's history, and undoing it puts the element back.
+        val step = host.steps.single()
+        runBlocking { fixture.session.applyLocalStamped(step.undo) }
+        assertEquals(before.frame, fixture.session.element("pe-render").frame)
     }
 
     @Test

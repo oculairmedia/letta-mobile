@@ -3,6 +3,7 @@ package com.letta.mobile.ui.canvas
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.KeyEvent
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.ui.canvas.plugin.PluginElementEdits
@@ -30,6 +31,18 @@ import kotlin.time.ExperimentalTime
  */
 internal suspend fun CanvasBoard.recordingDocuments(label: String, block: suspend () -> Unit) {
     CanvasWorkspaceSupport.recordDocumentChange(work.recorder, DocumentChangeRequest(label = label), block)
+}
+
+/** The recorder editors composed inside the board record their changes through. */
+internal fun boardDocumentRecorder(board: CanvasBoard): CanvasDocumentRecorder = object : CanvasDocumentRecorder {
+    override suspend fun recording(label: String, block: suspend () -> Unit) = board.recordingDocuments(label, block)
+
+    override fun record(step: CanvasHistory.Step.Documents) = board.recordStep(step)
+}
+
+/** Records [step] as one undoable step, unless it is undo or redo being applied. */
+internal fun CanvasBoard.recordStep(step: CanvasHistory.Step.Documents) {
+    if (!work.recorder.isApplyingHistory()) work.recorder.history.record(step)
 }
 
 /**

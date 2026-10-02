@@ -2,13 +2,13 @@ package com.letta.mobile.ui.canvas.plugin
 
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
-import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
 import com.letta.mobile.data.storage.InMemoryAssetStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -74,21 +74,31 @@ class PluginElementModelTest {
     }
 
     @Test
-    fun aMoveCarriesOnlyTheFrameOwnedByThePerson() {
-        val op = PluginElementEdits.moveOp("pe", CanvasDocumentFrame(1f, 2f, 3f, 4f))
-        assertEquals(CanvasGeometryOwner.USER, op.owner)
-        assertEquals(CanvasSession.LOCAL_USER_ACTOR_ID, op.actorId)
-        assertEquals(listOf(null, null, null, null, null, null, null), listOf(op.elementType, op.v, op.ref, op.props, op.snapshot, op.fallback, op.meta))
+    fun aMoveIsOneUndoableStepThatGivesTheFrameBack() = runBlocking {
+        val session = PluginCardFixtures.session()
+        val element = PluginCardFixtures.element("a")
+        PluginCardFixtures.place(session, element)
+        val step = assertNotNull(PluginElementEdits.move(session, "a", CanvasDocumentFrame(100f, 120f, 300f, 240f)))
+        val moved = PluginElementEdits.elementsOf(session).single()
+        assertEquals(CanvasDocumentFrame(100f, 120f, 300f, 240f), moved.frame)
+        assertEquals(CanvasGeometryOwner.USER, moved.owner)
+        assertEquals(element.props, moved.props)
+        assertNull(PluginElementEdits.move(session, "a", CanvasDocumentFrame(100f, 120f, 300f, 240f)), "nothing moved, nothing to undo")
+
+        session.applyLocalStamped(step.undo)
+        assertEquals(element.frame, PluginElementEdits.elementsOf(session).single().frame)
     }
 
     @Test
     fun aRemovalRemovesTheElementAndIgnoresOneThatIsNotThere() = runBlocking {
         val session = PluginCardFixtures.session()
         PluginCardFixtures.place(session, PluginCardFixtures.element("a"))
-        PluginElementEdits.remove(session, "missing")
+        assertNull(PluginElementEdits.remove(session, "missing"))
         assertEquals(listOf("a"), PluginElementEdits.elementsOf(session).map { it.id })
-        PluginElementEdits.remove(session, "a")
+        val step = assertNotNull(PluginElementEdits.remove(session, "a"))
         assertTrue(PluginElementEdits.elementsOf(session).isEmpty())
+        session.applyLocalStamped(step.undo)
+        assertEquals(listOf("a"), PluginElementEdits.elementsOf(session).map { it.id })
     }
 
     @Test
