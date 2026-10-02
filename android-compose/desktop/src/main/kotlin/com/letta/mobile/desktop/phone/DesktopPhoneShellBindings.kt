@@ -1,7 +1,13 @@
 package com.letta.mobile.desktop.phone
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
 import com.letta.mobile.desktop.DesktopDestination
 
 /*
@@ -29,10 +35,37 @@ internal fun DesktopPhoneChrome?.agentPaneVisible(sidebarVisible: Boolean): Bool
 internal fun isBareChatPage(destination: DesktopDestination, hasSharedChatPage: Boolean, editingAgentId: String?): Boolean =
     destination == DesktopDestination.Conversations && hasSharedChatPage && editingAgentId == null
 
-/** [content] only on the desktop: what a phone's window says nothing about (its width, the side panes). */
+/** Reports the shell's width to the desktop layout; a phone's width says nothing about the layout the person saved. */
 @Composable
-internal fun DesktopOnly(phone: DesktopPhoneChrome?, content: @Composable () -> Unit) {
-    if (phone == null) content()
+internal fun ReportShellWidth(phone: DesktopPhoneChrome?, widthDp: Float, report: (Float) -> Unit) {
+    if (phone != null) return
+    LaunchedEffect(widthDp) { report(widthDp) }
+}
+
+/**
+ * The shell's row: the agent rail and sidebar ([navigationPanes]) beside [content] on the desktop;
+ * on a phone, [content] alone, with the panes in a drawer over it.
+ */
+@Composable
+internal fun DesktopShellRow(
+    phone: DesktopPhoneChrome?,
+    reducedMotion: Boolean,
+    navigationPanes: @Composable RowScope.() -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    if (phone == null) {
+        Row(Modifier.fillMaxSize()) {
+            navigationPanes()
+            content()
+        }
+        return
+    }
+    Box(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxSize(), content = content)
+        PhoneNavigationDrawer(open = phone.drawerOpen, onDismiss = { phone.drawerOpen = false }, reducedMotion = reducedMotion) {
+            Row(Modifier.fillMaxHeight(), content = navigationPanes)
+        }
+    }
 }
 
 /** A phone's drawer closes once something in it was picked: a destination, a conversation, an agent to edit. */
@@ -45,11 +78,4 @@ internal fun ClosePhoneDrawerOnNavigation(
 ) {
     if (phone == null) return
     LaunchedEffect(destination, conversationId, editingAgentId) { phone.drawerOpen = false }
-}
-
-/** The desktop's navigation panes as the phone's drawer; nothing on the desktop, where they sit beside the content. */
-@Composable
-internal fun PhoneDrawerHost(phone: DesktopPhoneChrome?, reducedMotion: Boolean, panes: @Composable () -> Unit) {
-    if (phone == null) return
-    PhoneNavigationDrawer(open = phone.drawerOpen, onDismiss = { phone.drawerOpen = false }, reducedMotion = reducedMotion, content = panes)
 }
