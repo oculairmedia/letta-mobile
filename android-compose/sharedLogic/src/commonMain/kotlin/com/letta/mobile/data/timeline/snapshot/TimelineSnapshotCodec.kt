@@ -13,6 +13,7 @@ import com.letta.mobile.data.timeline.timelineCurrentTimeMillis
 import com.letta.mobile.data.timeline.timelineNow
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.serialization.json.Json
@@ -273,6 +274,99 @@ suspend fun TimelineEvent.Confirmed.toStoredTimelineEventWithImageBodies(
         }
     },
 )
+
+/**
+ * Gives each image the inline pointer had to drop (no thumbnail, no reference, bytes still in
+ * memory) a body in [bodies], so it survives a restart. [timeline] must be the timeline this
+ * envelope was built from. An image the store refuses stays size-only, as it was before.
+ *
+ * [previous], the last envelope the store durably accepted, lets an unchanged message reuse the
+ * reference it already has instead of decoding and hashing its image again on every write.
+ */
+suspend fun StoredTimelineEnvelope.withImageBodies(
+    timeline: Timeline,
+    bodies: ConfirmedTimelineImageBodies,
+    previous: StoredTimelineEnvelope? = null,
+): StoredTimelineEnvelope {
+    val confirmed = timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+    if (confirmed.size != events.size) return this
+    val persisted by lazy { previous?.events?.associateBy { it.serverId }.orEmpty() }
+    var changed = false
+    val withBodies = events.mapIndexed { index, stored ->
+        // Same filter as toStoredTimelineEvent, so attachment indices line up.
+        val images = confirmed[index].attachments.filterNot { it.base64.isEmpty() && it.storedByteSize == null }
+        if (confirmed[index].serverId != stored.serverId || images.size != stored.attachments.size) {
+            return@mapIndexed stored
+        }
+        val attachments = stored.attachments.mapIndexed { position, pointer ->
+            val base64 = images[position].base64
+            if (pointer.thumbnailBase64 != null || pointer.bodyReference != null || base64.isEmpty()) {
+                pointer
+            } else {
+                val known = persisted[stored.serverId]?.attachments?.getOrNull(position)?.takeIf {
+                    it.mediaType == pointer.mediaType && it.bodyReference?.decodedBytes == pointer.byteSize
+                }?.bodyReference
+                (known ?: persistImageBody(scope, base64, bodies))?.let { reference ->
+                    changed = true
+                    pointer.copy(byteSize = reference.decodedBytes, bodyReference = reference)
+                } ?: pointer
+            }
+        }
+        if (attachments == stored.attachments) stored else stored.copy(attachments = attachments)
+    }
+    return if (changed) copy(events = withBodies) else this
+}
+
+private suspend fun persistImageBody(
+    scope: TimelineScope,
+    base64: String,
+    bodies: ConfirmedTimelineImageBodies,
+): StoredImageBodyReference? = try {
+    bodies.persistImage(scope, base64)
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (error: Exception) {
+    Telemetry.error(
+        "TimelineImageBody", "persist.failed", error,
+        "scope" to scope.storageKey,
+        "base64Length" to base64.length,
+    )
+    null
+}
+
+/**
+ * [TimelineSnapshotCodec.storedEnvelopeToTimeline] plus image bodies, resolved newest first within
+ * [maxDecodedImageBytes]. Anything missing, corrupt, or past the budget stays a placeholder.
+ */
+suspend fun StoredTimelineEnvelope.toTimelineWithImageBodies(
+    bodies: ConfirmedTimelineImageBodies,
+    maxDecodedImageBytes: Long = 32L * 1024 * 1024,
+): Timeline {
+    var remaining = maxDecodedImageBytes
+    val budgeted = object : TimelineImageBodyReader {
+        override suspend fun resolveImage(reference: StoredImageBodyReference): String? {
+            if (reference.decodedBytes !in 1..remaining) return null
+            remaining -= reference.decodedBytes
+            return bodies.resolveImage(scope, reference)
+        }
+    }
+    val resolved = ArrayList<TimelineEvent.Confirmed>(events.size)
+    for (stored in events.asReversed()) {
+        resolved += if (stored.attachments.any { it.bodyReference != null }) {
+            stored.toConfirmedTimelineEventWithImageBodies(budgeted)
+        } else {
+            stored.toConfirmedTimelineEvent()
+        }
+    }
+    resolved.reverse()
+    return Timeline(
+        conversationId = scope.conversationId,
+        events = resolved.toPersistentList(),
+        liveCursor = liveCursor,
+        backfillCursor = backfillCursor,
+        releasedOlderCount = releasedOlderCount,
+    )
+}
 
 /** Resolve only a selected event, never during metadata enumeration. Missing bytes stay placeholders. */
 suspend fun StoredTimelineEvent.toConfirmedTimelineEventWithImageBodies(
