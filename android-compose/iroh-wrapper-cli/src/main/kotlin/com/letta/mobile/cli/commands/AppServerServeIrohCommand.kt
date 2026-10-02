@@ -700,7 +700,7 @@ class AppServerServeIrohCommand : CliktCommand(
         )
 
     /**
-     * The canvas relay every app connected here shares boards through, and the canvas.* tools the
+     * The canvas relay every app connected here shares boards through, and the canvas_* tools the
      * agents this host serves get, answered from the relay's log (letta-mobile-aknkw): they work on
      * every runtime the host starts, app connected or not. Called in [run] before the controller is
      * built, so its registry carries the tools.
@@ -730,7 +730,7 @@ class AppServerServeIrohCommand : CliktCommand(
     private fun resolvedModelExposureFile(): String =
         com.letta.mobile.data.controller.node.iroh.FileModelExposureStore.resolvePath(modelExposureFile, canvasOpsDir)
 
-    /** The host's canvas.* tools, set by [startCanvasRelay]. */
+    /** The host's canvas_* tools, set by [startCanvasRelay]. */
     private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()
 
     /**
@@ -964,7 +964,7 @@ internal fun isRealNetworkInterface(iface: java.net.NetworkInterface): Boolean {
  *    [hostTools] alone (nothing else; with none, the pre-1vuec behavior).
  *  - `binary` non-blank => registry advertises the Iroh agent-message tool
  *    with `agentMessaging` capability enabled, and [hostTools].
- *  - [hostTools] (the host's canvas.* tools, letta-mobile-aknkw) are advertised either way:
+ *  - [hostTools] (the host's canvas_* tools, letta-mobile-aknkw) are advertised either way:
  *    they need no binary, only the canvas relay this host runs.
  *
  * The agent-message tool uses `identityDir` and `addressStore` only when

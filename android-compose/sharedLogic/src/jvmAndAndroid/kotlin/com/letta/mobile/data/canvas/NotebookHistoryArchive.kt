@@ -11,7 +11,6 @@ import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardOpenOption.CREATE_NEW
 import java.nio.file.StandardOpenOption.WRITE
 import java.security.MessageDigest
-import java.util.Date
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import kotlin.io.path.name
@@ -22,7 +21,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.automerge.AmValue
 import org.automerge.Document
-import org.automerge.NewValue
 import org.automerge.ObjectId
 import org.automerge.ObjectType
 import org.automerge.Read
@@ -138,7 +136,7 @@ internal class NotebookHistoryArchive(
     }
 
     /** The repository's storage key for [documentKey]. */
-    fun storageName(documentKey: String): String = base58Check(hexBytes(documentKey))
+    fun storageName(documentKey: String): String = base58Check(documentKey.hexToBytes())
 
     fun documentBytes(documentKey: String): Long = chunks(documentDirectory(documentKey)).sumOf { Files.size(it) }
 
@@ -149,35 +147,9 @@ internal class NotebookHistoryArchive(
      */
     fun recoverInterrupted(index: NotebookDocumentIndex) {
         if (!Files.isDirectory(archiveRoot, NOFOLLOW_LINKS)) return
-        val keys = Files.list(archiveRoot).use { stream -> stream.iterator().asSequence().map { it.name }.toList() }
-            .filter(NotebookDocumentIndex::isKey)
-        for (key in keys) {
-            val directory = archiveRoot.resolve(key)
-            if (!Files.isDirectory(directory, NOFOLLOW_LINKS)) continue
-            // Half-built documents (never journaled, or journaled but never moved in), and temp files.
-            entries(directory).filter { it.name.endsWith(BUILDING_SUFFIX) || (it.name.startsWith(".") && it.name.endsWith(".tmp")) }
-                .forEach(::deleteTree)
-            recoverLegacyRestart(key, directory)
-            entries(directory).filter { it.name.endsWith(SUCCESSOR_SUFFIX) }.sorted().forEach { journal ->
-                val successor = Files.readString(journal, UTF_8).trim()
-                val indexed = index.read()
-                when {
-                    !NotebookDocumentIndex.isKey(successor) -> Files.delete(journal)
-                    successor in indexed -> retire(key, journal, index)
-                    key in indexed && chunks(documentDirectory(successor)).isNotEmpty() -> {
-                        // The new document is whole: finish the move rather than discard it.
-                        index.replace(key, successor)
-                        retire(key, journal, index)
-                    }
-                    else -> {
-                        // Never committed: the new document, if any of it exists, is referenced by
-                        // nothing. The old document is untouched.
-                        deleteTree(documentDirectory(successor))
-                        Files.delete(journal)
-                    }
-                }
-            }
-        }
+        entries(archiveRoot)
+            .filter { NotebookDocumentIndex.isKey(it.name) && Files.isDirectory(it, NOFOLLOW_LINKS) }
+            .forEach { Recovery(it, index).run() }
     }
 
     /**
@@ -190,84 +162,7 @@ internal class NotebookHistoryArchive(
         nowEpochMs: Long,
         index: NotebookDocumentIndex,
         restoreListBytes: Long,
-    ): Compaction {
-        val directory = documentDirectory(documentKey)
-        val files = chunks(directory)
-        require(files.isNotEmpty()) { "No stored chunks for $documentKey" }
-        // One exact-size buffer: an over-budget document may be tens of MB on a small heap.
-        val sizes = files.map { Files.size(it) }
-        val history = ByteArray(Math.toIntExact(sizes.sum()))
-        var offset = 0
-        files.forEach { file ->
-            Files.newInputStream(file).use { input ->
-                while (true) {
-                    val read = input.read(history, offset, history.size - offset)
-                    if (read <= 0) break
-                    offset += read
-                }
-            }
-        }
-        check(offset == history.size) { "Chunks changed while archiving $documentKey" }
-        val archiveDirectory = Files.createDirectories(archiveRoot.resolve(documentKey))
-        val archive = archiveDirectory.resolve("$nowEpochMs$ARCHIVE_SUFFIX")
-        writeArchive(archive, history)
-        afterStep(Step.ARCHIVED)
-
-        val newKey = hex(DocumentId.generate().bytes)
-        val old = Document.load(history)
-        val fresh = Document()
-        val successor = try {
-            val heads = old.heads.map { hex(it.bytes) }
-            val archived = fresh.startTransaction().use { tx ->
-                val archived = NotebookBoardStorage.copyCurrentState(old, tx, setOf(HISTORY_ARCHIVE, PREVIOUS_DOCUMENT), restoreListBytes)
-                copyArchiveEntries(old, tx, documentKey)
-                appendArchiveEntry(tx, documentKey, archive.name, history.size.toLong(), heads, nowEpochMs)
-                tx.set(ObjectId.ROOT, PREVIOUS_DOCUMENT, documentKey)
-                tx.commit()
-                archived
-            }
-            // The board, notes, items and canvas identity must read back exactly as they were.
-            check(NotebookBoardStorage.sameContent(old, fresh)) { "The new document's content differs from $documentKey's" }
-            val canvasId = (fresh.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
-                ?.let { runCatching { Json.decodeFromString<CanvasDocument>(it).id }.getOrNull() }
-            Triple(fresh.save(), canvasId, archived)
-        } finally {
-            old.free()
-            fresh.free()
-        }
-        val (freshBytes, canvasId, archivedEntries) = successor
-        Document.load(freshBytes).free()
-
-        // Build the new document whole, journal it, move it in with one rename, then commit by
-        // swapping the index. recoverInterrupted resolves a crash between any two of these steps.
-        val building = archiveDirectory.resolve("$nowEpochMs$BUILDING_SUFFIX")
-        deleteTree(building)
-        val snapshot = Files.createDirectories(building.resolve("snapshot")).resolve(sha256Hex(freshBytes))
-        FileChannel.open(snapshot, CREATE_NEW, WRITE).use { channel ->
-            val buffer = ByteBuffer.wrap(freshBytes)
-            while (buffer.hasRemaining()) channel.write(buffer)
-            channel.force(true)
-        }
-        afterStep(Step.SUCCESSOR_PARTIAL)
-        val journal = archiveDirectory.resolve("$nowEpochMs$SUCCESSOR_SUFFIX")
-        val journalTemp = Files.createTempFile(archiveDirectory, ".successor-", ".tmp")
-        try {
-            Files.writeString(journalTemp, newKey, UTF_8)
-            Files.move(journalTemp, journal, ATOMIC_MOVE)
-        } finally {
-            Files.deleteIfExists(journalTemp)
-        }
-        afterStep(Step.JOURNALED)
-        val target = documentDirectory(newKey)
-        check(!Files.exists(target, NOFOLLOW_LINKS)) { "New document $newKey already has storage" }
-        Files.createDirectories(target.parent)
-        Files.move(building, target, ATOMIC_MOVE)
-        afterStep(Step.SUCCESSOR_READY)
-        check(index.replace(documentKey, newKey)) { "$documentKey left the index during its move" }
-        afterStep(Step.INDEXED)
-        retire(documentKey, journal, index)
-        return Compaction(archive, newKey, history.size.toLong(), freshBytes.size.toLong(), canvasId, archivedEntries)
-    }
+    ): Compaction = Move(documentKey, nowEpochMs, index).run(restoreListBytes)
 
     /** After the commit point: retire [key], delete its storage, then the journal. */
     private fun retire(key: String, journal: Path, index: NotebookDocumentIndex) {
@@ -278,23 +173,52 @@ internal class NotebookHistoryArchive(
         Files.deleteIfExists(journal)
     }
 
-    /**
-     * Earlier builds restarted a history in place: `<stamp>.fresh` (the fresh document, whole) and
-     * `<stamp>.replaced` (the old chunks, moved aside). The document directory is always the whole
-     * old history, the whole fresh snapshot, or absent with the old history in `.replaced`.
-     */
-    private fun recoverLegacyRestart(documentKey: String, directory: Path) {
-        val stamps = entries(directory).mapNotNull { entry ->
+    /** What a crash left in one old document's archive [directory], finished or undone. */
+    private inner class Recovery(private val directory: Path, private val index: NotebookDocumentIndex) {
+        private val key = directory.name
+
+        fun run() {
+            // Half-built documents (never journaled, or journaled but never moved in), and temp files.
+            entries(directory).filter(::isScratch).forEach(::deleteTree)
+            recoverLegacyRestart()
+            entries(directory).filter { it.name.endsWith(SUCCESSOR_SUFFIX) }.sorted().forEach(::resolve)
+        }
+
+        private fun isScratch(entry: Path): Boolean = entry.name.endsWith(BUILDING_SUFFIX) || isTempFile(entry)
+
+        /** One journaled move: finished if the index names the new document or it is whole, else undone. */
+        private fun resolve(journal: Path) {
+            val successor = Files.readString(journal, UTF_8).trim()
+            val indexed = index.read()
             when {
-                entry.name.endsWith(LEGACY_FRESH_SUFFIX) -> entry.name.removeSuffix(LEGACY_FRESH_SUFFIX)
-                entry.name.endsWith(LEGACY_REPLACED_SUFFIX) -> entry.name.removeSuffix(LEGACY_REPLACED_SUFFIX)
-                else -> null
+                !NotebookDocumentIndex.isKey(successor) -> Files.delete(journal)
+                successor in indexed -> retire(key, journal, index)
+                key in indexed && chunks(documentDirectory(successor)).isNotEmpty() -> {
+                    // The new document is whole: finish the move rather than discard it.
+                    index.replace(key, successor)
+                    retire(key, journal, index)
+                }
+                else -> {
+                    // Never committed: the new document, if any of it exists, is referenced by
+                    // nothing. The old document is untouched.
+                    deleteTree(documentDirectory(successor))
+                    Files.delete(journal)
+                }
             }
-        }.distinct().sorted()
-        val target = documentDirectory(documentKey)
-        for (stamp in stamps) {
-            val fresh = directory.resolve("$stamp$LEGACY_FRESH_SUFFIX")
-            val replaced = directory.resolve("$stamp$LEGACY_REPLACED_SUFFIX")
+        }
+
+        /**
+         * Earlier builds restarted a history in place: `<stamp>.fresh` (the fresh document, whole) and
+         * `<stamp>.replaced` (the old chunks, moved aside). The document directory is always the whole
+         * old history, the whole fresh snapshot, or absent with the old history in `.replaced`.
+         */
+        private fun recoverLegacyRestart() {
+            val stamps = entries(directory).mapNotNull { legacyStamp(it.name) }.distinct().sorted()
+            stamps.forEach { stamp -> recoverLegacyStamp(directory.resolve("$stamp$LEGACY_FRESH_SUFFIX"), directory.resolve("$stamp$LEGACY_REPLACED_SUFFIX")) }
+        }
+
+        private fun recoverLegacyStamp(fresh: Path, replaced: Path) {
+            val target = documentDirectory(key)
             val hasFresh = Files.isDirectory(fresh, NOFOLLOW_LINKS)
             val hasReplaced = Files.isDirectory(replaced, NOFOLLOW_LINKS)
             when {
@@ -315,24 +239,120 @@ internal class NotebookHistoryArchive(
         }
     }
 
+    /** The new document's bytes and what building it found. */
+    private class Successor(val bytes: ByteArray, val canvasId: CanvasId?, val restoreEntriesArchived: Int)
+
+    /** One move of [documentKey]'s board to a new document, stamped [stamp]. */
+    private inner class Move(
+        private val documentKey: String,
+        private val stamp: Long,
+        private val index: NotebookDocumentIndex,
+    ) {
+        private val archiveDirectory: Path = archiveRoot.resolve(documentKey)
+        private val newKey: String = DocumentId.generate().bytes.toHex()
+
+        fun run(restoreListBytes: Long): Compaction {
+            val history = readHistory()
+            Files.createDirectories(archiveDirectory)
+            val archive = archiveDirectory.resolve("$stamp$ARCHIVE_SUFFIX")
+            writeArchive(archive, history)
+            afterStep(Step.ARCHIVED)
+            val successor = buildSuccessor(history, archive, restoreListBytes)
+            Document.load(successor.bytes).free()
+
+            // Build the new document whole, journal it, move it in with one rename, then commit by
+            // swapping the index. recoverInterrupted resolves a crash between any two of these steps.
+            val building = writeBuilding(successor.bytes)
+            afterStep(Step.SUCCESSOR_PARTIAL)
+            val journal = writeJournal()
+            afterStep(Step.JOURNALED)
+            moveIn(building)
+            afterStep(Step.SUCCESSOR_READY)
+            check(index.replace(documentKey, newKey)) { "$documentKey left the index during its move" }
+            afterStep(Step.INDEXED)
+            retire(documentKey, journal, index)
+            return Compaction(
+                archive = archive,
+                newKey = newKey,
+                bytesBefore = history.size.toLong(),
+                bytesAfter = successor.bytes.size.toLong(),
+                canvasId = successor.canvasId,
+                restoreEntriesArchived = successor.restoreEntriesArchived,
+            )
+        }
+
+        /** The stored chunks, snapshots first, in one exact-size buffer: an over-budget document may be tens of MB on a small heap. */
+        private fun readHistory(): ByteArray {
+            val files = chunks(documentDirectory(documentKey))
+            require(files.isNotEmpty()) { "No stored chunks for $documentKey" }
+            val history = ByteArray(Math.toIntExact(files.sumOf { Files.size(it) }))
+            var offset = 0
+            files.forEach { file -> offset = readInto(file, history, offset) }
+            check(offset == history.size) { "Chunks changed while archiving $documentKey" }
+            return history
+        }
+
+        private fun buildSuccessor(history: ByteArray, archive: Path, restoreListBytes: Long): Successor {
+            val old = Document.load(history)
+            val fresh = Document()
+            try {
+                val entry = ArchiveEntry(documentKey, archive.name, history.size.toLong(), old.heads.map { it.bytes.toHex() }, stamp)
+                val archived = fresh.startTransaction().use { tx ->
+                    val archived = NotebookBoardStorage.copyCurrentState(old, tx, setOf(HISTORY_ARCHIVE, PREVIOUS_DOCUMENT), restoreListBytes)
+                    copyArchiveEntries(old, tx, documentKey)
+                    appendArchiveEntry(tx, entry)
+                    tx.set(ObjectId.ROOT, PREVIOUS_DOCUMENT, documentKey)
+                    tx.commit()
+                    archived
+                }
+                // The board, notes, items and canvas identity must read back exactly as they were.
+                check(NotebookBoardStorage.sameContent(old, fresh)) { "The new document's content differs from $documentKey's" }
+                return Successor(fresh.save(), canvasIdOf(fresh), archived)
+            } finally {
+                old.free()
+                fresh.free()
+            }
+        }
+
+        /** The new document's snapshot, written whole and synced into `<stamp>.building`. */
+        private fun writeBuilding(bytes: ByteArray): Path {
+            val building = archiveDirectory.resolve("$stamp$BUILDING_SUFFIX")
+            deleteTree(building)
+            val snapshot = Files.createDirectories(building.resolve("snapshot")).resolve(sha256(bytes).toHex())
+            FileChannel.open(snapshot, CREATE_NEW, WRITE).use { channel ->
+                val buffer = ByteBuffer.wrap(bytes)
+                while (buffer.hasRemaining()) channel.write(buffer)
+                channel.force(true)
+            }
+            return building
+        }
+
+        /** `<stamp>.successor`, naming the new document, written atomically. */
+        private fun writeJournal(): Path {
+            val journal = archiveDirectory.resolve("$stamp$SUCCESSOR_SUFFIX")
+            val journalTemp = Files.createTempFile(archiveDirectory, ".successor-", ".tmp")
+            try {
+                Files.writeString(journalTemp, newKey, UTF_8)
+                Files.move(journalTemp, journal, ATOMIC_MOVE)
+            } finally {
+                Files.deleteIfExists(journalTemp)
+            }
+            return journal
+        }
+
+        private fun moveIn(building: Path) {
+            val target = documentDirectory(newKey)
+            check(!Files.exists(target, NOFOLLOW_LINKS)) { "New document $newKey already has storage" }
+            Files.createDirectories(target.parent)
+            Files.move(building, target, ATOMIC_MOVE)
+        }
+    }
+
     private fun writeArchive(archive: Path, history: ByteArray) {
         val temp = Files.createTempFile(archive.parent, ".archive-", ".tmp")
         try {
             GZIPOutputStream(Files.newOutputStream(temp)).use { it.write(history) }
-            val digest = MessageDigest.getInstance("SHA-256")
-            var length = 0L
-            GZIPInputStream(Files.newInputStream(temp)).use { input ->
-                val buffer = ByteArray(BUFFER_BYTES)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    digest.update(buffer, 0, read)
-                    length += read
-                }
-            }
-            check(length == history.size.toLong() && digest.digest().contentEquals(sha256(history))) {
-                "History archive did not read back"
-            }
+            check(gunzippedMatches(temp, history)) { "History archive did not read back" }
             Files.move(temp, archive, ATOMIC_MOVE)
         } finally {
             Files.deleteIfExists(temp)
@@ -354,19 +374,29 @@ internal class NotebookHistoryArchive(
         }
     }
 
-    private fun appendArchiveEntry(tx: Transaction, document: String, file: String, bytes: Long, heads: List<String>, at: Long) {
+    private fun appendArchiveEntry(tx: Transaction, entry: ArchiveEntry) {
         val list = (tx.get(ObjectId.ROOT, HISTORY_ARCHIVE).orElse(null) as? AmValue.List)?.id
             ?: tx.set(ObjectId.ROOT, HISTORY_ARCHIVE, ObjectType.LIST)
-        val entry = JsonObject(
+        tx.insert(list, tx.length(list), entry.toJson().toString())
+    }
+
+    /** One `ROOT.historyArchive` entry: which document's history, in which file, up to which heads. */
+    private class ArchiveEntry(
+        val document: String,
+        val file: String,
+        val bytes: Long,
+        val heads: List<String>,
+        val archivedAtEpochMs: Long,
+    ) {
+        fun toJson(): JsonObject = JsonObject(
             mapOf(
                 "document" to JsonPrimitive(document),
                 "file" to JsonPrimitive(file),
                 "bytes" to JsonPrimitive(bytes),
                 "heads" to JsonArray(heads.map(::JsonPrimitive)),
-                "archivedAtEpochMs" to JsonPrimitive(at),
+                "archivedAtEpochMs" to JsonPrimitive(archivedAtEpochMs),
             ),
         )
-        tx.insert(list, tx.length(list), entry.toString())
     }
 
     private fun entries(directory: Path): List<Path> =
@@ -397,47 +427,6 @@ internal class NotebookHistoryArchive(
         private const val BUFFER_BYTES = 64 * 1024
         private const val ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-        /** Copy one value into map [to] at [key]. Text marks are not copied; notebook text carries none. */
-        fun copyValue(source: Read, value: AmValue, tx: Transaction, to: ObjectId, key: String) {
-            when (value) {
-                is AmValue.Map -> copyMap(source, value.id, tx, tx.set(to, key, ObjectType.MAP))
-                is AmValue.List -> copyList(source, value.id, tx, tx.set(to, key, ObjectType.LIST))
-                is AmValue.Text -> tx.spliceText(tx.set(to, key, ObjectType.TEXT), 0, 0, source.text(value.id).orElseThrow())
-                else -> tx.set(to, key, scalar(value))
-            }
-        }
-
-        /** Copy a whole object tree. */
-        fun copyMap(source: Read, from: ObjectId, tx: Transaction, to: ObjectId) {
-            for (key in source.keys(from).orElseThrow()) copyValue(source, source.get(from, key).orElseThrow(), tx, to, key)
-        }
-
-        private fun copyList(source: Read, from: ObjectId, tx: Transaction, to: ObjectId) {
-            source.listItems(from).orElseThrow().forEachIndexed { index, value ->
-                val at = index.toLong()
-                when (value) {
-                    is AmValue.Map -> copyMap(source, value.id, tx, tx.insert(to, at, ObjectType.MAP))
-                    is AmValue.List -> copyList(source, value.id, tx, tx.insert(to, at, ObjectType.LIST))
-                    is AmValue.Text -> tx.spliceText(tx.insert(to, at, ObjectType.TEXT), 0, 0, source.text(value.id).orElseThrow())
-                    else -> tx.insert(to, at, scalar(value))
-                }
-            }
-        }
-
-        private fun scalar(value: AmValue): NewValue = when (value) {
-            is AmValue.Str -> NewValue.str(value.value)
-            is AmValue.Int -> NewValue.integer(value.value)
-            is AmValue.UInt -> NewValue.uint(value.value)
-            is AmValue.F64 -> NewValue.f64(value.value)
-            is AmValue.Bool -> NewValue.bool(value.value)
-            is AmValue.Bytes -> NewValue.bytes(value.value)
-            is AmValue.Counter -> NewValue.counter(value.value)
-            is AmValue.Timestamp -> NewValue.timestamp(Date(value.value.time))
-            is AmValue.Null -> NewValue.NULL
-            // Refuse rather than drop a value this version cannot write back.
-            else -> error("Cannot copy Automerge value ${value::class.java.simpleName}")
-        }
-
         fun base58Check(payload: ByteArray): String {
             val sha = MessageDigest.getInstance("SHA-256")
             val check = sha.digest(sha.digest(payload)).copyOf(4)
@@ -454,12 +443,53 @@ internal class NotebookHistoryArchive(
             return out.reverse().toString()
         }
 
-        private fun hexBytes(hex: String): ByteArray = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        /** The stamp of a legacy same-id restart's `.fresh` or `.replaced` entry; null for any other. */
+        private fun legacyStamp(name: String): String? = when {
+            name.endsWith(LEGACY_FRESH_SUFFIX) -> name.removeSuffix(LEGACY_FRESH_SUFFIX)
+            name.endsWith(LEGACY_REPLACED_SUFFIX) -> name.removeSuffix(LEGACY_REPLACED_SUFFIX)
+            else -> null
+        }
 
-        private fun hex(bytes: ByteArray): String = bytes.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+        private fun isTempFile(entry: Path): Boolean = entry.name.startsWith(".") && entry.name.endsWith(".tmp")
+
+        /** The canvas id in [document]'s metadata; null if it has none or it does not parse. */
+        private fun canvasIdOf(document: Read): CanvasId? =
+            (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
+                ?.let { runCatching { Json.decodeFromString<CanvasDocument>(it).id }.getOrNull() }
+
+        /** Reads [file] into [buffer] from [start]; returns the offset after the last byte read. */
+        private fun readInto(file: Path, buffer: ByteArray, start: Int): Int {
+            var offset = start
+            Files.newInputStream(file).use { input ->
+                while (true) {
+                    val read = input.read(buffer, offset, buffer.size - offset)
+                    if (read <= 0) break
+                    offset += read
+                }
+            }
+            return offset
+        }
+
+        /** Whether gzip file [archive] reads back to exactly [expected]. */
+        private fun gunzippedMatches(archive: Path, expected: ByteArray): Boolean {
+            val digest = MessageDigest.getInstance("SHA-256")
+            var length = 0L
+            GZIPInputStream(Files.newInputStream(archive)).use { input ->
+                val buffer = ByteArray(BUFFER_BYTES)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                    length += read
+                }
+            }
+            return length == expected.size.toLong() && digest.digest().contentEquals(sha256(expected))
+        }
+
+        private fun String.hexToBytes(): ByteArray = chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+        private fun ByteArray.toHex(): String = joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
 
         private fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
-
-        private fun sha256Hex(bytes: ByteArray): String = hex(sha256(bytes))
     }
 }

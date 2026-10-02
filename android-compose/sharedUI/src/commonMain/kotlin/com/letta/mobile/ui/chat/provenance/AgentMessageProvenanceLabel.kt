@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -94,7 +94,7 @@ fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: Col
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(1.dp, tint.copy(alpha = 0.3f)),
     ) {
-        SelectionContainer {
+        LettaSelectionContainer {
             Column(
                 modifier = Modifier.padding(LettaDimens.Space.md),
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),

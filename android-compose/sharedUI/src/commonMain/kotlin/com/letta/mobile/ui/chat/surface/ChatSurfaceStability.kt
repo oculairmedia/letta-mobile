@@ -42,6 +42,7 @@ internal fun rememberStablePlatform(platform: ChatSurfacePlatform): ChatSurfaceP
 /** Which of [ChatSurfaceHost]'s members are set, as a bit mask. */
 internal fun ChatSurfaceHost.affordanceShape(): Int = listOf(
     openCanvas, openAgent, resolveAgentName, openSubagent, openModelPicker, pickWorkingDirectory, openAgentPane, editAgent,
+    openAgentSwitcher,
 ).foldIndexed(0) { index, mask, member -> if (member != null) mask or (1 shl index) else mask }
 
 private fun ChatSurfacePlatform.slotShape(): Int = listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange)
@@ -68,6 +69,7 @@ internal fun forwardingHost(current: State<ChatSurfaceHost>): ChatSurfaceHost {
         },
         openAgentPane = if (host.openAgentPane == null) null else { { current.value.openAgentPane?.invoke() } },
         editAgent = if (host.editAgent == null) null else { { current.value.editAgent?.invoke() } },
+        openAgentSwitcher = if (host.openAgentSwitcher == null) null else { { current.value.openAgentSwitcher?.invoke() } },
     )
 }
 

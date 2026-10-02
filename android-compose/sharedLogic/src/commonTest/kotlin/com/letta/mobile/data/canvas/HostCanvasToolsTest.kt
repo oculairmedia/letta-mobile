@@ -17,7 +17,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * The host's own canvas.* tools (letta-mobile-aknkw): an agent the host runs draws on the boards the
+ * The host's own canvas_* tools (letta-mobile-aknkw): an agent the host runs draws on the boards the
  * apps share, through the relay's log, with or without an app connected.
  */
 class HostCanvasToolsTest {

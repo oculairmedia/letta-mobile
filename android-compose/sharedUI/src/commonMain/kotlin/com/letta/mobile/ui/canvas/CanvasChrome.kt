@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +52,11 @@ import com.composables.icons.lucide.Undo2
 import com.composables.icons.lucide.ZoomIn
 import com.composables.icons.lucide.ZoomOut
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
+import com.letta.mobile.data.canvas.CanvasSyncHealth
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.canvas_menu_share
 import com.letta.mobile.ui.theme.LettaDimens
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The board's chrome, in the layout whiteboard tools converge on: a small title pill top-left,
@@ -130,6 +135,46 @@ internal data class CanvasUndoActions(
 )
 
 /**
+ * What the board's overflow (more) menu lists besides the board commands: zoom and history when
+ * no pill carries them ([compact]), share when no button of its own does, the sync status when no
+ * badge shows it, and the host page's own entries first.
+ */
+internal class CanvasOverflow(
+    val zoom: CanvasZoom,
+    val checkpointCount: Int?,
+    val onHistory: (() -> Unit)?,
+    val menu: CanvasMenuActions,
+    val background: CanvasBackgroundActions,
+    val compact: Boolean,
+    val onShare: (() -> Unit)? = null,
+    val sync: CanvasSyncHealth? = null,
+    val host: List<CanvasHostMenuEntry> = emptyList(),
+)
+
+/** The overflow menu itself, anchored to whichever button opened it. */
+@Composable
+internal fun CanvasOverflowMenu(overflow: CanvasOverflow, expanded: Boolean, onDismiss: () -> Unit) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        overflow.sync?.let { CanvasSyncStatusLine(it) }
+        overflow.host.forEach { entry -> MenuEntry(entry.icon, entry.label) { onDismiss(); entry.onClick() } }
+        if (overflow.sync != null || overflow.host.isNotEmpty()) HorizontalDivider()
+        overflow.onShare?.let { share ->
+            MenuEntry(Lucide.Share2, stringResource(Res.string.canvas_menu_share)) { onDismiss(); share() }
+        }
+        if (overflow.compact) {
+            val zoom = overflow.zoom
+            MenuEntry(Lucide.ZoomIn, "Zoom in (${zoom.scalePercent}%)", onClick = zoom.onZoomIn)
+            MenuEntry(Lucide.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
+            MenuEntry(Lucide.Maximize, "Fit to content") { onDismiss(); zoom.onReset() }
+            overflow.onHistory?.let { history ->
+                MenuEntry(Lucide.History, "History (${overflow.checkpointCount ?: 0})") { onDismiss(); history() }
+            }
+        }
+        BoardMenuEntries(overflow.menu, overflow.background, onDismiss)
+    }
+}
+
+/**
  * Top-right: zoom, then history and share as icons, everything else behind the overflow.
  *
  * With [undo] (the compact layout) the pill is undo, redo, share and the overflow instead: the
@@ -165,17 +210,11 @@ internal fun CanvasActionsPill(
         }
         Box {
             PillIconButton(Lucide.EllipsisVertical, "More", onClick = { menuOpen = true })
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                if (compact) {
-                    MenuEntry(Lucide.ZoomIn, "Zoom in (${zoom.scalePercent}%)", onClick = zoom.onZoomIn)
-                    MenuEntry(Lucide.ZoomOut, "Zoom out", onClick = zoom.onZoomOut)
-                    MenuEntry(Lucide.Maximize, "Fit to content") { menuOpen = false; zoom.onReset() }
-                    if (onHistory != null) {
-                        MenuEntry(Lucide.History, "History (${checkpointCount ?: 0})") { menuOpen = false; onHistory() }
-                    }
-                }
-                BoardMenuEntries(menu, background) { menuOpen = false }
-            }
+            CanvasOverflowMenu(
+                overflow = CanvasOverflow(zoom, checkpointCount, onHistory, menu, background, compact),
+                expanded = menuOpen,
+                onDismiss = { menuOpen = false },
+            )
         }
     }
 }

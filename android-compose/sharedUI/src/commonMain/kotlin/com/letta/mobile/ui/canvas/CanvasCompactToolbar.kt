@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
@@ -19,10 +21,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Redo2
+import com.composables.icons.lucide.Undo2
+import com.letta.mobile.data.canvas.CanvasSyncHealth
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.canvas_foot_more
+import com.letta.mobile.sharedui.resources.canvas_foot_more_status
+import com.letta.mobile.sharedui.resources.canvas_foot_redo
+import com.letta.mobile.sharedui.resources.canvas_foot_undo
 import com.letta.mobile.ui.theme.LettaDimens
+import org.jetbrains.compose.resources.stringResource
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
 import io.ak1.drawbox.ui.controls.ControlsBarState
@@ -34,7 +47,9 @@ import io.ak1.drawbox.ui.controls.ControlsBarState
  * add button and the property control. Everything that puts something on the board (notes, text,
  * every shape) is in the add menu, which is the same menu a long press opens on the board itself,
  * where it adds at the finger instead of the middle of the screen. Undo and redo are not here:
- * [CanvasActionsPill] carries them in the compact layout.
+ * [CanvasActionsPill] carries them in the compact layout - except under the phone's chat page,
+ * which keeps the top of the board clear, where they end the bar with the overflow menu
+ * ([CompactBoardActions]).
  *
  * There is no pan tool: on a phone a finger dragged across open board pans, and two fingers pinch
  * (see [touchNavigation]).
@@ -56,10 +71,12 @@ internal fun CanvasCompactToolbar(
     properties: CanvasProperties,
     actions: CompactToolbarActions,
     modifier: Modifier = Modifier,
+    /** The board's own actions at the end of the bar, after a divider: see [CompactBoardActions]. */
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val dispatch = actions.dispatch
     Surface(
-        modifier = modifier,
+        modifier = modifier.testTag(CANVAS_COMPACT_TOOLBAR_TAG),
         // A full pill, the shape Craft, Freeform and Obsidian's canvas all float their tools in.
         shape = RoundedCornerShape(percent = 50),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
@@ -86,8 +103,62 @@ internal fun CanvasCompactToolbar(
                 placement = PropertyPopoverPlacement.ABOVE,
                 modifier = Modifier.size(COMPACT_BUTTON),
             )
+            if (trailing != null) {
+                ToolbarDivider()
+                trailing()
+            }
         }
     }
+}
+
+/**
+ * Undo, redo and the overflow menu at the end of the phone bar, where the board's actions go when
+ * the page around it keeps the top of the board clear (see [CanvasHostChrome]). Sharing and the
+ * sync status are in the menu; a status other than "synced" also marks the more button with its
+ * dot, so a board that stopped syncing never looks like one that syncs.
+ */
+@Composable
+internal fun CompactBoardActions(undo: CanvasUndoActions, overflow: CanvasOverflow) {
+    ControlButton(
+        Control(Lucide.Undo2, stringResource(Res.string.canvas_foot_undo), enabled = undo.canUndo),
+        size = COMPACT_BUTTON,
+        onClick = undo.onUndo,
+    )
+    ControlButton(
+        Control(Lucide.Redo2, stringResource(Res.string.canvas_foot_redo), enabled = undo.canRedo),
+        size = COMPACT_BUTTON,
+        onClick = undo.onRedo,
+    )
+    var open by remember { mutableStateOf(false) }
+    val sync = overflow.sync?.takeIf { it != CanvasSyncHealth.Synced }
+    val label = if (sync == null) {
+        stringResource(Res.string.canvas_foot_more)
+    } else {
+        stringResource(Res.string.canvas_foot_more_status, canvasSyncStatusText(sync).label)
+    }
+    Box(Modifier.testTag(CANVAS_FOOT_MORE_TAG)) {
+        ControlButton(Control(Lucide.EllipsisVertical, label), size = COMPACT_BUTTON) { open = true }
+        if (sync != null) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(LettaDimens.Space.xs)
+                    .size(SYNC_DOT)
+                    .background(canvasSyncDotColor(sync), CircleShape),
+            )
+        }
+        CanvasOverflowMenu(overflow, expanded = open, onDismiss = { open = false })
+    }
+}
+
+@Composable
+private fun ToolbarDivider() {
+    Box(
+        Modifier
+            .padding(horizontal = LettaDimens.Space.xs)
+            .size(width = LettaDimens.Stroke.hairline, height = LettaDimens.Space.xl)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
 }
 
 /** The bar's one way to put things on the board; the same entries a long press offers. */

@@ -18,7 +18,7 @@ data class CanvasDryRunProblem(
 )
 
 /**
- * What `canvas.apply_ops` / `canvas.replace_scene` with `dry_run: true` answer (letta-mobile-qygvv.30):
+ * What `canvas_apply_ops` / `canvas_replace_scene` with `dry_run: true` answer (letta-mobile-qygvv.30):
  * whether the batch would be published, checked against the canvas at [revision], and nothing
  * published either way.
  */
