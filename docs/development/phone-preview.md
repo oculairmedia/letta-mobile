@@ -162,7 +162,7 @@ screen.
 
 ## Adding a screen to the playground
 
-The screens are `PhoneScene`s in `android-compose/sharedUI-devfixtures` (a JVM module that only
+The screens are `PhoneScene`s in `android-compose/sharedUI-devfixtures` (a Kotlin Multiplatform module, jvm target, sources in `src/jvmMain`, that only
 sharedUI's `jvmTest`, desktop's `test` and desktop's `phonePlayground` source set depend on):
 
 1. If the screen needs new data, add it to `PhoneFixtures` (a `ChatUiState`, a composer state, a
