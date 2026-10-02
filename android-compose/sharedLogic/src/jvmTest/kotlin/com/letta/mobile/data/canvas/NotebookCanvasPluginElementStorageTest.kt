@@ -136,7 +136,8 @@ class NotebookCanvasPluginElementStorageTest {
         println("canvas growth [plugin state]: $UPDATES updates of one of $ELEMENTS plugin elements -> $perUpdate bytes/update (one entry ~$oneEntry bytes)")
         // The entry is not rewritten per update, only its props, clock and summaries (and the
         // board's revision). Rewriting the collection would cost about ELEMENTS x oneEntry.
-        assertTrue(perUpdate < oneEntry * 2, "a state update cost $perUpdate bytes (one entry is $oneEntry bytes)")
+        // Measured on CI: 79 bytes per update for a 1477 byte entry.
+        assertTrue(perUpdate < oneEntry / 4, "a state update cost $perUpdate bytes (one entry is $oneEntry bytes)")
     }
 
     @Test
