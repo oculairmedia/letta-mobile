@@ -89,4 +89,20 @@ class JsonSchemaCheckTest {
         assertEquals(emptyList(), JsonSchemaCheck(widget).check(example), "$example")
         assertEquals(json("""{"status":"idle","progress":0.0,"count":0,"label":"text","tags":["text"],"a/b~c":false}"""), example)
     }
+
+    private val map = schema(
+        """
+        {"type":"object","maxProperties":2,"propertyNames":{"type":"string","pattern":"^[a-z]+$","maxLength":5},
+         "additionalProperties":{"type":"integer","minimum":0}}
+        """,
+    )
+
+    @Test
+    fun aMapHoldsEveryKeyToPropertyNamesAndEveryValueToAdditionalProperties() {
+        assertEquals(emptyList(), problems(map, """{"a":1,"b":2}"""))
+        assertEquals(listOf("/Bad" to "BAD_PATTERN"), problems(map, """{"Bad":1}"""))
+        assertEquals(listOf("/toolong" to "TOO_LONG"), problems(map, """{"toolong":1}"""))
+        assertEquals(listOf("/a" to "OUT_OF_RANGE"), problems(map, """{"a":-1}"""))
+        assertEquals(listOf("" to "TOO_MANY_ITEMS"), problems(map, """{"a":1,"b":2,"c":3}"""))
+    }
 }
