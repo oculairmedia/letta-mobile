@@ -1,5 +1,7 @@
 // Vendored DrawBox (akshay2211/DrawBox v2.1.0, Apache-2.0). See VENDORED.md for what came from
 // where and every change made here, so fixes can be offered back upstream.
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
@@ -9,7 +11,8 @@ plugins {
 }
 
 kotlin {
-    // Upstream also targets iOS, JS and wasm; Letta ships Android and the JVM desktop only.
+    // Upstream also targets iOS and JS; Letta ships Android, the JVM desktop and wasm (the web
+    // client renders :sharedUI, which draws canvases with this module; letta-mobile-o4ygk.4).
     android {
         namespace = "io.ak1.drawbox"
         compileSdk = libs.versions.compileSdk.get().toInt()
@@ -23,6 +26,11 @@ kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
     }
 
     sourceSets {

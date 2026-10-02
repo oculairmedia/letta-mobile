@@ -1204,7 +1204,7 @@ fun CanvasWorkspace(
                             CanvasWorkspaceSupport.handleWheelZoom(event, controller)
                             // A real touch press picks with a fingertip's reach, before DrawBox sees it.
                             if (event.type == PointerEventType.Press && event.changes.any { it.type == PointerType.Touch }) {
-                                fingerRecency.touched(System.currentTimeMillis())
+                                fingerRecency.touched(kotlin.time.Clock.System.now().toEpochMilliseconds())
                             }
                         }
                     }
@@ -1218,7 +1218,7 @@ fun CanvasWorkspace(
                 // Shapes and notes share one selection look; see CanvasSelectionChrome.
                 selectionStyle = canvasSelectionStyle(),
                 additiveTaps = compact && multiSelecting,
-                pickTolerance = { fingerRecency.pickTolerance(System.currentTimeMillis()) },
+                pickTolerance = { fingerRecency.pickTolerance(kotlin.time.Clock.System.now().toEpochMilliseconds()) },
                 // Gestures read the controller's state as it is now, not as of the last frame, so
                 // anything the board dispatches during a press is already seen by that press.
                 liveState = { controller.state.value },

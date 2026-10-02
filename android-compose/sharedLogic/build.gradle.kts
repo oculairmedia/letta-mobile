@@ -108,6 +108,10 @@ kotlin {
                 // duplicated per platform (letta-mobile-mqzkc).
                 api(libs.ktor.client.core)
                 api(libs.ktor.client.websockets)
+                // letta-mobile-o4ygk.4: the canonical timeline presentation pages its settled rows
+                // in commonMain so :sharedUI can render it on wasm. paging-common is KMP (android,
+                // jvm, wasmJs, linux/mingw/macos-arm64 native).
+                api(libs.androidx.paging.common)
             }
         }
 
@@ -117,10 +121,9 @@ kotlin {
         val jvmAndAndroid by creating {
             dependsOn(commonMain.get())
             dependencies {
-                // Paging-common is Android/JVM only. Former :core:domain contracts
-                // (IMessageRepository, IAllConversationsRepository) live in this
-                // source set because they expose PagingData / java.time.Instant.
-                api(libs.androidx.paging.common)
+                // Former :core:domain contracts (IMessageRepository,
+                // IAllConversationsRepository) live in this source set because they
+                // expose java.time.Instant. paging-common comes from commonMain.
                 // letta-mobile-gw0h1: QR Code encoder for the CLI pair command.
                 // ZXing's `core` jar is pure Java (no Android-only deps).
                 api("com.google.zxing:core:3.5.3")

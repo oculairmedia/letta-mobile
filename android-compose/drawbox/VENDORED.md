@@ -24,8 +24,14 @@ those are fixed where they live, and each fix is a candidate to contribute upstr
   Letta draws its own controls (the published `drawbox-ui` Android artifact ships without its
   resources; see letta-mobile-r5f3r), so nothing else from that module is used.
 
-Not taken: the iOS, JS, wasm and web source sets (Letta builds Android and JVM only), the sample
-apps, docs, and upstream's publishing, Dokka, Spotless and lint setup.
+- From `DrawBox/src/wasmJsMain` and `DrawBox/src/webMain` (letta-mobile-o4ygk.4, same commit):
+  `ClipboardImage.wasmJs.kt`, `DragDropImage.wasmJs.kt`, `ImageDecoder.web.kt` and
+  `Platform.web.kt`, copied unchanged into `src/wasmJsMain`. Letta has no JS target, so upstream's
+  `webMain` (shared by JS and wasm) is folded into `wasmJsMain`; the file names keep their upstream
+  suffixes so they diff cleanly.
+
+Not taken: the iOS and JS source sets (Letta builds Android, JVM and wasm), the sample apps, docs,
+and upstream's publishing, Dokka, Spotless and lint setup.
 
 ## Letta changes
 

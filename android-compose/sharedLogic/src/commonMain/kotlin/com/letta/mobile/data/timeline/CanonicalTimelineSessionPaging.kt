@@ -7,7 +7,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
-import java.util.concurrent.atomic.AtomicReference
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -27,7 +27,7 @@ fun CanonicalTimelineSession.paging(
     anchor: TimelinePageKey? = selection.anchor,
     settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
 ): Flow<PagingData<TimelineSettledRecord>> {
-    val active = AtomicReference<TimelineLedgerPagingSource?>(null)
+    val active = atomic<TimelineLedgerPagingSource?>(null)
     val pages = Pager(
         config = PagingConfig(
             pageSize = engine.budget.maxMetadataRows, enablePlaceholders = false,
@@ -36,7 +36,7 @@ fun CanonicalTimelineSession.paging(
         initialKey = anchor,
         remoteMediator = TimelineHistoryMediator(this, selection),
         pagingSourceFactory = {
-            TimelineLedgerPagingSource(engine, selection, selection.scope.agentId, settledProjectionAdapter).also(active::set)
+            TimelineLedgerPagingSource(engine, selection, selection.scope.agentId, settledProjectionAdapter).also { active.value = it }
         },
     ).flow
     return channelFlow {
@@ -46,7 +46,7 @@ fun CanonicalTimelineSession.paging(
             old.selection === new.selection && old.durableRevision == new.durableRevision
         }.collectIndexed { index, current ->
             if (current.selection !== selection) pump.cancel()
-            else if (index > 0) active.get()?.invalidate()
+            else if (index > 0) active.value?.invalidate()
         }
     }
 }

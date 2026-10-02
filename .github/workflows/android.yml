@@ -328,10 +328,11 @@ jobs:
         # JVM-only API leaks in commonMain/commonTest (b97bcf48). The wasmJs
         # compiles catch breakage in wasmJsMain/wasmJsTest and dependencies
         # that ship no wasm artifact, without making web-wasm required
-        # (letta-mobile-o4ygk.2).
+        # (letta-mobile-o4ygk.2). :sharedUI compiles for wasm too, so JVM-only
+        # calls in the shared Compose UI fail here (letta-mobile-o4ygk.4).
         run: |
           ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
-          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs
+          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 
   web-wasm:

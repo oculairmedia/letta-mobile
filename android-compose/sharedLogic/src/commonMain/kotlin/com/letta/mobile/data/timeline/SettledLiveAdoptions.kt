@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 /**
  * Which settled rows took over which live rows, for one presentation's lifetime.
@@ -12,10 +14,16 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 internal class SettledLiveAdoptions {
     private val byIdentity = HashMap<TimelineMessageId, LiveRowPresentation>()
     private val holders = HashMap<String, Set<TimelineMessageId>>()
+    private val lock = SynchronizedObject()
 
     /** [item] as the live row it replaces showed it, or null when it replaces none. */
-    @Synchronized
     fun adopted(
+        item: ChatRenderItem,
+        residents: List<TimelineResidentEvent>,
+        live: () -> Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>>,
+    ): ChatRenderItem? = synchronized(lock) { adoptLocked(item, residents, live) }
+
+    private fun adoptLocked(
         item: ChatRenderItem,
         residents: List<TimelineResidentEvent>,
         live: () -> Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>>,

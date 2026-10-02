@@ -10,7 +10,8 @@ import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
-import java.util.concurrent.ConcurrentHashMap
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -43,7 +44,9 @@ class CanonicalTimelinePresentation private constructor(
     private val resident = MutableStateFlow<Map<TimelineMessageId, Long>>(emptyMap())
     private val residentOtids = MutableStateFlow<Set<String>>(emptySet())
     private val residentServerIds = MutableStateFlow<Set<String>>(emptySet())
-    private val streamedKeyAliases = ConcurrentHashMap<TimelineMessageId, String>()
+    // Written by the live projection and read by paging's projection; guarded by its own lock.
+    private val streamedKeyAliasLock = SynchronizedObject()
+    private val streamedKeyAliases = HashMap<TimelineMessageId, String>()
     private val adoptions = SettledLiveAdoptions()
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -191,7 +194,7 @@ class CanonicalTimelinePresentation private constructor(
         if (aliases.isEmpty()) return
         for ((serverId, canonical) in aliases) {
             if (publication.block.events.any { it.serverId == serverId }) {
-                streamedKeyAliases.putIfAbsent(canonical, "segment-$serverId")
+                synchronized(streamedKeyAliasLock) { streamedKeyAliases.getOrPut(canonical) { "segment-$serverId" } }
             }
         }
     }
@@ -287,14 +290,14 @@ class CanonicalTimelinePresentation private constructor(
 
     /** Preserve the LazyColumn slot while an aliased streamed row becomes its canonical ledger row. */
     private fun replacementKey(identity: TimelineMessageId): String {
-        streamedKeyAliases[identity]?.let { return it }
+        synchronized(streamedKeyAliasLock) { streamedKeyAliases[identity] }?.let { return it }
         val live = owner.session.live.value
         val streamedId = live?.aliases?.entries?.singleOrNull { (serverId, canonical) ->
             canonical == identity && live.block.events.any { it.serverId == serverId }
         }?.key
         val key = "segment-${streamedId ?: identity.value}"
         if (streamedId != null) {
-            streamedKeyAliases[identity] = key
+            synchronized(streamedKeyAliasLock) { streamedKeyAliases[identity] = key }
         }
         return key
     }
