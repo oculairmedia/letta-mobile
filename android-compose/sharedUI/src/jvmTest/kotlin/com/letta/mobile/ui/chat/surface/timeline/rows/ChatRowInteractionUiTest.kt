@@ -198,7 +198,7 @@ class ChatRowInteractionUiTest {
         )
         setContent {
             // The settled header (and its collapse control) shows on the conversation's newest row.
-            MaterialTheme { RenderRow(block, rowContext(collapsedRunIds = collapsed, newestMessageId = "b"), rowCallbacks(actions)) }
+            MaterialTheme { RenderRow(block, rowContext(itemState = renderState(collapsedRunIds = collapsed), newestMessageId = "b"), rowCallbacks(actions)) }
         }
 
         onNodeWithText("Looking into it.").assertExists()
@@ -222,7 +222,7 @@ class ChatRowInteractionUiTest {
             isReasoning = true,
         )
         setContent {
-            MaterialTheme { RenderRow(single(thought), rowContext(expandedReasoning = expanded), rowCallbacks(actions)) }
+            MaterialTheme { RenderRow(single(thought), rowContext(itemState = renderState(expandedReasoning = expanded)), rowCallbacks(actions)) }
         }
 
         // Collapsed, the header previews only the reasoning's first line.
