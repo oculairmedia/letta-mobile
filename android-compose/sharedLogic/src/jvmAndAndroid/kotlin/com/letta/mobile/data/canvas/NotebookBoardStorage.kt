@@ -19,15 +19,21 @@ import org.automerge.Transaction
  * the board times the number of saves. (Writing the whole scene on every save is how one phone's
  * 112 KB board became a 62 MB snapshot.)
  *
- * - `ROOT.board`: a JSON string with the scene's scalar and array fields, `elements` as ordering
- *   stubs (`{"id": …}`) plus id-less legacy elements, and `{}` placeholders for object fields.
- * - `ROOT.boardFields`: map of object-valued scene field (`_documents`, `_arrowBindings`, …) to a
- *   map of entry to JSON string, so editing one note rewrites that note, not every note.
+ * - `ROOT.board`: a JSON string with the scene's scalar fields, `elements` as ordering stubs
+ *   (`{"id": …}`) plus id-less legacy elements, `{}` placeholders for object fields, and ordering
+ *   stubs for arrays of id'd entries.
+ * - `ROOT.boardFields`: map of object-valued scene field (`_arrowBindings`, `_labelOwners`, …) to
+ *   a map of entry to JSON string.
+ * - `ROOT.boardArrays`: map of scene field whose value is an array of entries with distinct ids
+ *   (the projector's `_documents`, the board's notes) to a map of entry id to a map of field to
+ *   JSON string, the way elements are kept. The array's order is the stubs in `ROOT.board`.
+ *   Moving one note rewrites that note's frame, and a keystroke rewrites that note's text, not
+ *   every note.
  * - `ROOT.boardElements`: map of element id to a map of field to JSON string. A field is written
  *   only when its value changed, so moving an element rewrites its geometry, not its style.
  *
- * Older documents keep full element bodies and object fields inline in `ROOT.board`; readers
- * accept both and the next write moves them out.
+ * Older documents keep full element bodies, object fields and arrays inline in `ROOT.board`;
+ * readers accept every layout and the next write moves them out.
  *
  * The canvas layer's last-written scene ("base", for its three-way merge) is kept as digests
  * (`canvasBaseElements`, `canvasBaseFields`), not as a second full copy of the scene.
@@ -40,11 +46,14 @@ internal object NotebookBoardStorage {
      * The board layout this build reads and writes, in `ROOT.boardVersion`. 1: everything inline
      * in `ROOT.board` plus `ROOT.boardElements`. 2: object fields moved to `ROOT.boardFields`,
      * leaving `{}` placeholders in `ROOT.board`; written the first time a document gets
-     * `boardFields`. A document with a higher version is read but never written (see
-     * [NotebookLocalStore]), so this build cannot clobber fields it does not know about. Builds
-     * from before the marker do not read it; that residual risk is in the PR that added it.
+     * `boardFields`. 3: arrays of id'd entries (`_documents`) moved to `ROOT.boardArrays`,
+     * leaving id stubs in `ROOT.board`; written the first time a document gets either map. A
+     * document with a higher version is read but never written (see [NotebookLocalStore]), so
+     * this build cannot clobber fields it does not know about: a layout-2 reader would take the
+     * stubs for the notes themselves and write them back. Builds from before the marker do not
+     * read it; that residual risk is in the PR that added it.
      */
-    const val LAYOUT_VERSION = 2
+    const val LAYOUT_VERSION = 3
     private const val LAYOUT = "boardVersion"
 
     fun layoutVersion(read: Read): Long = when (val value = read.get(ObjectId.ROOT, LAYOUT).orElse(null)) {
@@ -55,6 +64,7 @@ internal object NotebookBoardStorage {
 
     private const val BOARD = "board"
     private const val FIELDS = "boardFields"
+    private const val ARRAYS = "boardArrays"
     private const val ELEMENTS = "boardElements"
     private const val TOMBSTONES = "boardTombstones"
     private const val DELETED = "boardDeletedElements"
@@ -78,23 +88,26 @@ internal object NotebookBoardStorage {
         if (stored.isInline) return raw
         val root = Json.parseToJsonElement(raw).jsonObject
         val objectFields = stored.objectFields()
+        val arrayFields = stored.arrayFields(root)
         val merged = LinkedHashMap<String, JsonElement>()
-        root.forEach { (key, value) -> merged[key] = objectFields[key] ?: value }
-        objectFields.forEach { (key, value) -> if (key !in merged) merged[key] = value }
+        root.forEach { (key, value) -> merged[key] = objectFields[key] ?: arrayFields[key] ?: value }
+        for ((key, value) in objectFields.entries + arrayFields.entries) if (key !in merged) merged[key] = value
         merged["elements"] = JsonArray(stored.elements(root))
         return JsonObject(merged).toString()
     }
 
-    /** The parts of a board kept outside `ROOT.board`: element bodies, tombstones and object fields. */
+    /** The parts of a board kept outside `ROOT.board`: element bodies, tombstones, object fields and arrays. */
     private class StoredBoard(private val read: Read) {
         private val elementMap = mapAt(read, ObjectId.ROOT, ELEMENTS)
         private val fieldMap = mapAt(read, ObjectId.ROOT, FIELDS)
         private val keys = keysOf(read, elementMap).toSet()
         private val deleted = keysOf(read, mapAt(read, ObjectId.ROOT, TOMBSTONES)).toSet()
         private val fieldKeys = keysOf(read, fieldMap)
+        private val arrayMap = mapAt(read, ObjectId.ROOT, ARRAYS)
+        private val arrayKeys = keysOf(read, arrayMap)
 
         /** Nothing is kept outside the board string: it is the whole board. */
-        val isInline: Boolean get() = listOf(keys, deleted, fieldKeys).all { it.isEmpty() }
+        val isInline: Boolean get() = listOf(keys, deleted, fieldKeys, arrayKeys).all { it.isEmpty() }
 
         /** Id-less legacy elements, then live elements in the board string's order, then the rest by id. */
         fun elements(root: JsonObject): List<JsonElement> {
@@ -106,6 +119,23 @@ internal object NotebookBoardStorage {
         }
 
         fun objectFields(): Map<String, JsonObject> = readMaps(fieldMap, fieldKeys)
+
+        /** Arrays kept entry by entry, each in the order of its stubs in [root]. */
+        fun arrayFields(root: JsonObject): Map<String, JsonArray> {
+            val arrays = arrayMap ?: return emptyMap()
+            return arrayKeys.mapNotNull { key -> mapAt(read, arrays, key)?.let { key to readEntries(it, root[key]) } }.toMap()
+        }
+
+        /**
+         * An array kept entry by entry, in the order of its [stubs]; entries without a stub (added by
+         * a peer whose board string lost the merge) follow, by id, as elements do.
+         */
+        private fun readEntries(map: ObjectId, stubs: JsonElement?): JsonArray {
+            val entries = read.keys(map).orElseThrow().toSet()
+            val stubIds = (stubs as? JsonArray).orEmpty().mapNotNull(::idOf)
+            val ordered = stubIds.filter { it in entries }.distinct() + (entries - stubIds.toSet()).sorted()
+            return JsonArray(readMaps(map, ordered).values.toList())
+        }
 
         /** The maps of JSON strings under [parent] at [entries], in that order; missing ones skipped. */
         private fun readMaps(parent: ObjectId?, entries: List<String>): Map<String, JsonObject> {
@@ -217,32 +247,66 @@ internal object NotebookBoardStorage {
         return JsonObject(envelope)
     }
 
-    /** The board string holds ordering stubs and scalar fields; object fields go entry by entry. */
+    /**
+     * The board string holds ordering stubs and scalar fields; object fields go entry by entry, and
+     * arrays of id'd entries go entry by entry and field by field.
+     */
     private fun writeEnvelope(tx: Transaction, board: JsonObject) {
-        val objectFields = board.filter { (key, value) -> isSceneField(key) && value is JsonObject }
-            .mapValues { it.value as JsonObject }
-        setStringIfChanged(tx, ObjectId.ROOT, BOARD, stubbedBoard(board, objectFields.keys))
-        val existing = mapAt(tx, ObjectId.ROOT, FIELDS)
-        if (existing == null && objectFields.isEmpty()) return
-        // A reader of layout 1 would see the `{}` placeholders as empty fields and write them back.
+        val parts = EnvelopeParts(board)
+        setStringIfChanged(tx, ObjectId.ROOT, BOARD, parts.stubbedBoard())
+        val writesFields = mapAt(tx, ObjectId.ROOT, FIELDS) != null || parts.objectFields.isNotEmpty()
+        val writesArrays = mapAt(tx, ObjectId.ROOT, ARRAYS) != null || parts.arrayFields.isNotEmpty()
+        if (!(writesFields || writesArrays)) return
+        // A reader of an older layout would take the placeholders and stubs for the fields
+        // themselves and write them back.
         if (layoutVersion(tx) < LAYOUT_VERSION) tx.set(ObjectId.ROOT, LAYOUT, LAYOUT_VERSION)
-        writeStringMaps(tx, existing ?: tx.set(ObjectId.ROOT, FIELDS, ObjectType.MAP), objectFields)
+        if (writesFields) {
+            writeMaps(tx, rootMap(tx, FIELDS), parts.objectFields) { map, value -> putStrings(tx, map, value) }
+        }
+        if (writesArrays) {
+            writeMaps(tx, rootMap(tx, ARRAYS), parts.arrayFields) { map, entries ->
+                writeMaps(tx, map, entries) { entryMap, entry -> putStrings(tx, entryMap, entry) }
+            }
+        }
     }
 
-    /** [board] with elements as ordering stubs and each of [objectFields] as a `{}` placeholder. */
-    private fun stubbedBoard(board: JsonObject, objectFields: Set<String>): String =
-        JsonObject(board.mapValues { (key, value) ->
+    /** A board split for writing: which scene fields go entry by entry, and the board string left. */
+    private class EnvelopeParts(private val board: JsonObject) {
+        private val sceneFields = board.filterKeys(::isSceneField)
+        val objectFields: Map<String, JsonObject> =
+            sceneFields.filterValues { it is JsonObject }.mapValues { it.value as JsonObject }
+        val arrayFields: Map<String, Map<String, JsonObject>> =
+            sceneFields.mapNotNull { (key, value) -> entriesById(value)?.let { key to it } }.toMap()
+
+        /** The board with elements and arrays as ordering stubs and object fields as `{}` placeholders. */
+        fun stubbedBoard(): String = JsonObject(board.mapValues { (key, value) ->
             when {
                 key == "elements" -> JsonArray((value as? JsonArray).orEmpty().map(::stub))
                 key in objectFields -> JsonObject(emptyMap())
+                key in arrayFields -> JsonArray((value as JsonArray).map(::stub))
                 else -> value
             }
         }).toString()
+    }
 
-    /** [parent] holds one map of JSON strings per key of [values]; other keys are dropped. */
-    private fun writeStringMaps(tx: Transaction, parent: ObjectId, values: Map<String, JsonObject>) {
+    /** [parent] holds one map per key of [values], written by [write]; other keys are dropped. */
+    private fun <T> writeMaps(tx: Transaction, parent: ObjectId, values: Map<String, T>, write: (ObjectId, T) -> Unit) {
         tx.keys(parent).orElseThrow().filter { it !in values }.forEach { tx.delete(parent, it) }
-        values.forEach { (key, value) -> putStrings(tx, mapAt(tx, parent, key) ?: tx.set(parent, key, ObjectType.MAP), value) }
+        values.forEach { (key, value) -> write(mapAt(tx, parent, key) ?: tx.set(parent, key, ObjectType.MAP), value) }
+    }
+
+    /**
+     * [value]'s entries by id when it is a non-empty array of objects with distinct ids (the
+     * projector's `_documents`); null for any other value, which stays inline.
+     */
+    private fun entriesById(value: JsonElement): Map<String, JsonObject>? {
+        val array = (value as? JsonArray)?.takeIf { it.isNotEmpty() } ?: return null
+        val entries = LinkedHashMap<String, JsonObject>()
+        for (entry in array) {
+            val id = idOf(entry) ?: return null
+            if (entries.put(id, entry as JsonObject) != null) return null
+        }
+        return entries
     }
 
     /** [map] holds [value]'s fields as JSON strings, writing only those that changed. */
@@ -406,11 +470,12 @@ internal object NotebookBoardStorage {
         if (tx.get(map, key).isPresent) tx.delete(map, key)
     }
 
-    private fun elementsMap(tx: Transaction): ObjectId =
-        mapAt(tx, ObjectId.ROOT, ELEMENTS) ?: tx.set(ObjectId.ROOT, ELEMENTS, ObjectType.MAP)
+    /** The root map at [key], made if there is none. */
+    private fun rootMap(tx: Transaction, key: String): ObjectId = mapAt(tx, ObjectId.ROOT, key) ?: tx.set(ObjectId.ROOT, key, ObjectType.MAP)
 
-    private fun deletedMap(tx: Transaction): ObjectId =
-        mapAt(tx, ObjectId.ROOT, DELETED) ?: tx.set(ObjectId.ROOT, DELETED, ObjectType.MAP)
+    private fun elementsMap(tx: Transaction): ObjectId = rootMap(tx, ELEMENTS)
+
+    private fun deletedMap(tx: Transaction): ObjectId = rootMap(tx, DELETED)
 
     /** Automerge records a put even when the value is the same; skip those. */
     fun setStringIfChanged(tx: Transaction, map: ObjectId, key: String, value: String) {

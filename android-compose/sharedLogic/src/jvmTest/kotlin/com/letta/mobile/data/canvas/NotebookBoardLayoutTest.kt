@@ -15,13 +15,14 @@ import kotlin.test.assertTrue
  * not understand refuses to write it (and says so) instead of writing back what it cannot see.
  */
 class NotebookBoardLayoutTest {
-    private val withNotes = """{"elements":[{"id":"a","type":"Path"}],"_documents":{"n1":{"json":"{}"}}}"""
+    // `_documents` as the projector writes it: an array of entries with ids.
+    private val withNotes = """{"elements":[{"id":"a","type":"Path"}],"_documents":[{"id":"n1","json":"{}"}]}"""
 
     private fun layout(store: NotebookLocalStore, id: DocumentId): Long =
         store.open(id)!!.withDocument { NotebookBoardStorage.layoutVersion(it) }.get(5, TimeUnit.SECONDS)
 
     @Test
-    fun movingObjectFieldsOutOfTheBoardStringBumpsTheLayout() = runBlocking {
+    fun movingFieldsOutOfTheBoardStringBumpsTheLayout() = runBlocking {
         NotebookLocalStore(Files.createTempDirectory("notebook-layout-bump-"), "layout-peer").use { notebooks ->
             val store = NotebookCanvasDocumentStore(notebooks)
             store.upsert(CanvasDocument(CanvasId("plain"), title = "Plain", sceneJson = """{"elements":[{"id":"a"}]}"""))
