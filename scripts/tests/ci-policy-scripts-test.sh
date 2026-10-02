@@ -102,6 +102,8 @@ assert_contains "$shared_job" ':appserver-cli:test :appserver-cli:distZip :iroh-
 assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative'
 # letta-mobile-o4ygk.2: wasmJs compiles stay in the REQUIRED shared job.
 assert_contains "$shared_job" ':sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs'
+# letta-mobile-o4ygk.4: the shared Compose UI compiles for wasm in the same required job.
+assert_contains "$shared_job" ':sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '2'
 

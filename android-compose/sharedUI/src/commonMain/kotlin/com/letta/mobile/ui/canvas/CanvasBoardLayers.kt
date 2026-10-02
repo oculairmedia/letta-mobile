@@ -97,7 +97,7 @@ private fun CanvasBoard.trackBoardPosition(coordinates: LayoutCoordinates) {
 private fun CanvasBoard.watchInitialPress(event: PointerEvent) {
     CanvasWorkspaceSupport.handleWheelZoom(event, controller)
     if (event.type == PointerEventType.Press && event.changes.any { it.type == PointerType.Touch }) {
-        ui.fingerRecency.touched(System.currentTimeMillis())
+        ui.fingerRecency.touched(kotlin.time.Clock.System.now().toEpochMilliseconds())
     }
 }
 
@@ -142,7 +142,7 @@ private fun CanvasDrawingLayer(board: CanvasBoard) {
         // Shapes and notes share one selection look; see CanvasSelectionChrome.
         selectionStyle = canvasSelectionStyle(),
         additiveTaps = board.view.compact && ui.multiSelecting,
-        pickTolerance = { ui.fingerRecency.pickTolerance(System.currentTimeMillis()) },
+        pickTolerance = { ui.fingerRecency.pickTolerance(kotlin.time.Clock.System.now().toEpochMilliseconds()) },
         // Gestures read the controller's state as it is now, not as of the last frame, so
         // anything the board dispatches during a press is already seen by that press.
         liveState = { board.controller.state.value },

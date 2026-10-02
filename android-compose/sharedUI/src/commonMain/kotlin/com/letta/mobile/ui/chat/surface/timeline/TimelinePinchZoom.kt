@@ -27,6 +27,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.jvm.JvmInline
 
 /**
  * letta-mobile-bglj6.1: pinch-to-zoom of the timeline's text scale, in common pointer input.

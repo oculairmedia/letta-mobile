@@ -18,8 +18,8 @@ import org.jetbrains.skia.RuntimeShaderBuilder
 import org.jetbrains.skia.Surface as SkiaSurface
 
 /**
- * Desktop: the shared ambient source compiled as SkSL, exactly as DesktopAmbientChatBackground
- * compiles it (Skia expects a premultiplied result, hence that main). Compiled once per page
+ * Desktop and web (both Skiko): the shared ambient source compiled as SkSL, exactly as
+ * DesktopAmbientChatBackground compiles it (Skia expects a premultiplied result, hence that main). Compiled once per page
  * (AmbientGlowShaders); the builder and paint are reused across frames and released with it.
  */
 internal actual fun createAmbientGlowShader(): AmbientGlowShader? = SkiaAmbientGlowShader.compile()

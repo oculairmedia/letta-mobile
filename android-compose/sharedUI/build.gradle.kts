@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
@@ -29,6 +31,11 @@ compose.resources {
 }
 
 kotlin {
+    // Every target, wasm included (letta-mobile-o4ygk.4).
+    compilerOptions {
+        optIn.add("androidx.compose.material3.ExperimentalMaterial3Api")
+    }
+
     android {
         namespace = "com.letta.mobile.sharedui"
         compileSdk = libs.versions.compileSdk.get().toInt()
@@ -41,23 +48,21 @@ kotlin {
 
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            freeCompilerArgs.addAll(
-                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            )
         }
     }
 
     jvm {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            freeCompilerArgs.addAll(
-                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            )
         }
     }
 
-    // Phase 3b: android + jvm hosts for shared Compose UI. wasmJs remains a
-    // follow-on (web keeps its local theme duplicates until then).
+    // letta-mobile-o4ygk.4: the web client compiles the same shared UI. The required
+    // shared-multiplatform job compiles main and test for wasm; the browser tests are not run yet.
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
 
     sourceSets {
         commonMain {
@@ -108,7 +113,7 @@ kotlin {
                 // so Android and desktop read one copy instead of R.string and literals).
                 implementation("org.jetbrains.compose.components:components-resources:1.10.0")
                 // The shared chat page's paged canonical timeline (LazyPagingItems over
-                // CanonicalTimelinePresentation.settled). KMP: android + jvm.
+                // CanonicalTimelinePresentation.settled). KMP: android, jvm and wasm.
                 implementation(libs.androidx.paging.compose)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
@@ -119,6 +124,20 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
             }
+        }
+
+        // Skia-backed actuals shared by desktop and web (letta-mobile-o4ygk.4): both render with
+        // Skiko, so the SkSL glow shader and the Skia image decode compile once for both.
+        val skikoMain by creating {
+            dependsOn(commonMain.get())
+        }
+
+        jvmMain {
+            dependsOn(skikoMain)
+        }
+
+        wasmJsMain {
+            dependsOn(skikoMain)
         }
 
         androidMain {

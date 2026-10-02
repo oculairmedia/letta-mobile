@@ -14,6 +14,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -741,7 +742,7 @@ internal fun A2uiComponent.validationError(
     renderScope: A2uiRenderScope,
     legacyValidation: String?,
 ): String? {
-    if (legacyValidation != null && value.isNotBlank() && !value.matchesValidation(legacyValidation)) {
+    if (value.failsValidation(rememberValidationRegex(legacyValidation))) {
         return "Invalid value"
     }
     val checks = raw["checks"] as? JsonArray ?: return null
@@ -779,16 +780,17 @@ internal fun JsonElement?.choiceSelection(): Set<String> = when (this) {
     else -> emptySet()
 }
 
-private val validationRegexCache = mutableMapOf<String, Regex>()
-private val validationRegexLock = Any()
+/**
+ * A component's validation pattern, compiled once for as long as the component shows it rather
+ * than on every check. Null when there is no pattern or it is not a valid regex: anything passes.
+ */
+@Composable
+internal fun rememberValidationRegex(pattern: String?): Regex? =
+    remember(pattern) { pattern?.let { runCatching { Regex(it) }.getOrNull() } }
 
-internal fun String.matchesValidation(pattern: String): Boolean =
-    runCatching {
-        val regex = synchronized(validationRegexLock) {
-            validationRegexCache.getOrPut(pattern) { Regex(pattern) }
-        }
-        regex.matches(this)
-    }.getOrDefault(true)
+/** Whether this non-blank value fails [regex]; a missing or invalid pattern fails nothing. */
+internal fun String.failsValidation(regex: Regex?): Boolean =
+    regex != null && isNotBlank() && !regex.matches(this)
 
 internal fun String.toDateMillis(): Long? =
     runCatching {
