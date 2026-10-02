@@ -42,7 +42,7 @@ class CanvasArtifactReceiptsTest {
 
     @Test
     fun theFixtureReceiptProjectsToThePlansPart() {
-        val events = listOf(user("u1"), call("t1", result = receiptJson), assistant("a1", "Done."))
+        val events = listOf(user("u1"), call(Call("t1", result = receiptJson)), assistant(Said("a1", "Done.")))
         val part = CanvasArtifactReceipts.attach(events).values.single().single()
         // Plan 5.3, "Projected chat part".
         assertEquals("weekend-plan", part.artifactId)
@@ -91,7 +91,7 @@ class CanvasArtifactReceiptsTest {
             ),
         )
         val preview = worst.encodeToByteArray().decodeToString(0, MessageListWireProjection.TOOL_RETURN_PREVIEW_BYTES)
-        val part = CanvasArtifactReceipts.attach(listOf(call("t1", result = preview, truncated = true))).values.single().single()
+        val part = CanvasArtifactReceipts.attach(listOf(call(Call("t1", result = preview, truncated = true)))).values.single().single()
         assertEquals(CanvasArtifactStatus.Published, part.status)
         assertEquals(artifactId, part.artifactId)
         assertTrue(part.canvasId!!.startsWith("canvas-conversation-"))
@@ -104,11 +104,11 @@ class CanvasArtifactReceiptsTest {
     fun attachesExactlyOnePartToTheNarratingMessageAfterTheCall() {
         val events = listOf(
             user("u1"),
-            assistant("a0", "Let me put that on the board.", step = "s1"),
+            assistant(Said("a0", "Let me put that on the board.", step = "s1")),
             reasoning("r1", step = "s1"),
-            call("t1", result = receiptJson, step = "s1"),
-            assistant("a1", "It's on the board.", step = "s2"),
-            assistant("a2", "Anything else?", step = "s3"),
+            call(Call("t1", result = receiptJson, step = "s1")),
+            assistant(Said("a1", "It's on the board.", step = "s2")),
+            assistant(Said("a2", "Anything else?", step = "s3")),
         )
         val attached = CanvasArtifactReceipts.attach(events)
         assertEquals(setOf(CanvasArtifactReceipts.eventKey(events[4])), attached.keys)
@@ -119,9 +119,9 @@ class CanvasArtifactReceiptsTest {
     fun prefersTheNarrationInTheCallsOwnStep() {
         val events = listOf(
             user("u1"),
-            call("t1", result = receiptJson, step = "s1"),
-            assistant("a1", "Another step's text", step = "s2"),
-            assistant("a2", "Same step's text", step = "s1"),
+            call(Call("t1", result = receiptJson, step = "s1")),
+            assistant(Said("a1", "Another step's text", step = "s2")),
+            assistant(Said("a2", "Same step's text", step = "s1")),
         )
         assertEquals(setOf(CanvasArtifactReceipts.eventKey(events[3])), CanvasArtifactReceipts.attach(events).keys)
     }
@@ -130,16 +130,16 @@ class CanvasArtifactReceiptsTest {
     fun withoutNarrationAfterItFallsBackToTheLastNarrationBeforeItInTheSameStep() {
         val events = listOf(
             user("u1"),
-            assistant("a0", "Other step", step = "s0"),
-            assistant("a1", "Putting it on the board", step = "s1"),
-            call("t1", result = receiptJson, step = "s1"),
+            assistant(Said("a0", "Other step", step = "s0")),
+            assistant(Said("a1", "Putting it on the board", step = "s1")),
+            call(Call("t1", result = receiptJson, step = "s1")),
         )
         assertEquals(setOf(CanvasArtifactReceipts.eventKey(events[2])), CanvasArtifactReceipts.attach(events).keys)
     }
 
     @Test
     fun withNoNarrationAtAllItStaysOnTheToolCall() {
-        val events = listOf(user("u1"), assistant("a0", "Other step", step = "s0"), call("t1", result = receiptJson, step = "s1"))
+        val events = listOf(user("u1"), assistant(Said("a0", "Other step", step = "s0")), call(Call("t1", result = receiptJson, step = "s1")))
         assertEquals(setOf(CanvasArtifactReceipts.eventKey(events[2])), CanvasArtifactReceipts.attach(events).keys)
     }
 
@@ -147,26 +147,26 @@ class CanvasArtifactReceiptsTest {
     fun neverAttachesAcrossRunsOrTurns() {
         val events = listOf(
             user("u1"),
-            call("t1", result = receiptJson, run = "run-1", step = "s1"),
-            assistant("other-run", "Another run's text", run = "run-2", step = "s9"),
+            call(Call("t1", result = receiptJson, run = "run-1", step = "s1")),
+            assistant(Said("other-run", "Another run's text", run = "run-2", step = "s9")),
             user("u2"),
-            assistant("next-turn", "Next turn", run = "run-1", step = "s2"),
+            assistant(Said("next-turn", "Next turn", run = "run-1", step = "s2")),
         )
         assertEquals(setOf(CanvasArtifactReceipts.eventKey(events[1])), CanvasArtifactReceipts.attach(events).keys)
     }
 
     @Test
     fun theProviderSafeToolNameIsTheComposeToolToo() {
-        val events = listOf(call("t1", result = receiptJson, name = CanvasToolContract.COMPOSE.replace('.', '_')), assistant("a1", "Done."))
+        val events = listOf(call(Call("t1", result = receiptJson, name = CanvasToolContract.COMPOSE.replace('.', '_'))), assistant(Said("a1", "Done.")))
         assertEquals(1, CanvasArtifactReceipts.attach(events).values.single().size)
-        assertTrue(CanvasArtifactReceipts.attach(listOf(call("t2", result = receiptJson, name = "canvas_apply_ops"))).isEmpty())
+        assertTrue(CanvasArtifactReceipts.attach(listOf(call(Call("t2", result = receiptJson, name = "canvas_apply_ops")))).isEmpty())
     }
 
     // --- status ----------------------------------------------------------------------------
 
     @Test
     fun pendingFlipsToPublishedInPlaceOnTheSameMessage() {
-        val pending = listOf(user("u1"), call("t1", result = null, arguments = requestJson), assistant("a1", "Adding it."))
+        val pending = listOf(user("u1"), call(Call("t1", result = null, arguments = requestJson)), assistant(Said("a1", "Adding it.")))
         val before = CanvasArtifactReceipts.attach(pending)
         val pendingPart = before.values.single().single()
         assertEquals(CanvasArtifactStatus.Pending, pendingPart.status)
@@ -176,7 +176,7 @@ class CanvasArtifactReceiptsTest {
         assertNull(pendingPart.bounds)
         assertFalse(pendingPart.canShowOnCanvas)
 
-        val settled = pending.toMutableList().also { it[1] = call("t1", result = receiptJson, arguments = requestJson) }
+        val settled = pending.toMutableList().also { it[1] = call(Call("t1", result = receiptJson, arguments = requestJson)) }
         val after = CanvasArtifactReceipts.attach(settled)
         assertEquals(before.keys, after.keys)
         val published = after.values.single().single()
@@ -186,7 +186,7 @@ class CanvasArtifactReceiptsTest {
 
     @Test
     fun aRefusalIsAFailedCardWithTheBoardsReason() {
-        val events = listOf(call("t1", result = refusalJson, isError = true, arguments = requestJson), assistant("a1", "That failed."))
+        val events = listOf(call(Call("t1", result = refusalJson, isError = true, arguments = requestJson)), assistant(Said("a1", "That failed.")))
         val part = CanvasArtifactReceipts.attach(events).values.single().single()
         assertEquals(CanvasArtifactStatus.Failed, part.status)
         assertEquals("VALIDATION_FAILED", part.error?.code)
@@ -201,7 +201,7 @@ class CanvasArtifactReceiptsTest {
 
     @Test
     fun aPlainTextErrorIsAFailedCardCarryingThatText() {
-        val part = CanvasArtifactReceipts.attach(listOf(call("t1", result = "Unknown canvas", isError = true))).values.single().single()
+        val part = CanvasArtifactReceipts.attach(listOf(call(Call("t1", result = "Unknown canvas", isError = true)))).values.single().single()
         assertEquals(CanvasArtifactStatus.Failed, part.status)
         assertEquals("Unknown canvas", part.error?.message)
     }
@@ -209,7 +209,7 @@ class CanvasArtifactReceiptsTest {
     @Test
     fun aDryRunIsAPreviewNotAPublication() {
         val dryRun = receiptJson.replace("\"published\"", "\"dry_run\"")
-        val part = CanvasArtifactReceipts.attach(listOf(call("t1", result = dryRun))).values.single().single()
+        val part = CanvasArtifactReceipts.attach(listOf(call(Call("t1", result = dryRun)))).values.single().single()
         assertEquals(CanvasArtifactStatus.DryRun, part.status)
         assertFalse(part.canShowOnCanvas)
     }
@@ -217,21 +217,21 @@ class CanvasArtifactReceiptsTest {
     @Test
     fun aTruncatedReturnDegradesToAPartWithoutBoundsNeverToNothing() {
         val preview = receiptJson.take(120)
-        val events = listOf(call("t1", result = preview, truncated = true, arguments = requestJson), assistant("a1", "Done."))
+        val events = listOf(call(Call("t1", result = preview, truncated = true, arguments = requestJson)), assistant(Said("a1", "Done.")))
         val part = CanvasArtifactReceipts.attach(events).values.single().single()
         assertEquals(CanvasArtifactStatus.Published, part.status)
         assertEquals("weekend-plan", part.artifactId)
         assertEquals("Weekend plan", part.title)
         assertNull(part.bounds)
         // Even a full-looking body is not trusted while the marker says it is a preview.
-        val markedFull = CanvasArtifactReceipts.attach(listOf(call("t2", result = receiptJson, truncated = true))).values.single().single()
+        val markedFull = CanvasArtifactReceipts.attach(listOf(call(Call("t2", result = receiptJson, truncated = true)))).values.single().single()
         assertNull(markedFull.bounds)
         assertEquals("weekend-plan", markedFull.artifactId)
     }
 
     @Test
     fun anUnreadableReturnDegradesTooAndReadsItsIdsFromTheText() {
-        val part = CanvasArtifactReceipts.attach(listOf(call("t1", result = "{\"artifact_id\":\"x-1\",\"canvas_id\":\"canvas-9\", broken")))
+        val part = CanvasArtifactReceipts.attach(listOf(call(Call("t1", result = "{\"artifact_id\":\"x-1\",\"canvas_id\":\"canvas-9\", broken"))))
             .values.single().single()
         assertEquals(CanvasArtifactStatus.Published, part.status)
         assertEquals("x-1", part.artifactId)
@@ -247,9 +247,9 @@ class CanvasArtifactReceiptsTest {
         val events = listOf(
             user("u1"),
             localCall("t1", result = null),
-            call("t1", result = receiptJson, serverId = "m-live"),
-            call("t1", result = receiptJson, serverId = "m-replay"),
-            assistant("a1", "Done."),
+            call(Call("t1", result = receiptJson, serverId = "m-live")),
+            call(Call("t1", result = receiptJson, serverId = "m-replay")),
+            assistant(Said("a1", "Done.")),
         )
         val attached = CanvasArtifactReceipts.attach(events)
         val part = attached.values.flatten().single()
@@ -261,10 +261,10 @@ class CanvasArtifactReceiptsTest {
     fun aRetryUnderTheSameArtifactIdYieldsOnePartWithTheLatestStatus() {
         val events = listOf(
             user("u1"),
-            call("t1", result = refusalJson, isError = true, arguments = requestJson, step = "s1"),
-            assistant("a1", "Let me fix that.", step = "s2"),
-            call("t2", result = receiptJson, arguments = requestJson, step = "s3"),
-            assistant("a2", "Done.", step = "s4"),
+            call(Call("t1", result = refusalJson, isError = true, arguments = requestJson, step = "s1")),
+            assistant(Said("a1", "Let me fix that.", step = "s2")),
+            call(Call("t2", result = receiptJson, arguments = requestJson, step = "s3")),
+            assistant(Said("a2", "Done.", step = "s4")),
         )
         val attached = CanvasArtifactReceipts.attach(events)
         assertEquals(setOf(CanvasArtifactReceipts.eventKey(events[4])), attached.keys)
@@ -274,7 +274,7 @@ class CanvasArtifactReceiptsTest {
     @Test
     fun twoArtifactsInOneRunKeepTheirOrder() {
         val second = receiptJson.replace("weekend-plan", "second")
-        val events = listOf(user("u1"), call("t1", result = receiptJson, step = "s1"), call("t2", result = second, step = "s2"), assistant("a1", "Both done."))
+        val events = listOf(user("u1"), call(Call("t1", result = receiptJson, step = "s1")), call(Call("t2", result = second, step = "s2")), assistant(Said("a1", "Both done.")))
         assertEquals(listOf("weekend-plan", "second"), CanvasArtifactReceipts.attach(events).values.single().map { it.artifactId })
     }
 
@@ -284,8 +284,8 @@ class CanvasArtifactReceiptsTest {
     fun hydratingTheSameEventsFromAStoredEnvelopeAttachesTheSameParts() {
         val live = listOf(
             user("u1"),
-            call("t1", result = receiptJson, arguments = requestJson, step = "s1"),
-            assistant("a1", "It's on the board.", step = "s2"),
+            call(Call("t1", result = receiptJson, arguments = requestJson, step = "s1")),
+            assistant(Said("a1", "It's on the board.", step = "s2")),
         )
         val envelope = StoredTimelineEnvelope(
             scope = TimelineScope("backend-1", "conv-123"),
@@ -303,7 +303,7 @@ class CanvasArtifactReceiptsTest {
 
     @Test
     fun noComposeCallsMeansNoMapAndUntouchedMessages() {
-        val events = listOf(user("u1"), assistant("a1", "Hi"))
+        val events = listOf(user("u1"), assistant(Said("a1", "Hi")))
         val attached = CanvasArtifactReceipts.attach(events)
         assertTrue(attached.isEmpty())
         val message = timelineEventToUiMessage(events[1])!!
@@ -312,7 +312,7 @@ class CanvasArtifactReceiptsTest {
 
     @Test
     fun theMapperCarriesTheAttachedPartsOnBothBranches() {
-        val events = listOf(user("u1"), call("t1", result = receiptJson), assistant("a1", "Done."))
+        val events = listOf(user("u1"), call(Call("t1", result = receiptJson)), assistant(Said("a1", "Done.")))
         val attached = CanvasArtifactReceipts.attach(events)
         val parts = attached.getValue(CanvasArtifactReceipts.eventKey(events[2]))
         assertEquals(parts, timelineEventToUiMessage(events[2], artifacts = parts)?.artifacts)
@@ -332,46 +332,54 @@ class CanvasArtifactReceiptsTest {
         return position
     }
 
-    private fun user(id: String) = confirmed(id, TimelineMessageType.USER, "Plan my weekend", run = null, step = null)
+    private fun user(id: String) = confirmed(Said(id, "Plan my weekend", run = null, step = null), TimelineMessageType.USER)
 
-    private fun assistant(id: String, text: String, run: String? = RUN, step: String? = "s1") =
-        confirmed(id, TimelineMessageType.ASSISTANT, text, run, step)
+    private fun assistant(said: Said) = confirmed(said, TimelineMessageType.ASSISTANT)
 
-    private fun reasoning(id: String, step: String) = confirmed(id, TimelineMessageType.REASONING, "thinking", RUN, step)
+    private fun reasoning(id: String, step: String) = confirmed(Said(id, "thinking", step = step), TimelineMessageType.REASONING)
 
-    private fun confirmed(id: String, type: TimelineMessageType, text: String, run: String?, step: String?) = TimelineEvent.Confirmed(
-        position = next(), otid = "otid-$id", content = text, serverId = id, messageType = type,
-        date = parseTimelineInstant(T0), runId = run, stepId = step,
+    private fun confirmed(said: Said, type: TimelineMessageType) = TimelineEvent.Confirmed(
+        position = next(), otid = "otid-${said.id}", content = said.text, serverId = said.id, messageType = type,
+        date = parseTimelineInstant(T0), runId = said.run, stepId = said.step,
     )
 
-    private fun call(
-        callId: String,
-        result: String?,
-        isError: Boolean = false,
-        truncated: Boolean = false,
-        arguments: String = "{}",
-        name: String = CanvasToolContract.COMPOSE,
-        run: String = RUN,
-        step: String = "s1",
-        serverId: String = "m-$callId",
-    ) = TimelineEvent.Confirmed(
-        position = next(), otid = "otid-$serverId", content = "", serverId = serverId,
-        messageType = TimelineMessageType.TOOL_CALL, date = parseTimelineInstant(T0), runId = run, stepId = step,
-        toolCalls = persistentListOf(ToolCall(id = callId, name = name, arguments = arguments)),
-        toolReturnContentByCallId = if (result == null) persistentMapOf() else persistentMapOf(callId to result),
-        toolReturnIsErrorByCallId = if (result == null) persistentMapOf() else persistentMapOf(callId to isError),
-        toolReturnTruncationByCallId = if (truncated) persistentMapOf(callId to ToolReturnTruncation("ret-$callId", 9999L)) else persistentMapOf(),
+    private fun call(call: Call) = TimelineEvent.Confirmed(
+        position = next(), otid = "otid-${call.serverId}", content = "", serverId = call.serverId,
+        messageType = TimelineMessageType.TOOL_CALL, date = parseTimelineInstant(T0), runId = call.run, stepId = call.step,
+        toolCalls = persistentListOf(ToolCall(id = call.callId, name = call.name, arguments = call.arguments)),
+        toolReturnContentByCallId = call.result?.let { persistentMapOf(call.callId to it) } ?: persistentMapOf(),
+        toolReturnIsErrorByCallId = call.result?.let { persistentMapOf(call.callId to call.isError) } ?: persistentMapOf(),
+        toolReturnTruncationByCallId = call.truncation(),
     )
 
     private fun localCall(callId: String, result: String?) = TimelineEvent.Local(
         position = next(), otid = "local-$callId", content = "", sentAt = parseTimelineInstant(T0),
         deliveryState = DeliveryState.SENT, messageType = TimelineMessageType.TOOL_CALL,
         toolCalls = persistentListOf(ToolCall(id = callId, name = CanvasToolContract.COMPOSE, arguments = "{}")),
-        toolReturnContentByCallId = if (result == null) persistentMapOf() else persistentMapOf(callId to result),
+        toolReturnContentByCallId = result?.let { persistentMapOf(callId to it) } ?: persistentMapOf(),
     )
 
     private fun fixture(name: String): String =
         checkNotNull(javaClass.getResource("/canvas/compose/v1/$name")) { "missing fixture $name" }.readText()
+
+    /** A message as these tests write it: its id and text, in a run and step. */
+    private data class Said(val id: String, val text: String, val run: String? = RUN, val step: String? = "s1")
+
+    /** A canvas_compose call as these tests write it, and its return ([result] null while pending). */
+    private data class Call(
+        val callId: String,
+        val result: String?,
+        val isError: Boolean = false,
+        val truncated: Boolean = false,
+        val arguments: String = "{}",
+        val name: String = CanvasToolContract.COMPOSE,
+        val run: String = RUN,
+        val step: String = "s1",
+        val serverId: String = "m-$callId",
+    ) {
+        fun truncation() =
+            if (truncated) persistentMapOf(callId to ToolReturnTruncation("ret-$callId", 9999L)) else persistentMapOf()
+    }
 
     private companion object {
         const val RUN = "run-1"

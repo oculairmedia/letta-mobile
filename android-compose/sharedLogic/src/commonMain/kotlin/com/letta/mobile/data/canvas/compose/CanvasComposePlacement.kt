@@ -1,20 +1,8 @@
 package com.letta.mobile.data.canvas.compose
 
-import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneDocument
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.floatOrNull
-import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /** A world-unit rectangle placement hands out. */
 data class Slot(val x: Float, val y: Float, val width: Float, val height: Float) {
@@ -102,11 +90,10 @@ object CanvasComposePlacement {
 
     fun place(items: List<SizedItem>, contentBounds: ComposeBounds?): Placement {
         if (items.isEmpty()) return Placement(emptyMap(), emptyMap(), null)
-        val (x, y) = origin(contentBounds)
         val slots = LinkedHashMap<String, Slot>()
         val labels = LinkedHashMap<String, Slot>()
         val sizes = items.map { sizeOf(it) }
-        val cells = grid(sizes, x, y)
+        val cells = grid(sizes, origin(contentBounds))
         items.forEachIndexed { i, item ->
             val cell = cells[i]
             when (item) {
@@ -137,7 +124,7 @@ object CanvasComposePlacement {
     fun labelRow(label: String?, innerWidth: Float): Float {
         if (label.isNullOrBlank()) return GROUP_LABEL_ROW
         val font = GROUP_LABEL_FONT.toDouble()
-        val lines = CanvasComposeReserve.lineCount(label, innerWidth.toDouble(), font, mono = false)
+        val lines = WorstCaseWrap(innerWidth.toDouble(), font).lines(label)
         return maxOf(GROUP_LABEL_ROW, ceil(lines * CanvasComposeReserve.LINE_HEIGHT_EM * font).toFloat())
     }
 
@@ -162,13 +149,14 @@ object CanvasComposePlacement {
         if (!group.label.isNullOrBlank()) {
             labels[group.key] = Slot(frame.x + GROUP_PADDING, frame.y + GROUP_LABEL_TOP, innerWidth, row)
         }
-        val cells = grid(group.children.map { Size(it.width, it.height) }, frame.x + GROUP_PADDING, frame.y + GROUP_PADDING + row)
+        val cells = grid(group.children.map { Size(it.width, it.height) }, frame.x + GROUP_PADDING to frame.y + GROUP_PADDING + row)
         group.children.forEachIndexed { i, child -> slots[child.key] = cells[i] }
     }
 
-    /** The cells of a row-major grid of [sizes] starting at ([x], [y]); each cell is its item's own size. */
-    private fun grid(sizes: List<Size>, x: Float, y: Float): List<Slot> {
+    /** The cells of a row-major grid of [sizes] starting at [topLeft]; each cell is its item's own size. */
+    private fun grid(sizes: List<Size>, topLeft: Pair<Float, Float>): List<Slot> {
         if (sizes.isEmpty()) return emptyList()
+        val (x, y) = topLeft
         val columns = columns(sizes.size)
         val columnWidth = sizes.maxOf { it.width }
         val cells = ArrayList<Slot>(sizes.size)
@@ -215,8 +203,6 @@ object CanvasComposePlacement {
 
     // ---- Content bounds of a scene, read from its JSON -------------------------------------------
 
-    private val json = Json { ignoreUnknownKeys = true }
-
     /**
      * The board's content bounds exactly as the renderer's zoom-to-fit computes them
      * (sharedUI `CanvasViewportFit.contentBounds`): the union of every element's DrawBox
@@ -224,7 +210,7 @@ object CanvasComposePlacement {
      * elements. Null when there is nothing. Frameless documents are not in it (they are laid out
      * relative to it, by [placeFrameless]).
      */
-    fun contentBounds(sceneJson: String): ComposeBounds? = boundsOf(sceneJson, conservative = false)
+    fun contentBounds(sceneJson: String): ComposeBounds? = SceneBounds(sceneJson).content()
 
     /**
      * What a new artifact must stay clear of: [contentBounds], with each element's box grown to
@@ -232,135 +218,8 @@ object CanvasComposePlacement {
      * rather than DrawBox's one-line guess) and the frameless documents where [placeFrameless]
      * puts them. This is the bounds the compiler places against.
      */
-    fun occupiedBounds(sceneJson: String): ComposeBounds? {
-        val framed = boundsOf(sceneJson, conservative = true)
-        val documents = CanvasOpProjector.documentsOf(sceneJson)
-        val frameless = placeFrameless(documents, contentBounds(sceneJson))
-        return union(framed, union(frameless.values))
-    }
-
-    private fun boundsOf(sceneJson: String, conservative: Boolean): ComposeBounds? {
-        if (sceneJson.isBlank()) return null
-        val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() as? JsonObject ?: return null
-        val rects = mutableListOf<Slot>()
-        (root["elements"] as? JsonArray)?.forEach { element ->
-            (element as? JsonObject)?.let { rects += elementBounds(it, conservative) }
-        }
-        CanvasOpProjector.documentsOf(sceneJson).forEach { document ->
-            document.frame?.let { rects += Slot(it.x, it.y, it.width, it.height) }
-        }
-        return union(rects)
-    }
+    fun occupiedBounds(sceneJson: String): ComposeBounds? = SceneBounds(sceneJson).occupied()
 
     /** DrawBox `Element.bounds()` of one serialized element, optionally grown as [occupiedBounds] says. */
-    internal fun elementBounds(element: JsonObject, conservative: Boolean): Slot {
-        val type = element.string("type")
-        val box = when (type) {
-            "Text" -> textBounds(element, conservative)
-            "Image" -> pointsBounds(element.offsets("points"))
-            "Shape" -> shapeBounds(element)
-            else -> {
-                // A Path, and DrawBox reads any other type as one: samples, else legacy points.
-                val samples = (element["samples"] as? JsonArray)?.map { sample(it) }
-                pointsBounds(samples ?: element.offsets("points"))
-            }
-        }
-        if (!conservative) return box
-        val rotation = element.float("rotation") ?: 0f
-        return if (rotation == 0f) box else rotated(box, rotation)
-    }
-
-    private fun textBounds(element: JsonObject, conservative: Boolean): Slot {
-        val fontSize = element.float("fontSize") ?: 24f
-        val points = element.offsets("points")
-        val topLeft = element.string("textTopLeft")?.let { offset(it) } ?: points.firstOrNull() ?: (0f to 0f)
-        val wrapWidth = (
-            element.float("wrapWidth")
-                ?: if (points.size >= 2) points.last().first - points.first().first else 240f
-            ).coerceAtLeast(1f)
-        // DrawBox's single-line guess until the renderer measures; the conservative box books the wrapped lines.
-        val guess = (fontSize * 1.2f).coerceAtLeast(fontSize)
-        val height = if (conservative) {
-            val text = element.string("text").orEmpty()
-            val lines = CanvasComposeReserve.lineCount(text, wrapWidth.toDouble(), fontSize.toDouble(), mono = false)
-            maxOf(guess, ceil(lines * CanvasComposeReserve.LINE_HEIGHT_EM * fontSize).toFloat())
-        } else {
-            guess
-        }
-        return Slot(topLeft.first, topLeft.second, wrapWidth, height)
-    }
-
-    private fun shapeBounds(element: JsonObject): Slot {
-        val points = element.offsets("points")
-        return when (element.string("shapeType")) {
-            "CIRCLE" -> {
-                if (points.size < 2) return pointsBounds(points)
-                val (sx, sy) = points.first()
-                val (ex, ey) = points.last()
-                val cx = (sx + ex) * 0.5f
-                val cy = (sy + ey) * 0.5f
-                val dx = ex - sx
-                val dy = ey - sy
-                val radius = sqrt(dx * dx + dy * dy) * 0.5f
-                exact(cx - radius, cy - radius, cx + radius, cy + radius)
-            }
-            "LINE", "ARROW" -> {
-                if (points.size < 2) return pointsBounds(points)
-                val start = points.first()
-                val end = points.last()
-                val bend = element.string("bend")?.let { offset(it) } ?: (0f to 0f)
-                if (bend.first == 0f && bend.second == 0f) return pointsBounds(listOf(start, end))
-                val mid = (start.first + end.first) * 0.5f to (start.second + end.second) * 0.5f
-                val control = mid.first + bend.first to mid.second + bend.second
-                pointsBounds(listOf(start, end, control))
-            }
-            else -> if (points.size >= 2) pointsBounds(listOf(points.first(), points.last())) else pointsBounds(points)
-        }
-    }
-
-    /** A rectangle from its edges, so right - left is computed the way DrawBox's `Rect` holds it. */
-    private fun exact(left: Float, top: Float, right: Float, bottom: Float) = Slot(left, top, right - left, bottom - top)
-
-    private fun pointsBounds(points: List<Pair<Float, Float>>): Slot {
-        // DrawBox gives an element with no points the empty rectangle at the origin, and zoom-to-fit counts it.
-        if (points.isEmpty()) return Slot(0f, 0f, 0f, 0f)
-        val left = points.minOf { it.first }
-        val top = points.minOf { it.second }
-        val right = points.maxOf { it.first }
-        val bottom = points.maxOf { it.second }
-        return exact(left, top, right, bottom)
-    }
-
-    /** The axis-aligned box of [box] turned by [degrees] about its centre. */
-    private fun rotated(box: Slot, degrees: Float): Slot {
-        val radians = degrees * PI / 180.0
-        val c = abs(cos(radians))
-        val s = abs(sin(radians))
-        val w = box.width * c + box.height * s
-        val h = box.width * s + box.height * c
-        val cx = box.x + box.width / 2.0
-        val cy = box.y + box.height / 2.0
-        return Slot((cx - w / 2).toFloat(), (cy - h / 2).toFloat(), w.toFloat(), h.toFloat())
-    }
-
-    private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
-
-    private fun JsonObject.float(key: String): Float? = (this[key] as? JsonPrimitive)?.floatOrNull
-
-    private fun JsonObject.offsets(key: String): List<Pair<Float, Float>> =
-        (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.let(::offset) }.orEmpty()
-
-    /** DrawBox's `"x,y"`: anything that is not exactly two numbers reads as the origin. */
-    private fun offset(text: String): Pair<Float, Float> {
-        val parts = text.split(",")
-        if (parts.size != 2) return 0f to 0f
-        return (parts[0].toFloatOrNull() ?: 0f) to (parts[1].toFloatOrNull() ?: 0f)
-    }
-
-    /** A path sample `"x,y[,w[,tilt[,azimuth]]]"`: its position. */
-    private fun sample(element: JsonElement): Pair<Float, Float> {
-        val parts = (element as? JsonPrimitive)?.contentOrNull?.split(",") ?: return 0f to 0f
-        if (parts.size !in 2..5) return 0f to 0f
-        return (parts[0].toFloatOrNull() ?: 0f) to (parts[1].toFloatOrNull() ?: 0f)
-    }
+    internal fun elementBounds(element: JsonObject, conservative: Boolean): Slot = ElementBounds(element, conservative).bounds()
 }

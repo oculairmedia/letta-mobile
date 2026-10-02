@@ -427,27 +427,7 @@ class CanvasComposePlacementTest {
                 d.id to Slot(f.x, f.y, f.width, f.height)
             }
 
-        fun randomItems(random: Random): List<SizedItem> {
-            var budget = random.nextInt(1, CanvasComposeContract.MAX_ITEMS + 1)
-            var n = 0
-            val items = mutableListOf<SizedItem>()
-            while (budget > 0) {
-                val width = if (random.nextInt(5) == 0) 480f else 320f
-                val height = random.nextInt(32, 1_201).toFloat()
-                if (budget >= 2 && random.nextInt(4) == 0) {
-                    val children = List(random.nextInt(1, minOf(budget - 1, 9) + 1)) {
-                        SizedItem.Leaf("k${n++}", if (random.nextBoolean()) 320f else 480f, random.nextInt(32, 1_201).toFloat())
-                    }
-                    val label = if (random.nextBoolean()) "label ".repeat(random.nextInt(1, 12)) else null
-                    items += SizedItem.Group("k${n++}", label, children)
-                    budget -= 1 + children.size
-                } else {
-                    items += SizedItem.Leaf("k${n++}", width, height)
-                    budget--
-                }
-            }
-            return items
-        }
+        fun randomItems(random: Random): List<SizedItem> = RandomItems(random).make()
 
         fun randomBounds(random: Random): ComposeBounds? = if (random.nextInt(4) == 0) {
             null
@@ -460,4 +440,31 @@ class CanvasComposePlacementTest {
             )
         }
     }
+}
+
+/** Random items for the placement properties, keyed `k0`, `k1`, ... in the order they are made. */
+private class RandomItems(private val random: Random) {
+    private var n = 0
+
+    fun make(): List<SizedItem> {
+        var budget = random.nextInt(1, CanvasComposeContract.MAX_ITEMS + 1)
+        val items = mutableListOf<SizedItem>()
+        while (budget > 0) {
+            val width = if (random.nextInt(5) == 0) 480f else 320f
+            val height = random.nextInt(32, 1_201).toFloat()
+            val item = if (budget >= 2 && random.nextInt(4) == 0) group(budget) else SizedItem.Leaf("k${n++}", width, height)
+            items += item
+            budget -= if (item is SizedItem.Group) 1 + item.children.size else 1
+        }
+        return items
+    }
+
+    /** A group of at most [budget] - 1 children (nine at most), labelled or not. */
+    private fun group(budget: Int): SizedItem.Group {
+        val children = List(random.nextInt(1, minOf(budget - 1, 9) + 1)) { child() }
+        val label = if (random.nextBoolean()) "label ".repeat(random.nextInt(1, 12)) else null
+        return SizedItem.Group("k${n++}", label, children)
+    }
+
+    private fun child() = SizedItem.Leaf("k${n++}", if (random.nextBoolean()) 320f else 480f, random.nextInt(32, 1_201).toFloat())
 }

@@ -593,17 +593,11 @@ fun CanvasWorkspace(
     // not an animation, so reduced motion has nothing to honour here.
     val cameraTarget = cameraRequest?.target
     LaunchedEffect(cameraTarget, initialLoadDone, boardSize) {
-        val target = cameraTarget ?: return@LaunchedEffect
-        if (!initialLoadDone || boardSize.width <= 0 || boardSize.height <= 0) return@LaunchedEffect
-        val boardId = session?.canvasId?.value
-        if (target.canvasId == null || boardId == null || target.canvasId == boardId) {
-            CanvasViewportFit.fitOrNull(target.bounds, boardSize, maxScale = 1f)?.let { fit ->
-                controller.resetCamera()
-                controller.zoomBy(fit.scale, Offset.Zero)
-                controller.panBy(fit.offset)
-            }
+        cameraRequest?.frameOn(cameraTarget, CameraBoard(session?.canvasId?.value, boardSize, initialLoadDone)) { fit ->
+            controller.resetCamera()
+            controller.zoomBy(fit.scale, Offset.Zero)
+            controller.panBy(fit.offset)
         }
-        cameraRequest?.consume(target)
     }
 
     // The keyboard covers the foot of a phone's board, and on the shared chat page the chat bar
@@ -1351,7 +1345,7 @@ fun CanvasWorkspace(
                 CanvasNotesLayer(
                     onLiveFrame = { id, frame -> if (frame == null) liveNoteFrames.remove(id) else liveNoteFrames[id] = frame },
                     framelessFrames = framelessFrames,
-                    onFittedHeight = { id, height -> if (height == null) fittedNoteHeights.remove(id) else fittedNoteHeights[id] = height },
+                    onFittedHeight = fittedNoteHeights::putOrRemove,
                     session = session,
                     documents = documents,
                     viewport = state.viewport,

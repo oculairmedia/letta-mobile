@@ -169,21 +169,7 @@ fun timelineEventToUiMessage(
                         )
                     }
                 } else null
-            val uiApproval: UiApprovalRequest? =
-                if (!ev.approvalDecided) {
-                    ev.approvalRequestId?.let { reqId ->
-                        UiApprovalRequest(
-                            requestId = reqId,
-                            toolCalls = ev.toolCalls.map { tc ->
-                                UiApprovalToolCall(
-                                    toolCallId = tc.effectiveId,
-                                    name = tc.name ?: "tool",
-                                    arguments = tc.arguments ?: "",
-                                )
-                            },
-                        )
-                    }
-                } else null
+            val uiApproval = pendingApprovalRequest(ev.approvalDecided, ev.approvalRequestId, ev.toolCalls)
 
             if (ev.messageType == TimelineMessageType.TOOL_CALL && uiToolCalls == null && ev.content.isBlank()) {
                 return null
@@ -308,21 +294,7 @@ fun timelineEventToUiMessage(
                         )
                     }
                 } else null
-            val uiApproval: UiApprovalRequest? =
-                if (!ev.approvalDecided) {
-                    ev.approvalRequestId?.let { reqId ->
-                        UiApprovalRequest(
-                            requestId = reqId,
-                            toolCalls = ev.toolCalls.map { tc ->
-                                UiApprovalToolCall(
-                                    toolCallId = tc.effectiveId,
-                                    name = tc.name ?: "tool",
-                                    arguments = tc.arguments ?: "",
-                                )
-                            },
-                        )
-                    }
-                } else null
+            val uiApproval = pendingApprovalRequest(ev.approvalDecided, ev.approvalRequestId, ev.toolCalls)
             // Intentionally never synthesize a standalone approvalResponse
             // here — see comment above. The chip on the tool card carries
             // the "Approved" indicator without hiding the tool body.
@@ -392,6 +364,26 @@ fun timelineEventToUiMessage(
             )
         }
     }
+}
+
+/** The approval buttons for [toolCalls] while request [requestId] is undecided; null once decided or with no request. */
+private fun pendingApprovalRequest(
+    decided: Boolean,
+    requestId: String?,
+    toolCalls: List<com.letta.mobile.data.model.ToolCall>,
+): UiApprovalRequest? {
+    if (decided) return null
+    val reqId = requestId ?: return null
+    return UiApprovalRequest(
+        requestId = reqId,
+        toolCalls = toolCalls.map { tc ->
+            UiApprovalToolCall(
+                toolCallId = tc.effectiveId,
+                name = tc.name ?: "tool",
+                arguments = tc.arguments ?: "",
+            )
+        },
+    )
 }
 
 private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: String?): UiSubagentDispatch? =

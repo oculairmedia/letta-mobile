@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
+import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -114,20 +115,20 @@ object HostCanvasTools {
      * and answers its receipt without writing it again.
      */
     private suspend fun compose(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
-        val host = CanvasComposeHosting.IROH_HOST
+        val hosting = CanvasComposeHosting(CanvasComposeHosting.IROH_HOST, caller.toolCallId)
         val canvasId = HostCanvasToolInputs.string(input, "canvas_id")?.takeIf { it.isNotBlank() }
         val entry = when (val access = if (canvasId != null) backend.open(caller, canvasId) else backend.ownConversation(caller)) {
             is HostCanvasAccess.Granted -> access.entry
             is HostCanvasAccess.Denied ->
-                return CanvasComposeHosting.refused(host, CanvasComposeHosting.deniedCode(access.reason), access.reason, caller.toolCallId)
-            null -> return CanvasComposeHosting.refused(host, ComposeErrorCode.CANVAS_NOT_FOUND, NO_DEFAULT_CANVAS, caller.toolCallId)
+                return hosting.refused(CanvasComposeHosting.deniedCode(access.reason), access.reason)
+            null -> return hosting.refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_DEFAULT_CANVAS)
         }
         if (!entry.acl.canWrite(caller.agentId)) {
             val reason = "Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'"
-            return CanvasComposeHosting.refused(host, ComposeErrorCode.UNAUTHORIZED, reason, caller.toolCallId)
+            return hosting.refused(ComposeErrorCode.UNAUTHORIZED, reason)
         }
         val scene = backend.scene(entry)
-        return CanvasComposeHosting.compose(host, input, entry.canvasId, scene.sceneJson, scene.revision, caller.toolCallId) { ops ->
+        return hosting.compose(input, ComposeTarget(entry.canvasId, scene.sceneJson, scene.revision)) { ops ->
             when (val published = backend.publish(caller, entry, ops, atomic = true)) {
                 is HostCanvasPublish.Published -> published.revision
                 is HostCanvasPublish.Denied -> throw ComposePublishException(

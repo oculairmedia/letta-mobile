@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
+import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -248,9 +249,9 @@ private suspend fun executeCompose(
     input: JsonObject,
     caller: ExternalToolCaller,
 ): ExternalToolResult {
-    val host = CanvasComposeHosting.APP
+    val hosting = CanvasComposeHosting(CanvasComposeHosting.APP, caller.toolCallId)
     val callerId = context.resolveCallerId()
-    fun refused(code: ComposeErrorCode, message: String) = CanvasComposeHosting.refused(host, code, message, caller.toolCallId)
+    fun refused(code: ComposeErrorCode, message: String) = hosting.refused(code, message)
     val named = (input["canvas_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
     val canvasId = named?.let(::CanvasId)
         ?: caller.conversationId?.let { context.store.getForConversation(it)?.id }
@@ -264,8 +265,8 @@ private suspend fun executeCompose(
     if (doc.acl != null && !doc.acl.canWrite(callerId)) {
         return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
     }
-    return CanvasComposeHosting.compose(host, input, doc.id.value, doc.sceneJson, doc.revision, caller.toolCallId) { ops ->
-        publishComposed(context.store, session, doc, ops, callerId)
+    return hosting.compose(input, ComposeTarget(doc.id.value, doc.sceneJson, doc.revision)) { ops ->
+        publishComposed(context, session, doc, ops)
     }
 }
 
@@ -276,12 +277,12 @@ private suspend fun executeCompose(
  * revision this call read. Returns the revision it landed at.
  */
 private suspend fun publishComposed(
-    store: CanvasDocumentStore,
+    context: CanvasToolContext,
     session: CanvasSession?,
     doc: CanvasDocument,
     ops: List<CanvasOp>,
-    callerId: String,
 ): Long {
+    val callerId = context.resolveCallerId()
     if (session != null) {
         return try {
             session.applyAgentBatch(ops, callerId).revision
@@ -290,7 +291,7 @@ private suspend fun publishComposed(
         }
     }
     val batch = CanvasStampedBatch.of(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) { CanvasOpDiffer.generateOpId("agent") }
-    return persistWithoutSession(store, doc, CanvasOpProjector.project(doc.sceneJson, listOf(batch)))
+    return persistWithoutSession(context.store, doc, CanvasOpProjector.project(doc.sceneJson, listOf(batch)))
         ?: throw ComposePublishException(
             ComposeErrorCode.BOARD_REFUSED,
             "Conflict: canvas '${doc.id.value}' changed since revision ${doc.revision} was read; retry the same call",

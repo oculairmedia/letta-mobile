@@ -31,11 +31,11 @@ class CanvasArtifactProjectionPathsTest {
     private val receiptJson = checkNotNull(javaClass.getResource("/canvas/compose/v1/receipt.json")).readText()
     private val requestJson = checkNotNull(javaClass.getResource("/canvas/compose/v1/request.json")).readText()
 
-    private val user = confirmed(1.0, "u1", TimelineMessageType.USER, "Plan my weekend", run = null)
+    private val user = confirmed(1.0, TimelineMessageType.USER, Said("u1", "Plan my weekend", run = null))
     private val pendingCall = call(2.0, result = null)
     private val publishedCall = call(2.0, result = receiptJson)
-    private val narration = confirmed(3.0, "a1", TimelineMessageType.ASSISTANT, "It's on the board.", step = "s2")
-    private val followUp = confirmed(4.0, "a2", TimelineMessageType.ASSISTANT, "Anything else?", step = "s3")
+    private val narration = confirmed(3.0, TimelineMessageType.ASSISTANT, Said("a1", "It's on the board.", step = "s2"))
+    private val followUp = confirmed(4.0, TimelineMessageType.ASSISTANT, Said("a2", "Anything else?", step = "s3"))
 
     @Test
     fun theStreamingProjectorMovesThePartOntoTheNarrationAndFlipsItInPlace() {
@@ -112,16 +112,12 @@ class CanvasArtifactProjectionPathsTest {
 
     private fun List<UiMessage>.byId(id: String): UiMessage = single { it.id == id }
 
-    private fun confirmed(
-        position: Double,
-        id: String,
-        type: TimelineMessageType,
-        text: String,
-        run: String? = "run-1",
-        step: String? = "s1",
-    ) = TimelineEvent.Confirmed(
-        position = position, otid = "otid-$id", content = text, serverId = id, messageType = type,
-        date = parseTimelineInstant(T0), runId = run, stepId = step,
+    /** A message as these tests write it: its id and text, in a run and step. */
+    private data class Said(val id: String, val text: String, val run: String? = "run-1", val step: String? = "s1")
+
+    private fun confirmed(position: Double, type: TimelineMessageType, said: Said) = TimelineEvent.Confirmed(
+        position = position, otid = "otid-${said.id}", content = said.text, serverId = said.id, messageType = type,
+        date = parseTimelineInstant(T0), runId = said.run, stepId = said.step,
     )
 
     private fun call(position: Double, result: String?) = TimelineEvent.Confirmed(

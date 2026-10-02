@@ -65,21 +65,17 @@ class ChatCanvasArtifactSnapshotTest {
         override val actions: ChatActions = RecordingChatActions()
     }
 
-    private fun receipt(
-        id: String,
-        status: CanvasArtifactStatus,
-        title: String,
-        kinds: List<ComposeKind>,
-        count: Int,
-        error: CanvasArtifactError? = null,
-    ) = CanvasArtifactReceipt(
-        artifactId = id,
+    /** What a card names: its artifact, title, kinds and piece count. */
+    private data class Card(val id: String, val title: String, val kinds: List<ComposeKind>, val count: Int)
+
+    private fun receipt(card: Card, status: CanvasArtifactStatus, error: CanvasArtifactError? = null) = CanvasArtifactReceipt(
+        artifactId = card.id,
         canvasId = "canvas-conversation-conv-1",
         revision = 42,
         status = status,
-        title = title,
-        kinds = kinds,
-        itemCount = count,
+        title = card.title,
+        kinds = card.kinds,
+        itemCount = card.count,
         bounds = if (status == CanvasArtifactStatus.Published) ComposeBounds(80f, 80f, 712f, 746f) else null,
         error = error,
     )
@@ -104,21 +100,24 @@ class ChatCanvasArtifactSnapshotTest {
                 timestamp = "2026-10-01T10:00:06Z", runId = "run-1",
                 artifacts = listOf(
                     receipt(
-                        "weekend-plan", CanvasArtifactStatus.Published, "Weekend plan",
-                        listOf(ComposeKind.TEXT, ComposeKind.CHECKLIST, ComposeKind.NOTE, ComposeKind.GROUP, ComposeKind.CARD), 6,
+                        Card(
+                            "weekend-plan", "Weekend plan",
+                            listOf(ComposeKind.TEXT, ComposeKind.CHECKLIST, ComposeKind.NOTE, ComposeKind.GROUP, ComposeKind.CARD), 6,
+                        ),
+                        CanvasArtifactStatus.Published,
                     ),
                 ),
             ),
             UiMessage(id = "u2", role = "user", content = "Add a packing list and a budget.", timestamp = "2026-10-01T10:01:00Z"),
             UiMessage(
                 id = "a2", role = "assistant", content = "Adding a packing list now.", timestamp = "2026-10-01T10:01:03Z", runId = "run-2",
-                artifacts = listOf(receipt("packing", CanvasArtifactStatus.Pending, "Packing list", listOf(ComposeKind.CHECKLIST), 1)),
+                artifacts = listOf(receipt(Card("packing", "Packing list", listOf(ComposeKind.CHECKLIST), 1), CanvasArtifactStatus.Pending)),
             ),
             UiMessage(
                 id = "a3", role = "assistant", content = "The budget did not go on the board.", timestamp = "2026-10-01T10:01:05Z", runId = "run-2",
                 artifacts = listOf(
                     receipt(
-                        "budget", CanvasArtifactStatus.Failed, "Budget", listOf(ComposeKind.CARD), 1,
+                        Card("budget", "Budget", listOf(ComposeKind.CARD), 1), CanvasArtifactStatus.Failed,
                         error = CanvasArtifactError("VALIDATION_FAILED", "a CARD holds at most 8 fields (got 11)", problemCount = 2),
                     ),
                 ),

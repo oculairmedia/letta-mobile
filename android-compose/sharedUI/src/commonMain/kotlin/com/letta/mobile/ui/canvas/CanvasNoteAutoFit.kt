@@ -173,26 +173,30 @@ internal data class NoteFitRequest(
 @Composable
 internal fun NoteFitMeasurer(request: NoteFitRequest, onFit: (NoteFit) -> Unit) {
     val blocks = remember(request.json) { CanvasNoteAutoFit.blocksOf(request.json) }
-    val registry = rememberCanvasBlockRegistry()
-    val padding = CanvasNoteChrome.bodyPadding(request.plain, isLabel = false)
-    val chrome = if (request.plain) null else CanvasNoteChrome.handleHeight
-    InWorldUnits { NoteFitLayout(request, blocks, registry, padding, chrome, onFit) }
+    val content = NoteFitContent(
+        blocks = blocks,
+        registry = rememberCanvasBlockRegistry(),
+        padding = CanvasNoteChrome.bodyPadding(request.plain, isLabel = false),
+        chrome = if (request.plain) null else CanvasNoteChrome.handleHeight,
+    )
+    InWorldUnits { NoteFitLayout(request, content, onFit) }
 }
+
+/** What a fit lays out: the card's blocks with its block registry, its body padding and the handle above it. */
+private class NoteFitContent(
+    val blocks: List<Block>,
+    val registry: io.github.linreal.cascade.editor.registry.BlockRegistry,
+    val padding: PaddingValues,
+    val chrome: Dp?,
+)
 
 @OptIn(ExperimentalCascadePreviewApi::class)
 @Composable
-private fun NoteFitLayout(
-    request: NoteFitRequest,
-    blocks: List<Block>,
-    registry: io.github.linreal.cascade.editor.registry.BlockRegistry,
-    padding: PaddingValues,
-    chrome: Dp?,
-    onFit: (NoteFit) -> Unit,
-) {
+private fun NoteFitLayout(request: NoteFitRequest, content: NoteFitContent, onFit: (NoteFit) -> Unit) {
     SubcomposeLayout(Modifier.clearAndSetSemantics {}) { _ ->
         val widthPx = request.width.toInt().coerceAtLeast(1)
         val loose = Constraints(minWidth = widthPx, maxWidth = widthPx, minHeight = 0, maxHeight = Constraints.Infinity)
-        val chromePx = chrome?.toPx() ?: 0f
+        val chromePx = content.chrome?.toPx() ?: 0f
         val scales = request.fixedScale?.let { listOf(it) } ?: CanvasNoteAutoFit.FONT_SCALES
         val fit = CanvasNoteAutoFit.resolve(request.reserved, chromePx, scales) { scale ->
             val measurables = subcompose("fit-$scale") {
@@ -201,11 +205,11 @@ private fun NoteFitLayout(
                     style = CanvasNoteAutoFit.scaledStyle(request.style, scale),
                 )
                 CascadeDocumentPreview(
-                    blocks = blocks,
+                    blocks = content.blocks,
                     // Never placed and never read out: the card's own editor is the text a screen
                     // reader meets, so this copy must not show up as a second one.
-                    modifier = Modifier.clearAndSetSemantics {}.fillMaxWidth().padding(padding),
-                    registry = registry,
+                    modifier = Modifier.clearAndSetSemantics {}.fillMaxWidth().padding(content.padding),
+                    registry = content.registry,
                     theme = theme,
                     // Unbounded: the default preview caps blocks and lines per block, which is a
                     // card summary, not the text the editor lays out.

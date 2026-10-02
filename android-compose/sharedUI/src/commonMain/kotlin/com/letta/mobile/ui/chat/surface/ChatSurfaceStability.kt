@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 
@@ -53,7 +54,7 @@ internal fun forwardingHost(current: State<ChatSurfaceHost>): ChatSurfaceHost {
     val host = current.value
     return ChatSurfaceHost(
         openCanvas = if (host.openCanvas == null) null else { { current.value.openCanvas?.invoke() } },
-        showOnCanvas = if (host.showOnCanvas == null) null else { { receipt -> current.value.showOnCanvas?.invoke(receipt) } },
+        showOnCanvas = forwardedShowOnCanvas(current),
         openAgent = if (host.openAgent == null) null else { { agentId -> current.value.openAgent?.invoke(agentId) } },
         resolveAgentName = host.resolveAgentName,
         openSubagent = if (host.openSubagent == null) {
@@ -74,6 +75,10 @@ internal fun forwardingHost(current: State<ChatSurfaceHost>): ChatSurfaceHost {
         openAgentSwitcher = if (host.openAgentSwitcher == null) null else { { current.value.openAgentSwitcher?.invoke() } },
     )
 }
+
+/** The host's "Show on canvas" (letta-mobile-bglj6.13), calling whatever the host passed last; null when it passes none. */
+private fun forwardedShowOnCanvas(current: State<ChatSurfaceHost>): ((CanvasArtifactReceipt) -> Unit)? =
+    if (current.value.showOnCanvas == null) null else { { receipt -> current.value.showOnCanvas?.invoke(receipt) } }
 
 private fun forwardingPlatform(current: State<ChatSurfacePlatform>): ChatSurfacePlatform {
     val platform = current.value

@@ -47,13 +47,13 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -97,8 +97,13 @@ class CanvasComposeMultiCardEndToEndTest {
         }
     }
 
+    /** One compose call as the App Server sends it: its request id, tool call id and input. */
+    private data class ComposeCall(val requestId: String, val toolCallId: String, val input: String)
+
+    /** A compose call's answer: its text and whether it is an error. */
+    private data class Answer(val text: String, val isError: Boolean)
+
     private val request: String = checkNotNull(javaClass.getResource("/canvas/compose/v1/request-multi-card.json")).readText()
-    private val json = Json { ignoreUnknownKeys = true }
 
     private val host = HostCanvasComposeToolsTest.Host()
     private val client = RecordingClient()
@@ -109,28 +114,28 @@ class CanvasComposeMultiCardEndToEndTest {
         connectionGenerationProvider = { 0L },
     )
 
-    /** One compose call as the App Server sends it, answered by the real dispatcher: the answer's text and error flag. */
-    private suspend fun dispatch(requestId: String, toolCallId: String, input: String): Pair<String, Boolean> {
+    /** [call] answered by the real dispatcher. */
+    private suspend fun dispatch(call: ComposeCall): Answer {
         dispatcher.answer(
             AppServerInboundFrame.ExternalToolCallRequest(
-                requestId = requestId,
+                requestId = call.requestId,
                 runtime = AppServerRuntimeScope(agentId = AGENT, conversationId = CONVERSATION),
-                toolCallId = toolCallId,
+                toolCallId = call.toolCallId,
                 toolName = CanvasToolContract.COMPOSE,
-                input = json.parseToJsonElement(input).jsonObject,
+                input = json.parseToJsonElement(call.input).jsonObject,
             ),
             leaseToken = 1L,
             validatedGeneration = 0L,
         )
         val response = client.responses.last()
-        assertEquals(requestId, response.requestId)
+        assertEquals(call.requestId, response.requestId)
         val result = assertNotNull(response.result)
-        return result.content.single().text.orEmpty() to (result.isError == true)
+        return Answer(result.content.single().text.orEmpty(), result.isError == true)
     }
 
-    private fun receiptOf(answer: Pair<String, Boolean>): ComposeReceipt {
-        assertTrue(!answer.second, "refused: ${answer.first}")
-        return CanvasComposeContract.json.decodeFromString(ComposeReceipt.serializer(), answer.first)
+    private fun receiptOf(answer: Answer): ComposeReceipt {
+        assertTrue(!answer.isError, "refused: ${answer.text}")
+        return CanvasComposeContract.json.decodeFromString(ComposeReceipt.serializer(), answer.text)
     }
 
     /** A drawing and two notes a person made before the agent composed anything. */
@@ -160,61 +165,86 @@ class CanvasComposeMultiCardEndToEndTest {
     @Test
     fun aMixedArtifactGoesFromTheAgentToTheBoardTheNotebookAndOneReceiptCard() = runBlocking {
         drawAndWriteFirst()
-        val before = host.scene()
         val beforeEntries = host.logged().size
-        val existing = rectsOf(before.sceneJson, artifactId = null).values.toList()
+        val existing = Board(host.scene().sceneJson).rects(artifactId = null).values.toList()
         assertEquals(3, existing.size)
 
         // --- the agent composes, through the dispatcher, onto the host ------------------------
-        val answer = dispatch("req-1", CALL_1, request)
+        val first = ComposeCall("req-1", CALL_1, request)
+        val answer = dispatch(first)
         val receipt = receiptOf(answer)
+        assertTheReceiptNamesEveryPiece(receipt, answer)
+
+        // One atomic entry in the relay log: the whole artifact as one batch.
+        val entries = host.logged()
+        assertEquals(beforeEntries + 1, entries.size, "the artifact is one log entry")
+        assertEquals(AGENT, assertIs<CanvasOp.BatchOp>(entries.last().op).actorId)
+
+        // The board: every piece there, notes AUTO with provenance, nothing over anything else.
+        val scene = host.scene()
+        assertEquals(receipt.revision, scene.revision)
+        val board = Board(scene.sceneJson)
+        assertThePiecesAreOnTheBoard(board, receipt)
+        assertLaidOutCleanly(board, receipt, existing)
+
+        // --- an app takes the relay log into its notebook, restarts, and reads the board back --
+        val reloaded = Board(reloadedThroughANotebook())
+        assertSameBoard(board, reloaded)
+        assertLaidOutCleanly(reloaded, receipt, existing)
+
+        // --- the run's frames: one receipt card, on the narrating message ---------------------
+        assertOneCardOnTheNarration(timeline(first, answer), receipt, reloaded)
+
+        // --- a second compose lands beside the first, overlapping nothing ---------------------
+        val afterSecond = assertASecondComposeLandsBeside(reloaded, receipt, existing)
+
+        // --- a retry of the first is idempotent: nothing written, the same receipt, one card --
+        assertARetryIsIdempotent(first, Answered(answer, receipt), afterSecond)
+    }
+
+    /** A call's answer and the receipt read from it. */
+    private class Answered(val answer: Answer, val receipt: ComposeReceipt)
+
+    private fun assertTheReceiptNamesEveryPiece(receipt: ComposeReceipt, answer: Answer) {
         assertEquals(ComposeStatus.PUBLISHED, receipt.status)
         assertEquals("lisbon-trip", receipt.artifactId)
-        val pieces = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }
+        val pieces = piecesOf(receipt)
         assertEquals(12, pieces.size)
         assertEquals(
             setOf(ComposeKind.TEXT, ComposeKind.CHECKLIST, ComposeKind.NOTE, ComposeKind.GROUP, ComposeKind.CARD),
             pieces.map { it.kind }.toSet(),
         )
-        assertTrue(answer.first.encodeToByteArray().size < CanvasComposeContract.MAX_RECEIPT_BYTES)
+        assertTrue(answer.text.encodeToByteArray().size < CanvasComposeContract.MAX_RECEIPT_BYTES)
+    }
 
-        // One atomic entry in the relay log: the whole artifact as one batch.
-        val entries = host.logged()
-        assertEquals(beforeEntries + 1, entries.size, "the artifact is one log entry")
-        val batch = assertIs<CanvasOp.BatchOp>(entries.last().op)
-        assertEquals(AGENT, batch.actorId)
-
-        // The board: every piece there, notes AUTO with provenance, nothing over anything else.
-        val scene = host.scene()
-        assertEquals(receipt.revision, scene.revision)
-        pieces.forEach { assertTrue("\"${it.boardId(receipt.artifactId)}\"" in scene.sceneJson, it.key) }
-        val composedDocuments = CanvasOpProjector.documentsOf(scene.sceneJson).filter { it.compose?.artifactId == receipt.artifactId }
+    private fun assertThePiecesAreOnTheBoard(board: Board, receipt: ComposeReceipt) {
+        val pieces = piecesOf(receipt)
+        pieces.forEach { assertTrue("\"${it.boardId(receipt.artifactId)}\"" in board.sceneJson, it.key) }
+        val composedDocuments = board.documents().filter { it.compose?.artifactId == receipt.artifactId }
         assertEquals(pieces.count { it.kind in DOCUMENT_KINDS }, composedDocuments.size)
         composedDocuments.forEach { document ->
             assertEquals(CanvasGeometryOwner.AUTO, document.owner, document.id)
             assertEquals(CanvasComposeContract.CATALOG, document.compose!!.catalog)
             assertEquals(CanvasComposeContract.VERSION, document.compose!!.version)
         }
-        assertLaidOutCleanly(scene.sceneJson, receipt, existing)
+    }
 
-        // --- an app takes the relay log into its notebook, restarts, and reads the board back --
+    /** The relay log applied by an app into its notebook, the app restarted, and the board read back. */
+    private suspend fun reloadedThroughANotebook(): String {
         val path = Files.createTempDirectory("canvas-compose-e2e-")
-        val canvasId = CanvasId.forConversation(CONVERSATION)
         NotebookLocalStore(path, "e2e-peer").use { notebooks ->
             val session = CanvasSession.create(
                 NotebookCanvasDocumentStore(notebooks),
-                CanvasCreateOptions(canvasId = canvasId, conversationId = CONVERSATION, agentId = AGENT),
+                CanvasCreateOptions(canvasId = CANVAS_ID, conversationId = CONVERSATION, agentId = AGENT),
             )
             host.logged().forEach { entry -> assertNotNull(session.applyRemote(entry.op, vouchedActor = entry.op.actorId), "entry ${entry.cursor}") }
         }
-        val reloaded = NotebookLocalStore(path, "e2e-peer").use { notebooks ->
-            assertNotNull(NotebookCanvasDocumentStore(notebooks).get(canvasId)).sceneJson
+        return NotebookLocalStore(path, "e2e-peer").use { notebooks ->
+            assertNotNull(NotebookCanvasDocumentStore(notebooks).get(CANVAS_ID)).sceneJson
         }
-        assertSameBoard(scene.sceneJson, reloaded)
-        assertLaidOutCleanly(reloaded, receipt, existing)
+    }
 
-        // --- the run's frames: one receipt card, on the narrating message ---------------------
-        val events = timeline(CALL_1, request, answer)
+    private fun assertOneCardOnTheNarration(events: List<TimelineEvent>, receipt: ComposeReceipt, reloaded: Board) {
         val attached = CanvasArtifactReceipts.attach(events)
         val narrating = events.filterIsInstance<TimelineEvent.Confirmed>().single { it.messageType == TimelineMessageType.ASSISTANT }
         assertEquals(setOf(CanvasArtifactReceipts.eventKey(narrating)), attached.keys)
@@ -222,35 +252,42 @@ class CanvasComposeMultiCardEndToEndTest {
         assertEquals(CanvasArtifactStatus.Published, card.status)
         assertEquals(receipt.bounds, card.bounds)
         assertEquals(12, card.itemCount)
-        assertEquals(canvasId.value, card.canvasId)
+        assertEquals(CANVAS_ID.value, card.canvasId)
         assertTrue(card.canShowOnCanvas)
-        card.pieceIds.forEach { assertTrue("\"$it\"" in reloaded, "the card names $it, which is not on the reloaded board") }
+        card.pieceIds.forEach { assertTrue("\"$it\"" in reloaded.sceneJson, "the card names $it, which is not on the reloaded board") }
         // Hydrated from the stored envelope (a reload of the conversation): the same card.
         assertEquals(attached, CanvasArtifactReceipts.attach(hydrate(events)))
+    }
 
-        // --- a second compose lands beside the first, overlapping nothing ---------------------
-        val occupied = CanvasComposePlacement.occupiedBounds(reloaded)
-        val second = receiptOf(dispatch("req-2", CALL_2, SECOND_REQUEST))
+    /** A second compose, named by its call, lands where placement puts it and over nothing. */
+    private suspend fun assertASecondComposeLandsBeside(reloaded: Board, receipt: ComposeReceipt, existing: List<Rect>): Board {
+        val occupied = CanvasComposePlacement.occupiedBounds(reloaded.sceneJson)
+        val second = receiptOf(dispatch(ComposeCall("req-2", CALL_2, SECOND_REQUEST)))
         assertEquals(CanvasComposeIds.derived(CALL_2), second.artifactId, "no artifact_id: named by the call")
         val secondBounds = assertNotNull(second.bounds)
         val (originX, originY) = CanvasComposePlacement.origin(occupied)
         assertEquals(originX, secondBounds.x)
         assertEquals(originY, secondBounds.y)
-        val afterSecond = host.scene().sceneJson
-        assertLaidOutCleanly(afterSecond, second, existing + rectsOf(afterSecond, receipt.artifactId).values)
+        val afterSecond = Board(host.scene().sceneJson)
+        assertLaidOutCleanly(afterSecond, second, existing + afterSecond.rects(receipt.artifactId).values)
         assertTrue(!secondBounds.intersects(receipt.bounds!!), "$secondBounds over $receipt")
+        return afterSecond
+    }
 
-        // --- a retry of the first is idempotent: nothing written, the same receipt, one card --
+    /** A retry of [first] writes nothing and answers the same receipt; under another call id too, one card. */
+    private suspend fun assertARetryIsIdempotent(first: ComposeCall, firstAnswered: Answered, board: Board) {
+        val receipt = firstAnswered.receipt
         val logged = host.logged().size
-        val retried = receiptOf(dispatch("req-3", CALL_1, request))
+        val retried = receiptOf(dispatch(first.copy(requestId = "req-3")))
         assertEquals(logged, host.logged().size, "a retry wrote to the board")
-        assertEquals(afterSecond, host.scene().sceneJson)
+        assertEquals(board.sceneJson, host.scene().sceneJson)
         assertEquals(listOf(CanvasComposeService.ALREADY_PUBLISHED_WARNING), retried.warnings)
         assertEquals(receipt.copy(revision = retried.revision, warnings = retried.warnings), retried)
         // Under another call id too (the model sent it again): still the same artifact, one card.
-        val again = dispatch("req-4", CALL_3, request)
-        assertEquals(receipt.bounds, receiptOf(again).bounds)
-        val withRetry = timeline(CALL_1, request, answer) + timeline(CALL_3, request, again, prefix = "retry")
+        val again = first.copy(requestId = "req-4", toolCallId = CALL_3)
+        val againAnswer = dispatch(again)
+        assertEquals(receipt.bounds, receiptOf(againAnswer).bounds)
+        val withRetry = timeline(first, firstAnswered.answer) + timeline(again, againAnswer, prefix = "retry")
         val cards = CanvasArtifactReceipts.attach(withRetry).values.flatten()
         assertEquals(1, cards.size, "a retry is one card, not two")
         assertEquals(receipt.bounds, cards.single().bounds)
@@ -259,17 +296,15 @@ class CanvasComposeMultiCardEndToEndTest {
     // --- layout checks -------------------------------------------------------------------------
 
     /**
-     * The pieces of [receipt] on [sceneJson]: none overlaps another (a group's frame holds its
+     * The pieces of [receipt] on [board]: none overlaps another (a group's frame holds its
      * children and its label, and nothing else), none overlaps [existing], and all lie inside the
      * receipt's bounds.
      */
-    private fun assertLaidOutCleanly(sceneJson: String, receipt: ComposeReceipt, existing: Collection<Rect>) {
-        val rects = rectsOf(sceneJson, receipt.artifactId)
+    private fun assertLaidOutCleanly(board: Board, receipt: ComposeReceipt, existing: Collection<Rect>) {
+        val rects = board.rects(receipt.artifactId)
         val bounds = assertNotNull(receipt.bounds)
         val outer = Rect(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height)
-        val groups = receipt.items.filter { it.kind == ComposeKind.GROUP }.associate { group ->
-            group.boardId(receipt.artifactId) to (group.children.orEmpty().map { it.boardId(receipt.artifactId) } + CanvasComposeIds.label(receipt.artifactId, group.key))
-        }
+        val groups = groupMembers(receipt)
         rects.forEach { (id, rect) ->
             assertTrue(outer.contains(rect), "$id $rect is outside the receipt bounds $outer")
             existing.forEach { assertTrue(!rect.intersects(it), "$id $rect is over existing content $it") }
@@ -278,36 +313,31 @@ class CanvasComposeMultiCardEndToEndTest {
             val frame = rects.getValue(group)
             members.forEach { assertTrue(frame.contains(rects.getValue(it)), "$it is outside its group $frame") }
         }
-        val ids = rects.keys.toList()
-        for (i in ids.indices) for (j in i + 1 until ids.size) {
-            val a = ids[i]
-            val b = ids[j]
-            val nested = groups[a]?.contains(b) == true || groups[b]?.contains(a) == true
-            if (!nested) assertTrue(!rects.getValue(a).intersects(rects.getValue(b)), "$a ${rects[a]} overlaps $b ${rects[b]}")
-        }
-        assertEquals(receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.size + groups.size, rects.size, "pieces and group labels")
+        assertNoOverlapsOutsideGroups(rects, groups)
+        assertEquals(piecesOf(receipt).size + groups.size, rects.size, "pieces and group labels")
     }
 
-    /**
-     * Board rectangles by id: framed documents and elements, of the artifact [artifactId] (or, with
-     * null, of nothing composed), with the placement engine's own element geometry.
-     */
-    private fun rectsOf(sceneJson: String, artifactId: String?): Map<String, Rect> {
-        val documents = CanvasOpProjector.documentsOf(sceneJson).filter { it.compose?.artifactId == artifactId }
-            .associate { d -> d.id to d.frame!!.let { Rect(it.x, it.y, it.x + it.width, it.y + it.height) } }
-        val elements = (json.parseToJsonElement(sceneJson).jsonObject["elements"] as? JsonArray).orEmpty().map { it.jsonObject }
-            .filter { ((it["_compose"] as? JsonObject)?.get("artifactId") as? JsonPrimitive)?.content == artifactId }
-            .associate { element ->
-                val slot = CanvasComposePlacement.elementBounds(element, conservative = false)
-                element.getValue("id").jsonPrimitive.content to Rect(slot.x, slot.y, slot.right, slot.bottom)
+    /** Each group's board id with the ids its frame holds: its children and its label. */
+    private fun groupMembers(receipt: ComposeReceipt): Map<String, List<String>> =
+        receipt.items.filter { it.kind == ComposeKind.GROUP }.associate { group ->
+            group.boardId(receipt.artifactId) to (group.children.orEmpty().map { it.boardId(receipt.artifactId) } + CanvasComposeIds.label(receipt.artifactId, group.key))
+        }
+
+    /** No two of [rects] overlap, but a group's frame and what it holds. */
+    private fun assertNoOverlapsOutsideGroups(rects: Map<String, Rect>, groups: Map<String, List<String>>) {
+        fun nested(a: String, b: String) = groups[a]?.contains(b) == true || groups[b]?.contains(a) == true
+        val ids = rects.keys.toList()
+        ids.forEachIndexed { i, a ->
+            ids.drop(i + 1).filterNot { b -> nested(a, b) }.forEach { b ->
+                assertTrue(!rects.getValue(a).intersects(rects.getValue(b)), "$a ${rects[a]} overlaps $b ${rects[b]}")
             }
-        return documents + elements
+        }
     }
 
     /** The two boards hold the same documents (content, frame, owner, provenance, colour, title) and elements. */
-    private fun assertSameBoard(expected: String, actual: String) {
-        val want = CanvasOpProjector.documentsOf(expected).associateBy { it.id }
-        val got = CanvasOpProjector.documentsOf(actual).associateBy { it.id }
+    private fun assertSameBoard(expected: Board, actual: Board) {
+        val want = expected.documents().associateBy { it.id }
+        val got = actual.documents().associateBy { it.id }
         assertEquals(want.keys, got.keys)
         want.forEach { (id, document) ->
             val other = got.getValue(id)
@@ -318,23 +348,21 @@ class CanvasComposeMultiCardEndToEndTest {
             assertEquals(document.color, other.color, id)
             assertEquals(document.title, other.title, id)
         }
-        fun elements(scene: String) = json.parseToJsonElement(scene).jsonObject.getValue("elements").jsonArray
-            .associate { it.jsonObject.getValue("id").jsonPrimitive.content to it.jsonObject.filterKeys { key -> key in ELEMENT_CONTENT } }
-        assertEquals(elements(expected), elements(actual))
+        assertEquals(expected.elementContent(), actual.elementContent())
     }
 
     // --- the chat side -------------------------------------------------------------------------
 
     /** The run as the App Server streams it: the user's ask, the call, its return, the narration. */
-    private fun timeline(callId: String, input: String, answer: Pair<String, Boolean>, prefix: String = "run"): List<TimelineEvent> {
-        val run = "$prefix-$callId"
+    private fun timeline(call: ComposeCall, answer: Answer, prefix: String = "run"): List<TimelineEvent> {
+        val run = "$prefix-${call.toolCallId}"
         val frames: List<LettaMessage> = listOf(
             UserMessage(id = "$run-user", contentRaw = JsonPrimitive("Plan the Lisbon trip on the board"), runId = run, otid = "$run-otid-user"),
             ToolCallMessage(
                 id = "$run-call", runId = run, seqId = 1, otid = "$run-otid-call",
-                toolCall = ToolCall(id = callId, name = CanvasToolContract.COMPOSE, arguments = input),
+                toolCall = ToolCall(id = call.toolCallId, name = CanvasToolContract.COMPOSE, arguments = call.input),
             ),
-            toolReturnFrame(run, callId, answer.first, answer.second),
+            toolReturnFrame(run, call, answer),
             AssistantMessage(id = "$run-assistant", contentRaw = JsonPrimitive("It's on the board."), runId = run, seqId = 3, otid = "$run-otid-a"),
         )
         var timeline = Timeline(conversationId = CONVERSATION)
@@ -347,18 +375,18 @@ class CanvasComposeMultiCardEndToEndTest {
         return timeline.events
     }
 
-    private fun toolReturnFrame(run: String, callId: String, text: String, isError: Boolean): LettaMessage {
-        val status = if (isError) "error" else "success"
+    private fun toolReturnFrame(run: String, call: ComposeCall, answer: Answer): LettaMessage {
+        val status = if (answer.isError) "error" else "success"
         val frame = buildJsonObject {
             put("message_type", "tool_return_message")
             put("id", "$run-return")
             put("run_id", run)
             put("seq_id", 2)
             put("status", status)
-            put("tool_call_id", callId)
-            put("tool_return", text)
+            put("tool_call_id", call.toolCallId)
+            put("tool_return", answer.text)
             putJsonArray("tool_returns") {
-                add(buildJsonObject { put("tool_call_id", callId); put("status", status); put("tool_return", text) })
+                add(buildJsonObject { put("tool_call_id", call.toolCallId); put("status", status); put("tool_return", answer.text) })
             }
         }
         return json.decodeFromJsonElement(LettaMessageSerializer, frame)
@@ -374,6 +402,34 @@ class CanvasComposeMultiCardEndToEndTest {
         return TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEnvelope.serializer(), text).events.map(StoredTimelineEvent::toConfirmedTimelineEvent)
     }
 
+    /** A board's scene, read the ways these checks need. */
+    private class Board(val sceneJson: String) {
+        fun documents(): List<CanvasSceneDocument> = CanvasOpProjector.documentsOf(sceneJson)
+
+        private fun elements(): List<JsonObject> =
+            (json.parseToJsonElement(sceneJson).jsonObject["elements"] as? JsonArray).orEmpty().map { it.jsonObject }
+
+        /**
+         * Rectangles by id: framed documents and elements, of the artifact [artifactId] (or, with
+         * null, of nothing composed), with the placement engine's own element geometry.
+         */
+        fun rects(artifactId: String?): Map<String, Rect> {
+            val documents = documents().filter { it.compose?.artifactId == artifactId }
+                .associate { d -> d.id to d.frame!!.let { Rect(it.x, it.y, it.x + it.width, it.y + it.height) } }
+            val elements = elements()
+                .filter { ((it["_compose"] as? JsonObject)?.get("artifactId") as? JsonPrimitive)?.content == artifactId }
+                .associate { element ->
+                    val slot = CanvasComposePlacement.elementBounds(element, conservative = false)
+                    element.getValue("id").jsonPrimitive.content to Rect(slot.x, slot.y, slot.right, slot.bottom)
+                }
+            return documents + elements
+        }
+
+        /** Each element's content by id: what a reload must keep. */
+        fun elementContent(): Map<String, Map<String, JsonElement>> =
+            elements().associate { it.getValue("id").jsonPrimitive.content to it.filterKeys { key -> key in ELEMENT_CONTENT } }
+    }
+
     private data class Rect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
         fun intersects(o: Rect): Boolean = left < o.right && o.left < right && top < o.bottom && o.top < bottom
 
@@ -387,8 +443,13 @@ class CanvasComposeMultiCardEndToEndTest {
         const val CALL_1 = "toolu_01LisbonTripCompose"
         const val CALL_2 = "toolu_01RestaurantsCompose"
         const val CALL_3 = "toolu_01LisbonTripAgain"
+        val CANVAS_ID = CanvasId.forConversation(CONVERSATION)
         val DOCUMENT_KINDS = setOf(ComposeKind.NOTE, ComposeKind.CHECKLIST, ComposeKind.CARD)
         val ELEMENT_CONTENT = setOf("type", "shapeType", "points", "text", "textTopLeft", "wrapWidth", "fontSize", "_compose")
+        val json = Json { ignoreUnknownKeys = true }
+
+        /** Every piece of [receipt]: its items and their children. */
+        fun piecesOf(receipt: ComposeReceipt) = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }
 
         /** A second artifact the agent adds later, named by its call. */
         val SECOND_REQUEST = """{"title":"Where to eat","items":[

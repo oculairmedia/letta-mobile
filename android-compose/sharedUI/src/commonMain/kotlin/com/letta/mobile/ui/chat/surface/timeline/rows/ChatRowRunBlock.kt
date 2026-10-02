@@ -262,9 +262,12 @@ private fun UiMessage.isPlainAssistantStep(): Boolean =
  * canvas card (letta-mobile-bglj6.13: a compose call with no narration of its own) folds only its
  * calls; the card stays a step.
  */
-internal fun UiMessage.isRunToolCallMessage(): Boolean = isPlainAssistantStep() && content.isBlank() && artifacts.isEmpty()
+internal fun UiMessage.isRunToolCallMessage(): Boolean = isPlainAssistantStep() && !hasStepOfItsOwn()
 
-private fun UiMessage.hasProseAndToolCalls(): Boolean = isPlainAssistantStep() && (content.isNotBlank() || artifacts.isNotEmpty())
+private fun UiMessage.hasProseAndToolCalls(): Boolean = isPlainAssistantStep() && hasStepOfItsOwn()
+
+/** Prose, or a canvas card: what keeps a tool-calling message a step of its own. */
+private fun UiMessage.hasStepOfItsOwn(): Boolean = content.isNotBlank() || artifacts.isNotEmpty()
 
 /** A collapsed run previews its newest step that is not reasoning. */
 private fun collapsedPreview(messages: List<UiMessage>): UiMessage =

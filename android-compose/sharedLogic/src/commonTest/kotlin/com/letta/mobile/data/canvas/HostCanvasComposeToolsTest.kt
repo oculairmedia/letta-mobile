@@ -10,6 +10,7 @@ import com.letta.mobile.data.canvas.compose.ComposeReceipt
 import com.letta.mobile.data.canvas.compose.ComposeReceiptItem
 import com.letta.mobile.data.canvas.compose.ComposeRefusal
 import com.letta.mobile.data.canvas.compose.ComposeStatus
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import kotlinx.coroutines.test.runTest
@@ -42,9 +43,7 @@ class HostCanvasComposeToolsTest {
         ): ExternalToolResult = registry.invoke(
             CanvasToolContract.COMPOSE,
             Json.parseToJsonElement(request).jsonObject,
-            agentId = agent,
-            conversationId = conversation,
-            toolCallId = toolCallId,
+            ExternalToolCaller(agentId = agent, conversationId = conversation, toolCallId = toolCallId),
         )
 
         suspend fun logged(): List<CanvasRelayEntry> = store.readAfter(TOPIC, 0L)

@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.compose.CanvasComposeService
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposeOutcome
 import com.letta.mobile.data.canvas.compose.ComposeProblem
+import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonObject
@@ -23,23 +24,18 @@ import kotlinx.serialization.json.JsonPrimitive
  *   reads the receipt card from it (CanvasArtifactReceipts).
  * - A canvas the caller may not use, or that is not there, is a refusal of the same shape
  *   ([ComposeErrorCode.UNAUTHORIZED], [ComposeErrorCode.CANVAS_NOT_FOUND]), not free text.
+ *
+ * One instance answers one call: the [host] that answered it ([IROH_HOST] or [APP]) and the
+ * [toolCallId] of the call, as the host received it.
  */
-internal object CanvasComposeHosting {
-    /** [Telemetry] attribute naming which host answered. */
-    const val IROH_HOST = "iroh-host"
-    const val APP = "app"
-
+internal class CanvasComposeHosting(private val host: String, private val toolCallId: String?) {
     /**
-     * The compose call [input] on the canvas [canvasId] (scene [sceneJson] at [sceneRevision]),
-     * published through [publish], answered as a tool result.
+     * The compose call [input] on the canvas of [target] (its scene, at its revision), published
+     * through [publish], answered as a tool result. The call's own [toolCallId] names the artifact.
      */
     suspend fun compose(
-        host: String,
         input: JsonObject,
-        canvasId: String,
-        sceneJson: String,
-        sceneRevision: Long,
-        toolCallId: String?,
+        target: ComposeTarget,
         publish: suspend (List<CanvasOp>) -> Long,
     ): ExternalToolResult {
         val request = tolerant(input)
@@ -48,54 +44,28 @@ internal object CanvasComposeHosting {
             // artifact; without either, a retry would put a second copy on the board.
             Telemetry.event(
                 CanvasComposeService.TAG, "compose.noToolCallId",
-                "host" to host, "canvasId" to canvasId,
+                "host" to host, "canvasId" to target.canvasId,
                 level = Telemetry.Level.WARN,
             )
         }
         val outcome = CanvasComposeService.compose(
             input = request,
-            canvasId = canvasId,
-            sceneJson = sceneJson,
-            sceneRevision = sceneRevision,
-            toolCallId = toolCallId?.takeIf { it.isNotBlank() },
+            target = target.copy(toolCallId = toolCallId?.takeIf { it.isNotBlank() }),
             publish = publish,
         )
-        record(host, canvasId, toolCallId, outcome)
+        record(target.canvasId, outcome)
         return answer(outcome)
     }
 
     /** A refusal before anything was compiled: the canvas could not be used. */
-    fun refused(host: String, code: ComposeErrorCode, message: String, toolCallId: String?): ExternalToolResult {
+    fun refused(code: ComposeErrorCode, message: String): ExternalToolResult {
         val outcome = ComposeOutcome.Refused(CanvasComposeContract.refusal(code, listOf(ComposeProblem("", code.name, message))))
-        record(host, canvasId = null, toolCallId = toolCallId, outcome = outcome)
+        record(canvasId = null, outcome = outcome)
         return answer(outcome)
     }
 
-    /** The code of an access refusal: the hosts word an ACL refusal "Unauthorized: ...". */
-    fun deniedCode(reason: String): ComposeErrorCode =
-        if (reason.startsWith(UNAUTHORIZED_PREFIX)) ComposeErrorCode.UNAUTHORIZED else ComposeErrorCode.CANVAS_NOT_FOUND
-
-    /** `canvas_compose_guide`: the whole format. */
-    fun guide(): ExternalToolResult = ExternalToolResult.Success(CanvasComposeGuide.text)
-
-    private fun answer(outcome: ComposeOutcome): ExternalToolResult = when (outcome) {
-        is ComposeOutcome.Done -> ExternalToolResult.Success(outcome.json)
-        is ComposeOutcome.Refused -> ExternalToolResult.Error(outcome.json)
-    }
-
-    /**
-     * `dry_run` as the other canvas tools take it ([CanvasDryRun.requested]): a model that writes
-     * "true" for true is not refused for it. The schema is otherwise held strictly.
-     */
-    private fun tolerant(input: JsonObject): JsonObject {
-        val dryRun = input[CanvasDryRun.PARAM] as? JsonPrimitive ?: return input
-        if (!dryRun.isString) return input
-        val flag = dryRun.content.trim().lowercase().toBooleanStrictOrNull() ?: return input
-        return JsonObject(input + (CanvasDryRun.PARAM to JsonPrimitive(flag)))
-    }
-
     /** One event per answered call, as the board's other writes are recorded. */
-    private fun record(host: String, canvasId: String?, toolCallId: String?, outcome: ComposeOutcome) {
+    private fun record(canvasId: String?, outcome: ComposeOutcome) {
         when (outcome) {
             is ComposeOutcome.Done -> Telemetry.event(
                 CanvasComposeService.TAG, "compose.answered",
@@ -120,5 +90,34 @@ internal object CanvasComposeHosting {
         }
     }
 
-    private const val UNAUTHORIZED_PREFIX = "Unauthorized"
+    companion object {
+        /** [Telemetry] attribute naming which host answered. */
+        const val IROH_HOST = "iroh-host"
+        const val APP = "app"
+
+        private const val UNAUTHORIZED_PREFIX = "Unauthorized"
+
+        /** The code of an access refusal: the hosts word an ACL refusal "Unauthorized: ...". */
+        fun deniedCode(reason: String): ComposeErrorCode =
+            if (reason.startsWith(UNAUTHORIZED_PREFIX)) ComposeErrorCode.UNAUTHORIZED else ComposeErrorCode.CANVAS_NOT_FOUND
+
+        /** `canvas_compose_guide`: the whole format. */
+        fun guide(): ExternalToolResult = ExternalToolResult.Success(CanvasComposeGuide.text)
+
+        private fun answer(outcome: ComposeOutcome): ExternalToolResult = when (outcome) {
+            is ComposeOutcome.Done -> ExternalToolResult.Success(outcome.json)
+            is ComposeOutcome.Refused -> ExternalToolResult.Error(outcome.json)
+        }
+
+        /**
+         * `dry_run` as the other canvas tools take it ([CanvasDryRun.requested]): a model that writes
+         * "true" for true is not refused for it. The schema is otherwise held strictly.
+         */
+        private fun tolerant(input: JsonObject): JsonObject {
+            val dryRun = input[CanvasDryRun.PARAM] as? JsonPrimitive ?: return input
+            if (!dryRun.isString) return input
+            val flag = dryRun.content.trim().lowercase().toBooleanStrictOrNull() ?: return input
+            return JsonObject(input + (CanvasDryRun.PARAM to JsonPrimitive(flag)))
+        }
+    }
 }
