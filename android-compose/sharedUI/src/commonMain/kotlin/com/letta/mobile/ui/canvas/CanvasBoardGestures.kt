@@ -33,15 +33,36 @@ import androidx.compose.ui.input.pointer.pointerInput
 @Composable
 internal fun Modifier.boardContextGesture(
     onContext: (Offset) -> Unit,
-    /** A finger's long press, when it means something other than a right click. */
-    onLongPress: (Offset) -> Unit = onContext,
+    /**
+     * A finger's long press, when it means something other than a right click. It answers
+     * [LongPressOutcome.BOX] when the drag that follows draws a selection box.
+     */
+    onLongPress: (Offset) -> LongPressOutcome = { onContext(it); LongPressOutcome.DONE },
+    /** The selection box a [LongPressOutcome.BOX] press drags out; see [SelectionBoxDrag]. */
+    onBox: (SelectionBoxDrag) -> Unit = {},
 ): Modifier {
     // Read through state so a new lambda each recomposition does not restart a gesture mid-press.
     val latest by rememberUpdatedState(onContext)
     val latestLong by rememberUpdatedState(onLongPress)
-    return pointerInput(Unit) { detectBoardContext { latestLong(it) } }
+    val latestBox by rememberUpdatedState(onBox)
+    return pointerInput(Unit) { detectBoardContext({ latestLong(it) }, { latestBox(it) }) }
         .pointerInput(Unit) { detectSecondaryClick { latest(it) } }
 }
+
+/** What a finger's long press went on to do. */
+internal enum class LongPressOutcome {
+    /** It did its job (a menu, a selection); the rest of the press is swallowed. */
+    DONE,
+
+    /** The finger now drags a selection box out from where it was held. */
+    BOX,
+}
+
+/**
+ * A selection box being dragged out from [from] to [to], in the board's own space. [to] is null
+ * while the finger has not left the slop; [released] is the finger lifting, when a box selects.
+ */
+internal data class SelectionBoxDrag(val from: Offset, val to: Offset?, val released: Boolean)
 
 /**
  * A right click. Watched as raw presses: a secondary-button press is not a "down" to the gesture
@@ -66,18 +87,103 @@ private fun androidx.compose.ui.input.pointer.PointerEvent.rightClickPosition():
     return change.position.takeIf { change.type == PointerType.Mouse }
 }
 
-private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectBoardContext(onContext: (Offset) -> Unit) {
+private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectBoardContext(
+    onLongPress: (Offset) -> LongPressOutcome,
+    onBox: (SelectionBoxDrag) -> Unit,
+) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         // A stylus held still is a pen about to draw, and a mouse has the right button.
         if (down.type != PointerType.Touch) return@awaitEachGesture
         val interrupted = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { awaitHoldEnds(down) }
         if (interrupted == null) {
-            onContext(down.position)
-            consumeUntilRelease()
+            when (onLongPress(down.position)) {
+                LongPressOutcome.DONE -> consumeUntilRelease()
+                LongPressOutcome.BOX -> dragSelectionBox(down, onBox)
+            }
         }
     }
 }
+
+/**
+ * Follows the held finger until it lifts, reporting the box from where it was held to where it
+ * is. Everything is consumed, so the tool underneath neither draws nor moves anything.
+ */
+private suspend fun AwaitPointerEventScope.dragSelectionBox(down: PointerInputChange, onBox: (SelectionBoxDrag) -> Unit) {
+    var last: Offset? = null
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        event.changes.forEach { it.consume() }
+        val change = event.changes.firstOrNull { it.id == down.id }
+        if (change == null || !change.pressed) break
+        if (last != null || movedPastSlop(change, down)) {
+            last = change.position
+            onBox(SelectionBoxDrag(down.position, last, released = false))
+        }
+    }
+    onBox(SelectionBoxDrag(down.position, last, released = true))
+}
+
+/**
+ * Two quick finger taps on open board zoom in there: [canZoomAt] says where that is (in the
+ * board's own space), [onZoom] eases the board in. The second tap is consumed so the tool beneath
+ * does not also act on it; a double tap on an element is left alone, for DrawBox to open its text.
+ *
+ * Only fingers: a mouse double click and a pen double tap mean other things on the board.
+ */
+@Composable
+internal fun Modifier.touchDoubleTapZoom(
+    canZoomAt: (Offset) -> Boolean,
+    onZoom: (Offset) -> Unit,
+): Modifier {
+    val canZoom by rememberUpdatedState(canZoomAt)
+    val zoom by rememberUpdatedState(onZoom)
+    return pointerInput(Unit) {
+        val taps = CanvasDoubleTap(
+            tapSlop = viewConfiguration.touchSlop,
+            doubleTapSlop = viewConfiguration.touchSlop * DOUBLE_TAP_REACH,
+            tapMillis = viewConfiguration.longPressTimeoutMillis,
+            doubleTapMillis = viewConfiguration.doubleTapTimeoutMillis,
+        )
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (down.type != PointerType.Touch) {
+                taps.clear()
+                return@awaitEachGesture
+            }
+            val second = taps.down(down.position.x, down.position.y, down.uptimeMillis) != null &&
+                canZoom(down.position)
+            if (second) down.consume()
+            val up = awaitTapUp(down, consume = second)
+            when {
+                up == null -> taps.clear()
+                second -> {
+                    taps.clear()
+                    zoom(down.position)
+                }
+                else -> taps.up(up.position.x, up.position.y, up.uptimeMillis)
+            }
+        }
+    }
+}
+
+/**
+ * The lift of [down] when it was a tap: the only finger, lifted before it moved past the slop.
+ * Null when it moved, a second finger joined, or it was cancelled. [consume] swallows it.
+ */
+private suspend fun AwaitPointerEventScope.awaitTapUp(down: PointerInputChange, consume: Boolean): PointerInputChange? {
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        if (consume) event.changes.forEach { it.consume() }
+        if (event.changes.count { it.pressed } > 1) return null
+        val change = event.changes.firstOrNull { it.id == down.id } ?: return null
+        if (movedPastSlop(change, down)) return null
+        if (!change.pressed) return change
+    }
+}
+
+/** How far apart, in touch slops, the two taps of a double tap may land. */
+private const val DOUBLE_TAP_REACH = 3f
 
 /**
  * Suspends until the finger that went [down] stops holding still: it lifts, moves past the touch

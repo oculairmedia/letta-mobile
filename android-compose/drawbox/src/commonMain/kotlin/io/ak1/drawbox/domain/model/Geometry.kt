@@ -49,15 +49,93 @@ fun Element.bounds(): Rect = when (this) {
 
 private fun lineArrowBounds(shape: Element.Shape): Rect {
     if (shape.points.size < 2) return pointsBounds(shape.points)
-    val start = shape.points[0]
-    val end = shape.points.last()
-    if (shape.bend == Offset.Zero) return pointsBounds(listOf(start, end))
-    // Quadratic bezier with control = midpoint + bend stays inside the convex
-    // hull of {start, end, control}, so its bbox = bbox of those three points.
-    val mid = Offset((start.x + end.x) * 0.5f, (start.y + end.y) * 0.5f)
-    val control = Offset(mid.x + shape.bend.x, mid.y + shape.bend.y)
-    return pointsBounds(listOf(start, end, control))
+    // A bezier stays inside the convex hull of its points, so the hull's box holds it.
+    return pointsBounds(shape.linePath().hull())
 }
+
+/**
+ * The path a [ShapeType.LINE] or [ShapeType.ARROW] draws, in world space: straight, one arc
+ * through [Element.Shape.bend], or a cubic leaving and arriving along its two end handles.
+ * Rendering, hit testing, bounds and export all read this, so they cannot disagree.
+ */
+sealed interface LinePath {
+    val start: Offset
+    val end: Offset
+
+    data class Straight(override val start: Offset, override val end: Offset) : LinePath
+
+    data class Quadratic(override val start: Offset, val control: Offset, override val end: Offset) : LinePath
+
+    data class Cubic(
+        override val start: Offset,
+        val control1: Offset,
+        val control2: Offset,
+        override val end: Offset,
+    ) : LinePath
+
+    /** The point at [t] in `0..1` along the curve. */
+    fun pointAt(t: Float): Offset {
+        val u = 1f - t
+        return when (this) {
+            is Straight -> start * u + end * t
+            is Quadratic -> start * (u * u) + control * (2f * u * t) + end * (t * t)
+            is Cubic -> start * (u * u * u) + control1 * (3f * u * u * t) + control2 * (3f * u * t * t) + end * (t * t * t)
+        }
+    }
+
+    /** Which way the curve is heading as it reaches [end]; what an arrowhead points along. */
+    fun endDirection(): Offset = when (this) {
+        is Straight -> end - start
+        is Quadratic -> if (end != control) end - control else end - start
+        is Cubic -> when {
+            end != control2 -> end - control2
+            end != control1 -> end - control1
+            else -> end - start
+        }
+    }
+
+    /** The points whose convex hull holds the whole curve. */
+    fun hull(): List<Offset> = when (this) {
+        is Straight -> listOf(start, end)
+        is Quadratic -> listOf(start, control, end)
+        is Cubic -> listOf(start, control1, control2, end)
+    }
+}
+
+/** This line or arrow's [LinePath]. Needs at least two points. */
+fun Element.Shape.linePath(): LinePath {
+    val start = points[0]
+    val end = points.last()
+    val out = startHandle
+    val inward = endHandle
+    return when {
+        out != null && inward != null -> LinePath.Cubic(start, start + out, end + inward, end)
+        bend != Offset.Zero -> LinePath.Quadratic(start, controlPoint(), end)
+        else -> LinePath.Straight(start, end)
+    }
+}
+
+/**
+ * End handles for a connector that meets each shape square to its side: each handle points
+ * from the bound shape's centre out through that end, and an unbound end points along the line.
+ * Each reaches [HANDLE_REACH] of the run, so the curve is round without overshooting.
+ */
+fun smoothConnectorHandles(
+    start: Offset,
+    end: Offset,
+    startShape: Element.Shape?,
+    endShape: Element.Shape?,
+): Pair<Offset, Offset> {
+    val reach = distance(start, end) * HANDLE_REACH
+    fun outward(point: Offset, shape: Element.Shape?, fallback: Offset): Offset {
+        val away = shape?.let { point - it.bounds().center }?.takeIf { it.getDistance() > 0.5f } ?: fallback
+        val length = away.getDistance()
+        return if (length > 0.5f) away * (reach / length) else Offset.Zero
+    }
+    return outward(start, startShape, end - start) to outward(end, endShape, start - end)
+}
+
+private const val HANDLE_REACH = 0.45f
 
 /** Quadratic-bezier control point for a curved [ShapeType.LINE] / [ShapeType.ARROW]. */
 fun Element.Shape.controlPoint(): Offset {
@@ -68,12 +146,7 @@ fun Element.Shape.controlPoint(): Offset {
 }
 
 /** World-space point on the curve at t = 0.5 — the spot where the bend handle sits. */
-fun Element.Shape.bezierMidpoint(): Offset {
-    val start = points[0]
-    val end = points.last()
-    val mid = Offset((start.x + end.x) * 0.5f, (start.y + end.y) * 0.5f)
-    return Offset(mid.x + bend.x * 0.5f, mid.y + bend.y * 0.5f)
-}
+fun Element.Shape.bezierMidpoint(): Offset = linePath().pointAt(0.5f)
 
 /**
  * World-space attachment point for an arrow connector binding to this shape.
@@ -375,35 +448,23 @@ private fun hitTestShape(
                     distanceToSegment(p, bl, apex) <= hitRadius
             }
         }
-        ShapeType.LINE, ShapeType.ARROW -> {
-            if (shape.bend == Offset.Zero) {
-                distanceToSegment(p, start, end) <= hitRadius
-            } else {
-                val control = shape.controlPoint()
-                distanceToQuadraticBezier(p, start, control, end) <= hitRadius
-            }
+        ShapeType.LINE, ShapeType.ARROW -> when (val path = shape.linePath()) {
+            is LinePath.Straight -> distanceToSegment(p, start, end) <= hitRadius
+            else -> distanceToCurve(p, path) <= hitRadius
         }
     }
 }
 
-private fun distanceToQuadraticBezier(p: Offset, p0: Offset, p1: Offset, p2: Offset): Float {
-    // Sample the curve at N points and approximate by closest sample distance.
-    // 24 samples is plenty for sub-pixel hit-tests at typical view scales.
-    val steps = 24
+private fun distanceToCurve(p: Offset, path: LinePath): Float {
+    // Sample the curve and take the nearest sample. 32 samples is plenty for sub-pixel
+    // hit tests at typical view scales, cubic included.
+    val steps = 32
     var best = Float.MAX_VALUE
-    var i = 0
-    while (i <= steps) {
-        val t = i.toFloat() / steps
-        val u = 1f - t
-        val x = u * u * p0.x + 2f * u * t * p1.x + t * t * p2.x
-        val y = u * u * p0.y + 2f * u * t * p1.y + t * t * p2.y
-        val dx = p.x - x
-        val dy = p.y - y
-        val d2 = dx * dx + dy * dy
-        if (d2 < best) best = d2
-        i++
+    for (i in 0..steps) {
+        val d = distance(p, path.pointAt(i.toFloat() / steps))
+        if (d < best) best = d
     }
-    return sqrt(best)
+    return best
 }
 
 /** Topmost element under `point`, picked by descending zIndex. See [hitTest] for [hollowInterior]. */

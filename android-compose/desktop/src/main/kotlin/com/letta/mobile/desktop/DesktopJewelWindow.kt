@@ -27,18 +27,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.components.LocalMenuActionScope
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
-import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
-import com.letta.mobile.desktop.touch.screenExclusionRectOrNull
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
 import dev.nucleusframework.window.BasicTitleBar
@@ -51,7 +45,6 @@ import dev.nucleusframework.window.styling.DecoratedWindowStyle
 import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
-import java.awt.Rectangle
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
@@ -119,6 +112,9 @@ internal data class DesktopHeaderChromeState(
 /** Title-bar height: taller than a stock 32-44dp caption bar to comfortably
  * fit the two-line agent identity block (title over agent name). */
 private val TitleBarHeight = 48.dp
+
+/** Text-selection handles at twice the mouse-sized default, so a fingertip can take hold of them. */
+private const val TOUCH_HANDLE_SCALE = 2f
 
 /** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
 private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
@@ -214,41 +210,6 @@ internal fun DesktopJewelWindow(
                     windowStyle = windowStyle,
                     titleBarStyle = titleBarStyle,
                 ) {
-                    // Windows touchscreens: DesktopWindowsTouchInput swallows every
-                    // touch drag and replays it as wheel-scroll, which would eat the
-                    // title bar's own drag-to-move gesture before Nucleus ever sees
-                    // it. Publishing these bounds tells the shim to leave gestures
-                    // that start here alone (letta-mobile touch-title-bar regression).
-                    // Screen coordinates sidestep both the density scaling between
-                    // Compose's px space and AWT's, and any offset between the AWT
-                    // component that receives the touch event and this content.
-                    //
-                    // X and width are measured from this Row -- our own content --
-                    // rather than from BasicTitleBar's own outer modifier, which was
-                    // tried first and reported a rectangle offset downward by exactly
-                    // one title bar height from where the title bar and tabs actually
-                    // render on screen.
-                    //
-                    // Y is deliberately NOT taken from this same measurement, even
-                    // though it lives in the same LayoutCoordinates: live probing
-                    // showed this Row's own onGloballyPositioned firing with two
-                    // different Y values across layout passes in the same run --
-                    // window-relative Y=0 on some passes, Y=TitleBarHeight (one full
-                    // title-bar height) on others -- while X and width stayed put.
-                    // That is consistent with Nucleus's native title-bar-height
-                    // plumbing (TitleBarLayoutPolicy's applyTitleBar callback and the
-                    // JNI nativeSetTitleBarHeight path) intermittently double-counting
-                    // its own inset when it recomputes the client-area offset, not
-                    // with anything this file controls -- so there is no "correct"
-                    // Y to read from this coordinate space at all, only two different
-                    // wrong-some-of-the-time ones. The title bar is always the top
-                    // TitleBarHeight of the window, full stop, so anchoring Y to the
-                    // window's own (stable) screen position sidesteps the flip
-                    // entirely instead of trying to pick the right transient sample.
-                    DisposableEffect(window) {
-                        onDispose { DesktopTouchDragExclusion.publish(window, null) }
-                    }
-                    val titleBarHeightPx = with(LocalDensity.current) { TitleBarHeight.roundToPx() }
                     BasicTitleBar(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
@@ -256,15 +217,7 @@ internal fun DesktopJewelWindow(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = LettaDimens.Space.sm)
-                                .onGloballyPositioned { coordinates ->
-                                    val bounds = titleBarScreenBoundsOrNull(
-                                        coordinates = coordinates,
-                                        windowOriginOnScreen = runCatching { window.locationOnScreen }.getOrNull(),
-                                        titleBarHeightPx = titleBarHeightPx,
-                                    )
-                                    DesktopTouchDragExclusion.publish(window, bounds)
-                                },
+                                .padding(start = LettaDimens.Space.sm),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             // Sidebar toggle: the one control that survives
@@ -392,39 +345,27 @@ internal fun DesktopJewelWindow(
                     // The window's own scope runs what a menu item chose: a popup is dismissed by
                     // being removed, so the action cannot belong to the popup.
                     val windowScope = rememberCoroutineScope()
+                    // Text selected by touch gets finger-sized handles and a Copy / Quote bar;
+                    // the mouse keeps its own, and the bar only shows just after a finger.
+                    val touchToolbar = remember {
+                        com.letta.mobile.ui.text.TouchTextToolbar {
+                            com.letta.mobile.desktop.touch.DesktopTouchOrigin.wasTouch(System.currentTimeMillis())
+                        }
+                    }
+                    val quoteSink = remember { com.letta.mobile.ui.text.QuoteSink() }
                     CompositionLocalProvider(
+                        com.letta.mobile.ui.text.LocalSelectionHandleScale provides TOUCH_HANDLE_SCALE,
+                        androidx.compose.ui.platform.LocalTextToolbar provides touchToolbar,
+                        com.letta.mobile.ui.text.LocalQuoteSink provides quoteSink,
                         LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
                         com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
                         LocalMenuActionScope provides windowScope,
                     ) {
                         content()
+                        com.letta.mobile.ui.text.TouchTextToolbarHost(touchToolbar, quoteSink)
                     }
                 }
             }
         }
     }
-}
-
-/**
- * The title bar's screen-space bounds for [DesktopTouchDragExclusion], or
- * null when [coordinates] cannot yet be resolved to a screen position (see
- * [screenExclusionRectOrNull] for why that happens and why null — meaning
- * "clear any previously published bounds" — is the deliberate fail-safe
- * choice rather than a best-effort rectangle).
- *
- * X and width come from [coordinates] (Compose's own measurement of this
- * Row, screen-relative). Y comes from [windowOriginOnScreen] instead of
- * [coordinates] — see the call site's comment for why the latter is
- * unreliable for Y specifically — falling back to the coordinates' own Y
- * when the window's screen position isn't available yet (very first frames,
- * before the AWT peer exists).
- */
-private fun titleBarScreenBoundsOrNull(
-    coordinates: LayoutCoordinates,
-    windowOriginOnScreen: java.awt.Point?,
-    titleBarHeightPx: Int,
-): Rectangle? {
-    val topLeft = coordinates.positionOnScreen()
-    val y = windowOriginOnScreen?.y?.toFloat() ?: topLeft.y
-    return screenExclusionRectOrNull(topLeft.x, y, coordinates.size.width, titleBarHeightPx)
 }

@@ -20,6 +20,9 @@ jni = "0.21"
 octotablet = "0.1"
 raw-window-handle = "0.6"
 
+[patch.crates-io]
+octotablet = { path = "../octotablet" }
+
 [dev-dependencies]
 # Only for the standalone probe example, never for the shipped library.
 winit = "0.29"

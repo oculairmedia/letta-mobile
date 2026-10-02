@@ -81,6 +81,11 @@ sealed interface TimelineMutation {
         val candidateRunIds: Set<String> = emptySet(),
     ) : TimelineMutation
     data class RepairFullToolReturn(val message: ToolReturnMessage) : TimelineMutation
+    /** Fills the size-only image placeholders of row [serverId] with server-held [images]. */
+    data class RestoreImagePlaceholders(
+        val serverId: String,
+        val images: List<MessageContentPart.Image>,
+    ) : TimelineMutation
     data class AdvanceDanglingSweep(val generation: Long) : TimelineMutation
     data class SettleDanglingToolCalls(
         val generation: Long,
@@ -338,6 +343,7 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
         mutation.candidateRunIds,
     )
     is TimelineMutation.RepairFullToolReturn -> reduceFullToolReturnRepair(state, mutation.message)
+    is TimelineMutation.RestoreImagePlaceholders -> reduceImagePlaceholderRestore(state, mutation)
     is TimelineMutation.AdvanceDanglingSweep -> changedIfNeeded(
         state,
         state.copy(danglingSweepGeneration = maxOf(state.danglingSweepGeneration, mutation.generation)),
@@ -393,6 +399,19 @@ private fun reduceFullToolReturnRepair(
     return TimelineReduction(
         next = state.copy(timeline = nextTimeline),
         result = TimelineReductionResult.FullToolReturnRepaired(message.id, nextTimeline != state.timeline),
+    )
+}
+
+private fun reduceImagePlaceholderRestore(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.RestoreImagePlaceholders,
+): TimelineReduction {
+    val next = state.timeline.withImagePlaceholdersFilled(mutation.serverId, mutation.images)
+    if (next === state.timeline) return unchanged(state)
+    return TimelineReduction(
+        next = state.copy(timeline = next),
+        result = TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
+        persistenceDelta = exactConfirmedDelta(state.timeline, next),
     )
 }
 
