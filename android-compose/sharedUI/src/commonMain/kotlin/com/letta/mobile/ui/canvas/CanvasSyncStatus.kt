@@ -40,6 +40,41 @@ internal fun canvasSyncStatusText(health: CanvasSyncHealth): CanvasSyncStatusTex
     is CanvasSyncHealth.Failed -> CanvasSyncStatusText("Sync failed", "Sync failed: ${health.reason}")
 }
 
+/** The status dot's colour: green in sync, amber offline, the scheme's own for the rest. */
+@Composable
+internal fun canvasSyncDotColor(health: CanvasSyncHealth): Color = when (health) {
+    CanvasSyncHealth.Synced -> Color(0xFF22C55E)
+    CanvasSyncHealth.Connecting -> MaterialTheme.colorScheme.primary
+    is CanvasSyncHealth.OfflineQueued -> Color(0xFFF59E0B)
+    is CanvasSyncHealth.LocalOnly -> MaterialTheme.colorScheme.outline
+    is CanvasSyncHealth.Failed -> MaterialTheme.colorScheme.error
+}
+
+/**
+ * The sync status as the first line of the board's overflow menu, where the phone's chat page
+ * keeps it once the top of the board is clear: the dot and the words, read out in full.
+ */
+@Composable
+internal fun CanvasSyncStatusLine(health: CanvasSyncHealth, modifier: Modifier = Modifier) {
+    val text = canvasSyncStatusText(health)
+    Row(
+        modifier = modifier
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
+            .clearAndSetSemantics { contentDescription = text.description },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        Box(Modifier.size(SYNC_DOT).background(canvasSyncDotColor(health), CircleShape))
+        Text(
+            text = text.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /**
  * Whether this board is shared right now, always on the board: a quiet dot when it is in sync, and
  * words when it is not - so a canvas that stays on this device never looks like one that syncs.
@@ -48,13 +83,8 @@ internal fun canvasSyncStatusText(health: CanvasSyncHealth): CanvasSyncStatusTex
 @Composable
 internal fun CanvasSyncStatusBadge(health: CanvasSyncHealth, modifier: Modifier = Modifier) {
     val text = canvasSyncStatusText(health)
-    val (dot, words) = when (health) {
-        CanvasSyncHealth.Synced -> Color(0xFF22C55E) to false
-        CanvasSyncHealth.Connecting -> MaterialTheme.colorScheme.primary to true
-        is CanvasSyncHealth.OfflineQueued -> Color(0xFFF59E0B) to true
-        is CanvasSyncHealth.LocalOnly -> MaterialTheme.colorScheme.outline to true
-        is CanvasSyncHealth.Failed -> MaterialTheme.colorScheme.error to true
-    }
+    val dot = canvasSyncDotColor(health)
+    val words = health != CanvasSyncHealth.Synced
     // In the header bar it is part of the bar; on its own it is a pill of its own.
     val inBar = LocalInHeaderBar.current
     Surface(
@@ -71,7 +101,7 @@ internal fun CanvasSyncStatusBadge(health: CanvasSyncHealth, modifier: Modifier 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
-            Box(Modifier.size(8.dp).background(dot, CircleShape))
+            Box(Modifier.size(SYNC_DOT).background(dot, CircleShape))
             if (words) {
                 Text(
                     text = text.label,
@@ -85,3 +115,6 @@ internal fun CanvasSyncStatusBadge(health: CanvasSyncHealth, modifier: Modifier 
         }
     }
 }
+
+/** The status dot, on the badge, in the menu and on the phone bar's more button. */
+internal val SYNC_DOT = 8.dp

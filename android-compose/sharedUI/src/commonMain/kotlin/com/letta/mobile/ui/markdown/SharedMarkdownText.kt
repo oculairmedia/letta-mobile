@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.markdown
 
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -69,6 +70,11 @@ fun SharedMarkdownText(
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
     retainState: Boolean = true,
+    /**
+     * The body's style, for paragraphs and lists alike (a speech bubble's smaller type); null keeps
+     * the timeline's (bodyMedium text, the renderer's bodyLarge paragraphs and lists).
+     */
+    textStyle: TextStyle? = null,
 ) {
     if (text.isBlank()) return
     val repaired = remember(text) { repairIncompleteMarkdownForStreaming(text) }
@@ -120,7 +126,7 @@ fun SharedMarkdownText(
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
             ),
             typography = markdownTypography(
-                text = MaterialTheme.typography.bodyMedium,
+                text = textStyle ?: MaterialTheme.typography.bodyMedium,
                 code = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 h1 = MaterialTheme.typography.headlineSmall,
                 h2 = MaterialTheme.typography.titleLarge,
@@ -128,6 +134,10 @@ fun SharedMarkdownText(
                 h4 = MaterialTheme.typography.titleSmall,
                 h5 = MaterialTheme.typography.bodyLarge,
                 h6 = MaterialTheme.typography.bodyMedium,
+                paragraph = textStyle ?: MaterialTheme.typography.bodyLarge,
+                ordered = textStyle ?: MaterialTheme.typography.bodyLarge,
+                bullet = textStyle ?: MaterialTheme.typography.bodyLarge,
+                list = textStyle ?: MaterialTheme.typography.bodyLarge,
             ),
         )
     }

@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -33,6 +34,8 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.surface.timeline.ObserveResidentRows
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowContexts
+import com.letta.mobile.ui.chat.surface.timeline.rememberTimelineFadeAlphas
+import com.letta.mobile.ui.chat.surface.timeline.timelineFadingEdges
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
@@ -78,10 +81,21 @@ internal fun DockedReplyCard(params: DockedReplyParams, modifier: Modifier = Mod
     }
     val contexts = rememberRowContexts(params.state, params.capabilities, params.appearance, rowFontScale(params.appearance))
     val callbacks = rememberRowCallbacks(params.actions, params.host) { _, _ -> params.onIntent(ChatSurfaceIntent.Expand) }
+    // The full page's edge fades (TimelineListFrame), on the same reversed-list terms: the top
+    // dissolves under the panel's header while older rows are above, the bottom above the composer
+    // only while newer ones are below, so the newest message at rest is never dimmed.
+    val fades = rememberTimelineFadeAlphas(
+        canScrollTowardOlder = listState.canScrollForward,
+        canScrollTowardNewer = listState.canScrollBackward,
+        promptPinned = false,
+    )
     LazyColumn(
         state = listState,
         reverseLayout = true,
-        modifier = modifier.testTag(DOCKED_REPLY_TAG),
+        modifier = modifier
+            .clipToBounds()
+            .timelineFadingEdges(fades)
+            .testTag(DOCKED_REPLY_TAG),
         contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md, Alignment.Bottom),
     ) {

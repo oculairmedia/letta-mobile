@@ -162,4 +162,9 @@ data class ChatSurfaceHost(
     val openAgentPane: (() -> Unit)? = null,
     /** Opens the conversation's agent in its editor (the mascot's pencil badge); null hides it. */
     val editAgent: (() -> Unit)? = null,
+    /**
+     * Opens the host's agent switcher. The phone's canvas mode offers it in the board's menu, in
+     * place of the host header's agent pill, which that mode does not show; null leaves it out.
+     */
+    val openAgentSwitcher: (() -> Unit)? = null,
 )

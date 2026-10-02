@@ -1,11 +1,6 @@
 package com.letta.mobile.ui.chat.surface
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -22,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -50,8 +44,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -83,10 +75,6 @@ import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_expand
 import com.letta.mobile.sharedui.resources.chat_surface_head
 import com.letta.mobile.sharedui.resources.chat_surface_head_agent
 import com.letta.mobile.ui.chat.AgentSphere
-import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
-import com.letta.mobile.ui.chat.surface.ambient.ambientTint
-import com.letta.mobile.ui.ambient.AmbientMotionStatus
-import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.mascot.mascotAvailable
@@ -103,8 +91,9 @@ import org.jetbrains.compose.resources.stringResource
  * letta-mobile-bglj6.1.9: the Touch canvas mode. No panel: a flush chat bar pinned to the bottom of
  * the screen (the full page's bar, same draft, same send) and, over the canvas, a chat head in the
  * manner of Google Messages' bubbles: a disc with the agent's mascot, dragged anywhere and snapped
- * back to the nearer screen edge. While the agent works the ambient halo glows around it; its reply
- * pops out of it in a speech popup that opens towards the middle of the screen. Tapping the popup
+ * back to the nearer screen edge. No glow surrounds it: while the agent works the mascot's own
+ * animation is the cue, as on the desktop's minimised dock. Its reply pops out of it in a speech
+ * popup that opens towards the middle of the screen. Tapping the popup
  * opens the chat, its x hides it until the next prompt; tapping the head shows or hides the popup
  * (or, with nothing to show, opens the chat), a long press opens the agent's pane.
  */
@@ -124,7 +113,6 @@ internal class TouchHeadContent(
     val openChat: () -> Unit,
     val openAgent: (() -> Unit)?,
     val turn: @Composable () -> CollapsedTurn,
-    val ambient: @Composable () -> ChatAmbient,
 )
 
 /**
@@ -189,7 +177,6 @@ internal fun TouchDockLayer(
 @Composable
 private fun TouchChatHead(content: TouchHeadContent) {
     val turn = content.turn()
-    val ambient = content.ambient()
     // Per turn, as the minimised dock's bubble: a new prompt brings a new popup.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     var hidden by rememberSaveable { mutableStateOf(false) }
@@ -214,7 +201,6 @@ private fun TouchChatHead(content: TouchHeadContent) {
         }
         ChatHead(
             content = content,
-            ambient = ambient,
             position = position,
             drag = drag,
             lane = lane,
@@ -248,12 +234,11 @@ private class HeadLane(val widthDp: Float, val heightDp: Float) {
 /**
  * The disc with the agent: its mascot (the page's one companion seat stands over it, scaled to
  * the disc) or, without one, the agent's sphere. Drag it anywhere; let go and it snaps to the
- * nearer edge. While the agent works the ambient halo glows around it.
+ * nearer edge. Nothing glows around it: the mascot's animation says the agent is working.
  */
 @Composable
 private fun ChatHead(
     content: TouchHeadContent,
-    ambient: ChatAmbient,
     position: () -> Offset,
     drag: Animatable<Offset, *>,
     lane: HeadLane,
@@ -306,7 +291,6 @@ private fun ChatHead(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.requiredSize(ChatHeadDimens.head + ChatHeadDimens.haloBleed * 2)) { ChatHeadHalo(ambient, Modifier.matchParentSize()) }
         Box(
             Modifier
                 .matchParentSize()
@@ -320,47 +304,6 @@ private fun ChatHead(
             AgentSphere(size = ChatHeadDimens.fallbackSphere)
         }
     }
-}
-
-/**
- * The thinking cue around the head: a soft disc of the ambient tint (tertiary while the agent works,
- * error when the run fails, secondary as it completes), breathing while it runs. Idle draws nothing.
- */
-@Composable
-private fun ChatHeadHalo(ambient: ChatAmbient, modifier: Modifier) {
-    val reducedMotion = LocalReducedMotion.current
-    val tint by animateColorAsState(
-        targetValue = ambientTint(ambient.status, MaterialTheme.colorScheme),
-        animationSpec = tween(if (reducedMotion) 0 else ChatMotionTokens.AmbientGlow.GLIDE_MILLIS),
-        label = "chatHeadHaloTint",
-    )
-    if (tint.alpha <= 0f) return
-    val breathing = !reducedMotion && ambient.status == AmbientMotionStatus.Running
-    val breath = if (breathing) {
-        rememberInfiniteTransition(label = "chatHeadHalo").animateFloat(
-            initialValue = ChatHeadDimens.haloBreathLow,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(ChatHeadDimens.haloBreathMillis), RepeatMode.Reverse),
-            label = "chatHeadHaloBreath",
-        )
-    } else {
-        null
-    }
-    Box(
-        modifier.drawBehind {
-            val strength = ChatHeadDimens.haloStrength * (breath?.value ?: 1f)
-            val glow = tint.copy(alpha = tint.alpha * strength)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0f to glow,
-                    ChatHeadDimens.haloSolidFraction to glow,
-                    1f to Color.Transparent,
-                    center = center,
-                    radius = size.minDimension / 2f,
-                ),
-            )
-        },
-    )
 }
 
 /** Where the popup goes: beside the head, towards the middle, aligned with its foot or its top. */
@@ -404,9 +347,10 @@ private fun HeadPopup(
         )
     }
     val tail = ChatSurfaceDimens.collapsedBubbleTailWidth
-    // Beside the head, up to 80 % of the screen: what is left between the head and the far margin.
+    // Beside the head, a compact bubble: what is left between the head and the far margin, at most
+    // a share of the screen and a fixed cap.
     val besideHead = lane.widthDp - lane.size - 2 * ChatHeadDimens.edgeMargin.value - ChatHeadDimens.popupGap.value
-    val maxWidth = minOf(besideHead, lane.widthDp * ChatHeadDimens.popupMaxWidthFraction)
+    val maxWidth = minOf(besideHead, lane.widthDp * ChatHeadDimens.popupMaxWidthFraction, ChatHeadDimens.popupMaxWidth.value)
     Surface(
         modifier = Modifier
             .layout { measurable, constraints ->
@@ -443,14 +387,22 @@ private fun HeadPopup(
                         if (!turn.streaming) liveRegion = LiveRegionMode.Polite
                     }
                     .padding(
-                        start = LettaDimens.Space.md + tail * (if (placement.headOnRight) 0f else 1f),
-                        end = LettaDimens.Space.md + LettaDimens.Control.iconButtonSm + tail * (if (placement.headOnRight) 1f else 0f),
-                        top = LettaDimens.Space.sm,
-                        bottom = LettaDimens.Space.sm,
+                        start = ChatHeadDimens.popupPaddingHorizontal + tail * (if (placement.headOnRight) 0f else 1f),
+                        end = ChatHeadDimens.popupPaddingHorizontal + LettaDimens.Control.iconButtonSm + tail * (if (placement.headOnRight) 1f else 0f),
+                        top = ChatHeadDimens.popupPaddingVertical,
+                        bottom = ChatHeadDimens.popupPaddingVertical,
                     ),
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
-                if (turn.text.isNotBlank()) BubbleText(turn, ChatHeadDimens.popupMaxHeight)
+                if (turn.text.isNotBlank()) {
+                    BubbleText(
+                        turn = turn,
+                        maxHeight = ChatHeadDimens.popupMaxHeight,
+                        // A size down from the timeline's body: a bubble's aside, in sp so it scales with the font.
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        fadeLength = ChatHeadDimens.popupFadeLength,
+                    )
+                }
                 if (turn.working) WorkingLine(working)
                 if (turn.needsInput) NeedsInputChip(onOpen)
             }

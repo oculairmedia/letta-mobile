@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-bglj6.1: the phone board's tool bar under the shared chat page, which keeps the top clear. -->
+    <string name="canvas_foot_undo">Undo</string>
+    <string name="canvas_foot_redo">Redo</string>
+    <string name="canvas_foot_more">More board actions</string>
+    <string name="canvas_foot_more_status">More board actions, %1$s</string>
+    <string name="canvas_menu_share">Share to chat</string>
+</resources>
