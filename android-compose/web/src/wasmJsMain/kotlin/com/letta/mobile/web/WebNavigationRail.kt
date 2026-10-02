@@ -1,5 +1,6 @@
 package com.letta.mobile.web
 
+import com.letta.mobile.ui.chat.AgentOrb
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -99,7 +100,7 @@ internal fun WebNavigationRail(
                         if (selected) {
                             Box(Modifier.align(Alignment.CenterStart).size(width = 3.dp, height = 28.dp).background(MaterialTheme.colorScheme.primary))
                         }
-                        WebAgentAvatar(agents.indexOf(agent), 36.dp)
+                        AgentOrb(agents.indexOf(agent), 36.dp, agentId = agent.id)
                         if (agent.isOnline) {
                             Box(
                                 modifier = Modifier
