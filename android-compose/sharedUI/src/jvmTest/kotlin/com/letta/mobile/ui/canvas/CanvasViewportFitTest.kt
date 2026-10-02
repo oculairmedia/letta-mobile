@@ -5,7 +5,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneDocument
+import io.ak1.drawbox.domain.model.DrawingSerializer
 import io.ak1.drawbox.domain.model.Viewport
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +41,20 @@ class CanvasViewportFitTest {
         assertNull(CanvasViewportFit.contentBounds(emptyList(), emptyList()))
         val note = CanvasSceneDocument(id = "n", json = "", frame = CanvasDocumentFrame(500f, 600f, 300f, 200f))
         assertEquals(Rect(500f, 600f, 800f, 800f), CanvasViewportFit.contentBounds(emptyList(), listOf(note)))
+    }
+
+    /**
+     * The scene sharedLogic CanvasComposePlacementTest reads from JSON (letta-mobile-bglj6.9): placement
+     * puts new artifacts against the same bounds zoom-to-fit shows, so the two are held to the same
+     * numbers. Copied verbatim from that test's SHARED_FIXTURE_SCENE.
+     */
+    @Test
+    fun contentBoundsAgreeWithComposePlacementOnTheSharedScene() {
+        val elements = DrawingSerializer.deserialize(SHARED_FIXTURE_SCENE).elements
+        val documents = CanvasOpProjector.documentsOf(SHARED_FIXTURE_SCENE)
+        assertEquals(6, elements.size)
+        assertEquals(2, documents.size)
+        assertEquals(Rect(-20f, -80f, 1000f, 800f), CanvasViewportFit.contentBounds(elements, documents))
     }
 
     @Test
@@ -76,5 +92,19 @@ class CanvasViewportFitTest {
         val tall = Rect(50f, 500f, 250f, 1500f)
         assertEquals(Offset(0f, -420f), CanvasViewportFit.panIntoBand(tall, Viewport(), band))
         assertNull(CanvasViewportFit.panIntoBand(Rect(10f, 100f, 90f, 200f), Viewport(), band))
+    }
+
+    private companion object {
+        const val SHARED_FIXTURE_SCENE: String = """{"bgColor":"#ffffffff","elements":[""" +
+            """{"id":"path","type":"Path","zIndex":0,"points":[],"strokeColor":"#000000ff","strokeWidth":2.0,"samples":["-20.0,10.0,2.0","40.0,30.0,2.0"]},""" +
+            """{"id":"rect","type":"Shape","zIndex":1,"points":["0.0,200.0","50.0,220.0","120.0,260.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"RECTANGLE"},""" +
+            """{"id":"circle","type":"Shape","zIndex":2,"points":["100.0,100.0","160.0,180.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"CIRCLE"},""" +
+            """{"id":"arrow","type":"Shape","zIndex":3,"points":["300.0,0.0","500.0,0.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"ARROW","bend":"0.0,-80.0"},""" +
+            """{"id":"text","type":"Text","zIndex":4,"points":[],"strokeColor":"#000000ff","strokeWidth":1.0,"text":"Hello","textTopLeft":"600.0,50.0","wrapWidth":200.0,"fontSize":20.0},""" +
+            """{"id":"image","type":"Image","zIndex":5,"points":["900.0,400.0","1000.0,500.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"intrinsicWidth":100.0,"intrinsicHeight":100.0}""" +
+            """],"_documents":[""" +
+            """{"id":"framed","json":"{\"version\":2,\"blocks\":[]}","frame":{"x":500.0,"y":600.0,"width":300.0,"height":200.0}},""" +
+            """{"id":"frameless","json":"{\"version\":2,\"blocks\":[]}"}""" +
+            """]}"""
     }
 }

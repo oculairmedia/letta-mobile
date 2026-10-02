@@ -144,6 +144,11 @@ fun CanvasWorkspace(
      * chat header over the status bar). The board draws under it; its own chrome keeps below it.
      */
     chromeTopInset: Dp = 0.dp,
+    /**
+     * Where something outside the board asks the camera to go (the chat's "Show on canvas",
+     * letta-mobile-bglj6.13); null when nothing outside steers it.
+     */
+    cameraRequest: CanvasCameraRequest? = null,
 ) {
     val state by controller.state.collectAsState()
     // What the board's chrome keeps clear of: the system bars and the keyboard, and the host's chrome.
@@ -179,6 +184,9 @@ fun CanvasWorkspace(
     // snapping worked on every drawn shape and on no note: shapes are read fresh from
     // controller.state, notes came from a list captured before they existed.
     val liveDocuments by rememberUpdatedState(documents)
+    // The height each auto-fitted note is SHOWN at (never stored; letta-mobile-bglj6.11). Read only
+    // when a group move commits, so it is a plain map and its updates recompose nothing.
+    val fittedNoteHeights = remember { HashMap<String, Float>() }
     val coroutineScope = rememberCoroutineScope()
     // Whether the press DrawBox is picking for came from a finger, which needs a wider target.
     val fingerRecency = remember { CanvasFingerRecency() }
@@ -574,6 +582,18 @@ fun CanvasWorkspace(
         }
     }
 
+    // A region asked for from outside (the chat's "Show on canvas"): framed once the board is
+    // loaded and measured, never zoomed in past 100%, after the open-time fit so it wins. A jump,
+    // not an animation, so reduced motion has nothing to honour here.
+    val cameraTarget = cameraRequest?.target
+    LaunchedEffect(cameraTarget, initialLoadDone, boardSize) {
+        cameraRequest?.frameOn(cameraTarget, CameraBoard(session?.canvasId?.value, boardSize, initialLoadDone)) { fit ->
+            controller.resetCamera()
+            controller.zoomBy(fit.scale, Offset.Zero)
+            controller.panBy(fit.offset)
+        }
+    }
+
     // The keyboard covers the foot of a phone's board, and on the shared chat page the chat bar
     // rides up on it. While a note, a text or a shape's text is typed into, the camera (never the
     // element, and never the zoom) keeps it in the band left above the keyboard, the bar and the
@@ -702,7 +722,7 @@ fun CanvasWorkspace(
         val offset = groupOffset
         groupOffset = Offset.Zero
         if (session == null || offset == Offset.Zero || selectedNoteIds.isEmpty()) return
-        val frames = CanvasWorkspaceSupport.buildMoveFrames(documents, selectedNoteIds, offset)
+        val frames = CanvasWorkspaceSupport.buildMoveFrames(documents, selectedNoteIds, offset, fittedNoteHeights)
         coroutineScope.launch {
             recordingDocuments("moving notes") { runCatching { session.moveDocuments(frames) } }
         }
@@ -1310,8 +1330,16 @@ fun CanvasWorkspace(
 
             // Block documents live on the board as note cards, in world coordinates.
             if (session != null && documents.isNotEmpty()) {
+                // A frameless note's slot comes from the shared placement engine, laid out against
+                // the same bounds zoom-to-fit uses (letta-mobile-bglj6.11). Only worked out when
+                // there is a frameless note at all.
+                val framelessFrames = remember(documents, state.elements) {
+                    framelessFramesOf(documents) { CanvasViewportFit.contentBounds(state.elements, documents) }
+                }
                 CanvasNotesLayer(
                     onLiveFrame = { id, frame -> if (frame == null) liveNoteFrames.remove(id) else liveNoteFrames[id] = frame },
+                    framelessFrames = framelessFrames,
+                    onFittedHeight = fittedNoteHeights::putOrRemove,
                     session = session,
                     documents = documents,
                     viewport = state.viewport,

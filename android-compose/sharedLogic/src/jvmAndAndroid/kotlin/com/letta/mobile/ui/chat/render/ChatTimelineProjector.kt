@@ -2,6 +2,9 @@ package com.letta.mobile.ui.chat.render
 
 import com.letta.mobile.data.a2ui.A2uiHistoryExtractor
 import com.letta.mobile.data.a2ui.A2uiMessage
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts.applyTo
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
@@ -145,11 +148,14 @@ class ChatTimelineProjector {
         ownAgentId: String? = null,
     ): TimelineProjection {
         val startedAtMs = System.currentTimeMillis()
+        // letta-mobile-bglj6.13: canvas_compose receipts move across events (onto the narrating
+        // message), so they are attached once over the whole timeline, after the per-event cache.
+        val scope = ProjectionScope(ownAgentId, CanvasArtifactReceipts.attach(timeline.events))
         tailProjectionFastPath(
             timeline = timeline,
             prefix = prefix,
             isActiveRunStreaming = isActiveRunStreaming,
-            ownAgentId = ownAgentId,
+            scope = scope,
         )?.let { fastProjection ->
             emitProjectionTelemetry(
                 timeline = timeline,
@@ -181,7 +187,7 @@ class ChatTimelineProjector {
             nextCache[key] = projected
             nextRecords += projected
             a2uiMessages += projected.a2uiMessages
-            projected.uiMessage?.let(live::add)
+            projected.uiMessage?.let { live += scope.receipts.applyTo(event, it) }
         }
         projectionCache = nextCache
 
@@ -190,12 +196,8 @@ class ChatTimelineProjector {
         val tailIsAssistant = timeline.events.lastOrNull().let {
             it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.ASSISTANT
         }
-        var pendingCount = 0
-        var confirmedCount = 0
-        nextRecords.forEach {
-            if (it.isLettaServerLocalPending) pendingCount++
-            if (it.isConfirmedVisible) confirmedCount++
-        }
+        val pendingCount = nextRecords.count { it.isLettaServerLocalPending }
+        val confirmedCount = nextRecords.count { it.isConfirmedVisible }
         val anyLettaServerLocalPending = pendingCount > 0
         val anyConfirmed = confirmedCount > 0
         // letta-mobile-dir4k: the projection layer's view of "any run is still
@@ -257,6 +259,7 @@ class ChatTimelineProjector {
             tailIsAssistant = tailIsAssistant,
             pendingCount = pendingCount,
             confirmedCount = confirmedCount,
+            receipts = scope.receipts,
         )
         emitProjectionTelemetry(
             timeline = timeline,
@@ -300,9 +303,10 @@ class ChatTimelineProjector {
         timeline: Timeline,
         prefix: List<UiMessage>,
         isActiveRunStreaming: Boolean,
-        ownAgentId: String?,
+        scope: ProjectionScope,
     ): TimelineProjection? {
-        val previous = lastProjectionSnapshot ?: return null
+        // A receipt that moved or changed touches a row other than the tail: project in full.
+        val previous = lastProjectionSnapshot?.takeIf { it.receipts == scope.receipts } ?: return null
         if (previous.conversationId != timeline.conversationId || timeline.events.isEmpty()) return null
         if (previous.prefix !== prefix) return null
         // letta-mobile-ixtzn: guard against empty previous.records (e.g. after
@@ -320,7 +324,8 @@ class ChatTimelineProjector {
         val tailEvent = timeline.events.last()
         val tailKey = tailEvent.projectionKey()
         val tailCached = projectionCache[tailKey]?.takeIf { it.event == tailEvent }
-        val tailRecord = tailCached ?: tailEvent.projectForCacheRecord(tailKey, ownAgentId)
+        val tailRecord = tailCached ?: tailEvent.projectForCacheRecord(tailKey, scope.ownAgentId)
+        val tailUi = tailRecord.uiMessage?.let { scope.receipts.applyTo(tailEvent, it) }
 
         // letta-mobile-yflpp DEDUPE: during streaming the authoritative Timeline
         // StateFlow can re-emit ~20x/sec for the SAME visible content. The
@@ -374,20 +379,16 @@ class ChatTimelineProjector {
             }
         }
 
-        val records = if (appendTail) {
-            previous.records + tailRecord
-        } else {
-            previous.records.dropLast(1) + tailRecord
-        }
+        val records = previous.records.withTail(tailRecord, append = appendTail)
         val live = if (appendTail) {
-            if (tailRecord.uiMessage == null) previous.liveMessages else previous.liveMessages + tailRecord.uiMessage
+            if (tailUi == null) previous.liveMessages else previous.liveMessages + tailUi
         } else {
             // Safe to call .last() here: we've already guarded for isEmpty() above.
             val previousTailHadUi = previous.records.last().uiMessage != null
             when {
-                previousTailHadUi && tailRecord.uiMessage != null -> previous.liveMessages.dropLast(1) + tailRecord.uiMessage
+                previousTailHadUi && tailUi != null -> previous.liveMessages.dropLast(1) + tailUi
                 previousTailHadUi -> previous.liveMessages.dropLast(1)
-                tailRecord.uiMessage != null -> previous.liveMessages + tailRecord.uiMessage
+                tailUi != null -> previous.liveMessages + tailUi
                 else -> previous.liveMessages
             }
         }
@@ -413,10 +414,10 @@ class ChatTimelineProjector {
         // and only the new card recomposes. Falls back to a fresh
         // combineOlderPrefix walk if the prior snapshot is unavailable.
         val combined = if (appendTail && previous.uiSnapshot != null) {
-            val appended = if (tailRecord.uiMessage == null) {
+            val appended = if (tailUi == null) {
                 previous.uiSnapshot
             } else {
-                previous.uiSnapshot.toMutableList().also { it.add(tailRecord.uiMessage) }
+                previous.uiSnapshot.toMutableList().also { it.add(tailUi) }
             }
             appended.toPersistentList()
         } else if (appendTail) {
@@ -479,6 +480,7 @@ class ChatTimelineProjector {
             tailIsAssistant = tailIsAssistant,
             pendingCount = pendingCount,
             confirmedCount = confirmedCount,
+            receipts = scope.receipts,
         )
         val messageListChange = if (appendTail) {
             ChatMessageListChange.AppendTail
@@ -594,7 +596,8 @@ class ChatTimelineProjector {
     }
 
     private fun UiMessage.toolCardCount(): Int =
-        toolCalls?.size ?: if (role == "tool" || generatedUi != null || approvalRequest != null || approvalResponse != null) 1 else 0
+        (toolCalls?.size ?: if (role == "tool" || generatedUi != null || approvalRequest != null || approvalResponse != null) 1 else 0) +
+            artifacts.size
 
     private fun TimelineEvent.isLettaServerLocalPending(): Boolean =
         this is TimelineEvent.Local && deliveryState == DeliveryState.SENDING
@@ -613,7 +616,8 @@ class ChatTimelineProjector {
             toolCalls.isNullOrEmpty() &&
             approvalRequest == null &&
             approvalResponse == null &&
-            attachments.isEmpty()
+            attachments.isEmpty() &&
+            artifacts.isEmpty()
 
     private companion object {
         // Sample rate for the deduped no-op telemetry counter so a long
@@ -678,6 +682,12 @@ data class TimelineProjection(
     val noChange: Boolean = false,
 )
 
+/** This list with [tail] appended, or in place of its last entry. */
+private fun <T> List<T>.withTail(tail: T, append: Boolean): List<T> = if (append) this + tail else dropLast(1) + tail
+
+/** What a projection reads besides the timeline: whose chat it is, and the compose receipts (letta-mobile-bglj6.13). */
+private class ProjectionScope(val ownAgentId: String?, val receipts: Map<String, List<CanvasArtifactReceipt>>)
+
 private data class CachedTimelineProjectionSnapshot(
     val conversationId: String,
     val stablePrefixVersion: Long,
@@ -700,6 +710,8 @@ private data class CachedTimelineProjectionSnapshot(
     // per streaming tick.
     val pendingCount: Int = 0,
     val confirmedCount: Int = 0,
+    /** letta-mobile-bglj6.13: the receipts applied to [liveMessages], to tell when they move. */
+    val receipts: Map<String, List<CanvasArtifactReceipt>> = emptyMap(),
 )
 
 private data class TimelineProjectionKey(

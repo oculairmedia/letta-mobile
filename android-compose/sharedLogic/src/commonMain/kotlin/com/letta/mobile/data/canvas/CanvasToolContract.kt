@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.compose.CanvasComposeContract
+import com.letta.mobile.data.canvas.compose.CanvasComposeSchema
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -38,6 +40,11 @@ object CanvasToolContract {
     const val EXPORT_SVG = "canvas_export_svg"
     const val LIST = "canvas_list"
     const val RENDER_PREVIEW = "canvas_render_preview"
+    const val COMPOSE = "canvas_compose"
+    const val COMPOSE_GUIDE = "canvas_compose_guide"
+
+    /** The upper bound on [compose]'s description: the format itself is [composeGuide]'s answer. */
+    const val COMPOSE_DESCRIPTION_MAX_CHARS = 700
 
     /**
      * What export_svg answers until a real exporter runs where the tools do (letta-mobile-qsq7v).
@@ -49,11 +56,10 @@ object CanvasToolContract {
             "Use canvas_get_scene to read the canvas."
 
     /** How every canvas-reading tool is told which canvas: optional, defaulting to the conversation's. */
-    private val canvasIdParam = ToolParam(
-        "canvas_id",
-        description = "The canvas to use. Omit it to use the canvas of the conversation you are in " +
-            "(created on first use); only name one to reach a different canvas from canvas_list.",
-    )
+    const val CANVAS_ID_DESCRIPTION = "The canvas to use. Omit it to use the canvas of the conversation you are in " +
+        "(created on first use); only name one to reach a different canvas from canvas_list."
+
+    private val canvasIdParam = ToolParam("canvas_id", description = CANVAS_ID_DESCRIPTION)
 
     /** Checks a write without making it (letta-mobile-qygvv.30). */
     private val dryRunParam = ToolParam(
@@ -105,10 +111,12 @@ object CanvasToolContract {
             "add_element {elementId, elementJson} adds one element and update_element {elementId, elementJson} " +
             "replaces it whole (elementJson is one element as a JSON string, in the scene format below); " +
             "remove_element {elementId}; set_background {colorHex \"#rrggbbaa\"}; " +
-            "set_document {documentId, documentJson, frame?, color?, style?} places a block-document note on the board " +
+            "set_document {documentId, documentJson, frame?, color?, style?, owner?} places a block-document note on the board " +
             "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
-            "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}) and " +
+            "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}, " +
+            "owner: explicit (default when a frame is given) | user | auto) and " +
             "remove_document {documentId} takes it off. opId, actorId and lamport are filled in by the host. " +
+            "To create notes, checklists, cards or text, use $COMPOSE instead: it places and sizes them for you. " +
             "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
             "drawn or the board it leaves is inconsistent (update_element/remove_element/remove_document of an id " +
             "that is not there, add_element of an id that is, a note label whose shape is gone, an arrow bound to a " +
@@ -167,11 +175,45 @@ object CanvasToolContract {
     )
 
     /**
+     * canvas_compose v1 (letta-mobile-bglj6.6): notes, checklists, cards, text and groups by
+     * meaning, placed and sized by the board. Its input is [CanvasComposeSchema.input], strict at
+     * every level, so a refusal's JSON-pointer path names a place in the schema the model saw.
+     */
+    val compose = CanvasToolDefinition(
+        COMPOSE,
+        "Put notes, checklists, cards, text and labelled groups on a canvas in one call (with no canvas_id, " +
+            "the canvas of the conversation you are in). Read $COMPOSE_GUIDE once first: it has the format, caps, " +
+            "markdown subset and error codes. Each item has a \"kind\": NOTE {markdown}, CHECKLIST " +
+            "{items: [{text, checked?}]}, CARD {title, fields?: [{label, value}], markdown?}, TEXT " +
+            "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes " +
+            "everything. All or nothing: a refusal lists each problem with a JSON-pointer path " +
+            "(e.g. /items/2/markdown) and nothing is published. Pass dry_run: true to see the receipt without " +
+            "publishing. To draw, use $APPLY_OPS.",
+        CanvasComposeSchema.input,
+    )
+
+    /** The whole canvas_compose format ([com.letta.mobile.data.canvas.compose.CanvasComposeGuide]); no input. */
+    val composeGuide = CanvasToolDefinition(
+        COMPOSE_GUIDE,
+        "Describe the $COMPOSE format (${CanvasComposeContract.CATALOG} version ${CanvasComposeContract.VERSION}): " +
+            "the kinds and their fields, the caps, the markdown subset, the colours, the error codes and a full " +
+            "example. Takes no input.",
+        objectSchema(),
+    )
+
+    /**
+     * The compose pair, defined here so both hosts take one contract. Both hosts answer them
+     * (HostCanvasTools on the Iroh host, CanvasExternalTools on an app's own App Server;
+     * letta-mobile-bglj6.12), so they are in [all], and [applyOps]' description points at [COMPOSE].
+     */
+    val composeTools: List<CanvasToolDefinition> = listOf(compose, composeGuide)
+
+    /**
      * The tools offered to agents. [exportSvg] is not among them until it renders the real canvas: a
      * tool that always fails only costs an agent turns (see ExternalToolRegistry.factoryDefault).
      */
     // Only advertise preview when a mobile renderer bridge is actually connected.
-    val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, list)
+    val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, list) + composeTools
     val withPreview: List<CanvasToolDefinition> = all + renderPreview
 
     /** An object of [params]; the [ToolParam.required] ones are listed as required. */

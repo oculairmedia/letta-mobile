@@ -1,0 +1,120 @@
+[
+  {
+    "type": "add_element",
+    "opId": "",
+    "actorId": "",
+    "lamport": 0,
+    "elementId": "cmp-weekend-plan-selfcare",
+    "elementJson": "{\"type\":\"Shape\",\"shapeType\":\"RECTANGLE\",\"points\":[\"816.0,279.0\",\"1528.0,555.0\"],\"strokeColor\":\"#9e9e9eff\",\"strokeWidth\":1.0,\"fillColor\":\"#f5f5f5ff\",\"cornerRadius\":16.0,\"zIndex\":0,\"_compose\":{\"artifactId\":\"weekend-plan\",\"key\":\"selfcare\",\"kind\":\"GROUP\",\"catalog\":\"letta.canvas.compose\",\"version\":1}}"
+  },
+  {
+    "type": "set_document",
+    "opId": "",
+    "actorId": "",
+    "lamport": 0,
+    "documentId": "cmp-weekend-plan-shopping",
+    "documentJson": "{\"version\":2,\"blocks\":[{\"id\":\"b1\",\"type\":{\"typeId\":\"todo\",\"checked\":false},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Milk\",\"spans\":[]}},{\"id\":\"b2\",\"type\":{\"typeId\":\"todo\",\"checked\":true},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Eggs\",\"spans\":[]}},{\"id\":\"b3\",\"type\":{\"typeId\":\"todo\",\"checked\":false},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Bread\",\"spans\":[]}}]}",
+    "frame": {
+      "x": 816.0,
+      "y": 80.0,
+      "width": 320.0,
+      "height": 175.0
+    },
+    "color": "#fde68a",
+    "title": "Shopping",
+    "owner": "auto",
+    "compose": {
+      "artifactId": "weekend-plan",
+      "key": "shopping",
+      "kind": "CHECKLIST",
+      "catalog": "letta.canvas.compose",
+      "version": 1
+    }
+  },
+  {
+    "type": "set_document",
+    "opId": "",
+    "actorId": "",
+    "lamport": 0,
+    "documentId": "cmp-weekend-plan-meals",
+    "documentJson": "{\"version\":2,\"blocks\":[{\"id\":\"b1\",\"type\":{\"typeId\":\"heading_2\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Saturday\",\"spans\":[]}},{\"id\":\"b2\",\"type\":{\"typeId\":\"bullet_list\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Pasta\",\"spans\":[]}},{\"id\":\"b3\",\"type\":{\"typeId\":\"heading_2\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Sunday\",\"spans\":[]}},{\"id\":\"b4\",\"type\":{\"typeId\":\"bullet_list\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Roast\",\"spans\":[]}},{\"id\":\"b5\",\"type\":{\"typeId\":\"todo\",\"checked\":false},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Buy a chicken\",\"spans\":[]}}]}",
+    "frame": {
+      "x": 80.0,
+      "y": 279.0,
+      "width": 320.0,
+      "height": 290.0
+    },
+    "color": "#bbf7d0",
+    "title": "Meals",
+    "owner": "auto",
+    "compose": {
+      "artifactId": "weekend-plan",
+      "key": "meals",
+      "kind": "NOTE",
+      "catalog": "letta.canvas.compose",
+      "version": 1
+    }
+  },
+  {
+    "type": "set_document",
+    "opId": "",
+    "actorId": "",
+    "lamport": 0,
+    "documentId": "cmp-weekend-plan-walk",
+    "documentJson": "{\"version\":2,\"blocks\":[{\"id\":\"b1\",\"type\":{\"typeId\":\"heading_2\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Walk\",\"spans\":[]}},{\"id\":\"b2\",\"type\":{\"typeId\":\"paragraph\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"When: Sat 09:00\",\"spans\":[{\"start\":0,\"end\":5,\"style\":{\"type\":\"bold\"}}]}},{\"id\":\"b3\",\"type\":{\"typeId\":\"paragraph\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Where: Park\",\"spans\":[{\"start\":0,\"end\":6,\"style\":{\"type\":\"bold\"}}]}}]}",
+    "frame": {
+      "x": 840.0,
+      "y": 335.0,
+      "width": 320.0,
+      "height": 196.0
+    },
+    "color": "#ffffff",
+    "title": "Walk",
+    "owner": "auto",
+    "compose": {
+      "artifactId": "weekend-plan",
+      "key": "walk",
+      "kind": "CARD",
+      "catalog": "letta.canvas.compose",
+      "version": 1
+    }
+  },
+  {
+    "type": "set_document",
+    "opId": "",
+    "actorId": "",
+    "lamport": 0,
+    "documentId": "cmp-weekend-plan-read",
+    "documentJson": "{\"version\":2,\"blocks\":[{\"id\":\"b1\",\"type\":{\"typeId\":\"paragraph\"},\"content\":{\"kind\":\"text\",\"version\":1,\"text\":\"Finish Dune before Sunday.\",\"spans\":[{\"start\":7,\"end\":11,\"style\":{\"type\":\"italic\"}}]}}]}",
+    "frame": {
+      "x": 1184.0,
+      "y": 335.0,
+      "width": 320.0,
+      "height": 120.0
+    },
+    "owner": "auto",
+    "compose": {
+      "artifactId": "weekend-plan",
+      "key": "read",
+      "kind": "NOTE",
+      "catalog": "letta.canvas.compose",
+      "version": 1
+    }
+  },
+  {
+    "type": "add_element",
+    "opId": "",
+    "actorId": "",
+    "lamport": 0,
+    "elementId": "cmp-weekend-plan-heading",
+    "elementJson": "{\"type\":\"Text\",\"text\":\"Weekend plan\",\"textTopLeft\":\"80.0,80.0\",\"wrapWidth\":480.0,\"fontSize\":36.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#212121ff\",\"zIndex\":2,\"_compose\":{\"artifactId\":\"weekend-plan\",\"key\":\"heading\",\"kind\":\"TEXT\",\"catalog\":\"letta.canvas.compose\",\"version\":1}}"
+  },
+  {
+    "type": "add_element",
+    "opId": "",
+    "actorId": "",
+    "lamport": 0,
+    "elementId": "cmp-weekend-plan-selfcare-label",
+    "elementJson": "{\"type\":\"Text\",\"text\":\"Self-care\",\"textTopLeft\":\"840.0,295.0\",\"wrapWidth\":664.0,\"fontSize\":18.0,\"alignment\":\"LEFT\",\"fontFamilyKey\":\"sans\",\"strokeColor\":\"#424242ff\",\"zIndex\":1,\"_compose\":{\"artifactId\":\"weekend-plan\",\"key\":\"selfcare\",\"kind\":\"GROUP\",\"catalog\":\"letta.canvas.compose\",\"version\":1}}"
+  }
+]

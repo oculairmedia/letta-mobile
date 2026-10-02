@@ -31,7 +31,28 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
 - `UpdateElementOp`: Updates an existing element identified by `elementId`.
 - `RemoveElementOp`: Removes an existing element by `elementId`.
 - `SetBackgroundOp`: Updates the canvas background color (`bgColor`).
-- `BatchOp`: Atomic bundle of multiple operations applied in a single revision increment.
+- `SetBackgroundPatternOp` (`set_background_pattern`): Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins.
+- `SetDocumentOp` (`set_document`): Upserts a block document (a note: Cascade v2 JSON) with its optional `frame`, `color`, `style`, `title`, geometry `owner` (`AUTO`/`EXPLICIT`/`USER`) and canvas_compose provenance (`compose`); null fields keep what the document has. Last writer wins per document.
+- `RemoveDocumentOp` (`remove_document`): Takes a block document off the board.
+- `SetArrowBindingOp` (`set_arrow_binding`): Binds (or unbinds) a connector's ends to block documents; last writer wins per connector.
+- `SetLabelOwnerOp` (`set_label_owner`): Records (or releases) the shape a label document belongs to, so ownership is never inferred from an id.
+- `BatchOp`: Atomic bundle of multiple operations applied in a single revision increment. canvas_compose publishes a whole artifact as one (`CanvasStampedBatch`); the inner ops keep their own ids and lamports.
+
+## Agent tools
+
+The `canvas.*` tools an agent sees are defined once in `CanvasToolContract` and answered by the Iroh host (`HostCanvasTools`) or an app's own runtime (`CanvasExternalTools`), so a call means the same on either:
+
+- `canvas_create`, `canvas_list`: make a canvas, list the ones you may read (a conversation already has its canvas, the default for every other tool).
+- `canvas_get_scene`: the scene (DrawBox JSON, plus `_documents`) and its revision.
+- `canvas_replace_scene`: replace the whole drawing (notes are kept); all or nothing, `dry_run` to check first.
+- `canvas_apply_ops`: a batch of the ops above (`add_element`, `update_element`, `remove_element`, `set_background`, `set_document`, `remove_document`); all or nothing through `CanvasBatchValidator`, `dry_run` to check first. Explicit geometry: a note placed with a `frame` is `owner: EXPLICIT`.
+- `canvas_compose`: notes, checklists, cards, text and labelled groups by meaning; the board places and sizes them (`owner: AUTO`) and the call publishes one atomic batch and answers a receipt, which the chat shows as one card with "Show on canvas". Prefer it to `apply_ops` for anything that is not a drawing.
+- `canvas_compose_guide`: the compose format (kinds, caps, markdown subset, colours, ids, errors); an agent reads it once before composing.
+- `canvas_render_preview`: a rendered preview of a proposed scene or ops where a renderer runs.
+
+## Compose
+
+`canvas_compose` is a compiler in front of the op log, not a second canvas: one validator, one log, one store. Its package README is `compose/README.md` (architecture, pipeline, receipt, adding a kind); the agent-facing reference is `docs/reference/canvas-compose-v1.md`; the plan and what changed while building it are in `docs/design/canvas-compose-plan.md`. A host that serves Iroh conversations must run a rebuilt Iroh wrapper for compose to be offered and for `owner`/`compose` on documents to survive a host rewrite.
 
 ## Conflict Resolution Rules
 1. **Idempotency & Deduplication**:

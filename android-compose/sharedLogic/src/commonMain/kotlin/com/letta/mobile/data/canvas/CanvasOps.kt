@@ -110,6 +110,9 @@ sealed interface CanvasOp {
      * live on the board beside the drawing, keyed by [documentId]; last writer wins per document.
      * A null [frame] keeps the document where it already is, a null [color] keeps its colour and a
      * null [style] keeps how its text is set and a null [title] keeps its title (an empty one clears it).
+     * A null [owner] keeps the document's geometry owner, except that a [frame] given to a document
+     * with no owner yet makes it [CanvasGeometryOwner.EXPLICIT]; a null [compose] keeps its
+     * canvas_compose provenance.
      */
     @Serializable
     @SerialName("set_document")
@@ -123,6 +126,8 @@ sealed interface CanvasOp {
         val color: String? = null,
         val style: CanvasTextStyle? = null,
         val title: String? = null,
+        val owner: CanvasGeometryOwner? = null,
+        val compose: CanvasComposeProvenance? = null,
     ) : CanvasOp
 
     @Serializable

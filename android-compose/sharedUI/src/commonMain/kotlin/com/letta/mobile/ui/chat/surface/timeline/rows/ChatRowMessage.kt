@@ -80,6 +80,7 @@ private fun AssistantMessageColumn(
             )
         }
         message.generatedUi?.let { GeneratedUiCard(it, context, callbacks) }
+        if (message.artifacts.isNotEmpty()) CanvasArtifactCards(message.artifacts, callbacks)
         message.approvalRequest?.let { ApprovalRequestCard(it, context, callbacks) }
         message.approvalResponse?.let { ApprovalResponseCard(it) }
     }

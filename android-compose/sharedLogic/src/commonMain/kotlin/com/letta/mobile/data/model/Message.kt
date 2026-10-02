@@ -358,11 +358,7 @@ data class ToolReturnMessage(
             val contentPartResponse = extractContentPartResponse(toolReturnRaw)
             val parsedStringPayload = toolReturnRaw.parseJsonStringPayload()
             val rawFuncResponse = when (val raw = toolReturnRaw) {
-                is JsonPrimitive -> when {
-                    raw.isString && parsedStringPayload == null -> raw.content
-                    raw.isString && parsedStringPayload.isSubagentDispatchResult() -> raw.content
-                    else -> null
-                }
+                is JsonPrimitive -> stringReturnAnswer(raw, parsedStringPayload, contentPartResponse)
                 // Structured (non-stringified) Agent return objects must keep
                 // their JSON body so hydration can recover taskId/agentId.
                 is JsonObject -> if (raw.isSubagentDispatchResult()) {
@@ -406,6 +402,20 @@ data class ToolReturnMessage(
  * Bare `agent_id` alone is too broad (admin/API tools also return it) — require
  * an explicit task id or subagent-scoped agent id field.
  */
+/**
+ * The text of a stringified tool return [raw] that is the answer itself: plain text ([parsed] null),
+ * an Agent dispatch result, or (letta-mobile-bglj6.12) a JSON object a tool answered with
+ * (canvas_compose's receipt or refusal, apply_ops' result) that holds no content part to read text
+ * out of: read down to nothing, the chat lost the receipt the TOOL_CALL event is meant to carry.
+ */
+private fun stringReturnAnswer(raw: JsonPrimitive, parsed: JsonElement?, contentPartResponse: String?): String? = when {
+    !raw.isString -> null
+    parsed == null -> raw.content
+    parsed.isSubagentDispatchResult() -> raw.content
+    parsed is JsonObject && contentPartResponse == null -> raw.content
+    else -> null
+}
+
 private fun JsonElement?.isSubagentDispatchResult(): Boolean {
     val obj = this as? JsonObject ?: return false
     return obj.containsKey("task_id") ||

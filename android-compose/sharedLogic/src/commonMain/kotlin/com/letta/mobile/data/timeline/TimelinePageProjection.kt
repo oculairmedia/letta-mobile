@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
+import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
@@ -33,7 +35,16 @@ data class TimelinePageProjectionInput(
     val context: TimelineProjectionContext,
     val records: List<TimelineProjectionRecord>,
     val envelope: TimelineRunEnvelope,
-)
+) {
+    /**
+     * letta-mobile-bglj6.13: the page's canvas_compose receipts, attached over its presented events.
+     * A receipt follows its TOOL_CALL record: a run split across pages puts it on the tool call's
+     * page (on the call itself when the narration is on another page), so it is never shown twice.
+     */
+    internal val canvasReceipts: Map<String, List<CanvasArtifactReceipt>> by lazy {
+        CanvasArtifactReceipts.attach(records.mapNotNull { it.event.takeUnless { _ -> it.excluded } })
+    }
+}
 
 /** No final render rows are constructed until the complete bounded input has been prepared. */
 internal fun TimelinePageProjectionInput.project(adapter: TimelineSettledProjectionAdapter): List<TimelineSettledRecord> =
@@ -43,11 +54,21 @@ internal fun TimelinePageProjectionInput.project(adapter: TimelineSettledProject
             input.excluded -> TimelineSettledPresentation.Drop
             input.event == null -> TimelineSettledPresentation.Defer
             else -> adapter.project(record, input.event, context.ownAgentId)
+                ?.withReceipts(canvasReceipts[CanvasArtifactReceipts.eventKey(input.event)])
                 ?.let { TimelineSettledPresentation.Render(input.event, it) }
                 ?: TimelineSettledPresentation.Drop
         }
         record.copy(preparedPresentation = presentation)
     }
+
+/** A per-record item (one message) carrying its page-attached receipts. */
+private fun ChatRenderItem.withReceipts(receipts: List<CanvasArtifactReceipt>?): ChatRenderItem {
+    if (receipts.isNullOrEmpty()) return this
+    return when (this) {
+        is ChatRenderItem.Single -> copy(message = message.copy(artifacts = receipts))
+        is ChatRenderItem.RunBlock -> copy(messages = messages.map { (message, position) -> message.copy(artifacts = receipts) to position })
+    }
+}
 
 /**
  * Groups renderable residents before Paging creates rows. Per-record projection is still retained
@@ -79,8 +100,11 @@ private fun TimelinePageProjectionInput.renderableRecords(
 ): List<IndexedRenderedRecord> = prepared.mapIndexedNotNull { index, record ->
     val presentation = record.preparedPresentation as? TimelineSettledPresentation.Render
         ?: return@mapIndexedNotNull null
-    val message = timelineEventToUiMessage(presentation.event, context.ownAgentId)
-        ?: return@mapIndexedNotNull null
+    val message = timelineEventToUiMessage(
+        presentation.event,
+        context.ownAgentId,
+        canvasReceipts[CanvasArtifactReceipts.eventKey(presentation.event)].orEmpty(),
+    ) ?: return@mapIndexedNotNull null
     IndexedRenderedRecord(index, record, presentation, message)
 }
 

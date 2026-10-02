@@ -308,26 +308,34 @@ class CanvasSession(
         color: String? = null,
         style: CanvasTextStyle? = null,
         title: String? = null,
-    ): CanvasDocument? {
+    ): CanvasDocument? = writeDocument(CanvasDocumentWrite(documentId, documentJson, frame, color, style, title, actorId = actorId))
+
+    /**
+     * Writes a block document (Cascade JSON) as a local op, as [write] says (its frame, owner and
+     * compose provenance among the rest, letta-mobile-bglj6.7); a no-op when nothing would change.
+     */
+    suspend fun writeDocument(write: CanvasDocumentWrite): CanvasDocument? {
         val op = CanvasOp.SetDocumentOp(
             opId = CanvasOpDiffer.generateOpId("doc"),
-            actorId = actorId,
+            actorId = write.actorId,
             lamport = lamportClock + 1,
-            documentId = documentId,
-            documentJson = documentJson,
-            frame = frame,
-            color = color,
-            style = style,
-            title = title,
+            documentId = write.documentId,
+            documentJson = write.documentJson,
+            frame = write.frame,
+            color = write.color,
+            style = write.style,
+            title = write.title,
+            owner = write.owner,
+            compose = write.compose,
         )
-        val existing = documents().firstOrNull { it.id == documentId }
+        val existing = documents().firstOrNull { it.id == write.documentId }
         return if (existing != null && existing.alreadyHas(op)) null else applyLocal(op)
     }
 
     /** Whether writing [op] would leave this document as it is: the same text, and nothing [op] sets differs. */
     private fun CanvasSceneDocument.alreadyHas(op: CanvasOp.SetDocumentOp): Boolean =
         json == op.documentJson && keeps(op.frame, frame) && keeps(op.color, color) && keeps(op.style, style) &&
-            (op.title == null || op.title.ifBlank { null } == title)
+            (op.title == null || op.title.ifBlank { null } == title) && keeps(op.owner, owner) && keeps(op.compose, compose)
 
     /** A field [op] leaves out ([wanted] null) keeps what the document has. */
     private fun <T> keeps(wanted: T?, current: T?): Boolean = wanted == null || wanted == current
@@ -362,7 +370,10 @@ class CanvasSession(
         return setDocument(documentId, existing.json, actorId, color = colorHex)
     }
 
-    /** Moves or resizes a block document without replacing text edited since the drag began. */
+    /**
+     * Moves or resizes a block document without replacing text edited since the drag began. A
+     * person's move: the document becomes [CanvasGeometryOwner.USER]-owned and is never auto-fitted again.
+     */
     suspend fun moveDocument(
         documentId: String,
         frame: CanvasDocumentFrame,
@@ -380,6 +391,7 @@ class CanvasSession(
                 documentJson = existing.json,
                 frame = frame,
                 style = style,
+                owner = CanvasGeometryOwner.USER,
             ),
         )
     }
@@ -409,6 +421,16 @@ class CanvasSession(
             last = applyLocalLocked(stamped)
         }
         last
+    }
+
+    /**
+     * An agent's checked batch applied as one op (letta-mobile-bglj6.12, canvas_compose): stamped
+     * after this session's clock ([CanvasStampedBatch]), held to the ACL as [actorId], logged,
+     * committed as a single revision and published to peers as one message, so a peer never holds
+     * half of it.
+     */
+    suspend fun applyAgentBatch(ops: List<CanvasOp>, actorId: String): CanvasDocument = mutex.withLock {
+        applyLocalLocked(CanvasStampedBatch.of(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") })
     }
 
     /** Shared notebook history, independent of this person's undo stack. */
@@ -504,7 +526,8 @@ class CanvasSession(
     /**
      * Moves several block documents at once, as one batch with one set_document op per document,
      * so a group drag lands as a single revision and peers see the notes move together. Documents
-     * that are not there, or already at their frame, are skipped; nothing to do returns null.
+     * that are not there, or already at their frame, are skipped; nothing to do returns null. Each
+     * moved document becomes [CanvasGeometryOwner.USER]-owned, as with [moveDocument].
      */
     suspend fun moveDocuments(
         frames: Map<String, CanvasDocumentFrame>,
@@ -521,6 +544,7 @@ class CanvasSession(
                 documentId = id,
                 documentJson = doc.json,
                 frame = frame,
+                owner = CanvasGeometryOwner.USER,
             )
         }
         if (ops.isEmpty()) return@withLock null
@@ -760,4 +784,20 @@ data class CanvasConversationOptions(
     val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
     val syncTransport: CanvasSyncTransport? = null,
     val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)
+
+/**
+ * A write of block document [documentId] ([CanvasSession.writeDocument]): its text, and what else
+ * it sets; a field left null keeps what the document has. [actorId] is who writes it.
+ */
+data class CanvasDocumentWrite(
+    val documentId: String,
+    val documentJson: String,
+    val frame: CanvasDocumentFrame? = null,
+    val color: String? = null,
+    val style: CanvasTextStyle? = null,
+    val title: String? = null,
+    val owner: CanvasGeometryOwner? = null,
+    val compose: CanvasComposeProvenance? = null,
+    val actorId: String = CanvasSession.LOCAL_USER_ACTOR_ID,
 )

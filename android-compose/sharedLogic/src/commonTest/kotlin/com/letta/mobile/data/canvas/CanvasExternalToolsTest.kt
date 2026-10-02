@@ -47,6 +47,8 @@ class CanvasExternalToolsTest {
                 "canvas_replace_scene",
                 "canvas_apply_ops",
                 "canvas_list",
+                "canvas_compose",
+                "canvas_compose_guide",
             ),
             advertised,
         )
@@ -179,6 +181,30 @@ class CanvasExternalToolsTest {
             json.parseToJsonElement(CanvasSceneValidator.scene(CanvasSceneSchema.sceneExample.toString()).let { (it as CanvasSceneCheck.Valid).json }),
             json.parseToJsonElement(CanvasOpProjector.stripMetadataForDrawBox(doc.sceneJson)),
         )
+    }
+
+    /** letta-mobile-bglj6.7: the app path decodes set_document's owner and refuses one outside the enum. */
+    @Test
+    fun applyOpsOnTheAppPathTakesADocumentOwnerAndRefusesAnUnknownOne() = runTest {
+        val canvasId = CanvasId("canvas-owner")
+        store.upsert(openDocument(canvasId))
+        val tool = CanvasApplyOpsTool(store, sessions)
+        fun note(owner: String) = buildJsonObject {
+            put("canvas_id", canvasId.value)
+            put(
+                "ops",
+                json.parseToJsonElement(
+                    """[{"type":"set_document","opId":"o","actorId":"a","lamport":1,"documentId":"n",""" +
+                        """"documentJson":"{\"version\":2,\"blocks\":[]}","owner":"$owner"}]""",
+                ),
+            )
+        }
+
+        assertIs<ExternalToolResult.Success>(tool.invoke(note("user"), agentId = "agent-1"))
+        assertEquals(CanvasGeometryOwner.USER, CanvasOpProjector.documentsOf(store.get(canvasId)!!.sceneJson).single().owner)
+
+        val refused = assertIs<ExternalToolResult.Error>(tool.invoke(note("sideways"), agentId = "agent-1"))
+        assertTrue("sideways" in refused.error, refused.error)
     }
 
     @Test
@@ -320,6 +346,8 @@ class CanvasExternalToolsTest {
             "canvas_apply_ops" to buildJsonObject { put("canvas_id", "canvas-open"); put("ops", buildJsonArray { }) },
             "canvas_export_svg" to buildJsonObject { put("canvas_id", "canvas-open") },
             "canvas_list" to buildJsonObject { put("conversation_id", "conv-open") },
+            "canvas_compose" to buildJsonObject { put("canvas_id", "canvas-open") },
+            "canvas_compose_guide" to buildJsonObject { },
         )
         for (tool in CanvasExternalTools.all(store, sessions)) {
             val result = tool.invoke(inputs.getValue(tool.name), agentId = null)

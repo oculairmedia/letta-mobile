@@ -308,6 +308,9 @@ internal class TextLayoutCache {
             // a short centred line sat at the left of its box.
             constraints = Constraints.fixedWidth(wrapWidth.toInt().coerceAtLeast(1)),
             softWrap = true,
+            // World units: the font size is world px whatever the display's density or the
+            // person's font-size setting (see WorldDensity).
+            density = WorldDensity,
         )
         byId[id] = Entry(key, layout)
         return layout

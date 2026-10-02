@@ -1,0 +1,76 @@
+{
+  "about": "canvas_compose v1 placement goldens (letta-mobile-bglj6.9, plan section 3.4). Each case: the sized items and the board's content bounds in, the slots, group label boxes and artifact bounds out. Held by CanvasComposePlacementGoldenTest.",
+  "cases": [
+    {
+      "name": "empty board, five notes",
+      "content_bounds": null,
+      "items": [
+        { "key": "i0", "width": 320.0, "height": 200.0 },
+        { "key": "i1", "width": 320.0, "height": 200.0 },
+        { "key": "i2", "width": 320.0, "height": 200.0 },
+        { "key": "i3", "width": 320.0, "height": 200.0 },
+        { "key": "i4", "width": 320.0, "height": 200.0 }
+      ],
+      "slots": {
+        "i0": { "x": 80.0, "y": 80.0, "width": 320.0, "height": 200.0 },
+        "i1": { "x": 424.0, "y": 80.0, "width": 320.0, "height": 200.0 },
+        "i2": { "x": 768.0, "y": 80.0, "width": 320.0, "height": 200.0 },
+        "i3": { "x": 80.0, "y": 304.0, "width": 320.0, "height": 200.0 },
+        "i4": { "x": 424.0, "y": 304.0, "width": 320.0, "height": 200.0 }
+      },
+      "labels": {},
+      "bounds": { "x": 80.0, "y": 80.0, "width": 1008.0, "height": 424.0 }
+    },
+    {
+      "name": "the request fixture's shape: heading, checklist, note and a group of two",
+      "content_bounds": null,
+      "items": [
+        { "key": "heading", "width": 480.0, "height": 63.0 },
+        { "key": "shopping", "width": 320.0, "height": 200.0 },
+        { "key": "meals", "width": 320.0, "height": 300.0 },
+        { "key": "selfcare", "label": "Self-care", "children": [
+          { "key": "walk", "width": 320.0, "height": 180.0 },
+          { "key": "read", "width": 320.0, "height": 120.0 }
+        ] }
+      ],
+      "slots": {
+        "heading": { "x": 80.0, "y": 80.0, "width": 480.0, "height": 63.0 },
+        "shopping": { "x": 816.0, "y": 80.0, "width": 320.0, "height": 200.0 },
+        "meals": { "x": 80.0, "y": 304.0, "width": 320.0, "height": 300.0 },
+        "selfcare": { "x": 816.0, "y": 304.0, "width": 712.0, "height": 260.0 },
+        "walk": { "x": 840.0, "y": 360.0, "width": 320.0, "height": 180.0 },
+        "read": { "x": 1184.0, "y": 360.0, "width": 320.0, "height": 120.0 }
+      },
+      "labels": {
+        "selfcare": { "x": 840.0, "y": 320.0, "width": 664.0, "height": 32.0 }
+      },
+      "bounds": { "x": 80.0, "y": 80.0, "width": 1448.0, "height": 524.0 }
+    },
+    {
+      "name": "right of narrow content",
+      "content_bounds": { "x": -100.0, "y": 50.0, "width": 600.0, "height": 900.0 },
+      "items": [
+        { "key": "a", "width": 320.0, "height": 120.0 },
+        { "key": "b", "width": 320.0, "height": 300.0 }
+      ],
+      "slots": {
+        "a": { "x": 548.0, "y": 50.0, "width": 320.0, "height": 120.0 },
+        "b": { "x": 892.0, "y": 50.0, "width": 320.0, "height": 300.0 }
+      },
+      "labels": {},
+      "bounds": { "x": 548.0, "y": 50.0, "width": 664.0, "height": 300.0 }
+    },
+    {
+      "name": "below wide content",
+      "content_bounds": { "x": -100.0, "y": 50.0, "width": 2401.0, "height": 900.0 },
+      "items": [
+        { "key": "a", "width": 320.0, "height": 120.0 }
+      ],
+      "slots": {
+        "a": { "x": -100.0, "y": 998.0, "width": 320.0, "height": 120.0 }
+      },
+      "labels": {},
+      "bounds": { "x": -100.0, "y": 998.0, "width": 320.0, "height": 120.0 }
+    }
+  ]
+}

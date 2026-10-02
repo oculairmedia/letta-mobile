@@ -19,7 +19,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.TextAlignment
@@ -80,8 +79,8 @@ fun InlineShapeTextEditor(
             value = draft,
             onValueChange = onDraftChange,
             textStyle = TextStyle(
-                // Direct `.sp` for the same reason as InlineTextEditor: renderer parity.
-                fontSize = (shape.fontSize * viewport.scale).sp,
+                // Screen px of the shape's world-unit font, as InlineTextEditor: renderer parity.
+                fontSize = with(density) { (shape.fontSize * viewport.scale).toSp() },
                 fontFamily = FontRegistry.resolve(shape.fontFamilyKey),
                 textAlign = when (shape.textAlignment) {
                     TextAlignment.LEFT -> TextAlign.Left
