@@ -30,6 +30,8 @@ internal object CanvasBatchSteps {
         is CanvasOp.SetLabelOwnerOp -> op.documentId
         is CanvasOp.SetDocumentOp -> op.documentId
         is CanvasOp.RemoveDocumentOp -> op.documentId
+        is CanvasOp.SetPluginElementOp -> op.elementId
+        is CanvasOp.RemovePluginElementOp -> op.elementId
         is CanvasOp.ReplaceSceneOp, is CanvasOp.SetBackgroundOp, is CanvasOp.SetBackgroundPatternOp, is CanvasOp.BatchOp -> ""
     }
 
@@ -44,6 +46,8 @@ internal object CanvasBatchSteps {
         is CanvasOp.SetLabelOwnerOp -> "set_label_owner"
         is CanvasOp.SetDocumentOp -> "set_document"
         is CanvasOp.RemoveDocumentOp -> "remove_document"
+        is CanvasOp.SetPluginElementOp -> "set_plugin_element"
+        is CanvasOp.RemovePluginElementOp -> "remove_plugin_element"
         is CanvasOp.BatchOp -> "batch"
     }
 }

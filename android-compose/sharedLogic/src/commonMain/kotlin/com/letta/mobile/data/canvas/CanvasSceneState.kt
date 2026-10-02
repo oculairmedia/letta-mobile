@@ -21,6 +21,13 @@ enum class CanvasStateInvariant(val wire: String, val breaksRender: Boolean = fa
     DOCUMENT_SIZE("document.size"),
     LABEL_OWNER("label.owner"),
     ARROW_BINDING("arrow.binding"),
+    PLUGIN_ELEMENT_SHAPE("pluginElement.shape"),
+    PLUGIN_ELEMENT_EXISTS("pluginElement.exists"),
+    PLUGIN_ELEMENT_FIRST_WRITE("pluginElement.firstWrite"),
+    PLUGIN_ELEMENT_DECODES("pluginElement.decodes"),
+    PLUGIN_ELEMENT_SIZE("pluginElement.size"),
+    PLUGIN_ELEMENT_COUNT("pluginElement.count"),
+    PLUGIN_ELEMENT_DUPLICATE_ID("pluginElement.duplicateId"),
 }
 
 /**
@@ -40,6 +47,8 @@ object CanvasSceneLimits {
     const val MAX_ELEMENTS: Int = 5_000
     const val MAX_ELEMENT_CHARS: Int = 512 * 1024
     const val MAX_DOCUMENT_CHARS: Int = 512 * 1024
+    const val MAX_PLUGIN_ELEMENTS: Int = 200
+    const val MAX_PLUGIN_ELEMENT_CHARS: Int = 16 * 1024
 }
 
 /**

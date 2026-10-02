@@ -48,6 +48,8 @@ data class CanvasOpEntity(
                 is CanvasOp.SetLabelOwnerOp -> "set_label_owner"
                 is CanvasOp.SetDocumentOp -> "set_document"
                 is CanvasOp.RemoveDocumentOp -> "remove_document"
+                is CanvasOp.SetPluginElementOp -> "set_plugin_element"
+                is CanvasOp.RemovePluginElementOp -> "remove_plugin_element"
                 is CanvasOp.BatchOp -> "batch"
             }
             return CanvasOpEntity(
