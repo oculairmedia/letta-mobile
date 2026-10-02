@@ -8,11 +8,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
@@ -20,6 +26,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
 import com.letta.mobile.data.repository.modelcontrol.ProviderField
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 data class ProviderFormActions(
@@ -52,9 +59,15 @@ fun ProviderConnectDialog(form: ProviderConnectForm, busy: Boolean, actions: Pro
 
 @Composable
 private fun ProviderFormBody(form: ProviderConnectForm, onChange: (ProviderConnectForm) -> Unit) {
+    ProviderFormFields(form, onChange, modifier = Modifier.verticalScroll(rememberScrollState()))
+}
+
+/** The form's method chips and fields; the dialog scrolls them, the settings pages show them inline. */
+@Composable
+internal fun ProviderFormFields(form: ProviderConnectForm, onChange: (ProviderConnectForm) -> Unit, modifier: Modifier = Modifier) {
     Column(
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        modifier = Modifier.verticalScroll(rememberScrollState()),
+        modifier = modifier,
     ) {
         if (form.provider.authMethods.size > 1) AuthMethodChips(form, onChange)
         form.method?.description?.takeIf { it.isNotBlank() }?.let {
@@ -79,15 +92,32 @@ private fun AuthMethodChips(form: ProviderConnectForm, onChange: (ProviderConnec
     }
 }
 
+/** Secret fields are masked; the eye toggle shows what was typed (never a saved key: the host returns none). */
 @Composable
 private fun ProviderFieldInput(field: ProviderField, value: String, onValueChange: (String) -> Unit) {
+    var revealed by remember(field.key) { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(if (field.required) "${field.label} *" else field.label) },
         placeholder = field.placeholder?.let { { Text(it) } },
         singleLine = true,
-        visualTransformation = if (field.secret) PasswordVisualTransformation() else VisualTransformation.None,
+        trailingIcon = if (field.secret) {
+            {
+                IconButton(
+                    onClick = { revealed = !revealed },
+                    modifier = Modifier.testTag("provider_field_reveal_${field.key}"),
+                ) {
+                    Icon(
+                        imageVector = if (revealed) LettaIcons.VisibilityOff else LettaIcons.Visibility,
+                        contentDescription = ModelControlStrings.showSecret(field.label, revealed),
+                    )
+                }
+            }
+        } else {
+            null
+        },
+        visualTransformation = if (field.secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = if (field.secret) KeyboardType.Password else KeyboardType.Uri),
         modifier = Modifier.fillMaxWidth().testTag("provider_field_${field.key}"),
     )

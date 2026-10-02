@@ -54,6 +54,7 @@
     <string name="pairing_scan_again">Scan again</string>
     <string name="pairing_regenerate">Regenerate</string>
     <string name="screen_system_access_entry_description">Review Android permissions, special access, and privileged-tool exposure.</string>
+    <string name="screen_providers_entry_description">Accounts, API keys and custom endpoints on the host, and which models the picker shows.</string>
     <string name="screen_system_access_summary_headline">Capability registry</string>
     <plurals name="screen_system_access_summary_body">
         <item quantity="one">%1$d of %2$d supported capability is currently tool-usable in the %3$s flavor.</item>
@@ -1057,7 +1058,6 @@
     <string name="screen_models_no_models">No models available</string>
     <string name="screen_models_tab_llm">LLM Models</string>
     <string name="screen_models_tab_embedding">Embedding Models</string>
-    <string name="screen_models_tab_exposure">Visibility</string>
     <string name="screen_models_detail_handle">Handle: %1$s</string>
     <string name="screen_models_detail_provider">Provider: %1$s</string>
     <string name="screen_models_detail_provider_name">Provider Name: %1$s</string>

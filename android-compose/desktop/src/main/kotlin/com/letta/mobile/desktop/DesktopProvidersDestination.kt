@@ -1,81 +1,29 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
-import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
-import com.letta.mobile.data.repository.modelcontrol.ModelExposureController
-import com.letta.mobile.data.repository.modelcontrol.ProviderAdminController
-import com.letta.mobile.data.repository.modelcontrol.ProviderConnectionRepository
-import com.letta.mobile.ui.modelcontrol.ModelExposurePane
-import com.letta.mobile.ui.modelcontrol.ProviderConnectionPane
-import com.letta.mobile.ui.modelcontrol.ProviderFormActions
-import com.letta.mobile.ui.modelcontrol.ProviderPaneActions
+import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
+import com.letta.mobile.ui.modelcontrol.ProviderSettingsActions
+import com.letta.mobile.ui.modelcontrol.ProviderSettingsPane
 
 /**
- * Providers & Models (letta-mobile-w4q4p): the desktop binding of the shared
- * provider-management and model-exposure panes. Repositories and presenters
- * are the sharedLogic ones Android uses; this file only wires them to the
- * desktop's channel transport and a composition scope.
+ * Providers (letta-mobile-w4q4p.6 / .6.1): the desktop binding of the shared
+ * settings pane — Accounts, API keys, Custom Endpoints and Models in its own
+ * left navigation. The presenter and repositories are the sharedLogic ones
+ * Android uses; [session] is the one the model picker and the Models sheet
+ * read, so a change here shows there at once.
  */
 @Composable
-internal fun ProvidersDestinationContent(rpc: AdminRpcInvoker, modifier: Modifier = Modifier) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
-    Column(modifier = modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Providers") })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Models") })
-        }
-        if (tab == 0) ProvidersTab(rpc) else ModelsTab(rpc)
-    }
-}
-
-@Composable
-private fun ProvidersTab(rpc: AdminRpcInvoker) {
+internal fun ProvidersDestinationContent(session: ModelControlSession, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
-    val controller = remember(rpc) { ProviderAdminController(scope, ProviderConnectionRepository(rpc)) }
+    val controller = remember(session) { session.managementController(scope) }
     LaunchedEffect(controller) { controller.refresh() }
     val state by controller.state.collectAsState()
-    ProviderConnectionPane(
-        state = state,
-        actions = ProviderPaneActions(
-            onConnect = controller::openConnect,
-            onDisconnect = controller::requestDisconnect,
-            form = ProviderFormActions(
-                onChange = controller::updateForm,
-                onSubmit = controller::submitConnect,
-                onDismiss = controller::dismissForm,
-            ),
-            onConfirmDisconnect = controller::confirmDisconnect,
-            onDismissDisconnect = controller::dismissDisconnect,
-        ),
-    )
-}
-
-@Composable
-private fun ModelsTab(rpc: AdminRpcInvoker) {
-    val scope = rememberCoroutineScope()
-    val controller = remember(rpc) { ModelExposureController(scope, ModelCatalogRepository(rpc)) }
-    LaunchedEffect(controller) { controller.refresh() }
-    val state by controller.state.collectAsState()
-    ModelExposurePane(
-        state = state,
-        actions = com.letta.mobile.ui.modelcontrol.ModelExposureActions(
-            onQueryChange = controller::setQuery,
-            onExposedChange = controller::setExposed,
-        ),
-    )
+    val actions = remember(controller) { ProviderSettingsActions.bind(controller) }
+    ProviderSettingsPane(state = state, actions = actions, modifier = modifier)
 }

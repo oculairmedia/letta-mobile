@@ -5,8 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.IModelRepository
-import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
-import com.letta.mobile.data.repository.modelcontrol.ModelExposureController
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -29,17 +27,13 @@ data class ModelBrowserUiState(
     val selectedEmbeddingModel: EmbeddingModel? = null,
 )
 
-/** EXPOSURE: which host models the pickers show (letta-mobile-w4q4p). */
-enum class ModelTab { LLM, EMBEDDING, EXPOSURE }
+/** Model visibility moved to the Providers & Models screen (letta-mobile-w4q4p.6). */
+enum class ModelTab { LLM, EMBEDDING }
 
 @HiltViewModel
 class ModelBrowserViewModel @Inject constructor(
     private val modelRepository: IModelRepository,
-    modelCatalog: ModelCatalogRepository,
 ) : ViewModel() {
-    /** Shared presenter behind the EXPOSURE tab; logic lives in sharedLogic. */
-    val exposure = ModelExposureController(viewModelScope, modelCatalog)
-
     private val _uiState = MutableStateFlow<UiState<ModelBrowserUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ModelBrowserUiState>> = _uiState.asStateFlow()
 
@@ -80,7 +74,6 @@ class ModelBrowserViewModel @Inject constructor(
     fun selectTab(tab: ModelTab) {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(current.copy(selectedTab = tab, selectedProvider = null))
-        if (tab == ModelTab.EXPOSURE) exposure.refresh()
     }
 
     fun selectLlmModel(model: LlmModel) {
@@ -134,7 +127,6 @@ class ModelBrowserViewModel @Inject constructor(
         return when (state.selectedTab) {
             ModelTab.LLM -> state.models.map { it.providerType }.distinct().sorted()
             ModelTab.EMBEDDING -> state.embeddingModels.map { it.providerType }.distinct().sorted()
-            ModelTab.EXPOSURE -> emptyList()
         }
     }
 }

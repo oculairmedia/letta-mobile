@@ -33,6 +33,17 @@ class ConversationModelSelections {
 
     fun clear(conversationId: String) = record(conversationId, null)
 
+    /**
+     * Undoes a failed switch of [conversationId] to [model] by restoring
+     * [previous], unless a newer pick has replaced [model] meanwhile: an
+     * earlier failure must not undo it. True when it restored.
+     */
+    fun rollback(conversationId: String, model: String, previous: String?): Boolean {
+        if (get(conversationId) != model) return false
+        record(conversationId, previous)
+        return true
+    }
+
     /** The model to show as selected for [conversationId] when its agent runs [agentModel]. */
     fun effectiveModel(conversationId: String?, agentModel: String?): String? =
         resolve(conversationOverride = conversationId?.let(::get), agentModel = agentModel)
