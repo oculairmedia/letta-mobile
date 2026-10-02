@@ -678,6 +678,17 @@ class DesktopChatController(
         }
     }
 
+    /**
+     * Re-reads the chat's model list (letta-mobile-w4q4p.6.1) after the shared
+     * picker refreshed the host catalog or the Models sheet changed what is
+     * shown, so composer labels and model routing see the same models.
+     */
+    suspend fun reloadModelCatalog() {
+        if (closed) return
+        val extras = gatewayExtras ?: return
+        modelCatalogHelper.startModelCatalogLoad(extras, replaceCurrent = true).await().getOrThrow()
+    }
+
     /** Apply a model override to the active conversation. */
     fun setConversationModel(model: String) {
         if (closed) return

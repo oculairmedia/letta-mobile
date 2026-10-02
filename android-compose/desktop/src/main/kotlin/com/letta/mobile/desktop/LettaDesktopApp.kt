@@ -937,6 +937,8 @@ internal fun LettaDesktopApp(
                 visibility = overlays,
                 data = DesktopOverlayData(
                     availableModels = availableModels,
+                    chatModels = chatController.availableModels,
+                    modelControl = bootstrapState.modelControl,
                     composerModelLabel = chatState.composerModelLabel,
                     modelOptions = modelOptions,
                     paletteItems = paletteItems,

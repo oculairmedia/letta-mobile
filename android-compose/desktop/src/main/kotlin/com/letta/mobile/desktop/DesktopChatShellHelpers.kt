@@ -546,6 +546,7 @@ internal fun createDesktopOverlayActions(
     params: CreateDesktopOverlayActionsParams,
 ): DesktopOverlayActions = DesktopOverlayActions(
     onModelSelected = params.chatController::setConversationModel,
+    reloadChatModels = params.chatController::reloadModelCatalog,
     onSelectConversation = {
         params.chatController.selectConversation(it)
         params.onSelectDestination(DesktopDestination.Conversations)

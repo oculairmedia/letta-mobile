@@ -12,8 +12,10 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopCommandPalette
-import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
+import com.letta.mobile.desktop.chat.DesktopModelPicker
+import com.letta.mobile.desktop.chat.DesktopModelsEditor
 import com.letta.mobile.ui.components.ImageDropOverlay
+import kotlinx.coroutines.launch
 
 /** Avatar chips shown in the New Conversation "Recent" row. */
 internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
@@ -22,6 +24,9 @@ internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
 @Stable
 internal class DesktopOverlayVisibility {
     var modelPicker by mutableStateOf(false)
+
+    /** The "Models" exposure editor opened from the picker's "Edit Models…" (letta-mobile-w4q4p.6.1). */
+    var modelsEditor by mutableStateOf(false)
     var commandPalette by mutableStateOf(false)
     var newConversation by mutableStateOf(false)
     var newAgent by mutableStateOf(false)
@@ -31,6 +36,10 @@ internal class DesktopOverlayVisibility {
 @Immutable
 internal data class DesktopOverlayData(
     val availableModels: List<LlmModel>,
+    /** The chat's model list as a flow: the picker's fallback when the host has no admin catalog. */
+    val chatModels: kotlinx.coroutines.flow.StateFlow<List<LlmModel>>,
+    /** The host's provider/model control, shared with the Providers destination. */
+    val modelControl: com.letta.mobile.data.repository.modelcontrol.ModelControlSession?,
     val composerModelLabel: String,
     val modelOptions: List<Pair<String, String>>,
     val paletteItems: List<PaletteItem>,
@@ -43,6 +52,8 @@ internal data class DesktopOverlayData(
 @Immutable
 internal data class DesktopOverlayActions(
     val onModelSelected: (String) -> Unit,
+    /** Re-reads the chat's model list after the host catalog changed. */
+    val reloadChatModels: suspend () -> Unit = {},
     val onSelectConversation: (String) -> Unit,
     val onOpenAgent: (String) -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
@@ -63,11 +74,33 @@ internal fun DesktopAppOverlays(
     actions: DesktopOverlayActions,
 ) {
     if (visibility.modelPicker) {
-        DesktopModelPickerSheet(
-            models = data.availableModels,
+        DesktopModelPicker(
+            session = data.modelControl,
+            chatModels = data.chatModels,
             selectedValue = data.composerModelLabel,
+            reloadChatModels = actions.reloadChatModels,
             onSelect = actions.onModelSelected,
+            onEditModels = {
+                visibility.modelPicker = false
+                visibility.modelsEditor = true
+            },
             onDismiss = { visibility.modelPicker = false },
+        )
+    }
+    val modelControl = data.modelControl
+    if (visibility.modelsEditor && modelControl != null) {
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        DesktopModelsEditor(
+            session = modelControl,
+            onAddProvider = {
+                visibility.modelsEditor = false
+                actions.onNavigate(DesktopDestination.Providers)
+            },
+            onDismiss = {
+                visibility.modelsEditor = false
+                // What the picker shows may have changed; the chat routes picks through its own list.
+                scope.launch { runCatching { actions.reloadChatModels() } }
+            },
         )
     }
     if (visibility.newConversation) {

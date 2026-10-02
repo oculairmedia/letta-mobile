@@ -33,6 +33,9 @@ fun NavGraphBuilder.configGraph(
             onNavigateToCanvasDebug = {
                 navController.navigate(CanvasDebugRoute)
             },
+            onNavigateToProviders = {
+                navController.navigate(ProvidersRoute)
+            },
         )
     }
 

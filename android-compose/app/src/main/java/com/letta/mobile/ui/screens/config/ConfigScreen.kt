@@ -63,6 +63,7 @@ fun ConfigScreen(
     onNavigateToSystemAccess: () -> Unit = {},
     onNavigateToVibesyncDebug: () -> Unit = {},
     onNavigateToCanvasDebug: () -> Unit = {},
+    onNavigateToProviders: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -114,6 +115,7 @@ fun ConfigScreen(
                 onNavigateToSystemAccess = onNavigateToSystemAccess,
                 onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
                 onNavigateToCanvasDebug = onNavigateToCanvasDebug,
+                onNavigateToProviders = onNavigateToProviders,
                 onRefresh = viewModel::loadConfig,
                 onSave = {
                     viewModel.saveConfig(
@@ -181,6 +183,7 @@ private fun ConfigContent(
     onNavigateToSystemAccess: () -> Unit,
     onNavigateToVibesyncDebug: () -> Unit,
     onNavigateToCanvasDebug: () -> Unit = {},
+    onNavigateToProviders: () -> Unit = {},
     onRefresh: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
@@ -415,6 +418,7 @@ private fun ConfigContent(
             onNavigateToSystemAccess = onNavigateToSystemAccess,
             onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
             onNavigateToCanvasDebug = onNavigateToCanvasDebug,
+            onNavigateToProviders = onNavigateToProviders,
         )
 
         CardGroup {
@@ -1162,10 +1166,17 @@ private fun IntegrationsSection(
     onNavigateToSystemAccess: () -> Unit,
     onNavigateToVibesyncDebug: () -> Unit,
     onNavigateToCanvasDebug: () -> Unit,
+    onNavigateToProviders: () -> Unit,
 ) {
     CardGroup(title = {
         ConfigSectionTitle(stringResource(R.string.screen_config_integrations_section))
     }) {
+        item(
+            onClick = onNavigateToProviders,
+            headlineContent = { Text(stringResource(R.string.screen_providers_title)) },
+            supportingContent = { Text(stringResource(R.string.screen_providers_entry_description)) },
+            leadingContent = { Icon(LettaIcons.Server, contentDescription = null) },
+        )
         item(
             onClick = onNavigateToSystemAccess,
             headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },

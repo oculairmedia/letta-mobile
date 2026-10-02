@@ -120,7 +120,8 @@ private fun providerSubtitle(section: ProviderSection): String {
     val connection = provider.connections.firstOrNull()
     return when {
         connection != null -> listOfNotNull("Connected", connection.baseUrl ?: connection.providerName).joinToString(" · ")
-        !provider.canConnectFromApp -> "Sign-in not supported on this device yet"
+        provider.isOauth -> ModelControlStrings.METHOD_TERMINAL
+        !provider.canConnectFromApp -> "Nothing to connect from the app"
         provider.description.isNotBlank() -> provider.description
         else -> "Not connected"
     }

@@ -40,6 +40,8 @@ data class ProviderManagementState(
     val expanded: Set<String> = emptySet(),
     val form: ProviderConnectForm? = null,
     val pendingDisconnect: ConnectableProvider? = null,
+    /** A subscription provider whose terminal sign-in steps are showing. */
+    val signIn: ConnectableProvider? = null,
 ) {
     val totalModels: Int get() = sections.sumOf { it.models.size }
     val shownModels: Int get() = sections.sumOf { it.exposedCount }
@@ -131,6 +133,35 @@ class ProviderManagementController(
 
     fun openConnect(provider: ConnectableProvider) =
         _state.update { it.copy(form = ProviderConnectForm(provider), error = null) }
+
+    /** Re-opens a connected provider's form; an endpoint keeps its base URL (saved keys are never returned). */
+    fun openEdit(provider: ConnectableProvider) =
+        _state.update { it.copy(form = providerEditForm(provider), error = null) }
+
+    /** Subscription providers connect from the host's terminal; this shows how. */
+    fun openSignIn(provider: ConnectableProvider) = _state.update { it.copy(signIn = provider, error = null, message = null) }
+
+    fun dismissSignIn() = _state.update { it.copy(signIn = null) }
+
+    /**
+     * "Check again" after a terminal sign-in: re-lists providers and, once the
+     * account shows as connected, closes the steps and re-queries the models
+     * it brought.
+     */
+    fun checkSignIn() {
+        val provider = _state.value.signIn ?: return
+        run(failure = "Couldn't check ${provider.displayName}") {
+            val connected = providers.refresh().firstOrNull { it.id == provider.id }?.isConnected == true
+            if (connected) {
+                _state.update { it.copy(signIn = null, message = "${provider.displayName} connected") }
+                catalog.refresh(force = true)
+            } else {
+                _state.update {
+                    it.copy(message = "${provider.displayName} isn't connected yet. Finish /connect in the terminal, then check again.")
+                }
+            }
+        }
+    }
 
     fun updateForm(form: ProviderConnectForm) = _state.update { it.copy(form = form) }
 

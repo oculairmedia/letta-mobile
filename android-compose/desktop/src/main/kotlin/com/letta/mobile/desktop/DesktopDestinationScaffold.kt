@@ -201,8 +201,8 @@ internal fun DestinationContent(
             actions = actions.schedules,
             modifier = modifier,
         )
-        DesktopDestination.Providers -> inputs.state.modelControlRpc?.let { rpc ->
-            ProvidersDestinationContent(rpc = rpc, modifier = modifier)
+        DesktopDestination.Providers -> inputs.state.modelControl?.let { session ->
+            ProvidersDestinationContent(session = session, modifier = modifier)
         }
         DesktopDestination.Channels -> ChannelsDestinationContent(
             channelLibraryState = inputs.channelLibraryState,

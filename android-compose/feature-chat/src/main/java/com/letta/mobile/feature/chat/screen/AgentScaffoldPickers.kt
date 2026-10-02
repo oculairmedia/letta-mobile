@@ -1,5 +1,17 @@
 package com.letta.mobile.feature.chat.screen
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
+import com.letta.mobile.ui.modelcontrol.ModelControlModal
+import com.letta.mobile.ui.modelcontrol.ModelControlPresentation
+import com.letta.mobile.ui.modelcontrol.ModelPickerActions
+import com.letta.mobile.ui.modelcontrol.ModelPickerContent
+import com.letta.mobile.ui.modelcontrol.ModelsEditActions
+import com.letta.mobile.ui.modelcontrol.ModelsEditContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -733,14 +745,15 @@ internal fun ModelInfoCard(
 }
 
 /**
- * Bottom-sheet quick picker for swapping the active agent's model.
- * Lists available LLM models grouped by provider type, with one-tap
- * apply. Capability hints (context window size, tier) are included
- * when the model-list API provides them.
- *
- * letta-mobile-g5hyz: tap → bottom-sheet quick picker.
+ * The composer's model picker on Android (letta-mobile-w4q4p.6.1): the shared
+ * [ModelPickerContent] in a bottom sheet — "Search models", exposed models
+ * under collapsible provider headers with their reasoning tier, the current
+ * one marked, and "Refresh Models" / "Edit Models…". On an Iroh host
+ * [catalogSource] is the App Server catalog (exposure, provider names,
+ * re-query on refresh); otherwise, or when the host does not answer it, the
+ * picker lists [models] as before. A pick goes to [onModelSelected] with the
+ * model's handle, which keeps the per-conversation switch semantics.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ModelPickerSheet(
     models: List<LlmModel>,
@@ -748,159 +761,65 @@ internal fun ModelPickerSheet(
     onDismiss: () -> Unit,
     onModelSelected: (String) -> Unit,
     onRefresh: () -> Unit,
+    catalogSource: ModelPickerSource? = null,
+    onEditModels: (() -> Unit)? = null,
 ) {
     val reasoning = LocalModelPickerReasoning.current
-    var isDismissingForAction by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val latestModels = rememberUpdatedState(models)
+    val latestRefresh = rememberUpdatedState(onRefresh)
     val scope = rememberCoroutineScope()
-
-    fun selectThenDismiss(action: () -> Unit) {
-        if (isDismissingForAction) return
-        isDismissingForAction = true
-        action()
-        onDismiss()
-        scope.launch { runCatching { sheetState.hide() } }
+    val controller = remember(catalogSource) {
+        val fallback = ModelPickerSource.of(snapshotFlow { latestModels.value }) { latestRefresh.value() }
+        ModelPickerController(scope, catalogSource?.let { ModelPickerSource.withFallback(it, fallback) } ?: fallback)
     }
-
-    LaunchedEffect(Unit) {
-        if (models.isEmpty()) onRefresh()
-    }
-
-    var modelQuery by rememberSaveable { mutableStateOf("") }
-
-    val grouped = remember(models, modelQuery) {
-        val q = modelQuery.trim().lowercase()
-        val filtered = if (q.isEmpty()) {
-            models
-        } else {
-            models.filter { model ->
-                model.displayName.lowercase().contains(q) ||
-                    model.providerType.lowercase().contains(q) ||
-                    (model.providerName?.lowercase()?.contains(q) == true) ||
-                    (model.handle?.lowercase()?.contains(q) == true) ||
-                    model.name.lowercase().contains(q) ||
-                    model.id.lowercase().contains(q)
-            }
-        }
-        val sorted = filtered.sortedWith(compareBy({ it.providerType }, { it.displayName.lowercase() }))
-        sorted.groupBy { it.providerType.ifBlank { "Other" } }
-    }
-
-    val activeModel = remember(models, currentModel) {
-        ModelCatalog.selectedModel(models, currentModel)
-    }
-
-    ModalBottomSheet(
-        sheetState = sheetState,
-        onDismissRequest = onDismiss,
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(LettaDimens.Space.lg)
-                .testTag(AgentScaffoldTestTags.MODEL_PICKER_SHEET),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.screen_drawer_model_picker_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onRefresh) {
-                    Icon(
-                        LettaIcons.Refresh,
-                        contentDescription = stringResource(R.string.action_refresh),
-                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
-                    )
+    LaunchedEffect(controller, currentModel) { controller.setSelected(currentModel) }
+    LaunchedEffect(controller) { controller.ensureLoaded() }
+    val state by controller.state.collectAsState()
+    var picked by remember { mutableStateOf(false) }
+    val actions = remember(controller, onEditModels) {
+        ModelPickerActions.bind(
+            controller = controller,
+            onSelect = { entry ->
+                if (!picked) {
+                    picked = true
+                    if (!entry.selected) onModelSelected(entry.handle.value)
+                    onDismiss()
                 }
-            }
-
-            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
-
-            if (models.isNotEmpty()) {
-                LettaSearchBar(
-                    query = modelQuery,
-                    onQueryChange = { modelQuery = it },
-                    onClear = { modelQuery = "" },
-                    placeholder = stringResource(R.string.screen_drawer_model_picker_search_hint),
-                    compact = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
-            }
-
-            if (grouped.isEmpty()) {
-                Text(
-                    text = if (modelQuery.isBlank()) {
-                        stringResource(R.string.screen_drawer_model_picker_empty)
-                    } else {
-                        stringResource(R.string.screen_drawer_model_picker_no_match, modelQuery)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = LettaDimens.Space.lg),
-                )
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-                    modifier = Modifier.heightIn(max = PickerListMaxHeight),
-                ) {
-                    grouped.forEach { (provider, providerModels) ->
-                        item(key = "provider-$provider") {
-                            Text(
-                                text = provider.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
-                            )
-                        }
-                        itemsIndexed(
-                            providerModels,
-                            key = { index, model ->
-                                // Catalogs can emit duplicate handles (same model
-                                // listed under more than one provider entry). Index
-                                // keeps LazyColumn keys unique without remounting
-                                // rows that already have a distinct id.
-                                listOfNotNull(model.id, model.handle, model.name, index.toString())
-                                    .joinToString("|")
-                            },
-                        ) { _, model ->
-                            val handle = model.handle ?: model.name
-                            ModelPickerRow(
-                                model = model,
-                                spec = ModelPickerRowSpec(
-                                    handle = handle,
-                                    isActive = model == activeModel,
-                                    enabled = !isDismissingForAction,
-                                    efforts = reasoning.effortsFor(handle),
-                                    subtitle = buildModelSubtitle(model),
-                                ),
-                                onSelect = { selectThenDismiss { onModelSelected(handle) } },
-                                onEffortSelected = { effort -> selectThenDismiss { reasoning.onEffortSelected(handle, effort) } },
-                            )
-                        }
-                    }
+            },
+            onEditModels = onEditModels,
+            onEffortSelected = { entry, effort ->
+                if (!picked) {
+                    picked = true
+                    reasoning.onEffortSelected(entry.handle.value, effort)
                 }
-            }
-
-            Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
-        }
+            },
+        )
+    }
+    ModelControlModal(ModelControlPresentation.Sheet, onDismiss = onDismiss) {
+        ModelPickerContent(
+            state = state,
+            actions = actions,
+            modifier = Modifier.testTag(AgentScaffoldTestTags.MODEL_PICKER_SHEET),
+        )
     }
 }
 
 /**
- * Builds the subtitle line for a model picker item: context window
- * size and provider name when available.
+ * "Models" (letta-mobile-w4q4p.6.1): show or hide each model of the host in
+ * the picker. "Add provider…" opens the Providers screen.
  */
-private fun buildModelSubtitle(model: LlmModel): String {
-    val parts = mutableListOf<String>()
-    model.contextWindow?.takeIf { it > 0 }?.let {
-        parts.add("${it / 1000}K context")
+@Composable
+internal fun ModelsEditSheet(
+    controller: ProviderManagementController,
+    onDismiss: () -> Unit,
+    onAddProvider: (() -> Unit)?,
+) {
+    LaunchedEffect(controller) { if (controller.state.value.sections.isEmpty()) controller.refresh() }
+    val state by controller.state.collectAsState()
+    val actions = remember(controller, onAddProvider) { ModelsEditActions.bind(controller, onClose = onDismiss, onAddProvider = onAddProvider) }
+    ModelControlModal(ModelControlPresentation.Sheet, onDismiss = onDismiss) {
+        ModelsEditContent(state = state, actions = actions)
     }
-    model.providerName?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
-    return parts.joinToString(" · ")
 }
 
 internal data class DrawerNavigationCallbacks(

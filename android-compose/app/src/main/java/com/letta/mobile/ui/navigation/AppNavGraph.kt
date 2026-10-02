@@ -77,6 +77,7 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
         onNavigateToTools = { navController.navigate(AllToolsRoute) },
         onNavigateToMemory = { agentId -> navController.navigate(MemoryRoute(agentId)) },
         onNavigateToAdmin = { navController.navigate(AdminRoute) },
+        onNavigateToProviders = { navController.navigate(ProvidersRoute) },
         onNavigateToSchedules = { agentId -> navController.navigate(SchedulesRoute(agentId)) },
         onNavigateToProjects = { navController.navigate(HomeRoute) },
         onNavigateToConversationList = { navController.navigate(ConversationsRoute) },

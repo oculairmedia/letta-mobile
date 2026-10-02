@@ -14,6 +14,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -273,9 +276,9 @@ internal fun AgentScaffoldSheets(state: AgentScaffoldRuntimeState) {
         )
     }
 
+    var showModelsEditor by remember { mutableStateOf(false) }
     if (sheetVisibility.showModelPicker) {
         val reasoning = ModelPickerReasoning(
-            effortsFor = params.viewModel::reasoningEffortsFor,
             onEffortSelected = { handle, effort ->
                 params.viewModel.updateActiveAgentModel(
                     handle,
@@ -294,6 +297,33 @@ internal fun AgentScaffoldSheets(state: AgentScaffoldRuntimeState) {
                     sheetVisibility.onShowModelPickerChange(false)
                 },
                 onRefresh = params.viewModel::refreshModels,
+                catalogSource = remember(params.viewModel) { params.viewModel.modelPickerSource() },
+                onEditModels = {
+                    sheetVisibility.onShowModelPickerChange(false)
+                    showModelsEditor = true
+                },
+            )
+        }
+    }
+    if (showModelsEditor) {
+        val scope = rememberCoroutineScope()
+        val controller = remember(params.viewModel) { params.viewModel.modelsEditController(scope) }
+        if (controller == null) {
+            showModelsEditor = false
+        } else {
+            ModelsEditSheet(
+                controller = controller,
+                onDismiss = {
+                    showModelsEditor = false
+                    // The chat's own model list routes picks; re-read it after exposure changes.
+                    params.viewModel.refreshModels()
+                },
+                onAddProvider = params.navigation.onNavigateToProviders?.let { navigate ->
+                    {
+                        showModelsEditor = false
+                        navigate()
+                    }
+                },
             )
         }
     }
