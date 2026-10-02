@@ -32,15 +32,16 @@ enum class PluginManifestProblem {
 
 /** A JSON pointer (RFC 6901) into a manifest, built a segment at a time: `ManifestPointer.ROOT / "actions" / "start"`. */
 class ManifestPointer private constructor(val path: String) {
-    operator fun div(segment: Any): ManifestPointer =
-        ManifestPointer(path + "/" + segment.toString().replace("~", "~0").replace("/", "~1"))
+    operator fun div(segment: String): ManifestPointer = ManifestPointer(path + "/" + segment.replace("~", "~0").replace("/", "~1"))
+
+    operator fun div(index: Int): ManifestPointer = ManifestPointer("$path/$index")
 
     override fun toString(): String = path
 
     companion object {
         val ROOT: ManifestPointer = ManifestPointer("")
 
-        fun of(vararg segments: Any): ManifestPointer = segments.fold(ROOT) { pointer, segment -> pointer / segment }
+        fun of(vararg segments: String): ManifestPointer = segments.fold(ROOT) { pointer, segment -> pointer / segment }
     }
 }
 

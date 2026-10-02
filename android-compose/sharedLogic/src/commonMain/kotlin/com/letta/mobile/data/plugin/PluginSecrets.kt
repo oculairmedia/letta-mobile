@@ -6,16 +6,13 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 /**
  * One secret's value (plan section 3.4). It never prints: [toString] is redacted, so a secret held
  * in a data class, a log line or an exception message shows only that it is there. [reveal] is
- * for the one place that hands it to the plugin (env, headers, `PluginHost.secret`).
+ * for the one place that hands it to the plugin (env, headers, `PluginHost.secret`). Equality is
+ * identity: compare revealed values where that is meant.
  */
 class SecretValue(private val value: String) {
     fun reveal(): String = value
 
     override fun toString(): String = REDACTED
-
-    override fun equals(other: Any?): Boolean = other is SecretValue && other.value == value
-
-    override fun hashCode(): Int = value.hashCode()
 
     companion object {
         const val REDACTED: String = "<redacted>"
