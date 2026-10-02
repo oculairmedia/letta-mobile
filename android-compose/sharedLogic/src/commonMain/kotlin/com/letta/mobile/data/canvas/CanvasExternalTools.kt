@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.canvas.compose.ComposeTarget
+import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -24,12 +25,14 @@ private val canvasJson = Json {
 /**
  * [agentId] is the transport-authenticated caller: the runtime scope the App Server stamped on
  * the tool-call frame. It is never read from the tool input, which the model controls, so a
- * caller cannot name a different agent to read or write as it.
+ * caller cannot name a different agent to read or write as it. [kinds] are the plugin kinds whose
+ * props a plugin element write is held to.
  */
 private data class CanvasToolContext(
     val store: CanvasDocumentStore,
     val sessions: CanvasSessionRegistry,
     val agentId: String,
+    val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) {
     fun resolveCallerId(): String = agentId
 }
@@ -200,8 +203,9 @@ private suspend fun executeApplyOps(
         // actor the input named, so the log, the broadcast and scene provenance all carry it.
         val callerOps = suppliedOps.map { it.withActor(callerId) }
         // Held to the board it lands on, as the Iroh host holds it (letta-mobile-s416w.5): a plugin
-        // element's first write must be whole, and a removal must find what it removes.
-        val ops = when (val checked = CanvasBatchValidator.check(doc.sceneJson, callerOps)) {
+        // element's first write must be whole, a removal must find what it removes, and props are
+        // held to the installed kinds.
+        val ops = when (val checked = CanvasBatchValidator.check(doc.sceneJson, callerOps, context.kinds)) {
             is CanvasBatchCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
             is CanvasBatchCheck.Valid -> checked.ops
         }
@@ -226,7 +230,7 @@ private suspend fun dryRun(
     val ops = opsOf(input) ?: return null
     return when (val lookup = findCanvasDocument(context, input)) {
         is CanvasLookupResult.Error -> lookup.result
-        is CanvasLookupResult.Found -> CanvasAppDryRun.answer(lookup.doc, ops, context.resolveCallerId())
+        is CanvasLookupResult.Found -> CanvasAppDryRun.answer(lookup.doc, ops, context.resolveCallerId(), context.kinds)
     }
 }
 
@@ -317,6 +321,7 @@ private const val NO_CONVERSATION_CANVAS =
 abstract class BaseCanvasTool(
     val store: CanvasDocumentStore,
     val sessions: CanvasSessionRegistry,
+    val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) : HostExternalTool {
     override val capability: Capability = Capability.ImageHydration
 }
@@ -334,7 +339,7 @@ private inline fun BaseCanvasTool.runWithContext(
         return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
     }
     return runCatching {
-        action(CanvasToolContext(store, sessions, agentId))
+        action(CanvasToolContext(store, sessions, agentId, kinds))
     }.getOrElse { ExternalToolResult.Error("$failurePrefix: ${it.message}") }
 }
 
@@ -416,7 +421,8 @@ class CanvasReplaceSceneTool(
 class CanvasApplyOpsTool(
     store: CanvasDocumentStore,
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-) : BaseCanvasTool(store, sessions) {
+    kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+) : BaseCanvasTool(store, sessions, kinds) {
     override val name: String = NAME
     override val description: String = CanvasToolContract.applyOps.description
     override val inputSchema: JsonObject = CanvasToolContract.applyOps.inputSchema
@@ -541,13 +547,18 @@ class CanvasComposeGuideTool(
 object CanvasExternalTools {
     /**
      * [sessions] must be the same registry the canvas UI registers into, or every tool falls back
-     * to the store and an agent's edits never reach the session the user is looking at.
+     * to the store and an agent's edits never reach the session the user is looking at. [kinds]
+     * are the plugin kinds this app holds plugin element props to.
      */
-    fun all(store: CanvasDocumentStore, sessions: CanvasSessionRegistry): List<HostExternalTool> = listOf(
+    fun all(
+        store: CanvasDocumentStore,
+        sessions: CanvasSessionRegistry,
+        kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+    ): List<HostExternalTool> = listOf(
         CanvasCreateTool(store, sessions),
         CanvasGetSceneTool(store, sessions),
         CanvasReplaceSceneTool(store, sessions),
-        CanvasApplyOpsTool(store, sessions),
+        CanvasApplyOpsTool(store, sessions, kinds),
         CanvasListTool(store, sessions),
         CanvasComposeTool(store, sessions),
         CanvasComposeGuideTool(store, sessions),

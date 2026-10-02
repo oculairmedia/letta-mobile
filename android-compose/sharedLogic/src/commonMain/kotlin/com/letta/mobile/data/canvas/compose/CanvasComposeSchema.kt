@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract as Contract
+import com.letta.mobile.data.schema.JsonSchemaCheck
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -19,7 +20,9 @@ import kotlinx.serialization.json.put
  * [check] reads the schema rather than restating it: the keywords used here (type, properties,
  * required, additionalProperties, enum, pattern, min/maxLength, min/maxItems, and anyOf told
  * apart by a one-value `kind` enum) are the whole vocabulary, so the schema the model sees and
- * the rules a request is held to cannot drift apart. The check itself is [ComposeSchemaCheck].
+ * the rules a request is held to cannot drift apart. The check itself is the shared
+ * [JsonSchemaCheck], with `kind` telling an item's branches apart and [ComposeSchemaHooks] wording
+ * its problems as `canvas_compose` does.
  */
 object CanvasComposeSchema {
     internal const val KIND = "kind"
@@ -123,9 +126,10 @@ object CanvasComposeSchema {
         "dry_run" to TypeSchema("boolean", description = "true to check the request and see the receipt without publishing.").json(),
     )
 
+    private val checker = JsonSchemaCheck(input, discriminator = KIND, hooks = ComposeSchemaHooks)
+
     /** Every place [instance] breaks [input], each with the JSON pointer of the offending value. */
-    fun check(instance: JsonElement): List<ComposeProblem> =
-        mutableListOf<ComposeProblem>().also { ComposeSchemaCheck(it).visit(SchemaNode(input, instance, path = "")) }
+    fun check(instance: JsonElement): List<ComposeProblem> = checker.check(instance).map(ComposeSchemaHooks::toCompose)
 
     // Schema builders. Every object is closed: a field the contract does not name is refused.
 
