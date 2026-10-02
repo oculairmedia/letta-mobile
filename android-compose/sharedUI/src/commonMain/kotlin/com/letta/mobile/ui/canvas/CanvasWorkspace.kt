@@ -77,7 +77,6 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSceneStateGuard
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
-import com.letta.mobile.data.canvas.affecting
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.input.imageDragAndDropTarget
 import io.github.vinceglb.filekit.readBytes
@@ -167,11 +166,6 @@ fun CanvasWorkspace(
             }
         }?.collectAsState()
             ?: remember { mutableStateOf<com.letta.mobile.data.canvas.CanvasSyncHealth?>(null) }
-        )
-    // A save that did not reach disk stays on the board until restart; see CanvasStorageFaultBanner.
-    val storageFaults by (
-        session?.storageFaults?.collectAsState()
-            ?: remember { mutableStateOf(emptyList<com.letta.mobile.data.canvas.CanvasStorageFault>()) }
         )
     val presences by if (presenceTransport != null && session != null) {
         presenceTransport.observePresence(session.canvasId).collectAsState(emptyList())
@@ -1451,17 +1445,13 @@ fun CanvasWorkspace(
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
-            session?.let { open ->
-                val faults = storageFaults.affecting(open.canvasId)
-                if (faults.isNotEmpty()) {
-                    CanvasStorageFaultBanner(
-                        faults = faults,
-                        modifier = Modifier.align(Alignment.TopCenter)
-                            .windowInsetsPadding(WindowInsets.safeDrawing)
-                            .padding(top = STORAGE_FAULT_TOP, start = CHROME_INSET, end = CHROME_INSET),
-                    )
-                }
-            }
+            // A save that did not reach disk stays on the board until restart.
+            CanvasStorageFaultOverlay(
+                session = session,
+                modifier = Modifier.align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(top = STORAGE_FAULT_TOP, start = CHROME_INSET, end = CHROME_INSET),
+            )
             val zoomActions = CanvasZoom(
                 scalePercent = state.viewport.scalePercent,
                 onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
