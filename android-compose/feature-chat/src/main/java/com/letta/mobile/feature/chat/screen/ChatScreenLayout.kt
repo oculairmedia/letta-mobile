@@ -98,8 +98,10 @@ internal fun ChatScreenLayout(
         ChatScreenMainContent(
             params = params,
             contentCallbacks = localState.contentCallbacks,
-            bottomPaddingDp = localState.bottomPaddingDp,
-            composerAboveInputDp = localState.composerAboveInputDp,
+            insets = ChatScreenContentInsets(
+                bottomPadding = localState.bottomPaddingDp,
+                composerAboveInput = localState.composerAboveInputDp,
+            ),
             openSubagentTarget = localState.openSubagentTarget,
         )
         ChatScreenSubagentRingsOverlay(
@@ -170,14 +172,20 @@ private fun ChatScreenDetailOverlays(
     )
 }
 
+/** How far the timeline keeps clear of the composer: the whole column, and the band above its input card. */
+private data class ChatScreenContentInsets(
+    val bottomPadding: Dp,
+    val composerAboveInput: Dp,
+)
+
 @Composable
 private fun ChatScreenMainContent(
     params: ChatScreenLayoutParams,
     contentCallbacks: ChatContentCallbacks,
-    bottomPaddingDp: Dp,
-    composerAboveInputDp: Dp,
+    insets: ChatScreenContentInsets,
     openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
 ) {
+    val bottomPaddingDp = insets.bottomPadding
     val contentPhase = chatScreenContentPhase(params.state)
     val truncatedToolResultResolver = remember(params.viewModel) {
         TruncatedToolResultResolver { messageId ->
@@ -211,7 +219,7 @@ private fun ChatScreenMainContent(
                         // the card (companion row, tool chips, queued sends,
                         // goal status) so it sits at the same visual height the
                         // user perceives as "above the composer" (2026-09-28).
-                        scrollFabBottomPadding = bottomPaddingDp - composerAboveInputDp,
+                        scrollFabBottomPadding = bottomPaddingDp - insets.composerAboveInput,
                         activeFontScale = params.activeFontScale,
                         scrollToMessageId = params.viewModel.scrollToMessageId,
                     ),
@@ -461,13 +469,7 @@ private fun ChatScreenComposerColumn(params: ChatScreenComposerColumnParams) {
             },
     ) {
         ChatScreenGoalStatusSection(params.state, params.viewModel)
-        ChatScreenComposerInputSection(
-            state = params.state,
-            composerState = params.composerState,
-            viewModel = params.viewModel,
-            navigation = params.navigation,
-            onInputCardHeightChange = params.onInputCardHeightChange,
-        )
+        ChatScreenComposerInputSection(params)
     }
 }
 
@@ -539,13 +541,11 @@ internal fun activeRunActivity(messages: List<com.letta.mobile.data.model.UiMess
 }
 
 @Composable
-private fun ChatScreenComposerInputSection(
-    state: ChatUiState,
-    composerState: ChatComposerState,
-    viewModel: AdminChatViewModel,
-    navigation: ChatScreenNavigationCallbacks,
-    onInputCardHeightChange: (Dp) -> Unit,
-) {
+private fun ChatScreenComposerInputSection(params: ChatScreenComposerColumnParams) {
+    val state = params.state
+    val composerState = params.composerState
+    val viewModel = params.viewModel
+    val navigation = params.navigation
     val reducedMotion = rememberReducedMotionEnabled()
     val launchPicker = rememberImageAttachmentPicker(
         onPicked = { viewModel.addAttachment(it) },
@@ -594,7 +594,7 @@ private fun ChatScreenComposerInputSection(
                 emptyList()
             },
             onOpenCanvas = navigation.onOpenCanvas,
-            onInputCardHeightChange = onInputCardHeightChange,
+            onInputCardHeightChange = params.onInputCardHeightChange,
         )
     }
 }
