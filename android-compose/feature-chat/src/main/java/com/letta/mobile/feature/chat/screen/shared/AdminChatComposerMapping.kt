@@ -102,13 +102,19 @@ internal object AdminChatComposerMapping {
      * reading's "Other" remainder rather than being dropped.
      */
     fun contextUsage(window: ContextWindowUiState): ContextWindowUsageState? {
+        if (!window.hasAnythingToReport()) return null
         val hasReading = window.maxTokens > 0
-        if (!hasReading && !window.isLoading && window.error == null) return null
         return ContextWindowUsageState(
             usage = if (hasReading) ContextWindowUsage.from(window.toOverview()) else null,
             loading = window.isLoading,
             error = window.error,
         )
+    }
+
+    /** A reading, a load in flight, or an error: anything the usage chip can show. */
+    private fun ContextWindowUiState.hasAnythingToReport(): Boolean {
+        if (maxTokens > 0) return true
+        return isLoading || error != null
     }
 
     private fun ContextWindowUiState.toOverview(): ContextWindowOverview = ContextWindowOverview(
