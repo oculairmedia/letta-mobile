@@ -60,12 +60,12 @@ internal fun ChatTimeline(
     val callbacks = rememberRowCallbacks(actions, host) { images, index -> viewer = ImageViewerRequest(images, index) }
     val (pinch, pinchModifier) = rememberTimelinePinch(
         enabled = capabilities.fontScale,
-        committedScale = appearance.fontScale,
+        committedScale = TextScale(appearance.fontScale),
         range = appearance.fontScaleRange,
         onCommit = actions::setFontScale,
     )
     // Rows lay out at the resting scale only: the live gesture is the list layer's (TimelineListFrame).
-    val fontScale = pinch.restingScale(appearance.fontScale)
+    val fontScale = pinch.restingScale(TextScale(appearance.fontScale))
     // A host that already scales text (desktop, via density) leaves rows only a pending pinch's delta.
     val rowFontScale = if (appearance.fontScaleAppliedByHost) fontScale / appearance.fontScale else fontScale
     val contexts = rememberRowContexts(state, capabilities, appearance, rowFontScale)
@@ -108,7 +108,7 @@ internal fun ChatTimeline(
         )
         PinchScaleReadout(
             pinch,
-            appearance.fontScale,
+            TextScale(appearance.fontScale),
             Modifier.align(Alignment.TopCenter).padding(top = topInset + LettaDimens.Space.lg),
         )
         viewer?.let { request ->

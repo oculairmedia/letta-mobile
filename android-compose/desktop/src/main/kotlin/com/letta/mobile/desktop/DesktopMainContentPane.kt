@@ -123,8 +123,8 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
             modifier = Modifier.fillMaxSize(),
         )
     }
-    // The shared page draws it in the canvas header (see LettaDesktopApp's canvasHeaderTrailing).
-    if (sharedChatPage == null && !inputs.showBackgroundTasks && inputs.subagentRepository != null) {
+    // The shared page draws it in the canvas header (see DesktopShellMainPane's canvasHeaderTrailing).
+    if (inputs.showsBackgroundTasksToggle()) {
         DesktopBackgroundTasksToggle(
             runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
             onClick = actions.onShowBackgroundTasks,
@@ -133,6 +133,15 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
                 .padding(top = LettaDimens.Space.md, end = LettaDimens.Space.lg),
         )
     }
+}
+
+/**
+ * The conversation's background-tasks toggle: only over [ChatDetailPane] (the shared page draws
+ * its own), while the tasks pane is closed and there is a repository to list.
+ */
+private fun DesktopMainContentInputs.showsBackgroundTasksToggle(): Boolean {
+    if (sharedChatPage != null) return false
+    return !showBackgroundTasks && subagentRepository != null
 }
 
 @Composable

@@ -38,7 +38,8 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun TouchCompanionSlot(model: ComposerModel) {
     val agentId = model.uiState.agentId
-    if (!LocalComposerCompanion.current || agentId == null || !mascotAvailable(agentId)) return
+    if (!LocalComposerCompanion.current || agentId == null) return
+    if (!mascotAvailable(agentId)) return
     val working = model.uiState.isStreaming || model.uiState.isAgentTyping
     val reducedMotion = LocalReducedMotion.current
     val shown by animateFloatAsState(

@@ -49,10 +49,15 @@ internal class ImageBitmapLruCache(private val maxEntries: Int, private val maxB
 
     /** Evicts the least recently used images until at most [targetBytes] (and the entry cap) remain. */
     fun trim(targetBytes: Long) {
-        while (entries.isNotEmpty() && (entries.size > maxEntries || bytes > targetBytes)) {
+        while (entries.isNotEmpty() && overBudget(targetBytes)) {
             val eldest = entries.keys.first()
             entries.remove(eldest)?.let { bytes -= it.byteCount() }
         }
+    }
+
+    /** More entries than the cap, or more decoded bytes than [targetBytes]. */
+    private fun overBudget(targetBytes: Long): Boolean {
+        return entries.size > maxEntries || bytes > targetBytes
     }
 
     fun clear() {

@@ -74,6 +74,7 @@ import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.movePointerIcon
+import com.letta.mobile.ui.markdown.MarkdownPaint
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
@@ -205,7 +206,6 @@ internal fun CollapsedDock(
     /** False while the dock opens back into the panel: the companion is on its way to the bar. */
     seated: Boolean = true,
 ) {
-    val turn = content.turn()
     Column(modifier.testTag(DOCK_COLLAPSED_TAG)) {
         Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg)) {
             // Even insets on both sides keep the mascot over the bar's centre and the bubble clear
@@ -215,7 +215,6 @@ internal fun CollapsedDock(
                 state,
                 content,
                 seated,
-                turn,
                 Modifier.align(Alignment.BottomCenter).padding(horizontal = sides),
             )
             RestoreButton(state, Modifier.align(Alignment.BottomEnd))
@@ -229,9 +228,9 @@ private fun CollapsedTurnColumn(
     state: ChatDockState,
     content: CollapsedDockContent,
     seated: Boolean,
-    turn: CollapsedTurn,
     modifier: Modifier,
 ) {
+    val turn = content.turn()
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     val showReply = turn.hasReply && turn.dismissKey != dismissedTurn
@@ -393,8 +392,10 @@ internal fun BubbleText(
             text = shown,
             // Retaining the previous AST across a reshaped update can crash Compose Desktop.
             retainState = false,
-            textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-            textStyle = textStyle,
+            paint = MarkdownPaint(
+                textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                textStyle = textStyle,
+            ),
         )
     }
 }

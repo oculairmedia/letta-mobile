@@ -50,14 +50,16 @@ class ComposerCompanionUiTest {
                         // The agent pane's hero seat, as the desktop sidebar declares it.
                         if (agentPaneOpen()) MascotSeat(agent, MascotStage.AGENT_PANE_HERO, 80.dp, empty = {})
                         ChatComposerPanel(
-                            composer = ChatComposerUiState(),
-                            uiState = ChatUiState(agentId = agentId),
-                            actions = RecordingChatActions(),
-                            capabilities = ChatSurfaceCapabilities.Default,
-                            host = ChatSurfaceHost(),
-                            platform = ChatSurfacePlatform.Default,
-                            mode = mode,
-                            onIntent = {},
+                            ComposerInputs(
+                                composer = ChatComposerUiState(),
+                                uiState = ChatUiState(agentId = agentId),
+                                actions = RecordingChatActions(),
+                                capabilities = ChatSurfaceCapabilities.Default,
+                                host = ChatSurfaceHost(),
+                                platform = ChatSurfacePlatform.Default,
+                                mode = mode,
+                                onIntent = {},
+                            ),
                         )
                     }
                 }

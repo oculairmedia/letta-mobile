@@ -58,9 +58,11 @@ internal fun ComposerContextChip(state: ContextWindowUsageState) {
     var open by remember { mutableStateOf(false) }
     Box {
         ComposerActionChip(
-            label = stringResource(Res.string.composer_context_label, contextChipValue(state)),
+            label = ComposerChipLabel(
+                text = stringResource(Res.string.composer_context_label, contextChipValue(state)),
+                leadingIcon = Lucide.ChartPie,
+            ),
             onClick = { open = !open },
-            leadingIcon = Lucide.ChartPie,
         )
         if (open) {
             ComposerPopover(

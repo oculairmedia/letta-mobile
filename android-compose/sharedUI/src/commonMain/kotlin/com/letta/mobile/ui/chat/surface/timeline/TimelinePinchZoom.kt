@@ -27,6 +27,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.jvm.JvmInline
 
 /**
  * letta-mobile-bglj6.1: pinch-to-zoom of the timeline's text scale, in common pointer input.
@@ -39,6 +40,10 @@ import kotlin.math.roundToInt
  * it shows until the owner's committed scale moves (to it, or anywhere else: a host change such
  * as desktop's Ctrl+scroll then wins).
  */
+/** A text scale the owner holds (1 is the default size): what the rows lay out at, before any pinch. */
+@JvmInline
+internal value class TextScale(val value: Float)
+
 @Stable
 internal class TimelinePinchScale(
     range: ClosedFloatingPointRange<Float> = MIN_SCALE..MAX_SCALE,
@@ -54,30 +59,36 @@ internal class TimelinePinchScale(
     private var pending by mutableStateOf<Float?>(null)
 
     /** The owner's committed scale when the gesture began; [pending] holds only until it moves. */
-    private var committedAtBegin = 1f
+    private var committedAtBegin = TextScale(1f)
 
     /** The scale rows lay out at: a just-committed value, else [committed]. Never the live gesture. */
-    fun restingScale(committed: Float): Float =
-        pending?.takeIf { sameScale(committed, committedAtBegin) } ?: committed
+    fun restingScale(committed: TextScale): Float {
+        return pending?.takeIf { sameScale(committed, committedAtBegin) } ?: committed.value
+    }
 
     /** The scale the read-out shows: the live gesture, else [restingScale]. */
-    fun effectiveScale(committed: Float): Float =
-        if (isPinching) liveScale() else restingScale(committed)
+    fun effectiveScale(committed: TextScale): Float {
+        return if (isPinching) liveScale() else restingScale(committed)
+    }
 
     /** The list layer's scale over the rows' layout: the live gesture over its base. Draw phase only. */
     val layerScale: Float
-        get() = if (isPinching) liveScale() / base else 1f
+        get() = currentLayerScale()
+
+    private fun currentLayerScale(): Float {
+        return if (isPinching) liveScale() / base else 1f
+    }
 
     private fun liveScale(): Float = (base * transient).coerceIn(minScale, maxScale)
 
     /** The owner's committed scale changed: whatever it now is supersedes a pending commit. */
-    fun onCommittedChanged(committed: Float) {
+    fun onCommittedChanged(committed: TextScale) {
         if (pending != null && !sameScale(committed, committedAtBegin)) pending = null
     }
 
-    fun begin(committed: Float) {
+    fun begin(committed: TextScale) {
         committedAtBegin = committed
-        base = committed.coerceIn(minScale, maxScale)
+        base = committed.value.coerceIn(minScale, maxScale)
         transient = 1f
         pending = null
         isPinching = true
@@ -91,7 +102,7 @@ internal class TimelinePinchScale(
     fun finish(): Float {
         val snapped = ((liveScale() / step).roundToInt() * step).coerceIn(minScale, maxScale)
         // A pinch back to where it began leaves the rows as they are: nothing to hold.
-        pending = snapped.takeUnless { sameScale(it, committedAtBegin) }
+        pending = snapped.takeUnless { sameScale(TextScale(it), committedAtBegin) }
         isPinching = false
         transient = 1f
         return snapped
@@ -109,7 +120,7 @@ internal class TimelinePinchScale(
         const val STEP: Float = 0.02f
         private const val EPSILON: Float = 0.0001f
 
-        private fun sameScale(a: Float, b: Float): Boolean = abs(a - b) < EPSILON
+        private fun sameScale(a: TextScale, b: TextScale): Boolean = abs(a.value - b.value) < EPSILON
     }
 }
 
@@ -120,7 +131,7 @@ internal class TimelinePinchScale(
 internal fun Modifier.timelinePinchZoom(
     enabled: Boolean,
     pinch: TimelinePinchScale,
-    committedScale: () -> Float,
+    committedScale: () -> TextScale,
     onCommit: (Float) -> Unit,
 ): Modifier {
     if (!enabled) return this
@@ -150,7 +161,7 @@ internal fun Modifier.timelinePinchZoom(
 @Composable
 internal fun rememberTimelinePinch(
     enabled: Boolean,
-    committedScale: Float,
+    committedScale: TextScale,
     range: ClosedFloatingPointRange<Float>,
     onCommit: (Float) -> Unit,
 ): Pair<TimelinePinchScale, Modifier> {
@@ -171,7 +182,7 @@ internal val TimelinePinchOrigin: TransformOrigin = TransformOrigin(pivotFractio
 
 /** The read-out while pinching, in its own scope: the live scale recomposes only this. */
 @Composable
-internal fun PinchScaleReadout(pinch: TimelinePinchScale, committedScale: Float, modifier: Modifier = Modifier) {
+internal fun PinchScaleReadout(pinch: TimelinePinchScale, committedScale: TextScale, modifier: Modifier = Modifier) {
     if (pinch.isPinching) PinchScaleIndicator(pinch.effectiveScale(committedScale), modifier)
 }
 
