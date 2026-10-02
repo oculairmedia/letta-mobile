@@ -100,7 +100,12 @@ fun scrubUserEnvelope(content: String): String {
  *   tooling) should observe the timeline directly without going through this
  *   projection.
  */
-fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiMessage? {
+fun timelineEventToUiMessage(
+    ev: TimelineEvent,
+    ownAgentId: String? = null,
+    /** letta-mobile-bglj6.13: this event's compose receipts, from [CanvasArtifactReceipts.attach]. */
+    artifacts: List<CanvasArtifactReceipt> = emptyList(),
+): UiMessage? {
     return when (ev) {
         is TimelineEvent.Local -> {
             // letta-mobile-5s1n: Locals can now represent in-flight assistant
@@ -164,21 +169,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                         )
                     }
                 } else null
-            val uiApproval: UiApprovalRequest? =
-                if (!ev.approvalDecided) {
-                    ev.approvalRequestId?.let { reqId ->
-                        UiApprovalRequest(
-                            requestId = reqId,
-                            toolCalls = ev.toolCalls.map { tc ->
-                                UiApprovalToolCall(
-                                    toolCallId = tc.effectiveId,
-                                    name = tc.name ?: "tool",
-                                    arguments = tc.arguments ?: "",
-                                )
-                            },
-                        )
-                    }
-                } else null
+            val uiApproval = pendingApprovalRequest(ev.approvalDecided, ev.approvalRequestId, ev.toolCalls)
 
             if (ev.messageType == TimelineMessageType.TOOL_CALL && uiToolCalls == null && ev.content.isBlank()) {
                 return null
@@ -233,6 +224,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                 } else {
                     null
                 },
+                artifacts = artifacts,
             )
         }
         is TimelineEvent.Confirmed -> {
@@ -302,21 +294,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                         )
                     }
                 } else null
-            val uiApproval: UiApprovalRequest? =
-                if (!ev.approvalDecided) {
-                    ev.approvalRequestId?.let { reqId ->
-                        UiApprovalRequest(
-                            requestId = reqId,
-                            toolCalls = ev.toolCalls.map { tc ->
-                                UiApprovalToolCall(
-                                    toolCallId = tc.effectiveId,
-                                    name = tc.name ?: "tool",
-                                    arguments = tc.arguments ?: "",
-                                )
-                            },
-                        )
-                    }
-                } else null
+            val uiApproval = pendingApprovalRequest(ev.approvalDecided, ev.approvalRequestId, ev.toolCalls)
             // Intentionally never synthesize a standalone approvalResponse
             // here — see comment above. The chip on the tool card carries
             // the "Approved" indicator without hiding the tool body.
@@ -382,9 +360,30 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                 } else {
                     null
                 },
+                artifacts = artifacts,
             )
         }
     }
+}
+
+/** The approval buttons for [toolCalls] while request [requestId] is undecided; null once decided or with no request. */
+private fun pendingApprovalRequest(
+    decided: Boolean,
+    requestId: String?,
+    toolCalls: List<com.letta.mobile.data.model.ToolCall>,
+): UiApprovalRequest? {
+    if (decided) return null
+    val reqId = requestId ?: return null
+    return UiApprovalRequest(
+        requestId = reqId,
+        toolCalls = toolCalls.map { tc ->
+            UiApprovalToolCall(
+                toolCallId = tc.effectiveId,
+                name = tc.name ?: "tool",
+                arguments = tc.arguments ?: "",
+            )
+        },
+    )
 }
 
 private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: String?): UiSubagentDispatch? =

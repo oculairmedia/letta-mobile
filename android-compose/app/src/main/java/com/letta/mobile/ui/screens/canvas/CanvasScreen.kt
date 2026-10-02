@@ -83,6 +83,8 @@ fun CanvasScreen(
     showTitle: Boolean = true,
     /** Host chrome floating over the board's top edge; see [CanvasWorkspace]. */
     chromeTopInset: Dp = 0.dp,
+    /** The shared chat's "Show on canvas" camera requests (letta-mobile-bglj6.13); null elsewhere. */
+    cameraRequest: com.letta.mobile.ui.canvas.CanvasCameraRequest? = null,
 ) {
     LaunchedEffect(canvasId, conversationId, agentId) {
         viewModel.initSession(canvasId, conversationId, agentId)
@@ -99,6 +101,7 @@ fun CanvasScreen(
             onShareToChat = onShareToChat,
             showTitle = showTitle,
             chromeTopInset = chromeTopInset,
+            cameraRequest = cameraRequest,
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

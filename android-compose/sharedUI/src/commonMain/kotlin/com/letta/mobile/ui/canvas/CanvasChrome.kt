@@ -378,6 +378,14 @@ internal val BoardBackgrounds: List<NamedColor> = listOf(
 internal val LocalInHeaderBar = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 /**
+ * [CanvasHeaderBar]'s height: one row of [LettaDimens.Control.iconButtonLg] actions, its
+ * [LettaDimens.Space.xs] padding above and below, and its hairline border. What sits under the bar
+ * offsets from this rather than from a guess.
+ */
+internal val CanvasHeaderBarHeight: androidx.compose.ui.unit.Dp =
+    LettaDimens.Control.iconButtonLg + LettaDimens.Space.xs * 2 + LettaDimens.Stroke.hairline * 2
+
+/**
  * The board's header: one bar across the top holding the title, the sync status and the actions,
  * rather than three islands. The pills composed inside it drop their own surfaces.
  */

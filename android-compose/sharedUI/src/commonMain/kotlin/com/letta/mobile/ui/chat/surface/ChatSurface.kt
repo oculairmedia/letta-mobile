@@ -126,9 +126,17 @@ fun ChatSurface(
     val stableHost = rememberStableHost(host)
     val stablePlatform = rememberStablePlatform(platform)
     val canvasActions = remember(port, shareFailed) { ChatCanvasActions(port.actions, stableOnIntent, shareFailed) }
-    // With a canvas in hand, "open canvas" is a mode change, not the host's navigation.
-    val effectiveHost = remember(stableHost, canvas != null) {
-        if (canvas == null) stableHost else stableHost.copy(openCanvas = { stableOnIntent(ChatSurfaceIntent.OpenCanvas) })
+    // With a canvas in hand, "open canvas" is a mode change, not the host's navigation, and
+    // "show on canvas" also frames the artifact on this page's own board (letta-mobile-bglj6.13).
+    val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
+        if (canvas == null) {
+            stableHost
+        } else {
+            stableHost.copy(
+                openCanvas = { stableOnIntent(ChatSurfaceIntent.OpenCanvas) },
+                showOnCanvas = canvasActions::showArtifact,
+            )
+        }
     }
     val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
     // One scroll position per conversation (and paged presentation), kept across mode changes.

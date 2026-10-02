@@ -84,6 +84,8 @@ private val AppChatCanvasSlot = ChatCanvasSlot { target, actions, chromeTopInset
                 // Under the chat's floating header, where one shows: the board runs behind it. In the
                 // phone's canvas mode the header steps aside and the board's actions sit at its foot.
                 chromeTopInset = chromeTopInset,
+                // A chat card's "Show on canvas" frames its artifact on this board (bglj6.13).
+                cameraRequest = actions.camera,
             )
         }
     }

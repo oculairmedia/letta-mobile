@@ -236,6 +236,8 @@ private fun DockedConversationCanvas(
         showTitle = false,
         headerTrailing = headerTrailing,
         modifier = Modifier.fillMaxSize(),
+        // A chat card's "Show on canvas" frames its artifact here (letta-mobile-bglj6.13).
+        cameraRequest = actions.camera,
     )
 }
 

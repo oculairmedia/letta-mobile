@@ -1,0 +1,19 @@
+{
+  "catalog": "letta.canvas.compose",
+  "version": 1,
+  "artifact_id": "weekend-plan",
+  "title": "Weekend plan",
+  "items": [
+    { "kind": "TEXT", "key": "heading", "text": "Weekend plan", "size": "heading" },
+    { "kind": "CHECKLIST", "key": "shopping", "title": "Shopping", "color": "yellow",
+      "items": [ { "text": "Milk" }, { "text": "Eggs", "checked": true }, { "text": "Bread" } ] },
+    { "kind": "NOTE", "key": "meals", "title": "Meals", "color": "green",
+      "markdown": "## Saturday\n- Pasta\n\n## Sunday\n- Roast\n- [ ] Buy a chicken" },
+    { "kind": "GROUP", "key": "selfcare", "label": "Self-care",
+      "children": [
+        { "kind": "CARD", "key": "walk", "title": "Walk",
+          "fields": [ { "label": "When", "value": "Sat 09:00" }, { "label": "Where", "value": "Park" } ] },
+        { "kind": "NOTE", "key": "read", "markdown": "Finish *Dune* before Sunday." }
+      ] }
+  ]
+}

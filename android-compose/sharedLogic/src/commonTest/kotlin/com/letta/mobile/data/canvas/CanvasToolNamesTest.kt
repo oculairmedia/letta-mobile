@@ -5,7 +5,7 @@ import kotlin.test.assertTrue
 
 /**
  * Model providers reject a tool whose name is not letters, digits, `_` or `-` (at most 64). A
- * dotted `canvas.get_scene` was refused by the providers, so every agent run that carried the
+ * dotted `canvas_get_scene` was refused by the providers, so every agent run that carried the
  * canvas tools failed. Every canvas tool name, offered or not, must pass.
  */
 class CanvasToolNamesTest {

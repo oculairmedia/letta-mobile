@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -52,6 +53,47 @@ data class CanvasSceneDocument(
     val style: CanvasTextStyle? = null,
     /** The note's title, shown over it on the board and at the top of it opened large; null for none. */
     val title: String? = null,
+    /**
+     * Who decides the frame ([CanvasGeometryOwner]); null for a document written before owners
+     * existed, or by a writer that never placed it.
+     */
+    val owner: CanvasGeometryOwner? = null,
+    /** Which canvas_compose request made this document; null for one compose did not make. */
+    val compose: CanvasComposeProvenance? = null,
+)
+
+/**
+ * Who owns a block document's frame (canvas_compose plan, decision D3). Stored as a mode, never
+ * as a measurement: the renderer measures locally and never writes geometry back.
+ *
+ *  - [AUTO]: placed by canvas_compose with a reserved height; the renderer fits the card to its
+ *    content within that reservation.
+ *  - [EXPLICIT]: a writer named the frame (`set_document` with a frame); drawn verbatim.
+ *  - [USER]: a person moved or resized it; drawn verbatim, and never auto-fitted again.
+ *
+ * A document with no owner and no frame is a legacy frameless note, laid out as [AUTO] would be.
+ */
+@Serializable
+enum class CanvasGeometryOwner {
+    @SerialName("auto") AUTO,
+    @SerialName("explicit") EXPLICIT,
+    @SerialName("user") USER,
+}
+
+/**
+ * Where a canvas_compose artifact's piece came from: the request's [artifactId], the item's [key],
+ * its [kind] (a `ComposeKind` name, kept as text so a board written by a later catalog version
+ * still reads here), and the [catalog] and [version] that compiled it. Carried by a block
+ * document as `compose`, and by a TEXT or GROUP element as `_compose` (underscore-prefixed, so
+ * [CanvasOpProjector.stripMetadataForDrawBox] removes it before DrawBox sees the element).
+ */
+@Serializable
+data class CanvasComposeProvenance(
+    val artifactId: String,
+    val key: String,
+    val kind: String,
+    val catalog: String,
+    val version: Int,
 )
 
 /**

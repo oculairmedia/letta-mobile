@@ -147,4 +147,27 @@
     <string name="rows_show_transcript">Show transcript</string>
     <string name="rows_hide_transcript">Hide transcript</string>
     <string name="rows_transcript">Transcript: %1$s</string>
+
+    <!-- letta-mobile-bglj6.13: the canvas.compose card on the message that narrates it. -->
+    <string name="rows_canvas_untitled">Board update</string>
+    <string name="rows_canvas_show">Show on canvas</string>
+    <string name="rows_canvas_pending">Adding to the board…</string>
+    <string name="rows_canvas_published">On the board</string>
+    <string name="rows_canvas_dry_run">Preview only: nothing was added</string>
+    <string name="rows_canvas_failed">Not added to the board</string>
+    <string name="rows_canvas_card_description">%1$s, %2$s</string>
+    <string name="rows_canvas_kind_note">Note</string>
+    <string name="rows_canvas_kind_checklist">Checklist</string>
+    <string name="rows_canvas_kind_card">Card</string>
+    <string name="rows_canvas_kind_text">Text</string>
+    <string name="rows_canvas_kind_group">Group</string>
+    <string name="rows_canvas_summary">%1$s · %2$s</string>
+    <plurals name="rows_canvas_items">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <plurals name="rows_canvas_more_problems">
+        <item quantity="one">and %1$d more problem</item>
+        <item quantity="other">and %1$d more problems</item>
+    </plurals>
 </resources>

@@ -206,6 +206,7 @@ private fun ChatRenderItem.geometryContentFingerprint(
         include(message.approvalResponse.hashCode())
         include(message.attachments.size)
         include(message.attachments.geometryAttachmentsHash())
+        include(message.artifacts.hashCode())
         include((message.id !in state.expandedReasoningMessageIds).hashCode())
         include((state.activeApprovalRequestId == message.approvalRequest?.requestId).hashCode())
     }

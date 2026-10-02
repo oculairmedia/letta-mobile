@@ -81,6 +81,13 @@ data class UiMessage(
      * the send is represented as a tool call, not a standalone message.
      */
     val agentMessageProvenance: AgentMessageProvenance? = null,
+    /**
+     * letta-mobile-bglj6.13: canvas_compose artifacts this message narrates, one part per compose
+     * call. Derived by [com.letta.mobile.data.chat.projection.CanvasArtifactReceipts.attach] from
+     * the compose tool return already persisted on the TOOL_CALL event; never stored. Usually on
+     * the assistant text that follows the call, else on the tool call itself.
+     */
+    val artifacts: List<com.letta.mobile.data.chat.projection.CanvasArtifactReceipt> = emptyList(),
 )
 
 @Immutable

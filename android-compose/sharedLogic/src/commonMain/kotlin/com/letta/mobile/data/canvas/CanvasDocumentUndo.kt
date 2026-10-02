@@ -161,5 +161,8 @@ object CanvasDocumentUndo {
         style = document.style,
         // Null would keep the title the change gave it; empty clears it back to none.
         title = document.title.orEmpty(),
+        // An ownerless document has no owner to name, so undoing a move keeps the USER it gave.
+        owner = document.owner,
+        compose = document.compose,
     )
 }

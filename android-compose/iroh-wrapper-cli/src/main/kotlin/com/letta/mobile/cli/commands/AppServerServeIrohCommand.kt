@@ -469,8 +469,10 @@ class AppServerServeIrohCommand : CliktCommand(
             "Notebook sync requires --iroh-secret-key-file for stable peer identity"
         }
         val peerId = IrohNodeIdentity.nodeIdHexFromSecretBytes(FileIrohSecretKeyStore(keyFile).loadOrCreate())
+        // An over-budget history moves to a new document when the store opens; the retired id is
+        // never announced to peers or stored again.
         val store = NotebookLocalStore(java.nio.file.Path.of(requireNotNull(notebookDir)), peerId)
-        val protocol = AutomergeIrohRepoProtocol(store.repo, peers, scope) { remote, alpn ->
+        val protocol = AutomergeIrohRepoProtocol(store.repoForSync(), peers, scope) { remote, alpn ->
             checkNotNull(endpointProvider()) { "Iroh endpoint not started" }.connect(remote, alpn)
         }
         return store to protocol

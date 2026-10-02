@@ -1,0 +1,10 @@
+{
+  "artifact_id": "standup",
+  "title": "Stand-up",
+  "items": [
+    { "kind": "TEXT", "text": "Stand-up, Thursday", "size": "heading" },
+    { "kind": "CHECKLIST", "key": "blockers", "title": "Blockers", "color": "#ffcc80",
+      "items": [ { "text": "CI is red on main", "checked": false } ] }
+  ],
+  "dry_run": true
+}

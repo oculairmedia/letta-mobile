@@ -73,8 +73,17 @@ interface ExternalTool {
 /**
  * Who a tool call comes from: the runtime scope the App Server stamped on the request, which the
  * model cannot choose. [agentId] and [conversationId] are null when the frame carried no scope.
+ *
+ * [toolCallId] is the request's `tool_call_id`: the id the model's tool call has in the run, the
+ * same one the timeline's TOOL_CALL event and its return are keyed on (letta-mobile-bglj6.12). A
+ * tool that must answer a retried call the same way (canvas_compose derives its artifact id from
+ * it) reads it; null when the call came some other way.
  */
-data class ExternalToolCaller(val agentId: String?, val conversationId: String? = null)
+data class ExternalToolCaller(
+    val agentId: String?,
+    val conversationId: String? = null,
+    val toolCallId: String? = null,
+)
 
 /**
  * Host-owned external tool that is available because of the client device, not
