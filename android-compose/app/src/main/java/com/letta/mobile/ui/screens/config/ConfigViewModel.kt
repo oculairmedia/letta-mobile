@@ -116,74 +116,9 @@ class ConfigViewModel @Inject constructor(
         viewModelScope.launch {
             val retainedState = (_uiState.value as? UiState.Success)?.data
             val requestId = RetainedContentRefresh.nextRequestId(latestLoadRequestId)
-            when (
-                val start = RetainedContentRefresh.begin(
-                    requestId = requestId,
-                    retainedContent = retainedState,
-                    // A refresh reconstructs the form from persisted state. Never let it
-                    // replace edits that have not gone through saveConfig yet.
-                    canRefresh = { !it.hasUnsavedChanges },
-                )
-            ) {
-                RetainedContentRefresh.Start.Skip -> return@launch
-                is RetainedContentRefresh.Start.Loading -> {
-                    latestLoadRequestId = start.requestId
-                    _uiState.value = UiState.Loading
-                }
-                is RetainedContentRefresh.Start.Retaining -> {
-                    latestLoadRequestId = start.requestId
-                    _uiState.value = UiState.Success(
-                        start.content.copy(isRefreshing = true, refreshError = null)
-                    )
-                }
-            }
+            if (!beginLoad(requestId, retainedState)) return@launch
             try {
-                val activeConfig = settingsRepository.activeConfig.value
-                val preferences = loadDisplayPreferences()
-                val configUiState = if (activeConfig != null && !createNew) {
-                    ConfigUiState(
-                        mode = activeConfig.mode.toServerMode(),
-                        serverUrl = activeConfig.serverUrl,
-                        apiToken = activeConfig.accessToken ?: "",
-                        theme = preferences.theme,
-                        themePreset = preferences.themePreset,
-                        dynamicColor = preferences.dynamicColor,
-                        enableProjects = preferences.enableProjects,
-                        hapticsEnabled = preferences.hapticsEnabled,
-                        sharedChatPageEnabled = preferences.sharedChatPageEnabled,
-                        openChatsOnCanvas = preferences.openChatsOnCanvas,
-                        localModelPath = activeConfig.localModelPath.orEmpty(),
-                        localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
-                        localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
-                        localModelMaxTokens = activeConfig.localModelMaxTokens.normalizedLocalModelMaxTokens(),
-                        localProviderBaseUrl = activeConfig.localProviderBaseUrl.orEmpty(),
-                        localProviderApiKey = activeConfig.localProviderApiKey.orEmpty(),
-                        localProviderModel = activeConfig.localProviderModel.orEmpty(),
-                        huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
-                        savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
-                        embeddedModelCatalog = embeddedModelRepository.catalog.value,
-                        embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
-                    )
-                } else {
-                    // createNew = true: empty form, fresh UUID at save time.
-                    // OR there's no active config yet (first-time setup).
-                    // Mode falls through to ConfigUiState's default (CLOUD)
-                    // — the existing first-time setup expects that default,
-                    // and the user toggles to SELF_HOSTED inline if needed.
-                    ConfigUiState(
-                        theme = preferences.theme,
-                        themePreset = preferences.themePreset,
-                        dynamicColor = preferences.dynamicColor,
-                        enableProjects = preferences.enableProjects,
-                        hapticsEnabled = preferences.hapticsEnabled,
-                        sharedChatPageEnabled = preferences.sharedChatPageEnabled,
-                        openChatsOnCanvas = preferences.openChatsOnCanvas,
-                        huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
-                        savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
-                        embeddedModelCatalog = embeddedModelRepository.catalog.value,
-                        embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
-                    )
-                }
+                val configUiState = buildConfigUiState()
                 if (RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) {
                     _uiState.value = UiState.Success(configUiState)
                 }
@@ -191,18 +126,97 @@ class ConfigViewModel @Inject constructor(
                 throw cancelled
             } catch (e: Exception) {
                 if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
-                when (
-                    val failure = RetainedContentRefresh.failure(
-                        retainedContent = retainedState,
-                        message = e.message ?: "Failed to load config",
-                    )
-                ) {
-                    is RetainedContentRefresh.Failure.ShowError -> _uiState.value = UiState.Error(failure.message)
-                    is RetainedContentRefresh.Failure.Retain -> _uiState.value = UiState.Success(
-                        failure.content.copy(isRefreshing = false, refreshError = failure.message)
-                    )
-                }
+                showLoadFailure(retainedState, e.message ?: "Failed to load config")
             }
+        }
+    }
+
+    /**
+     * Puts the screen into its loading (or, with retained content, refreshing) state for
+     * [requestId]. False when the load must not run at all.
+     */
+    private fun beginLoad(requestId: Long, retainedState: ConfigUiState?): Boolean {
+        when (
+            val start = RetainedContentRefresh.begin(
+                requestId = requestId,
+                retainedContent = retainedState,
+                // A refresh reconstructs the form from persisted state. Never let it
+                // replace edits that have not gone through saveConfig yet.
+                canRefresh = { !it.hasUnsavedChanges },
+            )
+        ) {
+            RetainedContentRefresh.Start.Skip -> return false
+            is RetainedContentRefresh.Start.Loading -> {
+                latestLoadRequestId = start.requestId
+                _uiState.value = UiState.Loading
+            }
+            is RetainedContentRefresh.Start.Retaining -> {
+                latestLoadRequestId = start.requestId
+                _uiState.value = UiState.Success(
+                    start.content.copy(isRefreshing = true, refreshError = null)
+                )
+            }
+        }
+        return true
+    }
+
+    /** The form, rebuilt from the active config (when editing it) and the persisted preferences. */
+    private suspend fun buildConfigUiState(): ConfigUiState {
+        val activeConfig = settingsRepository.activeConfig.value
+        val preferences = loadDisplayPreferences()
+        return if (activeConfig != null && !createNew) {
+            ConfigUiState(
+                mode = activeConfig.mode.toServerMode(),
+                serverUrl = activeConfig.serverUrl,
+                apiToken = activeConfig.accessToken ?: "",
+                theme = preferences.theme,
+                themePreset = preferences.themePreset,
+                dynamicColor = preferences.dynamicColor,
+                enableProjects = preferences.enableProjects,
+                hapticsEnabled = preferences.hapticsEnabled,
+                sharedChatPageEnabled = preferences.sharedChatPageEnabled,
+                openChatsOnCanvas = preferences.openChatsOnCanvas,
+                localModelPath = activeConfig.localModelPath.orEmpty(),
+                localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
+                localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
+                localModelMaxTokens = activeConfig.localModelMaxTokens.normalizedLocalModelMaxTokens(),
+                localProviderBaseUrl = activeConfig.localProviderBaseUrl.orEmpty(),
+                localProviderApiKey = activeConfig.localProviderApiKey.orEmpty(),
+                localProviderModel = activeConfig.localProviderModel.orEmpty(),
+                huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
+                savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
+                embeddedModelCatalog = embeddedModelRepository.catalog.value,
+                embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
+            )
+        } else {
+            // createNew = true: empty form, fresh UUID at save time.
+            // OR there's no active config yet (first-time setup).
+            // Mode falls through to ConfigUiState's default (CLOUD)
+            // — the existing first-time setup expects that default,
+            // and the user toggles to SELF_HOSTED inline if needed.
+            ConfigUiState(
+                theme = preferences.theme,
+                themePreset = preferences.themePreset,
+                dynamicColor = preferences.dynamicColor,
+                enableProjects = preferences.enableProjects,
+                hapticsEnabled = preferences.hapticsEnabled,
+                sharedChatPageEnabled = preferences.sharedChatPageEnabled,
+                openChatsOnCanvas = preferences.openChatsOnCanvas,
+                huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
+                savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
+                embeddedModelCatalog = embeddedModelRepository.catalog.value,
+                embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
+            )
+        }
+    }
+
+    /** A failed load: an error screen, or the retained form with the refresh error under it. */
+    private fun showLoadFailure(retainedState: ConfigUiState?, message: String) {
+        when (val failure = RetainedContentRefresh.failure(retainedContent = retainedState, message = message)) {
+            is RetainedContentRefresh.Failure.ShowError -> _uiState.value = UiState.Error(failure.message)
+            is RetainedContentRefresh.Failure.Retain -> _uiState.value = UiState.Success(
+                failure.content.copy(isRefreshing = false, refreshError = failure.message)
+            )
         }
     }
 
