@@ -729,6 +729,9 @@ internal fun ModelInfoCard(
     }
 }
 
+/** Who the drawer is about: the agent and the backend it runs on. */
+private data class DrawerAgentIdentity(val name: String, val id: String, val backendLabel: String?)
+
 internal data class DrawerNavigationCallbacks(
     val onNavigateToAdmin: () -> Unit = {},
     val onNavigateToConversations: () -> Unit = {},
@@ -774,9 +777,7 @@ internal fun DrawerContent(
             .navigationBarsPadding(),
     ) {
         DrawerAgentHeader(
-            agentName = agentName,
-            agentId = agentId,
-            activeBackendLabel = activeBackendLabel,
+            identity = DrawerAgentIdentity(name = agentName, id = agentId, backendLabel = activeBackendLabel),
             onSearchMessages = {
                 HapticEffects.segmentTick(haptic, view)
                 onSearchMessages()
@@ -847,13 +848,11 @@ private val DrawerInset = LettaDimens.Space.md
 /** Who: the agent's avatar (the shared one), its name, the backend it talks to, and its actions. */
 @Composable
 private fun DrawerAgentHeader(
-    agentName: String,
-    agentId: String,
-    activeBackendLabel: String?,
+    identity: DrawerAgentIdentity,
     onSearchMessages: () -> Unit,
     onEditAgent: () -> Unit,
 ) {
-    val displayName = agentName.ifBlank { stringResource(R.string.screen_drawer_default_agent_name) }
+    val displayName = identity.name.ifBlank { stringResource(R.string.screen_drawer_default_agent_name) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -862,7 +861,7 @@ private fun DrawerAgentHeader(
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         // A still: on this screen the composer companion is the live one.
-        AgentAvatar(agentId = agentId, name = displayName, size = LettaDimens.Orb.railSlotWidth, live = false)
+        AgentAvatar(agentId = identity.id, name = displayName, size = LettaDimens.Orb.railSlotWidth, live = false)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = displayName,
@@ -878,7 +877,7 @@ private fun DrawerAgentHeader(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = activeBackendLabel ?: stringResource(R.string.screen_drawer_backend_unknown),
+                    text = identity.backendLabel ?: stringResource(R.string.screen_drawer_backend_unknown),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
