@@ -68,6 +68,18 @@ fun ConfigScreen(
     val context = LocalContext.current
     val batteryOptimization = rememberBatteryOptimizationState(context)
     val localModelImportLauncher = rememberLocalModelImportLauncher(viewModel, context)
+    val callbacks = rememberConfigContentCallbacks(
+        viewModel = viewModel,
+        onImportLocalModel = {
+            localModelImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+        },
+        onSave = {
+            viewModel.saveConfig(
+                onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
+                onError = snackbar::dispatch,
+            )
+        },
+    )
 
     Scaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
@@ -85,44 +97,129 @@ fun ConfigScreen(
             )
             is UiState.Success -> ConfigContent(
                 state = state.data,
-                onModeChange = { viewModel.updateMode(it) },
-                onServerUrlChange = { viewModel.updateServerUrl(it) },
-                onApiTokenChange = { viewModel.updateApiToken(it) },
-                onThemeChange = { viewModel.updateTheme(it) },
-                onThemePresetChange = { viewModel.updateThemePreset(it) },
-                onDynamicColorChange = { viewModel.updateDynamicColor(it) },
-                onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
-                onHapticsEnabledChange = { viewModel.updateHapticsEnabled(it) },
-                onSharedChatPageEnabledChange = { viewModel.updateSharedChatPageEnabled(it) },
-                onOpenChatsOnCanvasChange = { viewModel.updateOpenChatsOnCanvas(it) },
-                onLocalModelPathChange = { viewModel.updateLocalModelPath(it) },
-                onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
-                onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
-                onLocalModelMaxTokensChange = { viewModel.updateLocalModelMaxTokens(it) },
-                onLocalProviderBaseUrlChange = { viewModel.updateLocalProviderBaseUrl(it) },
-                onLocalProviderApiKeyChange = { viewModel.updateLocalProviderApiKey(it) },
-                onLocalProviderModelChange = { viewModel.updateLocalProviderModel(it) },
-                onHuggingFaceTokenChange = { viewModel.updateHuggingFaceToken(it) },
-                onImportLocalModel = {
-                    localModelImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
-                },
-                onDownloadEmbeddedModel = { viewModel.downloadEmbeddedModel(it) },
-                onCancelEmbeddedModelDownload = { viewModel.cancelEmbeddedModelDownload(it) },
-                onSelectEmbeddedModel = { viewModel.selectEmbeddedModel(it) },
-                batteryOptimizationExempt = batteryOptimization.exempt,
-                onRequestBatteryOptimizationExemption = batteryOptimization.requestExemption,
-                destinations = destinations,
-                onRefresh = viewModel::loadConfig,
-                onSave = {
-                    viewModel.saveConfig(
-                        onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
-                        onError = snackbar::dispatch,
-                    )
-                },
+                callbacks = callbacks,
+                host = ConfigContentHost(batteryOptimization, destinations),
                 modifier = Modifier.padding(paddingValues)
             )
         }
     }
+}
+
+/** The server card's edits; the on-device model's live in [LocalModelCallbacks]. */
+@Stable
+private class ServerSettingsCallbacks(
+    val onModeChange: (ServerMode) -> Unit,
+    val onServerUrlChange: (String) -> Unit,
+    val onApiTokenChange: (String) -> Unit,
+)
+
+/** The on-device model and local provider field edits, shown while the mode is [ServerMode.LOCAL]. */
+@Stable
+private class LocalModelCallbacks(
+    val onLocalModelPathChange: (String) -> Unit,
+    val onLocalModelHandleChange: (String) -> Unit,
+    val onLocalModelAcceleratorChange: (String) -> Unit,
+    val onLocalModelMaxTokensChange: (String) -> Unit,
+    val onLocalProviderBaseUrlChange: (String) -> Unit,
+    val onLocalProviderApiKeyChange: (String) -> Unit,
+    val onLocalProviderModelChange: (String) -> Unit,
+    val onHuggingFaceTokenChange: (String) -> Unit,
+)
+
+/** Getting a model file onto the device: importing one, or the embedded catalog's downloads. */
+@Stable
+private class EmbeddedModelCallbacks(
+    val onImportLocalModel: () -> Unit,
+    val onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
+    val onCancelEmbeddedModelDownload: (EmbeddedModelCatalogItem) -> Unit,
+    val onSelectEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
+)
+
+/** The appearance card's edits. */
+@Stable
+private class AppearanceCallbacks(
+    val onThemeChange: (AppTheme) -> Unit,
+    val onThemePresetChange: (ThemePreset) -> Unit,
+    val onDynamicColorChange: (Boolean) -> Unit,
+)
+
+/** The features card's switches. */
+@Stable
+private class FeatureToggleCallbacks(
+    val onEnableProjectsChange: (Boolean) -> Unit,
+    val onHapticsEnabledChange: (Boolean) -> Unit,
+    val onSharedChatPageEnabledChange: (Boolean) -> Unit,
+    val onOpenChatsOnCanvasChange: (Boolean) -> Unit,
+)
+
+/** Everything the settings content can ask of its owner, grouped by the card that asks. */
+@Stable
+private class ConfigContentCallbacks(
+    val server: ServerSettingsCallbacks,
+    val localModel: LocalModelCallbacks,
+    val embeddedModel: EmbeddedModelCallbacks,
+    val appearance: AppearanceCallbacks,
+    val features: FeatureToggleCallbacks,
+    val onRefresh: () -> Unit,
+    val onSave: () -> Unit,
+)
+
+/** What the hosting screen supplies beside the view model: battery status and navigation. */
+private class ConfigContentHost(
+    val batteryOptimization: BatteryOptimizationState,
+    val destinations: ConfigDestinations,
+)
+
+@Composable
+private fun rememberConfigContentCallbacks(
+    viewModel: ConfigViewModel,
+    onImportLocalModel: () -> Unit,
+    onSave: () -> Unit,
+): ConfigContentCallbacks {
+    val currentOnImportLocalModel by rememberUpdatedState(onImportLocalModel)
+    val currentOnSave by rememberUpdatedState(onSave)
+    return remember(viewModel) {
+        ConfigContentCallbacks(
+            server = ServerSettingsCallbacks(
+                onModeChange = { viewModel.updateMode(it) },
+                onServerUrlChange = { viewModel.updateServerUrl(it) },
+                onApiTokenChange = { viewModel.updateApiToken(it) },
+            ),
+            localModel = localModelCallbacks(viewModel),
+            embeddedModel = EmbeddedModelCallbacks(
+                onImportLocalModel = { currentOnImportLocalModel() },
+                onDownloadEmbeddedModel = { viewModel.downloadEmbeddedModel(it) },
+                onCancelEmbeddedModelDownload = { viewModel.cancelEmbeddedModelDownload(it) },
+                onSelectEmbeddedModel = { viewModel.selectEmbeddedModel(it) },
+            ),
+            appearance = AppearanceCallbacks(
+                onThemeChange = { viewModel.updateTheme(it) },
+                onThemePresetChange = { viewModel.updateThemePreset(it) },
+                onDynamicColorChange = { viewModel.updateDynamicColor(it) },
+            ),
+            features = FeatureToggleCallbacks(
+                onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
+                onHapticsEnabledChange = { viewModel.updateHapticsEnabled(it) },
+                onSharedChatPageEnabledChange = { viewModel.updateSharedChatPageEnabled(it) },
+                onOpenChatsOnCanvasChange = { viewModel.updateOpenChatsOnCanvas(it) },
+            ),
+            onRefresh = viewModel::loadConfig,
+            onSave = { currentOnSave() },
+        )
+    }
+}
+
+private fun localModelCallbacks(viewModel: ConfigViewModel): LocalModelCallbacks {
+    return LocalModelCallbacks(
+        onLocalModelPathChange = { viewModel.updateLocalModelPath(it) },
+        onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
+        onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
+        onLocalModelMaxTokensChange = { viewModel.updateLocalModelMaxTokens(it) },
+        onLocalProviderBaseUrlChange = { viewModel.updateLocalProviderBaseUrl(it) },
+        onLocalProviderApiKeyChange = { viewModel.updateLocalProviderApiKey(it) },
+        onLocalProviderModelChange = { viewModel.updateLocalProviderModel(it) },
+        onHuggingFaceTokenChange = { viewModel.updateHuggingFaceToken(it) },
+    )
 }
 
 private fun requestBatteryOptimizationExemption(
@@ -154,39 +251,10 @@ private fun requestBatteryOptimizationExemption(
 @Composable
 private fun ConfigContent(
     state: ConfigUiState,
-    onModeChange: (ServerMode) -> Unit,
-    onServerUrlChange: (String) -> Unit,
-    onApiTokenChange: (String) -> Unit,
-    onThemeChange: (AppTheme) -> Unit,
-    onThemePresetChange: (ThemePreset) -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit,
-    onEnableProjectsChange: (Boolean) -> Unit,
-    onHapticsEnabledChange: (Boolean) -> Unit,
-    onSharedChatPageEnabledChange: (Boolean) -> Unit,
-    onOpenChatsOnCanvasChange: (Boolean) -> Unit,
-    onLocalModelPathChange: (String) -> Unit,
-    onLocalModelHandleChange: (String) -> Unit,
-    onLocalModelAcceleratorChange: (String) -> Unit,
-    onLocalModelMaxTokensChange: (String) -> Unit,
-    onLocalProviderBaseUrlChange: (String) -> Unit,
-    onLocalProviderApiKeyChange: (String) -> Unit,
-    onLocalProviderModelChange: (String) -> Unit,
-    onHuggingFaceTokenChange: (String) -> Unit,
-    onImportLocalModel: () -> Unit,
-    onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
-    onCancelEmbeddedModelDownload: (EmbeddedModelCatalogItem) -> Unit,
-    onSelectEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
-    batteryOptimizationExempt: Boolean,
-    onRequestBatteryOptimizationExemption: () -> Unit,
-    destinations: ConfigDestinations,
-    onRefresh: () -> Unit,
-    onSave: () -> Unit,
+    callbacks: ConfigContentCallbacks,
+    host: ConfigContentHost,
     modifier: Modifier = Modifier
 ) {
-    val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -197,254 +265,300 @@ private fun ConfigContent(
         ConfigRefreshStatus(
             isRefreshing = state.isRefreshing,
             error = state.refreshError,
-            onRetry = onRefresh,
+            onRetry = callbacks.onRefresh,
         )
+        ServerSection(
+            state = state,
+            server = callbacks.server,
+            localModel = callbacks.localModel,
+            embeddedModel = callbacks.embeddedModel,
+        )
+        AppearanceSection(state = state, callbacks = callbacks.appearance)
+        FeaturesSection(state = state, callbacks = callbacks.features)
+        BackgroundDeliverySection(batteryOptimization = host.batteryOptimization)
+        IntegrationsSection(host.destinations)
+        SaveSection(isSaving = state.isSaving, onSave = callbacks.onSave)
+    }
+}
 
-        CardGroup(title = {
-            ConfigSectionTitle(stringResource(R.string.screen_config_server_section))
-        }) {
+@Composable
+private fun ServerSection(
+    state: ConfigUiState,
+    server: ServerSettingsCallbacks,
+    localModel: LocalModelCallbacks,
+    embeddedModel: EmbeddedModelCallbacks,
+) {
+    CardGroup(title = {
+        ConfigSectionTitle(stringResource(R.string.screen_config_server_section))
+    }) {
+        item(
+            headlineContent = {
+                ConnectionModeSelector(
+                    mode = state.mode,
+                    onModeChange = server.onModeChange,
+                )
+            },
+        )
+        item(
+            headlineContent = {
+                ServerUrlField(
+                    mode = state.mode,
+                    serverUrl = state.serverUrl,
+                    onServerUrlChange = server.onServerUrlChange,
+                )
+            },
+        )
+        if (state.mode == ServerMode.LOCAL) {
             item(
                 headlineContent = {
-                    ConnectionModeSelector(
-                        mode = state.mode,
-                        onModeChange = onModeChange,
-                    )
+                    EmbeddedRuntimeStatusItem(status = state.embeddedRuntimeStatus)
                 },
             )
             item(
                 headlineContent = {
-                    ServerUrlField(
-                        mode = state.mode,
-                        serverUrl = state.serverUrl,
-                        onServerUrlChange = onServerUrlChange,
-                    )
+                    LocalModelSettingsItem(state = state, callbacks = localModel, embeddedModel = embeddedModel)
                 },
             )
-            if (state.mode == ServerMode.LOCAL) {
-                item(
-                    headlineContent = {
-                        EmbeddedRuntimeStatusItem(status = state.embeddedRuntimeStatus)
-                    },
-                )
-                item(
-                    headlineContent = {
-                        LocalModelSettingsItem(
-                            state = state,
-                            onLocalModelPathChange = onLocalModelPathChange,
-                            onLocalModelHandleChange = onLocalModelHandleChange,
-                            onLocalModelAcceleratorChange = onLocalModelAcceleratorChange,
-                            onLocalModelMaxTokensChange = onLocalModelMaxTokensChange,
-                            onLocalProviderBaseUrlChange = onLocalProviderBaseUrlChange,
-                            onLocalProviderApiKeyChange = onLocalProviderApiKeyChange,
-                            onLocalProviderModelChange = onLocalProviderModelChange,
-                            onHuggingFaceTokenChange = onHuggingFaceTokenChange,
-                            onImportLocalModel = onImportLocalModel,
-                            onDownloadEmbeddedModel = onDownloadEmbeddedModel,
-                            onCancelEmbeddedModelDownload = onCancelEmbeddedModelDownload,
-                            onSelectEmbeddedModel = onSelectEmbeddedModel,
-                        )
-                    },
-                )
-            }
-            if (state.mode != ServerMode.LOCAL) {
-                item(
-                    headlineContent = {
-                        ApiTokenField(
-                            value = state.apiToken,
-                            onValueChange = onApiTokenChange,
-                        )
-                    },
-                )
-            }
         }
-
-        CardGroup(title = {
-            ConfigSectionTitle(stringResource(R.string.screen_config_appearance_section))
-        }) {
+        if (state.mode != ServerMode.LOCAL) {
             item(
                 headlineContent = {
-                    FormItem(label = { Text(stringResource(R.string.screen_config_theme_mode)) }) {
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                selected = state.theme == AppTheme.SYSTEM,
-                                onClick = {
-                                    HapticEffects.segmentTick(haptic, view, enabled = state.theme != AppTheme.SYSTEM)
-                                    onThemeChange(AppTheme.SYSTEM)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                                label = { Text(stringResource(R.string.screen_config_theme_mode_system)) },
-                            )
-                            SegmentedButton(
-                                selected = state.theme == AppTheme.LIGHT,
-                                onClick = {
-                                    HapticEffects.segmentTick(haptic, view, enabled = state.theme != AppTheme.LIGHT)
-                                    onThemeChange(AppTheme.LIGHT)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                                label = { Text(stringResource(R.string.common_light_theme)) },
-                            )
-                            SegmentedButton(
-                                selected = state.theme == AppTheme.DARK,
-                                onClick = {
-                                    HapticEffects.segmentTick(haptic, view, enabled = state.theme != AppTheme.DARK)
-                                    onThemeChange(AppTheme.DARK)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                                label = { Text(stringResource(R.string.common_dark_theme)) },
-                            )
+                    ApiTokenField(
+                        value = state.apiToken,
+                        onValueChange = server.onApiTokenChange,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppearanceSection(
+    state: ConfigUiState,
+    callbacks: AppearanceCallbacks,
+) {
+    val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    CardGroup(title = {
+        ConfigSectionTitle(stringResource(R.string.screen_config_appearance_section))
+    }) {
+        item(
+            headlineContent = {
+                ThemeModeSelector(theme = state.theme, onThemeChange = callbacks.onThemeChange)
+            },
+        )
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_config_dynamic_color)) },
+            supportingContent = {
+                Text(
+                    stringResource(
+                        if (dynamicColorSupported) {
+                            R.string.screen_config_dynamic_color_supported
+                        } else {
+                            R.string.screen_config_dynamic_color_unsupported
                         }
-                    }
-                },
-            )
-            item(
-                headlineContent = { Text(stringResource(R.string.screen_config_dynamic_color)) },
-                supportingContent = {
-                    Text(
-                        stringResource(
-                            if (dynamicColorSupported) {
-                                R.string.screen_config_dynamic_color_supported
-                            } else {
-                                R.string.screen_config_dynamic_color_unsupported
-                            }
-                        )
                     )
-                },
-                trailingContent = {
-                    HapticSwitch(
-                        checked = state.dynamicColor,
-                        onCheckedChange = onDynamicColorChange,
-                        enabled = dynamicColorSupported,
-                    )
-                },
-            )
-            item(
-                headlineContent = {
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                    ) {
-                        ThemePreset.entries.forEach { preset ->
-                            FilterChip(
-                                selected = state.themePreset == preset,
-                                onClick = {
-                                    HapticEffects.segmentTick(haptic, view, enabled = state.themePreset != preset)
-                                    onThemePresetChange(preset)
-                                },
-                                label = { Text(themePresetLabel(preset)) },
-                            )
-                        }
-                    }
-                },
-                supportingContent = {
-                    Text(
-                        stringResource(
-                            if (state.dynamicColor && dynamicColorSupported) {
-                                R.string.screen_config_theme_preset_overridden
-                            } else {
-                                R.string.screen_config_theme_preset
-                            }
-                        )
-                    )
-                },
-            )
-        }
-
-        CardGroup(title = {
-            ConfigSectionTitle(stringResource(R.string.screen_config_features_section))
-        }) {
-            item(
-                headlineContent = { Text(stringResource(R.string.screen_config_enable_projects)) },
-                supportingContent = { Text(stringResource(R.string.screen_config_enable_projects_description)) },
-                trailingContent = {
-                    HapticSwitch(
-                        checked = state.enableProjects,
-                        onCheckedChange = onEnableProjectsChange,
-                    )
-                },
-            )
-            item(
-                headlineContent = { Text(stringResource(R.string.screen_config_haptics)) },
-                supportingContent = { Text(stringResource(R.string.screen_config_haptics_description)) },
-                trailingContent = {
-                    HapticSwitch(
-                        checked = state.hapticsEnabled,
-                        onCheckedChange = onHapticsEnabledChange,
-                    )
-                },
-            )
-            item(
-                headlineContent = { Text(stringResource(R.string.screen_config_shared_chat_page)) },
-                supportingContent = { Text(stringResource(R.string.screen_config_shared_chat_page_description)) },
-                trailingContent = {
-                    HapticSwitch(
-                        checked = state.sharedChatPageEnabled,
-                        onCheckedChange = onSharedChatPageEnabledChange,
-                    )
-                },
-            )
-            if (state.sharedChatPageEnabled) {
-                item(
-                    headlineContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas)) },
-                    supportingContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas_description)) },
-                    trailingContent = {
-                        HapticSwitch(
-                            checked = state.openChatsOnCanvas,
-                            onCheckedChange = onOpenChatsOnCanvasChange,
-                        )
-                    },
                 )
-            }
-        }
+            },
+            trailingContent = {
+                HapticSwitch(
+                    checked = state.dynamicColor,
+                    onCheckedChange = callbacks.onDynamicColorChange,
+                    enabled = dynamicColorSupported,
+                )
+            },
+        )
+        item(
+            headlineContent = {
+                ThemePresetPicker(selected = state.themePreset, onThemePresetChange = callbacks.onThemePresetChange)
+            },
+            supportingContent = {
+                Text(
+                    stringResource(
+                        if (state.dynamicColor && dynamicColorSupported) {
+                            R.string.screen_config_theme_preset_overridden
+                        } else {
+                            R.string.screen_config_theme_preset
+                        }
+                    )
+                )
+            },
+        )
+    }
+}
 
-        CardGroup(title = {
-            ConfigSectionTitle(stringResource(R.string.screen_config_background_delivery_section))
-        }) {
+@Composable
+private fun ThemeModeSelector(
+    theme: AppTheme,
+    onThemeChange: (AppTheme) -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    FormItem(label = { Text(stringResource(R.string.screen_config_theme_mode)) }) {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            SegmentedButton(
+                selected = theme == AppTheme.SYSTEM,
+                onClick = {
+                    HapticEffects.segmentTick(haptic, view, enabled = theme != AppTheme.SYSTEM)
+                    onThemeChange(AppTheme.SYSTEM)
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                label = { Text(stringResource(R.string.screen_config_theme_mode_system)) },
+            )
+            SegmentedButton(
+                selected = theme == AppTheme.LIGHT,
+                onClick = {
+                    HapticEffects.segmentTick(haptic, view, enabled = theme != AppTheme.LIGHT)
+                    onThemeChange(AppTheme.LIGHT)
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                label = { Text(stringResource(R.string.common_light_theme)) },
+            )
+            SegmentedButton(
+                selected = theme == AppTheme.DARK,
+                onClick = {
+                    HapticEffects.segmentTick(haptic, view, enabled = theme != AppTheme.DARK)
+                    onThemeChange(AppTheme.DARK)
+                },
+                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                label = { Text(stringResource(R.string.common_dark_theme)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemePresetPicker(
+    selected: ThemePreset,
+    onThemePresetChange: (ThemePreset) -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    @OptIn(ExperimentalLayoutApi::class)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        ThemePreset.entries.forEach { preset ->
+            FilterChip(
+                selected = selected == preset,
+                onClick = {
+                    HapticEffects.segmentTick(haptic, view, enabled = selected != preset)
+                    onThemePresetChange(preset)
+                },
+                label = { Text(themePresetLabel(preset)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeaturesSection(
+    state: ConfigUiState,
+    callbacks: FeatureToggleCallbacks,
+) {
+    CardGroup(title = {
+        ConfigSectionTitle(stringResource(R.string.screen_config_features_section))
+    }) {
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_config_enable_projects)) },
+            supportingContent = { Text(stringResource(R.string.screen_config_enable_projects_description)) },
+            trailingContent = {
+                HapticSwitch(
+                    checked = state.enableProjects,
+                    onCheckedChange = callbacks.onEnableProjectsChange,
+                )
+            },
+        )
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_config_haptics)) },
+            supportingContent = { Text(stringResource(R.string.screen_config_haptics_description)) },
+            trailingContent = {
+                HapticSwitch(
+                    checked = state.hapticsEnabled,
+                    onCheckedChange = callbacks.onHapticsEnabledChange,
+                )
+            },
+        )
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_config_shared_chat_page)) },
+            supportingContent = { Text(stringResource(R.string.screen_config_shared_chat_page_description)) },
+            trailingContent = {
+                HapticSwitch(
+                    checked = state.sharedChatPageEnabled,
+                    onCheckedChange = callbacks.onSharedChatPageEnabledChange,
+                )
+            },
+        )
+        if (state.sharedChatPageEnabled) {
             item(
-                headlineContent = { Text(stringResource(R.string.screen_config_reliable_background_delivery)) },
-                supportingContent = {
-                    Text(
-                        stringResource(
-                            if (batteryOptimizationExempt) {
-                                R.string.screen_config_battery_optimization_exempt_description
-                            } else {
-                                R.string.screen_config_battery_optimization_restricted_description
-                            }
-                        )
+                headlineContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas)) },
+                supportingContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas_description)) },
+                trailingContent = {
+                    HapticSwitch(
+                        checked = state.openChatsOnCanvas,
+                        onCheckedChange = callbacks.onOpenChatsOnCanvasChange,
                     )
                 },
-                leadingContent = { Icon(LettaIcons.Settings, contentDescription = null) },
-                trailingContent = {
-                    if (batteryOptimizationExempt) {
-                        AssistChip(
-                            onClick = {},
-                            enabled = false,
-                            label = { Text(stringResource(R.string.screen_config_battery_optimization_status_unrestricted)) },
-                            leadingIcon = { Icon(LettaIcons.CheckCircle, contentDescription = null) },
-                        )
-                    } else {
-                        TextButton(onClick = onRequestBatteryOptimizationExemption) {
-                            Text(stringResource(R.string.screen_config_battery_optimization_allow_action))
+            )
+        }
+    }
+}
+
+@Composable
+private fun BackgroundDeliverySection(batteryOptimization: BatteryOptimizationState) {
+    val exempt = batteryOptimization.exempt
+    CardGroup(title = {
+        ConfigSectionTitle(stringResource(R.string.screen_config_background_delivery_section))
+    }) {
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_config_reliable_background_delivery)) },
+            supportingContent = {
+                Text(
+                    stringResource(
+                        if (exempt) {
+                            R.string.screen_config_battery_optimization_exempt_description
+                        } else {
+                            R.string.screen_config_battery_optimization_restricted_description
                         }
+                    )
+                )
+            },
+            leadingContent = { Icon(LettaIcons.Settings, contentDescription = null) },
+            trailingContent = {
+                if (exempt) {
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = { Text(stringResource(R.string.screen_config_battery_optimization_status_unrestricted)) },
+                        leadingIcon = { Icon(LettaIcons.CheckCircle, contentDescription = null) },
+                    )
+                } else {
+                    TextButton(onClick = batteryOptimization.requestExemption) {
+                        Text(stringResource(R.string.screen_config_battery_optimization_allow_action))
                     }
-                },
-            )
-        }
+                }
+            },
+        )
+    }
+}
 
-        IntegrationsSection(destinations)
-
-        CardGroup {
-            item(
-                onClick = if (state.isSaving) null else onSave,
-                headlineContent = { Text(stringResource(R.string.action_save_configuration)) },
-                leadingContent = { Icon(LettaIcons.Save, contentDescription = null) },
-                trailingContent = {
-                    if (state.isSaving) {
-                        CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Orb.sm))
-                    }
-                },
-            )
-        }
+@Composable
+private fun SaveSection(
+    isSaving: Boolean,
+    onSave: () -> Unit,
+) {
+    CardGroup {
+        item(
+            onClick = if (isSaving) null else onSave,
+            headlineContent = { Text(stringResource(R.string.action_save_configuration)) },
+            leadingContent = { Icon(LettaIcons.Save, contentDescription = null) },
+            trailingContent = {
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Orb.sm))
+                }
+            },
+        )
     }
 }
 
@@ -675,18 +789,8 @@ private fun EmbeddedRuntimeStatusItem(
 @Composable
 private fun LocalModelSettingsItem(
     state: ConfigUiState,
-    onLocalModelPathChange: (String) -> Unit,
-    onLocalModelHandleChange: (String) -> Unit,
-    onLocalModelAcceleratorChange: (String) -> Unit,
-    onLocalModelMaxTokensChange: (String) -> Unit,
-    onLocalProviderBaseUrlChange: (String) -> Unit,
-    onLocalProviderApiKeyChange: (String) -> Unit,
-    onLocalProviderModelChange: (String) -> Unit,
-    onHuggingFaceTokenChange: (String) -> Unit,
-    onImportLocalModel: () -> Unit,
-    onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
-    onCancelEmbeddedModelDownload: (EmbeddedModelCatalogItem) -> Unit,
-    onSelectEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
+    callbacks: LocalModelCallbacks,
+    embeddedModel: EmbeddedModelCallbacks,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -702,7 +806,7 @@ private fun LocalModelSettingsItem(
         var hfTokenVisible by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = state.huggingFaceToken,
-            onValueChange = onHuggingFaceTokenChange,
+            onValueChange = callbacks.onHuggingFaceTokenChange,
             label = { Text(stringResource(R.string.screen_config_hugging_face_token)) },
             placeholder = { Text(stringResource(R.string.screen_config_hugging_face_token_placeholder)) },
             visualTransformation = if (hfTokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -720,13 +824,13 @@ private fun LocalModelSettingsItem(
             items = state.embeddedModelCatalog,
             selectedPath = state.localModelPath,
             hasHuggingFaceToken = state.huggingFaceToken.isNotBlank(),
-            onDownload = onDownloadEmbeddedModel,
-            onCancel = onCancelEmbeddedModelDownload,
-            onSelect = onSelectEmbeddedModel,
+            onDownload = embeddedModel.onDownloadEmbeddedModel,
+            onCancel = embeddedModel.onCancelEmbeddedModelDownload,
+            onSelect = embeddedModel.onSelectEmbeddedModel,
         )
         OutlinedTextField(
             value = state.localModelPath,
-            onValueChange = onLocalModelPathChange,
+            onValueChange = callbacks.onLocalModelPathChange,
             label = { Text(stringResource(R.string.screen_config_local_model_path)) },
             placeholder = { Text(stringResource(R.string.screen_config_local_model_path_placeholder)) },
             modifier = Modifier.fillMaxWidth(),
@@ -734,7 +838,7 @@ private fun LocalModelSettingsItem(
             singleLine = true,
         )
         OutlinedButton(
-            onClick = onImportLocalModel,
+            onClick = embeddedModel.onImportLocalModel,
             enabled = !state.isImportingLocalModel,
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -760,7 +864,7 @@ private fun LocalModelSettingsItem(
         }
         OutlinedTextField(
             value = state.localModelHandle,
-            onValueChange = onLocalModelHandleChange,
+            onValueChange = callbacks.onLocalModelHandleChange,
             label = { Text(stringResource(R.string.screen_config_local_model_handle)) },
             placeholder = { Text(stringResource(R.string.screen_config_local_model_handle_placeholder)) },
             modifier = Modifier.fillMaxWidth(),
@@ -782,7 +886,7 @@ private fun LocalModelSettingsItem(
                                 view,
                                 enabled = state.localModelAccelerator != option.value,
                             )
-                            onLocalModelAcceleratorChange(option.value)
+                            callbacks.onLocalModelAcceleratorChange(option.value)
                         },
                         shape = SegmentedButtonDefaults.itemShape(
                             index = index,
@@ -795,7 +899,7 @@ private fun LocalModelSettingsItem(
         }
         OutlinedTextField(
             value = state.localModelMaxTokens,
-            onValueChange = onLocalModelMaxTokensChange,
+            onValueChange = callbacks.onLocalModelMaxTokensChange,
             label = { Text(stringResource(R.string.screen_config_local_model_max_tokens)) },
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -813,7 +917,7 @@ private fun LocalModelSettingsItem(
         )
         OutlinedTextField(
             value = state.localProviderBaseUrl,
-            onValueChange = onLocalProviderBaseUrlChange,
+            onValueChange = callbacks.onLocalProviderBaseUrlChange,
             label = { Text(stringResource(R.string.screen_config_local_provider_base_url)) },
             placeholder = { Text("http://192.168.1.10:8082/v1") },
             modifier = Modifier.fillMaxWidth(),
@@ -822,7 +926,7 @@ private fun LocalModelSettingsItem(
         )
         OutlinedTextField(
             value = state.localProviderApiKey,
-            onValueChange = onLocalProviderApiKeyChange,
+            onValueChange = callbacks.onLocalProviderApiKeyChange,
             label = { Text(stringResource(R.string.screen_config_local_provider_api_key)) },
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = { Icon(LettaIcons.Key, null) },
