@@ -5,6 +5,8 @@ import androidx.compose.ui.input.key.KeyEvent
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.ui.canvas.plugin.PluginElementEdits
+import com.letta.mobile.ui.canvas.plugin.PluginElementFrames
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
@@ -293,11 +295,12 @@ internal fun CanvasBoard.redoBoard() {
 }
 
 /**
- * Fits everything on the board (elements and notes) with padding; an empty board just goes back
+ * Fits everything on the board (elements, notes and plugin elements) with padding; an empty board just goes back
  * to 100% at the origin. [maxScale] lets the open-time fit shrink a board without enlarging it.
  */
 internal fun CanvasBoard.fitToContent(maxScale: Float = CanvasViewportFit.MAX_SCALE): Boolean {
-    val bounds = CanvasViewportFit.contentBounds(state.elements, documents)
+    val plugins = session?.let { PluginElementFrames.boundsOf(PluginElementEdits.elementsOf(it)) }.orEmpty()
+    val bounds = CanvasViewportFit.contentBounds(state.elements, documents, plugins)
     val fit = CanvasViewportFit.fitOrNull(bounds, ui.boardSize, maxScale)
     if (fit == null) {
         controller.resetCamera()

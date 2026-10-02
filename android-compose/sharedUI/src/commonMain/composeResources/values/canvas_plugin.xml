@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-s416w.4: plugin elements on the board and their fallback card. -->
+    <string name="canvas_plugin_card_description">%1$s, plugin element</string>
+    <string name="canvas_plugin_untitled">Plugin element</string>
+    <string name="canvas_plugin_move">Move %1$s</string>
+    <string name="canvas_plugin_open">Open</string>
+    <string name="canvas_plugin_open_action">Open %1$s</string>
+    <string name="canvas_plugin_snapshot_description">Snapshot of %1$s</string>
+    <string name="canvas_plugin_snapshot_loading">Loading the snapshot of %1$s</string>
+    <string name="canvas_plugin_badge_not_installed">Not installed</string>
+    <string name="canvas_plugin_badge_newer_version">Newer version</string>
+    <string name="canvas_plugin_badge_offline">Offline</string>
+    <string name="canvas_plugin_badge_fault">Live view failed</string>
+    <string name="canvas_plugin_status_idle">Idle</string>
+    <string name="canvas_plugin_status_running">Running</string>
+    <string name="canvas_plugin_status_done">Done</string>
+    <string name="canvas_plugin_status_failed">Failed</string>
+</resources>

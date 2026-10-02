@@ -37,6 +37,9 @@ import com.letta.mobile.data.canvas.CanvasSnapAnchor
 import com.letta.mobile.ui.theme.LettaDimens
 import io.ak1.drawbox.DrawBox
 import io.ak1.drawbox.domain.model.Element
+import com.letta.mobile.ui.canvas.plugin.CanvasPluginLayer
+import com.letta.mobile.ui.canvas.plugin.PluginBoardSelection
+import com.letta.mobile.ui.canvas.plugin.rememberPluginBoard
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.input.imageDragAndDropTarget
@@ -115,6 +118,7 @@ internal fun BoxScope.CanvasBoardLayers(board: CanvasBoard) {
         modifier = Modifier.fillMaxSize(),
     )
     CanvasBoardNotes(board)
+    CanvasBoardPlugins(board)
     // Presence layer (Card I3.5)
     PresenceLayer(
         presences = board.flows.sharing.presences.value,
@@ -322,6 +326,29 @@ private fun CanvasBoardNotes(board: CanvasBoard) {
         onGroupDragEnd = { board.commitGroupMove() },
         modifier = Modifier.fillMaxSize().clipToBounds(),
     )
+}
+
+/**
+ * Plugin elements (letta-mobile-s416w.4), beside the notes and in the same world units. A selected
+ * one is the board's active item, so a press on the board or on a note lets it go.
+ */
+@Composable
+private fun CanvasBoardPlugins(board: CanvasBoard) {
+    val session = board.session ?: return
+    CanvasPluginLayer(
+        board = rememberPluginBoard(session, board.flows.sessionDoc.value, board.host.assets),
+        viewport = board.state.viewport,
+        modifier = Modifier.fillMaxSize().clipToBounds(),
+        selection = PluginBoardSelection(board.ui.activeNoteId, eraseMode = board.state.mode == Mode.ERASER),
+        onSelect = { id -> board.selectPluginElement(id) },
+    )
+}
+
+/** Picking a plugin element replaces the board's selection, as picking a note does. */
+private fun CanvasBoard.selectPluginElement(id: String) {
+    controller.clearSelection()
+    ui.selectedNoteIds = emptySet()
+    ui.activeNoteId = id
 }
 
 private fun CanvasBoard.trackLiveFrame(id: String, frame: CanvasDocumentFrame?) {

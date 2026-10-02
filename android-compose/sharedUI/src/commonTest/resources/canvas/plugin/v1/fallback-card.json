@@ -1,0 +1,52 @@
+{
+  "comment": "letta-mobile-s416w.4: the fallback card's view model, one card per entry. 'snapshot' says what the test gives the card: 'image' (a picture put in the asset store under the element's ref), 'loading' (a ref no store has) or 'none'. 'install' and 'offline' are what the board knows of the plugin.",
+  "cards": [
+    {
+      "install": "installed",
+      "offline": false,
+      "snapshot": "image",
+      "element": {
+        "id": "pe-render",
+        "type": "ext:letta.example/widget",
+        "v": 1,
+        "frame": { "x": 40.0, "y": 40.0, "width": 320.0, "height": 300.0 },
+        "owner": "user",
+        "ref": "job:3d7c2e3e",
+        "props": { "status": "running", "progress": 0.42, "label": "Nightly render" },
+        "snapshot": { "assetRef": "sha256:0000000000000000000000000000000000000000000000000000000000000000", "mediaType": "image/png", "width": 640, "height": 400, "rev": 3 },
+        "fallback": { "title": "Nightly render", "subtitle": "Example · running 42%", "icon": "image", "openUrl": "https://example.test/jobs/3d7c2e3e" },
+        "meta": { "pluginId": "letta.example", "createdBy": "agent:agent-123", "toolCallId": "call_9" }
+      }
+    },
+    {
+      "install": "not_installed",
+      "offline": true,
+      "snapshot": "none",
+      "element": {
+        "id": "pe-frame",
+        "type": "ext:letta.example/frame",
+        "v": 2,
+        "frame": { "x": 400.0, "y": 40.0, "width": 300.0, "height": 300.0 },
+        "owner": "explicit",
+        "ref": "file:4410/page:2/frame:17",
+        "props": { "name": "Checkout flow", "revn": 128 },
+        "fallback": { "title": "Checkout flow", "subtitle": "Example · frame 17", "icon": "pen-tool", "openUrl": "meridian:plugin/letta.example/open?ref=frame-17" }
+      }
+    },
+    {
+      "install": "newer_version",
+      "offline": false,
+      "snapshot": "loading",
+      "element": {
+        "id": "pe-report",
+        "type": "ext:letta.example/report",
+        "v": 3,
+        "frame": { "x": 740.0, "y": 40.0, "width": 300.0, "height": 300.0 },
+        "owner": "explicit",
+        "props": { "status": "failed" },
+        "snapshot": { "assetRef": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "mediaType": "image/png" },
+        "fallback": { "title": "Quarterly report", "subtitle": "Example · export failed", "icon": "file" }
+      }
+    }
+  ]
+}
