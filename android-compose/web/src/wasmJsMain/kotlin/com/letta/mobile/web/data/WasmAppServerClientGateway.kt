@@ -1,6 +1,9 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.data.transport.appserver.AppServerApprovalAnswer
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerRunControls
@@ -108,9 +111,9 @@ class WasmAppServerClientGateway(
                 turnEngine = session.engine,
                 events = session.client.events,
                 isConnected = session.transport.isConnected,
-                admin = { method, params -> session.admin(method, params, ::nextRequestId) },
-                agentIdFor = { agent.id },
-                backendId = WEB_BACKEND_ID,
+                admin = { method, params -> session.admin(method.value, params, ::nextRequestId) },
+                agentIdFor = { AgentId(agent.id) },
+                backendId = BackendId(WEB_BACKEND_ID),
             ),
         )
         val target = TimelineChatTarget(agentId = agent.id, agentName = agent.name, conversationId = conversationId)
@@ -151,7 +154,7 @@ class WasmAppServerClientGateway(
 
 /** The page's stop and approval answers, scoped to [target]'s conversation. */
 private fun webRunControls(controls: AppServerRunControls, target: TimelineChatTarget) = TimelineChatRunControls(
-    stopRun = { controls.stop(target.agentId, target.conversationId) },
+    stopRun = { controls.stop(AgentId(target.agentId), ConversationId(target.conversationId)) },
     answerApproval = { answer ->
         controls.answer(
             AppServerApprovalAnswer(

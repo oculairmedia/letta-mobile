@@ -1,6 +1,8 @@
 package com.letta.mobile.data.transport.appserver
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
@@ -25,6 +27,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.time.Duration.Companion.seconds
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -35,19 +38,19 @@ import kotlin.test.assertTrue
 class AppServerTimelineTransportTest {
     @Test
     fun listsMessagesOverAdminRpcWithTheConversationsCursors() = runTest {
-        val calls = mutableListOf<Pair<String, JsonObject>>()
+        val calls = mutableListOf<Pair<AppServerAdminMethod, JsonObject>>()
         val transport = transport(admin = { method, params ->
             calls += method to params
             Json.parseToJsonElement("""{"messages":[$ASSISTANT_ROW]}""")
         })
 
         val messages = transport.listConversationMessages("conv-1", limit = 20, after = null, order = "asc")
-        val older = transport.listConversationMessagesBefore("conv-1", limit = 10, before = "msg-9", order = "desc")
+        val older = transport.list(ConversationId("conv-1"), AppServerMessagePage(limit = 10, before = "msg-9", order = "desc"))
 
         assertEquals("hello", (messages.single() as AssistantMessage).content)
         assertEquals(1, older.size)
         val (method, params) = calls.first()
-        assertEquals("message.list", method)
+        assertEquals("message.list", method.value)
         assertEquals("conv-1", params["conversation_id"]?.jsonPrimitive?.content)
         assertEquals("20", params["limit"]?.jsonPrimitive?.content)
         assertEquals("asc", params["order"]?.jsonPrimitive?.content)
@@ -78,8 +81,8 @@ class AppServerTimelineTransportTest {
         }
         runCurrent()
 
-        events.emit(streamDelta(conversationId = "conv-other"))
-        events.emit(streamDelta(conversationId = "conv-1"))
+        events.emit(streamDelta(ConversationId("conv-other")))
+        events.emit(streamDelta(ConversationId("conv-1")))
         runCurrent()
         collector.cancel()
 
@@ -121,8 +124,8 @@ class AppServerTimelineTransportTest {
             events = events,
             isConnected = flowOf(true),
             admin = admin,
-            agentIdFor = { "agent-1" },
-            heartbeatIntervalMs = 60_000L,
+            agentIdFor = { AgentId("agent-1") },
+            heartbeatInterval = 60.seconds,
         ),
     )
 
@@ -136,9 +139,9 @@ class AppServerTimelineTransportTest {
     )
 
     /** A `stream_delta` decoded the way the socket transport decodes it, raw frame included. */
-    private fun streamDelta(conversationId: String): AppServerReceivedFrame = AppServerProtocol.decodeFrame(
-        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"$conversationId"},""" +
-            """"event_seq":1,"emitted_at":"2026-10-02T00:00:00Z","idempotency_key":"frame-$conversationId",""" +
+    private fun streamDelta(conversation: ConversationId): AppServerReceivedFrame = AppServerProtocol.decodeFrame(
+        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"${conversation.value}"},""" +
+            """"event_seq":1,"emitted_at":"2026-10-02T00:00:00Z","idempotency_key":"frame-${conversation.value}",""" +
             """"delta":$ASSISTANT_DELTA}""",
         AppServerChannel.Stream,
     )

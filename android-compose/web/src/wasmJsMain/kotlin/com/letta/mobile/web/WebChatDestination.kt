@@ -48,6 +48,20 @@ internal data class WebChatRoster(
     val error: String?,
 )
 
+/** The board docked under the conversation: where it is kept, and whether the page opens on it. */
+internal data class WebChatCanvas(
+    val store: CanvasDocumentStore,
+    val openOnCanvas: Boolean,
+)
+
+/** Everything the chat destination draws from. */
+internal data class WebChatDestinationState(
+    val compact: Boolean,
+    val roster: WebChatRoster,
+    val chat: WebChatLoad,
+    val canvas: WebChatCanvas,
+)
+
 /** Where the chat destination's shell controls go. */
 internal data class WebChatShellActions(
     val onAgentSelected: (AgentItemState) -> Unit,
@@ -63,22 +77,18 @@ internal data class WebChatShellActions(
  */
 @Composable
 internal fun WebChatDestination(
-    compact: Boolean,
-    roster: WebChatRoster,
-    chat: WebChatLoad,
-    canvasStore: CanvasDocumentStore,
-    openOnCanvas: Boolean,
+    state: WebChatDestinationState,
     actions: WebChatShellActions,
     modifier: Modifier = Modifier,
 ) {
+    val roster = state.roster
     Column(modifier = modifier.fillMaxHeight()) {
-        WebChatHeader(compact, roster, actions)
+        WebChatHeader(state.compact, roster, actions)
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when (chat) {
+            when (val chat = state.chat) {
                 is WebChatLoad.Ready -> WebSharedChatPage(
                     port = chat.port,
-                    canvasStore = canvasStore,
-                    openOnCanvas = openOnCanvas,
+                    canvas = state.canvas,
                     navigation = WebChatPageNavigation(
                         openAgentPane = actions.onShowAgents,
                         agentNamesById = roster.agents.associate { it.id to it.name },
@@ -86,9 +96,11 @@ internal fun WebChatDestination(
                 )
                 WebChatLoad.Opening -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 is WebChatLoad.Failed, WebChatLoad.Idle -> WebConnectState(
-                    state = roster.connectionState,
-                    error = (chat as? WebChatLoad.Failed)?.message ?: roster.error,
-                    compact = compact,
+                    state = WebConnectInputs(
+                        connection = roster.connectionState,
+                        error = (chat as? WebChatLoad.Failed)?.message ?: roster.error,
+                        compact = state.compact,
+                    ),
                     onSettings = actions.onSettings,
                     modifier = Modifier.align(Alignment.Center),
                 )
@@ -162,12 +174,17 @@ private fun CompactAgentPicker(roster: WebChatRoster, onAgentSelected: (AgentIte
     }
 }
 
+/** What the connect state shows: the connection, the last error, and the layout it sits in. */
+private data class WebConnectInputs(
+    val connection: WebConnectionState,
+    val error: String?,
+    val compact: Boolean,
+)
+
 /** Before a conversation opens: the connection, and what to do next. */
 @Composable
 private fun WebConnectState(
-    state: WebConnectionState,
-    error: String?,
-    compact: Boolean,
+    state: WebConnectInputs,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -175,14 +192,14 @@ private fun WebConnectState(
         modifier = modifier.padding(LettaDimens.Space.xl).testTag(WebChatTags.CONNECT_STATE),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        WebConnectionStatus(state)
+        WebConnectionStatus(state.connection)
         Spacer(Modifier.height(LettaDimens.Space.md))
-        Text(connectHint(state), style = MaterialTheme.typography.bodyMedium)
-        if (error != null) {
+        Text(connectHint(state.connection), style = MaterialTheme.typography.bodyMedium)
+        state.error?.let { error ->
             Spacer(Modifier.height(LettaDimens.Space.sm))
             Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
-        if (compact && state !is WebConnectionState.Connected) {
+        if (state.compact && state.connection !is WebConnectionState.Connected) {
             Spacer(Modifier.height(LettaDimens.Space.sm))
             AssistChip(onClick = onSettings, label = { Text("Open settings") })
         }

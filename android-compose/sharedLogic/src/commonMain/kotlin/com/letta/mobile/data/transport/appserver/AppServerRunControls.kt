@@ -4,7 +4,9 @@ import com.letta.mobile.data.controller.AppServerApprovalDecisions
 import com.letta.mobile.data.controller.ApprovalRejectedException
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 
 /** One approval answer for an App Server conversation. */
@@ -29,8 +31,8 @@ class AppServerRunControls(
     private val clientLabel: String = "web client",
 ) {
     /** Asks the server to abort the conversation's active run; true when it confirmed the abort. */
-    suspend fun stop(agentId: String, conversationId: String): Boolean {
-        val response = engine.abort(agentId, conversationId, runId = null)
+    suspend fun stop(agent: AgentId, conversation: ConversationId): Boolean {
+        val response = engine.abort(agent.value, conversation.value, runId = null)
         return response.success && response.aborted
     }
 

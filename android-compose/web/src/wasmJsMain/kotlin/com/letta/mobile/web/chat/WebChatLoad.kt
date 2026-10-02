@@ -6,10 +6,6 @@ import androidx.compose.runtime.produceState
 import com.letta.mobile.web.data.AgentItemState
 import com.letta.mobile.web.data.WebConnectionState
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 
 /** Where the selected agent's conversation is on its way to the page. */
 sealed interface WebChatLoad {
@@ -31,7 +27,7 @@ fun interface WebChatOpener {
 /**
  * The selected agent's [WebChatSessionPort], rebuilt whenever the agent or the connection changes
  * (a reconnect is a new App Server session, so the old port's timeline is stale). The port and its
- * timeline run in a scope that ends with it, so a replaced port stops with its composition.
+ * timeline run in the producer's scope, so a replaced port stops with it.
  */
 @Composable
 internal fun rememberWebChatLoad(
@@ -45,9 +41,10 @@ internal fun rememberWebChatLoad(
             return@produceState
         }
         value = WebChatLoad.Opening
-        val portScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext[Job]))
+        // This producer's own scope: it ends when the agent or connection changes or the page
+        // leaves the composition, and the port's timeline ends with it.
         val port = try {
-            WebChatSessionPort(opener.open(agent), portScope)
+            WebChatSessionPort(opener.open(agent), this)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
@@ -55,10 +52,7 @@ internal fun rememberWebChatLoad(
             return@produceState
         }
         value = WebChatLoad.Ready(port)
-        awaitDispose {
-            port.close()
-            portScope.cancel()
-        }
+        awaitDispose { port.close() }
     }
     return load
 }

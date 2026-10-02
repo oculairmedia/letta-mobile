@@ -26,6 +26,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
+import com.letta.mobile.web.WebChatCanvas
 
 /** Where the page's host affordances go in the web shell. */
 internal data class WebChatPageNavigation(
@@ -38,10 +39,10 @@ internal data class WebChatPageNavigation(
 /**
  * letta-mobile-o4ygk.4.5: the web's conversation page, the shared [ChatSurface] in the Pointer
  * idiom, as desktop draws it. It opens on the conversation's canvas with the chat docked under it
- * when [openOnCanvas] is on (the default), else as the full-screen chat; expanding and "Open canvas"
+ * when [WebChatCanvas.openOnCanvas] is on (the default), else as the full-screen chat; expanding and "Open canvas"
  * move between the two.
  *
- * The canvas is the shared [CanvasWorkspace] over an in-memory [CanvasSession] from [canvasStore]:
+ * The canvas is the shared [CanvasWorkspace] over an in-memory [CanvasSession] from [WebChatCanvas.store]:
  * it lasts while the tab does, with no persistence or sync to other devices yet
  * (letta-mobile-o4ygk.4.6). The mascot
  * companion is off because the web has no mascot renderer, so the page shows the agent orb.
@@ -49,16 +50,15 @@ internal data class WebChatPageNavigation(
 @Composable
 internal fun WebSharedChatPage(
     port: WebChatSessionPort,
-    canvasStore: CanvasDocumentStore,
-    openOnCanvas: Boolean,
+    canvas: WebChatCanvas,
     navigation: WebChatPageNavigation,
     modifier: Modifier = Modifier,
 ) {
     var presentation by remember(port) {
-        mutableStateOf(ChatSurfacePresentation.initial(openOnCanvas = openOnCanvas, hasCanvas = true))
+        mutableStateOf(ChatSurfacePresentation.initial(openOnCanvas = canvas.openOnCanvas, hasCanvas = true))
     }
     var dockGeometry by remember { mutableStateOf(ChatDockGeometry.Default) }
-    val session = rememberConversationCanvas(canvasStore, port.target)
+    val session = rememberConversationCanvas(canvas.store, port.target)
     ChatSurface(
         port = port,
         presentation = presentation,

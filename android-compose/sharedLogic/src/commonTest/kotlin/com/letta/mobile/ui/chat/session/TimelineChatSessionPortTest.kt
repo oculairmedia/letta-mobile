@@ -12,6 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -196,7 +197,13 @@ class TimelineChatSessionPortTest {
     private fun TestScope.port(
         session: FakeTimelineChatSession,
         controls: TimelineChatRunControls = TimelineChatRunControls(),
-    ) = TimelineChatSessionPort(session, target, backgroundScope, TimelineChatSessionOptions(controls = controls))
+    ): TimelineChatSessionPort {
+        val port = TimelineChatSessionPort(session, target, backgroundScope, TimelineChatSessionOptions(controls = controls))
+        // The page's flows share while collected, as ChatSurface collects them.
+        backgroundScope.launch { port.uiState.collect {} }
+        backgroundScope.launch { port.composer.collect {} }
+        return port
+    }
 
     private fun image() = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")
 

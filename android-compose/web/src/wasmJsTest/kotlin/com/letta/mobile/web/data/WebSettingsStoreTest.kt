@@ -1,7 +1,6 @@
 package com.letta.mobile.web.data
 
 import com.letta.mobile.data.model.LettaConfig
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,64 +10,52 @@ import kotlin.test.assertTrue
 /** letta-mobile-o4ygk.4.5: the web's settings survive a reload, the access token does not. */
 class WebSettingsStoreTest {
     @Test
-    fun theBackendAddressSurvivesAReloadButTheTokenDoesNot() = runTest {
+    fun theBackendAddressSurvivesAReloadButTheTokenDoesNot() {
         val slot = MemorySlot()
-        val settings = WebSettings(WebSettingsPreferencesStore(slot))
-        settings.saveConfig(
+        WebSettingsStore(slot).saveBackend(
             LettaConfig(id = "default", mode = LettaConfig.Mode.CLOUD, serverUrl = "wss://example.test/ws", accessToken = "secret"),
         )
 
-        val reloaded = WebSettingsPreferencesStore(slot)
-        val config = WebSettings(reloaded).config(reloaded.snapshots.value)
+        val config = WebSettingsStore(slot).load().config
 
         assertEquals("wss://example.test/ws", config.serverUrl)
         assertEquals(LettaConfig.Mode.CLOUD, config.mode)
         assertNull(config.accessToken)
-        assertFalse(slot.value.orEmpty().contains("secret"))
+        assertFalse(slot.document?.json.orEmpty().contains("secret"))
     }
 
     @Test
-    fun conversationsOpenOnTheCanvasUntilTurnedOff() = runTest {
-        val store = WebSettingsPreferencesStore(MemorySlot())
-        val settings = WebSettings(store)
-        assertTrue(settings.openChatsOnCanvas(store.snapshots.value))
+    fun conversationsOpenOnTheCanvasUntilTurnedOff() {
+        val store = WebSettingsStore(MemorySlot())
+        assertTrue(store.load().openChatsOnCanvas)
 
-        store.edit { it.putBoolean("chat.open_on_canvas", false) }
+        store.save(store.load().copy(openChatsOnCanvas = false))
 
-        assertFalse(settings.openChatsOnCanvas(store.snapshots.value))
+        assertFalse(store.load().openChatsOnCanvas)
     }
 
     @Test
-    fun everyValueKindRoundTripsAndClearAllEmptiesTheSlot() = runTest {
-        val slot = MemorySlot()
-        val store = WebSettingsPreferencesStore(slot)
-        store.edit { editor ->
-            editor.putString("s", "text")
-            editor.putFloat("f", 1.5f)
-            editor.putStringSet("set", setOf("a", "b"))
-        }
+    fun savingTheBackendKeepsTheOtherSettings() {
+        val store = WebSettingsStore(MemorySlot())
+        store.save(WebSavedSettings(openChatsOnCanvas = false))
 
-        val reloaded = WebSettingsPreferencesStore(slot).snapshots.value
-        assertEquals("text", reloaded.getString("s"))
-        assertEquals(1.5f, reloaded.getFloat("f"))
-        assertEquals(setOf("a", "b"), reloaded.getStringSet("set"))
+        store.saveBackend(LettaConfig(id = "default", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://h/ws", accessToken = null))
 
-        store.clearAll()
-        assertNull(slot.value)
+        assertEquals(WebSavedSettings(serverUrl = "ws://h/ws", openChatsOnCanvas = false), store.load())
     }
 
     @Test
-    fun unreadableStoredSettingsReadAsEmpty() {
-        val store = WebSettingsPreferencesStore(MemorySlot("not json"))
+    fun unreadableStoredSettingsReadAsTheDefaults() {
+        val store = WebSettingsStore(MemorySlot(WebSettingsDocument("not json")))
 
-        assertNull(store.snapshots.value.getString("backend.server_url"))
+        assertEquals(WebSavedSettings(), store.load())
     }
 
-    private class MemorySlot(var value: String? = null) : WebSettingsSlot {
-        override fun read(): String? = value
+    private class MemorySlot(var document: WebSettingsDocument? = null) : WebSettingsSlot {
+        override fun read(): WebSettingsDocument? = document
 
-        override fun write(value: String?) {
-            this.value = value
+        override fun write(document: WebSettingsDocument?) {
+            this.document = document
         }
     }
 }

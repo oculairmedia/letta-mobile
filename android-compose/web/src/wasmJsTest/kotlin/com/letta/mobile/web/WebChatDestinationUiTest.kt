@@ -24,11 +24,12 @@ class WebChatDestinationUiTest {
         setContent {
             SharedMaterialTheme {
                 WebChatDestination(
-                    compact = false,
-                    roster = WebChatRoster(emptyList(), null, WebConnectionState.Unconfigured, error = null),
-                    chat = WebChatLoad.Idle,
-                    canvasStore = InMemoryCanvasDocumentStore(),
-                    openOnCanvas = true,
+                    state = WebChatDestinationState(
+                        compact = false,
+                        roster = WebChatRoster(emptyList(), null, WebConnectionState.Unconfigured, error = null),
+                        chat = WebChatLoad.Idle,
+                        canvas = WebChatCanvas(InMemoryCanvasDocumentStore(), openOnCanvas = true),
+                    ),
                     actions = WebChatShellActions(onAgentSelected = {}, onSettings = {}, onShowAgents = {}),
                 )
             }
@@ -43,11 +44,12 @@ class WebChatDestinationUiTest {
         setContent {
             SharedMaterialTheme {
                 WebChatDestination(
-                    compact = true,
-                    roster = WebChatRoster(listOf(agent), agent, WebConnectionState.Connected("WebSocket"), error = null),
-                    chat = WebChatLoad.Failed("conversation.create timed out"),
-                    canvasStore = InMemoryCanvasDocumentStore(),
-                    openOnCanvas = true,
+                    state = WebChatDestinationState(
+                        compact = true,
+                        roster = WebChatRoster(listOf(agent), agent, WebConnectionState.Connected("WebSocket"), error = null),
+                        chat = WebChatLoad.Failed("conversation.create timed out"),
+                        canvas = WebChatCanvas(InMemoryCanvasDocumentStore(), openOnCanvas = true),
+                    ),
                     actions = WebChatShellActions(onAgentSelected = {}, onSettings = {}, onShowAgents = {}),
                 )
             }

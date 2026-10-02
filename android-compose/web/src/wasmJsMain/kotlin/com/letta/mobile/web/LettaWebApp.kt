@@ -23,8 +23,7 @@ import com.letta.mobile.web.chat.WebChatOpener
 import com.letta.mobile.web.chat.rememberWebChatLoad
 import com.letta.mobile.web.data.AgentItemState
 import com.letta.mobile.web.data.WasmAppServerClientGateway
-import com.letta.mobile.web.data.WebSettings
-import com.letta.mobile.web.data.WebSettingsPreferencesStore
+import com.letta.mobile.web.data.WebSettingsStore
 import com.letta.mobile.web.fs.WebWorkspaceController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -36,14 +35,13 @@ fun LettaWebApp() {
     val scope = rememberCoroutineScope()
     val workspace = remember { WebWorkspaceController() }
     val gateway = remember { WasmAppServerClientGateway(scope) }
-    val settingsStore = remember { WebSettingsPreferencesStore() }
-    val settings = remember(settingsStore) { WebSettings(settingsStore) }
-    val savedSettings by settingsStore.snapshots.collectAsState()
+    val settingsStore = remember { WebSettingsStore() }
+    val savedSettings = remember(settingsStore) { settingsStore.load() }
     // letta-mobile-o4ygk.4.5: boards live in memory for the tab's lifetime (no web persistence yet).
     val canvasStore = remember { InMemoryCanvasDocumentStore() }
     val connectionState by gateway.state.collectAsState()
     val agents = remember { mutableStateListOf<AgentItemState>() }
-    var config by remember { mutableStateOf(settings.config(savedSettings)) }
+    var config by remember { mutableStateOf(savedSettings.config) }
     var destination by remember { mutableStateOf(WebNavDestination.CHAT) }
     var showSidebar by remember { mutableStateOf(true) }
     var selectedAgentId by remember { mutableStateOf<String?>(null) }
@@ -111,11 +109,12 @@ fun LettaWebApp() {
                     }
                     when (destination) {
                         WebNavDestination.CHAT -> WebChatDestination(
-                            compact = compact,
-                            roster = WebChatRoster(agents, selectedAgent, connectionState, uiError),
-                            chat = chat,
-                            canvasStore = canvasStore,
-                            openOnCanvas = settings.openChatsOnCanvas(savedSettings),
+                            state = WebChatDestinationState(
+                                compact = compact,
+                                roster = WebChatRoster(agents, selectedAgent, connectionState, uiError),
+                                chat = chat,
+                                canvas = WebChatCanvas(canvasStore, savedSettings.openChatsOnCanvas),
+                            ),
                             actions = WebChatShellActions(
                                 onAgentSelected = ::selectAgent,
                                 onSettings = { destination = WebNavDestination.SETTINGS },
@@ -129,7 +128,7 @@ fun LettaWebApp() {
                             config = config,
                             onConfigSaved = { saved ->
                                 config = saved
-                                scope.launch { settings.saveConfig(saved) }
+                                settingsStore.saveBackend(saved)
                             },
                             onTokenCleared = { config = config.copy(accessToken = null) },
                             onBack = { destination = WebNavDestination.CHAT },

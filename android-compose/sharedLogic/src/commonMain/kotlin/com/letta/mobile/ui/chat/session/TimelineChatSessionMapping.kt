@@ -38,6 +38,12 @@ data class TimelineComposerDraft(
     fun cleared() = copy(state = state.copy(error = null), hostError = null)
 }
 
+/** One message to send: its text and staged images. */
+data class TimelineSend(
+    val text: String,
+    val attachments: List<MessageContentPart.Image>,
+)
+
 /** The run and load facts the timeline itself does not carry. */
 data class TimelineRunState(
     val loading: Boolean = true,
