@@ -1,0 +1,15 @@
+{
+  "about": "letta.example widget props (manifest-example.json, schemaVersion 2) and the JSON pointers each is refused at; empty = accepted.",
+  "type": "ext:letta.example/widget",
+  "v": 2,
+  "cases": [
+    { "name": "valid", "props": { "status": "running", "progress": 0.42, "label": "Nightly render" }, "expected": [] },
+    { "name": "empty props", "props": {}, "expected": [] },
+    { "name": "status outside the enum", "props": { "status": "paused" }, "expected": ["/props/status"] },
+    { "name": "extra key", "props": { "status": "idle", "pct": 0.5 }, "expected": ["/props/pct"] },
+    { "name": "progress over the maximum", "props": { "progress": 1.5 }, "expected": ["/props/progress"] },
+    { "name": "progress not a number", "props": { "progress": "half" }, "expected": ["/props/progress"] },
+    { "name": "label too long", "props": { "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }, "expected": ["/props/label"] },
+    { "name": "several at once", "props": { "status": "paused", "progress": -1, "extra": true }, "expected": ["/props/status", "/props/progress", "/props/extra"] }
+  ]
+}

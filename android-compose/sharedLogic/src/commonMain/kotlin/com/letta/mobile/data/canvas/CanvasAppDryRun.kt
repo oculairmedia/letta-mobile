@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -26,9 +27,9 @@ internal object CanvasAppDryRun {
     fun replaceScene(input: JsonObject): List<CanvasOp>? =
         (input["scene_json"] as? JsonPrimitive)?.contentOrNull?.let { listOf(CanvasOp.ReplaceSceneOp("", "", 0L, it)) }
 
-    /** [ops] checked against [doc] as [callerId] would write them; nothing is written. */
-    fun answer(doc: CanvasDocument, ops: List<CanvasOp>, callerId: String): ExternalToolResult {
-        val check = CanvasBatchValidator.check(doc.sceneJson, ops.map { it.withActor(callerId) })
+    /** [ops] checked against [doc] as [callerId] would write them, plugin props against [kinds]; nothing is written. */
+    fun answer(doc: CanvasDocument, ops: List<CanvasOp>, callerId: String, kinds: PluginKindCatalog): ExternalToolResult {
+        val check = CanvasBatchValidator.check(doc.sceneJson, ops.map { it.withActor(callerId) }, kinds)
         val result = CanvasDryRun.result(check, doc.revision, doc.id.value)
         return ExternalToolResult.Success(json.encodeToString(CanvasDryRunResult.serializer(), result))
     }
