@@ -57,6 +57,8 @@ include(":avatar:core")
 include(":avatar:renderer-rive")
 include(":sharedLogic")
 include(":sharedUI")
+// Phone fixtures for the shared chat page: sharedUI's snapshot tests and desktop's phone playground.
+include(":sharedUI-devfixtures")
 // DrawBox, vendored from upstream v2.1.0 so the canvas can be fixed at the source (drawbox/VENDORED.md).
 include(":drawbox")
 include(":designsystem")

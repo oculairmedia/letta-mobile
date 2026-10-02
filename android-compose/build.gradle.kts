@@ -15,6 +15,9 @@ plugins {
     // runtime to 1.11.1; DesktopJewelTheme bridges Jewel's older text-menu ABI.
     id("org.jetbrains.compose") version "1.10.0" apply false
     id("dev.nucleusframework") version "2.1.5" apply false
+    // Compose Hot Reload for the desktop phone preview (docs/development/phone-preview.md). Applied to
+    // :desktop only when a hot task is requested, so ordinary and CI builds never see it.
+    id("org.jetbrains.compose.hot-reload") version "1.2.0" apply false
     id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
     id("io.github.takahirom.roborazzi") version "1.63.0" apply false
     alias(libs.plugins.kotlin.compose) apply false

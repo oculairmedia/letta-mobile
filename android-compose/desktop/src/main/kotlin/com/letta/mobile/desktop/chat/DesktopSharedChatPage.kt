@@ -4,7 +4,9 @@ import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import androidx.compose.runtime.MutableState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -26,6 +28,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
@@ -39,6 +44,9 @@ import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.canvas.DesktopCanvasHostSync
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.openDesktopCanvasSession
+import com.letta.mobile.desktop.phone.DesktopPhoneChrome
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.PhoneChatHeader
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
@@ -47,9 +55,12 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
+import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.ChatToolDetails
+import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 
@@ -132,11 +143,14 @@ internal fun DesktopSharedChatPage(
     val port = state.port
     SideEffect { port.updateHostInputs(state.hostInputs) }
     val openOnCanvas = LocalDesktopOpenChatsOnCanvas.current
+    // The phone preview draws this page as Android's SharedChatPage does; null on the desktop.
+    val phone = LocalDesktopPhone.current
     var presentation by remember {
-        mutableStateOf(ChatSurfacePresentation.initial(openOnCanvas.enabled.value, hasCanvas = true))
+        // A phone opens on the canvas, as Android does.
+        mutableStateOf(ChatSurfacePresentation.initial(phone != null || openOnCanvas.enabled.value, hasCanvas = true))
     }
     val hasConversation = state.canvasOwner.conversationId != null
-    val host = rememberDesktopChatSurfaceHost(port, navigation)
+    val host = rememberDesktopChatSurfaceHost(port, navigation, phone)
     val ambientStatus = rememberDesktopAmbientStatus(state.isThinking, state.errorMessage)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
     state.dockedCanvas?.let { router ->
@@ -149,12 +163,19 @@ internal fun DesktopSharedChatPage(
         }
     }
     var dockGeometry by state.dockGeometry
+    val onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } }
+    // The phone's floating header over the full-screen page; the page and the board draw under it and
+    // keep their content below it (Android's topChromeInset). Zero on the desktop.
+    var phoneHeaderHeight by remember { mutableStateOf(0.dp) }
+    val fullScreen = presentation.mode == ChatSurfaceMode.FullScreen
+    val topChromeInset = if (phone == null) 0.dp else phoneTopChromeInset(fullScreen, phoneHeaderHeight)
+    val page = @Composable { pageModifier: Modifier ->
     ChatSurface(
         port = port,
         presentation = presentation,
-        onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } },
+        onIntent = onIntent,
         host = host,
-        modifier = modifier
+        modifier = pageModifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             // Bubble phase, so an open image viewer or popup takes its own Escape first.
@@ -163,26 +184,85 @@ internal fun DesktopSharedChatPage(
                 if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
                 collapse
             },
-        appearance = ChatSurfaceAppearance(
-            fontScale = LocalDesktopChatFontScale.current,
-            // The font-scale host already scales the window's text through density.
-            fontScaleAppliedByHost = true,
-            fontScaleRange = MIN_CHAT_FONT_SCALE..MAX_CHAT_FONT_SCALE,
-        ),
-        platform = remember(ambientStatus) {
+        appearance = if (phone == null) {
+            ChatSurfaceAppearance(
+                fontScale = LocalDesktopChatFontScale.current,
+                // The font-scale host already scales the window's text through density.
+                fontScaleAppliedByHost = true,
+                fontScaleRange = MIN_CHAT_FONT_SCALE..MAX_CHAT_FONT_SCALE,
+            )
+        } else {
+            PhoneChatAppearance
+        },
+        platform = remember(ambientStatus, phone, topChromeInset) {
             ChatSurfacePlatform(
                 pageBackground = { content ->
                     DesktopAmbientChatBackground(status = ambientStatus, modifier = Modifier.fillMaxSize()) { content() }
                 },
-                showKeyboardHints = true,
+                // Touch first on the phone: the shortcut strip is desktop chrome.
+                showKeyboardHints = phone == null,
+                topChromeInset = topChromeInset,
             )
         },
         pagedTimeline = state.pagedTimeline,
         canvas = { actions ->
-            if (hasConversation) DockedConversationCanvas(session, actions, state.canvasHeaderTrailing) else ChatCanvasPlaceholder()
+            if (hasConversation) {
+                DockedConversationCanvas(session, actions, state.canvasHeaderTrailing, chromeTopInset = topChromeInset)
+            } else {
+                ChatCanvasPlaceholder()
+            }
         },
         dockGeometry = dockGeometry,
         onDockGeometryChange = { dockGeometry = it },
+    )
+    }
+    if (phone == null) {
+        page(modifier)
+    } else {
+        Box(modifier.fillMaxSize()) {
+            page(Modifier)
+            // On a phone the canvas mode keeps the top of the board clear: the header shows over the chat only.
+            if (fullScreen) {
+                PhoneChatPageHeader(
+                    port = port,
+                    onMenu = { phone.drawerOpen = true },
+                    onCanvas = { onIntent(ChatSurfaceIntent.Collapse) },
+                    onHeightChange = { phoneHeaderHeight = it },
+                )
+            }
+        }
+    }
+}
+
+/** The phone's idiom, as Android's SharedChatPage sets it: the Touch bar, sheets, the canvas's chat head. */
+private val PhoneChatAppearance = ChatSurfaceAppearance(
+    platformStyle = ChatPlatformStyle.Touch,
+    toolDetails = ChatToolDetails.Sheet,
+    fontScaleRange = DefaultFontScaleRange,
+)
+
+/** The status bar, plus the floating header while the full-screen page shows it. */
+@Composable
+private fun phoneTopChromeInset(fullScreen: Boolean, headerHeight: Dp): Dp {
+    val density = LocalDensity.current
+    val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+    return if (fullScreen) maxOf(statusBar, headerHeight) else statusBar
+}
+
+/** The header's own composable, so the agent's name is the only thing it collects from the page. */
+@Composable
+private fun PhoneChatPageHeader(
+    port: DesktopChatSessionPort,
+    onMenu: () -> Unit,
+    onCanvas: () -> Unit,
+    onHeightChange: (Dp) -> Unit,
+) {
+    val agentName = port.uiState.collectAsState().value.agentName
+    PhoneChatHeader(
+        title = agentName?.takeIf { it.isNotBlank() } ?: "Chat",
+        onMenu = onMenu,
+        onCanvas = onCanvas,
+        onHeightChange = onHeightChange,
     )
 }
 
@@ -219,6 +299,8 @@ private fun DockedConversationCanvas(
     session: CanvasSession?,
     actions: ChatCanvasActions,
     headerTrailing: (@Composable () -> Unit)?,
+    /** The phone's status bar (and header, over the full-screen page), which the board draws under. */
+    chromeTopInset: Dp = 0.dp,
 ) {
     if (session == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -236,6 +318,7 @@ private fun DockedConversationCanvas(
         modifier = Modifier.fillMaxSize(),
         // A chat card's "Show on canvas" frames its artifact here (letta-mobile-bglj6.13).
         cameraRequest = actions.camera,
+        chromeTopInset = chromeTopInset,
     )
 }
 
@@ -244,6 +327,7 @@ private fun DockedConversationCanvas(
 private fun rememberDesktopChatSurfaceHost(
     port: DesktopChatSessionPort,
     navigation: DesktopSharedChatPageNavigation,
+    phone: DesktopPhoneChrome? = null,
 ): ChatSurfaceHost {
     val directoryPicker = rememberDirectoryPickerLauncher(
         dialogSettings = FileKitDialogSettings(title = "Choose working directory"),
@@ -258,15 +342,18 @@ private fun rememberDesktopChatSurfaceHost(
     val hasEditAgent = navigation.editAgent != null
     // Keyed on the roster: rows resolve names while they compose, so new names are a new host.
     val agentNames = navigation.agentNamesById
-    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent, agentNames) {
+    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent, agentNames, phone) {
+        // On the phone the agent pane is the drawer, and it is also the agent switcher (Android's header pill).
+        val openDrawer: (() -> Unit)? = phone?.let { chrome -> { chrome.drawerOpen = true } }
         ChatSurfaceHost(
             openCanvas = { latest.openCanvas() },
             openAgent = { agentId -> latest.openAgent(agentId) },
             openModelPicker = { latest.openModelPicker() },
             resolveAgentName = agentNames::get,
             pickWorkingDirectory = if (supportsWorkingDirectory) ({ directoryPicker.launch() }) else null,
-            openAgentPane = if (hasAgentPane) ({ latest.openAgentPane?.invoke() }) else null,
+            openAgentPane = openDrawer ?: if (hasAgentPane) ({ latest.openAgentPane?.invoke() }) else null,
             editAgent = if (hasEditAgent) ({ latest.editAgent?.invoke() }) else null,
+            openAgentSwitcher = openDrawer,
         )
     }
 }
