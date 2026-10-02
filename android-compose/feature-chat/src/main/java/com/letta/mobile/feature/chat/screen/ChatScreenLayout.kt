@@ -141,24 +141,33 @@ internal fun ChatScreenLayout(
                 onTargetUpdate = localState.onTappedSubagentTargetChange,
             ),
         )
-        localState.toolRunDetails?.let { groups ->
-            ToolRunDetailsSheet(
-                groups = groups,
-                onDismiss = { localState.onToolRunDetailsChange(null) },
-                onAttachmentImageTap = localState.contentCallbacks.onAttachmentImageTap,
-            )
-        }
-        ChatScreenFloatingOverlays(
-            params = ChatScreenFloatingOverlaysParams(
-                floatingBannerMessage = params.floatingBannerMessage,
-                imageViewerState = localState.imageViewerState,
-                onImageViewerDismiss = { localState.onImageViewerStateChange(null) },
-                chatMode = params.chatMode,
-                a2uiDebugFrames = params.state.a2uiDebugFrames,
-                modifier = Modifier.fillMaxSize(),
-            ),
+        ChatScreenDetailOverlays(params = params, localState = localState)
+    }
+}
+
+/** The tool-run details sheet, the floating banner, the image viewer and the A2UI debug frames. */
+@Composable
+private fun ChatScreenDetailOverlays(
+    params: ChatScreenLayoutParams,
+    localState: ChatScreenLayoutLocalState,
+) {
+    localState.toolRunDetails?.let { groups ->
+        ToolRunDetailsSheet(
+            groups = groups,
+            onDismiss = { localState.onToolRunDetailsChange(null) },
+            onAttachmentImageTap = localState.contentCallbacks.onAttachmentImageTap,
         )
     }
+    ChatScreenFloatingOverlays(
+        params = ChatScreenFloatingOverlaysParams(
+            floatingBannerMessage = params.floatingBannerMessage,
+            imageViewerState = localState.imageViewerState,
+            onImageViewerDismiss = { localState.onImageViewerStateChange(null) },
+            chatMode = params.chatMode,
+            a2uiDebugFrames = params.state.a2uiDebugFrames,
+            modifier = Modifier.fillMaxSize(),
+        ),
+    )
 }
 
 @Composable
