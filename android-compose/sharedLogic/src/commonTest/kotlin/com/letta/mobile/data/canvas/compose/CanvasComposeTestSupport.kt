@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-/** JSON helpers for the canvas.compose contract tests: canonical form, pointers and edits by pointer. */
+/** JSON helpers for the canvas_compose contract tests: canonical form, pointers and edits by pointer. */
 internal object ComposeJson {
     fun parse(text: String): JsonElement = CanvasComposeContract.json.parseToJsonElement(text)
 

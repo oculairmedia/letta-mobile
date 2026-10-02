@@ -42,13 +42,13 @@ class CanvasExternalToolsTest {
 
         assertEquals(
             listOf(
-                "canvas.create",
-                "canvas.get_scene",
-                "canvas.replace_scene",
-                "canvas.apply_ops",
-                "canvas.list",
-                "canvas.compose",
-                "canvas.compose_guide",
+                "canvas_create",
+                "canvas_get_scene",
+                "canvas_replace_scene",
+                "canvas_apply_ops",
+                "canvas_list",
+                "canvas_compose",
+                "canvas_compose_guide",
             ),
             advertised,
         )
@@ -62,8 +62,8 @@ class CanvasExternalToolsTest {
     @Test
     fun canvasCreateAndGetSceneFlow() = runTest {
         val tools = CanvasExternalTools.all(store, sessions).associateBy { it.name }
-        val createTool = tools.getValue("canvas.create")
-        val getSceneTool = tools.getValue("canvas.get_scene")
+        val createTool = tools.getValue("canvas_create")
+        val getSceneTool = tools.getValue("canvas_get_scene")
 
         val createResult = createTool.invoke(
             buildJsonObject {
@@ -325,7 +325,7 @@ class CanvasExternalToolsTest {
     @Test
     fun errorHandlingMissingParamsOrDoc() = runTest {
         val tools = CanvasExternalTools.all(store, sessions).associateBy { it.name }
-        val getSceneTool = tools.getValue("canvas.get_scene")
+        val getSceneTool = tools.getValue("canvas_get_scene")
 
         val missingParamResult = getSceneTool.invoke(buildJsonObject { }, agentId = "agent-1")
         assertIs<ExternalToolResult.Error>(missingParamResult)
@@ -340,14 +340,14 @@ class CanvasExternalToolsTest {
     fun everyToolRefusesACallWithoutAnAuthenticatedAgent() = runTest {
         store.upsert(openDocument(CanvasId("canvas-open"), conversationId = "conv-open"))
         val inputs = mapOf(
-            "canvas.create" to buildJsonObject { put("title", "x") },
-            "canvas.get_scene" to buildJsonObject { put("canvas_id", "canvas-open") },
-            "canvas.replace_scene" to buildJsonObject { put("canvas_id", "canvas-open"); put("scene_json", "{}") },
-            "canvas.apply_ops" to buildJsonObject { put("canvas_id", "canvas-open"); put("ops", buildJsonArray { }) },
-            "canvas.export_svg" to buildJsonObject { put("canvas_id", "canvas-open") },
-            "canvas.list" to buildJsonObject { put("conversation_id", "conv-open") },
-            "canvas.compose" to buildJsonObject { put("canvas_id", "canvas-open") },
-            "canvas.compose_guide" to buildJsonObject { },
+            "canvas_create" to buildJsonObject { put("title", "x") },
+            "canvas_get_scene" to buildJsonObject { put("canvas_id", "canvas-open") },
+            "canvas_replace_scene" to buildJsonObject { put("canvas_id", "canvas-open"); put("scene_json", "{}") },
+            "canvas_apply_ops" to buildJsonObject { put("canvas_id", "canvas-open"); put("ops", buildJsonArray { }) },
+            "canvas_export_svg" to buildJsonObject { put("canvas_id", "canvas-open") },
+            "canvas_list" to buildJsonObject { put("conversation_id", "conv-open") },
+            "canvas_compose" to buildJsonObject { put("canvas_id", "canvas-open") },
+            "canvas_compose_guide" to buildJsonObject { },
         )
         for (tool in CanvasExternalTools.all(store, sessions)) {
             val result = tool.invoke(inputs.getValue(tool.name), agentId = null)
@@ -381,7 +381,7 @@ class CanvasExternalToolsTest {
         assertIs<ExternalToolResult.Error>(spoofed)
         assertTrue(spoofed.error.contains("Unauthorized"))
 
-        // canvas.create stamps ownership from the runtime identity, not the input.
+        // canvas_create stamps ownership from the runtime identity, not the input.
         val created = CanvasCreateTool(store, sessions).invoke(
             buildJsonObject { put("agent_id", "trusted-agent") },
             agentId = "intruder",
@@ -422,7 +422,7 @@ class CanvasExternalToolsTest {
         )
         assertIs<ExternalToolResult.Error>(createResult)
         assertTrue(createResult.error.contains("Unauthorized"))
-        assertTrue(createResult.error.contains("canvas-hidden").not(), "the private canvas id leaked through canvas.create")
+        assertTrue(createResult.error.contains("canvas-hidden").not(), "the private canvas id leaked through canvas_create")
 
         // The reader it names still resolves the existing canvas.
         val allowed = CanvasListTool(store, sessions).invoke(

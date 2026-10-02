@@ -43,7 +43,7 @@ data class CanvasArtifactError(
 )
 
 /**
- * letta-mobile-bglj6.13 (canvas.compose C8): the chat-side part of one compose call, shown as a
+ * letta-mobile-bglj6.13 (canvas_compose C8): the chat-side part of one compose call, shown as a
  * card on the message that narrates it. Derived, never persisted: it is read off the compose tool
  * return already stored on the TOOL_CALL timeline event (docs/design/canvas-compose-plan.md, D4).
  *
@@ -78,7 +78,7 @@ data class CanvasArtifactReceipt(
 /**
  * The single-receipt rule (plan 3.5, D4), as a pure projection over a run of timeline events.
  *
- * For every `canvas.compose` call (in a Local or Confirmed TOOL_CALL event) the receipt is read
+ * For every `canvas_compose` call (in a Local or Confirmed TOOL_CALL event) the receipt is read
  * from its return (`toolReturnContentByCallId[callId]`, else `toolReturnContent`) and attached to
  * exactly one event:
  *

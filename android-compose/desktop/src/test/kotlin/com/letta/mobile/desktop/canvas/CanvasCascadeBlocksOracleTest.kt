@@ -33,7 +33,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * The oracle for canvas.compose's block writer (letta-mobile-bglj6.8): the real cascade-editor
+ * The oracle for canvas_compose's block writer (letta-mobile-bglj6.8): the real cascade-editor
  * 1.9.2, which renders and edits every note, is the authority on the document format, and
  * [CanvasCascadeBlocks] (sharedLogic, no editor dependency) must write exactly what it reads.
  *

@@ -24,7 +24,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * canvas.compose on the Iroh host (letta-mobile-bglj6.12): the fixture request published through
+ * canvas_compose on the Iroh host (letta-mobile-bglj6.12): the fixture request published through
  * the relay's log as one batch, dry runs, structured refusals, retries and the caller checks.
  */
 class HostCanvasComposeToolsTest {

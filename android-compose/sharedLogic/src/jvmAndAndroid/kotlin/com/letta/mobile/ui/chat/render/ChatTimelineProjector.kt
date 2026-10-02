@@ -148,7 +148,7 @@ class ChatTimelineProjector {
         ownAgentId: String? = null,
     ): TimelineProjection {
         val startedAtMs = System.currentTimeMillis()
-        // letta-mobile-bglj6.13: canvas.compose receipts move across events (onto the narrating
+        // letta-mobile-bglj6.13: canvas_compose receipts move across events (onto the narrating
         // message), so they are attached once over the whole timeline, after the per-event cache.
         val receipts = CanvasArtifactReceipts.attach(timeline.events)
         tailProjectionFastPath(

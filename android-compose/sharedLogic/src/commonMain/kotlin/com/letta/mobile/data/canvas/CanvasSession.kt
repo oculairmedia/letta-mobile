@@ -420,7 +420,7 @@ class CanvasSession(
     }
 
     /**
-     * An agent's checked batch applied as one op (letta-mobile-bglj6.12, canvas.compose): stamped
+     * An agent's checked batch applied as one op (letta-mobile-bglj6.12, canvas_compose): stamped
      * after this session's clock ([CanvasStampedBatch]), held to the ACL as [actorId], logged,
      * committed as a single revision and published to peers as one message, so a peer never holds
      * half of it.

@@ -72,7 +72,7 @@ import kotlin.test.assertTrue
  * and two notes, through the real path:
  *
  * App Server `external_tool_call_request` -> ExternalToolDispatcher -> the Iroh host's
- * canvas.compose -> one atomic BatchOp in the relay log -> the board; the relay entries applied by
+ * canvas_compose -> one atomic BatchOp in the relay log -> the board; the relay entries applied by
  * an app into its notebook (NotebookLocalStore), the app restarted and the board read back; the
  * answer streamed back as the run's tool return -> the timeline reducer -> exactly one receipt on
  * the narrating message, the same after a hydrate from the stored envelope. Then a second compose

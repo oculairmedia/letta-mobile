@@ -17,7 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * The `canvas.compose` input schema, and the check that holds a request to it. The model is given
+ * The `canvas_compose` input schema, and the check that holds a request to it. The model is given
  * exactly this schema, so a refusal's path (`/items/2/markdown`) points at a place it can see. It
  * is strict at every level (`additionalProperties: false`) and its caps are [CanvasComposeContract]'s.
  *
@@ -108,7 +108,7 @@ object CanvasComposeSchema {
     /** The schema of one top-level item, any of the five kinds. */
     val item: JsonObject = anyOf(note, checklist, card, text, group)
 
-    /** The whole `canvas.compose` input. */
+    /** The whole `canvas_compose` input. */
     val input: JsonObject = obj(
         required = listOf("items"),
         "catalog" to string(enum = listOf(Contract.CATALOG)),

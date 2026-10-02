@@ -41,7 +41,7 @@ import kotlin.test.assertEquals
 /**
  * The compose call id, end to end in one process (letta-mobile-bglj6.12 with C8's projection): the
  * App Server's `external_tool_call_request` is answered by the real dispatcher through the Iroh
- * host's canvas.compose, the answer comes back on the run as the tool return of the TOOL_CALL with
+ * host's canvas_compose, the answer comes back on the run as the tool return of the TOOL_CALL with
  * the same `tool_call_id`, and the chat projection puts exactly one receipt card on the message
  * that narrates it, for the artifact the host derived from that id.
  */

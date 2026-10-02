@@ -25,7 +25,7 @@ import io.github.linreal.cascade.editor.ui.ExperimentalCascadePreviewApi
 import kotlin.math.ceil
 
 /**
- * Auto-fit for note cards (canvas.compose C6, letta-mobile-bglj6.11; absorbs letta-mobile-8tlf9).
+ * Auto-fit for note cards (canvas_compose C6, letta-mobile-bglj6.11; absorbs letta-mobile-8tlf9).
  *
  * The stored frame of an AUTO-owned note is a RESERVATION (plan section 3.4, decision D3): the
  * compose layer booked a height it could not measure. The card fits its content within it: it

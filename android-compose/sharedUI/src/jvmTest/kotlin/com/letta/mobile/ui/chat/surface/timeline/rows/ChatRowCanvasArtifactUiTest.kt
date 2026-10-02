@@ -28,7 +28,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * letta-mobile-bglj6.13: the canvas.compose card on the narrating message. Each status renders,
+ * letta-mobile-bglj6.13: the canvas_compose card on the narrating message. Each status renders,
  * "Show on canvas" raises the host with the receipt (its bounds), the action is offered to
  * assistive tech, and a run keeps the narration that carries a card.
  */
@@ -140,7 +140,7 @@ class ChatRowCanvasArtifactUiTest {
     fun aRunKeepsTheNarrationThatCarriesACard() = runComposeUiTest {
         val call = UiMessage(
             id = "tc", role = "assistant", content = "", timestamp = T0, runId = "run-1",
-            toolCalls = listOf(UiToolCall(name = "canvas.compose", arguments = "{}", result = "{}", status = "success", toolCallId = "t1")),
+            toolCalls = listOf(UiToolCall(name = "canvas_compose", arguments = "{}", result = "{}", status = "success", toolCallId = "t1")),
         )
         val item = ChatRenderItem.RunBlock("run-1", listOf(call to GroupPosition.First, narration(published) to GroupPosition.Last))
         setContent { MaterialTheme { RenderRow(item) } }
@@ -152,12 +152,12 @@ class ChatRowCanvasArtifactUiTest {
     fun aRunKeepsACardLeftOnAToolCallWithNoNarration() = runComposeUiTest {
         val call = UiMessage(
             id = "tc", role = "assistant", content = "", timestamp = T0, runId = "run-1",
-            toolCalls = listOf(UiToolCall(name = "canvas.compose", arguments = "{}", result = "{}", status = "success", toolCallId = "t1")),
+            toolCalls = listOf(UiToolCall(name = "canvas_compose", arguments = "{}", result = "{}", status = "success", toolCallId = "t1")),
             artifacts = listOf(published),
         )
         val other = UiMessage(
             id = "tc2", role = "assistant", content = "", timestamp = T0, runId = "run-1",
-            toolCalls = listOf(UiToolCall(name = "canvas.get_scene", arguments = "{}", result = "{}", status = "success", toolCallId = "t2")),
+            toolCalls = listOf(UiToolCall(name = "canvas_get_scene", arguments = "{}", result = "{}", status = "success", toolCallId = "t2")),
         )
         setContent { MaterialTheme { RenderRow(ChatRenderItem.RunBlock("run-1", listOf(call to GroupPosition.First, other to GroupPosition.Last))) } }
         onNodeWithTag(ChatRowTestTags.CANVAS_ARTIFACT).assertExists()

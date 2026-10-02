@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * canvas.compose v1 (letta-mobile-bglj6.6, docs/design/canvas-compose-plan.md): an agent says WHAT
+ * canvas_compose v1 (letta-mobile-bglj6.6, docs/design/canvas-compose-plan.md): an agent says WHAT
  * goes on the board (notes, checklists, cards, text, groups) and never WHERE; the compose layer
  * places it and compiles it into the one canvas op log. This is the wire contract only: the
  * request, the receipt and the refusal, with the caps and vocabularies both hosts hold an agent to.
@@ -226,7 +226,7 @@ enum class ComposeTextSize {
     @SerialName("body") BODY,
 }
 
-/** The `canvas.compose` input. No geometry at all: explicit frames stay with `apply_ops set_document`. */
+/** The `canvas_compose` input. No geometry at all: explicit frames stay with `apply_ops set_document`. */
 @Serializable
 data class ComposeRequest(
     val catalog: String? = null,
@@ -246,7 +246,7 @@ sealed class ComposeItem {
     abstract val key: String?
     abstract val kind: ComposeKind
 
-    /** A note of markdown (the subset canvas.compose_guide lists). */
+    /** A note of markdown (the subset canvas_compose_guide lists). */
     @Serializable
     @SerialName("NOTE")
     data class Note(
@@ -343,7 +343,7 @@ data class ComposeReceiptItem(
 }
 
 /**
- * The `canvas.compose` return, and the source of the chat's artifact card: what was made and
+ * The `canvas_compose` return, and the source of the chat's artifact card: what was made and
  * where, without layout detail. A dry run has the same shape with [status] `dry_run`.
  *
  * Kept under [MAX_RECEIPT_BYTES] at every cap (no per-item board ids; see [ComposeReceiptItem]),

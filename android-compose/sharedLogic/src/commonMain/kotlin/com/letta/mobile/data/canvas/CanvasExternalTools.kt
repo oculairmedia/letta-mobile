@@ -238,7 +238,7 @@ private suspend fun executeListCanvases(
 }
 
 /**
- * `canvas.compose` on an app's own App Server (letta-mobile-bglj6.12), the twin of the Iroh host's
+ * `canvas_compose` on an app's own App Server (letta-mobile-bglj6.12), the twin of the Iroh host's
  * ([HostCanvasTools]): the canvas named by `canvas_id`, or else the caller's conversation's, held to
  * the same read and write checks as [executeAuthorizedMutation], then [CanvasComposeHosting]
  * compiles, checks with the batch validator and publishes through [publishComposed].
@@ -298,7 +298,7 @@ private suspend fun publishComposed(
 }
 
 private const val NO_CONVERSATION_CANVAS =
-    "Missing required parameter: canvas_id (this conversation has no canvas yet; use canvas.list or canvas.create)"
+    "Missing required parameter: canvas_id (this conversation has no canvas yet; use canvas_list or canvas_create)"
 
 /**
  * Base class for Canvas host external tools.
@@ -328,7 +328,7 @@ private inline fun BaseCanvasTool.runWithContext(
 }
 
 /**
- * Tool: canvas.create
+ * Tool: canvas_create
  * Creates a new canvas document or resolves an existing conversation canvas.
  */
 class CanvasCreateTool(
@@ -350,7 +350,7 @@ class CanvasCreateTool(
 }
 
 /**
- * Tool: canvas.get_scene
+ * Tool: canvas_get_scene
  * Retrieves the current DrawBox scene JSON and revision for a canvas.
  */
 class CanvasGetSceneTool(
@@ -382,7 +382,7 @@ class CanvasGetSceneTool(
 }
 
 /**
- * Tool: canvas.replace_scene
+ * Tool: canvas_replace_scene
  * Replaces the DrawBox scene JSON for a canvas, incrementing revision.
  */
 class CanvasReplaceSceneTool(
@@ -404,7 +404,7 @@ class CanvasReplaceSceneTool(
 }
 
 /**
- * Tool: canvas.apply_ops
+ * Tool: canvas_apply_ops
  * Applies a list of Canvas operations to the canvas.
  */
 class CanvasApplyOpsTool(
@@ -426,7 +426,7 @@ class CanvasApplyOpsTool(
 }
 
 /**
- * Tool: canvas.export_svg
+ * Tool: canvas_export_svg
  * Returns the SVG export representation of a canvas.
  */
 class CanvasExportSvgTool(
@@ -451,7 +451,7 @@ class CanvasExportSvgTool(
 }
 
 /**
- * Tool: canvas.list
+ * Tool: canvas_list
  * Lists canvas IDs by conversation or agent.
  */
 class CanvasListTool(
@@ -474,7 +474,7 @@ class CanvasListTool(
 }
 
 /**
- * Tool: canvas.compose (letta-mobile-bglj6.12)
+ * Tool: canvas_compose (letta-mobile-bglj6.12)
  * Puts notes, checklists, cards, text and groups on a canvas by meaning; the board places them.
  */
 class CanvasComposeTool(
@@ -510,8 +510,8 @@ class CanvasComposeTool(
 }
 
 /**
- * Tool: canvas.compose_guide (letta-mobile-bglj6.12)
- * The canvas.compose format, caps and examples.
+ * Tool: canvas_compose_guide (letta-mobile-bglj6.12)
+ * The canvas_compose format, caps and examples.
  */
 class CanvasComposeGuideTool(
     store: CanvasDocumentStore,

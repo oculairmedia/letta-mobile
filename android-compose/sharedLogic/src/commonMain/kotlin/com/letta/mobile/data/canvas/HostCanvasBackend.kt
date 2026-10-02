@@ -24,7 +24,7 @@ sealed interface HostCanvasAccess {
 }
 
 /**
- * The host's side of the `canvas.*` tools (letta-mobile-aknkw.1): canvases read from and written to
+ * The host's side of the `canvas_*` tools (letta-mobile-aknkw.1): canvases read from and written to
  * the relay's durable op log, so an agent running on the host draws on the same boards the apps
  * share, whether or not any app is connected.
  *

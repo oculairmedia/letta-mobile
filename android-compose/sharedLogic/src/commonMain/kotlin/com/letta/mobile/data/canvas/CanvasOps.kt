@@ -112,7 +112,7 @@ sealed interface CanvasOp {
      * null [style] keeps how its text is set and a null [title] keeps its title (an empty one clears it).
      * A null [owner] keeps the document's geometry owner, except that a [frame] given to a document
      * with no owner yet makes it [CanvasGeometryOwner.EXPLICIT]; a null [compose] keeps its
-     * canvas.compose provenance.
+     * canvas_compose provenance.
      */
     @Serializable
     @SerialName("set_document")
@@ -190,7 +190,7 @@ fun CanvasOp.withStamp(opId: String, lamport: Long): CanvasOp = when (this) {
 }
 
 /**
- * Tool payload DTOs for App Server external tools (canvas.*).
+ * Tool payload DTOs for App Server external tools (canvas_*).
  */
 @Serializable
 data class CanvasCreateArgs(

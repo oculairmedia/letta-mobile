@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The canvas.compose pair as the model sees it (letta-mobile-bglj6.6): defined once in
+ * The canvas_compose pair as the model sees it (letta-mobile-bglj6.6): defined once in
  * [CanvasToolContract], short enough to sit in every tool list, and carried to the App Server
  * whole by the registry both hosts advertise through.
  */

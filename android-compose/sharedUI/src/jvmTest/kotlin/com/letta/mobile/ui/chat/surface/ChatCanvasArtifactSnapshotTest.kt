@@ -52,7 +52,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * letta-mobile-bglj6.13: the canvas.compose cards on the full-screen page, at a desktop size in the
+ * letta-mobile-bglj6.13: the canvas_compose cards on the full-screen page, at a desktop size in the
  * Pointer idiom and at phone size (412 x 915 dp, drawn at 2x) in the Touch idiom, light and dark:
  * a published artifact on its narration, one still being added, and a refused one. Writes PNGs to
  * build/chat-surface-snapshots/canvas-artifact-*.png for a reviewer; it asserts only that each
@@ -85,7 +85,7 @@ class ChatCanvasArtifactSnapshotTest {
     )
 
     private val composeCall = UiToolCall(
-        name = "canvas.compose", arguments = "{\"title\":\"Weekend plan\"}", result = "{\"ok\":true}", status = "success", toolCallId = "t1",
+        name = "canvas_compose", arguments = "{\"title\":\"Weekend plan\"}", result = "{\"ok\":true}", status = "success", toolCallId = "t1",
     )
 
     private val state = ChatUiState(

@@ -1,17 +1,17 @@
-# canvas.compose v1 reference
+# canvas_compose v1 reference
 
-`canvas.compose` lets an agent put notes, checklists, cards, text and labelled groups on a canvas by meaning; the board places and sizes them. `canvas.compose_guide` answers the guide below, which an agent reads once before composing. The guide is generated from the contract constants in `CanvasComposeGuide.kt` and this copy is held equal to it by `CanvasComposeGuideDocTest` (sharedLogic jvmTest); when the guide changes, paste `android-compose/sharedLogic/build/canvas-compose-guide.md` (written by that test) between the markers.
+`canvas_compose` lets an agent put notes, checklists, cards, text and labelled groups on a canvas by meaning; the board places and sizes them. `canvas_compose_guide` answers the guide below, which an agent reads once before composing. The guide is generated from the contract constants in `CanvasComposeGuide.kt` and this copy is held equal to it by `CanvasComposeGuideDocTest` (sharedLogic jvmTest); when the guide changes, paste `android-compose/sharedLogic/build/canvas-compose-guide.md` (written by that test) between the markers.
 
 For how compose is built (pipeline, ids, receipt, placement, auto-fit) and how to add a kind, see the package README, `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/README.md`, and the plan with its "As built" section, `docs/design/canvas-compose-plan.md`.
 
-## The guide (`canvas.compose_guide`)
+## The guide (`canvas_compose_guide`)
 
-<!-- canvas.compose_guide:start -->
-# canvas.compose (letta.canvas.compose, version 1)
+<!-- canvas_compose_guide:start -->
+# canvas_compose (letta.canvas.compose, version 1)
 
 Read this once before composing. You say WHAT goes on the board; the board decides where and how big. A request has no coordinates, sizes or layers.
 One call makes one artifact, all or nothing: if anything is wrong, nothing is published and every problem is listed.
-Use canvas.apply_ops instead to draw (shapes, arrows, paths, images), to put a note at a frame you choose (set_document with a frame), or to change or remove anything already on the board: compose only creates.
+Use canvas_apply_ops instead to draw (shapes, arrows, paths, images), to put a note at a frame you choose (set_document with a frame), or to change or remove anything already on the board: compose only creates.
 
 ## Request
 - items (required): what to make, in reading order; 1 to 24, the children of groups counted.
@@ -70,7 +70,7 @@ A refusal is {"ok": false, "code", "problems": [{"path", "code", "message"}], "h
 - ARTIFACT_EXISTS: the artifact_id is on the board with other content (path /artifact_id); compose never changes an artifact, so use a new artifact_id.
 - BOARD_REFUSED: the board's own rules refused the batch: each problem's code is the rule (e.g. element.exists, an id already taken) and its path the item; publish.failed means the write did not land, so send the same request again.
 - UNAUTHORIZED: you may not write to that canvas.
-- CANVAS_NOT_FOUND: no such canvas; omit canvas_id for this conversation's canvas, or pick one from canvas.list.
+- CANVAS_NOT_FOUND: no such canvas; omit canvas_id for this conversation's canvas, or pick one from canvas_list.
 Problem codes, one example each (path: request):
 - UNKNOWN_KIND at /items/0/kind: items: [{"kind":"STICKY","markdown":"x"}]
 - UNKNOWN_FIELD at /items/0/x: items: [{"kind":"NOTE","markdown":"x","x":40}]
@@ -107,4 +107,4 @@ Problem codes, one example each (path: request):
   ]
 }
 ```
-<!-- canvas.compose_guide:end -->
+<!-- canvas_compose_guide:end -->

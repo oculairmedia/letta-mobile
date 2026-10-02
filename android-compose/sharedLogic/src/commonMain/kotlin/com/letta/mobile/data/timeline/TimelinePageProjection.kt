@@ -37,7 +37,7 @@ data class TimelinePageProjectionInput(
     val envelope: TimelineRunEnvelope,
 ) {
     /**
-     * letta-mobile-bglj6.13: the page's canvas.compose receipts, attached over its presented events.
+     * letta-mobile-bglj6.13: the page's canvas_compose receipts, attached over its presented events.
      * A receipt follows its TOOL_CALL record: a run split across pages puts it on the tool call's
      * page (on the call itself when the narration is on another page), so it is never shown twice.
      */

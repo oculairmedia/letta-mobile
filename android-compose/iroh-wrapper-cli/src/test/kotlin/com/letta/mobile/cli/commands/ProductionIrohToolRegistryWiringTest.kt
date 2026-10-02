@@ -61,7 +61,7 @@ class ProductionIrohToolRegistryWiringTest {
     }
 
     /**
-     * letta-mobile-aknkw: every runtime the host starts gets the host's canvas.* tools, whether or
+     * letta-mobile-aknkw: every runtime the host starts gets the host's canvas_* tools, whether or
      * not --meridian-binary is set, since they need only the canvas relay the host runs.
      */
     @Test
@@ -88,7 +88,7 @@ class ProductionIrohToolRegistryWiringTest {
     }
 
     /**
-     * letta-mobile-bglj6.12: runtime_start.external_tools carries canvas.compose and its guide whole,
+     * letta-mobile-bglj6.12: runtime_start.external_tools carries canvas_compose and its guide whole,
      * so a rebuilt wrapper offers them to every agent it runs.
      */
     @Test

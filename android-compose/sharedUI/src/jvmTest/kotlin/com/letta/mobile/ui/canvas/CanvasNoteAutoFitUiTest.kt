@@ -44,7 +44,7 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
 /**
- * Note auto-fit rendered for real on Skiko (canvas.compose C6, letta-mobile-bglj6.11; letta-mobile-8tlf9's
+ * Note auto-fit rendered for real on Skiko (canvas_compose C6, letta-mobile-bglj6.11; letta-mobile-8tlf9's
  * acceptance criteria). One world unit is one px at the board's zoom 1, which is what these tests
  * draw at, so a card's bounds in the root are its world-unit size.
  */

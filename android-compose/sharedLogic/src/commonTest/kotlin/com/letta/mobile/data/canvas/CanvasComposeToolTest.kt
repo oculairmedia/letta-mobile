@@ -24,7 +24,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * canvas.compose on an app's own App Server (letta-mobile-bglj6.12): the same matrix as the Iroh
+ * canvas_compose on an app's own App Server (letta-mobile-bglj6.12): the same matrix as the Iroh
  * host's, through [CanvasExternalTools], with the board open in a live session and without one.
  */
 class CanvasComposeToolTest {

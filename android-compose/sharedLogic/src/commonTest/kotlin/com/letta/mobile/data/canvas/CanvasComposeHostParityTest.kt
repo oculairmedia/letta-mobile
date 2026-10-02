@@ -16,7 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 /**
- * The same canvas.compose call answered by the Iroh host and by an app's own App Server
+ * The same canvas_compose call answered by the Iroh host and by an app's own App Server
  * (letta-mobile-bglj6.12) publishes the same ops, leaves the same board and answers the same
  * receipt: both go through CanvasComposeService and write one [CanvasStampedBatch]. Only the op
  * ids differ (each host mints its own) and the revision (each counts its own way); the receipts

@@ -5,7 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * canvas.compose writes its colour presets as tints of the workspace's own note palette
+ * canvas_compose writes its colour presets as tints of the workspace's own note palette
  * (letta-mobile-bglj6.10): sharedLogic cannot see [NoteColors], so this holds the two together.
  */
 class CanvasComposeColorsTest {

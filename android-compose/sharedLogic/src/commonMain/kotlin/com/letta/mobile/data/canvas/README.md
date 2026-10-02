@@ -32,27 +32,27 @@ All scene mutations are expressed as typed `CanvasOp` instances carrying:
 - `RemoveElementOp`: Removes an existing element by `elementId`.
 - `SetBackgroundOp`: Updates the canvas background color (`bgColor`).
 - `SetBackgroundPatternOp` (`set_background_pattern`): Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins.
-- `SetDocumentOp` (`set_document`): Upserts a block document (a note: Cascade v2 JSON) with its optional `frame`, `color`, `style`, `title`, geometry `owner` (`AUTO`/`EXPLICIT`/`USER`) and canvas.compose provenance (`compose`); null fields keep what the document has. Last writer wins per document.
+- `SetDocumentOp` (`set_document`): Upserts a block document (a note: Cascade v2 JSON) with its optional `frame`, `color`, `style`, `title`, geometry `owner` (`AUTO`/`EXPLICIT`/`USER`) and canvas_compose provenance (`compose`); null fields keep what the document has. Last writer wins per document.
 - `RemoveDocumentOp` (`remove_document`): Takes a block document off the board.
 - `SetArrowBindingOp` (`set_arrow_binding`): Binds (or unbinds) a connector's ends to block documents; last writer wins per connector.
 - `SetLabelOwnerOp` (`set_label_owner`): Records (or releases) the shape a label document belongs to, so ownership is never inferred from an id.
-- `BatchOp`: Atomic bundle of multiple operations applied in a single revision increment. canvas.compose publishes a whole artifact as one (`CanvasStampedBatch`); the inner ops keep their own ids and lamports.
+- `BatchOp`: Atomic bundle of multiple operations applied in a single revision increment. canvas_compose publishes a whole artifact as one (`CanvasStampedBatch`); the inner ops keep their own ids and lamports.
 
 ## Agent tools
 
 The `canvas.*` tools an agent sees are defined once in `CanvasToolContract` and answered by the Iroh host (`HostCanvasTools`) or an app's own runtime (`CanvasExternalTools`), so a call means the same on either:
 
-- `canvas.create`, `canvas.list`: make a canvas, list the ones you may read (a conversation already has its canvas, the default for every other tool).
-- `canvas.get_scene`: the scene (DrawBox JSON, plus `_documents`) and its revision.
-- `canvas.replace_scene`: replace the whole drawing (notes are kept); all or nothing, `dry_run` to check first.
-- `canvas.apply_ops`: a batch of the ops above (`add_element`, `update_element`, `remove_element`, `set_background`, `set_document`, `remove_document`); all or nothing through `CanvasBatchValidator`, `dry_run` to check first. Explicit geometry: a note placed with a `frame` is `owner: EXPLICIT`.
-- `canvas.compose`: notes, checklists, cards, text and labelled groups by meaning; the board places and sizes them (`owner: AUTO`) and the call publishes one atomic batch and answers a receipt, which the chat shows as one card with "Show on canvas". Prefer it to `apply_ops` for anything that is not a drawing.
-- `canvas.compose_guide`: the compose format (kinds, caps, markdown subset, colours, ids, errors); an agent reads it once before composing.
-- `canvas.render_preview`: a rendered preview of a proposed scene or ops where a renderer runs.
+- `canvas_create`, `canvas_list`: make a canvas, list the ones you may read (a conversation already has its canvas, the default for every other tool).
+- `canvas_get_scene`: the scene (DrawBox JSON, plus `_documents`) and its revision.
+- `canvas_replace_scene`: replace the whole drawing (notes are kept); all or nothing, `dry_run` to check first.
+- `canvas_apply_ops`: a batch of the ops above (`add_element`, `update_element`, `remove_element`, `set_background`, `set_document`, `remove_document`); all or nothing through `CanvasBatchValidator`, `dry_run` to check first. Explicit geometry: a note placed with a `frame` is `owner: EXPLICIT`.
+- `canvas_compose`: notes, checklists, cards, text and labelled groups by meaning; the board places and sizes them (`owner: AUTO`) and the call publishes one atomic batch and answers a receipt, which the chat shows as one card with "Show on canvas". Prefer it to `apply_ops` for anything that is not a drawing.
+- `canvas_compose_guide`: the compose format (kinds, caps, markdown subset, colours, ids, errors); an agent reads it once before composing.
+- `canvas_render_preview`: a rendered preview of a proposed scene or ops where a renderer runs.
 
 ## Compose
 
-`canvas.compose` is a compiler in front of the op log, not a second canvas: one validator, one log, one store. Its package README is `compose/README.md` (architecture, pipeline, receipt, adding a kind); the agent-facing reference is `docs/reference/canvas-compose-v1.md`; the plan and what changed while building it are in `docs/design/canvas-compose-plan.md`. A host that serves Iroh conversations must run a rebuilt Iroh wrapper for compose to be offered and for `owner`/`compose` on documents to survive a host rewrite.
+`canvas_compose` is a compiler in front of the op log, not a second canvas: one validator, one log, one store. Its package README is `compose/README.md` (architecture, pipeline, receipt, adding a kind); the agent-facing reference is `docs/reference/canvas-compose-v1.md`; the plan and what changed while building it are in `docs/design/canvas-compose-plan.md`. A host that serves Iroh conversations must run a rebuilt Iroh wrapper for compose to be offered and for `owner`/`compose` on documents to survive a host rewrite.
 
 ## Conflict Resolution Rules
 1. **Idempotency & Deduplication**:
@@ -92,8 +92,8 @@ The `canvas.*` tools an agent sees are defined once in `CanvasToolContract` and 
    - `canWrite`: strictly requires the caller to be the document owner or an explicitly listed writer.
    - **Default Read Behavior**: When both `readerUserIds` and `readerAgentIds` are empty, read access defaults to public (anyone with the canvas ID can read), while write access remains strictly gated by `canWrite`. Once any explicit readers are added, read access is restricted to owners, writers, and explicitly listed readers.
    - **A canvas always has an ACL.** `CanvasSession.create` and `CanvasCreateTool` default to owner `local_user` (the actor the local human edits as) plus the creating agent as a writer when one is known; with no agent the canvas is owner-only. A null ACL is only ever a pre-P4 document and is treated as unrestricted. On Android the Room store refuses to load a row whose ACL column is present but unreadable rather than treating it as absent.
-   - **External tools carry the transport identity.** Every `canvas.*` tool takes its caller from the runtime agent scope the App Server stamped on the tool-call frame and refuses a call without one; `agent_id` in the tool input is never consulted, and every `apply_ops` operation (including nested batches) is rebound to the caller before it is validated, logged, broadcast or stamped into provenance. `canvas.create` and `canvas.list` only reveal an existing conversation canvas to a caller its ACL lets read, and agent-scoped listing applies the same read check as a direct lookup.
-   - **One canvas per conversation.** `CanvasDocumentStore.createForConversationIfAbsent` makes lookup-and-insert one atomic step (a Room transaction; the desktop store's directory lock; the in-memory mutex), so racing creators — `canvas.create` calls or `CanvasSession.getOrCreateForConversation` — share a canvas.
+   - **External tools carry the transport identity.** Every `canvas_*` tool takes its caller from the runtime agent scope the App Server stamped on the tool-call frame and refuses a call without one; `agent_id` in the tool input is never consulted, and every `apply_ops` operation (including nested batches) is rebound to the caller before it is validated, logged, broadcast or stamped into provenance. `canvas_create` and `canvas_list` only reveal an existing conversation canvas to a caller its ACL lets read, and agent-scoped listing applies the same read check as a direct lookup.
+   - **One canvas per conversation.** `CanvasDocumentStore.createForConversationIfAbsent` makes lookup-and-insert one atomic step (a Room transaction; the desktop store's directory lock; the in-memory mutex), so racing creators — `canvas_create` calls or `CanvasSession.getOrCreateForConversation` — share a canvas.
    - **Writes without a live session are optimistic.** Tool calls dispatch concurrently, so `replace_scene` / `apply_ops` against a canvas no `CanvasSession` holds persist through `CanvasDocumentStore.upsertIfRevision`; a call whose read revision is no longer current gets a `Conflict` error and must re-read, instead of overwriting the other writer under the same revision. The desktop store serialises writes per directory across store instances (an in-process lock keyed by the directory) and across processes (an OS lock on `.store.lock`), so the check holds however many stores point at `~/.letta/canvas`.
 
 8. **In-Session Checkpoint History & Restore (P4.3)**:

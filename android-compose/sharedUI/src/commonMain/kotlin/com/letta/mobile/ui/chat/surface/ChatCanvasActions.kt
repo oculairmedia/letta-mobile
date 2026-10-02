@@ -44,7 +44,7 @@ class ChatCanvasActions internal constructor(
     val camera: CanvasCameraRequest = CanvasCameraRequest()
 
     /**
-     * letta-mobile-bglj6.13: "Show on canvas" on a canvas.compose card. Frames the artifact's
+     * letta-mobile-bglj6.13: "Show on canvas" on a canvas_compose card. Frames the artifact's
      * bounds on the board (when the receipt has them) and brings the canvas forward with
      * [ChatSurfaceIntent.OpenCanvas], which is a no-op where the canvas already shows.
      */

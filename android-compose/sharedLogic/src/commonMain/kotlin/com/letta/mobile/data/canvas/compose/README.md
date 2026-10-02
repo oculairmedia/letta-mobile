@@ -1,11 +1,11 @@
-# canvas.compose
+# canvas_compose
 
 This package is the compose layer of the canvas: an agent says WHAT goes on the board (notes,
 checklists, cards, text, labelled groups) and never WHERE, and compose places it, sizes it and
 compiles it into the one canvas op log. Read this before changing the wire contract, the markdown
 subset, placement, the receipt, or before adding a kind.
 
-The agent-facing reference is the guide `canvas.compose_guide` answers (`CanvasComposeGuide.kt`,
+The agent-facing reference is the guide `canvas_compose_guide` answers (`CanvasComposeGuide.kt`,
 copied in `docs/reference/canvas-compose-v1.md`). The plan, its decisions and what changed while
 building it are in `docs/design/canvas-compose-plan.md` ("As built"); the prior art it draws on is
 `docs/design/canvas-compose-prior-art.md`.
@@ -37,7 +37,7 @@ Authoritative implementation files (sharedLogic `commonMain`, package
 Compose is not a second canvas. It is a compiler in front of the existing one:
 
 ```
-agent tool call canvas.compose {items, artifact_id?, title?, canvas_id?, dry_run?}
+agent tool call canvas_compose {items, artifact_id?, title?, canvas_id?, dry_run?}
   |  ExternalToolDispatcher (App Server) -> HostCanvasTools (Iroh host) | CanvasExternalTools (desktop)
   v
 CanvasComposeHosting.answer  ->  CanvasComposeService.compose(input, canvasId, sceneJson, revision, toolCallId, check, publish)

@@ -24,7 +24,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The canvas.compose compiler (letta-mobile-bglj6.10): what a request becomes on the board, every
+ * The canvas_compose compiler (letta-mobile-bglj6.10): what a request becomes on the board, every
  * refusal at its JSON pointer, ids that make a retry idempotent, and batches the board's own
  * validator accepts. The exact op batch for the request fixture is pinned on the JVM
  * (CanvasComposeCompiledGoldenTest, `compiled-ops.json`).

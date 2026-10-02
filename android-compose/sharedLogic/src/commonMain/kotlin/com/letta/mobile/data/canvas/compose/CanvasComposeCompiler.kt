@@ -57,7 +57,7 @@ sealed interface ComposeCompilation {
 }
 
 /**
- * The canvas.compose compiler (letta-mobile-bglj6.10, plan section 3.3): a request and the board it
+ * The canvas_compose compiler (letta-mobile-bglj6.10, plan section 3.3): a request and the board it
  * lands on become one flat op batch and the receipt that describes it, or a structured refusal.
  * Pure and host-independent; [CanvasComposeService] is what the hosts call.
  *
