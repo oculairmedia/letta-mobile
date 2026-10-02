@@ -298,7 +298,7 @@ private suspend fun publishComposed(
 }
 
 private const val NO_CONVERSATION_CANVAS =
-    "Missing required parameter: canvas_id (this conversation has no canvas yet; use canvas.list or canvas.create)"
+    "Missing required parameter: canvas_id (this conversation has no canvas yet; use canvas_list or canvas_create)"
 
 /**
  * Base class for Canvas host external tools.
@@ -328,7 +328,7 @@ private inline fun BaseCanvasTool.runWithContext(
 }
 
 /**
- * Tool: canvas.create
+ * Tool: canvas_create
  * Creates a new canvas document or resolves an existing conversation canvas.
  */
 class CanvasCreateTool(
@@ -350,7 +350,7 @@ class CanvasCreateTool(
 }
 
 /**
- * Tool: canvas.get_scene
+ * Tool: canvas_get_scene
  * Retrieves the current DrawBox scene JSON and revision for a canvas.
  */
 class CanvasGetSceneTool(
@@ -382,7 +382,7 @@ class CanvasGetSceneTool(
 }
 
 /**
- * Tool: canvas.replace_scene
+ * Tool: canvas_replace_scene
  * Replaces the DrawBox scene JSON for a canvas, incrementing revision.
  */
 class CanvasReplaceSceneTool(
@@ -404,7 +404,7 @@ class CanvasReplaceSceneTool(
 }
 
 /**
- * Tool: canvas.apply_ops
+ * Tool: canvas_apply_ops
  * Applies a list of Canvas operations to the canvas.
  */
 class CanvasApplyOpsTool(
@@ -426,7 +426,7 @@ class CanvasApplyOpsTool(
 }
 
 /**
- * Tool: canvas.export_svg
+ * Tool: canvas_export_svg
  * Returns the SVG export representation of a canvas.
  */
 class CanvasExportSvgTool(
@@ -451,7 +451,7 @@ class CanvasExportSvgTool(
 }
 
 /**
- * Tool: canvas.list
+ * Tool: canvas_list
  * Lists canvas IDs by conversation or agent.
  */
 class CanvasListTool(

@@ -190,7 +190,7 @@ fun CanvasOp.withStamp(opId: String, lamport: Long): CanvasOp = when (this) {
 }
 
 /**
- * Tool payload DTOs for App Server external tools (canvas.*).
+ * Tool payload DTOs for App Server external tools (canvas_*).
  */
 @Serializable
 data class CanvasCreateArgs(

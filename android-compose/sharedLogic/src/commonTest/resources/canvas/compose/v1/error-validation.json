@@ -6,7 +6,7 @@
   "problems": [
     { "path": "/items/1/kind", "code": "UNKNOWN_KIND", "message": "'STICKY' is not a kind; use NOTE, CHECKLIST, CARD, TEXT or GROUP" },
     { "path": "/items/2/items", "code": "TOO_MANY_ITEMS", "message": "at most 40 entries here (got 52)" },
-    { "path": "/items/3/markdown", "code": "UNSUPPORTED_MARKDOWN", "message": "raw HTML at offset 14 is not allowed; see canvas.compose_guide" }
+    { "path": "/items/3/markdown", "code": "UNSUPPORTED_MARKDOWN", "message": "raw HTML at offset 14 is not allowed; see canvas_compose_guide" }
   ],
-  "hint": "Nothing was published. Fix every problem and send the whole request again; canvas.compose_guide describes the format."
+  "hint": "Nothing was published. Fix every problem and send the whole request again; canvas_compose_guide describes the format."
 }

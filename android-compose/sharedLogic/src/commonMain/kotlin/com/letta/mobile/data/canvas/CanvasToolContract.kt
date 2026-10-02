@@ -28,20 +28,20 @@ private data class ToolParam(
 data class CanvasToolDefinition(val name: String, val description: String, val inputSchema: JsonObject)
 
 /**
- * The `canvas.*` tools as the model sees them, whoever runs them: an app's own runtime
+ * The `canvas_*` tools as the model sees them, whoever runs them: an app's own runtime
  * ([CanvasExternalTools]) or the host's ([HostCanvasTools]). One contract, so an agent's canvas
  * calls mean the same thing on either.
  */
 object CanvasToolContract {
-    const val CREATE = "canvas.create"
-    const val GET_SCENE = "canvas.get_scene"
-    const val REPLACE_SCENE = "canvas.replace_scene"
-    const val APPLY_OPS = "canvas.apply_ops"
-    const val EXPORT_SVG = "canvas.export_svg"
-    const val LIST = "canvas.list"
-    const val RENDER_PREVIEW = "canvas.render_preview"
-    const val COMPOSE = "canvas.compose"
-    const val COMPOSE_GUIDE = "canvas.compose_guide"
+    const val CREATE = "canvas_create"
+    const val GET_SCENE = "canvas_get_scene"
+    const val REPLACE_SCENE = "canvas_replace_scene"
+    const val APPLY_OPS = "canvas_apply_ops"
+    const val EXPORT_SVG = "canvas_export_svg"
+    const val LIST = "canvas_list"
+    const val RENDER_PREVIEW = "canvas_render_preview"
+    const val COMPOSE = "canvas_compose"
+    const val COMPOSE_GUIDE = "canvas_compose_guide"
 
     /** The upper bound on [compose]'s description: the format itself is [composeGuide]'s answer. */
     const val COMPOSE_DESCRIPTION_MAX_CHARS = 700
@@ -52,12 +52,12 @@ object CanvasToolContract {
      * The tool is not offered ([all] leaves it out); a call that names it anyway is told plainly.
      */
     const val EXPORT_SVG_NOT_IMPLEMENTED =
-        "canvas.export_svg is not implemented yet: nothing renders a canvas to SVG where the tools run. " +
-            "Use canvas.get_scene to read the canvas."
+        "canvas_export_svg is not implemented yet: nothing renders a canvas to SVG where the tools run. " +
+            "Use canvas_get_scene to read the canvas."
 
     /** How every canvas-reading tool is told which canvas: optional, defaulting to the conversation's. */
     const val CANVAS_ID_DESCRIPTION = "The canvas to use. Omit it to use the canvas of the conversation you are in " +
-        "(created on first use); only name one to reach a different canvas from canvas.list."
+        "(created on first use); only name one to reach a different canvas from canvas_list."
 
     private val canvasIdParam = ToolParam("canvas_id", description = CANVAS_ID_DESCRIPTION)
 

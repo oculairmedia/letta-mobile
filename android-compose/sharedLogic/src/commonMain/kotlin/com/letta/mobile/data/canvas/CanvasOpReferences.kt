@@ -11,7 +11,7 @@ internal object CanvasOpReferences {
     fun before(op: CanvasOp, scene: CanvasSceneIndex): CanvasStateViolation? = when (op) {
         is CanvasOp.AddElementOp -> if (scene.hasElement(op.elementId)) alreadyThere(op.elementId) else null
         is CanvasOp.UpdateElementOp -> missingElement(op.elementId, "update_element", scene, "add it with add_element")
-        is CanvasOp.RemoveElementOp -> missingElement(op.elementId, "remove_element", scene, "re-read it with canvas.get_scene")
+        is CanvasOp.RemoveElementOp -> missingElement(op.elementId, "remove_element", scene, "re-read it with canvas_get_scene")
         is CanvasOp.RemoveDocumentOp -> missingDocument(op.documentId, "remove_document", scene)
         is CanvasOp.SetDocumentOp -> undecodableDocument(op)
         else -> null

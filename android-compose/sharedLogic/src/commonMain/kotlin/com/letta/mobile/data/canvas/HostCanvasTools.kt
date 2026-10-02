@@ -16,7 +16,7 @@ private val hostCanvasJson = Json {
 }
 
 /**
- * The `canvas.*` tools run by the host (letta-mobile-aknkw.3), for every agent runtime the host
+ * The `canvas_*` tools run by the host (letta-mobile-aknkw.3), for every agent runtime the host
  * serves: registered through `runtime_start.external_tools` like any tool, answered from the relay's
  * log by [HostCanvasBackend]. Same names, descriptions and inputs as the apps' own
  * [CanvasExternalTools] ([CanvasToolContract]).
@@ -186,7 +186,7 @@ object HostCanvasTools {
     private fun missing(parameter: String) = ExternalToolResult.Error("Missing required parameter: $parameter")
 
     private const val NO_DEFAULT_CANVAS =
-        "Missing required parameter: canvas_id (this call is not in a conversation, so there is no default canvas; use canvas.list or canvas.create)"
+        "Missing required parameter: canvas_id (this call is not in a conversation, so there is no default canvas; use canvas_list or canvas_create)"
 }
 
 /** One host canvas tool: [definition] for the model, [run] for a call with a known caller. */

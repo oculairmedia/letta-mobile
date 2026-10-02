@@ -6,7 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** One owner for canvas.* on a runtime: the Iroh host there, the desktop against a direct App Server (letta-mobile-aknkw.4). */
+/** One owner for canvas_* on a runtime: the Iroh host there, the desktop against a direct App Server (letta-mobile-aknkw.4). */
 class DesktopCanvasToolRegistryTest {
     @Test
     fun onIrohTheDesktopOffersNoCanvasToolsOfItsOwn() {

@@ -36,9 +36,8 @@ internal interface DesktopTouchKeyboardController {
  * Skia canvas — the focused AWT component is always the Compose panel. Calling
  * the private natives directly sidesteps that focused-component gate entirely.
  *
- * Needs `--add-opens java.desktop/sun.awt.windows=ALL-UNNAMED` (a different
- * package from the `sun.awt` open `DesktopTouchEventAccessor` uses). Without
- * it, [bindOrNull] returns null and the caller falls back.
+ * Needs `--add-opens java.desktop/sun.awt.windows=ALL-UNNAMED`. Without it,
+ * [bindOrNull] returns null and the caller falls back.
  */
 internal object DesktopJdkTouchKeyboardAccessor {
 
@@ -53,6 +52,7 @@ internal object DesktopJdkTouchKeyboardAccessor {
      * never propagates a failure, without touching the real AWT toolkit or
      * popping a real keyboard on a CI box.
      */
+    @Suppress("NoAnyType") // Bound by reflection; the stand-in cannot share a type with WToolkit.
     fun bindOrNull(toolkit: Any = Toolkit.getDefaultToolkit()): DesktopTouchKeyboardController? = runCatching {
         val showMethod = toolkit.javaClass
             .getDeclaredMethod("showTouchKeyboard", Boolean::class.javaPrimitiveType)
@@ -134,9 +134,8 @@ internal object DesktopWindowsTouchKeyboard : DesktopTouchKeyboardController {
     private val fallbackFailureLogged = AtomicBoolean(false)
 
     /**
-     * Bound once, up front, the same fail-safe way
-     * [DesktopTouchEventAccessor.bindOrNull] binds: null means "unavailable",
-     * logged once, and every call becomes the COM/TabTip fallback.
+     * Bound once, up front, fail-safe: null means "unavailable", logged once,
+     * and every call becomes the COM/TabTip fallback.
      */
     private val jdkController: DesktopTouchKeyboardController? by lazy {
         DesktopJdkTouchKeyboardAccessor.bindOrNull().also { bound ->
@@ -275,14 +274,41 @@ internal class DesktopTouchKeyboardSessionGate(
     private val origin: DesktopTouchOriginTracker,
     private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
+    private var active = false
+    private var raised = false
+
     /** Returns true when the keyboard was raised; pass that back to [end]. */
     fun begin(): Boolean {
+        active = true
         val raise = origin.wasTouch(nowMillis())
-        if (raise) controller.show()
-        return raise
+        if (raise) {
+            controller.show()
+            raised = true
+        }
+        return raised
+    }
+
+    /**
+     * A finger landed on a text field that is already in a session.
+     *
+     * [begin] only runs when the session starts, so a tap on a composer that
+     * already has focus would otherwise never call [DesktopTouchKeyboardController.show].
+     */
+    fun fingerTapped() {
+        if (!active || raised) return
+        controller.show()
+        raised = true
     }
 
     fun end(raised: Boolean) {
-        if (raised) controller.hide()
+        active = false
+        if (raised || this.raised) controller.hide()
+        this.raised = false
     }
+}
+
+/** The live text-input gate, so the touch shim can raise the keyboard on a later tap. */
+internal object DesktopTouchKeyboardTaps {
+    @Volatile
+    var gate: DesktopTouchKeyboardSessionGate? = null
 }

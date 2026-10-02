@@ -339,6 +339,13 @@ sealed class Intent {
     data class SetLineBend(val id: String, val bend: Offset) : Intent()
 
     /**
+     * Make an ARROW a smooth connector: a cubic that leaves and meets each bound shape
+     * square to its side, along the line from the shape's centre through that end. The
+     * handles follow the shapes from then on. Does not snapshot history.
+     */
+    data class SmoothConnector(val id: String) : Intent()
+
+    /**
      * Recompute connector bindings for an ARROW based on where its endpoints
      * currently sit. Called at drag-end after creating or moving the arrow.
      *
