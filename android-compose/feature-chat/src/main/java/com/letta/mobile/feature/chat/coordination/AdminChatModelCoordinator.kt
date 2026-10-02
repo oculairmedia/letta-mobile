@@ -53,6 +53,14 @@ internal class AdminChatModelCoordinator(
 
     fun reasoningEffortsFor(handle: ModelHandle?): List<String> = modelControl?.reasoningEffortsFor(handle).orEmpty()
 
+    /** letta-mobile-w4q4p.6.1: the host catalog for the shared picker, on an Iroh host only (else the plain list). */
+    fun pickerSource(): com.letta.mobile.data.repository.modelcontrol.ModelPickerSource? =
+        modelControl?.takeIf { settingsRepository.activeBackendIsIroh() }?.pickerSource()
+
+    /** The Models sheet's presenter; null when the host has no exposure to edit. */
+    fun modelsEditController(scope: CoroutineScope): com.letta.mobile.data.repository.modelcontrol.ProviderManagementController? =
+        modelControl?.takeIf { settingsRepository.activeBackendIsIroh() }?.managementController(scope)
+
     /**
      * On an Iroh host with an open conversation the pick goes through
      * `model.update` for THIS conversation (with the chosen reasoning effort);

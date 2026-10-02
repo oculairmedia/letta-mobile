@@ -307,6 +307,13 @@ data class DesktopDataBindings(
     val chatSessionGraphFactory: DesktopChatSessionGraphFactory,
     /** letta-mobile-w4q4p: provider/model admin RPC over the current channel transport. */
     val modelControlRpc: com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker? = null,
+    /**
+     * letta-mobile-w4q4p.6.1: one provider + catalog repository pair over [modelControlRpc], shared
+     * by the model picker, the Models sheet and the Providers destination so a change in one shows
+     * in the others.
+     */
+    val modelControl: com.letta.mobile.data.repository.modelcontrol.ModelControlSession? =
+        modelControlRpc?.let { com.letta.mobile.data.repository.modelcontrol.ModelControlSession(it) },
 )
 
 fun createDefaultDesktopDataBindings(

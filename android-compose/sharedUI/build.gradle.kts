@@ -132,6 +132,8 @@ kotlin {
 
         jvmTest {
             dependencies {
+                // Model-control UI tests and their light/dark render snapshots (letta-mobile-w4q4p.6.1).
+                implementation(libs.compose.desktop.ui.test)
                 implementation(libs.junit4)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(compose.desktop.currentOs)
