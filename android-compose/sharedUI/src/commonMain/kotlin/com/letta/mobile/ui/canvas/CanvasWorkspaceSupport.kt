@@ -77,7 +77,7 @@ internal data class PenConsumerParams(
     /** A pen double tap landed on somewhere to type while drawing. Opens its text. */
     val onDoubleTapText: (Element) -> Unit = {},
     val penTaps: CanvasDoubleTap = CanvasDoubleTap(),
-    val clock: () -> Long = { System.currentTimeMillis() },
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 )
 
 internal data class DrawPhaseParams(

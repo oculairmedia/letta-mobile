@@ -8,6 +8,8 @@ import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.data.tooloutput.ToolOutputDocument
 import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.ui.theme.customColors
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 private const val TOOL_OUTPUT_DOCUMENT_CACHE_ENTRIES = 32
 private const val TOOL_OUTPUT_HIGHLIGHT_CACHE_ENTRIES = 128
@@ -114,7 +116,7 @@ fun clearToolOutputRenderCachesForTest() {
 private class ToolOutputLruCache<K, V>(
     private val maxEntries: Int,
 ) {
-    private val lock = Any()
+    private val lock = SynchronizedObject()
     private val values = linkedMapOf<K, V>()
 
     fun get(key: K): V? = synchronized(lock) {

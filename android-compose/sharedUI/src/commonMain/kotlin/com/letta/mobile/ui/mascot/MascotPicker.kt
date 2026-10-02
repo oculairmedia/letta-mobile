@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotPalette
 import com.letta.mobile.avatar.core.MascotShape
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import com.letta.mobile.ui.theme.LettaDimens
@@ -255,7 +256,7 @@ private fun DrawScope.drawSoftPolygon(color: Color, spec: SoftPolygon) {
     val inner = spec.radius - spec.corner / 2f
     val path = Path()
     for (i in 0 until spec.sides) {
-        val a = Math.toRadians((spec.startDeg + 360f * i / spec.sides).toDouble())
+        val a = (spec.startDeg + 360f * i / spec.sides).toDouble() * (PI / 180.0)
         val p = Offset(spec.center.x + inner * cos(a).toFloat(), spec.center.y + inner * sin(a).toFloat())
         if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
     }
