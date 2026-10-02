@@ -419,7 +419,7 @@ internal interface AmbientGlowShader {
 }
 
 /**
- * The shared ambient shader compiled for this platform (Skia RuntimeEffect on desktop, AGSL
+ * The shared ambient shader compiled for this platform (Skia RuntimeEffect on desktop and web, AGSL
  * RuntimeShader on Android 13+), or null where it cannot run; the gradient fallback draws then.
  * Compiling is the expensive part: see [AmbientGlowShaders].
  */
