@@ -100,6 +100,8 @@ assert_contains "$shared_job" 'Run remaining shared multiplatform verification t
 # even before Konan. JVM + CLI tests first; native compile second.
 assert_contains "$shared_job" ':appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
 assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative'
+# letta-mobile-o4ygk.2: wasmJs compiles stay in the REQUIRED shared job.
+assert_contains "$shared_job" ':sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '2'
 

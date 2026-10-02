@@ -311,10 +311,13 @@ jobs:
         # on follow-up PRs even when run before Konan). Desktop unit tests
         # still run in the required `test` job when android-compose/desktop
         # changes (additive module tasks). Native compile still catches
-        # JVM-only API leaks in commonMain/commonTest (b97bcf48).
+        # JVM-only API leaks in commonMain/commonTest (b97bcf48). The wasmJs
+        # compiles catch breakage in wasmJsMain/wasmJsTest and dependencies
+        # that ship no wasm artifact, without making web-wasm required
+        # (letta-mobile-o4ygk.2).
         run: |
           ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
-          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
+          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 
   web-wasm:
