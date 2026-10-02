@@ -1,0 +1,33 @@
+{
+  "id": "pe-widget-7f3a",
+  "type": "ext:letta.example/widget",
+  "v": 1,
+  "frame": { "x": 1200.0, "y": 80.0, "width": 320.0, "height": 240.0 },
+  "owner": "user",
+  "ref": "job:3d7c2e3e",
+  "props": { "status": "running", "progress": 0.42, "label": "Nightly render" },
+  "snapshot": {
+    "assetRef": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+    "mediaType": "image/png",
+    "width": 1024,
+    "height": 1024,
+    "rev": 3,
+    "takenAtEpochMs": 1770000000000
+  },
+  "fallback": { "title": "Nightly render", "subtitle": "Example · running 42%", "icon": "image", "openUrl": "https://example.test/jobs/3d7c2e3e" },
+  "meta": { "pluginId": "letta.example", "createdBy": "agent:agent-123", "toolCallId": "call_9" },
+  "_clock": {
+    "fallback": { "_lamport": 30, "_actorId": "agent:agent-123", "_opId": "op-place" },
+    "frame": { "_lamport": 41, "_actorId": "local_user", "_opId": "op-move" },
+    "meta": { "_lamport": 30, "_actorId": "agent:agent-123", "_opId": "op-place" },
+    "props": { "_lamport": 57, "_actorId": "plugin:letta.example", "_opId": "op-progress" },
+    "ref": { "_lamport": 30, "_actorId": "agent:agent-123", "_opId": "op-place" },
+    "snapshot": { "_lamport": 30, "_actorId": "agent:agent-123", "_opId": "op-place" },
+    "type": { "_lamport": 30, "_actorId": "agent:agent-123", "_opId": "op-place" }
+  },
+  "_frame": { "_lamport": 41, "_actorId": "local_user", "_opId": "op-move" },
+  "_state": { "_lamport": 57, "_actorId": "plugin:letta.example", "_opId": "op-progress" },
+  "_lamport": 57,
+  "_actorId": "plugin:letta.example",
+  "_opId": "op-progress"
+}

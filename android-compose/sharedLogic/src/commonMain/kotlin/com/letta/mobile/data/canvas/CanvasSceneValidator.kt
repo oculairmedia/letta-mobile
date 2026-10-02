@@ -1,5 +1,8 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElementSchema
+import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -8,8 +11,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
-/** Why one element (or the scene around it, with no [elementId]) cannot be drawn, and the type to show instead. */
-data class CanvasElementProblem(val elementId: String?, val reason: String, val suggested: CanvasElementSpec)
+/**
+ * Why one element (or the scene around it, with no [elementId]) cannot be drawn, and the type to show
+ * instead. A plugin element's problem has no DrawBox type to suggest; its [path] says where in the
+ * write it is (`/fallback/title`).
+ */
+data class CanvasElementProblem(
+    val elementId: String?,
+    val reason: String,
+    val suggested: CanvasElementSpec?,
+    val path: String? = null,
+)
 
 /** A writer's scene or element as the apps will get it: normalised JSON, or what stops them drawing it. */
 sealed interface CanvasSceneCheck {
@@ -24,7 +36,7 @@ sealed interface CanvasSceneCheck {
 sealed interface CanvasOpsCheck {
     data class Valid(val ops: List<CanvasOp>) : CanvasOpsCheck
 
-    data class Invalid(val message: String) : CanvasOpsCheck
+    data class Invalid(val message: String, val problems: List<CanvasElementProblem> = emptyList()) : CanvasOpsCheck
 }
 
 /**
@@ -66,13 +78,36 @@ object CanvasSceneValidator {
             CanvasSceneCheck.Invalid(listOf(CanvasElementProblem(documentId, "is not a Cascade document with a \"blocks\" array", CanvasSceneSchema.shape)))
         }
 
-    fun ops(ops: List<CanvasOp>): CanvasOpsCheck {
+    /**
+     * Every op of [ops] held to its format. A plugin element's kind is looked up in [kinds]; one it
+     * does not know is accepted on the envelope alone, with a WARN (plan section 4.3, D11).
+     */
+    fun ops(ops: List<CanvasOp>, kinds: PluginKindCatalog = PluginKindCatalog.Empty): CanvasOpsCheck {
         val problems = mutableListOf<CanvasElementProblem>()
-        val checked = ops.map { checkOp(it, problems) }
-        return if (problems.isEmpty()) CanvasOpsCheck.Valid(checked) else CanvasOpsCheck.Invalid(CanvasSceneSchemaText.problems(problems))
+        val checked = ops.map { checkOp(it, problems, kinds) }
+        return if (problems.isEmpty()) CanvasOpsCheck.Valid(checked) else CanvasOpsCheck.Invalid(CanvasSceneSchemaText.problems(problems), problems)
     }
 
-    private fun checkOp(op: CanvasOp, problems: MutableList<CanvasElementProblem>): CanvasOp = when (op) {
+    /** A plugin element write held to [CanvasPluginElementSchema]; problems carry their JSON-pointer path. */
+    fun pluginElement(op: CanvasOp.SetPluginElementOp, kinds: PluginKindCatalog = PluginKindCatalog.Empty): CanvasSceneCheck {
+        val found = CanvasPluginElementSchema.check(op)
+        if (found.isNotEmpty()) {
+            return CanvasSceneCheck.Invalid(found.map { CanvasElementProblem(op.elementId, it.reason, suggested = null, path = it.path) })
+        }
+        op.elementType?.takeIf { kinds.schemaFor(it, op.v ?: 1) == null }?.let { reportUnknownKind(op, it) }
+        return CanvasSceneCheck.Valid("")
+    }
+
+    private fun reportUnknownKind(op: CanvasOp.SetPluginElementOp, type: String) = Telemetry.event(
+        "Canvas", "pluginElement.unknownKind",
+        "elementId" to op.elementId,
+        "type" to type,
+        "v" to op.v,
+        "detail" to "no props schema for this kind here; accepted on the envelope alone",
+        level = Telemetry.Level.WARN,
+    )
+
+    private fun checkOp(op: CanvasOp, problems: MutableList<CanvasElementProblem>, kinds: PluginKindCatalog): CanvasOp = when (op) {
         is CanvasOp.ReplaceSceneOp -> scene(op.sceneJson).orRecord(problems, op) { op.copy(sceneJson = it) }
         is CanvasOp.AddElementOp -> element(op.elementId, op.elementJson).orRecord(problems, op) { op.copy(elementJson = it) }
         is CanvasOp.UpdateElementOp -> element(op.elementId, op.elementJson).orRecord(problems, op) { op.copy(elementJson = it) }
@@ -89,7 +124,9 @@ object CanvasSceneValidator {
         is CanvasOp.SetBackgroundPatternOp -> op // Typed DTO decoding constrains this payload; it is not rendered as scene JSON.
         is CanvasOp.RemoveElementOp -> op // Removing an absent element is an intentional idempotent operation.
         is CanvasOp.RemoveDocumentOp -> op // Removing an absent document is an intentional idempotent operation.
-        is CanvasOp.BatchOp -> op.copy(ops = op.ops.map { checkOp(it, problems) })
+        is CanvasOp.SetPluginElementOp -> pluginElement(op, kinds).orRecord(problems, op) { op }
+        is CanvasOp.RemovePluginElementOp -> op // The batch check refuses removing an absent one (CanvasOpReferences).
+        is CanvasOp.BatchOp -> op.copy(ops = op.ops.map { checkOp(it, problems, kinds) })
     }
 
     private fun background(op: CanvasOp.SetBackgroundOp): CanvasSceneCheck {

@@ -1,0 +1,22 @@
+{
+  "id": "pe-frame-board-2",
+  "type": "ext:letta.example/frame",
+  "v": 2,
+  "frame": { "x": -480.0, "y": 960.0, "width": 640.0, "height": 360.0 },
+  "owner": "explicit",
+  "ref": "file:4410/page:2/frame:17",
+  "props": { "name": "Checkout flow", "revn": 128, "format": "png" },
+  "fallback": { "title": "Checkout flow", "subtitle": "Example · frame 17", "icon": "pen-tool", "openUrl": "meridian:plugin/letta.example/open?ref=frame-17" },
+  "_clock": {
+    "fallback": { "_lamport": 12, "_actorId": "agent:agent-9", "_opId": "op-a" },
+    "frame": { "_lamport": 12, "_actorId": "agent:agent-9", "_opId": "op-a" },
+    "props": { "_lamport": 12, "_actorId": "agent:agent-9", "_opId": "op-a" },
+    "ref": { "_lamport": 12, "_actorId": "agent:agent-9", "_opId": "op-a" },
+    "type": { "_lamport": 12, "_actorId": "agent:agent-9", "_opId": "op-a" }
+  },
+  "_frame": { "_lamport": 12, "_actorId": "agent:agent-9", "_opId": "op-a" },
+  "_state": { "_lamport": 12, "_actorId": "agent:agent-9", "_opId": "op-a" },
+  "_lamport": 12,
+  "_actorId": "agent:agent-9",
+  "_opId": "op-a"
+}
