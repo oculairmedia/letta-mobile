@@ -166,6 +166,10 @@ jobs:
       # Root debug is compiled by testRootDebugUnitTest; Play is compiled by the
       # required play-release APK job. Sideload is the only unique flavor compile.
       # Architecture guardrails stay inside the required `test` job.
+      # checkArchitectureBoundaries reads the exported module graph and fails on
+      # edges into :app, feature->feature, shell->shell, library->feature and
+      # multiplatform->single-platform edges not in architecture-boundary-baseline.txt
+      # (letta-mobile-o4ygk.1). :build-logic:test proves each rule on synthetic graphs.
       - name: Run Android verification task graph
         env:
           ADDITIVE_TASKS: ${{ steps.additive_modules.outputs.tasks }}
@@ -175,6 +179,8 @@ jobs:
             :core:android-data:testDebugUnitTest
             :app:testRootDebugUnitTest
             :app:testScreenshot
+            :build-logic:test
+            checkArchitectureBoundaries
             :architecture-tests:test
             :architecture-tests:architectureTest
             :quality:detekt-rules:check

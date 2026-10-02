@@ -45,6 +45,10 @@ assert_contains "$test_job" 'Run Android verification task graph'
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
 assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
 assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
+# letta-mobile-o4ygk.1: the module-boundary gate and its synthetic-graph tests
+# run inside the REQUIRED test job, not only in the advisory graph workflow.
+assert_contains "$test_job" ':build-logic:test'
+assert_contains "$test_job" 'checkArchitectureBoundaries'
 # Stacked PRs must diff additive modules against the GitHub PR base. Diffing
 # vs origin/main re-runs lower-stack modules and lets unrelated flakes fail
 # required `test` (StreamingMarkdownRecompositionGateTest on #1556).
