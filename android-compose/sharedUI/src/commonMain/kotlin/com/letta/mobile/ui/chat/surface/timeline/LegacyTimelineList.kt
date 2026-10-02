@@ -69,7 +69,8 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
     val leading = if (thinking) 1 else 0
 
     val glide = rememberNewestEdgeGlide(listState)
-    val follow = rememberLegacyFollow(listState, glide, conversationId, rows, thinking)
+    val tail = LegacyTail(newest = rows.firstOrNull { it !is TimelineRow.DayDivider }, rowCount = rows.size, thinking = thinking)
+    val follow = rememberLegacyFollow(listState, glide, conversationId, tail)
     OlderHistoryEffect(
         listState = listState,
         gate = OlderHistoryGate(
@@ -99,9 +100,39 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
         ),
         modifier = modifier,
     ) {
-        legacyRows(rows, params.bindings, thinking, state.isLoadingOlderMessages, today, state.agentId, state.messages)
+        legacyRows(
+            rows = rows,
+            bindings = params.bindings,
+            today = today,
+            edges = LegacyEdgeRows(
+                thinking = thinking,
+                loadingOlder = state.isLoadingOlderMessages,
+                agentId = state.agentId,
+                messages = state.messages,
+            ),
+        )
     }
 }
+
+/**
+ * The rows at the list's two ends: the thinking row at the newest (over [messages]) and the
+ * older-history spinner at the oldest (for [agentId]).
+ */
+@Immutable
+private data class LegacyEdgeRows(
+    val thinking: Boolean,
+    val loadingOlder: Boolean,
+    val agentId: String?,
+    val messages: List<UiMessage>,
+)
+
+/** What the follow-latest effects watch at the newest end: its row, the row count, the thinking row. */
+@Immutable
+private data class LegacyTail(
+    val newest: TimelineRow?,
+    val rowCount: Int,
+    val thinking: Boolean,
+)
 
 /**
  * Newest-first rows for the reversed list. Folding and day sections are computed in chat order
@@ -116,18 +147,15 @@ internal fun timelineRowsNewestFirst(
 private fun LazyListScope.legacyRows(
     rows: List<TimelineRow>,
     bindings: TimelineRowBindings,
-    thinking: Boolean,
-    loadingOlder: Boolean,
     today: LocalDate,
-    agentId: String?,
-    messages: List<UiMessage>,
+    edges: LegacyEdgeRows,
 ) {
-    if (thinking) item(key = THINKING_KEY) { ThinkingRow(messages) }
+    if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
         TimelineRowContent(rows[index], bindings, today)
     }
-    if (loadingOlder) {
-        item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(agentId) }
+    if (edges.loadingOlder) {
+        item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(edges.agentId) }
     }
 }
 
@@ -156,8 +184,7 @@ private fun rememberLegacyFollow(
     listState: LazyListState,
     glide: NewestEdgeGlide,
     conversationId: String?,
-    rows: List<TimelineRow>,
-    thinking: Boolean,
+    tail: LegacyTail,
 ): TimelineFollow {
     val scope = rememberCoroutineScope()
     // A hoisted list may come back scrolled up (the chat was docked): follow only at the edge.
@@ -169,9 +196,8 @@ private fun rememberLegacyFollow(
             .distinctUntilChanged()
             .collect { following = ChatViewportFollowPolicy.nextFollowModeAfterScroll(following, it) }
     }
-    val newest = rows.firstOrNull { it !is TimelineRow.DayDivider }
-    FollowTailEffect(listState, newest, rows.size, thinking) { following }
-    ForceFollowOnSendEffect(listState, newest) { following = true }
+    FollowTailEffect(listState, tail) { following }
+    ForceFollowOnSendEffect(listState, tail.newest) { following = true }
     val showButton = ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.reversedViewportSnapshot(isDragged))
     return TimelineFollow(showScrollToLatest = showButton) {
         following = true
@@ -182,13 +208,12 @@ private fun rememberLegacyFollow(
 @Composable
 private fun FollowTailEffect(
     listState: LazyListState,
-    newest: TimelineRow?,
-    rowCount: Int,
-    thinking: Boolean,
+    tail: LegacyTail,
     following: () -> Boolean,
 ) {
-    val tailLength = (newest as? TimelineRow.Item)?.item?.contentLength() ?: 0
-    LaunchedEffect(newest?.key, rowCount, tailLength, thinking) {
+    val rowCount = tail.rowCount
+    val tailLength = (tail.newest as? TimelineRow.Item)?.item?.contentLength() ?: 0
+    LaunchedEffect(tail.newest?.key, rowCount, tailLength, tail.thinking) {
         if (ChatViewportFollowPolicy.shouldAutoFollow(following(), rowCount) && !listState.isScrollInProgress) {
             listState.scrollToItem(0)
         }
