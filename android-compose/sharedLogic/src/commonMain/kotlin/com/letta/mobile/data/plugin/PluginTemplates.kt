@@ -47,7 +47,8 @@ class ResolvedTemplates(private val values: Map<String, String>) {
 object PluginTemplates {
     private val TOKEN = Regex("\\$\\{([^}]*)\\}")
     private val REF = Regex("^(settings|secrets)\\.([a-zA-Z][a-zA-Z0-9_]{0,63})$")
-    private const val OPEN = "\${"
+    /** What every template starts with. */
+    const val OPEN: String = "\${"
 
     fun scan(text: String): TemplateScan {
         val refs = mutableListOf<TemplateRef>()

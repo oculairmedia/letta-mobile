@@ -73,7 +73,9 @@ data class PluginConsentDiff(
     val addedOrigins: Set<String>,
     val runtimeChanged: Boolean = false,
 ) {
-    val isEmpty: Boolean get() = addedCapabilities.isEmpty() && addedOrigins.isEmpty() && !runtimeChanged
+    val isEmpty: Boolean get() = !runtimeChanged && addsNothing
+
+    private val addsNothing: Boolean get() = addedCapabilities.isEmpty() && addedOrigins.isEmpty()
 
     companion object {
         /** What [manifest] asks for beyond [consent]. */

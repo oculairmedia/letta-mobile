@@ -30,9 +30,7 @@ data class PluginSettingsSummary(val configured: Set<String> = emptySet(), val m
         /** The summary of [values] (as the owner set them, defaults not filled in) against [manifest]. */
         fun of(manifest: PluginManifest, values: JsonObject): PluginSettingsSummary = PluginSettingsSummary(
             configured = values.keys.intersect(manifest.settings.keys),
-            missingRequired = manifest.settings.filter { (name, field) ->
-                field.required && field.default == null && values[name].let { it == null || it is JsonNull }
-            }.keys,
+            missingRequired = manifest.settings.filter { (name, field) -> field.mustBeSet() && values[name].isUnset() }.keys,
         )
     }
 }
@@ -89,3 +87,8 @@ object PluginSettings {
         field.maximum?.let { put("maximum", it) }
     }
 }
+
+/** A required field without a default: the owner must set it. */
+private fun PluginSettingField.mustBeSet(): Boolean = required && default == null
+
+private fun JsonElement?.isUnset(): Boolean = this == null || this is JsonNull

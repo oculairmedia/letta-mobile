@@ -33,7 +33,7 @@ object PluginManifestParser {
         val document = try {
             json.parseToJsonElement(text)
         } catch (malformed: SerializationException) {
-            return refused(problem("", PluginManifestProblem.SYNTAX, "not JSON: ${malformed.message?.lineSequence()?.firstOrNull()}"))
+            return refused(PluginManifestProblem.SYNTAX.at(ManifestPointer.ROOT, "not JSON: ${malformed.message?.lineSequence()?.firstOrNull()}"))
         }
         return parse(document)
     }
@@ -45,7 +45,7 @@ object PluginManifestParser {
             json.decodeFromJsonElement(PluginManifest.serializer(), document)
         } catch (undecodable: IllegalArgumentException) {
             // SerializationException is one; the schema has already held the shape, so this is a backstop.
-            return refused(problem("", PluginManifestProblem.SYNTAX, "does not decode: ${undecodable.message?.lineSequence()?.firstOrNull()}"))
+            return refused(PluginManifestProblem.SYNTAX.at(ManifestPointer.ROOT, "does not decode: ${undecodable.message?.lineSequence()?.firstOrNull()}"))
         }
         val ruleProblems = PluginManifestRules.check(manifest)
         return if (ruleProblems.isEmpty()) PluginManifestResult.Parsed(manifest) else PluginManifestResult.Refused(ruleProblems)

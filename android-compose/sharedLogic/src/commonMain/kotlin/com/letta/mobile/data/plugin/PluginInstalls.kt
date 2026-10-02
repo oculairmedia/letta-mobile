@@ -58,7 +58,7 @@ internal object PluginInstalls {
     }
 
     private fun packageProblem(state: PluginRegistryState, manifest: PluginManifest, sha256: String): PluginTransition? = when {
-        !PluginPackageRef.isSha256(sha256) -> refuse(PluginRefusal.BAD_HASH, "a package is installed by its sha256 (64 lowercase hex characters)")
+        PluginPackageRef.of(sha256) == null -> refuse(PluginRefusal.BAD_HASH, "a package is installed by its sha256 (64 lowercase hex characters)")
         manifest.contract.version !in PluginManifestRules.SUPPORTED_CONTRACT_VERSIONS ->
             refuse(PluginRefusal.UNSUPPORTED_CONTRACT, "contract version ${manifest.contract.version} is not supported here")
         else -> collision(state, manifest)
@@ -75,10 +75,13 @@ internal object PluginInstalls {
 
     /** Versions are pinned to the package they came from: an update is a newer version, never the same one again. */
     private fun versionProblem(plugin: InstalledPlugin, manifest: PluginManifest): PluginTransition? {
-        val current = PluginSemVer.parse(plugin.version)
-        val next = PluginSemVer.parse(manifest.version)
-        val newer = current != null && next != null && next > current
+        val newer = isNewer(PluginSemVer.parse(plugin.version), PluginSemVer.parse(manifest.version))
         return refuse(PluginRefusal.NOT_NEWER, "${manifest.version} is not newer than the installed ${plugin.version}; publish a new version").takeIf { !newer }
+    }
+
+    private fun isNewer(current: PluginSemVer?, next: PluginSemVer?): Boolean {
+        if (current == null || next == null) return false
+        return next > current
     }
 
     /** The consent the update runs under, or null when it asks for more than the owner agreed to. */

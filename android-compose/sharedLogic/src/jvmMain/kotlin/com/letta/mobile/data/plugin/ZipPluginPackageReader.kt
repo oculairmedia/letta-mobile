@@ -18,21 +18,21 @@ class ZipPluginPackageReader(
 ) : PluginPackageReader {
     override fun read(bytes: ByteArray, expectedSha256: String?): PluginPackageResult {
         if (bytes.size > PluginPackageLimits.MAX_PACKAGE_BYTES) {
-            return PluginPackageResult.Refused(PluginPackageProblemCode.TOO_LARGE, "a package is at most ${PluginPackageLimits.MAX_PACKAGE_BYTES} bytes (got ${bytes.size})")
+            return refused(PluginPackageProblemCode.TOO_LARGE, "a package is at most ${PluginPackageLimits.MAX_PACKAGE_BYTES} bytes (got ${bytes.size})")
         }
         val sha256 = sha256Hex(bytes)
         if (expectedSha256 != null && expectedSha256 != sha256) {
-            return PluginPackageResult.Refused(PluginPackageProblemCode.HASH_MISMATCH, "the package hashes to $sha256, not the pinned $expectedSha256")
+            return refused(PluginPackageProblemCode.HASH_MISMATCH, "the package hashes to $sha256, not the pinned $expectedSha256")
         }
         return try {
             when (val unpacked = Unpacker(maxUnpackedBytes).unpack(bytes)) {
-                is Unpacked.Files -> PluginPackages.assemble(sha256, unpacked.entries)
-                is Unpacked.Refused -> PluginPackageResult.Refused(unpacked.code, unpacked.message, unpacked.entry)
+                is Unpacked.Files -> PluginPackages.assemble(PluginPackageRef(sha256), unpacked.entries)
+                is Unpacked.Refused -> PluginPackageResult.Refused(listOf(PluginPackageProblem(unpacked.code, unpacked.message, unpacked.entry)))
             }
         } catch (broken: ZipException) {
-            PluginPackageResult.Refused(PluginPackageProblemCode.NOT_A_PACKAGE, "not a zip: ${broken.message}")
+            refused(PluginPackageProblemCode.NOT_A_PACKAGE, "not a zip: ${broken.message}")
         } catch (broken: IOException) {
-            PluginPackageResult.Refused(PluginPackageProblemCode.NOT_A_PACKAGE, "the package cannot be read: ${broken.message}")
+            refused(PluginPackageProblemCode.NOT_A_PACKAGE, "the package cannot be read: ${broken.message}")
         }
     }
 
@@ -87,6 +87,9 @@ class ZipPluginPackageReader(
 
     companion object {
         private const val BUFFER_BYTES = 64 * 1024
+
+        private fun refused(code: PluginPackageProblemCode, message: String) =
+            PluginPackageResult.Refused(listOf(PluginPackageProblem(code, message)))
 
         fun sha256Hex(bytes: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

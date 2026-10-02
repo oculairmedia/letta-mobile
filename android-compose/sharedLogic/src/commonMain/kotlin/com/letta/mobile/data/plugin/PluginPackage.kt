@@ -10,25 +10,6 @@ object PluginPackageLimits {
     const val MAX_ENTRIES: Int = 4096
 }
 
-/** A package by content (R3: installed by sha256): `sha256:<64 lowercase hex>`. */
-data class PluginPackageRef(val sha256: String) {
-    init {
-        require(SHA256.matches(sha256)) { "a package sha256 is 64 lowercase hex characters" }
-    }
-
-    override fun toString(): String = "$PREFIX$sha256"
-
-    companion object {
-        const val PREFIX: String = "sha256:"
-        private val SHA256 = Regex("^[0-9a-f]{64}$")
-
-        fun parse(text: String): PluginPackageRef? =
-            text.removePrefix(PREFIX).takeIf { text.startsWith(PREFIX) && SHA256.matches(it) }?.let(::PluginPackageRef)
-
-        fun isSha256(text: String): Boolean = SHA256.matches(text)
-    }
-}
-
 /** What a package carries for its runtime (plan section 1). */
 sealed interface PluginPayload {
     data class Jar(val path: String) : PluginPayload
@@ -79,9 +60,7 @@ class PluginPackage(
 sealed interface PluginPackageResult {
     data class Read(val pkg: PluginPackage) : PluginPackageResult
 
-    data class Refused(val problems: List<PluginPackageProblem>) : PluginPackageResult {
-        constructor(code: PluginPackageProblemCode, message: String, entry: String? = null) : this(listOf(PluginPackageProblem(code, message, entry)))
-    }
+    data class Refused(val problems: List<PluginPackageProblem>) : PluginPackageResult
 }
 
 /**
@@ -99,14 +78,15 @@ fun interface PluginPackageReader {
  * nothing beyond pages for `service`), every page's html present, every path inside the package.
  */
 object PluginPackages {
-    /** The package of [entries] (path to bytes, as unpacked) whose content hashes to [sha256]. */
-    fun assemble(sha256: String, entries: Map<String, ByteArray>): PluginPackageResult {
+    /** The package of [entries] (path to bytes, as unpacked) whose content is [ref]. */
+    fun assemble(ref: PluginPackageRef, entries: Map<String, ByteArray>): PluginPackageResult {
         val unsafe = entries.keys.filterNot(PluginPackagePaths::isInside)
         if (unsafe.isNotEmpty()) {
             return PluginPackageResult.Refused(unsafe.map { PluginPackageProblem(PluginPackageProblemCode.UNSAFE_PATH, "'$it' points outside the package", it) })
         }
-        val manifestBytes = entries[PluginPackagePaths.MANIFEST]
-            ?: return PluginPackageResult.Refused(PluginPackageProblemCode.NO_MANIFEST, "a package has ${PluginPackagePaths.MANIFEST} at its root")
+        val manifestBytes = entries[PluginPackagePaths.MANIFEST] ?: return PluginPackageResult.Refused(
+            listOf(PluginPackageProblem(PluginPackageProblemCode.NO_MANIFEST, "a package has ${PluginPackagePaths.MANIFEST} at its root")),
+        )
         val manifest = when (val parsed = PluginManifestParser.parse(manifestBytes.decodeToString())) {
             is PluginManifestResult.Parsed -> parsed.manifest
             is PluginManifestResult.Refused -> return PluginPackageResult.Refused(
@@ -116,7 +96,7 @@ object PluginPackages {
         val layout = layoutOf(manifest, entries.keys)
         val problems = problems(manifest, layout, entries.keys)
         if (problems.isNotEmpty()) return PluginPackageResult.Refused(problems)
-        return PluginPackageResult.Read(PluginPackage(PluginPackageRef(sha256), manifest, layout, entries))
+        return PluginPackageResult.Read(PluginPackage(ref, manifest, layout, entries))
     }
 
     /** Where [manifest] says things are, given the package holds [paths]. */
@@ -130,9 +110,9 @@ object PluginPackages {
     }
 
     private fun problems(manifest: PluginManifest, layout: PluginPackageLayout, paths: Set<String>): List<PluginPackageProblem> {
-        val pages = layout.pages.values.filter { it !in paths }.map { missing(it, "a page's html") }
+        val pages = layout.pages.values.filter { it !in paths }.map(::missing)
         return pages + when (val runtime = manifest.runtime) {
-            is PluginRuntime.Jvm -> listOfNotNull(missing(runtime.jar, "the jar").takeIf { runtime.jar !in paths })
+            is PluginRuntime.Jvm -> listOfNotNull(missing(runtime.jar).takeIf { runtime.jar !in paths })
             is PluginRuntime.Process -> processProblems(runtime, paths)
             is PluginRuntime.Service -> paths.filterNot(::isManifestOrPage).map {
                 PluginPackageProblem(PluginPackageProblemCode.UNEXPECTED_FILE, "a service package carries only its manifest and pages", it)
@@ -145,12 +125,12 @@ object PluginPackages {
         val commandInPackage = command.contains('/')
         val cwd = runtime.cwd.trimEnd('/')
         return listOfNotNull(
-            missing(command, "the command").takeIf { commandInPackage && command !in paths },
-            missing("$cwd/", "the working directory").takeIf { cwd != "." && paths.none { it.startsWith("$cwd/") } },
+            missing(command).takeIf { commandInPackage && command !in paths },
+            missing("$cwd/").takeIf { cwd != "." && paths.none { it.startsWith("$cwd/") } },
         )
     }
 
     private fun isManifestOrPage(path: String): Boolean = path == PluginPackagePaths.MANIFEST || path.startsWith(PluginPackagePaths.PAGES_DIR)
 
-    private fun missing(path: String, what: String) = PluginPackageProblem(PluginPackageProblemCode.MISSING_FILE, "the package has no $path ($what)", path)
+    private fun missing(path: String) = PluginPackageProblem(PluginPackageProblemCode.MISSING_FILE, "the package has no $path", path)
 }

@@ -25,63 +25,63 @@ internal object PluginContentRules {
     private val SCALAR_TYPES = setOf("string", "integer", "number", "boolean")
 
     fun check(manifest: PluginManifest): List<SchemaProblem> =
-        manifest.elements.flatMap { (kind, declared) -> element(manifest, kind, declared) } +
-            manifest.pages.flatMap { (id, page) -> page(manifest, id, page) }
+        manifest.elements.flatMap { (kind, declared) -> element(manifest, declared, ManifestPointer.of("elements", kind)) } +
+            manifest.pages.flatMap { (id, page) -> page(manifest, page, ManifestPointer.of("pages", id)) }
 
-    private fun element(manifest: PluginManifest, kind: String, declared: PluginElementKind): List<SchemaProblem> {
-        val path = pointer("elements", kind)
-        val unknownPage = problem("$path/page", PluginManifestProblem.UNKNOWN_PAGE, "no page '${declared.page}' in pages; declare it or drop the reference")
+    private fun element(manifest: PluginManifest, declared: PluginElementKind, at: ManifestPointer): List<SchemaProblem> {
+        val unknownPage = PluginManifestProblem.UNKNOWN_PAGE.at(at / "page", "no page '${declared.page}' in pages; declare it or drop the reference")
             .takeIf { declared.page != null && declared.page !in manifest.pages }
-        return listOfNotNull(unknownPage) + props(declared.props, "$path/props") + migrations(declared, "$path/migrations")
+        return listOfNotNull(unknownPage) + props(declared.props, at / "props") + migrations(declared, at / "migrations")
     }
 
-    private fun props(schema: JsonObject, path: String): List<SchemaProblem> {
-        val closed = (schema["type"] as? JsonPrimitive)?.content == "object" && (schema["additionalProperties"] as? JsonPrimitive)?.booleanOrNull == false
-        if (!closed) return listOf(badProps(path, "props are a closed object: \"type\": \"object\", \"additionalProperties\": false"))
+    private fun props(schema: JsonObject, at: ManifestPointer): List<SchemaProblem> {
+        if (!isClosedObject(schema)) return listOf(badProps(at, "props are a closed object: \"type\": \"object\", \"additionalProperties\": false"))
         val size = schema.toString().encodeToByteArray().size
-        val tooLarge = problem(path, PluginManifestProblem.PROPS_SCHEMA_TOO_LARGE, "the props schema is $size bytes; at most $MAX_PROPS_SCHEMA_BYTES")
+        val tooLarge = PluginManifestProblem.PROPS_SCHEMA_TOO_LARGE.at(at, "the props schema is $size bytes; at most $MAX_PROPS_SCHEMA_BYTES")
             .takeIf { size > MAX_PROPS_SCHEMA_BYTES }
-        val fields = (schema["properties"] as? JsonObject).orEmpty()
-        return listOfNotNull(tooLarge) + fields.mapNotNull { (name, field) -> propsField(field, "$path/properties" + pointer(name)) }
+        val fields = schema["properties"] as? JsonObject ?: JsonObject(emptyMap())
+        return listOfNotNull(tooLarge) + fields.mapNotNull { (name, field) -> propsField(field, at / "properties" / name) }
     }
+
+    private fun isClosedObject(schema: JsonObject): Boolean =
+        (schema["type"] as? JsonPrimitive)?.content == "object" && (schema["additionalProperties"] as? JsonPrimitive)?.booleanOrNull == false
 
     /** Why one props field is not a scalar or a short string, or null when it is. */
-    private fun propsField(field: JsonElement, path: String): SchemaProblem? {
-        val schema = field as? JsonObject ?: return badProps(path, "a props field is a schema object")
+    private fun propsField(field: JsonElement, at: ManifestPointer): SchemaProblem? {
+        val schema = field as? JsonObject ?: return badProps(at, "a props field is a schema object")
         val enum = schema["enum"] as? JsonArray
         if (enum != null) {
-            return badProps("$path/enum", "an enum props field lists scalars only").takeIf { enum.any { it !is JsonPrimitive || it is JsonNull } }
+            return badProps(at / "enum", "an enum props field lists scalars only").takeIf { enum.any { it !is JsonPrimitive || it is JsonNull } }
         }
         val type = (schema["type"] as? JsonPrimitive)?.content
-        if (type !in SCALAR_TYPES) return badProps(path, "props are flat: each field is a string, integer, number, boolean or enum")
-        val maxLength = (schema["maxLength"] as? JsonPrimitive)?.intOrNull
-        return badProps("$path/maxLength", "a string props field declares a maxLength of at most $MAX_PROPS_STRING_LENGTH")
-            .takeIf { type == "string" && (maxLength == null || maxLength > MAX_PROPS_STRING_LENGTH) }
+        if (type !in SCALAR_TYPES) return badProps(at, "props are flat: each field is a string, integer, number, boolean or enum")
+        return badProps(at / "maxLength", "a string props field declares a maxLength of at most $MAX_PROPS_STRING_LENGTH")
+            .takeIf { type == "string" && !isShortString(schema) }
     }
 
-    private fun migrations(declared: PluginElementKind, path: String): List<SchemaProblem> = declared.migrations.flatMap { (from, steps) ->
-        val stepsPath = path + pointer(from)
-        val future = problem(stepsPath, PluginManifestProblem.BAD_MIGRATION, "migrations are keyed by an earlier version than ${declared.schemaVersion}")
+    private fun isShortString(schema: JsonObject): Boolean =
+        ((schema["maxLength"] as? JsonPrimitive)?.intOrNull ?: Int.MAX_VALUE) <= MAX_PROPS_STRING_LENGTH
+
+    private fun migrations(declared: PluginElementKind, at: ManifestPointer): List<SchemaProblem> = declared.migrations.flatMap { (from, steps) ->
+        val stepsAt = at / from
+        val future = PluginManifestProblem.BAD_MIGRATION.at(stepsAt, "migrations are keyed by an earlier version than ${declared.schemaVersion}")
             .takeIf { (from.toIntOrNull() ?: 0) >= declared.schemaVersion }
         listOfNotNull(future) + steps.mapIndexedNotNull { index, step ->
-            problem("$stepsPath/$index", PluginManifestProblem.BAD_MIGRATION, "a step is exactly one of rename [from, to], default [field, scalar] or drop field")
+            PluginManifestProblem.BAD_MIGRATION.at(stepsAt / index, "a step is exactly one of rename [from, to], default [field, scalar] or drop field")
                 .takeIf { PluginMigrationOp.of(step) == null }
         }
     }
 
-    private fun page(manifest: PluginManifest, id: String, page: PluginPage): List<SchemaProblem> {
-        val path = pointer("pages", id)
-        val html = problem("$path/html", PluginManifestProblem.BAD_PATH, "a page is an .html file under pages/ inside the package")
+    private fun page(manifest: PluginManifest, page: PluginPage, at: ManifestPointer): List<SchemaProblem> {
+        val html = PluginManifestProblem.BAD_PATH.at(at / "html", "a page is an .html file under pages/ inside the package")
             .takeIf { !PluginPackagePaths.isPage(page.html) }
         val csp = listOf("connectDomains" to page.csp.connectDomains, "resourceDomains" to page.csp.resourceDomains, "frameDomains" to page.csp.frameDomains)
-            .flatMap { (name, domains) -> PluginManifestRules.origins(domains, "$path/csp/$name") }
+            .flatMap { (name, domains) -> PluginManifestRules.origins(domains, at / "csp" / name) }
         val permissions = page.permissions.mapIndexedNotNull { index, permission ->
-            PluginManifestRules.missing(permission, "$path/permissions/$index").takeIf { permission !in manifest.capabilities }
+            PluginManifestRules.missing(permission, at / "permissions" / index).takeIf { permission !in manifest.capabilities }
         }
-        return listOfNotNull(html) + csp + permissions + duplicates(page.displayModes, "$path/displayModes")
+        return listOfNotNull(html) + csp + permissions + duplicates(page.displayModes, at / "displayModes")
     }
 
-    private fun badProps(path: String, message: String) = problem(path, PluginManifestProblem.BAD_PROPS_SCHEMA, message)
-
-    private fun JsonObject?.orEmpty(): JsonObject = this ?: JsonObject(emptyMap())
+    private fun badProps(at: ManifestPointer, message: String) = PluginManifestProblem.BAD_PROPS_SCHEMA.at(at, message)
 }

@@ -12,6 +12,8 @@ import kotlin.test.assertTrue
 
 /** The package layout (plan section 3.1): manifest at the root, the runtime's files, pages, paths inside. */
 class PluginPackagesTest {
+    private val REF = PluginPackageRef(SHA_A)
+
     private fun files(manifest: PluginManifest, vararg paths: String): Map<String, ByteArray> =
         mapOf(PluginPackagePaths.MANIFEST to PluginManifestParser.encode(manifest).encodeToByteArray()) + paths.associateWith { it.encodeToByteArray() }
 
@@ -20,7 +22,7 @@ class PluginPackagesTest {
 
     @Test
     fun aJvmPackageHasItsJarAndPages() {
-        val pkg = assertIs<PluginPackageResult.Read>(PluginPackages.assemble(SHA_A, files(PluginRegistryFixtures.example, "plugin.jar", "pages/widget.html"))).pkg
+        val pkg = assertIs<PluginPackageResult.Read>(PluginPackages.assemble(REF, files(PluginRegistryFixtures.example, "plugin.jar", "pages/widget.html"))).pkg
         assertEquals(PluginPayload.Jar("plugin.jar"), pkg.layout.payload)
         assertEquals(mapOf("widget" to "pages/widget.html"), pkg.layout.pages)
         assertEquals("sha256:$SHA_A", pkg.ref.toString())
@@ -32,34 +34,34 @@ class PluginPackagesTest {
     fun missingFilesAreRefusedByName() {
         assertEquals(
             listOf("MISSING_FILE pages/widget.html", "MISSING_FILE plugin.jar"),
-            codes(PluginPackages.assemble(SHA_A, files(PluginRegistryFixtures.example))),
+            codes(PluginPackages.assemble(REF, files(PluginRegistryFixtures.example))),
         )
-        assertEquals(listOf("NO_MANIFEST null"), codes(PluginPackages.assemble(SHA_A, mapOf("plugin.jar" to ByteArray(1)))))
+        assertEquals(listOf("NO_MANIFEST null"), codes(PluginPackages.assemble(REF, mapOf("plugin.jar" to ByteArray(1)))))
     }
 
     @Test
     fun aProcessPackageCarriesEverythingOutsideTheManifestAndPages() {
         val process = manifest("/runtime" to json("""{"kind":"process","command":"./bin/run","cwd":"bin"}"""))
-        val pkg = assertIs<PluginPackageResult.Read>(PluginPackages.assemble(SHA_A, files(process, "bin/run", "bin/lib.js", "pages/widget.html"))).pkg
+        val pkg = assertIs<PluginPackageResult.Read>(PluginPackages.assemble(REF, files(process, "bin/run", "bin/lib.js", "pages/widget.html"))).pkg
         assertEquals(PluginPayload.ProcessFiles(listOf("bin/lib.js", "bin/run")), pkg.layout.payload)
         assertEquals(
             listOf("MISSING_FILE bin/run", "MISSING_FILE bin/"),
-            codes(PluginPackages.assemble(SHA_A, files(process, "lib.js", "pages/widget.html"))),
+            codes(PluginPackages.assemble(REF, files(process, "lib.js", "pages/widget.html"))),
         )
     }
 
     @Test
     fun aServicePackageCarriesOnlyItsManifestAndPages() {
         val service = manifest("/runtime" to json("""{"kind":"service","url":"wss://h.example.test/lcp"}"""))
-        assertEquals(PluginPayload.None, assertIs<PluginPackageResult.Read>(PluginPackages.assemble(SHA_A, files(service, "pages/widget.html"))).pkg.layout.payload)
-        assertEquals(listOf("UNEXPECTED_FILE plugin.jar"), codes(PluginPackages.assemble(SHA_A, files(service, "pages/widget.html", "plugin.jar"))))
+        assertEquals(PluginPayload.None, assertIs<PluginPackageResult.Read>(PluginPackages.assemble(REF, files(service, "pages/widget.html"))).pkg.layout.payload)
+        assertEquals(listOf("UNEXPECTED_FILE plugin.jar"), codes(PluginPackages.assemble(REF, files(service, "pages/widget.html", "plugin.jar"))))
     }
 
     @Test
     fun anUnsafePathOrABadManifestIsRefused() {
-        assertEquals(listOf("UNSAFE_PATH ../evil"), codes(PluginPackages.assemble(SHA_A, files(PluginRegistryFixtures.example, "../evil"))))
+        assertEquals(listOf("UNSAFE_PATH ../evil"), codes(PluginPackages.assemble(REF, files(PluginRegistryFixtures.example, "../evil"))))
         val bad = mapOf(PluginPackagePaths.MANIFEST to """{"id":"x"}""".encodeToByteArray())
-        assertTrue(codes(PluginPackages.assemble(SHA_A, bad)).all { it == "BAD_MANIFEST letta-plugin.json" })
+        assertTrue(codes(PluginPackages.assemble(REF, bad)).all { it == "BAD_MANIFEST letta-plugin.json" })
     }
 
     @Test

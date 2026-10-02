@@ -23,19 +23,32 @@ enum class PluginManifestProblem {
     UNDECLARED_REFERENCE,
     SECRET_IN_URL,
     BAD_SETTING,
+
+    ;
+
+    /** This problem at [at], worded by [message]. */
+    fun at(at: ManifestPointer, message: String): SchemaProblem = SchemaProblem(at.path, name, message)
 }
 
-/** A JSON pointer (RFC 6901) from [segments]: `pointer("actions", "start", "description")` is `/actions/start/description`. */
-internal fun pointer(vararg segments: Any): String =
-    segments.joinToString("") { "/" + it.toString().replace("~", "~0").replace("/", "~1") }
+/** A JSON pointer (RFC 6901) into a manifest, built a segment at a time: `ManifestPointer.ROOT / "actions" / "start"`. */
+class ManifestPointer private constructor(val path: String) {
+    operator fun div(segment: Any): ManifestPointer =
+        ManifestPointer(path + "/" + segment.toString().replace("~", "~0").replace("/", "~1"))
 
-internal fun problem(path: String, code: PluginManifestProblem, message: String): SchemaProblem = SchemaProblem(path, code.name, message)
+    override fun toString(): String = path
 
-/** The index of every entry of [values] that repeats an earlier one, refused at `[path]/<index>`. */
-internal fun <T> duplicates(values: List<T>, path: String): List<SchemaProblem> {
+    companion object {
+        val ROOT: ManifestPointer = ManifestPointer("")
+
+        fun of(vararg segments: Any): ManifestPointer = segments.fold(ROOT) { pointer, segment -> pointer / segment }
+    }
+}
+
+/** The index of every entry of [values] that repeats an earlier one, refused at `[at]/<index>`. */
+internal fun <T> duplicates(values: List<T>, at: ManifestPointer): List<SchemaProblem> {
     val seen = mutableSetOf<T>()
     return values.mapIndexedNotNull { index, value ->
-        problem("$path/$index", PluginManifestProblem.DUPLICATE, "'$value' is listed twice").takeIf { !seen.add(value) }
+        PluginManifestProblem.DUPLICATE.at(at / index, "'$value' is listed twice").takeIf { !seen.add(value) }
     }
 }
 
@@ -52,13 +65,15 @@ object PluginManifestRules {
     /** Agent tool names: what the App Server and the models accept. */
     const val MAX_TOOL_NAME_LENGTH: Int = 64
 
+    private val ROOT = ManifestPointer.ROOT
+
     fun check(manifest: PluginManifest): List<SchemaProblem> =
         contract(manifest) + capabilities(manifest) + net(manifest) + settings(manifest) + secrets(manifest) +
             actions(manifest) + PluginRuntimeRules.check(manifest) + PluginContentRules.check(manifest)
 
     private fun contract(manifest: PluginManifest): List<SchemaProblem> = listOfNotNull(
-        problem(
-            pointer("contract", "version"), PluginManifestProblem.UNSUPPORTED_CONTRACT,
+        PluginManifestProblem.UNSUPPORTED_CONTRACT.at(
+            ROOT / "contract" / "version",
             "contract version ${manifest.contract.version} is not supported here; this host speaks ${SUPPORTED_CONTRACT_VERSIONS.joinToString()}",
         ).takeIf { manifest.contract.version !in SUPPORTED_CONTRACT_VERSIONS },
     )
@@ -66,51 +81,52 @@ object PluginManifestRules {
     private fun capabilities(manifest: PluginManifest): List<SchemaProblem> {
         val declared = manifest.capabilities.toSet()
         val needs = listOf(
-            Triple(manifest.elements.isNotEmpty(), PluginCapability.CANVAS_PLACE, pointer("elements")),
-            Triple(manifest.pages.isNotEmpty(), PluginCapability.UI_PAGES, pointer("pages")),
-            Triple(manifest.net.connect.isNotEmpty(), PluginCapability.NET_CONNECT, pointer("net", "connect")),
+            Triple(manifest.elements.isNotEmpty(), PluginCapability.CANVAS_PLACE, ROOT / "elements"),
+            Triple(manifest.pages.isNotEmpty(), PluginCapability.UI_PAGES, ROOT / "pages"),
+            Triple(manifest.net.connect.isNotEmpty(), PluginCapability.NET_CONNECT, ROOT / "net" / "connect"),
         )
-        return duplicates(manifest.capabilities, pointer("capabilities")) + needs.mapNotNull { (uses, capability, path) ->
-            missing(capability, path).takeIf { uses && capability !in declared }
+        return duplicates(manifest.capabilities, ROOT / "capabilities") + needs.mapNotNull { (uses, capability, at) ->
+            missing(capability, at).takeIf { uses && capability !in declared }
         }
     }
 
-    internal fun missing(capability: PluginCapability, path: String): SchemaProblem =
-        problem(path, PluginManifestProblem.CAPABILITY_MISSING, "this needs the '${capability.wire}' capability; add it to capabilities")
+    internal fun missing(capability: PluginCapability, at: ManifestPointer): SchemaProblem =
+        PluginManifestProblem.CAPABILITY_MISSING.at(at, "this needs the '${capability.wire}' capability; add it to capabilities")
 
     private fun net(manifest: PluginManifest): List<SchemaProblem> {
-        val path = pointer("net", "connect")
-        val noOrigins = problem(path, PluginManifestProblem.NO_ORIGINS, "'net:connect' needs at least one origin here")
+        val at = ROOT / "net" / "connect"
+        val noOrigins = PluginManifestProblem.NO_ORIGINS.at(at, "'net:connect' needs at least one origin here")
             .takeIf { PluginCapability.NET_CONNECT in manifest.capabilities && manifest.net.connect.isEmpty() }
-        return listOfNotNull(noOrigins) + origins(manifest.net.connect, path) + duplicates(manifest.net.connect, path)
+        return listOfNotNull(noOrigins) + origins(manifest.net.connect, at) + duplicates(manifest.net.connect, at)
     }
 
-    /** Every entry of [values] that is not an origin, at `[path]/<index>`. */
-    internal fun origins(values: List<String>, path: String): List<SchemaProblem> = values.mapIndexedNotNull { index, value ->
-        problem(
-            "$path/$index", PluginManifestProblem.BAD_ORIGIN,
+    /** Every entry of [values] that is not an origin, at `[at]/<index>`. */
+    internal fun origins(values: List<String>, at: ManifestPointer): List<SchemaProblem> = values.mapIndexedNotNull { index, value ->
+        PluginManifestProblem.BAD_ORIGIN.at(
+            at / index,
             "'$value' is not an origin: scheme://host[:port] (http, https, ws or wss; no path; a wildcard only as a leading *.)",
         ).takeIf { PluginOrigin.parse(value) == null }
     }
 
     private fun settings(manifest: PluginManifest): List<SchemaProblem> = manifest.settings.flatMap { (name, field) ->
-        PluginSettingRules.check(field, pointer("settings", name))
+        PluginSettingRules.check(field, ROOT / "settings" / name)
     }
 
     private fun secrets(manifest: PluginManifest): List<SchemaProblem> =
-        duplicates(manifest.secrets.map { it.name }, pointer("secrets")).map { it.copy(path = it.path + "/name") }
+        duplicates(manifest.secrets.map { it.name }, ROOT / "secrets").map { it.copy(path = it.path + "/name") }
 
     private fun actions(manifest: PluginManifest): List<SchemaProblem> = manifest.actions.flatMap { (name, action) ->
-        val path = pointer("actions", name)
+        val at = ROOT / "actions" / name
+        val forAgent = PluginActionVisibility.AGENT in action.visibility
         val tool = manifest.toolName(name)
         listOfNotNull(
-            problem(path, PluginManifestProblem.BAD_TOOL_NAME, "the agent tool '$tool' is longer than $MAX_TOOL_NAME_LENGTH characters; shorten the action name")
-                .takeIf { PluginActionVisibility.AGENT in action.visibility && tool.length > MAX_TOOL_NAME_LENGTH },
-            problem("$path/description", PluginManifestProblem.MISSING_DESCRIPTION, "an action the agent sees needs a description; it is the tool's description")
-                .takeIf { PluginActionVisibility.AGENT in action.visibility && action.description == null },
-            problem("$path/input/type", PluginManifestProblem.BAD_INPUT_SCHEMA, "an action's input is an object schema: \"type\": \"object\"")
+            PluginManifestProblem.BAD_TOOL_NAME.at(at, "the agent tool '$tool' is longer than $MAX_TOOL_NAME_LENGTH characters; shorten the action name")
+                .takeIf { forAgent && tool.length > MAX_TOOL_NAME_LENGTH },
+            PluginManifestProblem.MISSING_DESCRIPTION.at(at / "description", "an action the agent sees needs a description; it is the tool's description")
+                .takeIf { forAgent && action.description == null },
+            PluginManifestProblem.BAD_INPUT_SCHEMA.at(at / "input" / "type", "an action's input is an object schema: \"type\": \"object\"")
                 .takeIf { (action.input["type"] as? JsonPrimitive)?.content != "object" },
-        ) + duplicates(action.visibility, "$path/visibility")
+        ) + duplicates(action.visibility, at / "visibility")
     }
 }
 
@@ -118,7 +134,7 @@ object PluginManifestRules {
 internal object PluginSettingRules {
     private val NUMERIC = setOf(PluginSettingType.INTEGER, PluginSettingType.NUMBER)
 
-    fun check(field: PluginSettingField, path: String): List<SchemaProblem> {
+    fun check(field: PluginSettingField, at: ManifestPointer): List<SchemaProblem> {
         val misplaced = listOf(
             Triple("values", field.values != null, field.type == PluginSettingType.ENUM),
             Triple("format", field.format != null, field.type == PluginSettingType.STRING),
@@ -126,18 +142,19 @@ internal object PluginSettingRules {
             Triple("minimum", field.minimum != null, field.type in NUMERIC),
             Triple("maximum", field.maximum != null, field.type in NUMERIC),
         ).mapNotNull { (keyword, present, fits) ->
-            bad("$path/$keyword", "'$keyword' does not apply to a ${field.type.name.lowercase()} setting").takeIf { present && !fits }
+            bad(at / keyword, "'$keyword' does not apply to a ${field.type.name.lowercase()} setting").takeIf { present && !fits }
         }
-        val values = bad("$path/values", "an enum setting lists its values").takeIf { field.type == PluginSettingType.ENUM && field.values == null }
-        val bounds = bad("$path/minimum", "minimum ${field.minimum} is over maximum ${field.maximum}")
-            .takeIf { field.minimum != null && field.maximum != null && field.minimum > field.maximum }
-        return misplaced + listOfNotNull(values, bounds) + defaultProblems(field, path, misplaced.isEmpty())
+        val values = bad(at / "values", "an enum setting lists its values").takeIf { field.type == PluginSettingType.ENUM && field.values == null }
+        val bounds = bad(at / "minimum", "minimum ${field.minimum} is over maximum ${field.maximum}").takeIf { boundsReversed(field) }
+        val default = field.default?.takeIf { misplaced.isEmpty() }?.let { PluginSettings.problems(field, it, (at / "default").path) }.orEmpty()
+        return misplaced + listOfNotNull(values, bounds) + default
     }
 
-    private fun defaultProblems(field: PluginSettingField, path: String, wellFormed: Boolean): List<SchemaProblem> {
-        val default = field.default ?: return emptyList()
-        return if (wellFormed) PluginSettings.problems(field, default, "$path/default") else emptyList()
+    private fun boundsReversed(field: PluginSettingField): Boolean {
+        val minimum = field.minimum ?: return false
+        val maximum = field.maximum ?: return false
+        return minimum > maximum
     }
 
-    private fun bad(path: String, message: String) = problem(path, PluginManifestProblem.BAD_SETTING, message)
+    private fun bad(at: ManifestPointer, message: String) = PluginManifestProblem.BAD_SETTING.at(at, message)
 }

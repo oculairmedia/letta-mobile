@@ -86,7 +86,10 @@ data class InstalledPlugin(
     val packageSha256: String get() = current.packageSha256
 
     /** Whether the plugin's agent tools are advertised: enabled or active, or updating from one of those. */
-    val advertised: Boolean get() = state.advertises || (state == PluginState.Updating && pendingUpdate?.resumeState?.advertises == true)
+    val advertised: Boolean get() = state.advertises || resumesAdvertised
+
+    /** Whether the staged update returns the plugin to a state that advertises its tools. */
+    private val resumesAdvertised: Boolean get() = pendingUpdate?.resumeState?.advertises == true
 
     /** Whether everything the plugin needs to run is set: required settings and required secrets. */
     val ready: Boolean

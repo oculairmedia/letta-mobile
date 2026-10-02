@@ -50,7 +50,7 @@ sealed interface PluginMigrationResult {
  */
 object PluginMigrations {
     fun apply(props: JsonObject, fromV: Int, toV: Int, kind: PluginElementKind): PluginMigrationResult {
-        if (fromV < 1 || toV > kind.schemaVersion || fromV > toV) {
+        if (toV !in validTargets(fromV, kind)) {
             return PluginMigrationResult.Refused("cannot migrate v$fromV to v$toV; the kind is at v${kind.schemaVersion}")
         }
         var current = props
@@ -62,6 +62,10 @@ object PluginMigrations {
         }
         return PluginMigrationResult.Migrated(current, toV)
     }
+
+    /** The versions props at [fromV] can be migrated to: none when [fromV] is not one of the kind's. */
+    private fun validTargets(fromV: Int, kind: PluginElementKind): IntRange =
+        if (fromV >= 1) fromV..kind.schemaVersion else IntRange.EMPTY
 
     /** [props] at [fromV] brought to the kind's current version. */
     fun toCurrent(props: JsonObject, fromV: Int, kind: PluginElementKind): PluginMigrationResult =
