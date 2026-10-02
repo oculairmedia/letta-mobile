@@ -198,7 +198,7 @@ private fun LocalProviderFields(state: ConfigUiState, callbacks: LocalModelCallb
         value = state.localProviderBaseUrl,
         onValueChange = callbacks.onLocalProviderBaseUrlChange,
         label = { Text(stringResource(R.string.screen_config_local_provider_base_url)) },
-        placeholder = { Text("http://192.168.1.10:8082/v1") },
+        placeholder = { Text(stringResource(R.string.screen_config_local_provider_base_url_placeholder)) },
         modifier = Modifier.fillMaxWidth(),
         leadingIcon = { Icon(LettaIcons.Link, null) },
         singleLine = true,

@@ -333,6 +333,7 @@
     <string name="screen_config_local_provider_section">Custom OpenAI-compatible endpoint (optional)</string>
     <string name="screen_config_local_provider_help">Route the local agent\'s model calls to a remote OpenAI-compatible server instead of the on-device model. The endpoint\'s models appear in the model pickers; memory, tools, and conversations stay on this device.</string>
     <string name="screen_config_local_provider_base_url">Endpoint base URL</string>
+    <string name="screen_config_local_provider_base_url_placeholder" translatable="false">http://192.168.1.10:8082/v1</string>
     <string name="screen_config_local_provider_api_key">API key (optional)</string>
     <string name="action_save_configuration">Save Configuration</string>
     <string name="screen_config_appearance_section">Appearance</string>
