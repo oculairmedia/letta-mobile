@@ -72,21 +72,25 @@ object CanvasPluginElementUndo {
     }
 
     /** [element] after [op]: what [op] names replaces its register, the rest is kept. */
-    private fun merged(element: CanvasPluginElement, op: CanvasOp.SetPluginElementOp): CanvasPluginElement {
-        val moved = op.frame != null
-        val retyped = op.elementType != null
-        return element.copy(
-            type = op.elementType ?: element.type,
-            v = if (retyped) op.v ?: 1 else element.v,
-            frame = op.frame ?: element.frame,
-            owner = if (moved) op.owner ?: CanvasGeometryOwner.EXPLICIT else element.owner,
-            ref = op.ref ?: element.ref,
-            props = op.props ?: element.props,
-            snapshot = op.snapshot ?: element.snapshot,
-            fallback = op.fallback ?: element.fallback,
-            meta = op.meta ?: element.meta,
-        )
-    }
+    private fun merged(element: CanvasPluginElement, op: CanvasOp.SetPluginElementOp): CanvasPluginElement =
+        withState(withPlacement(element, op), op)
+
+    /** The frame register (frame and owner) and the type register (type and v). */
+    private fun withPlacement(element: CanvasPluginElement, op: CanvasOp.SetPluginElementOp): CanvasPluginElement = element.copy(
+        type = op.elementType ?: element.type,
+        v = op.elementType?.let { op.v ?: 1 } ?: element.v,
+        frame = op.frame ?: element.frame,
+        owner = op.frame?.let { op.owner ?: CanvasGeometryOwner.EXPLICIT } ?: element.owner,
+    )
+
+    /** The registers the plugin writes besides the type. */
+    private fun withState(element: CanvasPluginElement, op: CanvasOp.SetPluginElementOp): CanvasPluginElement = element.copy(
+        ref = op.ref ?: element.ref,
+        props = op.props ?: element.props,
+        snapshot = op.snapshot ?: element.snapshot,
+        fallback = op.fallback ?: element.fallback,
+        meta = op.meta ?: element.meta,
+    )
 
     /** The element a first write makes, or null when [op] is not one (no type or no fallback). */
     private fun created(op: CanvasOp.SetPluginElementOp): CanvasPluginElement? {
