@@ -16,6 +16,11 @@ import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.Timeline
+import com.letta.mobile.data.timeline.TimelineEvent
+import com.letta.mobile.data.timeline.TimelineMessageType
+import com.letta.mobile.data.timeline.parseTimelineInstant
+import com.letta.mobile.data.model.ToolCall
+import kotlinx.collections.immutable.persistentListOf
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
@@ -241,6 +246,80 @@ class DesktopChatControllerTest {
 
         controller.close()
     }
+
+    /**
+     * letta-mobile-bglj6.1: the full page's glow went out mid-run. It read [thinkingConversationId],
+     * which clears the moment the agent's first message lands, while the run goes on through its
+     * Bash rounds with the Stop button up. The page state the Stop button and the docked panel's
+     * glow read keeps the run in flight until the turn's terminal.
+     */
+    @Test
+    fun theRunStaysInFlightThroughToolRoundsAfterTheFirstReplyLands() = runTest {
+        val loop = SuspendingSendDesktopLoop("conv-1")
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(),
+            loopFactory = { _, _, _ -> loop },
+        )
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("run the checks")
+        controller.send()
+        runCurrent()
+        // Mid-run: the prompt, a line of narration, then Bash rounds, each under its own run id.
+        loop.state.value = Timeline(
+            conversationId = "conv-1",
+            events = persistentListOf(
+                midRunEvent(TimelineMessageType.USER, "run the checks", "prompt-1", 1.0, runId = null),
+                midRunEvent(TimelineMessageType.ASSISTANT, "Checking the build.", "reply-1", 2.0, "local-run-100"),
+                midRunEvent(TimelineMessageType.TOOL_CALL, "", "call-1", 3.0, "local-run-100", bash = "call-1"),
+                midRunEvent(TimelineMessageType.TOOL_CALL, "", "call-2", 4.0, "local-run-101", bash = "call-2"),
+            ),
+        )
+        runCurrent()
+
+        // The old glow input is gone, though the turn is still running...
+        assertNull(controller.thinkingConversationId.value)
+        // ...and the page state (Stop button, docked glow, now the page glow) still says so.
+        val page = desktopChatUiState(
+            DesktopChatTimelineInputs(
+                surface = controller.state.value,
+                presence = controller.replyPresence.value,
+                cancellingConversationId = null,
+                sendQueue = com.letta.mobile.data.chat.send.ConversationSendQueue(),
+                local = DesktopChatLocalTimelineState(),
+            ),
+            previous = null,
+        )
+        assertTrue(page.isStreaming, "the Stop button is up")
+        assertTrue(page.isRunInFlight, "the page glow runs while the turn does")
+
+        loop.releaseSend()
+        runCurrent()
+        assertFalse(controller.replyPresence.value.isStreaming || controller.replyPresence.value.isAgentTyping)
+
+        controller.close()
+    }
+
+    private fun midRunEvent(
+        type: TimelineMessageType,
+        content: String,
+        serverId: String,
+        position: Double,
+        runId: String?,
+        bash: String? = null,
+    ) = TimelineEvent.Confirmed(
+        position = position,
+        otid = "server-$serverId",
+        content = content,
+        serverId = serverId,
+        messageType = type,
+        date = parseTimelineInstant("2026-09-25T11:05:0${position.toInt()}Z"),
+        runId = runId,
+        stepId = null,
+        toolCalls = bash?.let { persistentListOf(ToolCall(id = it, name = "Bash", arguments = "{\"command\":\"ls\"}")) }
+            ?: persistentListOf(),
+    )
 
     @Test
     fun replyPresenceClearsOnceAgentReplyLands() = runTest {
