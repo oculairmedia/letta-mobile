@@ -92,8 +92,8 @@ object ChatHeadDimens {
     val edgeMargin: Dp = LettaDimens.Space.md
 
     /**
-     * Kept clear above the head's lane: the canvas's actions pill sits in the top-right corner
-     * under the app bar.
+     * Kept clear above the head's lane: the status bar over the board's top edge (the phone's
+     * canvas mode keeps that edge otherwise clear), and a wide board's actions pill.
      */
     val topClearance: Dp = 72.dp
 
@@ -103,24 +103,26 @@ object ChatHeadDimens {
     /** Between the head and its popup. */
     val popupGap: Dp = LettaDimens.Space.xs
 
-    /** The popup is at most this share of the screen's width... */
-    const val popupMaxWidthFraction: Float = 0.8f
+    /**
+     * The popup is at most this share of the screen's width, and never wider than [popupMaxWidth]:
+     * a speech bubble beside the head, not a page over the board.
+     */
+    const val popupMaxWidthFraction: Float = 0.62f
+    val popupMaxWidth: Dp = 280.dp
 
-    /** ...and this tall, then it scrolls. */
-    val popupMaxHeight: Dp = 320.dp
+    /** ...and this tall (a few lines), then it scrolls under its edge fades. */
+    val popupMaxHeight: Dp = 112.dp
+
+    /** The popup's edge fades while its text scrolls. */
+    val popupFadeLength: Dp = LettaDimens.Space.lg
+
+    /** Around the popup's text: tight, as a bubble's. */
+    val popupPaddingHorizontal: Dp = LettaDimens.Space.sm
+    val popupPaddingVertical: Dp = LettaDimens.Space.sm
 
     /** The head's lift off the canvas. */
     val elevation: Dp = 6.dp
 
     /** The snap to an edge after a drag. */
     const val snapMillis: Int = 240
-
-    /** How far the thinking halo glows past the head's edge. */
-    val haloBleed: Dp = 22.dp
-
-    /** The halo's peak strength, the share of its radius held solid, and its breath. */
-    const val haloStrength: Float = 0.7f
-    const val haloSolidFraction: Float = 0.45f
-    const val haloBreathLow: Float = 0.55f
-    const val haloBreathMillis: Int = 1200
 }

@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,6 +62,12 @@ internal data class SharedChatPageParams(
      * timeline and the canvas run edge to edge behind them; their content and chrome rest below.
      */
     val topChromeInset: Dp = 0.dp,
+    /**
+     * Told whether the host's floating header should hide: on a phone the canvas mode keeps the
+     * top of the board clear (the head and the bar lead to the agent and the chat, and the board's
+     * menu carries the agent switcher and menu). The full-screen page keeps the header.
+     */
+    val onHostHeaderHiddenChange: ((Boolean) -> Unit)? = null,
 )
 
 /**
@@ -102,6 +110,14 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     // Back from the full-screen page returns to the canvas, the default view.
     BackHandler(enabled = canvasSlot != null && presentation.mode == ChatSurfaceMode.FullScreen) {
         onIntent(ChatSurfaceIntent.Collapse)
+    }
+    val reportHeaderHidden = params.onHostHeaderHiddenChange
+    if (reportHeaderHidden != null) {
+        val currentReport by rememberUpdatedState(reportHeaderHidden)
+        val headerHidden = canvasSlot != null && presentation.mode != ChatSurfaceMode.FullScreen
+        // After every composition, so the header is gone by the next frame; an unchanged value is a no-op.
+        SideEffect { currentReport(headerHidden) }
+        DisposableEffect(Unit) { onDispose { currentReport(false) } }
     }
     val target = ChatCanvasTarget(
         agentId = params.viewModel.agentId.value,
@@ -180,6 +196,8 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(
         openModelPicker = null,
         // The composer companion mascot opens the agent drawer, as the legacy page's does.
         openAgentPane = openPane,
+        // The header's agent pill, which the canvas mode's board menu stands in for.
+        openAgentSwitcher = onOpenAgentSwitcher,
     )
 }
 
