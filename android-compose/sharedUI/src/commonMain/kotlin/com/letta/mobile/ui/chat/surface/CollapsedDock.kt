@@ -74,6 +74,7 @@ import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.movePointerIcon
+import com.letta.mobile.ui.markdown.MarkdownPaint
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
@@ -393,8 +394,10 @@ internal fun BubbleText(
             text = shown,
             // Retaining the previous AST across a reshaped update can crash Compose Desktop.
             retainState = false,
-            textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-            textStyle = textStyle,
+            paint = MarkdownPaint(
+                textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                textStyle = textStyle,
+            ),
         )
     }
 }
