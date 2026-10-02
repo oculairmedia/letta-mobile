@@ -136,11 +136,17 @@ private fun DispatchPrompt(dispatch: UiSubagentDispatch) {
     }
 }
 
-private fun dispatchStatus(toolStatus: String): StringResource = when (toolStatus.lowercase()) {
-    "success", "succeeded", "completed", "complete", "done" -> Res.string.rows_dispatch_done
-    "error", "failed" -> Res.string.rows_dispatch_failed
-    else -> Res.string.rows_dispatch_running
+private fun dispatchStatus(toolStatus: String): StringResource {
+    val status = toolStatus.lowercase()
+    return when {
+        status in DISPATCH_DONE_STATUSES -> Res.string.rows_dispatch_done
+        status in DISPATCH_FAILED_STATUSES -> Res.string.rows_dispatch_failed
+        else -> Res.string.rows_dispatch_running
+    }
 }
+
+private val DISPATCH_DONE_STATUSES = setOf("success", "succeeded", "completed", "complete", "done")
+private val DISPATCH_FAILED_STATUSES = setOf("error", "failed")
 
 /** The return half: a subagent's `<task-notification>`. */
 @Immutable
@@ -150,13 +156,20 @@ private data class NotificationModel(
     val report: String?,
 ) {
     val status: String = notification.status.trim().lowercase()
-    val isFailure: Boolean = status == "failed" || status == "error"
+    val isFailure: Boolean = status in NOTIFICATION_FAILURE_STATUSES
 
     // The protocol names `completed` as its successful terminal state; older producers said
     // `success`. Never compact a status that is not positively successful.
-    val isSuccessfulCompletion: Boolean = status == "completed" || status == "success"
-    val hasDetails: Boolean = report != null || notification.transcriptUri != null
+    val isSuccessfulCompletion: Boolean = status in NOTIFICATION_SUCCESS_STATUSES
+
+    /** A report, or a transcript to point at: what the details disclosure has to show. */
+    fun hasDetails(): Boolean {
+        return report != null || notification.transcriptUri != null
+    }
 }
+
+private val NOTIFICATION_FAILURE_STATUSES = setOf("failed", "error")
+private val NOTIFICATION_SUCCESS_STATUSES = setOf("completed", "success")
 
 /**
  * A completed subagent contributes one compact row; its report, metadata and actions stay
@@ -202,10 +215,12 @@ private class NotificationActions(
     val onToggleDetails: () -> Unit,
 )
 
-private fun UiSubagentNotification.activityLabel(): StringResource = when {
-    taskId?.startsWith("exec_") == true -> Res.string.rows_activity_command
-    !subagentAgentId.isNullOrBlank() -> Res.string.rows_activity_subagent
-    else -> Res.string.rows_activity_task
+private fun UiSubagentNotification.activityLabel(): StringResource {
+    return when {
+        taskId?.startsWith("exec_") == true -> Res.string.rows_activity_command
+        !subagentAgentId.isNullOrBlank() -> Res.string.rows_activity_subagent
+        else -> Res.string.rows_activity_task
+    }
 }
 
 @Composable
@@ -283,7 +298,7 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
         notification.taskId?.let { MetaChip(it) }
     }
     NotificationActionRow(model, expanded, actions)
-    if (expanded && model.hasDetails) {
+    if (expanded && model.hasDetails()) {
         model.report?.let { SharedMarkdownText(text = it) }
         notification.transcriptUri?.let { transcript ->
             Text(
@@ -300,7 +315,7 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
 @Composable
 private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, actions: NotificationActions) {
     val onOpen = actions.onOpen
-    if (onOpen == null && !model.hasDetails) return
+    if (onOpen == null && !model.hasDetails()) return
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -317,7 +332,7 @@ private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, a
                     .padding(vertical = LettaDimens.Space.sm),
             )
         }
-        if (model.hasDetails) {
+        if (model.hasDetails()) {
             DisclosureLink(label = detailsLabel(model, expanded), expanded = expanded, onToggle = actions.onToggleDetails)
         }
     }
