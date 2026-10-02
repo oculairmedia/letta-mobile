@@ -9,21 +9,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
-import com.letta.mobile.data.repository.modelcontrol.ProviderAdminController
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.modelcontrol.ProviderConnectionPane
-import com.letta.mobile.ui.modelcontrol.ProviderFormActions
-import com.letta.mobile.ui.modelcontrol.ProviderPaneActions
+import com.letta.mobile.ui.modelcontrol.ProviderSettingsActions
+import com.letta.mobile.ui.modelcontrol.ProviderSettingsPane
 
 /**
- * App Server providers, live from the host (letta-mobile-w4q4p): connected
- * providers with Disconnect, every connectable provider with a Connect form
- * generated from its auth-method fields. The pane is shared with desktop.
+ * Providers, live from the host (letta-mobile-w4q4p.6 / .6.1): Accounts, API
+ * keys, Custom Endpoints and Models as tabs. The pane is shared with desktop;
+ * this screen only adds the app bar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +32,7 @@ fun ProviderAdminScreen(
 ) {
     val controller = viewModel.controller
     val state by controller.state.collectAsStateWithLifecycle()
+    val actions = remember(controller) { ProviderSettingsActions.bind(controller) }
     Scaffold(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
@@ -43,30 +43,9 @@ fun ProviderAdminScreen(
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
-                actions = {
-                    IconButton(onClick = controller::refresh) {
-                        Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
-                    }
-                },
             )
         },
     ) { padding ->
-        ProviderConnectionPane(
-            state = state,
-            actions = providerPaneActions(controller),
-            modifier = Modifier.padding(padding),
-        )
+        ProviderSettingsPane(state = state, actions = actions, modifier = Modifier.padding(padding))
     }
 }
-
-internal fun providerPaneActions(controller: ProviderAdminController) = ProviderPaneActions(
-    onConnect = controller::openConnect,
-    onDisconnect = controller::requestDisconnect,
-    form = ProviderFormActions(
-        onChange = controller::updateForm,
-        onSubmit = controller::submitConnect,
-        onDismiss = controller::dismissForm,
-    ),
-    onConfirmDisconnect = controller::confirmDisconnect,
-    onDismissDisconnect = controller::dismissDisconnect,
-)

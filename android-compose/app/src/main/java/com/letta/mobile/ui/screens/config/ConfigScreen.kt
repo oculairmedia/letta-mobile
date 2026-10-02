@@ -60,9 +60,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 fun ConfigScreen(
     onNavigateBack: () -> Unit,
     onNavigateToConfigList: () -> Unit,
-    onNavigateToSystemAccess: () -> Unit = {},
-    onNavigateToVibesyncDebug: () -> Unit = {},
-    onNavigateToCanvasDebug: () -> Unit = {},
+    destinations: ConfigDestinations = ConfigDestinations(),
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -113,9 +111,7 @@ fun ConfigScreen(
                 onSelectEmbeddedModel = { viewModel.selectEmbeddedModel(it) },
                 batteryOptimizationExempt = batteryOptimization.exempt,
                 onRequestBatteryOptimizationExemption = batteryOptimization.requestExemption,
-                onNavigateToSystemAccess = onNavigateToSystemAccess,
-                onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
-                onNavigateToCanvasDebug = onNavigateToCanvasDebug,
+                destinations = destinations,
                 onRefresh = viewModel::loadConfig,
                 onSave = {
                     viewModel.saveConfig(
@@ -182,9 +178,7 @@ private fun ConfigContent(
     onSelectEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
     batteryOptimizationExempt: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
-    onNavigateToSystemAccess: () -> Unit,
-    onNavigateToVibesyncDebug: () -> Unit,
-    onNavigateToCanvasDebug: () -> Unit = {},
+    destinations: ConfigDestinations,
     onRefresh: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
@@ -437,11 +431,7 @@ private fun ConfigContent(
             )
         }
 
-        IntegrationsSection(
-            onNavigateToSystemAccess = onNavigateToSystemAccess,
-            onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
-            onNavigateToCanvasDebug = onNavigateToCanvasDebug,
-        )
+        IntegrationsSection(destinations)
 
         CardGroup {
             item(
@@ -1184,29 +1174,31 @@ private fun rememberLocalModelImportLauncher(
  * was added.
  */
 @Composable
-private fun IntegrationsSection(
-    onNavigateToSystemAccess: () -> Unit,
-    onNavigateToVibesyncDebug: () -> Unit,
-    onNavigateToCanvasDebug: () -> Unit,
-) {
+private fun IntegrationsSection(destinations: ConfigDestinations) {
     CardGroup(title = {
         ConfigSectionTitle(stringResource(R.string.screen_config_integrations_section))
     }) {
         item(
-            onClick = onNavigateToSystemAccess,
+            onClick = destinations.onProviders,
+            headlineContent = { Text(stringResource(R.string.screen_providers_title)) },
+            supportingContent = { Text(stringResource(R.string.screen_providers_entry_description)) },
+            leadingContent = { Icon(LettaIcons.Server, contentDescription = null) },
+        )
+        item(
+            onClick = destinations.onSystemAccess,
             headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },
             supportingContent = { Text(stringResource(R.string.screen_system_access_entry_description)) },
             leadingContent = { Icon(LettaIcons.Key, contentDescription = null) },
         )
         if (BuildConfig.DEBUG) {
             item(
-                onClick = onNavigateToVibesyncDebug,
+                onClick = destinations.onVibesyncDebug,
                 headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_title)) },
                 supportingContent = { Text(stringResource(R.string.screen_vibesync_debug_entry_description)) },
                 leadingContent = { Icon(LettaIcons.Database, contentDescription = null) },
             )
             item(
-                onClick = onNavigateToCanvasDebug,
+                onClick = destinations.onCanvasDebug,
                 headlineContent = { Text(stringResource(R.string.screen_canvas_debug_title)) },
                 supportingContent = { Text(stringResource(R.string.screen_canvas_debug_entry_description)) },
                 leadingContent = { Icon(LettaIcons.Edit, contentDescription = null) },

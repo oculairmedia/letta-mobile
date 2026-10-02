@@ -82,6 +82,11 @@ data class CatalogModel(
     val model: LlmModel,
     val exposed: Boolean,
     val reasoningEfforts: List<String>,
+    /**
+     * The effort this row itself selects (`updateArgs.reasoning_effort`), when
+     * upstream lists the model per variant; null when the host does not say.
+     */
+    val reasoningEffort: String? = null,
 ) {
     /** Exposure is keyed by the selection handle the wrapper projected. */
     val handle: ModelHandle get() = ModelHandle(model.handle ?: model.id)

@@ -29,7 +29,11 @@ import com.composables.icons.lucide.GitFork
 import com.composables.icons.lucide.Grid2x2
 import com.composables.icons.lucide.HardDrive
 import com.composables.icons.lucide.Heart
+import com.composables.icons.lucide.Eye
+import com.composables.icons.lucide.EyeOff
 import com.composables.icons.lucide.Key
+import com.composables.icons.lucide.Server
+import com.composables.icons.lucide.SquareTerminal
 import com.composables.icons.lucide.LayoutDashboard
 import com.composables.icons.lucide.Lightbulb
 import com.composables.icons.lucide.Link
@@ -136,6 +140,10 @@ object LettaIcons {
     val ChatOutline: ImageVector get() = Lucide.MessageCircle
     val Settings: ImageVector get() = Lucide.Settings
     val Key: ImageVector get() = Lucide.Key
+    val Terminal: ImageVector get() = Lucide.SquareTerminal
+    val Server: ImageVector get() = Lucide.Server
+    val Visibility: ImageVector get() = Lucide.Eye
+    val VisibilityOff: ImageVector get() = Lucide.EyeOff
     val People: ImageVector get() = Lucide.Users
     val Cloud: ImageVector get() = Lucide.Cloud
     val Storage: ImageVector get() = Lucide.HardDrive
