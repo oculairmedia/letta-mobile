@@ -110,6 +110,8 @@ fun CanvasNoteEditorPanel(
     /** Narrow boards use the same editor inside a bottom sheet. */
     compact: Boolean = false,
     actions: NoteEditorActions? = null,
+    /** What the editor keeps clear of: the system bars and keyboard, and any host chrome over the board. */
+    insets: WindowInsets = WindowInsets.safeDrawing,
 ) {
     val tint = parseHexColor(document.color)?.takeIf { it.alpha > 0f }
     val background = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
@@ -166,7 +168,7 @@ fun CanvasNoteEditorPanel(
             modifier = Modifier
                 .fillMaxSize()
                 // Clear of the system bars, and of the keyboard, which the foot bar rides on.
-                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .windowInsetsPadding(insets)
                 .then(if (compact) Modifier else Modifier.padding(horizontal = LettaDimens.Space.xl, vertical = 56.dp).widthIn(max = 880.dp))
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .semantics { contentDescription = "Note editor" },

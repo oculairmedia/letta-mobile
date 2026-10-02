@@ -50,6 +50,7 @@ while IFS= read -r file; do
     android-compose/feature-chat/*) TASKS[":feature-chat:testDebugUnitTest"]=1 ;;
     android-compose/feature-editagent/*) TASKS[":feature-editagent:testDebugUnitTest"]=1 ;;
     android-compose/designsystem/*) TASKS[":designsystem:testDebugUnitTest"]=1 ;;
+    android-compose/sharedUI/*) TASKS[":sharedUI:jvmTest"]=1 ;;
     android-compose/core/android-data/*) TASKS[":core:android-data:testDebugUnitTest"]=1 ;;
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
     android-compose/cli/*) TASKS[":cli:testDebugUnitTest"]=1 ;;
@@ -62,6 +63,7 @@ ORDERED=(
   ":feature-chat:testDebugUnitTest"
   ":feature-editagent:testDebugUnitTest"
   ":designsystem:testDebugUnitTest"
+  ":sharedUI:jvmTest"
   ":core:android-data:testDebugUnitTest"
   ":desktop:test"
   ":cli:testDebugUnitTest"

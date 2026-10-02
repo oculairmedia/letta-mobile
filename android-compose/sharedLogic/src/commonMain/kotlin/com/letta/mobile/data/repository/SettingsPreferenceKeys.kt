@@ -18,6 +18,8 @@ internal object SettingsPreferenceKeys {
     const val PINNED_AGENT_NAMES = "pinned_agent_names"
     const val RESUME_RECENT_CONVERSATION = "resume_recent_conversation"
     const val HAPTICS_ENABLED = "haptics_enabled"
+    const val SHARED_CHAT_PAGE = "shared_chat_page"
+    const val OPEN_CHATS_ON_CANVAS = "open_chats_on_canvas"
 }
 
 /** Secret / identity keys persisted via [com.letta.mobile.data.storage.SecureSettingsStore]. */

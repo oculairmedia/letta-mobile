@@ -8,6 +8,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,9 +76,13 @@ fun CanvasScreen(
     canvasId: String,
     conversationId: String? = null,
     agentId: String? = null,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)?,
     onShareToChat: ((ByteArray, String) -> Unit)? = null,
     viewModel: CanvasViewModel = hiltViewModel(),
+    /** False when the canvas is the page itself (under the shared chat): no title bar or back. */
+    showTitle: Boolean = true,
+    /** Host chrome floating over the board's top edge; see [CanvasWorkspace]. */
+    chromeTopInset: Dp = 0.dp,
 ) {
     LaunchedEffect(canvasId, conversationId, agentId) {
         viewModel.initSession(canvasId, conversationId, agentId)
@@ -91,6 +97,8 @@ fun CanvasScreen(
             assets = viewModel.assets,
             onNavigateBack = onNavigateBack,
             onShareToChat = onShareToChat,
+            showTitle = showTitle,
+            chromeTopInset = chromeTopInset,
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

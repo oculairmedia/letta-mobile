@@ -20,6 +20,7 @@ import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
+import com.letta.mobile.desktop.chat.showsCanvasSidePane
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.desktop.memory.DesktopBlockApi
@@ -42,6 +43,13 @@ internal data class DesktopMainContentInputs(
     val subagentRepository: SubagentRepository?,
     val activeSubagents: List<SubagentEntry>,
     val activeCanvasSession: CanvasSession? = null,
+    /** The board the shared page has docked; the side pane never shows it a second time. */
+    val dockedCanvasId: com.letta.mobile.data.canvas.CanvasId? = null,
+    /**
+     * letta-mobile-bglj6.1: the shared KMP chat page, set only while DesktopSharedChatPageFlag is
+     * on. Null keeps [ChatDetailPane], the default.
+     */
+    val sharedChatPage: (@Composable (Modifier) -> Unit)? = null,
 )
 
 internal data class DesktopMainContentActions(
@@ -69,7 +77,7 @@ internal fun DesktopMainContentPane(
         }
         when {
             editing != null -> EditAgentSidePane(editing, inputs, actions)
-            canvas != null -> CanvasSidePane(canvas, actions)
+            canvas != null && showsCanvasSidePane(canvas.canvasId, inputs.dockedCanvasId) -> CanvasSidePane(canvas, actions)
         }
     }
 }
@@ -89,12 +97,18 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
         )
         return
     }
-    ChatDetailPane(
-        state = inputs.chatDetailState,
-        actions = actions.chatDetailActions,
-        modifier = Modifier.fillMaxSize(),
-    )
-    if (!inputs.showBackgroundTasks && inputs.subagentRepository != null) {
+    val sharedChatPage = inputs.sharedChatPage
+    if (sharedChatPage != null) {
+        sharedChatPage(Modifier.fillMaxSize())
+    } else {
+        ChatDetailPane(
+            state = inputs.chatDetailState,
+            actions = actions.chatDetailActions,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+    // The shared page draws it in the canvas header (see LettaDesktopApp's canvasHeaderTrailing).
+    if (sharedChatPage == null && !inputs.showBackgroundTasks && inputs.subagentRepository != null) {
         DesktopBackgroundTasksToggle(
             runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
             onClick = actions.onShowBackgroundTasks,

@@ -353,6 +353,10 @@
     <string name="screen_config_enable_projects_description">Show the Projects dashboard as the home screen. Requires a project registry endpoint on your server.</string>
     <string name="screen_config_haptics">Haptic feedback</string>
     <string name="screen_config_haptics_description">Vibrate as the agent streams replies and runs tools. Turn off to silence streaming and tool-call buzzes.</string>
+    <string name="screen_config_shared_chat_page">Shared chat page (preview)</string>
+    <string name="screen_config_shared_chat_page_description">Use the new chat page shared with desktop. Turn off to return to the current chat screen.</string>
+    <string name="screen_config_open_chats_on_canvas">Open conversations on the canvas</string>
+    <string name="screen_config_open_chats_on_canvas_description">Start each conversation on the canvas with the chat docked below. Turn off to open the traditional full-screen chat instead.</string>
     <string name="screen_config_background_delivery_section">Background delivery</string>
     <string name="screen_config_reliable_background_delivery">Reliable background delivery</string>
     <string name="screen_config_battery_optimization_exempt_description">Status: unrestricted. Android is currently allowing Letta to run without battery optimization limits for more reliable locked-screen chat delivery.</string>

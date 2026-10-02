@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.chat.projection.ToolTimelineGroup
+import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -67,21 +68,8 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         subagentNavigationScope,
     ) {
         { target ->
-            tappedSubagentTarget = target
-            if (target.subagentConversationId == null) {
-                subagentNavigationScope.launch {
-                    val subagent = params.resolvedSubagentSource.resolveSubagent(target.toolCallId).getOrNull()
-                    val agentId = target.subagentAgentId ?: subagent?.subagentAgentId
-                    val conversationId = subagent?.let {
-                        params.resolvedSubagentSource.resolveConversationId(it).getOrNull()
-                    }
-                    if (agentId != null && conversationId != null) {
-                        tappedSubagentTarget = target.copy(
-                            subagentAgentId = agentId,
-                            subagentConversationId = conversationId,
-                        )
-                    }
-                }
+            openSubagentTodoSheet(target, params.resolvedSubagentSource, subagentNavigationScope) {
+                tappedSubagentTarget = it
             }
         }
     }
@@ -105,6 +93,29 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         toolRunDetails = toolRunDetails,
         onToolRunDetailsChange = { toolRunDetails = it },
     )
+}
+
+/**
+ * Opens [target]'s todo sheet at once, then (when the dispatch has no conversation yet) resolves
+ * the subagent's agent and conversation in [scope] and re-targets the sheet so it can offer
+ * "view conversation". Shared by the legacy layout and the shared chat page.
+ */
+internal fun openSubagentTodoSheet(
+    target: SubagentTodoSheetTarget,
+    source: ActiveSubagentSource,
+    scope: CoroutineScope,
+    onTarget: (SubagentTodoSheetTarget) -> Unit,
+) {
+    onTarget(target)
+    if (target.subagentConversationId != null) return
+    scope.launch {
+        val subagent = source.resolveSubagent(target.toolCallId).getOrNull()
+        val agentId = target.subagentAgentId ?: subagent?.subagentAgentId
+        val conversationId = subagent?.let { source.resolveConversationId(it).getOrNull() }
+        if (agentId != null && conversationId != null) {
+            onTarget(target.copy(subagentAgentId = agentId, subagentConversationId = conversationId))
+        }
+    }
 }
 
 @Composable

@@ -432,6 +432,8 @@ internal data class DesktopComposerCommandsParams(
     val onCreateAgent: () -> Unit,
     val onEditAgent: (String?) -> Unit,
     val onCanvasSessionChange: (com.letta.mobile.data.canvas.CanvasSession?) -> Unit,
+    /** Set while the shared chat page docks the conversation's board: the canvas command shows it. */
+    val showDockedCanvas: (() -> Unit)? = null,
 )
 
 @Composable
@@ -441,7 +443,9 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
         params.agentSlashCommands,
         params.selectedDestination,
         params.selectedAgentId,
+        params.showDockedCanvas != null,
     ) {
+        val showDocked = params.showDockedCanvas
         buildComposerCommands(
             BuildComposerCommandsParams(
                 chatController = params.chatController,
@@ -449,7 +453,7 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
                 onCreateAgent = params.onCreateAgent,
                 onEditAgent = { params.onEditAgent(params.selectedAgentId) },
                 onNavigate = params.onNavigate,
-                onOpenCanvas = {
+                onOpenCanvas = showDocked ?: {
                     openDesktopCanvasSession(
                         OpenDesktopCanvasParams(
                             scope = params.chatScope,

@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +32,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -313,6 +318,8 @@ internal fun DesktopBackgroundTasksToggle(
     runningCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Inside another bar (the canvas header): just the orb button, no surface of its own. */
+    inBar: Boolean = false,
 ) {
     // Icon-only: the labelled pill was wide enough to collide with the pinned
     // prompt card; the tooltip carries the words (and the running count).
@@ -323,6 +330,24 @@ internal fun DesktopBackgroundTasksToggle(
     val tooltip = if (runningCount > 0) "Background tasks · $runningCount running" else "Background tasks"
     Box(modifier = modifier) {
         com.letta.mobile.desktop.DesktopTooltip(text = tooltip) {
+            if (inBar) {
+                Box(
+                    modifier = Modifier
+                        .size(LettaDimens.Control.iconButtonLg)
+                        .clip(CircleShape)
+                        // A button with the tooltip's words: the orb alone says nothing to a
+                        // screen reader.
+                        .clickable(role = Role.Button, onClick = onClick)
+                        .semantics { contentDescription = tooltip },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AgentActivityOrb(
+                        size = LettaDimens.Control.icon,
+                        activity = if (runningCount > 0) AgentActivity.Working else AgentActivity.Idle,
+                    )
+                }
+                return@DesktopTooltip
+            }
             Surface(
                 onClick = onClick,
                 shape = MaterialTheme.shapes.large,

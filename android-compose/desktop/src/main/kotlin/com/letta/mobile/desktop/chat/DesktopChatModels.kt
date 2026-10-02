@@ -5,6 +5,7 @@ import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
+import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatComposerState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatConversationGroup
@@ -40,6 +41,12 @@ data class DesktopChatSurfaceState(
     val connectionState: DesktopChatConnectionState = DesktopChatConnectionState.Demo,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
+    /**
+     * The composer's own error (attachment limits, a refused send, a failed canvas share). It is
+     * also written to [errorMessage] so the legacy page, which has one error, still shows it; the
+     * shared page shows it in the composer and keeps it out of the page snackbar.
+     */
+    val composerErrorMessage: String? = null,
     val backendLabel: String,
     val sessionGraphId: Long,
     val selectionGeneration: Long = 0L,
@@ -190,9 +197,24 @@ fun DesktopChatSurfaceState.withRuntimeState(runtimeState: ChatSessionState): De
         selectionGeneration = runtimeState.selectionGeneration,
     )
 
+/** Shows [message] as the composer's error (and, for the legacy page, the surface error). */
+internal fun DesktopChatSurfaceState.withComposerError(message: String): DesktopChatSurfaceState =
+    copy(composerErrorMessage = message, errorMessage = message)
+
+/** Clears the composer's error, and the surface error when that was the same error. */
+internal fun DesktopChatSurfaceState.withoutComposerError(): DesktopChatSurfaceState {
+    val composerError = composerErrorMessage ?: return this
+    return copy(composerErrorMessage = null, errorMessage = errorMessage.takeUnless { it == composerError })
+}
+
 fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
-    val conversationId = selectedConversationId ?: return this
     val draft = ChatComposerPolicy.beginSend(composer) ?: return this
+    return sendLocalMessage(draft)
+}
+
+/** Sends [draft] in the demo backend; [draft]'s nextState is the composer afterwards. */
+fun DesktopChatSurfaceState.sendLocalMessage(draft: ChatComposerSendDraft): DesktopChatSurfaceState {
+    val conversationId = selectedConversationId ?: return this
     val text = draft.text
     val attachments = draft.attachments
 

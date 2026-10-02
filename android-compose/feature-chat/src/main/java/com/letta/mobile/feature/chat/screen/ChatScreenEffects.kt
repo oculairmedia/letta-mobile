@@ -42,6 +42,11 @@ internal data class ChatScreenEffectsParams(
     val floatingBannerMessage: String,
     val onFloatingBannerMessageChange: (String) -> Unit,
     val ambient: ChatScreenAmbientState,
+    /**
+     * letta-mobile-bglj6.1: the shared chat page draws its own composer errors, error banner and
+     * A2UI snackbars (through ChatActions), so only the ambient and haptic effects run here.
+     */
+    val sharedChatPage: Boolean = false,
 )
 
 @Composable
@@ -58,6 +63,35 @@ internal fun rememberChatScreenAmbientState(): ChatScreenAmbientState {
 
 @Composable
 internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
+    val view = LocalView.current
+
+    if (!params.sharedChatPage) ChatScreenFeedbackEffects(params)
+
+    ChatScreenAmbientStatusEffect(state = params.state, ambient = params.ambient)
+
+    ChatScreenStreamingHapticEffect(
+        isStreaming = params.state.isStreaming,
+        error = params.state.error,
+        hapticsEnabled = params.hapticsEnabled,
+        view = view,
+    )
+
+    ChatScreenPendingToolHapticEffect(
+        pendingTools = params.state.pendingTools,
+        hapticsEnabled = params.hapticsEnabled,
+        view = view,
+    )
+
+    ChatScreenResolvedToolHapticEffect(
+        messages = params.state.messages,
+        hapticsEnabled = params.hapticsEnabled,
+        view = view,
+    )
+}
+
+/** The legacy layout's composer-error banner, error snackbar and A2UI action snackbar. */
+@Composable
+private fun ChatScreenFeedbackEffects(params: ChatScreenEffectsParams) {
     val snackbarDispatcher = LocalSnackbarDispatcher.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
@@ -88,27 +122,6 @@ internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
         hasMessages = params.state.messages.isNotEmpty(),
         snackbarDispatcher = snackbarDispatcher,
         onClearError = params.viewModel::clearError,
-    )
-
-    ChatScreenAmbientStatusEffect(state = params.state, ambient = params.ambient)
-
-    ChatScreenStreamingHapticEffect(
-        isStreaming = params.state.isStreaming,
-        error = params.state.error,
-        hapticsEnabled = params.hapticsEnabled,
-        view = view,
-    )
-
-    ChatScreenPendingToolHapticEffect(
-        pendingTools = params.state.pendingTools,
-        hapticsEnabled = params.hapticsEnabled,
-        view = view,
-    )
-
-    ChatScreenResolvedToolHapticEffect(
-        messages = params.state.messages,
-        hapticsEnabled = params.hapticsEnabled,
-        view = view,
     )
 }
 

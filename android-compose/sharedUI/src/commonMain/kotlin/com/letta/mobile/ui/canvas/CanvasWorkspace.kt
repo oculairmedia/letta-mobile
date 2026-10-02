@@ -2,6 +2,7 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
@@ -31,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,11 +57,14 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
@@ -122,6 +127,11 @@ fun CanvasWorkspace(
     onShareToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
     /** False when the host already shows the canvas title and a way back, as the desktop side pane does. */
     showTitle: Boolean = true,
+    /**
+     * The host's own control at the end of the header bar (desktop: the background-tasks
+     * button), so the host never has to float one over the board's chrome.
+     */
+    headerTrailing: (@Composable () -> Unit)? = null,
     /** Phone or desktop chrome; [CanvasLayout.AUTO] decides by the board's width. */
     layout: CanvasLayout = CanvasLayout.AUTO,
     /**
@@ -129,8 +139,19 @@ fun CanvasWorkspace(
      * several at once without a mouse. Off, it opens the board menu, as a phone's does.
      */
     longPressDrawsSelectionBox: Boolean = false,
+    /**
+     * Host chrome floating over the board's top edge, measured from that edge (the phone's shared
+     * chat header over the status bar). The board draws under it; its own chrome keeps below it.
+     */
+    chromeTopInset: Dp = 0.dp,
 ) {
     val state by controller.state.collectAsState()
+    // What the board's chrome keeps clear of: the system bars and the keyboard, and the host's chrome.
+    val systemInsets = WindowInsets.safeDrawing
+    val chromeBottomInset = LocalCanvasChromeBottomInset.current
+    val chromeInsets = remember(systemInsets, chromeTopInset, chromeBottomInset) {
+        systemInsets.union(WindowInsets(top = chromeTopInset, bottom = chromeBottomInset))
+    }
     val canUndo by controller.canUndo.collectAsState()
     val canRedo by controller.canRedo.collectAsState()
     val sessionDoc by (session?.document?.collectAsState() ?: remember { mutableStateOf(null) })
@@ -521,6 +542,9 @@ fun CanvasWorkspace(
     val boardWidth = with(LocalDensity.current) { boardSize.width.toDp() }
     val resolvedLayout = layout.resolveMeasured(boardSize.width, boardWidth)
     val compact = resolvedLayout == CanvasLayout.COMPACT
+    // The phone's chat page keeps the top of the board clear: the actions join the tool bar.
+    val hostChrome = LocalCanvasHostChrome.current
+    val actionsInFoot = compact && hostChrome.actionsInFoot
 
     // Fit everything on the board (elements and notes) with padding; an empty board just goes back
     // to 100% at the origin. [maxScale] lets the open-time fit shrink a board without enlarging it.
@@ -550,39 +574,53 @@ fun CanvasWorkspace(
         }
     }
 
-    // The keyboard covers the bottom of a phone's board. While it is up, the camera (never the
-    // element) moves the note or text being typed into clear of it and of the bars riding on it,
-    // then moves back when the keyboard goes, unless the board was moved in between.
+    // The keyboard covers the foot of a phone's board, and on the shared chat page the chat bar
+    // rides up on it. While a note, a text or a shape's text is typed into, the camera (never the
+    // element, and never the zoom) keeps it in the band left above the keyboard, the bar and the
+    // board's own foot, following the keyboard frame by frame as it slides in, and gives the pan
+    // back in step as it slides out; see CanvasKeyboardCamera. With reduced motion the camera waits
+    // for the keyboard to settle and moves once. A desktop has no keyboard inset: nothing moves.
+    //
+    // Everything that changes per frame (the keyboard, the bar riding on it) is read inside the
+    // effect, never in composition, so the keyboard's slide does not recompose the board.
+    //
     // Height of the bars at the foot of the board, which ride up on the keyboard. Kept from their
     // size alone, not their position: watching the position on every layout starved the board's
-    // pinch gesture. Read once the keyboard has settled.
+    // pinch gesture.
     val footHeight = remember { IntArray(1) }
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-    val safeBottom by rememberUpdatedState(WindowInsets.safeDrawing.getBottom(LocalDensity.current))
-    val chromeInsetPx = with(LocalDensity.current) { CHROME_INSET.toPx() }
-    val topReserve = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this) + KEYBOARD_TOP_RESERVE.roundToPx() }
+    val boardFrame = remember { CanvasBoardFrame() }
+    val keyboardDensity = LocalDensity.current
+    val imeInsets = LocalCanvasImeInsets.current ?: WindowInsets.ime
+    val safeInsets = WindowInsets.safeDrawing
+    val chromeBottomPx by rememberUpdatedState(with(keyboardDensity) { chromeBottomInset.roundToPx() })
+    val keyboardMarginPx = with(keyboardDensity) { (CHROME_INSET + KEYBOARD_MARGIN).toPx() }
+    val topReserve by rememberUpdatedState(with(keyboardDensity) { chromeInsets.getTop(this) + KEYBOARD_TOP_RESERVE.roundToPx() })
     val typingTarget: Rect? = when {
         expandedNoteId != null -> null
         activeNoteId != null -> documents.firstOrNull { it.id == activeNoteId }?.frame?.toRect()
         else -> editingTextId?.let { id -> state.elements.firstOrNull { it.id == id }?.bounds() }
     }
-    var keyboardPan by remember { mutableStateOf<Pair<Offset, Viewport>?>(null) }
-    LaunchedEffect(imeBottom > 0, typingTarget) {
-        if (imeBottom > 0 && typingTarget != null) {
-            // The keyboard slides in over a few frames; pan once it has settled.
-            delay(KEYBOARD_SETTLE_MS)
-            // The foot column sits on the bottom inset (the keyboard's, now) plus the chrome inset.
-            val bottom = boardSize.height - safeBottom - chromeInsetPx - footHeight[0]
-            val band = Rect(0f, topReserve.toFloat(), boardSize.width.toFloat(), bottom)
-            CanvasViewportFit.panIntoBand(typingTarget, controller.state.value.viewport, band)?.let { delta ->
+    val currentTypingTarget by rememberUpdatedState(typingTarget)
+    val keyboardReducedMotion by rememberUpdatedState(com.letta.mobile.ui.theme.LocalReducedMotion.current)
+    val keyboardCamera = remember(controller) { CanvasKeyboardCamera() }
+    LaunchedEffect(controller, imeInsets, safeInsets, keyboardDensity) {
+        snapshotFlow {
+            val ime = imeInsets.getBottom(keyboardDensity)
+            CanvasKeyboardFrame(
+                ime = ime,
+                // On the chat page the bar's inset already stands on the keyboard; elsewhere the
+                // keyboard (or the navigation bar under it) is all there is.
+                obstruction = maxOf(ime, safeInsets.getBottom(keyboardDensity), chromeBottomPx),
+                target = currentTypingTarget,
+                topReserve = topReserve,
+            )
+        }.collectLatest { frame ->
+            if (keyboardReducedMotion && frame.ime > 0) delay(KEYBOARD_SETTLE_MS)
+            val band = keyboardBand(boardFrame, frame.obstruction, footHeight[0].toFloat(), keyboardMarginPx, frame.topReserve)
+            keyboardCamera.step(frame.ime, frame.target, controller.state.value.viewport, band)?.let { delta ->
                 controller.panBy(delta)
-                keyboardPan = ((keyboardPan?.first ?: Offset.Zero) + delta) to controller.state.value.viewport
+                keyboardCamera.moved(controller.state.value.viewport)
             }
-        } else if (imeBottom == 0) {
-            keyboardPan?.let { (total, after) ->
-                if (controller.state.value.viewport == after) controller.panBy(-total)
-            }
-            keyboardPan = null
         }
     }
 
@@ -1132,7 +1170,11 @@ fun CanvasWorkspace(
                     placeImages(drops.map { it.bytes }, controller.state.value.viewport.screenToWorld(first.dropPositionScreen))
                 }
                 .onGloballyPositioned {
-                    boardBounds = it.boundsInRoot()
+                    val bounds = it.boundsInRoot()
+                    boardBounds = bounds
+                    boardFrame.top = bounds.top
+                    boardFrame.width = it.size.width.toFloat()
+                    boardFrame.rootHeight = it.findRootCoordinates().size.height.toFloat()
                     chromeRegions.sceneRootInWindow = it.findRootCoordinates().positionInWindow()
                 }
                 .pointerInput(controller) {
@@ -1403,10 +1445,81 @@ fun CanvasWorkspace(
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
-            // One bar across the top: back and title, the sync status, then the board's actions.
-            CanvasHeaderBar(
-                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(CHROME_INSET).canvasChrome(chromeRegions),
+            val zoomActions = CanvasZoom(
+                scalePercent = state.viewport.scalePercent,
+                onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
+                onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
+                // Fit everything on the board (elements and notes) with padding; an empty
+                // board just goes back to 100% at the origin.
+                onReset = {
+                    if (fitToContent()) statusMessage = "Fitted to content"
+                },
+                onActualSize = { controller.zoomTo(1f, boardCenter) },
+            )
+            val shareAction: (() -> Unit)? = onShareToChat?.let {
+                {
+                    isSharingToChat = true
+                    controller.exportSvg()
+                }
+            }
+            val menuActions = CanvasMenuActions(
+                onImportBuildCycle = {
+                    controller.importPath(CanvasSamples.buildCycleJson)
+                    statusMessage = "Imported Build Cycle sample"
+                },
+                onImportDailyLoop = {
+                    controller.importPath(CanvasSamples.dailyLoopJson)
+                    statusMessage = "Imported Daily Loop sample"
+                },
+                // A board saves on its own; an export is for somewhere else, so it carries its
+                // images' bytes rather than refs nothing there can resolve.
+                onExportJson = {
+                    val handler = onExportJson
+                    if (handler == null) {
+                        controller.exportJson()
+                    } else {
+                        coroutineScope.launch { exportStandalone(handler) }
+                    }
+                },
+                onExportSvg = { controller.exportSvg() },
+                onClear = {
+                    controller.reset()
+                    statusMessage = "Cleared canvas"
+                },
+            )
+            val backgroundActions = CanvasBackgroundActions(
+                color = state.bgColor,
+                onColor = { color ->
+                    controller.setBgColor(color)
+                    statusMessage = "Background changed"
+                },
+                pattern = backgroundPattern,
+                onPattern = { pattern ->
+                    if (session != null) {
+                        coroutineScope.launch { runCatching { session.setBackgroundPattern(pattern) } }
+                    } else {
+                        localPattern = pattern
+                    }
+                    statusMessage = "Background pattern: ${pattern.kind}"
+                },
+            )
+            val undoActions = CanvasUndoActions(
+                canUndo = controlsBarState.canUndo,
+                canRedo = controlsBarState.canRedo,
+                onUndo = ::undoBoard,
+                onRedo = ::redoBoard,
+            )
+
+            // With a title: one bar across the top (back and title, the sync status, then the
+            // board's actions). Without one (the canvas is the page, e.g. under the shared chat):
+            // just the actions, as a compact pill in the top-right corner over an uncovered board.
+            // Under the phone's chat page there is neither: the top of the board is clear, and the
+            // actions end the tool bar at the foot (see CompactBoardActions below).
+            if (!actionsInFoot) CanvasHeaderBar(
+                modifier = (if (showTitle) Modifier.align(Alignment.TopCenter).fillMaxWidth() else Modifier.align(Alignment.TopEnd))
+                    .windowInsetsPadding(chromeInsets)
+                    .padding(CHROME_INSET).canvasChrome(chromeRegions)
+                    .testTag(CANVAS_ACTIONS_TAG),
             ) {
             if (showTitle) {
                 CanvasTitlePill(
@@ -1424,80 +1537,18 @@ fun CanvasWorkspace(
             }
 
             syncHealth?.let { health -> CanvasSyncStatusBadge(health = health) }
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+            if (showTitle) androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
 
             CanvasActionsPill(
-                zoom = CanvasZoom(
-                    scalePercent = state.viewport.scalePercent,
-                    onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
-                    onZoomIn = { controller.zoomBy(ZOOM_STEP, boardCenter) },
-                    // Fit everything on the board (elements and notes) with padding; an empty
-                    // board just goes back to 100% at the origin.
-                    onReset = {
-                        if (fitToContent()) statusMessage = "Fitted to content"
-                    },
-                    onActualSize = { controller.zoomTo(1f, boardCenter) },
-                ),
+                zoom = zoomActions,
                 checkpointCount = if (session != null) checkpoints.size else null,
                 onHistory = if (session != null) ({ showHistoryDialog = true }) else null,
-                onShare = onShareToChat?.let {
-                    {
-                        isSharingToChat = true
-                        controller.exportSvg()
-                    }
-                },
-                menu = CanvasMenuActions(
-                    onImportBuildCycle = {
-                        controller.importPath(CanvasSamples.buildCycleJson)
-                        statusMessage = "Imported Build Cycle sample"
-                    },
-                    onImportDailyLoop = {
-                        controller.importPath(CanvasSamples.dailyLoopJson)
-                        statusMessage = "Imported Daily Loop sample"
-                    },
-                    // A board saves on its own; an export is for somewhere else, so it carries its
-                    // images' bytes rather than refs nothing there can resolve.
-                    onExportJson = {
-                        val handler = onExportJson
-                        if (handler == null) {
-                            controller.exportJson()
-                        } else {
-                            coroutineScope.launch { exportStandalone(handler) }
-                        }
-                    },
-                    onExportSvg = { controller.exportSvg() },
-                    onClear = {
-                        controller.reset()
-                        statusMessage = "Cleared canvas"
-                    },
-                ),
-                background = CanvasBackgroundActions(
-                    color = state.bgColor,
-                    onColor = { color ->
-                        controller.setBgColor(color)
-                        statusMessage = "Background changed"
-                    },
-                    pattern = backgroundPattern,
-                    onPattern = { pattern ->
-                        if (session != null) {
-                            coroutineScope.launch { runCatching { session.setBackgroundPattern(pattern) } }
-                        } else {
-                            localPattern = pattern
-                        }
-                        statusMessage = "Background pattern: ${pattern.kind}"
-                    },
-                ),
-                undo = if (compact) {
-                    CanvasUndoActions(
-                        canUndo = controlsBarState.canUndo,
-                        canRedo = controlsBarState.canRedo,
-                        onUndo = ::undoBoard,
-                        onRedo = ::redoBoard,
-                    )
-                } else {
-                    null
-                },
+                onShare = shareAction,
+                menu = menuActions,
+                background = backgroundActions,
+                undo = if (compact) undoActions else null,
             )
+            headerTrailing?.invoke()
             }
 
 
@@ -1697,7 +1748,7 @@ fun CanvasWorkspace(
                 )
             }
             if (!typingOnPhone && (hasSelection || notesSelected || controlsBarState.showFillTarget || (activeNote != null && expandedNoteId == null))) {
-                val topInset = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
+                val topInset = with(LocalDensity.current) { chromeInsets.getTop(this).toDp() }
                 AnchoredToSelection(
                     anchor = CanvasWorkspaceSupport.barAnchor(
                         BarAnchorParams(
@@ -1709,8 +1760,9 @@ fun CanvasWorkspace(
                         ),
                     ),
                     // On a phone the title and actions pills fill the top row, so the bar stays
-                    // below them even when the host hides the title.
-                    topClearance = topInset + if (showTitle || compact) 64.dp else CHROME_INSET,
+                    // below them even when the host hides the title - unless the host keeps the
+                    // top clear and the actions are at the foot.
+                    topClearance = topInset + if ((showTitle || compact) && !actionsInFoot) 64.dp else CHROME_INSET,
                     startClearance = resolvedLayout.railClearance(),
                     // Above the quick-create target, when there is one, not on it.
                     gap = if (quickAnchor != null) 56.dp else 12.dp,
@@ -1733,7 +1785,7 @@ fun CanvasWorkspace(
                     onAddNote = onAddNote,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .windowInsetsPadding(chromeInsets)
                         .padding(start = CHROME_INSET, top = 72.dp, bottom = 64.dp)
                         .canvasChrome(chromeRegions),
                 )
@@ -1749,6 +1801,7 @@ fun CanvasWorkspace(
                     onToolbar = { noteToolbar = it },
                     chromeRegions = chromeRegions,
                     compact = compact,
+                    insets = chromeInsets,
                     actions = NoteEditorActions(
                         canUndo = canUndo || historyCanUndo,
                         canRedo = canRedo || historyCanRedo,
@@ -1769,11 +1822,11 @@ fun CanvasWorkspace(
             }
 
             // The foot of the board: the active note's formatting bar, centred, above the status line
-            // on a desktop and above the tool bar on a phone. Inset from the system bars and the
-            // keyboard, so on a phone the formatting bar rides up with the keyboard.
+            // on a desktop and above the tool bar on a phone. Inset from the system bars, the
+            // keyboard and the host's chrome, so on a phone the formatting bar rides up with the keyboard.
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing).padding(CHROME_INSET)
+                    .windowInsetsPadding(chromeInsets).padding(CHROME_INSET)
                     .canvasChrome(chromeRegions)
                     .onSizeChanged { footHeight[0] = it.height },
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1796,6 +1849,26 @@ fun CanvasWorkspace(
                                 insert = insertActions,
                                 addAt = { controller.state.value.viewport.screenToWorld(boardCenter) },
                             ),
+                            trailing = if (actionsInFoot) {
+                                {
+                                    CompactBoardActions(
+                                        undo = undoActions,
+                                        overflow = CanvasOverflow(
+                                            zoom = zoomActions,
+                                            checkpointCount = if (session != null) checkpoints.size else null,
+                                            onHistory = if (session != null) ({ showHistoryDialog = true }) else null,
+                                            menu = menuActions,
+                                            background = backgroundActions,
+                                            compact = true,
+                                            onShare = shareAction,
+                                            sync = syncHealth,
+                                            host = hostChrome.menu,
+                                        ),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         )
                     }
                     else -> CanvasStatusLine(
@@ -1873,8 +1946,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawQuickCreateArro
     drawLine(color, to, back + normal * (QUICK_ARROW_HEAD_PX * 0.6f), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
     drawLine(color, to, back - normal * (QUICK_ARROW_HEAD_PX * 0.6f), strokeWidth = stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
 }
-/** Room kept at the top of the board for its title and sync bar when the keyboard moves the camera. */
+/**
+ * Room kept at the top of the board when the keyboard moves the camera: for the title and sync bar
+ * where there is one, and for the selection bar (a note's colour and size) floating over the target.
+ */
 private val KEYBOARD_TOP_RESERVE = 72.dp
+
+/** Between what is typed into and the bars riding on the keyboard, beyond the chrome's own inset. */
+private val KEYBOARD_MARGIN = LettaDimens.Space.md
 private const val KEYBOARD_SETTLE_MS = 150L
 private const val ZOOM_STEP = 1.25f
 /** How near, in screen pixels at 100%, a press has to be to an element to pick it. */

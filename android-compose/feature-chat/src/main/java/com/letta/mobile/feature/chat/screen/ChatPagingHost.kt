@@ -68,6 +68,11 @@ class ChatPagingPresentation(
      * discovered per row by [com.letta.mobile.data.timeline.resolveDeferredBody].
      */
     val deferredReader: (ChatRenderItem) -> DeferredBodyRead? = { null },
+    /**
+     * letta-mobile-bglj6.1: the canonical presentation this one adapts, when it has one. The
+     * shared chat page reads it directly instead of this Android paging adapter.
+     */
+    val canonical: com.letta.mobile.data.timeline.CanonicalTimelinePresentation? = null,
 ) {
     internal var viewport: ChatPagingViewport? = null
     internal var saveViewport: (ChatPagingViewport) -> Unit = {}

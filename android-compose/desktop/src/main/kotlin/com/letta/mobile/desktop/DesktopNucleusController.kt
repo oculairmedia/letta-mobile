@@ -320,8 +320,10 @@ internal class DesktopNucleusController(
                 )
             }
         }
-        WindowsNotificationCenter.show(content, tag, TOAST_GROUP) {
-            toastReplyHandlers.remove(tag)
+        // The callback reports the show's result and fires with a null error on SUCCESS too:
+        // dropping the handler unconditionally here made every inline reply a no-op.
+        WindowsNotificationCenter.show(content, tag, TOAST_GROUP) { error ->
+            if (error != null) toastReplyHandlers.remove(tag)
         }
     }
 
