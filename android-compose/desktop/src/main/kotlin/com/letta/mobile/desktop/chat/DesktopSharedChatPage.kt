@@ -26,6 +26,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
@@ -39,6 +41,13 @@ import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.canvas.DesktopCanvasHostSync
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.openDesktopCanvasSession
+import com.letta.mobile.desktop.phone.ChatPageFrame
+import com.letta.mobile.desktop.phone.DesktopPhoneChatFrame
+import com.letta.mobile.desktop.phone.DesktopPhoneChrome
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.PhoneChatPageInputs
+import com.letta.mobile.desktop.phone.chatAppearance
+import com.letta.mobile.desktop.phone.opensOnCanvas
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
@@ -131,11 +140,13 @@ internal fun DesktopSharedChatPage(
     val port = state.port
     SideEffect { port.updateHostInputs(state.hostInputs) }
     val openOnCanvas = LocalDesktopOpenChatsOnCanvas.current
+    // The phone preview draws this page as Android's SharedChatPage does; null on the desktop.
+    val phone = LocalDesktopPhone.current
     var presentation by remember {
-        mutableStateOf(ChatSurfacePresentation.initial(openOnCanvas.enabled.value, hasCanvas = true))
+        mutableStateOf(ChatSurfacePresentation.initial(phone.opensOnCanvas(openOnCanvas.enabled.value), hasCanvas = true))
     }
     val hasConversation = state.canvasOwner.conversationId != null
-    val host = rememberDesktopChatSurfaceHost(port, navigation)
+    val host = rememberDesktopChatSurfaceHost(port, navigation, phone)
     // The run's own state, as the composer's Stop button and the docked panel's glow read it: the
     // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
     val uiState by port.uiState.collectAsState()
@@ -151,42 +162,65 @@ internal fun DesktopSharedChatPage(
         }
     }
     var dockGeometry by state.dockGeometry
-    ChatSurface(
-        port = port,
-        presentation = presentation,
-        onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } },
-        host = host,
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            // Bubble phase, so an open image viewer or popup takes its own Escape first.
-            .onKeyEvent { event ->
-                val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
-                if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
-                collapse
+    val onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } }
+    val frameInputs = PhoneChatPageInputs(presentation.mode, port.uiState) { onIntent(ChatSurfaceIntent.Collapse) }
+    DesktopPhoneChatFrame(phone, frameInputs, modifier) { pageModifier, frame ->
+        ChatSurface(
+            port = port,
+            presentation = presentation,
+            onIntent = onIntent,
+            host = host,
+            modifier = pageModifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                // Bubble phase, so an open image viewer or popup takes its own Escape first.
+                .onKeyEvent { event ->
+                    val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
+                    if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
+                    collapse
+                },
+            appearance = phone.chatAppearance(rememberDesktopChatAppearance()),
+            platform = rememberDesktopChatPlatform(ambientStatus, frame),
+            pagedTimeline = state.pagedTimeline,
+            canvas = { actions ->
+                if (hasConversation) {
+                    DockedConversationCanvas(session, actions, state.canvasHeaderTrailing, frame.topChromeInset)
+                } else {
+                    ChatCanvasPlaceholder()
+                }
             },
-        appearance = ChatSurfaceAppearance(
-            fontScale = LocalDesktopChatFontScale.current,
+            dockGeometry = dockGeometry,
+            onDockGeometryChange = { dockGeometry = it },
+        )
+    }
+}
+
+/** The desktop's appearance: its own font scale, already applied to the window's text through density. */
+@Composable
+private fun rememberDesktopChatAppearance(): ChatSurfaceAppearance {
+    val fontScale = LocalDesktopChatFontScale.current
+    return remember(fontScale) {
+        ChatSurfaceAppearance(
+            fontScale = fontScale,
             // The font-scale host already scales the window's text through density.
             fontScaleAppliedByHost = true,
             fontScaleRange = MIN_CHAT_FONT_SCALE..MAX_CHAT_FONT_SCALE,
-        ),
-        platform = remember(ambientStatus) {
-            ChatSurfacePlatform(
-                pageBackground = { content ->
-                    DesktopAmbientChatBackground(status = ambientStatus, modifier = Modifier.fillMaxSize()) { content() }
-                },
-                showKeyboardHints = true,
-            )
-        },
-        pagedTimeline = state.pagedTimeline,
-        canvas = { actions ->
-            if (hasConversation) DockedConversationCanvas(session, actions, state.canvasHeaderTrailing) else ChatCanvasPlaceholder()
-        },
-        dockGeometry = dockGeometry,
-        onDockGeometryChange = { dockGeometry = it },
-    )
+        )
+    }
 }
+
+/** The ambient glow behind the page, and what the host's [frame] asks of it (the phone's top chrome). */
+@Composable
+private fun rememberDesktopChatPlatform(ambientStatus: DesktopAmbientStatus, frame: ChatPageFrame): ChatSurfacePlatform =
+    remember(ambientStatus, frame) {
+        ChatSurfacePlatform(
+            pageBackground = { content ->
+                DesktopAmbientChatBackground(status = ambientStatus, modifier = Modifier.fillMaxSize()) { content() }
+            },
+            showKeyboardHints = frame.showKeyboardHints,
+            topChromeInset = frame.topChromeInset,
+        )
+    }
 
 /** Escape on the full-screen page goes back to the canvas (Android's Back does the same). */
 internal fun escapeCollapsesToCanvas(mode: ChatSurfaceMode, key: Key, type: KeyEventType): Boolean =
@@ -221,6 +255,8 @@ private fun DockedConversationCanvas(
     session: CanvasSession?,
     actions: ChatCanvasActions,
     headerTrailing: (@Composable () -> Unit)?,
+    /** The phone's status bar (and header, over the full-screen page), which the board draws under. */
+    chromeTopInset: Dp = 0.dp,
 ) {
     if (session == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -238,6 +274,7 @@ private fun DockedConversationCanvas(
         modifier = Modifier.fillMaxSize(),
         // A chat card's "Show on canvas" frames its artifact here (letta-mobile-bglj6.13).
         cameraRequest = actions.camera,
+        chromeTopInset = chromeTopInset,
     )
 }
 
@@ -246,6 +283,7 @@ private fun DockedConversationCanvas(
 private fun rememberDesktopChatSurfaceHost(
     port: DesktopChatSessionPort,
     navigation: DesktopSharedChatPageNavigation,
+    phone: DesktopPhoneChrome? = null,
 ): ChatSurfaceHost {
     val directoryPicker = rememberDirectoryPickerLauncher(
         dialogSettings = FileKitDialogSettings(title = "Choose working directory"),
@@ -260,15 +298,18 @@ private fun rememberDesktopChatSurfaceHost(
     val hasEditAgent = navigation.editAgent != null
     // Keyed on the roster: rows resolve names while they compose, so new names are a new host.
     val agentNames = navigation.agentNamesById
-    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent, agentNames) {
+    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent, agentNames, phone) {
+        // On the phone the agent pane is the drawer, and it is also the agent switcher (Android's header pill).
+        val openDrawer: (() -> Unit)? = phone?.let { chrome -> { chrome.drawerOpen = true } }
         ChatSurfaceHost(
             openCanvas = { latest.openCanvas() },
             openAgent = { agentId -> latest.openAgent(agentId) },
             openModelPicker = { latest.openModelPicker() },
             resolveAgentName = agentNames::get,
             pickWorkingDirectory = if (supportsWorkingDirectory) ({ directoryPicker.launch() }) else null,
-            openAgentPane = if (hasAgentPane) ({ latest.openAgentPane?.invoke() }) else null,
+            openAgentPane = openDrawer ?: if (hasAgentPane) ({ latest.openAgentPane?.invoke() }) else null,
             editAgent = if (hasEditAgent) ({ latest.editAgent?.invoke() }) else null,
+            openAgentSwitcher = openDrawer,
         )
     }
 }

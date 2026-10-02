@@ -874,3 +874,119 @@ afterEvaluate {
 // configureEach block above (the doLast needs the directory to exist on
 // disk to read its release file). All packaging entry points are covered
 // by that match â€” no separate dependency wiring here.
+
+/*
+ * Phone preview (docs/development/phone-preview.md): the desktop app as a phone, and a gallery of the
+ * shared chat page's phone fixtures. Dev-only - nothing here is packaged, and the normal `run` and
+ * the installers are untouched.
+ *
+ *   ./gradlew :desktop:runPhone             the real app in a Pixel-sized window (LETTA_DESKTOP_PHONE=1)
+ *   ./gradlew :desktop:runPhonePlayground   the fixture gallery (no server)
+ *   ./gradlew :desktop:runPhoneHot / :desktop:runPhonePlaygroundHot   the same under Compose Hot Reload
+ */
+
+// The playground lives in its own source set, so the fixtures (sharedUI-devfixtures) never reach the
+// production classpath. It sees desktop's internals (the phone screen, the theme) as a test would.
+val phonePlayground: SourceSet = sourceSets.create("phonePlayground") {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += sourceSets.main.get().output
+}
+configurations.named("phonePlaygroundImplementation") { extendsFrom(configurations.implementation.get()) }
+configurations.named("phonePlaygroundRuntimeOnly") { extendsFrom(configurations.runtimeOnly.get()) }
+configurations.named("phonePlaygroundCompileClasspath") {
+    shouldResolveConsistentlyWith(configurations.getByName("phonePlaygroundRuntimeClasspath"))
+}
+dependencies {
+    "phonePlaygroundImplementation"(project(":sharedUI-devfixtures"))
+    // The phone shell's tests render the same fixture screens.
+    testImplementation(project(":sharedUI-devfixtures"))
+}
+kotlin.target.compilations.named("phonePlayground") {
+    associateWith(kotlin.target.compilations.getByName("main"))
+}
+
+/** The extracted JBR as a launcher, as the `run` task uses it (Jewel needs a 25+ runtime; JBR has the AWT input bridge). */
+val desktopJbrLauncher: Provider<JavaLauncher> = provider {
+    val executable = desktopJbrHome.get().file("bin/java.exe")
+    object : JavaLauncher {
+        override fun getExecutablePath() = executable
+        override fun getMetadata() = object : JavaInstallationMetadata {
+            override fun getLanguageVersion() = JavaLanguageVersion.of(minimumRuntimeJdk)
+            override fun getJavaRuntimeVersion() = jbrVersion
+            override fun getJvmVersion() = jbrVersion
+            override fun getVendor() = "JetBrains"
+            override fun getInstallationPath() = desktopJbrHome.get()
+            override fun isCurrentJvm() = false
+        }
+    }
+}
+
+/** The git-ignored native Rive bridge, when one was copied into the module (see avatar/renderer-rive/native/desktop). */
+val phoneRiveBridge = layout.projectDirectory.file("rive_desktop_bridge.dll").asFile
+
+/** What both phone launchers share: the JBR, the app's JVM flags, the Rive bridge and its warning. */
+fun JavaExec.configurePhoneLaunch() {
+    group = "application"
+    workingDir = projectDir
+    jvmArgs(
+        "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
+        "-XX:+ExplicitGCInvokesConcurrent",
+    )
+    if (isWindowsHost) {
+        dependsOn(extractDesktopJbr)
+        javaLauncher.set(desktopJbrLauncher)
+    }
+    val bridge = riveBridgeSource?.let(::File)?.takeIf { it.isFile } ?: phoneRiveBridge.takeIf { it.isFile }
+    if (bridge != null) {
+        systemProperty("rive.bridge.path", bridge.absolutePath)
+    } else {
+        doFirst {
+            logger.warn(
+                "WARNING: no rive_desktop_bridge.dll (copy it to ${phoneRiveBridge.path}, or pass -PriveBridge=<dll>); " +
+                    "mascots fall back to orbs in the phone preview.",
+            )
+        }
+    }
+}
+
+fun JavaExec.configurePhoneApp() {
+    description = "Runs the desktop app as a phone: Pixel 9 Pro window, Touch chat, simulated insets and keyboard."
+    mainClass.set("com.letta.mobile.desktop.MainKt")
+    environment("LETTA_DESKTOP_PHONE", "1")
+    configurePhoneLaunch()
+}
+
+fun JavaExec.configurePhonePlayground() {
+    description = "Runs the phone playground: the shared chat page's phone fixtures, live, without a server."
+    mainClass.set("com.letta.mobile.desktop.phone.playground.PhonePlaygroundKt")
+    configurePhoneLaunch()
+}
+
+tasks.register<JavaExec>("runPhone") {
+    classpath = sourceSets.main.get().runtimeClasspath
+    configurePhoneApp()
+}
+
+tasks.register<JavaExec>("runPhonePlayground") {
+    classpath = phonePlayground.runtimeClasspath
+    configurePhonePlayground()
+}
+
+// Compose Hot Reload (JetBrains Runtime + its agent; the JBR above supports enhanced class
+// redefinition). Applied only when a hot task is on the command line, because the plugin also adds
+// compiler flags and runtime artifacts that ordinary builds should not carry.
+val hotReloadRequested = gradle.startParameter.taskNames.any { name ->
+    name.substringAfterLast(':').let { it.startsWith("hot") || it.endsWith("Hot") }
+}
+if (hotReloadRequested) {
+    apply(plugin = "org.jetbrains.compose.hot-reload")
+    tasks.register<org.jetbrains.compose.reload.gradle.ComposeHotRun>("runPhoneHot") {
+        compilation.set(kotlin.target.compilations.getByName("main"))
+        configurePhoneApp()
+    }
+    tasks.register<org.jetbrains.compose.reload.gradle.ComposeHotRun>("runPhonePlaygroundHot") {
+        compilation.set(kotlin.target.compilations.getByName("phonePlayground"))
+        configurePhonePlayground()
+    }
+}

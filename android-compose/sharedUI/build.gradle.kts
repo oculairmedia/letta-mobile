@@ -140,6 +140,8 @@ kotlin {
                 // letta-mobile-bglj6.1: Compose UI tests for the shared chat page (runComposeUiTest).
                 implementation(libs.compose.desktop.ui.test)
                 implementation(kotlin("test"))
+                // The phone fixtures (conversation, ports, stand-in mascot) the desktop phone playground shows too.
+                implementation(project(":sharedUI-devfixtures"))
             }
         }
     }

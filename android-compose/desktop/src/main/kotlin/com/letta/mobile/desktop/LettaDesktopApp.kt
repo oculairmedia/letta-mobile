@@ -78,6 +78,13 @@ import java.awt.Window
 import java.time.Instant
 import dev.nucleusframework.application.NucleusApplicationScope
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
+import com.letta.mobile.desktop.phone.DesktopShellRow
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.ReportShellWidth
+import com.letta.mobile.desktop.phone.agentPaneVisible
+import com.letta.mobile.desktop.phone.drawsSharedChat
+import com.letta.mobile.desktop.phone.reducedMotionOr
+import com.letta.mobile.desktop.phone.sidebarVisible
 import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 
@@ -132,7 +139,8 @@ internal fun LettaDesktopApp(
         store = shellLayoutStore,
     )
     val shellLayoutState = shellLayoutController.state
-    val reducedMotion = remember { desktopPrefersReducedMotion() }
+    val phone = LocalDesktopPhone.current
+    val reducedMotion = phone.reducedMotionOr(remember { desktopPrefersReducedMotion() })
     SidebarToggleKeyDispatcherEffect(
         onToggle = { shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar) },
     )
@@ -320,7 +328,7 @@ internal fun LettaDesktopApp(
     }
     // letta-mobile-bglj6.1: the shared KMP chat page's port, built only while the preview flag is on.
     val sharedChatEnabled by LocalDesktopSharedChatPageFlag.current.enabled.collectAsState()
-    val sharedChatPort = if (sharedChatEnabled) {
+    val sharedChatPort = if (phone.drawsSharedChat(sharedChatEnabled)) {
         rememberDesktopChatSessionPort(chatController, ::dispatchA2uiAction)
     } else {
         null
@@ -691,16 +699,14 @@ internal fun LettaDesktopApp(
             // the measured width into it. The 56dp agent rail always stays as
             // the navigation affordance.
             val measuredWidthDp = maxWidth.value
-            val isSidebarVisible = shellLayoutState.isSidebarVisible &&
-                !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
+            val isSidebarVisible = phone.sidebarVisible(shellLayoutState.isSidebarVisible &&
+                !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp))
             // One rule for where the mascot stands (wbin4.4), driven from the shell's own state.
-            DriveMascotStage(selectedAgentId, agentPaneVisible = isSidebarVisible)
-            LaunchedEffect(measuredWidthDp) {
-                shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
-            }
+            DriveMascotStage(selectedAgentId, agentPaneVisible = phone.agentPaneVisible(isSidebarVisible))
+            ReportShellWidth(phone, measuredWidthDp) { shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) }
             // Every seated mascot draws here, over the shell, and travels between seats (wbin4.4).
             MascotTransportLayer(reducedMotion = reducedMotion) {
-                Row(Modifier.fillMaxSize()) {
+                DesktopShellRow(phone, reducedMotion, navigationPanes = {
                     // Far-left workspace/agent rail.
                     DesktopAgentRail(
                         state = DesktopAgentRailState(
@@ -779,6 +785,7 @@ internal fun LettaDesktopApp(
                     )
                     RailDivider()
                     }
+                }) {
                     val composerCommands = rememberDesktopComposerCommands(
                         DesktopComposerCommandsParams(
                             chatController = chatController,
