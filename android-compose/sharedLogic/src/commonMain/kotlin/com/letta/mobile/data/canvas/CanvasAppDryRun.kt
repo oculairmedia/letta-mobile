@@ -5,7 +5,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
 
 /**
  * `dry_run` for an app's own canvas tools ([CanvasExternalTools]), which share the host's contract
@@ -20,7 +19,7 @@ internal object CanvasAppDryRun {
 
     /** The ops a `canvas_apply_ops` [input] would write, or null when it has none to read. */
     fun applyOps(input: JsonObject): List<CanvasOp>? =
-        input["ops"]?.let { runCatching { json.decodeFromJsonElement<List<CanvasOp>>(it) }.getOrNull() }
+        input["ops"]?.let { runCatching { HostCanvasToolInputs.ops(it) }.getOrNull() }
 
     /** The replace a `canvas_replace_scene` [input] would write, or null when it names no scene. */
     fun replaceScene(input: JsonObject): List<CanvasOp>? =

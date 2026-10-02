@@ -13,7 +13,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 
 private val canvasJson = Json {
@@ -170,15 +169,23 @@ private suspend fun executeReplaceScene(
     }
 }
 
+/**
+ * [ops] written as the caller's, each stamped after the board's clock as the Iroh host stamps them
+ * ([CanvasStampedBatch.separately], letta-mobile-s416w.5): through the live session when the board is
+ * open, else into the store, conditional on the revision this call read.
+ */
 private suspend fun commitOpsUpdate(
-    store: CanvasDocumentStore,
+    context: CanvasToolContext,
     activeSession: CanvasSession?,
     doc: CanvasDocument,
     ops: List<CanvasOp>,
-): Long? = if (activeSession != null) {
-    activeSession.applyOps(ops).revision
-} else {
-    persistWithoutSession(store, doc, CanvasOpProjector.project(doc.sceneJson, ops))
+): Long? {
+    val callerId = context.resolveCallerId()
+    if (activeSession != null) return activeSession.applyAgentOps(ops, callerId).revision
+    val stamped = CanvasStampedBatch.separately(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) {
+        CanvasOpDiffer.generateOpId("agent")
+    }
+    return persistWithoutSession(context.store, doc, CanvasOpProjector.project(doc.sceneJson, stamped))
 }
 
 private suspend fun executeApplyOps(
@@ -186,19 +193,22 @@ private suspend fun executeApplyOps(
     input: JsonObject,
 ): ExternalToolResult {
     val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
-    val suppliedOps = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
+    // Read as the host reads it: identity optional, embedded JSON as string or object.
+    val suppliedOps = HostCanvasToolInputs.ops(opsJson)
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
         // The caller has already passed the write check; every op it sends is its own, whatever
         // actor the input named, so the log, the broadcast and scene provenance all carry it.
         val callerOps = suppliedOps.map { it.withActor(callerId) }
-        val ops = when (val checked = CanvasSceneValidator.ops(callerOps)) {
-            is CanvasOpsCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
-            is CanvasOpsCheck.Valid -> checked.ops
+        // Held to the board it lands on, as the Iroh host holds it (letta-mobile-s416w.5): a plugin
+        // element's first write must be whole, and a removal must find what it removes.
+        val ops = when (val checked = CanvasBatchValidator.check(doc.sceneJson, callerOps)) {
+            is CanvasBatchCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
+            is CanvasBatchCheck.Valid -> checked.ops
         }
-        val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
+        val revision = commitOpsUpdate(context, activeSession, doc, ops)
             ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
-            canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
+            canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision, canvasId = doc.id.value))
         )
     }
 }
@@ -367,12 +377,7 @@ class CanvasGetSceneTool(
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
                 is CanvasLookupResult.Found -> ExternalToolResult.Success(
-                    canvasJson.encodeToString(
-                        CanvasGetSceneResult(
-                            sceneJson = lookup.doc.sceneJson,
-                            revision = lookup.doc.revision,
-                        )
-                    )
+                    canvasJson.encodeToString(CanvasSceneRead.result(lookup.doc.sceneJson, lookup.doc.revision, lookup.doc.id.value)),
                 )
             }
         }

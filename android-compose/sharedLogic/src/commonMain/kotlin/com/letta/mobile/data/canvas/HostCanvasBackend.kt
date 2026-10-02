@@ -147,12 +147,14 @@ class HostCanvasBackend(
         val replies = Channel<CanvasRelayMessage>(Channel.UNLIMITED)
         val link = relay.connect(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX + caller.agentId) { replies.send(it) }
         try {
-            link.receive(CanvasRelayMessage.Join(entry.topic, entry.canvasId, afterCursor = store.head(entry.topic)))
-            var lamport = scene(entry).lamport
+            link.receive(
+                CanvasRelayMessage.Join(entry.topic, entry.canvasId, store.head(entry.topic), CanvasRelayFeatures.SUPPORTED),
+            )
+            val lamport = scene(entry).lamport
             val stamped = if (atomic) {
                 listOf(CanvasStampedBatch.of(ops, caller.agentId, lamport, newOpId))
             } else {
-                ops.map { it.withActor(caller.agentId).withStamp(newOpId(), ++lamport) }
+                CanvasStampedBatch.separately(ops, caller.agentId, lamport, newOpId)
             }
             stamped.forEach { link.receive(CanvasRelayMessage.Publish(entry.topic, it)) }
             return HostCanvasAcks(stamped).await(replies, ackTimeout)
