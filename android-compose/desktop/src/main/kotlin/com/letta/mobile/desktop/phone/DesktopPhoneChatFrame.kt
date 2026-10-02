@@ -1,0 +1,101 @@
+package com.letta.mobile.desktop.phone
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatSurfaceMode
+import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
+import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.ChatToolDetails
+import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
+import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * How the host frames the shared chat page: on the desktop, nothing; on the phone preview, the
+ * status bar and the floating header the page draws under ([topChromeInset], Android's
+ * `topChromeInset`), and no keyboard-shortcut strip.
+ */
+@Immutable
+internal data class ChatPageFrame(
+    val topChromeInset: Dp = 0.dp,
+    val showKeyboardHints: Boolean = true,
+)
+
+/** What the phone's header needs from the page: its mode, the conversation, and the way back to the canvas. */
+internal class PhoneChatPageInputs(
+    val mode: ChatSurfaceMode,
+    val uiState: StateFlow<ChatUiState>,
+    val onBackToCanvas: () -> Unit,
+)
+
+/** The phone opens conversations on the canvas, as Android does; the desktop follows its preference. */
+internal fun DesktopPhoneChrome?.opensOnCanvas(preference: Boolean): Boolean = this != null || preference
+
+/** The phone's idiom, as Android's SharedChatPage sets it; [desktop] when there is no phone. */
+internal fun DesktopPhoneChrome?.chatAppearance(desktop: ChatSurfaceAppearance): ChatSurfaceAppearance =
+    if (this == null) desktop else PhoneChatAppearance
+
+private val PhoneChatAppearance = ChatSurfaceAppearance(
+    platformStyle = ChatPlatformStyle.Touch,
+    toolDetails = ChatToolDetails.Sheet,
+    fontScaleRange = DefaultFontScaleRange,
+)
+
+/**
+ * Hosts the shared chat [page] as this window draws it. Without a phone it is exactly
+ * `page(modifier, ChatPageFrame())`. On the phone the page fills the screen edge to edge and the
+ * floating header ([PhoneChatHeader]) shows over the full-screen chat only: the canvas mode keeps
+ * the top of the board clear, as on Android.
+ */
+@Composable
+internal fun DesktopPhoneChatFrame(
+    phone: DesktopPhoneChrome?,
+    inputs: PhoneChatPageInputs,
+    modifier: Modifier = Modifier,
+    page: @Composable (Modifier, ChatPageFrame) -> Unit,
+) {
+    if (phone == null) {
+        page(modifier, ChatPageFrame())
+        return
+    }
+    var headerHeight by remember { mutableStateOf(0.dp) }
+    val fullScreen = inputs.mode == ChatSurfaceMode.FullScreen
+    val frame = ChatPageFrame(topChromeInset = phoneTopChromeInset(fullScreen, headerHeight), showKeyboardHints = false)
+    Box(modifier.fillMaxSize()) {
+        page(Modifier, frame)
+        if (fullScreen) PhoneChatPageHeader(phone, inputs) { headerHeight = it }
+    }
+}
+
+/** Its own composable, so the agent's name is the only thing it collects and the page does not recompose with it. */
+@Composable
+private fun PhoneChatPageHeader(phone: DesktopPhoneChrome, inputs: PhoneChatPageInputs, onHeightChange: (Dp) -> Unit) {
+    val state by inputs.uiState.collectAsState()
+    PhoneChatHeader(
+        title = state.agentName?.takeIf(String::isNotBlank) ?: "Chat",
+        onMenu = { phone.drawerOpen = true },
+        onCanvas = inputs.onBackToCanvas,
+        onHeightChange = onHeightChange,
+    )
+}
+
+/** The status bar, plus the floating header while the full-screen page shows it. */
+@Composable
+private fun phoneTopChromeInset(fullScreen: Boolean, headerHeight: Dp): Dp {
+    val density = LocalDensity.current
+    val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
+    return if (fullScreen) maxOf(statusBar, headerHeight) else statusBar
+}

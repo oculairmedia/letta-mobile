@@ -79,9 +79,16 @@ import java.awt.Window
 import java.time.Instant
 import dev.nucleusframework.application.NucleusApplicationScope
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
+import com.letta.mobile.desktop.phone.ClosePhoneDrawerOnNavigation
+import com.letta.mobile.desktop.phone.DesktopOnly
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.PhoneAwareContent
-import com.letta.mobile.desktop.phone.PhoneNavigationDrawer
+import com.letta.mobile.desktop.phone.PhoneDrawerHost
+import com.letta.mobile.desktop.phone.agentPaneVisible
+import com.letta.mobile.desktop.phone.drawsSharedChat
+import com.letta.mobile.desktop.phone.isBareChatPage
+import com.letta.mobile.desktop.phone.reducedMotionOr
+import com.letta.mobile.desktop.phone.sidebarVisible
 import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 
@@ -140,7 +147,7 @@ internal fun LettaDesktopApp(
     // and every phone branch below then leaves the desktop exactly as it was.
     val phone = LocalDesktopPhone.current
     val systemReducedMotion = remember { desktopPrefersReducedMotion() }
-    val reducedMotion = phone?.state?.reducedMotion ?: systemReducedMotion
+    val reducedMotion = phone.reducedMotionOr(systemReducedMotion)
     SidebarToggleKeyDispatcherEffect(
         onToggle = { shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar) },
     )
@@ -281,10 +288,7 @@ internal fun LettaDesktopApp(
 
     val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
-    // A phone's drawer closes once something in it was picked.
-    if (phone != null) {
-        LaunchedEffect(selectedDestination, chatState.selectedConversationId, editAgentId) { phone.drawerOpen = false }
-    }
+    ClosePhoneDrawerOnNavigation(phone, selectedDestination, chatState.selectedConversationId, editAgentId)
 
     SyncConversationTabs(chatState, selectedDestination, conversationTabsState) { conversationTabsState = it }
     val conversationById = remember(chatState.conversations) { chatState.conversations.associateBy { it.id } }
@@ -332,8 +336,7 @@ internal fun LettaDesktopApp(
     }
     // letta-mobile-bglj6.1: the shared KMP chat page's port, built only while the preview flag is on.
     val sharedChatEnabled by LocalDesktopSharedChatPageFlag.current.enabled.collectAsState()
-    // The phone preview always draws the shared page: it is the phone's chat.
-    val sharedChatPort = if (sharedChatEnabled || phone != null) {
+    val sharedChatPort = if (phone.drawsSharedChat(sharedChatEnabled)) {
         rememberDesktopChatSessionPort(chatController, ::dispatchA2uiAction)
     } else {
         null
@@ -704,13 +707,12 @@ internal fun LettaDesktopApp(
             // the measured width into it. The 56dp agent rail always stays as
             // the navigation affordance.
             val measuredWidthDp = maxWidth.value
-            // On a phone the sidebar lives in the drawer, where it is always shown.
-            val isSidebarVisible = phone != null || shellLayoutState.isSidebarVisible &&
-                !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
+            val isSidebarVisible = phone.sidebarVisible(
+                shellLayoutState.isSidebarVisible && !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp),
+            )
             // One rule for where the mascot stands (wbin4.4), driven from the shell's own state.
-            DriveMascotStage(selectedAgentId, agentPaneVisible = phone?.drawerOpen ?: isSidebarVisible)
-            // A phone's width says nothing about the desktop layout the person saved.
-            if (phone == null) {
+            DriveMascotStage(selectedAgentId, agentPaneVisible = phone.agentPaneVisible(isSidebarVisible))
+            DesktopOnly(phone) {
                 LaunchedEffect(measuredWidthDp) {
                     shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
                 }
@@ -800,7 +802,7 @@ internal fun LettaDesktopApp(
                     }
                 }
                 Row(Modifier.fillMaxSize()) {
-                    if (phone == null) navigationPanes()
+                    DesktopOnly(phone) { navigationPanes() }
                     val composerCommands = rememberDesktopComposerCommands(
                         DesktopComposerCommandsParams(
                             chatController = chatController,
@@ -886,7 +888,7 @@ internal fun LettaDesktopApp(
                     PhoneAwareContent(
                         phone = phone,
                         title = activeTitle,
-                        bare = selectedDestination == DesktopDestination.Conversations && sharedChatPage != null && editAgentId == null,
+                        bare = isBareChatPage(selectedDestination, hasSharedChatPage = sharedChatPage != null, editAgentId),
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     ) { contentModifier ->
                     DesktopMainContentPane(
@@ -1045,14 +1047,8 @@ internal fun LettaDesktopApp(
                         )
                     }
                 }
-                if (phone != null) {
-                    PhoneNavigationDrawer(
-                        open = phone.drawerOpen,
-                        onDismiss = { phone.drawerOpen = false },
-                        reducedMotion = reducedMotion,
-                    ) {
-                        Row(Modifier.fillMaxHeight()) { navigationPanes() }
-                    }
+                PhoneDrawerHost(phone, reducedMotion) {
+                    Row(Modifier.fillMaxHeight()) { navigationPanes() }
                 }
               }
             }

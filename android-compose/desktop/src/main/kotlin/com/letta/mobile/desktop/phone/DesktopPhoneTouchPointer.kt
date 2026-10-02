@@ -15,6 +15,7 @@ import java.awt.Component
 import java.awt.EventQueue
 import java.awt.Toolkit
 import java.awt.event.MouseEvent
+import java.lang.reflect.Field
 import javax.swing.JComponent
 import javax.swing.SwingUtilities
 
@@ -51,46 +52,70 @@ internal object DesktopPhoneTouchPointer {
     private class Target(val scene: ComposeScene, val content: Component, val container: JComponent)
 
     private fun resolve(window: ComposeWindow): Target {
-        val panel = field(window, ComposeWindow::class.java, "composePanel")
-        val container = field(panel, panel.javaClass, "_composeContainer")
-        val mediator = field(container, container.javaClass, "mediator")
-        val scene = (field(mediator, mediator.javaClass, "scene\$delegate") as Lazy<*>).value as ComposeScene
+        val panel = ComposeWindow::class.java.openField("composePanel").get(window)
+        val container = panel.javaClass.openField("_composeContainer").get(panel)
+        val mediator = container.javaClass.openField("mediator").get(container)
+        val scene = (mediator.javaClass.openField("scene\$delegate").get(mediator) as Lazy<*>).value as ComposeScene
         val content = mediator.javaClass.getMethod("getContentComponent").invoke(mediator) as Component
-        val root = field(mediator, mediator.javaClass, "container") as JComponent
+        val root = mediator.javaClass.openField("container").get(mediator) as JComponent
         return Target(scene, content, root)
     }
 
-    private fun field(owner: Any, type: Class<*>, name: String): Any {
-        val field = type.getDeclaredField(name).apply { isAccessible = true }
-        return checkNotNull(field.get(owner)) { "$name is null" }
-    }
+    /** [name], declared on this class, made readable. */
+    private fun Class<*>.openField(name: String): Field = getDeclaredField(name).apply { isAccessible = true }
 
     private class TouchQueue(private val target: Target, private val enabled: () -> Boolean) : EventQueue() {
         /** A left-button gesture is in flight as touch; it stays touch until release, whatever [enabled] says. */
         private var touchDown = false
 
         override fun dispatchEvent(event: AWTEvent) {
-            if (event is MouseEvent && event.component === target.content && translate(event)) return
-            super.dispatchEvent(event)
+            val handled = contentMouseEvent(event)?.let(::translate) ?: false
+            if (!handled) super.dispatchEvent(event)
         }
+
+        /** [event] as a mouse event on the Compose content, or null for anything else. */
+        private fun contentMouseEvent(event: AWTEvent): MouseEvent? =
+            (event as? MouseEvent)?.takeIf { it.component === target.content }
 
         /** True when [event] was handled here (sent as touch, or dropped as hover). */
         private fun translate(event: MouseEvent): Boolean {
-            if (!touchDown && !enabled()) return false
-            val primary = SwingUtilities.isLeftMouseButton(event)
+            if (!active()) return false
             return when (event.id) {
-                MouseEvent.MOUSE_PRESSED -> primary && send(event, PointerEventType.Press, pressed = true).also { touchDown = true }
-                MouseEvent.MOUSE_DRAGGED -> touchDown && send(event, PointerEventType.Move, pressed = true)
-                MouseEvent.MOUSE_RELEASED -> (primary && touchDown) && send(event, PointerEventType.Release, pressed = false).also { touchDown = false }
+                MouseEvent.MOUSE_PRESSED -> press(event)
+                MouseEvent.MOUSE_DRAGGED -> drag(event)
+                MouseEvent.MOUSE_RELEASED -> release(event)
                 // A phone has no hover, and the click AWT synthesises after a release is not an input.
                 MouseEvent.MOUSE_MOVED, MouseEvent.MOUSE_ENTERED, MouseEvent.MOUSE_EXITED -> !touchDown
-                MouseEvent.MOUSE_CLICKED -> primary
+                MouseEvent.MOUSE_CLICKED -> SwingUtilities.isLeftMouseButton(event)
                 else -> false
             }
         }
 
-        private fun send(event: MouseEvent, type: PointerEventType, pressed: Boolean): Boolean {
-            if (type == PointerEventType.Press && !target.content.isFocusOwner) target.content.requestFocus()
+        /** Translating, or finishing a touch gesture that started while it was. */
+        private fun active(): Boolean = touchDown || enabled()
+
+        private fun press(event: MouseEvent): Boolean {
+            if (!SwingUtilities.isLeftMouseButton(event)) return false
+            if (!target.content.isFocusOwner) target.content.requestFocus()
+            send(event, PointerEventType.Press, pressed = true)
+            touchDown = true
+            return true
+        }
+
+        private fun drag(event: MouseEvent): Boolean {
+            if (!touchDown) return false
+            send(event, PointerEventType.Move, pressed = true)
+            return true
+        }
+
+        private fun release(event: MouseEvent): Boolean {
+            if (!touchDown) return false
+            send(event, PointerEventType.Release, pressed = false)
+            touchDown = false
+            return true
+        }
+
+        private fun send(event: MouseEvent, type: PointerEventType, pressed: Boolean) {
             val point = SwingUtilities.convertPoint(event.component, event.point, target.container)
             val scale = target.content.graphicsConfiguration?.defaultTransform?.scaleX?.toFloat() ?: 1f
             target.scene.sendPointerEvent(
@@ -102,7 +127,6 @@ internal object DesktopPhoneTouchPointer {
                 nativeEvent = event,
                 button = PointerButton.Primary,
             )
-            return true
         }
     }
 }

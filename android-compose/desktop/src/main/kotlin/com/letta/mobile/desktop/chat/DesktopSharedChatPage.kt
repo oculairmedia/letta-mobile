@@ -4,9 +4,7 @@ import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import androidx.compose.runtime.MutableState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -28,7 +26,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiAction
@@ -44,9 +41,13 @@ import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.canvas.DesktopCanvasHostSync
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.openDesktopCanvasSession
+import com.letta.mobile.desktop.phone.ChatPageFrame
+import com.letta.mobile.desktop.phone.DesktopPhoneChatFrame
 import com.letta.mobile.desktop.phone.DesktopPhoneChrome
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
-import com.letta.mobile.desktop.phone.PhoneChatHeader
+import com.letta.mobile.desktop.phone.PhoneChatPageInputs
+import com.letta.mobile.desktop.phone.chatAppearance
+import com.letta.mobile.desktop.phone.opensOnCanvas
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
@@ -55,12 +56,9 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
-import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 
@@ -146,8 +144,7 @@ internal fun DesktopSharedChatPage(
     // The phone preview draws this page as Android's SharedChatPage does; null on the desktop.
     val phone = LocalDesktopPhone.current
     var presentation by remember {
-        // A phone opens on the canvas, as Android does.
-        mutableStateOf(ChatSurfacePresentation.initial(phone != null || openOnCanvas.enabled.value, hasCanvas = true))
+        mutableStateOf(ChatSurfacePresentation.initial(phone.opensOnCanvas(openOnCanvas.enabled.value), hasCanvas = true))
     }
     val hasConversation = state.canvasOwner.conversationId != null
     val host = rememberDesktopChatSurfaceHost(port, navigation, phone)
@@ -164,107 +161,64 @@ internal fun DesktopSharedChatPage(
     }
     var dockGeometry by state.dockGeometry
     val onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } }
-    // The phone's floating header over the full-screen page; the page and the board draw under it and
-    // keep their content below it (Android's topChromeInset). Zero on the desktop.
-    var phoneHeaderHeight by remember { mutableStateOf(0.dp) }
-    val fullScreen = presentation.mode == ChatSurfaceMode.FullScreen
-    val topChromeInset = if (phone == null) 0.dp else phoneTopChromeInset(fullScreen, phoneHeaderHeight)
-    val page = @Composable { pageModifier: Modifier ->
-    ChatSurface(
-        port = port,
-        presentation = presentation,
-        onIntent = onIntent,
-        host = host,
-        modifier = pageModifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            // Bubble phase, so an open image viewer or popup takes its own Escape first.
-            .onKeyEvent { event ->
-                val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
-                if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
-                collapse
-            },
-        appearance = if (phone == null) {
-            ChatSurfaceAppearance(
-                fontScale = LocalDesktopChatFontScale.current,
-                // The font-scale host already scales the window's text through density.
-                fontScaleAppliedByHost = true,
-                fontScaleRange = MIN_CHAT_FONT_SCALE..MAX_CHAT_FONT_SCALE,
-            )
-        } else {
-            PhoneChatAppearance
-        },
-        platform = remember(ambientStatus, phone, topChromeInset) {
-            ChatSurfacePlatform(
-                pageBackground = { content ->
-                    DesktopAmbientChatBackground(status = ambientStatus, modifier = Modifier.fillMaxSize()) { content() }
+    val frameInputs = PhoneChatPageInputs(presentation.mode, port.uiState) { onIntent(ChatSurfaceIntent.Collapse) }
+    DesktopPhoneChatFrame(phone, frameInputs, modifier) { pageModifier, frame ->
+        ChatSurface(
+            port = port,
+            presentation = presentation,
+            onIntent = onIntent,
+            host = host,
+            modifier = pageModifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                // Bubble phase, so an open image viewer or popup takes its own Escape first.
+                .onKeyEvent { event ->
+                    val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
+                    if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
+                    collapse
                 },
-                // Touch first on the phone: the shortcut strip is desktop chrome.
-                showKeyboardHints = phone == null,
-                topChromeInset = topChromeInset,
-            )
-        },
-        pagedTimeline = state.pagedTimeline,
-        canvas = { actions ->
-            if (hasConversation) {
-                DockedConversationCanvas(session, actions, state.canvasHeaderTrailing, chromeTopInset = topChromeInset)
-            } else {
-                ChatCanvasPlaceholder()
-            }
-        },
-        dockGeometry = dockGeometry,
-        onDockGeometryChange = { dockGeometry = it },
-    )
-    }
-    if (phone == null) {
-        page(modifier)
-    } else {
-        Box(modifier.fillMaxSize()) {
-            page(Modifier)
-            // On a phone the canvas mode keeps the top of the board clear: the header shows over the chat only.
-            if (fullScreen) {
-                PhoneChatPageHeader(
-                    port = port,
-                    onMenu = { phone.drawerOpen = true },
-                    onCanvas = { onIntent(ChatSurfaceIntent.Collapse) },
-                    onHeightChange = { phoneHeaderHeight = it },
-                )
-            }
-        }
+            appearance = phone.chatAppearance(rememberDesktopChatAppearance()),
+            platform = rememberDesktopChatPlatform(ambientStatus, frame),
+            pagedTimeline = state.pagedTimeline,
+            canvas = { actions ->
+                if (hasConversation) {
+                    DockedConversationCanvas(session, actions, state.canvasHeaderTrailing, frame.topChromeInset)
+                } else {
+                    ChatCanvasPlaceholder()
+                }
+            },
+            dockGeometry = dockGeometry,
+            onDockGeometryChange = { dockGeometry = it },
+        )
     }
 }
 
-/** The phone's idiom, as Android's SharedChatPage sets it: the Touch bar, sheets, the canvas's chat head. */
-private val PhoneChatAppearance = ChatSurfaceAppearance(
-    platformStyle = ChatPlatformStyle.Touch,
-    toolDetails = ChatToolDetails.Sheet,
-    fontScaleRange = DefaultFontScaleRange,
-)
-
-/** The status bar, plus the floating header while the full-screen page shows it. */
+/** The desktop's appearance: its own font scale, already applied to the window's text through density. */
 @Composable
-private fun phoneTopChromeInset(fullScreen: Boolean, headerHeight: Dp): Dp {
-    val density = LocalDensity.current
-    val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-    return if (fullScreen) maxOf(statusBar, headerHeight) else statusBar
+private fun rememberDesktopChatAppearance(): ChatSurfaceAppearance {
+    val fontScale = LocalDesktopChatFontScale.current
+    return remember(fontScale) {
+        ChatSurfaceAppearance(
+            fontScale = fontScale,
+            // The font-scale host already scales the window's text through density.
+            fontScaleAppliedByHost = true,
+            fontScaleRange = MIN_CHAT_FONT_SCALE..MAX_CHAT_FONT_SCALE,
+        )
+    }
 }
 
-/** The header's own composable, so the agent's name is the only thing it collects from the page. */
+/** The ambient glow behind the page, and what the host's [frame] asks of it (the phone's top chrome). */
 @Composable
-private fun PhoneChatPageHeader(
-    port: DesktopChatSessionPort,
-    onMenu: () -> Unit,
-    onCanvas: () -> Unit,
-    onHeightChange: (Dp) -> Unit,
-) {
-    val agentName = port.uiState.collectAsState().value.agentName
-    PhoneChatHeader(
-        title = agentName?.takeIf { it.isNotBlank() } ?: "Chat",
-        onMenu = onMenu,
-        onCanvas = onCanvas,
-        onHeightChange = onHeightChange,
-    )
-}
+private fun rememberDesktopChatPlatform(ambientStatus: DesktopAmbientStatus, frame: ChatPageFrame): ChatSurfacePlatform =
+    remember(ambientStatus, frame) {
+        ChatSurfacePlatform(
+            pageBackground = { content ->
+                DesktopAmbientChatBackground(status = ambientStatus, modifier = Modifier.fillMaxSize()) { content() }
+            },
+            showKeyboardHints = frame.showKeyboardHints,
+            topChromeInset = frame.topChromeInset,
+        )
+    }
 
 /** Escape on the full-screen page goes back to the canvas (Android's Back does the same). */
 internal fun escapeCollapsesToCanvas(mode: ChatSurfaceMode, key: Key, type: KeyEventType): Boolean =

@@ -65,20 +65,27 @@ internal class PhoneWindowInsets(private val source: PhoneInsetsSource) : Platfo
     override val systemGestures: PlatformInsets = PlatformInsets(getBottom = { px(source.navigationBarDp) })
     override val mandatorySystemGestures: PlatformInsets = systemGestures
 
+    /** A view of these insets without the safe (system bar) insets, the keyboard, or both. */
     override fun excluding(safeInsets: Boolean, ime: Boolean): PlatformWindowInsets {
-        if (!safeInsets && !ime) return this
-        val outer = this
-        return object : PlatformWindowInsets {
-            override val statusBars = if (safeInsets) PlatformInsets.Zero else outer.statusBars
-            override val navigationBars = if (safeInsets) PlatformInsets.Zero else outer.navigationBars
-            override val systemBars = if (safeInsets) PlatformInsets.Zero else outer.systemBars
-            override val displayCutout = if (safeInsets) PlatformInsets.Zero else outer.displayCutout
-            override val tappableElement = if (safeInsets) PlatformInsets.Zero else outer.tappableElement
-            override val systemGestures = if (safeInsets) PlatformInsets.Zero else outer.systemGestures
-            override val mandatorySystemGestures = if (safeInsets) PlatformInsets.Zero else outer.mandatorySystemGestures
-            override val ime = if (ime) PlatformInsets.Zero else outer.ime
-        }
+        val safe = if (safeInsets) NoWindowInsets else this
+        val keyboard = if (ime) NoWindowInsets else this
+        return MixedWindowInsets(safe = safe, keyboard = keyboard)
     }
+}
+
+/** Reports nothing: every inset is the interface's zero default. */
+private object NoWindowInsets : PlatformWindowInsets
+
+/** The system bars and gestures of [safe], with the keyboard of [keyboard]. */
+private class MixedWindowInsets(safe: PlatformWindowInsets, keyboard: PlatformWindowInsets) : PlatformWindowInsets {
+    override val statusBars = safe.statusBars
+    override val navigationBars = safe.navigationBars
+    override val systemBars = safe.systemBars
+    override val displayCutout = safe.displayCutout
+    override val tappableElement = safe.tappableElement
+    override val systemGestures = safe.systemGestures
+    override val mandatorySystemGestures = safe.mandatorySystemGestures
+    override val ime = keyboard.ime
 }
 
 /**
@@ -96,16 +103,13 @@ internal fun ProvidePhoneWindowInsets(
     }
 }
 
-private class PhoneInsetsProviderElement(
+/** Equal while it carries the same insets object (PhoneWindowInsets keeps identity equality). */
+private data class PhoneInsetsProviderElement(
     private val insets: PlatformWindowInsets,
 ) : ModifierNodeElement<PhoneInsetsProviderNode>() {
     override fun create(): PhoneInsetsProviderNode = PhoneInsetsProviderNode(insets)
 
     override fun update(node: PhoneInsetsProviderNode) = node.update(insets)
-
-    override fun hashCode(): Int = System.identityHashCode(insets)
-
-    override fun equals(other: Any?): Boolean = other is PhoneInsetsProviderElement && other.insets === insets
 }
 
 private class PhoneInsetsProviderNode(private var insets: PlatformWindowInsets) : PlatformWindowInsetsProviderNode() {

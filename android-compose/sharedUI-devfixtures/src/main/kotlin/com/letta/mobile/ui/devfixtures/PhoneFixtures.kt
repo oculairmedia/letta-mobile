@@ -119,23 +119,38 @@ object PhoneFixtures {
         state.copy(messages = persistentListOf(messages[2], messages[3].copy(content = "Done: the list is on the board.")))
     }
 
-    private fun receipt(
-        id: String,
-        status: CanvasArtifactStatus,
-        title: String,
-        kinds: List<ComposeKind>,
-        count: Int,
-        error: CanvasArtifactError? = null,
-    ) = CanvasArtifactReceipt(
-        artifactId = id,
+    /** The receipts' shared fields: this conversation's board, at one revision. */
+    private val receiptBase = CanvasArtifactReceipt(
+        artifactId = "",
         canvasId = "canvas-conversation-$CONVERSATION_ID",
         revision = 42,
-        status = status,
-        title = title,
-        kinds = kinds,
-        itemCount = count,
-        bounds = if (status == CanvasArtifactStatus.Published) ComposeBounds(80f, 80f, 712f, 746f) else null,
-        error = error,
+        status = CanvasArtifactStatus.Pending,
+        title = null,
+        kinds = emptyList(),
+        itemCount = 1,
+        bounds = null,
+    )
+
+    /** A published artifact on its narration, with where it landed on the board. */
+    private val weekendPlanReceipt = receiptBase.copy(
+        artifactId = "weekend-plan",
+        status = CanvasArtifactStatus.Published,
+        title = "Weekend plan",
+        kinds = listOf(ComposeKind.TEXT, ComposeKind.CHECKLIST, ComposeKind.NOTE, ComposeKind.GROUP, ComposeKind.CARD),
+        itemCount = 6,
+        bounds = ComposeBounds(80f, 80f, 712f, 746f),
+    )
+
+    /** One still being added. */
+    private val packingReceipt = receiptBase.copy(artifactId = "packing", title = "Packing list", kinds = listOf(ComposeKind.CHECKLIST))
+
+    /** One the board refused. */
+    private val budgetReceipt = receiptBase.copy(
+        artifactId = "budget",
+        status = CanvasArtifactStatus.Failed,
+        title = "Budget",
+        kinds = listOf(ComposeKind.CARD),
+        error = CanvasArtifactError("VALIDATION_FAILED", "a CARD holds at most 8 fields (got 11)", problemCount = 2),
     )
 
     /** The canvas.compose cards (letta-mobile-bglj6.13): a published artifact, one being added, a refused one. */
@@ -157,26 +172,16 @@ object PhoneFixtures {
                 UiMessage(
                     id = "a1", role = "assistant", content = "I put the plan on the board: a shopping checklist, meals, and a self-care group.",
                     timestamp = "2026-10-01T10:00:06Z", runId = "run-1",
-                    artifacts = listOf(
-                        receipt(
-                            "weekend-plan", CanvasArtifactStatus.Published, "Weekend plan",
-                            listOf(ComposeKind.TEXT, ComposeKind.CHECKLIST, ComposeKind.NOTE, ComposeKind.GROUP, ComposeKind.CARD), 6,
-                        ),
-                    ),
+                    artifacts = listOf(weekendPlanReceipt),
                 ),
                 UiMessage(id = "u2", role = "user", content = "Add a packing list and a budget.", timestamp = "2026-10-01T10:01:00Z"),
                 UiMessage(
                     id = "a2", role = "assistant", content = "Adding a packing list now.", timestamp = "2026-10-01T10:01:03Z", runId = "run-2",
-                    artifacts = listOf(receipt("packing", CanvasArtifactStatus.Pending, "Packing list", listOf(ComposeKind.CHECKLIST), 1)),
+                    artifacts = listOf(packingReceipt),
                 ),
                 UiMessage(
                     id = "a3", role = "assistant", content = "The budget did not go on the board.", timestamp = "2026-10-01T10:01:05Z", runId = "run-2",
-                    artifacts = listOf(
-                        receipt(
-                            "budget", CanvasArtifactStatus.Failed, "Budget", listOf(ComposeKind.CARD), 1,
-                            error = CanvasArtifactError("VALIDATION_FAILED", "a CARD holds at most 8 fields (got 11)", problemCount = 2),
-                        ),
-                    ),
+                    artifacts = listOf(budgetReceipt),
                 ),
             ),
         )
