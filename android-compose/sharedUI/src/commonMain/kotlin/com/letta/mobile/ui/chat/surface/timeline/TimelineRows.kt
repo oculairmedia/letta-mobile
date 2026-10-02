@@ -79,14 +79,19 @@ internal fun UiToolCall.needsAttention(): Boolean =
  */
 private fun ChatRenderItem.isToolOnlySingle(): Boolean {
     val message = (this as? ChatRenderItem.Single)?.message ?: return false
-    return message.role == "assistant" &&
-        !message.isReasoning &&
-        message.content.isBlank() &&
-        !message.toolCalls.isNullOrEmpty() &&
-        message.generatedUi == null &&
-        message.approvalRequest == null &&
-        message.approvalResponse == null &&
-        !message.carriesMedia()
+    return message.isBareToolCallMessage() && !message.carriesConversation()
+}
+
+/** An assistant message, not reasoning, with tool calls and no prose. */
+private fun UiMessage.isBareToolCallMessage(): Boolean {
+    if (role != "assistant" || isReasoning) return false
+    return content.isBlank() && !toolCalls.isNullOrEmpty()
+}
+
+/** Generated UI, an approval either way, or media: conversation that keeps its own row. */
+private fun UiMessage.carriesConversation(): Boolean {
+    if (generatedUi != null || approvalRequest != null) return true
+    return approvalResponse != null || carriesMedia()
 }
 
 /** An image attachment or a canvas card (letta-mobile-bglj6.13): content of its own, never folded. */
@@ -115,14 +120,17 @@ internal fun groupToolCallRows(chatOrderItems: List<ChatRenderItem>): List<Timel
 /** Exclusive end of the run of same-run tool-only singles starting at [start]. */
 private fun toolRunEnd(items: List<ChatRenderItem>, start: Int): Int {
     if (!items[start].isToolOnlySingle()) return start + 1
-    val runId = (items[start] as ChatRenderItem.Single).stableRunId
+    val first = items[start] as ChatRenderItem.Single
     var end = start
-    while (end < items.size && items[end].isToolOnlySingle() &&
-        (items[end] as ChatRenderItem.Single).stableRunId == runId
-    ) {
+    while (end < items.size && items[end].continuesToolRunOf(first)) {
         end++
     }
     return end
+}
+
+/** A tool-only single of the same run as [first]. */
+private fun ChatRenderItem.continuesToolRunOf(first: ChatRenderItem.Single): Boolean {
+    return isToolOnlySingle() && (this as ChatRenderItem.Single).stableRunId == first.stableRunId
 }
 
 internal fun TimelineRow.timestampOrNull(): String? = when (this) {

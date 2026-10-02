@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,18 +35,22 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 
+/** What a composer chip shows: its label, after an optional leading icon. */
+@Immutable
+internal data class ComposerChipLabel(val text: String, val leadingIcon: ImageVector? = null)
+
 /**
  * A composer chip that opens something (a picker, a popover). Lifted from desktop's
  * ComposerActionChip.
  */
 @Composable
 internal fun ComposerActionChip(
-    label: String,
+    label: ComposerChipLabel,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    leadingIcon: ImageVector? = null,
     enabled: Boolean = true,
 ) {
+    val leadingIcon = label.leadingIcon
     Surface(
         onClick = onClick,
         enabled = enabled,
@@ -68,7 +73,7 @@ internal fun ComposerActionChip(
                 )
             }
             Text(
-                text = label,
+                text = label.text,
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

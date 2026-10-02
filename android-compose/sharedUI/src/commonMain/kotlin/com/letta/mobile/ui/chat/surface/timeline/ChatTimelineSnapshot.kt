@@ -18,16 +18,14 @@ fun ChatTimelineSnapshot(
     state: ChatUiState,
     actions: ChatActions,
     modifier: Modifier = Modifier,
-    host: ChatSurfaceHost = ChatSurfaceHost(),
     appearance: ChatSurfaceAppearance = ChatSurfaceAppearance(),
-    capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
 ) {
     ChatTimeline(
         state = state,
         pagedTimeline = null,
         actions = actions,
-        capabilities = capabilities,
-        host = host,
+        capabilities = ChatSurfaceCapabilities.Default,
+        host = ChatSurfaceHost(),
         appearance = appearance,
         modifier = modifier,
     )

@@ -183,12 +183,18 @@ private class QuestionAnswers(
         val out = LinkedHashMap<String, List<String>>()
         for (q in questions) {
             if (q.question.isBlank()) continue
-            val picked = selections[q.question].orEmpty().toMutableList()
-            val other = otherText[q.question]?.takeIf { it.isNotBlank() }
-            if (other != null && (q.multiSelect || picked.isEmpty())) picked.add(other)
+            val picked = answerTo(q)
             if (picked.isNotEmpty()) out[q.question] = picked
         }
         return out
+    }
+
+    /** The picked chips, plus the "Other" text where it may join them (multi-select, or nothing picked). */
+    private fun answerTo(q: AskUserQuestionItem): List<String> {
+        val picked = selections[q.question].orEmpty().toMutableList()
+        val other = otherText[q.question]?.takeIf { it.isNotBlank() } ?: return picked
+        if (q.multiSelect || picked.isEmpty()) picked.add(other)
+        return picked
     }
 }
 

@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -83,9 +85,10 @@ internal data class SharedChatPageParams(
 internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = Modifier) {
     val port = rememberAdminChatSessionPort(params.viewModel, params.navigation.onBugCommand)
     val canvasSlot = LocalChatCanvasSlot.current
-    var presentation by rememberSaveable(stateSaver = PresentationSaver) {
+    val presentationState = rememberSaveable(stateSaver = PresentationSaver) {
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
     }
+    val presentation by presentationState
     // Where the docked panel sits; it opens as a full-width bottom panel on a phone.
     var dockGeometry by rememberSaveable(stateSaver = DockGeometrySaver) { mutableStateOf(ChatDockGeometry.Default) }
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
@@ -94,31 +97,16 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val host = remember(params.navigation, subagentSheet) {
         params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch)
     }
-    // One instance for the page's lifetime: ChatScreen recomposes per keystroke, and a fresh
-    // lambda here would reach every timeline row (letta-mobile-bglj6.1).
-    val currentHost by rememberUpdatedState(host)
     val hasCanvasSlot = canvasSlot != null
-    val onIntent: (ChatSurfaceIntent) -> Unit = remember(hasCanvasSlot) {
-        { intent ->
-            if (!hasCanvasSlot && routesToCanvasNavigation(presentation, intent)) {
-                currentHost.openCanvas?.invoke()
-            } else {
-                presentation = ChatSurfaceModeReducer.reduce(presentation, intent)
-            }
-        }
-    }
+    val onIntent = rememberSurfaceIntentHandler(presentationState, hasCanvasSlot, host)
     // Back from the full-screen page returns to the canvas, the default view.
-    BackHandler(enabled = canvasSlot != null && presentation.mode == ChatSurfaceMode.FullScreen) {
+    BackHandler(enabled = hasCanvasSlot && presentation.mode == ChatSurfaceMode.FullScreen) {
         onIntent(ChatSurfaceIntent.Collapse)
     }
-    val reportHeaderHidden = params.onHostHeaderHiddenChange
-    if (reportHeaderHidden != null) {
-        val currentReport by rememberUpdatedState(reportHeaderHidden)
-        val headerHidden = canvasSlot != null && presentation.mode != ChatSurfaceMode.FullScreen
-        // After every composition, so the header is gone by the next frame; an unchanged value is a no-op.
-        SideEffect { currentReport(headerHidden) }
-        DisposableEffect(Unit) { onDispose { currentReport(false) } }
-    }
+    ReportHostHeaderHidden(
+        report = params.onHostHeaderHiddenChange,
+        headerHidden = hasCanvasSlot && presentation.mode != ChatSurfaceMode.FullScreen,
+    )
     val target = ChatCanvasTarget(
         agentId = params.viewModel.agentId.value,
         conversationId = params.viewModel.conversationId?.value,
@@ -126,19 +114,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val topChromeInset = params.topChromeInset
     val canvas: (@Composable (ChatCanvasActions) -> Unit)? =
         canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
-    val appearance = remember(params.chatMode, params.fontScale, params.hapticsEnabled) {
-        ChatSurfaceAppearance(
-            displayMode = params.chatMode.toChatDisplayMode(),
-            fontScale = params.fontScale,
-            hapticsEnabled = params.hapticsEnabled,
-            // CachedSettingsRepository.setChatFontScale clamps to this range.
-            fontScaleRange = DefaultFontScaleRange,
-            // Touch idiom: a tool summary opens its calls in a bottom sheet.
-            toolDetails = ChatToolDetails.Sheet,
-            // The phone's idiom: the legacy composer bar, sheets, and the canvas's chat head.
-            platformStyle = ChatPlatformStyle.Touch,
-        )
-    }
+    val appearance = rememberSharedChatAppearance(params)
     Box(modifier) {
         ChatSurface(
             port = port,
@@ -167,6 +143,56 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
     }
 }
+
+/**
+ * The page's intent handler. One instance for the page's lifetime: ChatScreen recomposes per
+ * keystroke, and a fresh lambda here would reach every timeline row (letta-mobile-bglj6.1).
+ */
+@Composable
+private fun rememberSurfaceIntentHandler(
+    presentationState: MutableState<ChatSurfacePresentation>,
+    hasCanvasSlot: Boolean,
+    host: ChatSurfaceHost,
+): (ChatSurfaceIntent) -> Unit {
+    val currentHost by rememberUpdatedState(host)
+    return remember(hasCanvasSlot) {
+        { intent ->
+            var presentation by presentationState
+            if (!hasCanvasSlot && routesToCanvasNavigation(presentation, intent)) {
+                currentHost.openCanvas?.invoke()
+            } else {
+                presentation = ChatSurfaceModeReducer.reduce(presentation, intent)
+            }
+        }
+    }
+}
+
+/** Tells the host whether its floating header should hide, and shows it again on leaving. */
+@Composable
+@NonRestartableComposable
+private fun ReportHostHeaderHidden(report: ((Boolean) -> Unit)?, headerHidden: Boolean) {
+    if (report == null) return
+    val currentReport by rememberUpdatedState(report)
+    // After every composition, so the header is gone by the next frame; an unchanged value is a no-op.
+    SideEffect { currentReport(headerHidden) }
+    DisposableEffect(Unit) { onDispose { currentReport(false) } }
+}
+
+@Composable
+private fun rememberSharedChatAppearance(params: SharedChatPageParams): ChatSurfaceAppearance =
+    remember(params.chatMode, params.fontScale, params.hapticsEnabled) {
+        ChatSurfaceAppearance(
+            displayMode = params.chatMode.toChatDisplayMode(),
+            fontScale = params.fontScale,
+            hapticsEnabled = params.hapticsEnabled,
+            // CachedSettingsRepository.setChatFontScale clamps to this range.
+            fontScaleRange = DefaultFontScaleRange,
+            // Touch idiom: a tool summary opens its calls in a bottom sheet.
+            toolDetails = ChatToolDetails.Sheet,
+            // The phone's idiom: the legacy composer bar, sheets, and the canvas's chat head.
+            platformStyle = ChatPlatformStyle.Touch,
+        )
+    }
 
 /** Full-screen "open canvas" leaves for the canvas screen until the docked mode ships. */
 internal fun routesToCanvasNavigation(

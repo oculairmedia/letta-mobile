@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
@@ -34,10 +35,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -48,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
@@ -65,12 +69,14 @@ import com.letta.mobile.sharedui.resources.composer_send
 import com.letta.mobile.sharedui.resources.composer_stop
 import com.letta.mobile.sharedui.resources.composer_stopping
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
+import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /*
@@ -105,33 +111,16 @@ internal fun TouchComposerBar(
 ) {
     var sheetOpen by remember { mutableStateOf(false) }
     val sheetItems = touchSheetItems(model, onAttachImage)
-    val docked = model.mode == com.letta.mobile.ui.chat.session.ChatSurfaceMode.Docked
-    val keyboard = keyboardOpen()
-    // Swipe the bar up: on the canvas it opens the chat; on the chat page, the canvas (legacy).
-    val swipe = if (docked) !keyboard else model.offersOpenCanvas && !model.streaming && !keyboard
-    Column(
-        modifier.fillMaxWidth().swipeUpToCanvas(enabled = swipe) {
-            model.onIntent(if (docked) ChatSurfaceIntent.Expand else ChatSurfaceIntent.OpenCanvas)
-        },
-    ) {
-        if (model.composer.attachments.isNotEmpty()) {
-            Box(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
-                ComposerAttachmentStrip(attachments = model.composer.attachments, onRemove = model.actions::removeAttachment)
-            }
-        }
+    Column(modifier.fillMaxWidth().then(touchBarSwipe(model))) {
+        TouchAttachments(model)
         TouchBarSurface(model) {
             leading?.invoke()
             TouchPlusButton(
                 visible = sheetItems.isNotEmpty(),
                 onClick = { if (sheetItems.size == 1) sheetItems.single().onClick() else sheetOpen = true },
             )
-            val style = if (model.mode == com.letta.mobile.ui.chat.session.ChatSurfaceMode.Docked) {
-                TouchFieldStyle.copy(testTag = ComposerTestTags.DOCKED_INPUT)
-            } else {
-                TouchFieldStyle
-            }
             Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
-                ComposerTextField(model = model, style = style)
+                ComposerTextField(model = model, style = touchFieldStyle(model))
             }
             TouchTrailingSlot(model)
         }
@@ -139,14 +128,43 @@ internal fun TouchComposerBar(
     if (sheetOpen) TouchComposerActionSheet(items = sheetItems, onDismiss = { sheetOpen = false })
 }
 
-/** The bar's surface: top corners only, easing from its resting to its engaged look. */
+/** Swipe the bar up: on the canvas it opens the chat; on the chat page, the canvas (legacy). */
 @Composable
-private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+private fun touchBarSwipe(model: ComposerModel): Modifier {
+    val docked = model.mode == ChatSurfaceMode.Docked
+    val keyboard = keyboardOpen()
+    val toCanvas = model.offersOpenCanvas && !model.streaming
+    val swipe = if (docked) !keyboard else toCanvas && !keyboard
+    return Modifier.swipeUpToCanvas(enabled = swipe) {
+        model.onIntent(if (docked) ChatSurfaceIntent.Expand else ChatSurfaceIntent.OpenCanvas)
+    }
+}
+
+/** The staged images, above the bar. */
+@Composable
+private fun TouchAttachments(model: ComposerModel) {
+    if (model.composer.attachments.isEmpty()) return
+    Box(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
+        ComposerAttachmentStrip(attachments = model.composer.attachments, onRemove = model.actions::removeAttachment)
+    }
+}
+
+/** The canvas's bar keeps the field to its test tag for the docked input. */
+private fun touchFieldStyle(model: ComposerModel): ComposerFieldStyle {
+    return if (model.mode == ChatSurfaceMode.Docked) TouchFieldStyle.copy(testTag = ComposerTestTags.DOCKED_INPUT) else TouchFieldStyle
+}
+
+/** The bar's look, at rest or engaged. */
+@Immutable
+private class TouchBarLook(val corner: Dp, val elevation: Dp, val color: Color)
+
+/** The bar is engaged while it has focus or something to send; its corners, elevation and fill ease between the two looks. */
+@Composable
+private fun animatedTouchBarLook(model: ComposerModel, focused: Boolean): TouchBarLook {
     val scheme = MaterialTheme.colorScheme
-    val reducedMotion = LocalReducedMotion.current
-    var focused by remember { mutableStateOf(false) }
-    val engaged = focused || model.composer.text.isNotBlank() || model.composer.attachments.isNotEmpty()
-    val spec = if (reducedMotion) snap() else tween<Dp>(LettaMotionTokens.CHIP_MILLIS)
+    val drafted = model.composer.text.isNotBlank() || model.composer.attachments.isNotEmpty()
+    val engaged = focused || drafted
+    val spec = if (LocalReducedMotion.current) snap() else tween<Dp>(LettaMotionTokens.CHIP_MILLIS)
     val corner by animateDpAsState(
         if (engaged) TouchComposerDimens.engagedCorner else TouchComposerDimens.restingCorner,
         spec,
@@ -159,16 +177,25 @@ private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.
     )
     val color by animateColorAsState(
         if (engaged) scheme.surfaceContainer else scheme.surfaceContainerLow,
-        if (reducedMotion) snap() else tween(LettaMotionTokens.CHIP_MILLIS),
+        chipSpec(),
         label = "touchBarColor",
     )
+    return TouchBarLook(corner, elevation, color)
+}
+
+/** The bar's surface: top corners only, easing from its resting to its engaged look. */
+@Composable
+private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    var focused by remember { mutableStateOf(false) }
+    val look = animatedTouchBarLook(model, focused)
     val padding = touchBarPadding()
     Surface(
         modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.hasFocus }.testTag(ComposerTestTags.TOUCH_BAR),
-        shape = RoundedCornerShape(topStart = corner, topEnd = corner),
-        color = color,
+        shape = RoundedCornerShape(topStart = look.corner, topEnd = look.corner),
+        color = look.color,
         contentColor = scheme.onSurface,
-        tonalElevation = elevation,
+        tonalElevation = look.elevation,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(
@@ -182,6 +209,12 @@ private fun TouchBarSurface(model: ComposerModel, content: @Composable androidx.
             content = content,
         )
     }
+}
+
+/** The chips' easing: their own duration, or none under reduced motion. */
+@Composable
+private fun <T> chipSpec(): AnimationSpec<T> {
+    return if (LocalReducedMotion.current) snap() else tween(LettaMotionTokens.CHIP_MILLIS)
 }
 
 /**
@@ -211,7 +244,7 @@ private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
     val reducedMotion = LocalReducedMotion.current
     val scale by animateFloatAsState(
         if (pressed && !reducedMotion) TouchComposerDimens.pressedScale else 1f,
-        if (reducedMotion) snap() else tween(LettaMotionTokens.CHIP_MILLIS),
+        chipSpec(),
         label = "touchPlusScale",
     )
     Box(
@@ -295,14 +328,12 @@ private const val EXIT_SCALE = 0.76f
 private fun TouchActionButton(model: ComposerModel) {
     val stops = model.decisions.action == ComposerAction.Stop
     val haptics = LocalHapticFeedback.current
-    val reducedMotion = LocalReducedMotion.current
     val size by animateFloatAsState(
         if (stops) TouchComposerDimens.stopScale else 1f,
-        if (reducedMotion) snap() else tween(LettaMotionTokens.CHIP_MILLIS),
+        chipSpec(),
         label = "touchActionScale",
     )
-    val pulse = rememberStopPulse(stops && !model.decisions.stopping && !reducedMotion)
-    val scheme = MaterialTheme.colorScheme
+    val pulse = rememberStopPulse(stopPulses(model))
     FilledIconButton(
         onClick = {
             haptics.performHapticFeedback(HapticFeedbackType.Confirm)
@@ -317,24 +348,41 @@ private fun TouchActionButton(model: ComposerModel) {
                 scaleY = scale
             }
             .testTag(if (stops) ComposerTestTags.STOP else ComposerTestTags.SEND),
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = if (stops) scheme.errorContainer else scheme.primary,
-            contentColor = if (stops) scheme.onErrorContainer else scheme.onPrimary,
-            disabledContainerColor = scheme.surfaceContainerHigh,
-            disabledContentColor = scheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
-        ),
+        colors = touchActionColors(stops),
     ) {
         Icon(
             imageVector = if (stops) LettaIcons.Close else LettaIcons.Send,
-            contentDescription = stringResource(
-                when {
-                    model.decisions.stopping -> Res.string.composer_stopping
-                    stops -> Res.string.composer_stop
-                    else -> Res.string.composer_send
-                },
-            ),
+            contentDescription = stringResource(touchActionLabel(model.decisions)),
             modifier = Modifier.size(TouchComposerDimens.actionIcon),
         )
+    }
+}
+
+/** Stop beats while the run is live and not yet asked to stop; never under reduced motion. */
+@Composable
+private fun stopPulses(model: ComposerModel): Boolean {
+    if (LocalReducedMotion.current) return false
+    return model.decisions.action == ComposerAction.Stop && !model.decisions.stopping
+}
+
+/** Send in the primary colour; Stop in the error container. */
+@Composable
+private fun touchActionColors(stops: Boolean): IconButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    return IconButtonDefaults.filledIconButtonColors(
+        containerColor = if (stops) scheme.errorContainer else scheme.primary,
+        contentColor = if (stops) scheme.onErrorContainer else scheme.onPrimary,
+        disabledContainerColor = scheme.surfaceContainerHigh,
+        disabledContentColor = scheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
+    )
+}
+
+/** "Stopping" once asked, "Stop" during a run, otherwise "Send". */
+private fun touchActionLabel(decisions: ComposerDecisions): StringResource {
+    return when {
+        decisions.stopping -> Res.string.composer_stopping
+        decisions.action == ComposerAction.Stop -> Res.string.composer_stop
+        else -> Res.string.composer_send
     }
 }
 

@@ -70,33 +70,36 @@ class ComposerPolicyTest {
 
     @Test
     fun composerHintShowsOnlyWhileThereIsNothingToSend() {
-        assertTrue(composerHintVisible(text = "", hasAttachments = false))
-        assertTrue(composerHintVisible(text = "   ", hasAttachments = false), "whitespace is not a message")
-        assertFalse(composerHintVisible(text = "hello", hasAttachments = false))
-        assertFalse(composerHintVisible(text = "", hasAttachments = true))
+        val image = MessageContentPart.Image(base64 = "AA==", mediaType = "image/png")
+        assertTrue(composerHintVisible(ChatComposerUiState(text = "")))
+        assertTrue(composerHintVisible(ChatComposerUiState(text = "   ")), "whitespace is not a message")
+        assertFalse(composerHintVisible(ChatComposerUiState(text = "hello")))
+        assertFalse(composerHintVisible(ChatComposerUiState(text = "", attachments = persistentListOf(image))))
     }
 
     @Test
     fun actionStopsOnlyWhenThereIsNothingToQueue() {
         val queueing = ChatComposerUiState(text = "next", canQueueWhileStreaming = true)
-        assertEquals(ComposerAction.Send, composerAction(queueing, streaming = false, cancelling = false))
-        assertEquals(ComposerAction.Send, composerAction(queueing, streaming = true, cancelling = false))
-        assertEquals(ComposerAction.Stop, composerAction(queueing.copy(text = ""), streaming = true, cancelling = false))
-        assertEquals(ComposerAction.Stop, composerAction(queueing, streaming = true, cancelling = true))
+        assertEquals(ComposerAction.Send, composerAction(queueing, Idle))
+        assertEquals(ComposerAction.Send, composerAction(queueing, Streaming))
+        assertEquals(ComposerAction.Stop, composerAction(queueing.copy(text = ""), Streaming))
+        assertEquals(ComposerAction.Stop, composerAction(queueing, Cancelling))
         assertEquals(
             ComposerAction.Stop,
-            composerAction(queueing.copy(canQueueWhileStreaming = false), streaming = true, cancelling = false),
+            composerAction(queueing.copy(canQueueWhileStreaming = false), Streaming),
         )
     }
 
     @Test
     fun sendNeedsAPayloadAndAnOwnerThatTakesIt() {
         val image = MessageContentPart.Image(base64 = "AA==", mediaType = "image/png")
-        assertFalse(composerSendEnabled(ChatComposerUiState(text = "  ", canSend = true), streaming = false))
-        assertTrue(composerSendEnabled(ChatComposerUiState(attachments = persistentListOf(image), canSend = true), false))
-        assertFalse(composerSendEnabled(ChatComposerUiState(text = "hi", canSend = false), streaming = false))
+        assertFalse(composerSendEnabled(ChatComposerUiState(text = "  ", canSend = true), Idle))
         assertTrue(
-            composerSendEnabled(ChatComposerUiState(text = "hi", canQueueWhileStreaming = true), streaming = true),
+            composerSendEnabled(ChatComposerUiState(attachments = persistentListOf(image), canSend = true), Idle),
+        )
+        assertFalse(composerSendEnabled(ChatComposerUiState(text = "hi", canSend = false), Idle))
+        assertTrue(
+            composerSendEnabled(ChatComposerUiState(text = "hi", canQueueWhileStreaming = true), Streaming),
         )
     }
 
@@ -136,3 +139,7 @@ class ComposerPolicyTest {
         assertTrue(running.stopping)
     }
 }
+
+private val Idle = ComposerRun(streaming = false, cancelling = false)
+private val Streaming = ComposerRun(streaming = true, cancelling = false)
+private val Cancelling = ComposerRun(streaming = true, cancelling = true)

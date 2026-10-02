@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -83,21 +85,14 @@ internal fun CopyIconButton(
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
     val hovered by interactionSource.collectIsHoveredAsState()
-    var copied by remember { mutableStateOf(false) }
-    LaunchedEffect(copied) {
-        if (copied) {
-            delay(ChatRowDimens.copiedFeedbackMillis)
-            copied = false
-        }
-    }
+    var copied by rememberCopiedFeedback()
     val engaged = focused || hovered || copied
     val alpha by animateFloatAsState(
-        targetValue = copyAlpha(revealed = action.visible || engaged, strong = action.emphasized || engaged),
+        targetValue = copyAlpha(action, engaged),
         animationSpec = tween(durationMillis = COPY_FADE_MILLIS),
         label = "copyActionAlpha",
     )
     val description = if (copied) stringResource(Res.string.rows_copied) else action.contentDescription
-    val borderColor = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
     val copy = {
         clipboard.setText(AnnotatedString(action.text))
         copied = true
@@ -110,7 +105,7 @@ internal fun CopyIconButton(
             .sizeIn(minWidth = LettaDimens.Control.actionButton, minHeight = LettaDimens.Control.actionButton)
             .graphicsLayer { this.alpha = alpha }
             .clip(CircleShape)
-            .border(LettaDimens.Stroke.hairline, borderColor, CircleShape)
+            .border(LettaDimens.Stroke.hairline, copyBorderColor(focused), CircleShape)
             // Always a button to assistive technology: TalkBack on a phone, with no hover to
             // reveal it, copies from here whether or not it shows.
             .semantics {
@@ -122,24 +117,53 @@ internal fun CopyIconButton(
             // hidden, which reveals it, and Enter or Space copies.
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { event ->
-                (event.type == KeyEventType.KeyUp && event.key in ACTIVATION_KEYS).also { if (it) copy() }
+                isCopyActivation(event).also { if (it) copy() }
             }
             .indication(interactionSource, LocalIndication.current)
             .then(if (armed) Modifier.copyTap(interactionSource, copy) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = if (copied) LettaIcons.Check else LettaIcons.Copy,
-            contentDescription = null,
-            tint = if (copied) successTint() else tint,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-        )
+        CopyGlyph(copied, tint)
     }
 }
 
+/** The copy glyph, or the success check for a moment after a copy. */
+@Composable
+private fun CopyGlyph(copied: Boolean, tint: Color) {
+    Icon(
+        imageVector = if (copied) LettaIcons.Check else LettaIcons.Copy,
+        contentDescription = null,
+        tint = if (copied) successTint() else tint,
+        modifier = Modifier.size(LettaDimens.Control.icon),
+    )
+}
+
+/** The "copied" flag, which falls back by itself once the feedback has shown. */
+@Composable
+private fun rememberCopiedFeedback(): MutableState<Boolean> {
+    val copied = remember { mutableStateOf(false) }
+    LaunchedEffect(copied.value) {
+        if (copied.value) {
+            delay(ChatRowDimens.copiedFeedbackMillis)
+            copied.value = false
+        }
+    }
+    return copied
+}
+
+@Composable
+private fun copyBorderColor(focused: Boolean): Color {
+    return if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
+}
+
+/** Enter or Space, on release. */
+private fun isCopyActivation(event: KeyEvent): Boolean {
+    return event.type == KeyEventType.KeyUp && event.key in ACTIVATION_KEYS
+}
+
 /** A tap copies; the press shows through [interactionSource] like a clickable's would. */
-private fun Modifier.copyTap(interactionSource: MutableInteractionSource, onTap: () -> Unit): Modifier =
-    pointerInput(interactionSource) {
+private fun Modifier.copyTap(interactionSource: MutableInteractionSource, onTap: () -> Unit): Modifier {
+    return pointerInput(interactionSource) {
         detectTapGestures(
             onPress = { offset ->
                 val press = PressInteraction.Press(offset)
@@ -149,18 +173,23 @@ private fun Modifier.copyTap(interactionSource: MutableInteractionSource, onTap:
             onTap = { onTap() },
         )
     }
+}
 
 private val ACTIVATION_KEYS = setOf(Key.Enter, Key.NumPadEnter, Key.Spacebar)
 
-private fun copyAlpha(revealed: Boolean, strong: Boolean): Float = when {
-    !revealed -> 0f
-    strong -> 1f
-    else -> ChatRowAlpha.copyIdle
+/** Shown when [CopyAction.visible] or the button itself is engaged (hovered, focused, just copied). */
+private fun copyAlpha(action: CopyAction, engaged: Boolean): Float {
+    return when {
+        !(action.visible || engaged) -> 0f
+        action.emphasized || engaged -> 1f
+        else -> ChatRowAlpha.copyIdle
+    }
 }
 
 @Composable
-internal fun successTint(): Color =
-    MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
+internal fun successTint(): Color {
+    return MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
         ?: MaterialTheme.colorScheme.primary
+}
 
 private const val COPY_FADE_MILLIS = 120

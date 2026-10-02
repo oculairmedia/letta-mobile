@@ -161,19 +161,19 @@ class ChatDockGeometryMathTest {
     fun resizeKeepsTheOppositeEdgeAndHonoursMinAndMax() {
         val f = frame()
         val start = ChatDockGeometryMath.rect(ChatDockGeometry.Default, f)
-        val wider = ChatDockGeometryMath.resize(ChatDockGeometry.Default, ChatDockEdge.Right, 100f, 0f, f)
+        val wider = ChatDockGeometryMath.resize(ChatDockGeometry.Default, ChatDockEdge.Right, ChatDockDelta(100f, 0f), f)
         val widerRect = ChatDockGeometryMath.rect(wider, f)
         assertEquals(start.left, widerRect.left, EPS)
         assertEquals(860f, widerRect.width, EPS)
 
-        val tiny = ChatDockGeometryMath.resize(ChatDockGeometry.Default, ChatDockEdge.TopLeft, 2000f, 2000f, f)
+        val tiny = ChatDockGeometryMath.resize(ChatDockGeometry.Default, ChatDockEdge.TopLeft, ChatDockDelta(2000f, 2000f), f)
         val tinyRect = ChatDockGeometryMath.rect(tiny, f)
         assertEquals(300f, tinyRect.width, EPS)
         assertEquals(200f, tinyRect.height, EPS)
         assertEquals(start.right, tinyRect.right, EPS)
         assertEquals(start.bottom, tinyRect.bottom, EPS)
 
-        val huge = ChatDockGeometryMath.resize(ChatDockGeometry.Default, ChatDockEdge.TopLeft, -5000f, -5000f, f)
+        val huge = ChatDockGeometryMath.resize(ChatDockGeometry.Default, ChatDockEdge.TopLeft, ChatDockDelta(-5000f, -5000f), f)
         val hugeRect = ChatDockGeometryMath.rect(huge, f)
         assertEquals(970f, hugeRect.width, EPS) // the right edge stays; the left stops at the margin
         assertEquals(780f, hugeRect.height, EPS) // the container, less margins, before the max
@@ -184,7 +184,7 @@ class ChatDockGeometryMathTest {
     fun aCollapsedPanelOnlyResizesItsWidth() {
         val f = frame()
         val collapsed = ChatDockGeometryMath.collapse(ChatDockGeometry(heightDp = 400f))
-        val resized = ChatDockGeometryMath.resize(collapsed, ChatDockEdge.BottomRight, 50f, 300f, f)
+        val resized = ChatDockGeometryMath.resize(collapsed, ChatDockEdge.BottomRight, ChatDockDelta(50f, 300f), f)
         assertEquals(810f, resized.widthDp!!, EPS)
         assertEquals(400f, resized.heightDp!!, EPS)
     }

@@ -240,7 +240,8 @@ private class DockedGlide {
     fun shown(anchor: CompanionSeatAnchors.Anchor, last: Rect?, animate: Boolean): Rect {
         val previous = owner
         owner = anchor.owner
-        if (previous != null && previous !== anchor.owner && last != null && animate) {
+        val handedOver = animate && changedHands(previous, anchor.owner)
+        if (handedOver && last != null) {
             from = last
             pending = true
             handoffs++
@@ -248,6 +249,11 @@ private class DockedGlide {
         if (pending) return from
         val t = progress.value
         return if (t >= 1f) anchor.rect else lerp(from, anchor.rect, t)
+    }
+
+    /** The anchor moved from one owner to another (not merely appeared). */
+    private fun changedHands(previous: CompanionAnchorOwner?, next: CompanionAnchorOwner?): Boolean {
+        return previous != null && previous !== next
     }
 }
 
