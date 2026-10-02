@@ -1445,6 +1445,13 @@ fun CanvasWorkspace(
             }
             if (snapAnchor != null) CanvasSnapIndicator(anchor = snapAnchor, viewport = state.viewport)
 
+            // A save that did not reach disk stays on the board until restart.
+            CanvasStorageFaultOverlay(
+                session = session,
+                modifier = Modifier.align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(top = STORAGE_FAULT_TOP, start = CHROME_INSET, end = CHROME_INSET),
+            )
             val zoomActions = CanvasZoom(
                 scalePercent = state.viewport.scalePercent,
                 onZoomOut = { controller.zoomBy(1f / ZOOM_STEP, boardCenter) },
@@ -1903,6 +1910,9 @@ fun CanvasWorkspace(
 
 private const val INSERT_TEXT_TIMEOUT_MS = 2000L
 private val CHROME_INSET = LettaDimens.Space.md
+
+/** Below the header bar (and its inset), so the storage-fault banner never covers the title or actions. */
+private val STORAGE_FAULT_TOP = CHROME_INSET + CanvasHeaderBarHeight + LettaDimens.Space.sm
 /** How long before asking the host again for an asset it did not have yet. */
 private const val ASSET_RETRY_MS = 10_000L
 

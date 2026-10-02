@@ -30,6 +30,10 @@ class CanvasSession(
     private val _document = MutableStateFlow<CanvasDocument?>(null)
     val document: StateFlow<CanvasDocument?> = _document.asStateFlow()
 
+    /** Storage faults of the store behind this board; empty for a store that reports none. */
+    val storageFaults: StateFlow<List<CanvasStorageFault>> =
+        (store as? CanvasStorageHealth)?.storageFaults ?: MutableStateFlow(emptyList<CanvasStorageFault>()).asStateFlow()
+
     private val _checkpoints = MutableStateFlow<List<CanvasCheckpoint>>(emptyList())
     val checkpoints: StateFlow<List<CanvasCheckpoint>> = _checkpoints.asStateFlow()
 
