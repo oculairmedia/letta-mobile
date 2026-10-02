@@ -41,44 +41,54 @@ internal fun rememberStablePlatform(platform: ChatSurfacePlatform): ChatSurfaceP
 }
 
 /** Which of [ChatSurfaceHost]'s members are set, as a bit mask. */
-internal fun ChatSurfaceHost.affordanceShape(): Int = listOf(
-    openCanvas, openAgent, resolveAgentName, openSubagent, openModelPicker, pickWorkingDirectory, openAgentPane, editAgent,
-    showOnCanvas,
-    openAgentSwitcher,
-).foldIndexed(0) { index, mask, member -> if (member != null) mask or (1 shl index) else mask }
+internal fun ChatSurfaceHost.affordanceShape(): Int {
+    return presenceMask(
+        listOf(
+            openCanvas, openAgent, resolveAgentName, openSubagent, openModelPicker, pickWorkingDirectory, openAgentPane, editAgent,
+            showOnCanvas,
+            openAgentSwitcher,
+        ),
+    )
+}
 
-private fun ChatSurfacePlatform.slotShape(): Int = listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange)
-    .foldIndexed(0) { index, mask, member -> if (member != null) mask or (1 shl index) else mask }
+private fun ChatSurfacePlatform.slotShape(): Int {
+    return presenceMask(listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange))
+}
+
+/** Bit i set when [members]`[i]` is non-null. */
+private fun presenceMask(members: List<Any?>): Int {
+    return members.foldIndexed(0) { index, mask, member -> if (member != null) mask or (1 shl index) else mask }
+}
 
 internal fun forwardingHost(current: State<ChatSurfaceHost>): ChatSurfaceHost {
     val host = current.value
     return ChatSurfaceHost(
-        openCanvas = if (host.openCanvas == null) null else { { current.value.openCanvas?.invoke() } },
+        openCanvas = forwardIfSet<() -> Unit>(host.openCanvas) { { current.value.openCanvas?.invoke() } },
         showOnCanvas = forwardedShowOnCanvas(current),
-        openAgent = if (host.openAgent == null) null else { { agentId -> current.value.openAgent?.invoke(agentId) } },
+        openAgent = forwardIfSet<(String) -> Unit>(host.openAgent) { { agentId -> current.value.openAgent?.invoke(agentId) } },
         resolveAgentName = host.resolveAgentName,
-        openSubagent = if (host.openSubagent == null) {
-            null
-        } else {
+        openSubagent = forwardIfSet<(String, String?, String) -> Unit>(host.openSubagent) {
             { toolCallId, subagentAgentId, description ->
                 current.value.openSubagent?.invoke(toolCallId, subagentAgentId, description)
             }
         },
-        openModelPicker = if (host.openModelPicker == null) null else { { current.value.openModelPicker?.invoke() } },
-        pickWorkingDirectory = if (host.pickWorkingDirectory == null) {
-            null
-        } else {
-            { current.value.pickWorkingDirectory?.invoke() }
-        },
-        openAgentPane = if (host.openAgentPane == null) null else { { current.value.openAgentPane?.invoke() } },
-        editAgent = if (host.editAgent == null) null else { { current.value.editAgent?.invoke() } },
-        openAgentSwitcher = if (host.openAgentSwitcher == null) null else { { current.value.openAgentSwitcher?.invoke() } },
+        openModelPicker = forwardIfSet<() -> Unit>(host.openModelPicker) { { current.value.openModelPicker?.invoke() } },
+        pickWorkingDirectory = forwardIfSet<() -> Unit>(host.pickWorkingDirectory) { { current.value.pickWorkingDirectory?.invoke() } },
+        openAgentPane = forwardIfSet<() -> Unit>(host.openAgentPane) { { current.value.openAgentPane?.invoke() } },
+        editAgent = forwardIfSet<() -> Unit>(host.editAgent) { { current.value.editAgent?.invoke() } },
+        openAgentSwitcher = forwardIfSet<() -> Unit>(host.openAgentSwitcher) { { current.value.openAgentSwitcher?.invoke() } },
     )
 }
 
+/** Null when the host leaves [member] unset (the affordance stays hidden), else the [forwarder] it builds. */
+private inline fun <T : Any> forwardIfSet(member: T?, forwarder: () -> T): T? {
+    return if (member == null) null else forwarder()
+}
+
 /** The host's "Show on canvas" (letta-mobile-bglj6.13), calling whatever the host passed last; null when it passes none. */
-private fun forwardedShowOnCanvas(current: State<ChatSurfaceHost>): ((CanvasArtifactReceipt) -> Unit)? =
-    if (current.value.showOnCanvas == null) null else { { receipt -> current.value.showOnCanvas?.invoke(receipt) } }
+private fun forwardedShowOnCanvas(current: State<ChatSurfaceHost>): ((CanvasArtifactReceipt) -> Unit)? {
+    return forwardIfSet<(CanvasArtifactReceipt) -> Unit>(current.value.showOnCanvas) { { receipt -> current.value.showOnCanvas?.invoke(receipt) } }
+}
 
 private fun forwardingPlatform(current: State<ChatSurfacePlatform>): ChatSurfacePlatform {
     val platform = current.value
