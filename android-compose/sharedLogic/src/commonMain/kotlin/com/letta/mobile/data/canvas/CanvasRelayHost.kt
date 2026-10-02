@@ -76,6 +76,9 @@ class CanvasRelayHost(
         private val send: suspend (CanvasRelayMessage) -> Unit,
     ) {
         private val joined = mutableSetOf<String>()
+
+        /** What this app said it reads, by topic ([CanvasRelayFeatures]); nothing for an older app. */
+        private val reads = mutableMapOf<String, Set<String>>()
         /** This connection's live cursors: topic -> stamped peer id -> last seen. */
         private val presence = mutableMapOf<String, MutableMap<String, Long>>()
 
@@ -103,16 +106,21 @@ class CanvasRelayHost(
             if (message.topic.isBlank() || message.proposedCanvasId.isBlank()) return refuse("empty topic or canvas id")
             val canvasId = store.bind(message.topic, CanvasId(message.proposedCanvasId))
             val topic = topic(message.topic)
+            state.withLock { reads[message.topic] = message.features.toSet() }
             topic.lock.withLock {
                 // Under the topic lock, so no op fans out to this app between its catch-up and its
                 // subscription: it receives the log in cursor order, then everything after.
-                deliver(CanvasRelayMessage.Joined(message.topic, canvasId.value, hostId(), store.head(message.topic)))
+                deliver(
+                    CanvasRelayMessage.Joined(
+                        message.topic, canvasId.value, hostId(), store.head(message.topic), CanvasRelayFeatures.SUPPORTED,
+                    ),
+                )
                 var cursor = message.afterCursor.coerceAtLeast(0L)
                 while (true) {
                     val page = store.readAfter(message.topic, cursor)
                     if (page.isEmpty()) break
                     for (entry in page) {
-                        deliver(CanvasRelayMessage.Op(message.topic, entry.cursor, entry.origin, entry.op))
+                        deliverOp(CanvasRelayMessage.Op(message.topic, entry.cursor, entry.origin, entry.op))
                         cursor = entry.cursor
                     }
                 }
@@ -137,9 +145,19 @@ class CanvasRelayHost(
                 deliver(CanvasRelayMessage.Ack(message.topic, op.opId, appended.cursor, appended.duplicate))
                 if (!appended.duplicate) {
                     val fanned = CanvasRelayMessage.Op(message.topic, appended.cursor, origin, op)
-                    topic.sessions.filter { it !== this }.forEach { it.deliver(fanned) }
+                    topic.sessions.filter { it !== this }.forEach { it.deliverOp(fanned) }
                 }
             }
+        }
+
+        /**
+         * [message] as this app can read it ([CanvasRelayFeatures.forPeer]): an op it cannot decode is
+         * skipped, so an app built before it neither drops the connection over it nor replays it forever.
+         */
+        internal suspend fun deliverOp(message: CanvasRelayMessage.Op) {
+            val features = state.withLock { reads[message.topic].orEmpty() }
+            val readable = CanvasRelayFeatures.forPeer(message.op, features) ?: return
+            deliver(if (readable === message.op) message else message.copy(op = readable))
         }
 
         private suspend fun putAsset(message: CanvasRelayMessage.AssetPut) {
@@ -260,6 +278,7 @@ class CanvasRelayHost(
             val topic = topic(name)
             val gone = state.withLock {
                 joined -= name
+                reads -= name
                 presence.remove(name)?.keys.orEmpty()
             }
             topic.lock.withLock {

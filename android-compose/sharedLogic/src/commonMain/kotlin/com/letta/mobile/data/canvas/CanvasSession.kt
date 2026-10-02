@@ -278,6 +278,10 @@ class CanvasSession(
      * Applies a sequence of operations as a single revision bump.
      */
     suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
+        applyOpsLocked(ops, isRemote)
+    }
+
+    private suspend fun applyOpsLocked(ops: List<CanvasOp>, isRemote: Boolean): CanvasDocument {
         val current = currentDoc()
         val opsToApply = filterAndRecordOps(ops, isRemote, current.acl)
         if (opsToApply.isEmpty()) return current
@@ -287,7 +291,17 @@ class CanvasSession(
         if (!isRemote) {
             broadcastOps(opsToApply)
         }
-        updated
+        return updated
+    }
+
+    /**
+     * An agent's checked ops (canvas_apply_ops on an app's own App Server, letta-mobile-s416w.5),
+     * each rebound to [actorId] and stamped after this session's clock as the Iroh host stamps them
+     * after its log's ([CanvasStampedBatch.separately]), then committed as one revision and published
+     * op by op. An update the agent sends is newer than the board it read, whatever clock it wrote.
+     */
+    suspend fun applyAgentOps(ops: List<CanvasOp>, actorId: String): CanvasDocument = mutex.withLock {
+        applyOpsLocked(CanvasStampedBatch.separately(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") }, isRemote = false)
     }
 
     /**

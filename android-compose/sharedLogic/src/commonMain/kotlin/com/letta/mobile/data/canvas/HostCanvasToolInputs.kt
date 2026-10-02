@@ -22,6 +22,12 @@ internal object HostCanvasToolInputs {
     /** The JSON-string fields of ops and tool inputs that a model may send as objects. */
     private val embeddedJson = setOf("sceneJson", "elementJson", "documentJson")
 
+    /**
+     * The object fields of ops that a model may send as JSON strings, as it sends elementJson
+     * (letta-mobile-s416w.5): set_plugin_element's and set_document's.
+     */
+    private val embeddedObjects = setOf("frame", "style", "props", "snapshot", "fallback", "meta")
+
     fun string(input: JsonObject, key: String): String? = (input[key] as? JsonPrimitive)?.contentOrNull
 
     /** `scene_json` as a string, whether it came as one or as the object itself. */
@@ -45,8 +51,13 @@ internal object HostCanvasToolInputs {
         return JsonObject(fields)
     }
 
-    private fun embedded(key: String, value: JsonElement): JsonElement =
-        if (key in embeddedJson && value is JsonObject) JsonPrimitive(value.toString()) else value
+    private fun embedded(key: String, value: JsonElement): JsonElement = when {
+        key in embeddedJson && value is JsonObject -> JsonPrimitive(value.toString())
+        key in embeddedObjects && value is JsonPrimitive && value.isString -> objectIn(value.content) ?: value
+        else -> value
+    }
+
+    private fun objectIn(text: String): JsonObject? = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull()
 
     private val IDENTITY_DEFAULTS: Map<String, JsonElement> = mapOf(
         "opId" to JsonPrimitive(""),
