@@ -137,12 +137,13 @@ repo="$TMP/mapping"
 new_repo "$repo"
 base="$(git -C "$repo" rev-parse HEAD)"
 mkdir -p "$repo/android-compose/feature-chat/src" "$repo/android-compose/designsystem/src" \
-  "$repo/android-compose/desktop/src" "$repo/android-compose/cli/src"
+  "$repo/android-compose/sharedUI/src" "$repo/android-compose/desktop/src" "$repo/android-compose/cli/src"
 touch "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/designsystem/src/Theme.kt" \
+  "$repo/android-compose/sharedUI/src/Surface.kt" \
   "$repo/android-compose/desktop/src/Main.kt" "$repo/android-compose/cli/src/Cli.kt"
 git -C "$repo" add . && git -C "$repo" commit -qm modules
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base")"
-assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :desktop:test :cli:testDebugUnitTest"
+assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :sharedUI:jvmTest :desktop:test :cli:testDebugUnitTest"
 
 # Stacked PR: designsystem landed on the lower branch; this commit only
 # touches app/. Diff vs the stack base must not schedule designsystem.

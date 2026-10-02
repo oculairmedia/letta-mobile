@@ -93,6 +93,8 @@ fun ConfigScreen(
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
                 onHapticsEnabledChange = { viewModel.updateHapticsEnabled(it) },
+                onSharedChatPageEnabledChange = { viewModel.updateSharedChatPageEnabled(it) },
+                onOpenChatsOnCanvasChange = { viewModel.updateOpenChatsOnCanvas(it) },
                 onLocalModelPathChange = { viewModel.updateLocalModelPath(it) },
                 onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
                 onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
@@ -160,6 +162,8 @@ private fun ConfigContent(
     onDynamicColorChange: (Boolean) -> Unit,
     onEnableProjectsChange: (Boolean) -> Unit,
     onHapticsEnabledChange: (Boolean) -> Unit,
+    onSharedChatPageEnabledChange: (Boolean) -> Unit,
+    onOpenChatsOnCanvasChange: (Boolean) -> Unit,
     onLocalModelPathChange: (String) -> Unit,
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
@@ -369,6 +373,28 @@ private fun ConfigContent(
                     )
                 },
             )
+            item(
+                headlineContent = { Text(stringResource(R.string.screen_config_shared_chat_page)) },
+                supportingContent = { Text(stringResource(R.string.screen_config_shared_chat_page_description)) },
+                trailingContent = {
+                    HapticSwitch(
+                        checked = state.sharedChatPageEnabled,
+                        onCheckedChange = onSharedChatPageEnabledChange,
+                    )
+                },
+            )
+            if (state.sharedChatPageEnabled) {
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas)) },
+                    supportingContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas_description)) },
+                    trailingContent = {
+                        HapticSwitch(
+                            checked = state.openChatsOnCanvas,
+                            onCheckedChange = onOpenChatsOnCanvasChange,
+                        )
+                    },
+                )
+            }
         }
 
         CardGroup(title = {

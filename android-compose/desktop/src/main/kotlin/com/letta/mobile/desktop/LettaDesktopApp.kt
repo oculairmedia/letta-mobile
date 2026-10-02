@@ -66,6 +66,12 @@ import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.letta.mobile.desktop.chat.DesktopChatController
+import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
+import com.letta.mobile.desktop.chat.DesktopDockedCanvasRouter
+import com.letta.mobile.desktop.chat.DesktopSharedChatPage
+import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
+import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
+import com.letta.mobile.desktop.chat.rememberDesktopChatSessionPort
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Duration.Companion.seconds
 import java.awt.Window
@@ -209,6 +215,8 @@ internal fun LettaDesktopApp(
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents
     var showBackgroundTasks by remember { mutableStateOf(false) }
+    // letta-mobile-bglj6.1: the docked chat's saved placement, read once per app session.
+    val chatDockGeometry = com.letta.mobile.desktop.chat.rememberDesktopChatDockGeometry()
     // Work | Play presentation lens over the same agents/memory/conversations.
     var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
     val libraries = rememberDesktopLibraryControllers(
@@ -309,6 +317,25 @@ internal fun LettaDesktopApp(
             action
         }
         sessionGraph.channelTransport.sendA2uiAction(resolvedAction)
+    }
+    // letta-mobile-bglj6.1: the shared KMP chat page's port, built only while the preview flag is on.
+    val sharedChatEnabled by LocalDesktopSharedChatPageFlag.current.enabled.collectAsState()
+    val sharedChatPort = if (sharedChatEnabled) {
+        rememberDesktopChatSessionPort(chatController, ::dispatchA2uiAction)
+    } else {
+        null
+    }
+    val dockedCanvasRouter = remember { DesktopDockedCanvasRouter() }
+    // Only while the shared page is on does the conversation's board live in its dock.
+    val dockedCanvas = dockedCanvasRouter.takeIf { sharedChatPort != null }
+    val showDockedCanvas: (() -> Unit)? = dockedCanvas?.let { router ->
+        {
+            selectedDestination = DesktopDestination.Conversations
+            router.showDocked()
+        }
+    }
+    val openCanvasById: (com.letta.mobile.data.canvas.CanvasId) -> Unit = { id ->
+        if (dockedCanvas != null && id == dockedCanvas.dockedCanvasId) showDockedCanvas?.invoke() else canvasShell.open(id)
     }
     LaunchedEffect(sessionGraph, chatState.connectionState) {
         runCatching {
@@ -745,7 +772,7 @@ internal fun LettaDesktopApp(
                             onDeleteConversation = chatController::deleteConversation,
                             onNewChat = ::openNewChatForFocusedAgent,
                             onEditAgent = { editAgentId = selectedAgentId },
-                            onOpenCanvas = canvasShell::open,
+                            onOpenCanvas = openCanvasById,
                             onNewCanvas = { canvasShell.createNew(selectedAgentId) },
                             onArchiveCanvas = canvasShell.library::setArchived,
                         ),
@@ -766,6 +793,7 @@ internal fun LettaDesktopApp(
                             onCreateAgent = { overlays.newAgent = true },
                             onEditAgent = { editAgentId = it },
                             onCanvasSessionChange = { canvasShell.activeSession = it },
+                            showDockedCanvas = showDockedCanvas,
                         ),
                     )
                     val contextUsage = rememberFocusedContextUsage(
@@ -774,6 +802,63 @@ internal fun LettaDesktopApp(
                         settled = !isThinkingSelected && !isStreamingReplySelected,
                         repository = dataBindings.sessionGraphProvider.current.agentRepository,
                     )
+                    val openConversationCanvas = showDockedCanvas ?: {
+                        canvasShell.openForConversation(
+                            DesktopCanvasOwner(chatState.selectedConversationId, selectedAgentId, selectedAgentName),
+                        )
+                    }
+                    val agentNamesById = remember(rosterAgents) { rosterAgents.associate { it.id.value to it.name } }
+                    val sharedChatPage: (@Composable (Modifier) -> Unit)? = sharedChatPort?.let { port ->
+                        { pageModifier ->
+                            DesktopSharedChatPage(
+                                state = DesktopSharedChatPageState(
+                                    port = port,
+                                    pagedTimeline = canonicalPresentation,
+                                    hostInputs = DesktopChatComposerHostInputs(
+                                        commands = composerCommands,
+                                        mentionables = mentionables,
+                                        contextUsage = contextUsage,
+                                        placeholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
+                                    ),
+                                    errorMessage = chatState.errorMessage,
+                                    canvasStore = canvasShell.store,
+                                    canvasOwner = DesktopCanvasOwner(
+                                        chatState.selectedConversationId,
+                                        selectedAgentId,
+                                        selectedAgentName,
+                                    ),
+                                    dockGeometry = chatDockGeometry,
+                                    canvasHeaderTrailing = if (!showBackgroundTasks && subagentRepository != null) {
+                                        {
+                                            com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle(
+                                                runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
+                                                onClick = { showBackgroundTasks = true },
+                                                inBar = true,
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    dockedCanvas = dockedCanvas,
+                                ),
+                                navigation = DesktopSharedChatPageNavigation(
+                                    openCanvas = { openConversationCanvas() },
+                                    openAgent = ::openAgent,
+                                    openModelPicker = { overlays.modelPicker = true },
+                                    // As on the old page: the companion mascot brings the agent pane
+                                    // back and leaves any editor; its pencil opens the editor.
+                                    openAgentPane = {
+                                        editAgentId = null
+                                        selectedDestination = DesktopDestination.Conversations
+                                        shellLayoutController.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
+                                    },
+                                    editAgent = { editAgentId = selectedAgentId },
+                                    agentNamesById = agentNamesById,
+                                ),
+                                modifier = pageModifier,
+                            )
+                        }
+                    }
                     DesktopMainContentPane(
                         inputs = DesktopMainContentInputs(
                             editingAgentId = editAgentId,
@@ -798,7 +883,7 @@ internal fun LettaDesktopApp(
                                     selectedAgentName,
                                 ),
                                 submittingApprovalRequestIds = submittingApprovals,
-                                agentNamesById = rosterAgents.associate { it.id.value to it.name },
+                                agentNamesById = agentNamesById,
                                 agentIdentitiesById = identityByAgentId,
                                 workingDirectory = selectedConversationWorkingDirectory,
                                 workingDirectorySupported = chatController.supportsWorkingDirectory,
@@ -835,6 +920,8 @@ internal fun LettaDesktopApp(
                             subagentRepository = subagentRepository,
                             activeSubagents = activeSubagents,
                             activeCanvasSession = canvasShell.activeSession,
+                            dockedCanvasId = dockedCanvas?.dockedCanvasId,
+                            sharedChatPage = sharedChatPage,
                         ),
                         actions = DesktopMainContentActions(
                             onEditAgentClose = { editAgentId = null },
@@ -856,11 +943,7 @@ internal fun LettaDesktopApp(
                                     canSubmitApprovals = canSubmitApprovals,
                                     onA2uiAction = ::dispatchA2uiAction,
                                     onAttachImage = { pickerLauncher.launch() },
-                                    onOpenCanvas = {
-                                        canvasShell.openForConversation(
-                                            DesktopCanvasOwner(chatState.selectedConversationId, selectedAgentId, selectedAgentName),
-                                        )
-                                    },
+                                    onOpenCanvas = { openConversationCanvas() },
                                     onOpenModelPicker = { overlays.modelPicker = true },
                                     onSetPersona = { editAgentId = selectedAgentId },
                                     onNavigateToChannels = { selectedDestination = DesktopDestination.Channels },
@@ -1049,7 +1132,7 @@ internal fun LettaDesktopApp(
                             DesktopUnifiedSearch.CONVERSATIONS -> selectConversationTab(id)
                             DesktopUnifiedSearch.AGENTS -> openAgent(id)
                             DesktopUnifiedSearch.CANVASES ->
-                                canvasShell.open(com.letta.mobile.data.canvas.CanvasId(id))
+                                openCanvasById(com.letta.mobile.data.canvas.CanvasId(id))
                         }
                     }
                 },

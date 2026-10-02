@@ -116,6 +116,8 @@ object DisclosureChevronDefaults {
  * @param indicates Destination role ([ChevronIndication.Expansion] animated rotation vs [ChevronIndication.Sheet] static).
  * @param compact When true, renders at [LettaDimens.Control.iconSm] (13dp); otherwise [LettaDimens.Control.icon] (18dp).
  * @param contentDescription Optional accessibility label override. When null, derived from state.
+ * @param opensUpward The content it discloses unfolds above it (a dock or chat folded down to the
+ * bottom of the screen): the glyph points up while collapsed and down while expanded.
  */
 @Composable
 fun DisclosureChevron(
@@ -126,6 +128,7 @@ fun DisclosureChevron(
     indicates: ChevronIndication = ChevronIndication.Expansion,
     compact: Boolean = false,
     contentDescription: String? = null,
+    opensUpward: Boolean = false,
 ) {
     val isSheet = indicates == ChevronIndication.Sheet
     val reducedMotion = LocalReducedMotion.current
@@ -139,7 +142,8 @@ fun DisclosureChevron(
         label = "disclosure_chevron_rotation",
     )
 
-    val rotation = if (isSheet) DisclosureChevronDefaults.RotationCollapsed else animatedRotation
+    val stateRotation = if (isSheet) DisclosureChevronDefaults.RotationCollapsed else animatedRotation
+    val rotation = if (opensUpward) stateRotation + DisclosureChevronDefaults.RotationExpanded else stateRotation
 
     val tint = DisclosureChevronDefaults.tint(
         enabled = enabled,

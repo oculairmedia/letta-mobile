@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.feature.chat.screen.shared.SharedChatPage
+import com.letta.mobile.feature.chat.screen.shared.SharedChatPageParams
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.ui.ambient.VisibleAssistantStreamPulseState
 import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
@@ -31,6 +33,9 @@ internal fun ChatScreen(
     onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onOpenAgentPane: (() -> Unit)? = null,
     onOpenCanvas: (() -> Unit)? = null,
+    onOpenAgentSwitcher: (() -> Unit)? = null,
+    /** The shared page's canvas mode wants the board's top clear: true while the host's header should hide. */
+    onHostHeaderHiddenChange: ((Boolean) -> Unit)? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
     selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel(),
@@ -42,6 +47,9 @@ internal fun ChatScreen(
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val activeFontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
+    val sharedChatPageEnabled by viewModel.sharedChatPageEnabled.collectAsStateWithLifecycle()
+    // Subscribed alongside the gate above so both come from the same settings snapshot.
+    val openChatsOnCanvas by viewModel.openChatsOnCanvas.collectAsStateWithLifecycle()
 
     val backgroundModifier = when (chatBackground) {
         is ChatBackground.Default -> Modifier
@@ -49,12 +57,13 @@ internal fun ChatScreen(
         is ChatBackground.Gradient -> Modifier.background(chatBackground.toBrush())
     }
 
-    val navigation = remember(onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas) {
+    val navigation = remember(onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher) {
         ChatScreenNavigationCallbacks(
             onBugCommand = onBugCommand,
             onViewSubagentConversation = onViewSubagentConversation,
             onOpenAgentPane = onOpenAgentPane,
             onOpenCanvas = onOpenCanvas,
+            onOpenAgentSwitcher = onOpenAgentSwitcher,
         )
     }
 
@@ -88,6 +97,7 @@ internal fun ChatScreen(
                 floatingBannerMessage = floatingBannerMessage,
                 onFloatingBannerMessageChange = { floatingBannerMessage = it },
                 ambient = ambient,
+                sharedChatPage = sharedChatPageEnabled,
             ),
         )
 
@@ -97,6 +107,42 @@ internal fun ChatScreen(
         // receives `bottomInsetDp` for navbar-clearance.
         // The composer's height, as the layout measures it, so the glow can stay above it.
         var composerHeight by remember { mutableStateOf(androidx.compose.ui.unit.Dp.Unspecified) }
+        if (committedFontScale != null && sharedChatPageEnabled) {
+            // letta-mobile-bglj6.1: the shared page draws the glow behind its own full-screen
+            // layer (it is opaque over the docked canvas), and its composer handles the IME.
+            SharedChatPage(
+                params = SharedChatPageParams(
+                    viewModel = viewModel,
+                    navigation = navigation,
+                    chatMode = chatMode,
+                    fontScale = committedFontScale,
+                    hapticsEnabled = hapticsEnabled,
+                    pagingPresentation = pagingPresentation,
+                    openOnCanvas = openChatsOnCanvas,
+                    subagents = com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs(
+                        source = resolvedSubagentSource,
+                        selfTodoSource = resolvedSelfTodoSource,
+                        barState = subagentBarState,
+                    ),
+                    pageBackground = { content ->
+                        AmbientShaderAgentBackground(
+                            agentStatus = ambient.status,
+                            streamActivityPulse = streamActivityPulse,
+                            composerHeight = { composerHeight },
+                            modifier = Modifier.fillMaxSize().then(backgroundModifier),
+                        ) { content() }
+                    },
+                    // The shared composer reports its height so the glow keeps clear of it.
+                    onComposerHeightChange = { composerHeight = it },
+                    // Edge to edge, as the legacy layout: the page draws under the status bar and the
+                    // floating header, and only rests its content (and the canvas's chrome) below them.
+                    topChromeInset = contentPadding.calculateTopPadding(),
+                    onHostHeaderHiddenChange = onHostHeaderHiddenChange,
+                ),
+                modifier = modifier.fillMaxSize(),
+            )
+            return@LettaChatTheme
+        }
         AmbientShaderAgentBackground(
             agentStatus = ambient.status,
             streamActivityPulse = streamActivityPulse,

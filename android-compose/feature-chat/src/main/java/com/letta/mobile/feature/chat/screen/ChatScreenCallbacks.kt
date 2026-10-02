@@ -14,6 +14,8 @@ internal data class ChatScreenNavigationCallbacks(
     /** Open the agent's pane (the scaffold drawer) - the composer companion mascot taps into it. */
     val onOpenAgentPane: (() -> Unit)? = null,
     val onOpenCanvas: (() -> Unit)? = null,
+    /** Open the agent switcher (the header's agent pill), from where the header is not shown. */
+    val onOpenAgentSwitcher: (() -> Unit)? = null,
 )
 
 internal data class ChatContentCallbacks(

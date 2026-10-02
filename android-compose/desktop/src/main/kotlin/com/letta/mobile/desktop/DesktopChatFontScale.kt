@@ -50,6 +50,13 @@ private const val FLOAT_EPSILON = 0.0001f
 val LocalDesktopChatFontScale = compositionLocalOf { DEFAULT_CHAT_FONT_SCALE }
 
 /**
+ * Sets the chat font scale from inside the host (the shared chat page's pinch/zoom reports through
+ * `ChatActions.setFontScale`). The value is clamped and snapped, then persisted like a Ctrl+scroll.
+ * Outside a [DesktopChatFontScaleHost] it does nothing.
+ */
+val LocalDesktopChatFontScaleSetter = compositionLocalOf<(Float) -> Unit> { {} }
+
+/**
  * Next chat font scale for one Ctrl+scroll gesture.
  *
  * [scrollDeltaY] follows Compose's sign convention: positive is a scroll
@@ -126,6 +133,7 @@ internal fun DesktopChatFontScaleHost(
         CompositionLocalProvider(
             LocalDensity provides scaledDensity,
             LocalDesktopChatFontScale provides scale,
+            LocalDesktopChatFontScaleSetter provides { requested -> scale = snapChatFontScale(requested) },
             com.letta.mobile.ui.canvas.LocalWheelZoomRegions provides wheelZoomRegions,
         ) {
             content()

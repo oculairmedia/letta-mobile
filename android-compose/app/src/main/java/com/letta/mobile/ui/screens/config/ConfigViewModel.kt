@@ -23,6 +23,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
 import com.letta.mobile.ui.state.RetainedContentRefresh
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +50,8 @@ data class ConfigUiState(
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
     val hapticsEnabled: Boolean = true,
+    val sharedChatPageEnabled: Boolean = false,
+    val openChatsOnCanvas: Boolean = true,
     val localModelPath: String = "",
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
@@ -147,6 +150,8 @@ class ConfigViewModel @Inject constructor(
                         dynamicColor = preferences.dynamicColor,
                         enableProjects = preferences.enableProjects,
                         hapticsEnabled = preferences.hapticsEnabled,
+                        sharedChatPageEnabled = preferences.sharedChatPageEnabled,
+                        openChatsOnCanvas = preferences.openChatsOnCanvas,
                         localModelPath = activeConfig.localModelPath.orEmpty(),
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
@@ -171,6 +176,8 @@ class ConfigViewModel @Inject constructor(
                         dynamicColor = preferences.dynamicColor,
                         enableProjects = preferences.enableProjects,
                         hapticsEnabled = preferences.hapticsEnabled,
+                        sharedChatPageEnabled = preferences.sharedChatPageEnabled,
+                        openChatsOnCanvas = preferences.openChatsOnCanvas,
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
@@ -180,6 +187,8 @@ class ConfigViewModel @Inject constructor(
                 if (RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) {
                     _uiState.value = UiState.Success(configUiState)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
                 when (
@@ -203,12 +212,16 @@ class ConfigViewModel @Inject constructor(
         val dynamicColor = async { settingsRepository.getDynamicColor().first() }
         val enableProjects = async { settingsRepository.getEnableProjects().first() }
         val hapticsEnabled = async { settingsRepository.getHapticsEnabled().first() }
+        val sharedChatPageEnabled = async { settingsRepository.getSharedChatPageEnabled().first() }
+        val openChatsOnCanvas = async { settingsRepository.getOpenChatsOnCanvas().first() }
         DisplayPreferences(
             theme = theme.await(),
             themePreset = themePreset.await(),
             dynamicColor = dynamicColor.await(),
             enableProjects = enableProjects.await(),
             hapticsEnabled = hapticsEnabled.await(),
+            sharedChatPageEnabled = sharedChatPageEnabled.await(),
+            openChatsOnCanvas = openChatsOnCanvas.await(),
         )
     }
 
@@ -218,6 +231,8 @@ class ConfigViewModel @Inject constructor(
         val dynamicColor: Boolean,
         val enableProjects: Boolean,
         val hapticsEnabled: Boolean,
+        val sharedChatPageEnabled: Boolean,
+        val openChatsOnCanvas: Boolean,
     )
 
     fun updateMode(mode: ServerMode) {
@@ -306,6 +321,22 @@ class ConfigViewModel @Inject constructor(
             viewModelScope.launch {
                 settingsRepository.setHapticsEnabled(enabled)
             }
+        }
+    }
+
+    fun updateSharedChatPageEnabled(enabled: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, sharedChatPageEnabled = enabled))
+        viewModelScope.launch {
+            settingsRepository.setSharedChatPageEnabled(enabled)
+        }
+    }
+
+    fun updateOpenChatsOnCanvas(enabled: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, openChatsOnCanvas = enabled))
+        viewModelScope.launch {
+            settingsRepository.setOpenChatsOnCanvas(enabled)
         }
     }
 
@@ -440,6 +471,8 @@ class ConfigViewModel @Inject constructor(
                 )
                 autoPersistLocalModelSelection()
                 onSuccess?.invoke(imported.fileName)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 val latest = (_uiState.value as? UiState.Success)?.data ?: state
                 _uiState.value = UiState.Success(latest.copy(isImportingLocalModel = false))
@@ -586,6 +619,8 @@ class ConfigViewModel @Inject constructor(
                     )
                 )
                 onSuccess()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _uiState.value = UiState.Success(state.copy(isSaving = false))
                 onError?.invoke(e.message ?: "Failed to save config")

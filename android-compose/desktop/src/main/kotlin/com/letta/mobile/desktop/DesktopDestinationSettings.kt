@@ -17,11 +17,14 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.data.desktopConfigIdFor
+import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import com.letta.mobile.ui.theme.LettaDimens
@@ -127,9 +131,7 @@ internal fun BackendSettingsCard(
     )
 
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-        ),
+        colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -278,9 +280,7 @@ private val LettaConfig.Mode.label: String
 @Composable
 internal fun StartupReadinessCard(featureReadiness: List<DesktopFeatureReadiness>) {
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-        ),
+        colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -393,3 +393,91 @@ internal fun StatusPill(
         )
     }
 }
+
+/** The translucent container every settings card on this destination shares. */
+@Composable
+private fun desktopSettingsCardColors() = CardDefaults.cardColors(
+    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
+)
+
+/**
+ * letta-mobile-bglj6.1: opt-in for the shared KMP chat page. When the launch forces it on
+ * (system property / env), the switch shows on and is locked, saying why.
+ */
+@Composable
+internal fun DesktopSharedChatPageSettingsCard(
+    flag: DesktopSharedChatPageFlag = LocalDesktopSharedChatPageFlag.current,
+    openOnCanvas: DesktopOpenChatsOnCanvas = LocalDesktopOpenChatsOnCanvas.current,
+) {
+    val persistedEnabled by flag.persistedEnabled.collectAsState()
+    val sharedPageEnabled by flag.enabled.collectAsState()
+    val scope = rememberCoroutineScope()
+    Card(
+        colors = desktopSettingsCardColors(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        ) {
+            Text("Chat", style = MaterialTheme.typography.titleLarge)
+            SharedChatPageToggleRow(
+                checked = persistedEnabled || flag.forcedByEnvironment,
+                enabled = !flag.forcedByEnvironment,
+                onCheckedChange = { enabled -> scope.launch { flag.setPersistedEnabled(enabled) } },
+            )
+            Text(
+                text = sharedChatPageSupportingText(flag.forcedByEnvironment),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (sharedPageEnabled) {
+                OpenChatsOnCanvasToggle(openOnCanvas)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SharedChatPageToggleRow(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Shared chat page (preview)", style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+    }
+}
+
+/** letta-mobile-bglj6.1: the canvas is the default view; full-screen chat is optional. */
+@Composable
+private fun OpenChatsOnCanvasToggle(preference: DesktopOpenChatsOnCanvas) {
+    val enabled by preference.enabled.collectAsState()
+    val scope = rememberCoroutineScope()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Open conversations on the canvas", style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = enabled, onCheckedChange = { checked -> scope.launch { preference.setEnabled(checked) } })
+    }
+    Text(
+        text = "Start each conversation on the canvas with the chat docked below. " +
+            "Turn off to open the traditional full-screen chat instead.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+private fun sharedChatPageSupportingText(forcedByEnvironment: Boolean): String =
+    if (forcedByEnvironment) {
+        "Turned on for this launch by $SHARED_CHAT_SYSTEM_PROPERTY or $SHARED_CHAT_ENV_VARIABLE."
+    } else {
+        "Renders conversations with the chat page shared with Android. Still in preview."
+    }

@@ -121,27 +121,19 @@ internal data class ChatDetailPaneActions(
     val queueControls: () -> com.letta.mobile.data.chat.send.ChatSendQueueControls? = { null },
 )
 
+/**
+ * Drives the ambient glow off the thinking state: a teal breath while the agent works, a brief
+ * "completed" settle afterward, error tint on failure. Shared by [ChatDetailPane] and the shared
+ * chat page host so both pages glow the same.
+ */
 @Composable
-internal fun ChatDetailPane(
-    state: ChatDetailPaneState,
-    actions: ChatDetailPaneActions,
-    modifier: Modifier = Modifier,
-) {
-    val surface = state.surface
-    val approvalHandler = actions.onSubmitApproval?.let { onDecision ->
-        DesktopApprovalDecisionHandler(
-            onDecision = onDecision,
-            submittingRequestIds = state.submittingApprovalRequestIds,
-        )
-    }
-    // Drive the ambient glow off the thinking state: a teal breath while the
-    // agent works, a brief "completed" settle afterward, error tint on failure.
+internal fun rememberDesktopAmbientStatus(isThinking: Boolean, errorMessage: String?): DesktopAmbientStatus {
     var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
     var hadActiveRun by remember { mutableStateOf(false) }
-    LaunchedEffect(state.isThinking, surface.errorMessage) {
+    LaunchedEffect(isThinking, errorMessage) {
         when {
-            surface.errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
-            state.isThinking -> {
+            errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
+            isThinking -> {
                 hadActiveRun = true
                 ambientStatus = DesktopAmbientStatus.Running
             }
@@ -158,6 +150,24 @@ internal fun ChatDetailPane(
             else -> ambientStatus = DesktopAmbientStatus.Idle
         }
     }
+    return ambientStatus
+}
+
+@Composable
+internal fun ChatDetailPane(
+    state: ChatDetailPaneState,
+    actions: ChatDetailPaneActions,
+    modifier: Modifier = Modifier,
+) {
+    val surface = state.surface
+    val approvalHandler = actions.onSubmitApproval?.let { onDecision ->
+        DesktopApprovalDecisionHandler(
+            onDecision = onDecision,
+            submittingRequestIds = state.submittingApprovalRequestIds,
+        )
+    }
+    // Thinking clears at the first reply; the reply stream runs on to the turn's terminal.
+    val ambientStatus = rememberDesktopAmbientStatus(state.isThinking || state.isStreamingReply, surface.errorMessage)
     // No pane edge drawn here. The boundary between this pane and whatever sits
     // to its left (rail, or sidebar when open) is already drawn by RailDivider,
     // and this stroke landed immediately beside it — two 1px lines a pixel

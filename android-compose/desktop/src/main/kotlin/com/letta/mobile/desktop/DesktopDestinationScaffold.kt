@@ -408,6 +408,7 @@ private fun LazyListScope.scrollableDestinationItems(
                     actions = settings.localBackendDirectory,
                 )
             }
+            item { DesktopSharedChatPageSettingsCard() }
             item {
                 DesktopRailSettingsCard(
                     recencyDays = inputs.railRecencyDays,
