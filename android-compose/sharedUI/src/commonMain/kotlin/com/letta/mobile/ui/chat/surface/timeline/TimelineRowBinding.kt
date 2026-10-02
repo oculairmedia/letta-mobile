@@ -43,14 +43,19 @@ internal class TimelineRowContexts(
 
     fun forItem(item: ChatRenderItem): ChatRowContext {
         val holdsNewest = newestMessageId != null && item.containsMessageId(newestMessageId)
-        val streamingId = streaming?.streamingMessageId
-        val holdsStreaming = streamingId != null && item.containsMessageId(streamingId)
-        return when {
-            holdsStreaming && holdsNewest -> streamingNewest ?: base
-            holdsStreaming -> streaming ?: base
-            holdsNewest -> newest ?: base
-            else -> base
+        val holdsStreaming = holdsStreaming(item)
+        val context = when {
+            holdsStreaming && holdsNewest -> streamingNewest
+            holdsStreaming -> streaming
+            holdsNewest -> newest
+            else -> null
         }
+        return context ?: base
+    }
+
+    private fun holdsStreaming(item: ChatRenderItem): Boolean {
+        val streamingId = streaming?.streamingMessageId ?: return false
+        return item.containsMessageId(streamingId)
     }
 }
 
