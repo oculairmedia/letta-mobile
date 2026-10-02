@@ -134,7 +134,10 @@ class ArchitectureBoundaryGateTest {
 
     @Test
     fun `the checked-in baseline is well formed and owned`() {
-        val baseline = ArchitectureBoundaryBaseline.read(File("../architecture-boundary-baseline.txt").canonicalFile)
+        val file = File("../architecture-tests/boundary-baseline.txt").canonicalFile
+        assertTrue(file.isFile, "missing $file")
+
+        val baseline = ArchitectureBoundaryBaseline.read(file)
 
         assertTrue(baseline.all { it.bead.startsWith("letta-mobile-") })
     }

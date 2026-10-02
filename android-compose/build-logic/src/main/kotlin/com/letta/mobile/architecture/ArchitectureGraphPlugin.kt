@@ -37,7 +37,7 @@ class ArchitectureGraphPlugin : Plugin<Project> {
             group = "verification"
             description = "Fails on module-boundary violations in the exported graph that the baseline does not name."
             graphFile.set(exportTask.flatMap { it.outputFile })
-            baselineFile.convention(project.layout.projectDirectory.file("architecture-boundary-baseline.txt"))
+            baselineFile.convention(project.layout.projectDirectory.file("architecture-tests/boundary-baseline.txt"))
             reportFile.convention(project.layout.buildDirectory.file("reports/architecture/boundaries.txt"))
         }
 

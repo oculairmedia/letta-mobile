@@ -27,7 +27,7 @@ class ArchitectureBoundaryCheckTaskTest {
         val failure = runner().buildAndFail()
         assertTrue(failure.output.contains("into-app :lib -> :app"), failure.output)
 
-        write("architecture-boundary-baseline.txt", "into-app :lib -> :app letta-mobile-fixture.1\n")
+        write("architecture-tests/boundary-baseline.txt", "into-app :lib -> :app letta-mobile-fixture.1\n")
         val success = runner().build()
         assertTrue(success.output.contains("Module-boundary gate: PASSED"), success.output)
     }

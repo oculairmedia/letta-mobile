@@ -168,7 +168,7 @@ jobs:
       # Architecture guardrails stay inside the required `test` job.
       # checkArchitectureBoundaries reads the exported module graph and fails on
       # edges into :app, feature->feature, shell->shell, library->feature and
-      # multiplatform->single-platform edges not in architecture-boundary-baseline.txt
+      # multiplatform->single-platform edges not in architecture-tests/boundary-baseline.txt
       # (letta-mobile-o4ygk.1). :build-logic:test proves each rule on synthetic graphs.
       - name: Run Android verification task graph
         env:
