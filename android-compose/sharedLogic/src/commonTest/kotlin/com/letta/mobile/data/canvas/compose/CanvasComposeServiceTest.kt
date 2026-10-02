@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class CanvasComposeServiceTest {
     private suspend fun ComposeBoard.compose(request: String, toolCallId: String? = "call-1"): ComposeOutcome =
         CanvasComposeService.compose(
-            ComposeJson.parse(request), ComposeBoard.CANVAS, sceneJson, revision, toolCallId,
+            ComposeJson.parse(request), ComposeTarget(ComposeBoard.CANVAS, sceneJson, revision, toolCallId),
             publish = { publish(it) },
         )
 
@@ -55,7 +55,7 @@ class CanvasComposeServiceTest {
         val receipt = assertIs<ComposeOutcome.Done>(
             CanvasComposeService.compose(
                 ComposeJson.parse("""{"dry_run":true,"artifact_id":"x","items":[{"kind":"NOTE","markdown":"x"}]}"""),
-                ComposeBoard.CANVAS, board.sceneJson, 9, null,
+                ComposeTarget(ComposeBoard.CANVAS, board.sceneJson, 9),
                 publish = { error("a dry run must not publish") },
             ),
         ).receipt
@@ -66,10 +66,10 @@ class CanvasComposeServiceTest {
 
     @Test
     fun aDryRunTheBoardWouldRefuseIsRefused() = runTest {
-        val board = ComposeBoard().apply { addBox("cmp-x-i0", 0f, 0f, 10f, 10f) }
+        val board = ComposeBoard().apply { addBox("cmp-x-i0", Slot(0f, 0f, 10f, 10f)) }
         val outcome = CanvasComposeService.compose(
             ComposeJson.parse("""{"dry_run":true,"artifact_id":"x","items":[{"kind":"TEXT","text":"t","size":"body"}]}"""),
-            ComposeBoard.CANVAS, board.sceneJson, board.revision, null,
+            ComposeTarget(ComposeBoard.CANVAS, board.sceneJson, board.revision),
             publish = { error("a dry run must not publish") },
         )
         assertEquals(ComposeErrorCode.BOARD_REFUSED, assertIs<ComposeOutcome.Refused>(outcome).refusal.code)
@@ -90,7 +90,7 @@ class CanvasComposeServiceTest {
     @Test
     fun aBoardRefusalNamesTheItemWhoseOpBrokeTheRuleAndTheRule() = runTest {
         // Someone already drew an element under the id the heading would take.
-        val board = ComposeBoard().apply { addBox("cmp-weekend-plan-heading", 2000f, 2000f, 2100f, 2100f) }
+        val board = ComposeBoard().apply { addBox("cmp-weekend-plan-heading", Slot(2000f, 2000f, 100f, 100f)) }
         val before = board.sceneJson
         val published = board.published.size
         val refusal = assertIs<ComposeOutcome.Refused>(board.compose(WEEKEND_PLAN)).refusal
@@ -107,8 +107,8 @@ class CanvasComposeServiceTest {
     @Test
     fun aCorruptedCompileIsRefusedByTheBatchValidatorAndNothingIsPublished() = runTest {
         val board = ComposeBoard()
-        val outcome = CanvasComposeService.compose(
-            ComposeJson.parse(WEEKEND_PLAN), ComposeBoard.CANVAS, board.sceneJson, 0, null,
+        val outcome = ComposeRun(
+            ComposeTarget(ComposeBoard.CANVAS, board.sceneJson, 0),
             check = { CanvasBatchValidator.check(board.sceneJson, it) },
             publish = { board.publish(it) },
         ) { input, scene, fallback ->
@@ -119,7 +119,7 @@ class CanvasComposeServiceTest {
                     if (op is CanvasOp.SetDocumentOp && op.documentId == "cmp-weekend-plan-meals") op.copy(documentJson = """{"type":"doc"}""") else op
                 },
             )
-        }
+        }.run(ComposeJson.parse(WEEKEND_PLAN))
         val refusal = assertIs<ComposeOutcome.Refused>(outcome).refusal
         assertEquals(ComposeErrorCode.BOARD_REFUSED, refusal.code)
         assertEquals(listOf("/items/2" to CanvasStateInvariant.DOCUMENT_DECODES.wire), refusal.problems.map { it.path to it.code })
@@ -139,7 +139,7 @@ class CanvasComposeServiceTest {
     fun aPublishThatFailsIsARefusal() = runTest {
         val board = ComposeBoard()
         val failed = CanvasComposeService.compose(
-            ComposeJson.parse(WEEKEND_PLAN), ComposeBoard.CANVAS, "", 0, null,
+            ComposeJson.parse(WEEKEND_PLAN), ComposeTarget(ComposeBoard.CANVAS, "", 0),
             publish = { throw IllegalStateException("relay gone") },
         )
         val refusal = assertIs<ComposeOutcome.Refused>(failed).refusal
@@ -148,7 +148,7 @@ class CanvasComposeServiceTest {
         assertTrue("relay gone" in refusal.problems.single().message)
 
         val denied = CanvasComposeService.compose(
-            ComposeJson.parse(WEEKEND_PLAN), ComposeBoard.CANVAS, "", 0, null,
+            ComposeJson.parse(WEEKEND_PLAN), ComposeTarget(ComposeBoard.CANVAS, "", 0),
             publish = { throw ComposePublishException(ComposeErrorCode.UNAUTHORIZED, "actor cannot write") },
         )
         assertEquals(ComposeErrorCode.UNAUTHORIZED, assertIs<ComposeOutcome.Refused>(denied).refusal.code)
@@ -159,7 +159,7 @@ class CanvasComposeServiceTest {
     fun cancellationIsNotARefusal() = runTest {
         assertFailsWith<CancellationException> {
             CanvasComposeService.compose(
-                ComposeJson.parse(WEEKEND_PLAN), ComposeBoard.CANVAS, "", 0, null,
+                ComposeJson.parse(WEEKEND_PLAN), ComposeTarget(ComposeBoard.CANVAS, "", 0),
                 publish = { throw CancellationException("cancelled") },
             )
         }

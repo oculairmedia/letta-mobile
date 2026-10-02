@@ -44,7 +44,7 @@ class CanvasComposeCompiledGoldenTest {
     @Test
     fun theDryRunFixtureAnswersTheGoldenReceipt() = runTest {
         val outcome = CanvasComposeService.compose(
-            fixture("request-dry-run.json"), "canvas-conversation-conv-123", "", 7, "call-1",
+            fixture("request-dry-run.json"), ComposeTarget("canvas-conversation-conv-123", "", 7, "call-1"),
             publish = { error("a dry run must not publish") },
         )
         val done = assertIs<ComposeOutcome.Done>(outcome)

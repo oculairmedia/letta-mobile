@@ -8,6 +8,7 @@ import com.letta.mobile.data.canvas.compose.CanvasComposeService
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposeProblemCode
 import com.letta.mobile.data.canvas.compose.ComposeStatus
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import kotlinx.coroutines.flow.Flow
@@ -67,7 +68,7 @@ class CanvasComposeToolTest {
     ).also(sessions::register)
 
     private suspend fun compose(request: String, agent: String? = AGENT, conversation: String? = CONVERSATION, toolCallId: String? = "call-1") =
-        registry.invoke(CanvasToolContract.COMPOSE, Json.parseToJsonElement(request).jsonObject, agent, conversation, toolCallId)
+        registry.invoke(CanvasToolContract.COMPOSE, Json.parseToJsonElement(request).jsonObject, ExternalToolCaller(agent, conversation, toolCallId))
 
     private suspend fun revision(): Long = Json { ignoreUnknownKeys = true }.decodeFromString<CanvasGetSceneResult>(
         assertIs<ExternalToolResult.Success>(

@@ -23,6 +23,18 @@ sealed interface ComposeOutcome {
 }
 
 /**
+ * The canvas a compose call lands on: its id, the scene it is composed against (at
+ * [sceneRevision], when the host knows it), and the tool call that asked ([toolCallId], which
+ * names the artifact when the request does not).
+ */
+data class ComposeTarget(
+    val canvasId: String,
+    val sceneJson: String,
+    val sceneRevision: Long? = null,
+    val toolCallId: String? = null,
+)
+
+/**
  * What a publisher throws to say why the board would not take the batch in the contract's own
  * terms ([ComposeErrorCode.UNAUTHORIZED], [ComposeErrorCode.CANVAS_NOT_FOUND], ...). Any other
  * failure is answered as [ComposeErrorCode.BOARD_REFUSED].
@@ -50,58 +62,18 @@ object CanvasComposeService {
     const val ALREADY_PUBLISHED_WARNING = "This artifact was already on the board with this content; nothing was published again."
 
     /**
-     * [input] (the tool's arguments) composed onto the canvas [canvasId], whose scene is [sceneJson]
-     * at [sceneRevision]. [toolCallId] names the artifact when the request does not
-     * ([CanvasComposeIds.derived]). [check] is the batch validator against [sceneJson] unless the
-     * host checks against its own copy; [publish] writes the checked ops through the host's op log
-     * (stamping their identity) and returns the revision they landed at.
+     * [input] (the tool's arguments) composed onto the canvas of [target]. Its tool call id names
+     * the artifact when the request does not ([CanvasComposeIds.derived]). [check] is the batch
+     * validator against the target's scene unless the host checks against its own copy; [publish]
+     * writes the checked ops through the host's op log (stamping their identity) and returns the
+     * revision they landed at.
      */
     suspend fun compose(
         input: JsonElement,
-        canvasId: String,
-        sceneJson: String,
-        sceneRevision: Long? = null,
-        toolCallId: String? = null,
-        check: (List<CanvasOp>) -> CanvasBatchCheck = { CanvasBatchValidator.check(sceneJson, it) },
+        target: ComposeTarget,
+        check: (List<CanvasOp>) -> CanvasBatchCheck = { CanvasBatchValidator.check(target.sceneJson, it) },
         publish: suspend (List<CanvasOp>) -> Long,
-    ): ComposeOutcome = compose(input, canvasId, sceneJson, sceneRevision, toolCallId, check, publish) { request, scene, fallback ->
-        CanvasComposeCompiler.compile(request, scene, fallback)
-    }
-
-    /** [compose] with the compile step replaceable, so a test can corrupt what the compiler emits. */
-    internal suspend fun compose(
-        input: JsonElement,
-        canvasId: String,
-        sceneJson: String,
-        sceneRevision: Long?,
-        toolCallId: String?,
-        check: (List<CanvasOp>) -> CanvasBatchCheck,
-        publish: suspend (List<CanvasOp>) -> Long,
-        compile: (JsonElement, String, () -> String) -> ComposeCompilation,
-    ): ComposeOutcome {
-        val ready = when (val compiled = compile(input, sceneJson) { CanvasComposeIds.derived(toolCallId) }) {
-            is ComposeCompilation.Refused -> return ComposeOutcome.Refused(compiled.refusal)
-            is ComposeCompilation.Ready -> compiled
-        }
-        if (ready.alreadyPublished) {
-            return ComposeOutcome.Done(ready.receipt(canvasId, ComposeStatus.PUBLISHED, sceneRevision, listOf(ALREADY_PUBLISHED_WARNING)))
-        }
-        val valid = when (val checked = check(ready.ops)) {
-            is CanvasBatchCheck.Invalid -> return ComposeOutcome.Refused(boardRefusal(checked.violations, ready.itemPaths))
-            is CanvasBatchCheck.Valid -> checked
-        }
-        if (ready.dryRun) return ComposeOutcome.Done(ready.receipt(canvasId, ComposeStatus.DRY_RUN, revision = null))
-        val revision = try {
-            publish(valid.ops)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: ComposePublishException) {
-            return ComposeOutcome.Refused(publishRefusal(e.code, e.message, ready, canvasId))
-        } catch (e: Exception) {
-            return ComposeOutcome.Refused(publishRefusal(ComposeErrorCode.BOARD_REFUSED, e.message ?: e::class.simpleName, ready, canvasId))
-        }
-        return ComposeOutcome.Done(ready.receipt(canvasId, ComposeStatus.PUBLISHED, revision))
-    }
+    ): ComposeOutcome = ComposeRun(target, check, publish).run(input)
 
     /**
      * The board's violations as problems: each at the item whose op it was blamed on (`2` or `2.0`
@@ -119,15 +91,59 @@ object CanvasComposeService {
                 )
             },
         )
+}
 
-    private fun publishRefusal(code: ComposeErrorCode, message: String?, ready: ComposeCompilation.Ready, canvasId: String): ComposeRefusal {
+/**
+ * One [CanvasComposeService.compose] call: compile, check, publish, answer. [compile] is
+ * replaceable so a test can corrupt what the compiler emits.
+ */
+internal class ComposeRun(
+    private val target: ComposeTarget,
+    private val check: (List<CanvasOp>) -> CanvasBatchCheck,
+    private val publish: suspend (List<CanvasOp>) -> Long,
+    private val compile: (JsonElement, String, () -> String) -> ComposeCompilation = { request, scene, fallback ->
+        CanvasComposeCompiler.compile(request, scene, fallback)
+    },
+) {
+    suspend fun run(input: JsonElement): ComposeOutcome {
+        val ready = when (val compiled = compile(input, target.sceneJson) { CanvasComposeIds.derived(target.toolCallId) }) {
+            is ComposeCompilation.Refused -> return ComposeOutcome.Refused(compiled.refusal)
+            is ComposeCompilation.Ready -> compiled
+        }
+        if (ready.alreadyPublished) {
+            val warnings = listOf(CanvasComposeService.ALREADY_PUBLISHED_WARNING)
+            return ComposeOutcome.Done(ready.receipt(target.canvasId, ComposeStatus.PUBLISHED, target.sceneRevision, warnings))
+        }
+        val valid = when (val checked = check(ready.ops)) {
+            is CanvasBatchCheck.Invalid -> return ComposeOutcome.Refused(CanvasComposeService.boardRefusal(checked.violations, ready.itemPaths))
+            is CanvasBatchCheck.Valid -> checked
+        }
+        if (ready.dryRun) return ComposeOutcome.Done(ready.receipt(target.canvasId, ComposeStatus.DRY_RUN, revision = null))
+        return published(ready, valid.ops)
+    }
+
+    /** The checked [ops] published, answered with the receipt at the revision they landed at. */
+    private suspend fun published(ready: ComposeCompilation.Ready, ops: List<CanvasOp>): ComposeOutcome {
+        val revision = try {
+            publish(ops)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ComposePublishException) {
+            return ComposeOutcome.Refused(publishRefusal(ready, e.code, e.message))
+        } catch (e: Exception) {
+            return ComposeOutcome.Refused(publishRefusal(ready, ComposeErrorCode.BOARD_REFUSED, e.message ?: e::class.simpleName))
+        }
+        return ComposeOutcome.Done(ready.receipt(target.canvasId, ComposeStatus.PUBLISHED, revision))
+    }
+
+    private fun publishRefusal(ready: ComposeCompilation.Ready, code: ComposeErrorCode, message: String?): ComposeRefusal {
         // Loud: the batch passed every rule and the board still did not take it.
         Telemetry.event(
-            TAG, "publish.failed",
-            "canvasId" to canvasId, "artifactId" to ready.artifactId, "ops" to ready.ops.size, "code" to code.name, "reason" to message,
+            CanvasComposeService.TAG, "publish.failed",
+            "canvasId" to target.canvasId, "artifactId" to ready.artifactId, "ops" to ready.ops.size, "code" to code.name, "reason" to message,
             level = Telemetry.Level.WARN,
         )
-        val problemCode = if (code == ComposeErrorCode.BOARD_REFUSED) PUBLISH_FAILED else code.name
+        val problemCode = if (code == ComposeErrorCode.BOARD_REFUSED) CanvasComposeService.PUBLISH_FAILED else code.name
         return CanvasComposeContract.refusal(
             code,
             listOf(ComposeProblem("", problemCode, "the board did not take the artifact: ${message ?: "no reason given"}")),

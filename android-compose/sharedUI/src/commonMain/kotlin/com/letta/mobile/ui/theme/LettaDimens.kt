@@ -155,6 +155,16 @@ object LettaDimens {
 
         /** Widest a notice banner over content (a board's storage fault) grows: a readable line. */
         val noticeMaxWidth: Dp = 560.dp
+
+        /** A centred desktop modal (model picker, Models sheet): its width and tallest height. */
+        val modalWidth: Dp = 520.dp
+        val modalMaxHeight: Dp = 600.dp
+
+        /** A settings page's left navigation column on wide windows. */
+        val navWidth: Dp = 220.dp
+
+        /** Readable width of a settings page's content column. */
+        val contentMaxWidth: Dp = 760.dp
     }
 
     /**

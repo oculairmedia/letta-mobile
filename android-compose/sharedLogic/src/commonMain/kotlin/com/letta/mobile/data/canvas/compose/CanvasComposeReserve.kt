@@ -1,12 +1,21 @@
 package com.letta.mobile.data.canvas.compose
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.BLOCK_GAP
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.BODY_FONT
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.CHROME_HANDLE
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.CHROME_PADDING
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.CODE_FONT
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.CODE_PADDING
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.DIVIDER_HEIGHT
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.HEADING_FONTS
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.HORIZONTAL_PADDING
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.INDENT
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.LINE_HEIGHT_EM
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.MARKER_WIDTH
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.MAX_RESERVE
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.MIN_RESERVE
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.QUOTE_INSET
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.SAFETY_FACTOR
 import kotlin.math.ceil
 
 /**
@@ -21,10 +30,10 @@ import kotlin.math.ceil
  * and every target books the same number.
  *
  * Why it is an overestimate:
- * - Every character is booked at a WORST-CASE advance for its class ([advanceEm]): 0.6 em for
+ * - Every character is booked at a WORST-CASE advance for its class ([WorstCaseWrap]): 0.6 em for
  *   ordinary text, 0.75 em for capitals, 0.9 em for the widest Latin glyphs, 1.2 em for wide
  *   (CJK, emoji) characters, 0.65 em for monospace code.
- * - Lines are counted by greedy WORD wrap ([lineCount]), which is never fewer than the characters
+ * - Lines are counted by greedy WORD wrap ([WorstCaseWrap.lines]), which is never fewer than the characters
  *   divided by the line: a word that does not fit starts a new line, a word longer than a line is
  *   broken across lines.
  * - A line is booked at 1.5 x the font size (Compose sets about 1.2), each block gets 8 more, the
@@ -88,7 +97,14 @@ object CanvasComposeReserve {
     const val ADVANCE_EM = 0.6
     const val MONO_ADVANCE_EM = 0.65
 
-    private val json = Json { ignoreUnknownKeys = true }
+    /** Wide characters (CJK, fullwidth forms, emoji) in em. */
+    const val WIDE_ADVANCE_EM = 1.2
+
+    /** A capital letter in em (round capitals such as O, Q, G run near 0.7 in common sans faces). */
+    const val CAPITAL_ADVANCE_EM = 0.75
+
+    /** The widest Latin glyphs in em. */
+    const val BROAD_ADVANCE_EM = 0.9
 
     /**
      * The height to book for a NOTE, CHECKLIST or CARD document of [blocks] at [width] (the kind's
@@ -96,12 +112,12 @@ object CanvasComposeReserve {
      */
     fun reserve(kind: ComposeKind, blocks: List<ReserveBlock>, width: Float = CanvasComposeContract.width(kind), fontScale: Float = 1f): Float {
         require(kind != ComposeKind.TEXT && kind != ComposeKind.GROUP) { "$kind is not a note; use reserveText or the group's children" }
-        return documentReserve(blocks, width.toDouble(), fontScale.toDouble())
+        return ReserveColumn(width.toDouble(), fontScale.toDouble()).reserve(blocks)
     }
 
     /** [reserve] of a stored Cascade v2 document (`{"version":2,"blocks":[...]}`), the form every note is kept in. */
     fun reserveDocument(documentJson: String, width: Float = CanvasComposeContract.NOTE_WIDTH, fontScale: Float = 1f): Float =
-        documentReserve(blocksOf(documentJson), width.toDouble(), fontScale.toDouble())
+        ReserveColumn(width.toDouble(), fontScale.toDouble()).reserve(blocksOf(documentJson))
 
     /**
      * The height to book for a TEXT element: its lines at [wrapWidth] (the DrawBox `wrapWidth`)
@@ -109,64 +125,37 @@ object CanvasComposeReserve {
      */
     fun reserveText(text: String, size: ComposeTextSize, wrapWidth: Float = CanvasComposeContract.width(ComposeKind.TEXT, size)): Float {
         val font = textFont(size)
-        val lines = lineCount(text, wrapWidth.toDouble(), font, mono = false)
+        val lines = WorstCaseWrap(wrapWidth.toDouble(), font).lines(text)
         val raw = lines * LINE_HEIGHT_EM * font * SAFETY_FACTOR
         return ceil(raw).coerceAtMost(MAX_RESERVE.toDouble()).toFloat()
     }
 
     fun textFont(size: ComposeTextSize): Double = if (size == ComposeTextSize.HEADING) TEXT_HEADING_FONT else TEXT_BODY_FONT
 
-    /**
-     * The blocks of a Cascade v2 document, depth-first. A block's depth is its
-     * `attributes.indentationLevel` (how cascade-editor 1.9.2 and [CanvasCascadeBlocks] store a
-     * nested list item: a flat list, the child carrying the level) plus how deep it sits in nested
-     * `children`; each level takes one [INDENT] off the line, as the editor indents it. Reads only
-     * `type.typeId`, `type.level`, `attributes.indentationLevel` and `content.text`, so a newer
-     * document still yields its blocks; a block of a type it does not know is booked as a
-     * paragraph, unreadable input as none.
-     */
-    fun blocksOf(documentJson: String): List<ReserveBlock> {
-        if (documentJson.isBlank()) return emptyList()
-        val root = runCatching { json.parseToJsonElement(documentJson) }.getOrNull() as? JsonObject ?: return emptyList()
-        val out = mutableListOf<ReserveBlock>()
-        collect(root["blocks"], depth = 0, into = out)
-        return out
-    }
+    /** The blocks of a Cascade v2 document, as [ReserveDocument.blocksOf] reads them. */
+    fun blocksOf(documentJson: String): List<ReserveBlock> = ReserveDocument.blocksOf(documentJson)
+}
 
-    private fun collect(blocks: JsonElement?, depth: Int, into: MutableList<ReserveBlock>) {
-        (blocks as? JsonArray)?.forEach { element ->
-            val block = element as? JsonObject ?: return@forEach
-            val type = block["type"] as? JsonObject
-            val typeId = (type?.get("typeId") as? JsonPrimitive)?.contentOrNull
-            val level = ReserveBlockType.headingLevel(typeId) ?: (type?.get("level") as? JsonPrimitive)?.intOrNull ?: 1
-            val text = ((block["content"] as? JsonObject)?.get("text") as? JsonPrimitive)?.contentOrNull.orEmpty()
-            into += ReserveBlock(ReserveBlockType.of(typeId), text, level, depth + indentationOf(block))
-            collect(block["children"], depth + 1, into)
-        }
-    }
-
-    /** A block's `attributes.indentationLevel`, 0 when absent or unreadable. */
-    private fun indentationOf(block: JsonObject): Int {
-        val value = (block[CanvasCascadeBlocks.KEY_ATTRIBUTES] as? JsonObject)?.get(CanvasCascadeBlocks.KEY_INDENTATION_LEVEL) as? JsonPrimitive
-        return (value?.intOrNull ?: value?.contentOrNull?.toIntOrNull() ?: 0).coerceIn(0, MAX_INDENTATION)
-    }
-
-    /** Deeper than this is not an indentation any editor draws; it only stops a hostile value booking nothing. */
-    private const val MAX_INDENTATION = 16
-
-    private fun documentReserve(blocks: List<ReserveBlock>, width: Double, fontScale: Double): Float {
-        val body = blocks.sumOf { blockHeight(it, width, fontScale) }
+/**
+ * A note card's column, [width] world units wide with its type scaled by [fontScale]: the height
+ * [CanvasComposeReserve] books for blocks set in it.
+ */
+class ReserveColumn(private val width: Double, private val fontScale: Double = 1.0) {
+    /** The whole card: chrome and blocks, times the safety factor, clamped to the reserve range. */
+    fun reserve(blocks: List<ReserveBlock>): Float {
+        val body = blocks.sumOf(::blockHeight)
         val raw = (CHROME_HANDLE + CHROME_PADDING + body) * SAFETY_FACTOR
         return ceil(raw).coerceIn(MIN_RESERVE.toDouble(), MAX_RESERVE.toDouble()).toFloat()
     }
 
     /** One block's booked height: its wrapped lines at its font, plus the block gap. */
-    fun blockHeight(block: ReserveBlock, width: Double, fontScale: Double = 1.0): Double {
+    fun blockHeight(block: ReserveBlock): Double {
         if (block.type == ReserveBlockType.DIVIDER) return DIVIDER_HEIGHT + BLOCK_GAP
         val font = fontOf(block) * fontScale
         val inner = width - 2 * HORIZONTAL_PADDING - block.depth * INDENT - insetOf(block.type)
-        val lines = lineCount(block.text, inner, font, mono = block.type == ReserveBlockType.CODE)
-        val extra = if (block.type == ReserveBlockType.CODE) CODE_PADDING else 0.0
+        val code = block.type == ReserveBlockType.CODE
+        val lines = WorstCaseWrap(inner, font, mono = code).lines(block.text)
+        val extra = if (code) CODE_PADDING else 0.0
         return lines * LINE_HEIGHT_EM * font + BLOCK_GAP + extra
     }
 
@@ -180,152 +169,5 @@ object CanvasComposeReserve {
         ReserveBlockType.BULLET, ReserveBlockType.NUMBERED, ReserveBlockType.TODO -> MARKER_WIDTH
         ReserveBlockType.QUOTE -> QUOTE_INSET
         else -> 0.0
-    }
-
-    /**
-     * Lines [text] takes at [width] world units in a [font] of that size: hard line breaks kept,
-     * greedy word wrap at spaces, a word longer than a line broken across lines, every character
-     * at its worst-case advance. Empty text is one line (an empty block still takes a line).
-     */
-    fun lineCount(text: String, width: Double, font: Double, mono: Boolean): Int {
-        // A box narrower than a glyph still sets one glyph a line (hardLineCount breaks before every one).
-        val capacity = maxOf(width / font, 0.0)
-        var lines = 0
-        text.split('\n').forEach { hard ->
-            lines += hardLineCount(hard, capacity, mono)
-        }
-        return maxOf(lines, 1)
-    }
-
-    /** Lines of one hard line, widths in em; [capacity] is the line's width in em. */
-    private fun hardLineCount(line: String, capacity: Double, mono: Boolean): Int {
-        val space = if (mono) MONO_ADVANCE_EM else ADVANCE_EM
-        var lines = 1
-        var used = 0.0
-        line.split(' ').forEachIndexed { i, word ->
-            val advances = advancesOf(word, mono)
-            val wordWidth = advances.sum()
-            val lead = if (i == 0 || used == 0.0) 0.0 else space
-            when {
-                used + lead + wordWidth <= capacity -> used += lead + wordWidth
-                wordWidth <= capacity -> {
-                    lines++
-                    used = wordWidth
-                }
-                else -> {
-                    // Too long for any line: it starts on a fresh line and breaks between characters.
-                    if (used > 0.0) lines++
-                    used = 0.0
-                    advances.forEach { advance ->
-                        if (used + advance > capacity && used > 0.0) {
-                            lines++
-                            used = 0.0
-                        }
-                        used += advance
-                    }
-                }
-            }
-        }
-        return lines
-    }
-
-    private fun advancesOf(word: String, mono: Boolean): List<Double> {
-        val out = ArrayList<Double>(word.length)
-        var i = 0
-        while (i < word.length) {
-            val c = word[i]
-            if (c.isHighSurrogate() && i + 1 < word.length && word[i + 1].isLowSurrogate()) {
-                // An emoji or a supplementary-plane ideograph: one wide glyph.
-                out += WIDE_ADVANCE_EM
-                i += 2
-                continue
-            }
-            out += advanceEm(c, mono)
-            i++
-        }
-        return out
-    }
-
-    /** Wide characters (CJK, fullwidth forms, emoji) in em. */
-    const val WIDE_ADVANCE_EM = 1.2
-
-    /** A capital letter in em (round capitals such as O, Q, G run near 0.7 in common sans faces). */
-    const val CAPITAL_ADVANCE_EM = 0.75
-
-    /** The widest Latin glyphs in em. */
-    const val BROAD_ADVANCE_EM = 0.9
-
-    private const val BROAD = "MWmw@%"
-
-    /** The worst-case advance booked for [c], in em. */
-    fun advanceEm(c: Char, mono: Boolean): Double = when {
-        isWide(c) -> WIDE_ADVANCE_EM
-        mono -> MONO_ADVANCE_EM
-        c in BROAD -> BROAD_ADVANCE_EM
-        c.isUpperCase() -> CAPITAL_ADVANCE_EM
-        else -> ADVANCE_EM
-    }
-
-    private fun isWide(c: Char): Boolean {
-        val code = c.code
-        return code in 0x1100..0x115F ||
-            code in 0x2E80..0xA4CF ||
-            code in 0xAC00..0xD7A3 ||
-            code in 0xF900..0xFAFF ||
-            code in 0xFE30..0xFE4F ||
-            code in 0xFF00..0xFF60 ||
-            code in 0xFFE0..0xFFE6 ||
-            code in 0x2600..0x27BF
-    }
-
-}
-
-/** What the estimator needs of one block: its type, its words, its heading level and nesting depth. */
-data class ReserveBlock(
-    val type: ReserveBlockType,
-    val text: String,
-    val level: Int = 1,
-    val depth: Int = 0,
-)
-
-/** The Cascade block types the estimator tells apart (plan section 3.2). */
-enum class ReserveBlockType {
-    PARAGRAPH,
-    HEADING,
-    BULLET,
-    NUMBERED,
-    TODO,
-    QUOTE,
-    CODE,
-    DIVIDER,
-    ;
-
-    companion object {
-        private const val HEADING_PREFIX = "heading_"
-
-        /**
-         * The level of a cascade-editor heading `typeId`, which carries it (`heading_1` .. `heading_6`,
-         * as `BlockTypeCodec` 1.9.2 writes `BlockType.Heading(level)`); null for anything else.
-         */
-        fun headingLevel(typeId: String?): Int? =
-            typeId?.takeIf { it.startsWith(HEADING_PREFIX) }?.removePrefix(HEADING_PREFIX)?.toIntOrNull()
-
-        /** The type of a Cascade `typeId`; anything unknown is booked as a paragraph. */
-        fun of(typeId: String?): ReserveBlockType = when {
-            headingLevel(typeId) != null -> HEADING
-            else -> ofPlain(typeId)
-        }
-
-        private fun ofPlain(typeId: String?): ReserveBlockType = when (typeId) {
-            // A bare "heading" with a separate level is not what the library writes; read as one anyway.
-            "heading" -> HEADING
-            "bullet_list" -> BULLET
-            "numbered_list" -> NUMBERED
-            "todo" -> TODO
-            "quote" -> QUOTE
-            "code" -> CODE
-            "divider" -> DIVIDER
-            else -> PARAGRAPH
-        }
     }
 }

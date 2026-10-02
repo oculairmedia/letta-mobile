@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
@@ -192,11 +193,13 @@ internal class ExternalToolDispatcher(
                     externalToolRegistry.invoke(
                         toolName = request.toolName,
                         input = request.input,
-                        agentId = request.runtime?.agentId,
-                        conversationId = request.runtime?.conversationId,
-                        // letta-mobile-bglj6.12: the model's tool call id, the key the
-                        // timeline files this call's return under (canvas_compose's receipt).
-                        toolCallId = request.toolCallId,
+                        caller = ExternalToolCaller(
+                            agentId = request.runtime?.agentId,
+                            conversationId = request.runtime?.conversationId,
+                            // letta-mobile-bglj6.12: the model's tool call id, the key the
+                            // timeline files this call's return under (canvas_compose's receipt).
+                            toolCallId = request.toolCallId,
+                        ),
                     )
                 } ?: run {
                     Telemetry.event(

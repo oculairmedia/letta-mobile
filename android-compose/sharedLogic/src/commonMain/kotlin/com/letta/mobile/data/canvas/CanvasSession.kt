@@ -308,23 +308,27 @@ class CanvasSession(
         color: String? = null,
         style: CanvasTextStyle? = null,
         title: String? = null,
-        owner: CanvasGeometryOwner? = null,
-        compose: CanvasComposeProvenance? = null,
-    ): CanvasDocument? {
+    ): CanvasDocument? = writeDocument(CanvasDocumentWrite(documentId, documentJson, frame, color, style, title, actorId = actorId))
+
+    /**
+     * Writes a block document (Cascade JSON) as a local op, as [write] says (its frame, owner and
+     * compose provenance among the rest, letta-mobile-bglj6.7); a no-op when nothing would change.
+     */
+    suspend fun writeDocument(write: CanvasDocumentWrite): CanvasDocument? {
         val op = CanvasOp.SetDocumentOp(
             opId = CanvasOpDiffer.generateOpId("doc"),
-            actorId = actorId,
+            actorId = write.actorId,
             lamport = lamportClock + 1,
-            documentId = documentId,
-            documentJson = documentJson,
-            frame = frame,
-            color = color,
-            style = style,
-            title = title,
-            owner = owner,
-            compose = compose,
+            documentId = write.documentId,
+            documentJson = write.documentJson,
+            frame = write.frame,
+            color = write.color,
+            style = write.style,
+            title = write.title,
+            owner = write.owner,
+            compose = write.compose,
         )
-        val existing = documents().firstOrNull { it.id == documentId }
+        val existing = documents().firstOrNull { it.id == write.documentId }
         return if (existing != null && existing.alreadyHas(op)) null else applyLocal(op)
     }
 
@@ -780,4 +784,20 @@ data class CanvasConversationOptions(
     val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
     val syncTransport: CanvasSyncTransport? = null,
     val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)
+
+/**
+ * A write of block document [documentId] ([CanvasSession.writeDocument]): its text, and what else
+ * it sets; a field left null keeps what the document has. [actorId] is who writes it.
+ */
+data class CanvasDocumentWrite(
+    val documentId: String,
+    val documentJson: String,
+    val frame: CanvasDocumentFrame? = null,
+    val color: String? = null,
+    val style: CanvasTextStyle? = null,
+    val title: String? = null,
+    val owner: CanvasGeometryOwner? = null,
+    val compose: CanvasComposeProvenance? = null,
+    val actorId: String = CanvasSession.LOCAL_USER_ACTOR_ID,
 )

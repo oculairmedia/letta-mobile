@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import com.letta.mobile.data.canvas.CanvasCreateOptions
+import com.letta.mobile.data.canvas.CanvasDocumentWrite
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
 import com.letta.mobile.data.canvas.CanvasSession
@@ -131,7 +132,7 @@ class CanvasNoteAutoFitAndroidRenderTest {
         }
         cases.forEachIndexed { i, (_, json) ->
             val frame = CanvasDocumentFrame(20f + (i % 2) * 360f, 20f + (i / 2) * 620f, WIDTH, 4000f)
-            runBlocking { session.setDocument("fx$i", json, frame = frame, owner = CanvasGeometryOwner.AUTO) }
+            runBlocking { session.writeDocument(CanvasDocumentWrite("fx$i", json, frame = frame, owner = CanvasGeometryOwner.AUTO)) }
         }
         var density = 0f
         composeRule.setLettaTestContent {

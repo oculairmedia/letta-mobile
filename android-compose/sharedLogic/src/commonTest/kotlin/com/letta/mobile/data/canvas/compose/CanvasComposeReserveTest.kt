@@ -32,7 +32,7 @@ class CanvasComposeReserveTest {
         }
         CanvasComposeFixtures.texts.forEach { case ->
             val font = CanvasComposeReserve.textFont(case.size)
-            val worst = PessimisticRenderer.lines(case.text, CanvasComposeContract.width(ComposeKind.TEXT, case.size).toDouble(), font, mono = false) *
+            val worst = PessimisticWrap(CanvasComposeContract.width(ComposeKind.TEXT, case.size).toDouble(), font, mono = false).lines(case.text) *
                 PessimisticRenderer.LINE_EM * font
             assertTrue(case.reserve >= worst, "${case.name}: ${case.reserve} < $worst")
         }
@@ -108,7 +108,7 @@ class CanvasComposeReserveTest {
             ComposeTextSize.entries.forEach { size ->
                 val font = CanvasComposeReserve.textFont(size)
                 val width = CanvasComposeContract.width(ComposeKind.TEXT, size).toDouble()
-                val worst = PessimisticRenderer.lines(text, width, font, mono = false) * PessimisticRenderer.LINE_EM * font
+                val worst = PessimisticWrap(width, font, mono = false).lines(text) * PessimisticRenderer.LINE_EM * font
                 val reserve = CanvasComposeReserve.reserveText(text, size).toDouble()
                 assertTrue(reserve >= minOf(worst, CanvasComposeReserve.MAX_RESERVE.toDouble()), "'$text' $size: $reserve < $worst")
             }
@@ -126,38 +126,38 @@ class CanvasComposeReserveTest {
             // line holds: the space a line breaks at is on neither line.
             val perLine = maxOf(1, (width / (CanvasComposeReserve.ADVANCE_EM * font)).toInt())
             val plan = maxOf(1, ceil(text.count { it != ' ' } / perLine.toDouble()).toInt())
-            assertTrue(CanvasComposeReserve.lineCount(text, width, font, mono = false) >= plan, "'$text' at $width/$font")
+            assertTrue(WorstCaseWrap(width, font).lines(text) >= plan, "'$text' at $width/$font")
         }
     }
 
     @Test
     fun aLongUnbrokenWordBreaksAcrossLines() {
         // 16 px body, 0.6 em per character: 9.6 per character, 250 / 9.6 = 26 characters a line.
-        assertEquals(1, CanvasComposeReserve.lineCount("a".repeat(26), 250.0, 16.0, mono = false))
-        assertEquals(2, CanvasComposeReserve.lineCount("a".repeat(27), 250.0, 16.0, mono = false))
-        assertEquals(10, CanvasComposeReserve.lineCount("a".repeat(260), 250.0, 16.0, mono = false))
+        assertEquals(1, WorstCaseWrap(250.0, 16.0).lines("a".repeat(26)))
+        assertEquals(2, WorstCaseWrap(250.0, 16.0).lines("a".repeat(27)))
+        assertEquals(10, WorstCaseWrap(250.0, 16.0).lines("a".repeat(260)))
         // A short word then a long one: the long one starts on its own line.
-        assertEquals(3, CanvasComposeReserve.lineCount("hi " + "a".repeat(52), 250.0, 16.0, mono = false))
+        assertEquals(3, WorstCaseWrap(250.0, 16.0).lines("hi " + "a".repeat(52)))
         // A box narrower than one character still holds one a line.
-        assertEquals(5, CanvasComposeReserve.lineCount("abcde", 1.0, 16.0, mono = false))
+        assertEquals(5, WorstCaseWrap(1.0, 16.0).lines("abcde"))
     }
 
     @Test
     fun wordsThatDoNotFitWrapAndHardBreaksAreKept() {
         // 26 characters a line: "aaaa...(20) bbbbbbbb" does not fit, the second word wraps.
-        assertEquals(2, CanvasComposeReserve.lineCount("a".repeat(20) + " " + "b".repeat(8), 250.0, 16.0, mono = false))
-        assertEquals(3, CanvasComposeReserve.lineCount("one\ntwo\nthree", 250.0, 16.0, mono = false))
-        assertEquals(1, CanvasComposeReserve.lineCount("", 250.0, 16.0, mono = false))
+        assertEquals(2, WorstCaseWrap(250.0, 16.0).lines("a".repeat(20) + " " + "b".repeat(8)))
+        assertEquals(3, WorstCaseWrap(250.0, 16.0).lines("one\ntwo\nthree"))
+        assertEquals(1, WorstCaseWrap(250.0, 16.0).lines(""))
     }
 
     @Test
     fun wideCapitalAndBroadCharactersBookMoreRoom() {
         val width = 240.0
-        val lower = CanvasComposeReserve.lineCount("a".repeat(100), width, 16.0, mono = false)
-        val capitals = CanvasComposeReserve.lineCount("O".repeat(100), width, 16.0, mono = false)
-        val broad = CanvasComposeReserve.lineCount("W".repeat(100), width, 16.0, mono = false)
-        val wide = CanvasComposeReserve.lineCount("漢".repeat(100), width, 16.0, mono = false)
-        val emoji = CanvasComposeReserve.lineCount("😀".repeat(100), width, 16.0, mono = false)
+        val lower = WorstCaseWrap(width, 16.0).lines("a".repeat(100))
+        val capitals = WorstCaseWrap(width, 16.0).lines("O".repeat(100))
+        val broad = WorstCaseWrap(width, 16.0).lines("W".repeat(100))
+        val wide = WorstCaseWrap(width, 16.0).lines("漢".repeat(100))
+        val emoji = WorstCaseWrap(width, 16.0).lines("😀".repeat(100))
         assertTrue(lower < capitals && capitals < broad && broad < wide, "$lower $capitals $broad $wide")
         assertEquals(wide, emoji)
     }
@@ -224,8 +224,8 @@ class CanvasComposeReserveTest {
 
     @Test
     fun headingsBookTheEditorsOwnSizes() {
-        val one = CanvasComposeReserve.blockHeight(ReserveBlock(ReserveBlockType.HEADING, "Title", level = 1), 320.0)
-        val three = CanvasComposeReserve.blockHeight(ReserveBlock(ReserveBlockType.HEADING, "Title", level = 3), 320.0)
+        val one = ReserveColumn(320.0).blockHeight(ReserveBlock(ReserveBlockType.HEADING, "Title", level = 1))
+        val three = ReserveColumn(320.0).blockHeight(ReserveBlock(ReserveBlockType.HEADING, "Title", level = 3))
         assertEquals(1.5 * 32 + 8, one)
         assertEquals(1.5 * 24 + 8, three)
         // A document with the same text in a heading books more than in a paragraph.
@@ -325,34 +325,6 @@ internal object PessimisticRenderer {
         else -> 0.56
     }
 
-    fun lines(text: String, width: Double, font: Double, mono: Boolean): Int = text.split('\n').sumOf { hard ->
-        var lines = 1
-        var used = 0.0
-        val space = advance(' ', mono) * font
-        hard.split(' ').forEach { word ->
-            val glyphs = word.map { advance(it, mono) * font }
-            val w = glyphs.sum()
-            val lead = if (used == 0.0) 0.0 else space
-            if (used + lead + w <= width) {
-                used += lead + w
-            } else if (w <= width) {
-                lines++
-                used = w
-            } else {
-                if (used > 0.0) lines++
-                used = 0.0
-                glyphs.forEach { g ->
-                    if (used + g > width && used > 0.0) {
-                        lines++
-                        used = 0.0
-                    }
-                    used += g
-                }
-            }
-        }
-        lines
-    }
-
     fun note(blocks: List<ReserveBlock>, width: Double): Double = HANDLE + PADDING + blocks.sumOf { block ->
         val font = when (block.type) {
             ReserveBlockType.HEADING -> listOf(32.0, 28.0, 24.0, 20.0, 18.0, 16.0)[(block.level - 1).coerceIn(0, 5)]
@@ -367,6 +339,46 @@ internal object PessimisticRenderer {
         }
         val inner = maxOf(width - 2 * SIDE - block.depth * 24.0 - inset, font)
         val codePadding = if (block.type == ReserveBlockType.CODE) 12.0 else 0.0
-        lines(block.text, inner, font, block.type == ReserveBlockType.CODE) * LINE_EM * font + 6.0 + codePadding
+        PessimisticWrap(inner, font, block.type == ReserveBlockType.CODE).lines(block.text) * LINE_EM * font + 6.0 + codePadding
+    }
+}
+
+/** [PessimisticRenderer]'s pixel-level greedy word wrap at [width] in a [font] of that size. */
+internal class PessimisticWrap(private val width: Double, private val font: Double, private val mono: Boolean) {
+    private val space = PessimisticRenderer.advance(' ', mono) * font
+    private var lines = 1
+    private var used = 0.0
+
+    fun lines(text: String): Int = text.split('\n').sumOf { hard ->
+        lines = 1
+        used = 0.0
+        hard.split(' ').forEach { word -> place(word.map { PessimisticRenderer.advance(it, mono) * font }) }
+        lines
+    }
+
+    private fun place(glyphs: List<Double>) {
+        val w = glyphs.sum()
+        val lead = if (used == 0.0) 0.0 else space
+        when {
+            used + lead + w <= width -> used += lead + w
+            w <= width -> {
+                newLine()
+                used = w
+            }
+            else -> breakAcross(glyphs)
+        }
+    }
+
+    private fun breakAcross(glyphs: List<Double>) {
+        if (used > 0.0) newLine()
+        glyphs.forEach { g ->
+            if (used + g > width && used > 0.0) newLine()
+            used += g
+        }
+    }
+
+    private fun newLine() {
+        lines++
+        used = 0.0
     }
 }

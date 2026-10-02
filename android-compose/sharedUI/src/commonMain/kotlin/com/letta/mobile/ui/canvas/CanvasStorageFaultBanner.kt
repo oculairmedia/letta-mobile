@@ -9,11 +9,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasStorageFault
+import com.letta.mobile.data.canvas.affecting
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -42,6 +46,14 @@ internal fun canvasStorageFaultText(fault: CanvasStorageFault, timeZone: TimeZon
     }.orEmpty()
     val detail = "Notebook ${fault.documentId ?: "unknown"}$size · ${fault.message}"
     return CanvasStorageFaultText(headline, detail)
+}
+
+/** [session]'s storage faults that concern its canvas, as a [CanvasStorageFaultBanner]; nothing without any. */
+@Composable
+internal fun CanvasStorageFaultOverlay(session: CanvasSession?, modifier: Modifier = Modifier) {
+    if (session == null) return
+    val faults by session.storageFaults.collectAsState()
+    CanvasStorageFaultBanner(faults = faults.affecting(session.canvasId), modifier = modifier)
 }
 
 /**

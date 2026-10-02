@@ -31,18 +31,18 @@ class CanvasGeometryOwnerTest {
         version = 1,
     )
 
+    /** Document `n` written by actor `a` at [lamport]; [by] names another writer. */
     private fun set(
         lamport: Long,
         frame: CanvasDocumentFrame? = null,
         owner: CanvasGeometryOwner? = null,
         compose: CanvasComposeProvenance? = null,
-        body: String = "{\"v\":$lamport}",
-        actor: String = "a",
-        id: String = "n",
     ) = CanvasOp.SetDocumentOp(
-        opId = "op-$lamport-$actor", actorId = actor, lamport = lamport, documentId = id, documentJson = body,
+        opId = "op-$lamport-a", actorId = "a", lamport = lamport, documentId = "n", documentJson = "{\"v\":$lamport}",
         frame = frame, owner = owner, compose = compose,
     )
+
+    private fun CanvasOp.SetDocumentOp.by(actor: String) = copy(opId = "op-$lamport-$actor", actorId = actor)
 
     private fun project(vararg ops: CanvasOp, from: String = ""): String = CanvasOpProjector.project(from, ops.toList())
 
@@ -98,8 +98,8 @@ class CanvasGeometryOwnerTest {
 
     @Test
     fun anOlderOwnerWriteLosesAndBothArrivalOrdersConverge() {
-        val auto = set(5, frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance, actor = "agent")
-        val user = set(7, frame = frame.copy(x = 9f), owner = CanvasGeometryOwner.USER, compose = provenance, actor = "local_user")
+        val auto = set(5, frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance).by("agent")
+        val user = set(7, frame = frame.copy(x = 9f), owner = CanvasGeometryOwner.USER, compose = provenance).by("local_user")
         val oneWay = project(auto, user)
         val otherWay = project(user, auto)
         assertEquals(oneWay, otherWay)
@@ -114,8 +114,8 @@ class CanvasGeometryOwnerTest {
      */
     @Test
     fun aNamedOwnerConvergesEvenWhenTheWinnerLeavesProvenanceOut() {
-        val auto = set(5, frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance, actor = "agent")
-        val user = set(7, frame = frame.copy(x = 9f), owner = CanvasGeometryOwner.USER, actor = "local_user")
+        val auto = set(5, frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance).by("agent")
+        val user = set(7, frame = frame.copy(x = 9f), owner = CanvasGeometryOwner.USER).by("local_user")
         assertEquals(CanvasGeometryOwner.USER, single(project(auto, user)).owner)
         assertEquals(CanvasGeometryOwner.USER, single(project(user, auto)).owner)
     }
@@ -177,7 +177,7 @@ class CanvasGeometryOwnerTest {
     @Test
     fun aPersonsMoveMakesTheNoteTheirs() = runTest {
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("own-1")))
-        session.setDocument("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance)
+        session.writeDocument(CanvasDocumentWrite("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance))
         assertEquals(CanvasGeometryOwner.AUTO, session.documents().single().owner)
 
         session.moveDocument("n", frame.copy(x = 999f))
@@ -189,7 +189,7 @@ class CanvasGeometryOwnerTest {
     @Test
     fun aGroupMoveMakesEveryMovedNoteTheirsAndLeavesTheRestAlone() = runTest {
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("own-2")))
-        listOf("a", "b", "c").forEach { session.setDocument(it, "{}", frame = frame, owner = CanvasGeometryOwner.AUTO) }
+        listOf("a", "b", "c").forEach { session.writeDocument(CanvasDocumentWrite(it, "{}", frame = frame, owner = CanvasGeometryOwner.AUTO)) }
 
         session.moveDocuments(mapOf("a" to frame.copy(x = 1f), "b" to frame.copy(x = 2f), "c" to frame))
 
@@ -204,21 +204,21 @@ class CanvasGeometryOwnerTest {
     @Test
     fun setDocumentWritesOwnerAndProvenanceAndANewOwnerIsAChange() = runTest {
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("own-3")))
-        session.setDocument("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance)
+        session.writeDocument(CanvasDocumentWrite("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance))
         assertNull(
-            session.setDocument("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance),
+            session.writeDocument(CanvasDocumentWrite("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance)),
             "the same document is not written again",
         )
         assertNull(session.setDocument("n", "{}"), "a write that names no owner keeps it")
-        assertNotNull(session.setDocument("n", "{}", owner = CanvasGeometryOwner.USER), "a different owner is a change")
+        assertNotNull(session.writeDocument(CanvasDocumentWrite("n", "{}", owner = CanvasGeometryOwner.USER)), "a different owner is a change")
         assertEquals(CanvasGeometryOwner.USER, session.documents().single().owner)
-        assertNotNull(session.setDocument("n", "{}", compose = provenance.copy(key = "other")), "so is different provenance")
+        assertNotNull(session.writeDocument(CanvasDocumentWrite("n", "{}", compose = provenance.copy(key = "other"))), "so is different provenance")
     }
 
     @Test
     fun undoingAMoveGivesTheNoteBackToCompose() = runTest {
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("own-4")))
-        session.setDocument("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance)
+        session.writeDocument(CanvasDocumentWrite("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance))
         val before = session.documents()
         session.moveDocument("n", frame.copy(x = 999f))
         val step = assertNotNull(CanvasDocumentUndo.stepBetween(before, session.documents()))

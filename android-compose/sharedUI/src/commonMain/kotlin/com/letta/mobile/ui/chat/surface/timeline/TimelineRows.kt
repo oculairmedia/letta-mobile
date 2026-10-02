@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import kotlinx.datetime.LocalDate
 
@@ -85,9 +86,11 @@ private fun ChatRenderItem.isToolOnlySingle(): Boolean {
         message.generatedUi == null &&
         message.approvalRequest == null &&
         message.approvalResponse == null &&
-        message.attachments.isEmpty() &&
-        message.artifacts.isEmpty()
+        !message.carriesMedia()
 }
+
+/** An image attachment or a canvas card (letta-mobile-bglj6.13): content of its own, never folded. */
+private fun UiMessage.carriesMedia(): Boolean = attachments.isNotEmpty() || artifacts.isNotEmpty()
 
 /**
  * Folds consecutive tool-only singles of the SAME run (2+) into [TimelineRow.ToolGroup]s. Input

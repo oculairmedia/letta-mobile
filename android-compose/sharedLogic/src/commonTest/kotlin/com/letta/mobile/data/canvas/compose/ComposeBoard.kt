@@ -33,25 +33,25 @@ internal class ComposeBoard(var sceneJson: String = "") {
     }
 
     /** An ordinary note, placed by a person. */
-    fun addNote(id: String, frame: CanvasDocumentFrame, text: String = "A note of my own") {
+    fun addNote(id: String, frame: CanvasDocumentFrame) {
         publishChecked(
             listOf(
                 CanvasOp.SetDocumentOp(
                     "", "", 0, id,
-                    """{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"$text","spans":[]}}]}""",
+                    """{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"A note of my own","spans":[]}}]}""",
                     frame = frame,
                 ),
             ),
         )
     }
 
-    /** An ordinary drawn rectangle. */
-    fun addBox(id: String, left: Float, top: Float, right: Float, bottom: Float) {
+    /** An ordinary drawn rectangle over [box]. */
+    fun addBox(id: String, box: Slot) {
         publishChecked(
             listOf(
                 CanvasOp.AddElementOp(
                     "", "", 0, id,
-                    """{"type":"Shape","shapeType":"RECTANGLE","points":["$left,$top","$right,$bottom"],"strokeColor":"#000000ff","strokeWidth":2.0,"zIndex":0}""",
+                    """{"type":"Shape","shapeType":"RECTANGLE","points":["${box.x},${box.y}","${box.right},${box.bottom}"],"strokeColor":"#000000ff","strokeWidth":2.0,"zIndex":0}""",
                 ),
             ),
         )

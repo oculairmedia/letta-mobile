@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.compose.CanvasComposeService
 import com.letta.mobile.data.canvas.compose.ComposeCompilation
 import com.letta.mobile.data.canvas.compose.ComposeOutcome
 import com.letta.mobile.data.canvas.compose.ComposeStatus
+import com.letta.mobile.data.canvas.compose.ComposeTarget
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -35,7 +36,7 @@ class NotebookComposeStorageTest {
 
         NotebookLocalStore(path, "compose-peer").use { notebooks ->
             val session = CanvasSession.create(NotebookCanvasDocumentStore(notebooks), CanvasCreateOptions(canvasId = canvasId))
-            val outcome = CanvasComposeService.compose(request, canvasId.value, session.sceneJsonOrEmpty(), toolCallId = null) { ops ->
+            val outcome = CanvasComposeService.compose(request, ComposeTarget(canvasId.value, session.sceneJsonOrEmpty())) { ops ->
                 var lamport = 0L
                 session.applyOps(ops.map { it.withActor(CanvasSession.LOCAL_USER_ACTOR_ID).withStamp("compose-${++lamport}", lamport) }).revision
             }

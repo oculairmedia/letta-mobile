@@ -35,6 +35,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.canvas.CanvasCreateOptions
+import com.letta.mobile.data.canvas.CanvasDocumentWrite
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
 import com.letta.mobile.data.canvas.CanvasSession
@@ -74,8 +75,8 @@ class CanvasNoteWorldUnitsUiTest {
         CanvasSession.create(store = InMemoryCanvasDocumentStore(), options = CanvasCreateOptions(title = "World Units", initialSceneJson = ""))
     }
 
-    private fun put(session: CanvasSession, id: String, json: String, frame: CanvasDocumentFrame? = null, owner: CanvasGeometryOwner? = null, color: String? = null) = runBlocking {
-        session.setDocument(id, json, frame = frame, owner = owner, color = color)
+    private fun CanvasSession.put(note: WorldNote) = runBlocking {
+        writeDocument(CanvasDocumentWrite(note.id, note.json, frame = note.frame, owner = note.owner, color = note.color))
     }
 
     /** The notes of [session] on a board at [display], as a host would show them. */
@@ -130,13 +131,11 @@ class CanvasNoteWorldUnitsUiTest {
 
     /** A board of one of each kind of card: an AUTO note, an EXPLICIT note, a frameless note and a plain text block. */
     private fun board(session: CanvasSession) {
-        put(session, "auto", CanvasNoteAutoFitFixtures.mealPlan, CanvasDocumentFrame(40f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO)
-        put(session, "explicit", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(400f, 40f, 300f, 260f), CanvasGeometryOwner.EXPLICIT)
-        put(session, "frameless", CanvasNoteAutoFitFixtures.document(B("heading", "Errands", level = 2), B("paragraph", "Post office, then the bank.")))
-        put(
-            session, "plain", CanvasNoteAutoFitFixtures.document(B("paragraph", "Plain words on the board, wrapping onto a second line")),
-            CanvasDocumentFrame(740f, 40f, 260f, 400f), CanvasGeometryOwner.AUTO, color = PLAIN_TEXT_COLOR,
-        )
+        session.put(WorldNote("auto", CanvasNoteAutoFitFixtures.mealPlan, CanvasDocumentFrame(40f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO))
+        session.put(WorldNote("explicit", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(400f, 40f, 300f, 260f), CanvasGeometryOwner.EXPLICIT))
+        session.put(WorldNote("frameless", CanvasNoteAutoFitFixtures.document(B("heading", "Errands", level = 2), B("paragraph", "Post office, then the bank."))))
+        session.put(WorldNote("plain", CanvasNoteAutoFitFixtures.document(B("paragraph", "Plain words on the board, wrapping onto a second line")),
+            CanvasDocumentFrame(740f, 40f, 260f, 400f), CanvasGeometryOwner.AUTO, color = PLAIN_TEXT_COLOR,))
     }
 
     private data class Rendered(val bounds: Map<String, Rect>, val scales: Map<String, Float?>, val lines: Map<String, Rect>)
@@ -192,7 +191,7 @@ class CanvasNoteWorldUnitsUiTest {
                 val session = session()
                 cases.forEachIndexed { i, case ->
                     val frame = CanvasDocumentFrame(20f + (i % 5) * 360f, 20f + (i / 5) * 620f, case.width, 4000f)
-                    put(session, "fx$i", case.documentJson, frame, CanvasGeometryOwner.AUTO)
+                    session.put(WorldNote("fx$i", case.documentJson, frame, CanvasGeometryOwner.AUTO))
                 }
                 showNotes(session, display)
                 out = cases.indices.map { i -> cardBounds("fx$i").height to fontScale("fx$i") }
@@ -235,8 +234,8 @@ class CanvasNoteWorldUnitsUiTest {
         listOf(desktop, Display(2.75f, 1.3f)).forEach { display ->
             runDesktopComposeUiTest(width = BOARD, height = BOARD) {
                 val session = session()
-                put(session, "indented", indented, CanvasDocumentFrame(40f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO)
-                put(session, "flat", flat, CanvasDocumentFrame(400f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO)
+                session.put(WorldNote("indented", indented, CanvasDocumentFrame(40f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO))
+                session.put(WorldNote("flat", flat, CanvasDocumentFrame(400f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO))
                 showNotes(session, display)
                 val rendered = cardBounds("indented").height
                 println("reserve-gate@$display indented list: rendered=$rendered (flat ${cardBounds("flat").height}) reserve=$reserve")
@@ -250,7 +249,7 @@ class CanvasNoteWorldUnitsUiTest {
     @Test
     fun typingIntoAnAutoNoteStillWorksInWorldUnits() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
-        put(session, "n", CanvasNoteAutoFitFixtures.document(B("paragraph", "Pack")), CanvasDocumentFrame(80f, 80f, 320f, 400f), CanvasGeometryOwner.AUTO)
+        session.put(WorldNote("n", CanvasNoteAutoFitFixtures.document(B("paragraph", "Pack")), CanvasDocumentFrame(80f, 80f, 320f, 400f), CanvasGeometryOwner.AUTO))
         val active = mutableStateOf<String?>(null)
         var toolbar: NoteToolbar? = null
         showNotes(session, Display(2.75f, 1.3f), active = active, onToolbar = { toolbar = it })
@@ -380,3 +379,12 @@ class CanvasNoteWorldUnitsUiTest {
         const val FRAMES = 24
     }
 }
+
+/** A note these tests write to the board: its document, and the frame, owner and colour it is written with. */
+private data class WorldNote(
+    val id: String,
+    val json: String,
+    val frame: CanvasDocumentFrame? = null,
+    val owner: CanvasGeometryOwner? = null,
+    val color: String? = null,
+)

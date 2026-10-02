@@ -45,6 +45,7 @@ import com.letta.mobile.data.canvas.compose.ComposeReceipt
 import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
 import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
 import com.letta.mobile.data.chat.projection.CanvasArtifactStatus
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.AssistantMessage
@@ -75,6 +76,7 @@ import kotlin.math.ceil
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
@@ -114,33 +116,38 @@ class CanvasComposeEndToEndRenderTest {
     )
     private val canvasId = CanvasId.forConversation(CONVERSATION)
 
-    private suspend fun call(tool: String, input: String, toolCallId: String? = null): ExternalToolResult =
-        registry.invoke(tool, json.parseToJsonElement(input).jsonObject, agentId = AGENT, conversationId = CONVERSATION, toolCallId = toolCallId)
+    /** One canvas_compose call: its input and the tool call id it comes under. */
+    private data class ComposeCall(val input: String, val toolCallId: String)
 
-    private suspend fun compose(input: String, toolCallId: String): Pair<ComposeReceipt, String> {
-        val result = assertIs<ExternalToolResult.Success>(call(CanvasToolContract.COMPOSE, input, toolCallId), "refused")
-        return CanvasComposeContract.json.decodeFromString(ComposeReceipt.serializer(), result.content) to result.content
+    /** A published compose: its receipt, and the answer text it was read from. */
+    private data class Composed(val receipt: ComposeReceipt, val answer: String)
+
+    private suspend fun call(tool: String, input: JsonObject, toolCallId: String? = null): ExternalToolResult =
+        registry.invoke(tool, input, ExternalToolCaller(agentId = AGENT, conversationId = CONVERSATION, toolCallId = toolCallId))
+
+    private suspend fun compose(compose: ComposeCall): Composed {
+        val input = json.parseToJsonElement(compose.input).jsonObject
+        val result = assertIs<ExternalToolResult.Success>(call(CanvasToolContract.COMPOSE, input, compose.toolCallId), "refused")
+        return Composed(CanvasComposeContract.json.decodeFromString(ComposeReceipt.serializer(), result.content), result.content)
     }
 
     /** A drawing and two notes a person made before the agent composed anything. */
     private suspend fun drawAndWriteFirst() {
-        fun note(text: String) =
-            """{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"$text","spans":[]}}]}"""
         val ops = buildJsonArray {
             addJsonObject {
                 put("type", "add_element"); put("elementId", "sketch")
                 put("elementJson", """{"type":"Shape","shapeType":"CIRCLE","points":["80.0,80.0","560.0,400.0"],"strokeColor":"#1f2937ff","strokeWidth":3.0,"zIndex":0}""")
             }
             addJsonObject {
-                put("type", "set_document"); put("documentId", "note-a"); put("documentJson", note("Ideas for May"))
+                put("type", "set_document"); put("documentId", "note-a"); put("documentJson", NOTE_JSON.format("Ideas for May"))
                 put("frame", buildJsonObject { put("x", 80); put("y", 440); put("width", 300); put("height", 200) })
             }
             addJsonObject {
-                put("type", "set_document"); put("documentId", "note-b"); put("documentJson", note("Ask Ana about the flat"))
+                put("type", "set_document"); put("documentId", "note-b"); put("documentJson", NOTE_JSON.format("Ask Ana about the flat"))
                 put("frame", buildJsonObject { put("x", 420); put("y", 440); put("width", 300); put("height", 260) })
             }
         }
-        assertIs<ExternalToolResult.Success>(call(CanvasToolContract.APPLY_OPS, buildJsonObject { put("ops", ops) }.toString()))
+        assertIs<ExternalToolResult.Success>(call(CanvasToolContract.APPLY_OPS, buildJsonObject { put("ops", ops) }))
     }
 
     /** The relay log from [after] applied by an app, as its canvas client applies what the host relays. */
@@ -156,9 +163,10 @@ class CanvasComposeEndToEndRenderTest {
     @Test
     fun theComposedBoardRendersCleanlyAndShowOnCanvasFramesIt() {
         val path = Files.createTempDirectory("canvas-compose-e2e-render-")
-        val (first, firstAnswer) = runBlocking {
+        val firstCall = ComposeCall(request, CALL_1)
+        val firstComposed = runBlocking {
             drawAndWriteFirst()
-            val composed = compose(request, CALL_1)
+            val composed = compose(firstCall)
             // The app's notebook takes the log; the app restarts.
             NotebookLocalStore(path, PEER).use { notebooks ->
                 val session = CanvasSession.create(NotebookCanvasDocumentStore(notebooks), CanvasCreateOptions(canvasId = canvasId, conversationId = CONVERSATION, agentId = AGENT))
@@ -166,6 +174,7 @@ class CanvasComposeEndToEndRenderTest {
             }
             composed
         }
+        val first = firstComposed.receipt
         assertEquals("lisbon-trip", first.artifactId)
 
         NotebookLocalStore(path, PEER).use { notebooks ->
@@ -177,7 +186,7 @@ class CanvasComposeEndToEndRenderTest {
             assertComposedCardsFit(session, first, rendered)
 
             // --- the chat: one receipt card, and Show on canvas frames its bounds --------------
-            val card = receiptCard(CALL_1, request, firstAnswer)
+            val card = receiptCard(firstCall, firstComposed)
             assertEquals(CanvasArtifactStatus.Published, card.status)
             assertEquals(first.bounds, card.bounds)
             assertShowOnCanvasFrames(session, card)
@@ -185,7 +194,7 @@ class CanvasComposeEndToEndRenderTest {
             // --- a second compose renders beside the first ---------------------------------------
             val second = runBlocking {
                 val cursor = relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), 0L).last().cursor
-                val (receipt, _) = compose(SECOND_REQUEST, CALL_2)
+                val (receipt, _) = compose(ComposeCall(SECOND_REQUEST, CALL_2))
                 takeRelay(session, cursor)
                 receipt
             }
@@ -200,7 +209,7 @@ class CanvasComposeEndToEndRenderTest {
             // --- a retry writes nothing ----------------------------------------------------------
             runBlocking {
                 val logged = relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), 0L).size
-                val (retried, _) = compose(request, CALL_1)
+                val (retried, _) = compose(firstCall)
                 assertEquals(listOf(CanvasComposeService.ALREADY_PUBLISHED_WARNING), retried.warnings)
                 assertEquals(first.bounds, retried.bounds)
                 assertEquals(logged, relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), 0L).size)
@@ -235,7 +244,7 @@ class CanvasComposeEndToEndRenderTest {
                 }
             }
             waitForIdle()
-            out = documents.associate { it.id to cardBounds(it.id).translate(-viewport.offset) }
+            out = documents.associate { it.id to cardBounds(it).translate(-viewport.offset) }
             val scales = documents.associate { it.id to onNodeWithContentDescription("Note ${it.id}").fetchSemanticsNode().config.getOrNull(NoteFontScaleKey) }
             scales.forEach { (id, scale) -> if (id.startsWith("cmp-")) assertEquals(1f, scale, "$id was drawn with smaller type to fit") }
             val file = File("build/canvas-compose-e2e").apply { mkdirs() }.resolve(snapshot)
@@ -246,8 +255,8 @@ class CanvasComposeEndToEndRenderTest {
         return out
     }
 
-    private fun ComposeUiTest.cardBounds(id: String): Rect {
-        val node = onNodeWithContentDescription("Note $id").fetchSemanticsNode()
+    private fun ComposeUiTest.cardBounds(document: CanvasSceneDocument): Rect {
+        val node = onNodeWithContentDescription("Note ${document.id}").fetchSemanticsNode()
         return Rect(node.positionInRoot, Size(node.size.width.toFloat(), node.size.height.toFloat()))
     }
 
@@ -339,7 +348,9 @@ class CanvasComposeEndToEndRenderTest {
     // --- the chat --------------------------------------------------------------------------
 
     /** The run's frames through the timeline reducer and the receipt projection: exactly one card, on the narration. */
-    private fun receiptCard(callId: String, input: String, answer: String): CanvasArtifactReceipt {
+    private fun receiptCard(call: ComposeCall, composed: Composed): CanvasArtifactReceipt {
+        val callId = call.toolCallId
+        val answer = composed.answer
         val run = "run-$callId"
         val returnFrame = buildJsonObject {
             put("message_type", "tool_return_message"); put("id", "$run-return"); put("run_id", run); put("seq_id", 2)
@@ -348,7 +359,7 @@ class CanvasComposeEndToEndRenderTest {
         }
         val frames: List<LettaMessage> = listOf(
             UserMessage(id = "$run-user", contentRaw = JsonPrimitive("Plan the Lisbon trip on the board"), runId = run, otid = "$run-u"),
-            ToolCallMessage(id = "$run-call", runId = run, seqId = 1, otid = "$run-c", toolCall = ToolCall(id = callId, name = CanvasToolContract.COMPOSE, arguments = input)),
+            ToolCallMessage(id = "$run-call", runId = run, seqId = 1, otid = "$run-c", toolCall = ToolCall(id = callId, name = CanvasToolContract.COMPOSE, arguments = call.input)),
             json.decodeFromJsonElement(LettaMessageSerializer, returnFrame),
             AssistantMessage(id = "$run-assistant", contentRaw = JsonPrimitive("It's on the board."), runId = run, seqId = 3, otid = "$run-a"),
         )
@@ -375,6 +386,8 @@ class CanvasComposeEndToEndRenderTest {
         const val AGENT = "agent-1"
         const val CONVERSATION = "conv-e2e"
         const val PEER = "e2e-render-peer"
+        const val NOTE_JSON =
+            """{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"%s","spans":[]}}]}"""
         const val CALL_1 = "toolu_01LisbonTripCompose"
         const val CALL_2 = "toolu_01RestaurantsCompose"
         const val MARGIN = 80f

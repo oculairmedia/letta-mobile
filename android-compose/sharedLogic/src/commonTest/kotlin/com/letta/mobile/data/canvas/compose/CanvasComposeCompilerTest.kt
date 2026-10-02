@@ -178,7 +178,7 @@ class CanvasComposeCompilerTest {
         requests().forEach { (name, request) ->
             val board = ComposeBoard().apply {
                 addNote("mine", CanvasDocumentFrame(100f, 100f, 320f, 200f))
-                addBox("box", 500f, 120f, 700f, 260f)
+                addBox("box", Slot(500f, 120f, 200f, 140f))
             }
             val ready = readyOf(compileText(request, board.sceneJson))
             val check = CanvasBatchValidator.check(board.sceneJson, ready.ops)
@@ -398,7 +398,7 @@ class CanvasComposeCompilerTest {
     fun placementNeverOverlapsWhatIsAlreadyOnTheBoard() {
         val board = ComposeBoard().apply {
             addNote("mine", CanvasDocumentFrame(-200f, 40f, 320f, 400f))
-            addBox("box", 300f, -100f, 900f, 300f)
+            addBox("box", Slot(300f, -100f, 600f, 400f))
         }
         // A legacy frameless note: placement keeps clear of where the renderer will put it too.
         board.publishChecked(listOf(CanvasOp.SetDocumentOp("", "", 0, "legacy", """{"version":2,"blocks":[]}""")))

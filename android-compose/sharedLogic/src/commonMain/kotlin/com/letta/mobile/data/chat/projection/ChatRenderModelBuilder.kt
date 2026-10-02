@@ -467,13 +467,8 @@ private fun UiMessage.isPlainAssistantTextEchoOf(lastReasoningContent: String?):
         content == lastReasoningContent &&
         !isReasoning &&
         !isError &&
-        toolCalls.isNullOrEmpty() &&
-        generatedUi == null &&
-        approvalRequest == null &&
-        approvalResponse == null &&
-        attachments.isEmpty() &&
         // letta-mobile-bglj6.13: the narration carrying a canvas card is never an echo to drop.
-        artifacts.isEmpty()
+        carriesOnlyText()
 }
 
 fun filterMessagesForMode(

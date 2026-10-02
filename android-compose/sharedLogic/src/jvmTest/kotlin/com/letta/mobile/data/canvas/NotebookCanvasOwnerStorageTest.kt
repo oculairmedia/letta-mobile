@@ -27,8 +27,9 @@ class NotebookCanvasOwnerStorageTest {
             """"_compose":{"artifactId":"weekend-plan","key":"heading","kind":"TEXT","catalog":"letta.canvas.compose","version":1}}"""
         NotebookLocalStore(path, "owner-peer").use { notebooks ->
             val session = CanvasSession.create(NotebookCanvasDocumentStore(notebooks), CanvasCreateOptions(canvasId = canvasId))
-            session.setDocument("cmp-weekend-plan-meals", """{"version":2,"blocks":[]}""", frame = frame,
-                owner = CanvasGeometryOwner.AUTO, compose = provenance)
+            session.writeDocument(
+                CanvasDocumentWrite("cmp-weekend-plan-meals", """{"version":2,"blocks":[]}""", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance),
+            )
             session.setDocument("mine", """{"version":2,"blocks":[]}""", frame = frame.copy(x = 900f))
             session.moveDocument("mine", frame.copy(x = 950f))
             session.applyLocal(CanvasOp.AddElementOp("add-h", "local_user", 10, "cmp-weekend-plan-heading", heading))

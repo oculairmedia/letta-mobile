@@ -25,6 +25,7 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasCreateOptions
+import com.letta.mobile.data.canvas.CanvasDocumentWrite
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
@@ -92,23 +93,16 @@ class CanvasNoteAutoFitUiTest {
 
     private suspend fun CanvasSession.opCount(): Int = opLog.getOps(canvasId).size
 
-    private fun put(
-        session: CanvasSession,
-        id: String,
-        json: String,
-        frame: CanvasDocumentFrame? = null,
-        owner: CanvasGeometryOwner? = null,
-        style: CanvasTextStyle? = null,
-    ) = runBlocking {
-        session.setDocument(id, json, frame = frame, style = style, owner = owner)
+    private fun CanvasSession.put(note: FitNote) = runBlocking {
+        writeDocument(CanvasDocumentWrite(note.id, note.json, frame = note.frame, style = note.style, owner = note.owner))
     }
 
     /** 8tlf9 (a)+(f): two agent notes written with no frame are readable at width 320, sized by content, and apart. */
     @Test
     fun framelessAgentNotesAreFullyReadableSizedByContentAndNeverOverlap() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
-        put(session, "shopping", CanvasNoteAutoFitFixtures.shoppingList)
-        put(session, "meals", CanvasNoteAutoFitFixtures.mealPlan)
+        session.put(FitNote("shopping", CanvasNoteAutoFitFixtures.shoppingList))
+        session.put(FitNote("meals", CanvasNoteAutoFitFixtures.mealPlan))
         showNotes(session)
 
         val shopping = cardBounds("shopping")
@@ -127,7 +121,7 @@ class CanvasNoteAutoFitUiTest {
     @Test
     fun autoNoteWithRoomToSpareShrinksToItsContent() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
-        put(session, "n", CanvasNoteAutoFitFixtures.document(B("paragraph", "Two short lines"), B("paragraph", "of text")), CanvasDocumentFrame(80f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO)
+        session.put(FitNote("n", CanvasNoteAutoFitFixtures.document(B("paragraph", "Two short lines"), B("paragraph", "of text")), CanvasDocumentFrame(80f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO))
         showNotes(session)
 
         val bounds = cardBounds("n")
@@ -153,9 +147,9 @@ class CanvasNoteAutoFitUiTest {
         val prose = CanvasNoteAutoFitFixtures.notes.single { it.name == "long paragraph" }.documentJson
         val step = CanvasNoteAutoFit.FONT_SCALES[1]
         val tall = CanvasDocumentFrame(80f, 80f, 320f, 4000f)
-        put(session, "n", prose, tall, CanvasGeometryOwner.AUTO)
+        session.put(FitNote("n", prose, tall, CanvasGeometryOwner.AUTO))
         // The same content with its type already at the step: what a fit to the step draws.
-        put(session, "atStep", prose, tall.copy(x = 500f), CanvasGeometryOwner.AUTO, style = CanvasTextStyle(fontScale = step))
+        session.put(FitNote("atStep", prose, tall.copy(x = 500f), CanvasGeometryOwner.AUTO, style = CanvasTextStyle(fontScale = step)))
         showNotes(session)
         val natural = cardBounds("n").height
         val stepped = cardBounds("atStep").height
@@ -166,7 +160,7 @@ class CanvasNoteAutoFitUiTest {
         // Book between the two: less than the content takes at full size, enough for the step.
         val booked = floor((natural + stepped) / 2f)
         val diag = "natural=$natural stepped=$stepped booked=$booked"
-        put(session, "n", prose, tall.copy(height = booked), CanvasGeometryOwner.AUTO)
+        session.put(FitNote("n", prose, tall.copy(height = booked), CanvasGeometryOwner.AUTO))
         waitForIdle()
 
         val scale = assertNotNull(fontScale("n"), "note n has no fit scale; $diag")
@@ -181,7 +175,7 @@ class CanvasNoteAutoFitUiTest {
     @Test
     fun autoNoteFarOverItsBookingGrowsAtTheFontFloor() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
-        put(session, "n", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 150f), CanvasGeometryOwner.AUTO)
+        session.put(FitNote("n", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 150f), CanvasGeometryOwner.AUTO))
         showNotes(session)
 
         assertEquals(CanvasNoteAutoFit.FONT_FLOOR, fontScale("n"))
@@ -195,8 +189,8 @@ class CanvasNoteAutoFitUiTest {
     @Test
     fun explicitFramesAreDrawnVerbatim() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
-        put(session, "short", CanvasNoteAutoFitFixtures.document(B("paragraph", "Hi")), CanvasDocumentFrame(80f, 80f, 300f, 400f), CanvasGeometryOwner.EXPLICIT)
-        put(session, "long", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(500f, 80f, 480f, 150f), CanvasGeometryOwner.EXPLICIT)
+        session.put(FitNote("short", CanvasNoteAutoFitFixtures.document(B("paragraph", "Hi")), CanvasDocumentFrame(80f, 80f, 300f, 400f), CanvasGeometryOwner.EXPLICIT))
+        session.put(FitNote("long", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(500f, 80f, 480f, 150f), CanvasGeometryOwner.EXPLICIT))
         showNotes(session)
 
         assertEquals(Rect(80f, 80f, 380f, 480f), cardBounds("short").round())
@@ -212,7 +206,7 @@ class CanvasNoteAutoFitUiTest {
     fun aHumanResizeIsKeptAcrossAReload() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val store = InMemoryCanvasDocumentStore()
         val first = session(store)
-        put(first, "n", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 900f), CanvasGeometryOwner.AUTO)
+        first.put(FitNote("n", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 900f), CanvasGeometryOwner.AUTO))
         runBlocking { first.moveDocument("n", CanvasDocumentFrame(80f, 80f, 320f, 160f)) }
         assertEquals(CanvasGeometryOwner.USER, first.documents().single().owner)
 
@@ -231,7 +225,7 @@ class CanvasNoteAutoFitUiTest {
     @Test
     fun movingAFittedCardKeepsTheSizeItWasShownAt() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
-        put(session, "n", CanvasNoteAutoFitFixtures.document(B("paragraph", "A short note")), CanvasDocumentFrame(80f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO)
+        session.put(FitNote("n", CanvasNoteAutoFitFixtures.document(B("paragraph", "A short note")), CanvasDocumentFrame(80f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO))
         showNotes(session)
         val shown = cardBounds("n").height
         assertTrue(shown < 600f)
@@ -255,9 +249,9 @@ class CanvasNoteAutoFitUiTest {
     @Test
     fun renderingAutoNotesEmitsNoOps() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
-        put(session, "a", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 150f), CanvasGeometryOwner.AUTO)
-        put(session, "b", CanvasNoteAutoFitFixtures.document(B("paragraph", "Hi")), CanvasDocumentFrame(500f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO)
-        put(session, "c", CanvasNoteAutoFitFixtures.mealPlan)
+        session.put(FitNote("a", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 150f), CanvasGeometryOwner.AUTO))
+        session.put(FitNote("b", CanvasNoteAutoFitFixtures.document(B("paragraph", "Hi")), CanvasDocumentFrame(500f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO))
+        session.put(FitNote("c", CanvasNoteAutoFitFixtures.mealPlan))
         val ops = runBlocking { session.opCount() }
         val revision = session.document.value?.revision
         val scene = session.sceneJsonOrEmpty()
@@ -283,7 +277,7 @@ class CanvasNoteAutoFitUiTest {
         val cases = CanvasNoteAutoFitFixtures.notes.filter { it.name != CanvasNoteAutoFitFixtures.CAP_CASE }
         cases.forEachIndexed { i, case ->
             val frame = CanvasDocumentFrame(20f + (i % 5) * 360f, 20f + (i / 5) * 620f, case.width, 4000f)
-            put(session, "fx$i", case.documentJson, frame, CanvasGeometryOwner.AUTO)
+            session.put(FitNote("fx$i", case.documentJson, frame, CanvasGeometryOwner.AUTO))
         }
         showNotes(session)
 
@@ -302,10 +296,10 @@ class CanvasNoteAutoFitUiTest {
     @Test
     fun snapshotOfFittedNotes() = runDesktopComposeUiTest(width = 1500, height = 1100) {
         val session = session()
-        put(session, "shrunk", CanvasNoteAutoFitFixtures.document(B("heading", "Weekend", level = 2), B("paragraph", "A booking far taller than this.")), CanvasDocumentFrame(20f, 20f, 320f, 600f), CanvasGeometryOwner.AUTO)
-        put(session, "grown", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(360f, 20f, 320f, 200f), CanvasGeometryOwner.AUTO)
-        put(session, "explicit", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(700f, 20f, 320f, 200f), CanvasGeometryOwner.EXPLICIT)
-        put(session, "frameless", CanvasNoteAutoFitFixtures.mealPlan)
+        session.put(FitNote("shrunk", CanvasNoteAutoFitFixtures.document(B("heading", "Weekend", level = 2), B("paragraph", "A booking far taller than this.")), CanvasDocumentFrame(20f, 20f, 320f, 600f), CanvasGeometryOwner.AUTO))
+        session.put(FitNote("grown", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(360f, 20f, 320f, 200f), CanvasGeometryOwner.AUTO))
+        session.put(FitNote("explicit", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(700f, 20f, 320f, 200f), CanvasGeometryOwner.EXPLICIT))
+        session.put(FitNote("frameless", CanvasNoteAutoFitFixtures.mealPlan))
         showNotes(session)
         val image = onRoot().captureToImage().toAwtImage()
         val out = File("build/canvas-autofit-snapshots").apply { mkdirs() }.resolve("auto-fit.png")
@@ -319,3 +313,12 @@ class CanvasNoteAutoFitUiTest {
         const val BOARD = 2_400
     }
 }
+
+/** A note these tests write to the board: its document, and the frame, owner and style it is written with. */
+private data class FitNote(
+    val id: String,
+    val json: String,
+    val frame: CanvasDocumentFrame? = null,
+    val owner: CanvasGeometryOwner? = null,
+    val style: CanvasTextStyle? = null,
+)

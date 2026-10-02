@@ -45,6 +45,7 @@ internal object ModelControlWire {
                 model = AppServerListModelsAdapter.toLlmModel(entry, row),
                 exposed = row.bool("exposed") ?: true,
                 reasoningEfforts = row.strings("reasoning_efforts"),
+                reasoningEffort = ((row["updateArgs"] ?: row["update_args"]) as? JsonObject)?.string("reasoning_effort"),
             )
         }
     }
