@@ -12,12 +12,6 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -33,7 +27,7 @@ import kotlin.test.assertTrue
  */
 class ToolRoundRunStackingTest {
     @Test fun consecutiveToolRoundsOfOneTurnStackIntoOneLiveRun() = runBlocking {
-        val harness = Harness.open(durable = emptyList())
+        val harness = CanonicalTurnHarness.open(scope, durable = emptyList())
         try {
             val live = harness.streamMidRun(liveRounds)
             val runs = live.filter { it.isRunItem }
@@ -53,7 +47,7 @@ class ToolRoundRunStackingTest {
     }
 
     @Test fun aReloadedTurnStacksItsToolRoundsTheSameWay() = runBlocking {
-        val harness = Harness.open(durable = durableTurn)
+        val harness = CanonicalTurnHarness.open(scope, durable = durableTurn)
         try {
             harness.settle()
             val runs = harness.rows().filter { it.isRunItem }
@@ -66,7 +60,7 @@ class ToolRoundRunStackingTest {
     }
 
     @Test fun aTurnThatEndedInTextIsNotJoinedByTheNextRun() = runBlocking {
-        val harness = Harness.open(durable = emptyList())
+        val harness = CanonicalTurnHarness.open(scope, durable = emptyList())
         try {
             // A finished reply, then an agent-initiated run with no prompt in between: two runs.
             val live = harness.streamMidRun(
@@ -88,58 +82,12 @@ class ToolRoundRunStackingTest {
         is ChatRenderItem.Single -> listOf(item.message)
     }
 
-    private class Harness private constructor(
-        private val coordinator: CanonicalTimelineCoordinator,
-        private val owner: CanonicalTimelineCoordinator.Owner,
-        private val ui: CoroutineScope,
-        private val presentation: CanonicalTimelinePresentation,
-    ) {
-        companion object {
-            suspend fun open(durable: List<LettaMessage>): Harness {
-                val coordinator = CanonicalTimelineCoordinator(InMemoryTimelineStore(), DurableTransport(durable))
-                val owner = coordinator.acquire(scope)
-                val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-                return Harness(coordinator, owner, ui, CanonicalTimelinePresentation.open(coordinator, owner, ui))
-            }
-        }
-
-        private val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
-
-        /** Streams [frames] of a turn that is still running (no Done) and returns the live render. */
-        suspend fun streamMidRun(frames: List<LettaMessage>, expectedRows: Int? = null): List<ChatRenderItem> {
-            val fence = coordinator.beginLive(owner)
-            frames.forEach { assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(it))) }
-            val last = frames.last().id
-            awaitCondition({ "live turn never projected: ${presentation.live.value.map { it.key }}" }) {
-                val live = presentation.live.value
-                live.any { it.containsMessageId(last) } && (expectedRows == null || live.size == expectedRows)
-            }
-            return presentation.live.value
-        }
-
-        suspend fun settle() {
-            assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
-            ui.launch { presentation.settled.collectLatest { presenter.collectFrom(it) } }
-            presenter.awaitRows(2) { "settled turn never arrived" }
-            presenter.awaitIdle()
-        }
-
-        fun rows(): List<ChatRenderItem> = presenter.snapshot().items.map { it.item }
-
-        suspend fun close() {
-            presentation.close()
-            ui.cancel()
-        }
-    }
-
-    private class DurableTransport(private val durable: List<LettaMessage>) :
-        TimelineTransport by unexpectedTimelineTransport() {
-        override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
-            TimelineRemotePageResult.Page(
-                request.requestId, request.selectionGeneration,
-                durable.map { TimelineRemoteRecord(TimelineMessageId(it.id), it, 0) },
-                null, false, 0,
-            )
+    /** Streams a turn that is still running (no Done) and returns the live render. */
+    private suspend fun CanonicalTurnHarness.streamMidRun(
+        frames: List<LettaMessage>,
+        expectedRows: Int? = null,
+    ): List<ChatRenderItem> = stream(frames, finished = false) { live ->
+        live.any { it.containsMessageId(frames.last().id) } && (expectedRows == null || live.size == expectedRows)
     }
 
     private companion object {
