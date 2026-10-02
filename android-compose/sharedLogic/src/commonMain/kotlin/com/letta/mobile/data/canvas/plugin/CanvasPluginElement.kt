@@ -70,18 +70,3 @@ data class CanvasPluginFallback(
     val openUrl: String? = null,
 )
 
-/**
- * The props schemas of the plugin kinds a host knows, by element type and schema version.
- *
- * A seam for the kind schemas (letta-mobile-s416w.2): the validator asks it, and a kind it does not
- * know is accepted on the envelope alone with a WARN, so a board relayed by a host without the
- * plugin still converges. [Empty] knows no kinds.
- */
-fun interface PluginKindCatalog {
-    /** The props schema of [type] at version [v], or null when this host does not know that kind. */
-    fun schemaFor(type: String, v: Int): JsonObject?
-
-    companion object {
-        val Empty: PluginKindCatalog = PluginKindCatalog { _, _ -> null }
-    }
-}
