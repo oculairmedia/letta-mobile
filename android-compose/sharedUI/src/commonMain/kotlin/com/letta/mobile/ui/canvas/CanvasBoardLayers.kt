@@ -339,8 +339,11 @@ private fun CanvasBoardPlugins(board: CanvasBoard) {
         board = rememberPluginBoard(session, board.flows.sessionDoc.value, board.host.assets),
         viewport = board.state.viewport,
         modifier = Modifier.fillMaxSize().clipToBounds(),
-        selection = PluginBoardSelection(board.ui.activeNoteId, eraseMode = board.state.mode == Mode.ERASER),
-        onSelect = { id -> board.selectPluginElement(id) },
+        selection = PluginBoardSelection(
+            selectedId = board.ui.activeNoteId,
+            eraseMode = board.state.mode == Mode.ERASER,
+            onSelect = { id -> board.selectPluginElement(id) },
+        ),
     )
 }
 

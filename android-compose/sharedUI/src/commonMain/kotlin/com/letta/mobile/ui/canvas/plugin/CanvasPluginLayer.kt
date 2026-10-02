@@ -65,9 +65,16 @@ class PluginBoard(
     val snapshots: PluginSnapshotSources,
 )
 
-/** Which element is selected, and whether the eraser is held (a press then removes the element). */
+/**
+ * Which element is selected, whether the eraser is held (a press then removes the element), and
+ * what a press on an element tells the host ([onSelect], called with the element's id).
+ */
 @Immutable
-data class PluginBoardSelection(val selectedId: String? = null, val eraseMode: Boolean = false)
+class PluginBoardSelection(
+    val selectedId: String? = null,
+    val eraseMode: Boolean = false,
+    val onSelect: (String) -> Unit = {},
+)
 
 /**
  * The plugin elements of [session]'s board as of [revision] (anything that changes when the scene
@@ -84,7 +91,7 @@ fun rememberPluginBoard(session: CanvasSession, revision: CanvasDocument?, asset
  * the way they are: in the drawing's world coordinates, moving and scaling with the [viewport].
  *
  * Each element is drawn by the renderer [LocalPluginElementRenderers] has for its type, which in
- * core is always the [PluginFallbackCard]. A press selects it ([onSelect]); the selected one wears
+ * core is always the [PluginFallbackCard]. A press selects it ([PluginBoardSelection.onSelect]); the selected one wears
  * the board's selection chrome and resizes from its handles; a drag on its handle bar moves it.
  * Moves and resizes are written when the gesture ends, as one op that carries only the frame,
  * owned by USER, through the board's history recorder.
@@ -101,7 +108,6 @@ fun CanvasPluginLayer(
     viewport: Viewport,
     modifier: Modifier = Modifier,
     selection: PluginBoardSelection = PluginBoardSelection(),
-    onSelect: (String) -> Unit = {},
 ) {
     if (board.elements.isEmpty()) return
     // Read by the elements in layout and draw only, through a function whose identity never changes.
@@ -109,7 +115,7 @@ fun CanvasPluginLayer(
     val viewportOf: () -> Viewport = remember { { currentViewport.value } }
     // The host's callback is a new object on every recomposition (each frame of a zoom); each element
     // gets a handler made once that calls whatever the host passed last.
-    val latestSelect = rememberUpdatedState(onSelect)
+    val latestSelect = rememberUpdatedState(selection.onSelect)
     Box(modifier = modifier.fillMaxSize()) {
         board.elements.forEach { element ->
             key(element.id) {
@@ -118,8 +124,7 @@ fun CanvasPluginLayer(
                     element = element,
                     board = board,
                     viewport = viewportOf,
-                    state = PluginHostState(selected = element.id == selection.selectedId, eraseMode = selection.eraseMode),
-                    onSelect = select.select,
+                    state = PluginHostState(selected = element.id == selection.selectedId, eraseMode = selection.eraseMode, onSelect = select.select),
                 )
             }
         }
@@ -131,9 +136,12 @@ private class ElementSelect(id: String, latest: State<(String) -> Unit>) {
     val select: () -> Unit = { latest.value(id) }
 }
 
-/** An element's part in the board's selection; equal when nothing about it changed, so the element is skipped. */
+/**
+ * An element's part in the board's selection; equal when nothing about it changed (its [onSelect]
+ * is made once per element), so the element is skipped.
+ */
 @Immutable
-private data class PluginHostState(val selected: Boolean, val eraseMode: Boolean)
+private data class PluginHostState(val selected: Boolean, val eraseMode: Boolean, val onSelect: () -> Unit)
 
 @Composable
 private fun PluginElementHost(
@@ -141,7 +149,6 @@ private fun PluginElementHost(
     board: PluginBoard,
     viewport: () -> Viewport,
     state: PluginHostState,
-    onSelect: () -> Unit,
 ) {
     LocalNoteCompositionProbe.current?.invoke(element.id)
     val stored = PluginElementFrames.boardFrameOf(element)
@@ -173,7 +180,7 @@ private fun PluginElementHost(
                 // Required, not just a size: the element is never measured again while the zoom changes the margin.
                 .requiredSize(size)
                 .testTag(CanvasPluginTestTags.element(element.id))
-                .pressToSelect(element.id, state.eraseMode) { if (state.eraseMode) edits.remove() else onSelect() },
+                .pressToSelect(element.id, state.eraseMode) { if (state.eraseMode) edits.remove() else state.onSelect() },
         ) {
             InWorldUnits { LocalPluginElementRenderers.current.rendererFor(view.value)(view.value, chrome) }
         }

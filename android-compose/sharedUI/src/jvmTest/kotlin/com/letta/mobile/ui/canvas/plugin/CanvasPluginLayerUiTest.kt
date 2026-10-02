@@ -95,8 +95,7 @@ class CanvasPluginLayerUiTest {
                         CanvasPluginLayer(
                             board = board,
                             viewport = vp,
-                            selection = PluginBoardSelection(host.selected.value),
-                            onSelect = { id -> if (vp.scale > 0f) host.selected.value = id },
+                            selection = PluginBoardSelection(host.selected.value, onSelect = { id -> if (vp.scale > 0f) host.selected.value = id }),
                         )
                     }
                 }
