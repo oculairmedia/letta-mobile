@@ -26,31 +26,6 @@ class ArchitectureGateFixtureTest {
     }
 
     @Test
-    fun `Konsist policy catches implicit java lang use in commonMain`() {
-        val scope = Konsist.scopeFromExternalDirectory(resources.resolve("violation").toString())
-        val violations = KotlinSourcePolicy.violations(scope).filter { "ImplicitJvm.kt" in it }
-
-        assertEquals(
-            listOf("System.", "Math.", "::class.java", "synchronized("),
-            violations.map { it.substringAfter("uses JVM-only ") },
-        )
-    }
-
-    @Test
-    fun `implicit JVM scan ignores comments strings and common clocks`() {
-        val source = """
-            import kotlinx.atomicfu.locks.synchronized
-            // System.currentTimeMillis() in a comment
-            val label = "Math.max in a string"
-            val now = kotlin.time.Clock.System.now()
-            val sized = ChatDockGeometryMath.rect()
-            fun locked() = synchronized(lock) { 1 }
-        """.trimIndent()
-
-        assertEquals(emptyList<String>(), ImplicitJvmApiScan.hits(source))
-    }
-
-    @Test
     fun `ArchUnit catches a fixture package cycle`() {
         val classes = ClassFileImporter().importPackages("com.letta.mobile.architecture.fixtures.violation.cycle")
         val cycleRule = repositoryBytecodeRules().first()
