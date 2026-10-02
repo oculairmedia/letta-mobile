@@ -6,17 +6,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.key
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import com.mikepenz.markdown.compose.Markdown
-import com.mikepenz.markdown.compose.components.MarkdownComponentModel
-import com.mikepenz.markdown.compose.components.MarkdownComponents
-import com.mikepenz.markdown.compose.components.markdownComponents
-import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
-import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.MarkdownColors
@@ -24,43 +18,8 @@ import com.mikepenz.markdown.model.MarkdownState
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.ReferenceLinkHandlerImpl
 import com.mikepenz.markdown.model.rememberMarkdownState
-import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.parser.MarkdownParser
-
-fun interface MermaidDiagramRenderer {
-    @Composable
-    fun Render(source: String, modifier: Modifier)
-}
-
-val LocalMermaidDiagramRenderer = staticCompositionLocalOf<MermaidDiagramRenderer?> { null }
-
-internal enum class CodeFenceRenderer {
-    MermaidDiagram,
-    Code,
-}
-
-internal fun selectCodeFenceRenderer(
-    language: String,
-    source: String,
-    deferIncompleteMermaid: Boolean = false,
-): CodeFenceRenderer =
-    if (shouldRenderMermaidDiagram(language, source, deferIncompleteMermaid)) {
-        CodeFenceRenderer.MermaidDiagram
-    } else {
-        CodeFenceRenderer.Code
-    }
-
-private fun shouldRenderMermaidDiagram(
-    language: String,
-    source: String,
-    deferIncompleteMermaid: Boolean,
-): Boolean {
-    if (!language.equals("mermaid", ignoreCase = true)) return false
-    if (source.isBlank()) return false
-    if (deferIncompleteMermaid) return false
-    return true
-}
 
 /**
  * Common Android/Desktop Markdown paint adapter.
@@ -116,46 +75,6 @@ fun SharedMarkdownText(
             components = components,
             colors = sharedMarkdownColors(paint.textColor),
             typography = sharedMarkdownTypography(paint.textStyle),
-        )
-    }
-}
-
-/** Code blocks as the renderer draws them; code fences too, but a complete Mermaid fence as a diagram. */
-@Composable
-private fun rememberSharedMarkdownComponents(text: String): MarkdownComponents {
-    val deferIncompleteMermaid = remember(text) { hasOpenMarkdownCodeFence(text) }
-    val mermaidRenderer = LocalMermaidDiagramRenderer.current
-    return remember(mermaidRenderer, deferIncompleteMermaid) {
-        markdownComponents(
-            codeBlock = {
-                MarkdownCodeBlock(
-                    content = it.content,
-                    node = it.node,
-                )
-            },
-            codeFence = { SharedCodeFence(it, mermaidRenderer, deferIncompleteMermaid) },
-        )
-    }
-}
-
-@Composable
-private fun SharedCodeFence(
-    model: MarkdownComponentModel,
-    mermaidRenderer: MermaidDiagramRenderer?,
-    deferIncompleteMermaid: Boolean,
-) {
-    val (language, source) = extractCodeFenceInfo(model.content, model.node)
-    when (selectCodeFenceRenderer(language, source, deferIncompleteMermaid)) {
-        CodeFenceRenderer.MermaidDiagram -> mermaidRenderer?.Render(
-            source = source,
-            modifier = Modifier.fillMaxWidth(),
-        ) ?: MarkdownCodeFence(
-            content = model.content,
-            node = model.node,
-        )
-        CodeFenceRenderer.Code -> MarkdownCodeFence(
-            content = model.content,
-            node = model.node,
         )
     }
 }
@@ -227,19 +146,4 @@ internal class MarkdownRetentionTracker {
         previousText = text
         return revision
     }
-}
-
-private fun extractCodeFenceInfo(content: String, node: ASTNode): Pair<String, String> {
-    var language = ""
-    val codeLines = mutableListOf<String>()
-
-    for (child in node.children) {
-        when (child.type.name) {
-            "FENCE_LANG" -> language = content.substring(child.startOffset, child.endOffset).trim()
-            "CODE_FENCE_CONTENT" -> codeLines.add(content.substring(child.startOffset, child.endOffset))
-            "EOL" -> if (codeLines.isNotEmpty()) codeLines.add("\n")
-        }
-    }
-
-    return language to codeLines.joinToString("").trimEnd()
 }
