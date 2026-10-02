@@ -2,6 +2,8 @@ package com.letta.mobile.data.canvas.plugin
 
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
+import com.letta.mobile.data.canvas.CanvasSceneCheck
+import com.letta.mobile.data.canvas.CanvasSceneValidator
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -17,7 +19,8 @@ import kotlin.test.assertTrue
 /**
  * The serialized v1 plugin element fixtures under `commonTest/resources/canvas/plugin/v1/`
  * (letta-mobile-s416w.1): stored entries that decode and keep the envelope, and an op sequence
- * that projects to the stored entry whatever order its update and move arrive in.
+ * that projects to the stored entry whatever order its update and move arrive in; and the example
+ * manifest's kind refusing props at the pointers `props-problems.json` lists (letta-mobile-s416w.2).
  */
 class CanvasPluginFixturesTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -57,6 +60,26 @@ class CanvasPluginFixturesTest {
         val element = assertNotNull(CanvasPluginElements.decode(entry("element-widget.json")))
         assertEquals(element.pluginId, manifest.getValue("id").jsonPrimitive.content)
         assertTrue(element.kind in kinds, "$kinds")
+    }
+
+    @Test
+    fun theExampleManifestsWidgetRefusesPropsAtTheFixturesPointers() {
+        val manifest = json.parseToJsonElement(fixture("manifest-example.json")).jsonObject
+        val kinds = InMemoryPluginKindCatalog(
+            InMemoryPluginKindCatalog.specsOf(manifest.getValue("id").jsonPrimitive.content, manifest.getValue("elements").jsonObject),
+        )
+        val fixture = json.parseToJsonElement(fixture("props-problems.json")).jsonObject
+        val type = fixture.getValue("type").jsonPrimitive.content
+        val v = fixture.getValue("v").jsonPrimitive.int
+        fixture.getValue("cases").jsonArray.map { it.jsonObject }.forEach { case ->
+            val name = case.getValue("name").jsonPrimitive.content
+            val op = CanvasPluginElementFixtures.place(1).copy(elementType = type, v = v, props = case.getValue("props").jsonObject)
+            val paths = when (val check = CanvasSceneValidator.pluginElement(op, kinds)) {
+                is CanvasSceneCheck.Valid -> emptyList()
+                is CanvasSceneCheck.Invalid -> check.problems.map { it.path }
+            }
+            assertEquals(case.getValue("expected").jsonArray.map { it.jsonPrimitive.content }, paths, name)
+        }
     }
 
     private companion object {

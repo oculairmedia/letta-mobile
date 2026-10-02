@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.PluginBoardKinds
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 
 /** One refused op of a batch: where it is ([opIndex], `2` or `2.0` inside a batch op), what it is and the rule it breaks. */
@@ -27,10 +28,15 @@ sealed interface CanvasBatchCheck {
  *
  * Only what the batch INTRODUCES is refused. A board that already breaks a rule (written before
  * this check existed) must still accept the writes that repair it.
+ *
+ * A plugin element's props are held to its kind's schema in [PluginKindCatalog] (the host's
+ * installed kinds; [PluginKindCatalog.Empty] where none are), the kind read from the board for a
+ * write that names none.
  */
 object CanvasBatchValidator {
     fun check(sceneJson: String, ops: List<CanvasOp>, kinds: PluginKindCatalog = PluginKindCatalog.Empty): CanvasBatchCheck {
-        val shaped = ops.mapIndexed { index, op -> index to CanvasSceneValidator.ops(listOf(op), kinds) }
+        val board = PluginBoardKinds.of(sceneJson, ops)
+        val shaped = ops.mapIndexed { index, op -> index to CanvasSceneValidator.ops(listOf(op), kinds, board) }
         val shapeProblems = shaped.flatMap { (index, check) -> (check as? CanvasOpsCheck.Invalid)?.let { shapeViolations(index, ops[index], it) }.orEmpty() }
         if (shapeProblems.isNotEmpty()) return CanvasBatchCheck.Invalid(shapeProblems)
         val normalised = shaped.flatMap { (_, check) -> (check as CanvasOpsCheck.Valid).ops }
