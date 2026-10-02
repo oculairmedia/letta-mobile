@@ -326,4 +326,12 @@ data class ChatUiState(
      * a second Stop press while this is true force-clears locally.
      */
     val isCancellingRun: Boolean get() = isStreaming && isCancelling
+
+    /**
+     * letta-mobile-bglj6.1: a run is in flight, from the send until the turn's terminal, through
+     * every tool round, approval wait and gap between steps: the agent is typing (nothing has
+     * answered yet) or the run streams (the composer's Stop button is up). Every working cue (the
+     * ambient glow on the page and the docked panel, the dock's busy mascot) reads this one fact.
+     */
+    val isRunInFlight: Boolean get() = isStreaming || isAgentTyping
 }
