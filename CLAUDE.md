@@ -33,6 +33,8 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 ./gradlew :desktop:run                      # Compose Desktop (needs a display; on a headless VM use DISPLAY=:1 and SOFTWARE rendering)
 ```
 
+To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
+
 For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/letta-code@0.29.12` (see the App Server section of `AGENTS.md`).
 
 ---

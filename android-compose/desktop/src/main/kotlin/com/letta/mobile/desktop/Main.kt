@@ -59,6 +59,12 @@ fun main(args: Array<String>) {
     // ContentProvider; Desktop (and any future WasmJS) call this wrapper
     // explicitly. See sharedLogic/commonMain/.../KotzillaKmpMonitoring.kt.
     com.letta.mobile.data.observability.startKotzillaMonitoring()
+    // Phone preview (`:desktop:runPhone`, docs/development/phone-preview.md): the same app in a
+    // phone-sized window. Off unless the launch asks for it; the normal launch below is untouched.
+    if (com.letta.mobile.desktop.phone.desktopPhoneModeRequested()) {
+        com.letta.mobile.desktop.phone.runDesktopPhoneApplication(args)
+        return
+    }
     if (Platform.Current == Platform.Windows) {
         System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
         WindowsJumpListManager.setProcessAppId(LETTA_WINDOWS_AUMID)

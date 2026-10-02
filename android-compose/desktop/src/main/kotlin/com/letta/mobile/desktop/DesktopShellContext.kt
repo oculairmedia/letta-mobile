@@ -14,6 +14,8 @@ import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopDockedCanvasRouter
 import com.letta.mobile.desktop.chat.rememberDesktopChatSessionPort
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.drawsSharedChat
 
 /** letta-mobile-bglj6.1: the shared KMP chat page's wiring, present only while its preview flag is on. */
 internal data class DesktopSharedChatWiring(
@@ -84,7 +86,8 @@ private fun rememberDesktopSharedChatWiring(
 ): DesktopSharedChatWiring {
     // letta-mobile-bglj6.1: the shared KMP chat page's port, built only while the preview flag is on.
     val sharedChatEnabled by LocalDesktopSharedChatPageFlag.current.enabled.collectAsState()
-    val port = if (sharedChatEnabled) {
+    // The phone preview always draws the shared page: it is the phone's chat.
+    val port = if (LocalDesktopPhone.current.drawsSharedChat(sharedChatEnabled)) {
         rememberDesktopChatSessionPort(chatController, onA2uiAction)
     } else {
         null

@@ -1,5 +1,10 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.desktop.phone.ClosePhoneDrawerOnNavigation
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.PhoneAwareContent
+import com.letta.mobile.desktop.phone.isBareChatPage
+
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
@@ -68,6 +73,17 @@ internal fun DesktopMainContentPane(
     actions: DesktopMainContentActions,
     modifier: Modifier = Modifier,
 ) {
+    // The phone preview frames every destination but the chat page in a phone app bar; null on the desktop.
+    val phone = LocalDesktopPhone.current
+    ClosePhoneDrawerOnNavigation(phone, inputs.selectedDestination, inputs.chatDetailState.surface.selectedConversationId, inputs.editingAgentId)
+    val bare = isBareChatPage(inputs.selectedDestination, inputs.sharedChatPage != null, inputs.editingAgentId)
+    PhoneAwareContent(phone, title = inputs.selectedDestination.label, bare = bare, modifier = modifier) { paneModifier ->
+        MainContentRow(inputs, actions, paneModifier)
+    }
+}
+
+@Composable
+private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions, modifier: Modifier) {
     val editing = inputs.editingAgentId
     val canvas = inputs.activeCanvasSession
     // The editor is a panel beside the chat, not a page: the conversation stays in view.

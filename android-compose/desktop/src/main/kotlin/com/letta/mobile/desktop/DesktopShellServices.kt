@@ -25,6 +25,8 @@ import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.chat.rememberDesktopChatDockGeometry
 import com.letta.mobile.desktop.data.DesktopSessionGraph
 import com.letta.mobile.desktop.data.DesktopShellLayoutStore
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.reducedMotionOr
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitMode
@@ -126,7 +128,8 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
 private fun rememberDesktopShellLayout(backendConfigId: String): DesktopShellLayout {
     val store = remember { DesktopShellLayoutStore() }
     val controller = rememberDesktopShellLayoutController(backendConfigId = backendConfigId, store = store)
-    val reducedMotion = remember { desktopPrefersReducedMotion() }
+    // The phone preview brings its own reduced-motion preset; the desktop follows the OS.
+    val reducedMotion = LocalDesktopPhone.current.reducedMotionOr(remember { desktopPrefersReducedMotion() })
     SidebarToggleKeyDispatcherEffect(
         onToggle = { controller.dispatch(ShellLayoutEvent.ToggleSidebar) },
     )

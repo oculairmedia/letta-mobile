@@ -3,13 +3,11 @@ package com.letta.mobile.desktop
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -20,6 +18,11 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksSidePane
+import com.letta.mobile.desktop.phone.DesktopShellRow
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.ReportShellWidth
+import com.letta.mobile.desktop.phone.agentPaneVisible
+import com.letta.mobile.desktop.phone.sidebarVisible
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 
@@ -48,6 +51,8 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
 @Composable
 private fun DesktopShellLayoutBody(context: DesktopShellContext, frame: DesktopShellFrame) {
     val layout = context.core.layout
+    // The phone preview folds the rail and sidebar into a drawer; null in the desktop app.
+    val phone = LocalDesktopPhone.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Responsive shell: below the breakpoint (or when the user
         // explicitly collapses it) the capability/history sidebar is
@@ -57,33 +62,40 @@ private fun DesktopShellLayoutBody(context: DesktopShellContext, frame: DesktopS
         // the measured width into it. The 56dp agent rail always stays as
         // the navigation affordance.
         val measuredWidthDp = maxWidth.value
-        val isSidebarVisible = layout.controller.state.isSidebarVisible &&
+        val desktopSidebarVisible = layout.controller.state.isSidebarVisible &&
             !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
+        val isSidebarVisible = phone.sidebarVisible(desktopSidebarVisible)
         // One rule for where the mascot stands (wbin4.4), driven from the shell's own state.
-        DriveMascotStage(frame.focus.selectedAgentId, agentPaneVisible = isSidebarVisible)
-        LaunchedEffect(measuredWidthDp) {
-            layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
-        }
+        DriveMascotStage(frame.focus.selectedAgentId, agentPaneVisible = phone.agentPaneVisible(isSidebarVisible))
+        ReportShellWidth(phone, measuredWidthDp) { layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) }
         // Every seated mascot draws here, over the shell, and travels between seats (wbin4.4).
         MascotTransportLayer(reducedMotion = layout.reducedMotion) {
-            Row(Modifier.fillMaxSize()) {
-                // Far-left workspace/agent rail.
-                DesktopShellAgentRail(context, frame)
-                RailDivider()
-                // Agent sidebar: agent header + nav + conversations. Fully
-                // removed (not shrunk to an icon rail - AC #3) below the
-                // breakpoint or when the user explicitly collapses it.
-                DesktopCollapsibleSidebar(
-                    visible = isSidebarVisible,
-                    reducedMotion = layout.reducedMotion,
-                ) {
-                    DesktopShellAgentSidebar(context, frame)
-                    RailDivider()
-                }
+            DesktopShellRow(
+                phone,
+                layout.reducedMotion,
+                navigationPanes = { DesktopShellNavigationPanes(context, frame, isSidebarVisible) },
+            ) {
                 DesktopShellMainPane(context, frame)
                 DesktopShellBackgroundTasks(context, frame)
             }
         }
+    }
+}
+
+/** The far-left workspace/agent rail and the agent sidebar beside it. */
+@Composable
+private fun DesktopShellNavigationPanes(context: DesktopShellContext, frame: DesktopShellFrame, sidebarVisible: Boolean) {
+    DesktopShellAgentRail(context, frame)
+    RailDivider()
+    // Agent sidebar: agent header + nav + conversations. Fully
+    // removed (not shrunk to an icon rail - AC #3) below the
+    // breakpoint or when the user explicitly collapses it.
+    DesktopCollapsibleSidebar(
+        visible = sidebarVisible,
+        reducedMotion = context.core.layout.reducedMotion,
+    ) {
+        DesktopShellAgentSidebar(context, frame)
+        RailDivider()
     }
 }
 

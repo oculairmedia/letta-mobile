@@ -10,7 +10,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.ui.theme.CustomColors
 import com.letta.mobile.ui.theme.LettaColorTokens
@@ -23,10 +25,24 @@ import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.ui.ComponentStyling
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 
+/**
+ * A host's override of the desktop theme: the phone preview (`:desktop:runPhone`) picks light or dark
+ * itself and draws with the phone's Material type scale and shapes. Null (the default) follows the OS
+ * and keeps the desktop metrics.
+ */
+@Immutable
+internal data class DesktopThemeOverride(
+    val dark: Boolean,
+    /** Material 3's default type scale and shapes (Android's sizes) instead of the desktop's tighter ones. */
+    val phoneMetrics: Boolean = false,
+)
+
+internal val LocalDesktopThemeOverride = staticCompositionLocalOf<DesktopThemeOverride?> { null }
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkMode()
+    val dark = LocalDesktopThemeOverride.current?.dark ?: isSystemInDarkMode()
     val themeDefinition = remember(dark) {
         if (dark) JewelTheme.darkThemeDefinition() else JewelTheme.lightThemeDefinition()
     }
@@ -67,7 +83,8 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
  */
 @Composable
 internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkMode()
+    val override = LocalDesktopThemeOverride.current
+    val dark = override?.dark ?: isSystemInDarkMode()
     // Cool-slate palette (2026-06-23 retune) — sourced from the shared
     // LettaColorTokens so desktop and Android stay in lockstep (no duplication).
     val scheme = if (dark) darkColorScheme(
@@ -173,10 +190,11 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
     }
 
     CompositionLocalProvider(LocalCustomColors provides customColors) {
+        val phoneMetrics = override?.phoneMetrics == true
         MaterialTheme(
             colorScheme = scheme,
-            shapes = DesktopShapes,
-            typography = DesktopTypography,
+            shapes = if (phoneMetrics) PhoneShapes else DesktopShapes,
+            typography = if (phoneMetrics) PhoneTypography else DesktopTypography,
             content = content,
         )
     }
@@ -209,6 +227,12 @@ private val DesktopTypography = Typography().let { base ->
         labelSmall = base.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
     )
 }
+
+/** The phone preview's type scale: Material 3's defaults, the sizes Android's theme uses (in Inter there). */
+private val PhoneTypography = Typography()
+
+/** The phone preview's shapes: Material 3's defaults, as on Android. */
+private val PhoneShapes = Shapes()
 
 /**
  * Desktop corner-radius token scale — tighter than the Material 3 defaults
