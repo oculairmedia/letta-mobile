@@ -1,0 +1,31 @@
+{
+  "manifestVersion": 1,
+  "id": "letta.example",
+  "name": "Example",
+  "version": "1.2.0",
+  "publisher": "oculairmedia",
+  "contract": { "version": 1 },
+  "runtime": {
+    "kind": "service",
+    "url": "ws://127.0.0.1:7788/lcp",
+    "headers": { "Authorization": "Bearer ${secrets.apiToken}", "X-Example-Region": "${settings.region}" }
+  },
+  "settings": {
+    "region": { "type": "enum", "values": ["eu", "us"], "default": "eu" }
+  },
+  "secrets": [ { "name": "apiToken", "label": "API token", "required": true } ],
+  "capabilities": ["canvas:place", "canvas:read"],
+  "elements": {
+    "widget": {
+      "schemaVersion": 1,
+      "props": { "type": "object", "additionalProperties": false, "properties": {
+        "status": { "enum": ["idle", "running", "done", "failed"] },
+        "label": { "type": "string", "maxLength": 128 } } },
+      "defaultSize": { "width": 320, "height": 240 }
+    }
+  },
+  "actions": {
+    "start": { "description": "Start a job and place a widget", "visibility": ["agent"],
+               "input": { "type": "object", "additionalProperties": false, "properties": { "label": { "type": "string", "maxLength": 128 } } } }
+  }
+}
