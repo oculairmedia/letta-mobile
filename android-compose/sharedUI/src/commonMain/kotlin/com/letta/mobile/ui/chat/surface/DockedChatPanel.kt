@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +69,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.sharedui.resources.Res
@@ -318,27 +321,35 @@ internal fun DockedChatPanel(
         // The open panel's rect (gliding on a reset); minimised, the dock ends at its bottom edge.
         val open = animatedDockRect(openRect(geometry, frame), state)
         val openness = rememberDockOpenness(collapsed)
-        val showPanel by remember(openness) { derivedStateOf { openness.value > 0f } }
-        val showMinimised by remember(openness) { derivedStateOf { openness.value < 1f } }
-        val folding = showPanel && showMinimised
+        val showPanelState = remember(openness) { derivedStateOf { openness.value > 0f } }
+        val showMinimisedState = remember(openness) { derivedStateOf { openness.value < 1f } }
+        val layers = dockLayers(geometry, showPanelState, showMinimisedState, morph)
+        val showPanel = layers.showPanel
         val density = LocalDensity.current
         // The page covers the keyboard's area too: the morph grows into it.
         val fullHeightDp = maxHeight.value + with(density) { WindowInsets.ime.getBottom(density).toDp().value }
         val fullWidthDp = maxWidth.value
         val fraction = morph.fraction
-        // Minimised at rest the dock is as tall as what it shows; otherwise its rect sets its size.
-        val wrapHeight = !showPanel && !morph.morphing
+        val wrapHeight = layers.wrapHeight
         val opennessValue: () -> Float = remember(openness) { { openness.value } }
         Box(
             Modifier
                 .layout { measurable, constraints ->
                     val placed = dockPlacement(
+                        scope = this,
                         measurable = measurable,
                         constraints = constraints,
-                        target = DockPlacementTarget(geometry, frame, open, wrapHeight, state.snapping, state.foldFrom),
-                        openness = opennessValue(),
-                        morphTo = Pair(fullWidthDp, fullHeightDp),
-                        fraction = fraction(),
+                        target = DockPlacementTarget(
+                            geometry = geometry,
+                            frame = frame,
+                            open = open,
+                            wrapHeight = wrapHeight,
+                            snapping = state.snapping,
+                            foldFrom = state.foldFrom,
+                            openness = opennessValue(),
+                            page = ChatDockRect(0f, 0f, fullWidthDp, fullHeightDp),
+                            fraction = fraction(),
+                        ),
                     )
                     // Takes the whole area and places the panel inside it, like an offset: what
                     // follows (the tag, the actions, the content) sees only the panel's rect.
@@ -346,13 +357,7 @@ internal fun DockedChatPanel(
                         placed.placeable.place(placed.left, placed.top)
                     }
                 }
-                .then(
-                    if (wrapHeight) {
-                        Modifier.onSizeChanged { size -> state.collapsedHeightDp = with(density) { size.height.toDp().value } }
-                    } else {
-                        Modifier
-                    },
-                )
+                .then(collapsedHeightReporter(state, layers, density))
                 .dockSemantics(state, dockSemanticsLabels())
                 .testTag(DOCK_PANEL_TAG),
             contentAlignment = Alignment.BottomCenter,
@@ -363,51 +368,14 @@ internal fun DockedChatPanel(
                 takesTouches = showPanel,
                 glow = { glowModifier ->
                     // Minimised, the halo around the mascot glows instead.
-                    if (showPanel) ChatPanelAmbientGlow(
-                        ambient = content.ambient,
-                        placement = AmbientGlowPlacement.AboveComposer { state.barDp.takeUnless { it.isNaN() }?.dp ?: Dp.Unspecified },
-                        modifier = glowModifier,
-                    )
+                    if (showPanel) PanelGlow(state, content.ambient, glowModifier)
                 },
                 modifier = Modifier.matchParentSize(),
             )
-            Column(
-                Modifier
-                    .then(if (wrapHeight) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
-                    .graphicsLayer { alpha = morphDockedAlpha(fraction()) }
-                    .then(if (morph.morphing) Modifier.clearAndSetSemantics { } else Modifier),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .then(if (wrapHeight) Modifier else Modifier.weight(1f))
-                        // Mid-fold neither top is really there; the bar below stays reachable.
-                        .then(if (folding) Modifier.clearAndSetSemantics { } else Modifier),
-                    contentAlignment = Alignment.BottomCenter,
-                ) {
-                    if (showPanel) {
-                        PanelTop(
-                            state = state,
-                            content = content,
-                            modifier = Modifier.fillMaxSize().graphicsLayer {
-                                alpha = opennessValue()
-                                clip = true
-                            },
-                        )
-                    }
-                    if (showMinimised) {
-                        // No panel and no handles: the mascot and the bar float on the canvas.
-                        CollapsedDock(
-                            state = state,
-                            content = content.collapsed,
-                            // The companion stands here only once the dock is minimised.
-                            seated = collapsed,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onSizeChanged { state.minimisedTopDp = with(density) { it.height.toDp().value } }
-                                .graphicsLayer { alpha = 1f - opennessValue() },
-                        )
-                    }
+            Column(panelColumnModifier(layers, fraction)) {
+                // Mid-fold neither top is really there; the bar below stays reachable.
+                Box(panelTopsModifier(this, layers), contentAlignment = Alignment.BottomCenter) {
+                    DockTops(state, content, layers, opennessValue)
                 }
                 Box(Modifier.fillMaxWidth().onSizeChanged { state.barDp = with(density) { it.height.toDp().value } }) {
                     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
@@ -415,13 +383,12 @@ internal fun DockedChatPanel(
                     }
                 }
             }
-            if (showPanel && !showMinimised && !morph.morphing) Box(Modifier.matchParentSize()) { ResizeHandles(state) }
+            if (layers.handles) Box(Modifier.matchParentSize()) { ResizeHandles(state) }
             // Over the panel, its handles and its surface's glow: the agent's avatar on the top edge.
             if (showPanel) {
                 PanelBadge(
                     state = state,
-                    agentId = content.collapsed.agentId,
-                    seated = !collapsed,
+                    seat = BadgeSeat(agentId = content.collapsed.agentId, seated = !collapsed),
                     alpha = { opennessValue() * morphDockedAlpha(fraction()) },
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
@@ -430,7 +397,110 @@ internal fun DockedChatPanel(
     }
 }
 
-/** What the dock is placed by: its geometry and the open panel's (possibly gliding) rect. */
+/** What the dock shows this frame: the open panel, the minimised mascot, or both mid-fold. */
+@Immutable
+private data class DockLayers(
+    val collapsed: Boolean,
+    val showPanel: Boolean,
+    val showMinimised: Boolean,
+    /** Mid-fold: both tops are on screen. */
+    val folding: Boolean,
+    /** Minimised at rest the dock is as tall as what it shows; otherwise its rect sets its size. */
+    val wrapHeight: Boolean,
+    /** Open at rest, with no morph running: the resize handles show. */
+    val handles: Boolean,
+    val morphing: Boolean,
+)
+
+private fun dockLayers(
+    geometry: ChatDockGeometry,
+    showPanel: State<Boolean>,
+    showMinimised: State<Boolean>,
+    morph: SurfaceMorph,
+): DockLayers {
+    val panel = showPanel.value
+    val minimised = showMinimised.value
+    val settledOpen = panel && !minimised
+    return DockLayers(
+        collapsed = geometry.collapsed,
+        showPanel = panel,
+        showMinimised = minimised,
+        folding = panel && minimised,
+        wrapHeight = !panel && !morph.morphing,
+        handles = settledOpen && !morph.morphing,
+        morphing = morph.morphing,
+    )
+}
+
+/** Minimised at rest the dock reports its measured height to [state]; otherwise nothing. */
+@Composable
+private fun collapsedHeightReporter(state: ChatDockState, layers: DockLayers, density: Density): Modifier {
+    if (!layers.wrapHeight) return Modifier
+    return Modifier.onSizeChanged { size -> state.collapsedHeightDp = with(density) { size.height.toDp().value } }
+}
+
+/** The column of tops and bar: as wide as the dock, as tall as its rect unless it wraps; fading out under the page. */
+@Composable
+private fun panelColumnModifier(layers: DockLayers, fraction: () -> Float): Modifier {
+    val size = if (layers.wrapHeight) Modifier.fillMaxWidth() else Modifier.fillMaxSize()
+    val semantics = if (layers.morphing) Modifier.clearAndSetSemantics { } else Modifier
+    return size
+        .graphicsLayer { alpha = morphDockedAlpha(fraction()) }
+        .then(semantics)
+}
+
+/** The tops above the bar take the rest of the dock's height unless it wraps; mid-fold they are hidden from accessibility. */
+private fun panelTopsModifier(scope: ColumnScope, layers: DockLayers): Modifier {
+    val height = if (layers.wrapHeight) Modifier else with(scope) { Modifier.weight(1f) }
+    val semantics = if (layers.folding) Modifier.clearAndSetSemantics { } else Modifier
+    return Modifier.fillMaxWidth().then(height).then(semantics)
+}
+
+/** Above the bar: the open panel's header and conversation, and the minimised mascot, each while it shows. */
+@Composable
+private fun DockTops(state: ChatDockState, content: DockedPanelContent, layers: DockLayers, openness: () -> Float) {
+    val density = LocalDensity.current
+    if (layers.showPanel) {
+        PanelTop(
+            state = state,
+            content = content,
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                alpha = openness()
+                clip = true
+            },
+        )
+    }
+    if (layers.showMinimised) {
+        // No panel and no handles: the mascot and the bar float on the canvas.
+        CollapsedDock(
+            state = state,
+            content = content.collapsed,
+            // The companion stands here only once the dock is minimised.
+            seated = layers.collapsed,
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { state.minimisedTopDp = with(density) { it.height.toDp().value } }
+                .graphicsLayer { alpha = 1f - openness() },
+        )
+    }
+}
+
+/** The thinking glow on the open panel's fill, ending above its composer bar. */
+@Composable
+private fun PanelGlow(state: ChatDockState, ambient: ChatAmbient, modifier: Modifier) {
+    ChatPanelAmbientGlow(
+        ambient = ambient,
+        placement = AmbientGlowPlacement.AboveComposer { composerBarHeight(state) },
+        modifier = modifier,
+    )
+}
+
+/** The composer bar's measured height, or unspecified before it is measured. */
+private fun composerBarHeight(state: ChatDockState): Dp {
+    return state.barDp.takeUnless { it.isNaN() }?.dp ?: Dp.Unspecified
+}
+
+/** What the dock is placed by: its geometry, the open panel's (possibly gliding) rect, the fold and the morph. */
 private class DockPlacementTarget(
     val geometry: ChatDockGeometry,
     val frame: ChatDockFrame,
@@ -439,48 +509,58 @@ private class DockPlacementTarget(
     val snapping: Boolean,
     /** See [ChatDockState.foldFrom]. */
     val foldFrom: ChatDockGeometry?,
+    /** 1 open, 0 minimised. */
+    val openness: Float,
+    /** The whole area the morph grows the dock into. */
+    val page: ChatDockRect,
+    /** How far the morph has grown the dock into [page]. */
+    val fraction: Float,
 ) {
     /** The minimised dock's rect in [frame]: where it stood as it began to open, if it is opening. */
-    fun minimisedIn(frame: ChatDockFrame): ChatDockRect =
-        foldFrom?.let { ChatDockGeometryMath.rect(it, frame) } ?: minimisedRect(geometry, frame)
+    fun minimisedIn(frame: ChatDockFrame): ChatDockRect {
+        return foldFrom?.let { ChatDockGeometryMath.rect(it, frame) } ?: minimisedRect(geometry, frame)
+    }
+
+    /** Between the minimised and open rects by [openness]. */
+    fun dockedRect(): ChatDockRect {
+        val minimised = minimisedIn(frame)
+        return when {
+            openness >= 1f -> open
+            openness <= 0f -> minimised
+            else -> lerpRect(minimised, open, openness)
+        }
+    }
 }
 
 private class DockPlaced(val placeable: Placeable, val left: Int, val top: Int)
 
 /**
- * Measures and places the dock: between its minimised and open rects by [openness], then from
- * there towards the whole [morphTo] area by the morph's [fraction]. Minimised at rest it is as
- * tall as its content, placed by that measured height so the bar stays put on the frame the
- * dock folds.
+ * Measures and places the dock: between its minimised and open rects by the fold, then from
+ * there towards the whole page by the morph. Minimised at rest it is as tall as its content,
+ * placed by that measured height so the bar stays put on the frame the dock folds.
  */
-private fun MeasureScope.dockPlacement(
+private fun dockPlacement(
+    scope: MeasureScope,
     measurable: Measurable,
     constraints: Constraints,
     target: DockPlacementTarget,
-    openness: Float,
-    morphTo: Pair<Float, Float>,
-    fraction: Float,
 ): DockPlaced {
-    val minimised = target.minimisedIn(target.frame)
-    val docked = when {
-        openness >= 1f -> target.open
-        openness <= 0f -> minimised
-        else -> lerpRect(minimised, target.open, openness)
+    val rect = morphRect(target.dockedRect(), target.page, target.fraction)
+    return with(scope) {
+        val width = rect.width.dp.roundToPx().coerceAtLeast(0)
+        if (!target.wrapHeight) {
+            val placeable = measurable.measure(Constraints.fixed(width, rect.height.dp.roundToPx().coerceAtLeast(0)))
+            return DockPlaced(placeable, rect.left.dp.roundToPx(), rect.top.dp.roundToPx())
+        }
+        val placeable = measurable.measure(Constraints(minWidth = width, maxWidth = width, maxHeight = constraints.maxHeight))
+        val measured = if (target.snapping) {
+            rect
+        } else {
+            // Minimised by geometry or still on its way to opening: either way placed as the minimised dock.
+            target.minimisedIn(target.frame.copy(collapsedHeightDp = placeable.height.toDp().value))
+        }
+        DockPlaced(placeable, measured.left.dp.roundToPx(), measured.top.dp.roundToPx())
     }
-    val rect = morphRect(docked, morphTo.first, morphTo.second, fraction)
-    val width = rect.width.dp.roundToPx().coerceAtLeast(0)
-    if (!target.wrapHeight) {
-        val placeable = measurable.measure(Constraints.fixed(width, rect.height.dp.roundToPx().coerceAtLeast(0)))
-        return DockPlaced(placeable, rect.left.dp.roundToPx(), rect.top.dp.roundToPx())
-    }
-    val placeable = measurable.measure(Constraints(minWidth = width, maxWidth = width, maxHeight = constraints.maxHeight))
-    val measured = if (target.snapping) {
-        rect
-    } else {
-        // Minimised by geometry or still on its way to opening: either way placed as the minimised dock.
-        target.minimisedIn(target.frame.copy(collapsedHeightDp = placeable.height.toDp().value))
-    }
-    return DockPlaced(placeable, measured.left.dp.roundToPx(), measured.top.dp.roundToPx())
 }
 
 /** 1 open, 0 minimised, easing between them as the dock folds. Reduced motion jumps. */
@@ -572,16 +652,19 @@ private fun PanelTop(state: ChatDockState, content: DockedPanelContent, modifier
  * Where the panel sits in a [widthDp] x [heightDp] area: the same rect [DockedChatPanel] lays
  * it out at, so a morph that starts or ends here lines up with the panel at rest.
  */
-internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect =
-    ChatDockGeometryMath.rect(geometry, ChatDockFrame(widthDp, heightDp, DockLimits, collapsedHeightDp))
+internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect {
+    return ChatDockGeometryMath.rect(geometry, ChatDockFrame(widthDp, heightDp, DockLimits, collapsedHeightDp))
+}
 
 /** Where the panel stands open for [geometry]: itself, or where a minimised dock would open. */
-private fun openRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect =
-    ChatDockGeometryMath.rect(ChatDockGeometryMath.expand(geometry, frame), frame)
+private fun openRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect {
+    return ChatDockGeometryMath.rect(ChatDockGeometryMath.expand(geometry, frame), frame)
+}
 
 /** Where the dock stands minimised for [geometry]: itself, or where an open panel's bar would fold to. */
-private fun minimisedRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect =
-    ChatDockGeometryMath.rect(ChatDockGeometryMath.collapse(geometry, frame), frame)
+private fun minimisedRect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect {
+    return ChatDockGeometryMath.rect(ChatDockGeometryMath.collapse(geometry, frame), frame)
+}
 
 /** Drag to move, double-click / double-tap to reset; the panel's own controls sit on it. */
 private fun Modifier.moveHandle(state: ChatDockState): Modifier = this
@@ -641,19 +724,25 @@ private fun PanelHeader(state: ChatDockState, badged: Boolean) {
 
 /** The open panel wears the agent's avatar badge: on a chat page, for an agent with a mascot. */
 @Composable
-private fun dockBadgeShown(agentId: String?): Boolean =
-    LocalCompanionSeatAnchors.current != null && mascotAvailable(agentId)
+private fun dockBadgeShown(agentId: String?): Boolean {
+    return LocalCompanionSeatAnchors.current != null && mascotAvailable(agentId)
+}
+
+/** Who wears the panel's badge, and whether the companion stands in it (not once the dock minimises). */
+@Immutable
+private data class BadgeSeat(val agentId: String?, val seated: Boolean)
 
 /**
  * The agent's avatar at the top centre of the open panel: a neutral disc with a hairline ring
  * and a soft shadow, half above the panel's top edge (the dock's top inset keeps that half on
  * the canvas). The page's one companion seat stands in it ([CompanionSeatAnchor], scaled to
  * [ChatMascotDimens.dockBadgeSeat]); a tap on the character opens the agent pane, its pencil
- * edits it, and the disc's rim drags the panel like the strip around it. [seated] is false once
- * the dock minimises: the seat glides on to the mascot over the bar while the disc fades.
+ * edits it, and the disc's rim drags the panel like the strip around it. [BadgeSeat.seated] is
+ * false once the dock minimises: the seat glides on to the mascot over the bar while the disc fades.
  */
 @Composable
-private fun PanelBadge(state: ChatDockState, agentId: String?, seated: Boolean, alpha: () -> Float, modifier: Modifier) {
+private fun PanelBadge(state: ChatDockState, seat: BadgeSeat, alpha: () -> Float, modifier: Modifier) {
+    val agentId = seat.agentId
     if (!dockBadgeShown(agentId)) return
     val anchors = LocalCompanionSeatAnchors.current ?: return
     val scheme = MaterialTheme.colorScheme
@@ -678,7 +767,7 @@ private fun PanelBadge(state: ChatDockState, agentId: String?, seated: Boolean, 
             .clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
-        if (seated) CompanionSeatAnchor(anchors, size = ChatMascotDimens.dockBadgeSeat)
+        if (seat.seated) CompanionSeatAnchor(anchors, size = ChatMascotDimens.dockBadgeSeat)
     }
 }
 
@@ -705,7 +794,7 @@ private fun BoxScope.ResizeHandles(state: ChatDockState) {
 
 @Composable
 private fun ResizeHandle(state: ChatDockState, edge: ChatDockEdge, modifier: Modifier) {
-    Box(modifier.pointerHoverIcon(resizePointerIcon(edge.direction)).resizeDrag(state, edge))
+    Box(modifier.pointerHoverIcon(resizePointerIcon(resizeDirection(edge))).resizeDrag(state, edge))
 }
 
 @Composable
@@ -715,7 +804,7 @@ private fun ResizeGrip(state: ChatDockState, modifier: Modifier) {
     Canvas(
         modifier
             .size(ChatSurfaceDimens.dockResizeGrip)
-            .pointerHoverIcon(resizePointerIcon(ChatDockEdge.BottomRight.direction))
+            .pointerHoverIcon(resizePointerIcon(resizeDirection(ChatDockEdge.BottomRight)))
             .resizeDrag(state, ChatDockEdge.BottomRight)
             .semantics { contentDescription = label }
             .testTag(DOCK_RESIZE_GRIP_TAG),
@@ -744,13 +833,15 @@ private fun Modifier.resizeDrag(state: ChatDockState, edge: ChatDockEdge): Modif
     }
 }
 
-private val ChatDockEdge.direction: ResizeDirection
-    get() = when (this) {
+/** The pointer's resize arrow for a handle on [edge]. */
+private fun resizeDirection(edge: ChatDockEdge): ResizeDirection {
+    return when (edge) {
         ChatDockEdge.Left, ChatDockEdge.Right -> ResizeDirection.Horizontal
         ChatDockEdge.Top, ChatDockEdge.Bottom -> ResizeDirection.Vertical
         ChatDockEdge.TopLeft, ChatDockEdge.BottomRight -> ResizeDirection.DiagonalDown
         ChatDockEdge.TopRight, ChatDockEdge.BottomLeft -> ResizeDirection.DiagonalUp
     }
+}
 
 private val DockRectConverter = TwoWayConverter<ChatDockRect, AnimationVector4D>(
     convertToVector = { AnimationVector4D(it.left, it.top, it.width, it.height) },
