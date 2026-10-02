@@ -93,7 +93,10 @@ class HostCanvasComposeAtomicityTest {
         val receipt = receipt(host.compose(WEEKEND_PLAN))
         val batch = assertIs<CanvasOp.BatchOp>(host.logged().single().op)
         val sceneJson = host.scene().sceneJson
-        receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.forEach { assertTrue("\"${it.id}\"" in sceneJson, it.id) }
+        receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.forEach {
+            val id = it.boardId(receipt.artifactId)
+            assertTrue("\"$id\"" in sceneJson, id)
+        }
         assertTrue(batch.ops.size >= receipt.items.size)
     }
 

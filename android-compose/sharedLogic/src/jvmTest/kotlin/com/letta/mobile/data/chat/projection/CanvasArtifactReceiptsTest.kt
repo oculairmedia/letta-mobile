@@ -69,9 +69,11 @@ class CanvasArtifactReceiptsTest {
 
     @Test
     fun aReceiptOverTheThresholdHydratesAsAPreviewAndStillYieldsAPart() {
-        // The largest receipt the caps allow (24 checklists, longest keys and artifact id) is about
-        // 4.4 KB, over the 4 KiB hydrate threshold: message.list ships it as a 2 KiB preview. The
-        // degrade rule keeps the card (ids read from the preview), without bounds to frame.
+        // A receipt written before letta-mobile-bglj6.14, which still carried each item's board id:
+        // at the caps (24 checklists, longest keys and artifact id) it is about 4.4 KB, over the
+        // 4 KiB hydrate threshold, so message.list ships it as a 2 KiB preview. The degrade rule
+        // keeps the card (ids read from the preview), without bounds to frame. Receipts written
+        // now stay under the threshold (CanvasComposeReceiptSizeTest).
         val artifactId = "a".repeat(48)
         val items = (0 until CanvasComposeContract.MAX_ITEMS).map { i ->
             ComposeReceiptItem(key = "k$i".padEnd(32, 'x'), kind = ComposeKind.CHECKLIST, id = "cmp-$artifactId-" + "k$i".padEnd(32, 'x'), count = 40)

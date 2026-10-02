@@ -28,6 +28,8 @@ object CanvasComposeFixtures {
         val level: Int? = null,
         val checked: Boolean? = null,
         val children: List<B> = emptyList(),
+        /** `attributes.indentationLevel`, how cascade-editor and the compiler store a nested list item (a flat list). */
+        val indent: Int = 0,
     )
 
     /** A Cascade v2 document of [blocks], ids `b1`, `b2`, ... depth-first. */
@@ -53,6 +55,7 @@ object CanvasComposeFixtures {
                                 block.checked?.let { put("checked", it) }
                             },
                         )
+                        if (block.indent > 0) put("attributes", buildJsonObject { put("indentationLevel", block.indent) })
                         put(
                             "content",
                             buildJsonObject {
@@ -114,7 +117,9 @@ object CanvasComposeFixtures {
             "nested lists",
             ComposeKind.NOTE,
             document(
-                B("bullet_list", "Groceries for the week ahead", children = listOf(B("bullet_list", "Apples and pears from the market"))),
+                // Nested as cascade-editor and the compose compiler store it: a flat list, the child indented.
+                B("bullet_list", "Groceries for the week ahead"),
+                B("bullet_list", "Apples and pears from the market", indent = 1),
                 B("numbered_list", "Call the plumber about the kitchen sink"),
                 B("quote", "Simplicity is prerequisite for reliability."),
                 B("divider"),

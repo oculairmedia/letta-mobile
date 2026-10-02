@@ -105,7 +105,7 @@ object CanvasComposeCompiler {
 
         val placement = CanvasComposePlacement.place(built.map(::sized), CanvasComposePlacement.occupiedBounds(sceneJson))
         val emitted = Emitter(artifactId, placement).emit(built)
-        val receiptItems = built.map { receiptItem(it, artifactId) }
+        val receiptItems = built.map(::receiptItem)
         val dryRun = request.dryRun == true
 
         val existing = ExistingArtifact.of(sceneJson, artifactId)
@@ -237,12 +237,12 @@ object CanvasComposeCompiler {
         is Built.Group -> error("a group is not a leaf")
     }
 
-    private fun receiptItem(built: Built, artifactId: String): ComposeReceiptItem = ComposeReceiptItem(
+    /** Without its board id: that is `cmp-<artifactId>-<key>`, derived by a reader (ComposeReceiptItem.boardId). */
+    private fun receiptItem(built: Built): ComposeReceiptItem = ComposeReceiptItem(
         key = built.entry.key,
         kind = built.entry.item.kind,
-        id = CanvasComposeIds.piece(artifactId, built.entry.key),
         count = (built.entry.item as? ComposeItem.Checklist)?.items?.size,
-        children = (built as? Built.Group)?.children?.map { receiptItem(it, artifactId) },
+        children = (built as? Built.Group)?.children?.map(::receiptItem),
     )
 
     // ---- Ops --------------------------------------------------------------------------------------

@@ -93,7 +93,8 @@ class HostCanvasComposeToolsTest {
             assertEquals(CanvasComposeContract.CATALOG, document.compose!!.catalog)
         }
         receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.forEach { item: ComposeReceiptItem ->
-            assertTrue("\"${item.id}\"" in scene.sceneJson, "${item.id} is not on the board")
+            val id = item.boardId(receipt.artifactId)
+            assertTrue("\"$id\"" in scene.sceneJson, "$id is not on the board")
         }
     }
 

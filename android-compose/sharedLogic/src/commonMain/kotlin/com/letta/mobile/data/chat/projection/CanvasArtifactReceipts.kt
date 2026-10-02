@@ -64,6 +64,12 @@ data class CanvasArtifactReceipt(
     val bounds: ComposeBounds?,
     val error: CanvasArtifactError? = null,
     val toolCallId: String? = null,
+    /**
+     * The board ids of the artifact's pieces, group children included, in receipt order: what the
+     * receipt names, else derived as `cmp-<artifactId>-<key>` (receipts no longer carry them,
+     * letta-mobile-bglj6.14). Empty while pending, refused or unreadable.
+     */
+    val pieceIds: List<String> = emptyList(),
 ) {
     /** Only a published artifact is on a board to be shown. */
     val canShowOnCanvas: Boolean get() = status == CanvasArtifactStatus.Published
@@ -185,10 +191,10 @@ object CanvasArtifactReceipts {
             return null
         }
         val kinds = LinkedHashSet<ComposeKind>()
-        var count = 0
+        val pieceIds = mutableListOf<String>()
         fun visit(item: ComposeReceiptItem) {
             kinds += item.kind
-            count++
+            pieceIds += item.boardId(receipt.artifactId)
             item.children.orEmpty().forEach(::visit)
         }
         receipt.items.forEach(::visit)
@@ -199,9 +205,10 @@ object CanvasArtifactReceipts {
             status = if (receipt.status == ComposeStatus.DRY_RUN) CanvasArtifactStatus.DryRun else CanvasArtifactStatus.Published,
             title = receipt.title ?: request.title,
             kinds = kinds.toList(),
-            itemCount = count,
+            itemCount = pieceIds.size,
             bounds = receipt.bounds,
             toolCallId = callId,
+            pieceIds = pieceIds,
         )
     }
 

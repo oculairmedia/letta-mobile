@@ -51,6 +51,19 @@ class CanvasComposeFixturesTest {
     }
 
     @Test
+    fun aReceiptWithBoardIdsNamesTheSamePiecesAsOneWithout() {
+        val slim = assertRoundTrips("receipt.json", ComposeReceipt.serializer())
+        val legacy = assertRoundTrips("receipt-with-ids.json", ComposeReceipt.serializer())
+        fun all(receipt: ComposeReceipt) = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }
+        fun ids(receipt: ComposeReceipt) = all(receipt).map { it.boardId(receipt.artifactId) }
+        assertEquals(ids(legacy), ids(slim))
+        assertEquals(all(legacy).map { it.id }, ids(slim), "the derived id is the one an older receipt wrote")
+        fun stripped(items: List<ComposeReceiptItem>): List<ComposeReceiptItem> =
+            items.map { it.copy(id = null, children = it.children?.let(::stripped)) }
+        assertEquals(slim, legacy.copy(items = stripped(legacy.items)), "the only difference is the ids")
+    }
+
+    @Test
     fun theDryRunFixtureAsksForADryRun() {
         assertEquals(true, requestOf(CanvasComposeContract.decode(fixture("request-dry-run.json"))).dryRun)
     }
@@ -137,11 +150,14 @@ class CanvasComposeFixturesTest {
 
     private companion object {
         const val DIR = "/canvas/compose/v1"
-        val REQUESTS = listOf("request.json", "request-dry-run.json")
+        // request-multi-card.json is also the request of the multi-card end-to-end gate (letta-mobile-bglj6.14).
+        val REQUESTS = listOf("request.json", "request-dry-run.json", "request-multi-card.json")
         val REFUSED_REQUESTS = setOf("request-unsupported-version.json", "request-unknown-kind.json")
         val OUTPUTS: Map<String, KSerializer<*>> = mapOf(
             "receipt.json" to ComposeReceipt.serializer(),
             "receipt-dry-run.json" to ComposeReceipt.serializer(),
+            // A receipt as written before letta-mobile-bglj6.14, with each item's board id: still read.
+            "receipt-with-ids.json" to ComposeReceipt.serializer(),
             "error-validation.json" to ComposeRefusal.serializer(),
             "error-board-refused.json" to ComposeRefusal.serializer(),
         )

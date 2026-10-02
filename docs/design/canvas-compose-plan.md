@@ -1,6 +1,6 @@
 # canvas.compose: validated implementation plan (v1)
 
-Date: 2026-10-01. Status: APPROVED PLAN, implementation authorized through the research -> validation -> Opus-implementation pipeline Emmanuel set up. Supersedes the "PLAN ONLY" sections of `letta-mobile-bglj6` for E0-E4 (the canvas.compose parts); the shared chat page (E5, `letta-mobile-bglj6.1`) is already in flight on PR #1724 and is unaffected.
+Date: 2026-10-01. Status: IMPLEMENTED on `feat/canvas-compose`, see section 9 "As built" for what differs from this plan and the follow-ups. Originally: APPROVED PLAN, implementation authorized through the research -> validation -> Opus-implementation pipeline Emmanuel set up. Supersedes the "PLAN ONLY" sections of `letta-mobile-bglj6` for E0-E4 (the canvas.compose parts); the shared chat page (E5, `letta-mobile-bglj6.1`) is already in flight on PR #1724 and is unaffected.
 
 Inputs: `bd show letta-mobile-bglj6` (epic, architecture review of 2026-09-25, delivery order E0-E7), `letta-mobile-bglj6.1`, `letta-mobile-4i2z9.20` (persistence decision), `letta-mobile-8tlf9` (note frames never sized by content), `letta-mobile-le0z3` (closed, PR #1690), `letta-mobile-817ao`, `letta-mobile-99428`, `letta-mobile-dg8f8` (dotted tool names), `docs/design/canvas-compose-prior-art.md`, and the code on `origin/feat/shared-chat-page` (PR #1724) plus `origin/fix/canvas-automerge-oom` (PR #1727) for storage. Every file reference below was read on those refs.
 
@@ -208,17 +208,19 @@ Numbers are illustrative of the rules in 3.4 (origin 80,80; TEXT heading row 72 
   "title": "Weekend plan",
   "bounds": { "x": 80.0, "y": 80.0, "width": 712.0, "height": 746.0 },
   "items": [
-    { "key": "heading", "kind": "TEXT", "id": "cmp-weekend-plan-heading" },
-    { "key": "shopping", "kind": "CHECKLIST", "id": "cmp-weekend-plan-shopping", "count": 3 },
-    { "key": "meals", "kind": "NOTE", "id": "cmp-weekend-plan-meals" },
-    { "key": "selfcare", "kind": "GROUP", "id": "cmp-weekend-plan-selfcare", "children": [
-      { "key": "walk", "kind": "CARD", "id": "cmp-weekend-plan-walk" },
-      { "key": "read", "kind": "NOTE", "id": "cmp-weekend-plan-read" }
+    { "key": "heading", "kind": "TEXT" },
+    { "key": "shopping", "kind": "CHECKLIST", "count": 3 },
+    { "key": "meals", "kind": "NOTE" },
+    { "key": "selfcare", "kind": "GROUP", "children": [
+      { "key": "walk", "kind": "CARD" },
+      { "key": "read", "kind": "NOTE" }
     ] }
   ],
   "warnings": []
 }
 ```
+
+As built (letta-mobile-bglj6.14) items carry no `id`: each piece's board id is `cmp-<artifact_id>-<key>`, derived by the reader; receipts written earlier with `id` still read (section 9).
 
 Projected chat part (`UiMessage.artifacts[0]`, not a wire object):
 
@@ -291,3 +293,33 @@ Each bead's scope, files, acceptance criteria and tests are on the bead itself.
 1. Should composing from a full-screen chat automatically switch the view to the canvas? Recommendation: no; the receipt card's "Show on canvas" does it on tap, and the docked/canvas-first page already shows the board. (Product intent; the beads implement the recommendation unless told otherwise.)
 2. PR #1727 (`fix/canvas-automerge-oom`): the per-entry saving does not cover `_documents` because the projector writes an array (section 1). Recommendation: merge #1727 as is and take C10 next; or fold the object-form change into #1727 if you prefer one PR. Your PR, your call.
 3. The Iroh host wrapper must be rebuilt for `canvas_compose` and the new document fields to exist on Iroh-served conversations (same as `title` needed in dpen4). Recommendation: C7's PR includes the wrapper and the beads note says "HOST REDEPLOY REQUIRED".
+
+---
+
+## 9. As built (letta-mobile-bglj6.6 - .14, .17)
+
+Status: every bead of section 7 (C1-C9) is implemented on `feat/canvas-compose` with C10 (`letta-mobile-bglj6.15`, notes stored per entry) and the world-units decision (`letta-mobile-bglj6.17`); no PR is open for the branch yet. **HOST REDEPLOY REQUIRED**: the Iroh wrapper decodes typed ops (an old one drops `owner`/`compose` when it rewrites a note) and only a rebuilt one advertises `canvas.compose` and `canvas.compose_guide` (rebuild `:iroh-wrapper-cli:distZip`, install per `docs/architecture/lettashim-retirement-deployment-runbook.md`, restart `meridian-iroh-wrapper` only, check the NodeID is unchanged and `runtime_start` lists `canvas.compose`). Open follow-ups: `letta-mobile-bglj6.16` (per-property LWW, the v2 update prerequisite) and `letta-mobile-bglj6.18` (`apply_ops` atomic on the host, validated and stamped on the app path).
+
+Where the code differs from sections 1-5 (the code wins; this is the record):
+
+| Bead | Plan said | As built | Why |
+|---|---|---|---|
+| C1 (bglj6.6) | tool names `canvas_compose` / `canvas_compose_guide` | `canvas.compose` / `canvas.compose_guide` (`CanvasToolContract.COMPOSE`, `COMPOSE_GUIDE`); the receipt projection also accepts the underscore spelling | the provider-safe rename (`dg8f8`) is not on this branch; the beads followed the constants |
+| C2 (bglj6.7) | `owner: "AUTO"` on the wire | lower case `auto` / `explicit` / `user`; `CanvasComposeProvenance` lives in `data.canvas` with `kind` as a string; unknown stored owner/compose values are kept as stored | forward compatibility with a later catalog |
+| C3 (bglj6.8) | heading block `{"typeId":"heading","level":n}`; nested lists as Cascade `children` | `heading_<n>` type ids; a nested list item is a flat block with `attributes.indentationLevel` (the oracle test against cascade-editor 1.9.2 decides) | what the library writes and reads; a `heading` + `level` block renders as "Unsupported block type" |
+| C4 (bglj6.9) | flat 22 heading font, `ceil(chars / charsPerLine)`, one global column width | the editor's real heading sizes (32/28/24 ...), greedy word wrap with per-character-class advances, column width per grid, label row grows when a label wraps; the estimator reads `indentationLevel` (bglj6.17) | conservative for capitals, CJK and URLs; matches the renderer |
+| C5 (bglj6.10) | default keys `i1`, `i1-c2`; retries by a digest; presets onto `CanvasColorPicker` | 0-based keys (`i0`, `i3-c0`) that match the JSON-pointer indices; a retry is detected by comparing content signatures with geometry ignored (no digest stored), so a retry after a person moved a note is still a retry; presets map onto the sticky-note tints (red -> pink `#fbcfe8`, orange `#fed7aa`, yellow `#fde68a`, green `#bbf7d0`, cyan -> blue `#bfdbfe`, purple -> violet `#ddd6fe`), a NOTE/CHECKLIST without a colour takes the workspace default (null), a CARD is white | keys a model can map to its own request; no new provenance field; the note palette has no red or cyan |
+| C6 (bglj6.11) | AUTO content longer than the booking scrolls with an indicator; no font shrink in v1 | type steps down (1.0, 0.9, floor 0.8), then the card grows past the booking (visual only, never written back); never clipped. EXPLICIT/USER scroll | the dispatching instruction for C6; a clipped or scrolled agent note was the 8tlf9 complaint |
+| bglj6.17 | world unit = 1 dp on Android | everything on the board is in world units: cards compose under `CanvasWorldDensity` (density 1, font scale 1), DrawBox text too; board chrome stays in dp/sp | Emmanuel: "everything should use canvas units so it proportional"; the estimator and the renderer agree on every display |
+| C7 (bglj6.12) | publish through the host's existing per-op path | one stamped `CanvasOp.BatchOp` per artifact on both hosts (`CanvasStampedBatch`): one relay message, one log append, one ack; inner ops keep their own id and lamport; a lost ack heals on retry (`ALREADY_PUBLISHED`). `ExternalToolCaller.toolCallId` reaches the host through the dispatcher; a stringified JSON tool return without text is kept whole | an artifact is all or nothing on the board too, not only in the validator |
+| C8 (bglj6.13) | receipt item `{key, kind, id, count?, children?}` | as planned; the largest receipt was found to be about 4.6 KB | - |
+| C9 (bglj6.14) | the receipt as in 5.3 | items no longer carry `id`: it is derived as `cmp-<artifact_id>-<key>` (`ComposeReceiptItem.boardId`, `CanvasArtifactReceipt.pieceIds`); the largest receipt at every cap went from 4 626 to 2 394 bytes, under the 4 096 above which `message.list` hydrate ships a tool return as a 2 KiB preview without bounds (`CanvasComposeContract.MAX_RECEIPT_BYTES`, `CanvasComposeReceiptSizeTest`). Receipts already written with ids still read. The guide is generated from the contract constants and test-locked (`CanvasComposeGuideTest`, `docs/reference/canvas-compose-v1.md`); it is about 7 700 characters (cap `CanvasComposeGuide.MAX_CHARS` = 8 000), over the 6 000 the bead suggested, because every error and problem code carries an example that a test sends | a near-max compose lost its bounds on reload, so "Show on canvas" could not frame it |
+
+The multi-card gate (the 8tlf9 gate of the bglj6 review) is `CanvasComposeMultiCardEndToEndTest` (sharedLogic: App Server request -> ExternalToolDispatcher -> host -> one BatchOp -> notebook -> restart -> timeline -> one receipt; a second compose beside the first; an idempotent retry) and `CanvasComposeEndToEndRenderTest` (sharedUI, Skiko: every composed card rendered inside its reservation at full type size, no overlaps, inside the receipt bounds, Show on canvas framing them on the real workspace; snapshots in `sharedUI/build/canvas-compose-e2e/`). Both run `request-multi-card.json`.
+
+Manual device check (after the host redeploy), on the Pixel 9 Pro and on the Cintiq desktop:
+
+1. Ask the agent for a plan with a checklist, a long note with headings and nested lists, and a group of cards. The chat shows one card on the narrating message: title, kinds and count, published.
+2. Tap "Show on canvas": the canvas opens framed on the artifact at no more than 100%; nothing is clipped and nothing overlaps the existing drawing or notes.
+3. Move one composed note and resize another: they stay where put (owner USER); ask the agent to send the same compose again: nothing changes on the board and the chat still shows one card.
+4. Reload the conversation (and restart the app): the card is still there with Show on canvas working, and the board is unchanged.
