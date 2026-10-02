@@ -62,8 +62,9 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * letta-mobile-bglj6.1.9: the shared page at phone size (412 x 915 dp, drawn at 2x) in the Touch
  * idiom: the full page with the legacy composer bar, and the canvas mode's bottom bar with the
- * chat head and its reply popup. Writes PNGs to build/chat-surface-snapshots/phone-*.png for a
- * reviewer; it asserts only that each rendered.
+ * chat head and its reply popup. On the canvas the top of the board is clear: the board's undo,
+ * redo and more menu end its tool bar, and the head has no glow. Writes PNGs to
+ * build/chat-surface-snapshots/phone-*.png for a reviewer; it asserts only that each rendered.
  */
 class ChatSurfacePhoneSnapshotTest {
     private class FixturePort(state: ChatUiState, composer: ChatComposerUiState) : ChatSessionPort {
@@ -157,7 +158,7 @@ class ChatSurfacePhoneSnapshotTest {
                                 port = port,
                                 presentation = presentation,
                                 onIntent = {},
-                                host = ChatSurfaceHost(openCanvas = {}, openAgentPane = {}),
+                                host = ChatSurfaceHost(openCanvas = {}, openAgentPane = {}, openAgentSwitcher = {}),
                                 appearance = touch,
                                 platform = ChatSurfacePlatform(showKeyboardHints = false, voiceInput = { _ -> MicStandIn() }),
                                 canvas = if (shot.withCanvas) {

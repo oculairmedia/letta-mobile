@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -18,11 +19,13 @@ import kotlinx.coroutines.launch
 internal fun AgentScaffoldMainContent(
     state: AgentScaffoldRuntimeState,
     paddingValues: PaddingValues,
+    /** The shared page asks for the header to hide (its phone canvas mode) or come back. */
+    onHeaderHiddenChange: (Boolean) -> Unit = {},
 ) {
     val topPadding = paddingValues.calculateTopPadding()
     Column(modifier = Modifier.fillMaxSize()) {
         AgentScaffoldProjectInfoSection(state, topPadding)
-        AgentScaffoldChatSection(state, paddingValues, topPadding)
+        AgentScaffoldChatSection(state, paddingValues, topPadding, onHeaderHiddenChange)
     }
 }
 
@@ -46,6 +49,8 @@ private fun AgentScaffoldProjectInfoSection(
         onCreateBugReport = { params.sheetVisibility.onShowBugReportSheetChange(true) },
         modifier = Modifier
             .padding(top = topPadding)
+            // With the header hidden nothing pads for the status bar; the tray does.
+            .then(if (topPadding == 0.dp) Modifier.statusBarsPadding() else Modifier)
             .testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
     )
 }
@@ -55,6 +60,7 @@ private fun ColumnScope.AgentScaffoldChatSection(
     state: AgentScaffoldRuntimeState,
     paddingValues: PaddingValues,
     topPadding: androidx.compose.ui.unit.Dp,
+    onHeaderHiddenChange: (Boolean) -> Unit,
 ) {
     val params = state.params
     val dismissIdleSearchOnTimelineTap = params.searchUi.isChatSearchExpanded &&
@@ -88,6 +94,7 @@ private fun ColumnScope.AgentScaffoldChatSection(
             state = state,
             chatModifier = chatModifier,
             contentTopPadding = contentTopPadding,
+            onHeaderHiddenChange = onHeaderHiddenChange,
         )
     }
 }
@@ -128,6 +135,7 @@ private fun AgentScaffoldChatScreenPane(
     state: AgentScaffoldRuntimeState,
     chatModifier: Modifier,
     contentTopPadding: androidx.compose.ui.unit.Dp,
+    onHeaderHiddenChange: (Boolean) -> Unit,
 ) {
     val params = state.params
     ChatScreen(
@@ -138,6 +146,9 @@ private fun AgentScaffoldChatScreenPane(
         onBugCommand = { params.sheetVisibility.onShowBugReportSheetChange(true) },
         // The companion mascot opens the same agent pane as the top bar's menu.
         onOpenAgentPane = { state.scope.launch { state.drawerState.open() } },
+        // The header's agent pill, for the phone canvas mode's board menu while the header is hidden.
+        onOpenAgentSwitcher = { params.sheetVisibility.onShowAgentSwitcherChange(true) },
+        onHostHeaderHiddenChange = onHeaderHiddenChange,
         onViewSubagentConversation = params.navigation.onViewSubagentConversation
             ?: params.navigation.onSwitchConversation?.let { switch ->
                 { subagentAgentId, subagentConversationId ->

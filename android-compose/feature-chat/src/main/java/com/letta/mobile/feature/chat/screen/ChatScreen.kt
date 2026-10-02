@@ -33,6 +33,9 @@ internal fun ChatScreen(
     onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onOpenAgentPane: (() -> Unit)? = null,
     onOpenCanvas: (() -> Unit)? = null,
+    onOpenAgentSwitcher: (() -> Unit)? = null,
+    /** The shared page's canvas mode wants the board's top clear: true while the host's header should hide. */
+    onHostHeaderHiddenChange: ((Boolean) -> Unit)? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
     selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel(),
@@ -54,12 +57,13 @@ internal fun ChatScreen(
         is ChatBackground.Gradient -> Modifier.background(chatBackground.toBrush())
     }
 
-    val navigation = remember(onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas) {
+    val navigation = remember(onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher) {
         ChatScreenNavigationCallbacks(
             onBugCommand = onBugCommand,
             onViewSubagentConversation = onViewSubagentConversation,
             onOpenAgentPane = onOpenAgentPane,
             onOpenCanvas = onOpenCanvas,
+            onOpenAgentSwitcher = onOpenAgentSwitcher,
         )
     }
 
@@ -133,6 +137,7 @@ internal fun ChatScreen(
                     // Edge to edge, as the legacy layout: the page draws under the status bar and the
                     // floating header, and only rests its content (and the canvas's chrome) below them.
                     topChromeInset = contentPadding.calculateTopPadding(),
+                    onHostHeaderHiddenChange = onHostHeaderHiddenChange,
                 ),
                 modifier = modifier.fillMaxSize(),
             )
