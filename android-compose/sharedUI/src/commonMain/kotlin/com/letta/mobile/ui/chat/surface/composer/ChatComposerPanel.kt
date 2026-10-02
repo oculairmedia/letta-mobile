@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +26,22 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
+ * What the composer is drawn from: the session's draft, state and actions, the host's bindings,
+ * the mode it is drawn for and where it raises mode transitions.
+ */
+@Immutable
+internal data class ComposerInputs(
+    val composer: ChatComposerUiState,
+    val actions: ChatActions,
+    val uiState: ChatUiState = ChatUiState(),
+    val capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
+    val host: ChatSurfaceHost = ChatSurfaceHost(),
+    val platform: ChatSurfacePlatform = ChatSurfacePlatform.Default,
+    val mode: ChatSurfaceMode = ChatSurfaceMode.FullScreen,
+    val onIntent: (ChatSurfaceIntent) -> Unit = {},
+)
+
+/**
  * letta-mobile-bglj6.1: the shared composer: queued sends, the prompt card, autocomplete,
  * attachments, model/context/working-directory chrome, send and stop.
  *
@@ -34,17 +51,11 @@ import com.letta.mobile.ui.theme.LettaDimens
  * [ChatSurfaceIntent.OpenCanvas].
  */
 @Composable
-internal fun ChatComposerPanel(
-    composer: ChatComposerUiState,
-    uiState: ChatUiState,
-    actions: ChatActions,
-    capabilities: ChatSurfaceCapabilities,
-    host: ChatSurfaceHost,
-    platform: ChatSurfacePlatform,
-    mode: ChatSurfaceMode,
-    onIntent: (ChatSurfaceIntent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modifier) {
+    val composer = inputs.composer
+    val uiState = inputs.uiState
+    val actions = inputs.actions
+    val mode = inputs.mode
     val decisions = remember(composer, uiState.isStreaming, uiState.isCancellingRun) {
         ComposerDecisions.of(composer, uiState)
     }
@@ -52,11 +63,11 @@ internal fun ChatComposerPanel(
         composer = composer,
         uiState = uiState,
         actions = actions,
-        capabilities = capabilities,
-        host = host,
-        platform = platform,
+        capabilities = inputs.capabilities,
+        host = inputs.host,
+        platform = inputs.platform,
         mode = mode,
-        onIntent = onIntent,
+        onIntent = inputs.onIntent,
         decisions = decisions,
     )
     val attachImage = rememberComposerImagePicker(
@@ -91,7 +102,7 @@ internal fun ChatComposerPanel(
             DockedComposerBar(model, attachImage)
         } else {
             ComposerCompanionRow(model) { ComposerPromptCard(model, attachImage) }
-            if (platform.showKeyboardHints) {
+            if (inputs.platform.showKeyboardHints) {
                 ComposerHintRow(visible = composerHintVisible(composer.text, composer.attachments.isNotEmpty()))
             }
         }

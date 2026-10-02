@@ -47,7 +47,7 @@ internal fun ComposerModelControls(
 ) {
     var sheetOpen by remember { mutableStateOf(false) }
     ComposerActionChip(
-        label = model.currentLabel.ifBlank { stringResource(Res.string.composer_model_fallback) },
+        label = ComposerChipLabel(model.currentLabel.ifBlank { stringResource(Res.string.composer_model_fallback) }),
         onClick = { host.openModelPicker?.invoke() ?: run { sheetOpen = true } },
         enabled = !model.isSwitching,
         modifier = Modifier.testTag(ComposerTestTags.MODEL_CHIP),
@@ -93,9 +93,8 @@ private fun ComposerEffortChip(
     val defaultLabel = stringResource(Res.string.composer_effort_default)
     Box {
         ComposerActionChip(
-            label = current ?: defaultLabel,
+            label = ComposerChipLabel(current ?: defaultLabel, Lucide.Gauge),
             onClick = { open = !open },
-            leadingIcon = Lucide.Gauge,
             modifier = Modifier.testTag(ComposerTestTags.EFFORT_CHIP),
         )
         if (open) {

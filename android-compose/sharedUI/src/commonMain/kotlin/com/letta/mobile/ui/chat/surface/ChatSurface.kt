@@ -58,6 +58,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
+import com.letta.mobile.ui.chat.surface.composer.ComposerInputs
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.rememberComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerCompanion
@@ -590,14 +591,16 @@ private fun DockedA2uiStack(frame: ChatSurfaceFrame) {
 @Composable
 private fun ComposerPanel(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
     ChatComposerPanel(
-        composer = frame.composer,
-        uiState = frame.uiState,
-        actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
-        capabilities = frame.capabilities,
-        host = frame.host,
-        platform = frame.platform,
-        mode = mode,
-        onIntent = frame.onIntent,
+        inputs = ComposerInputs(
+            composer = frame.composer,
+            uiState = frame.uiState,
+            actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
+            capabilities = frame.capabilities,
+            host = frame.host,
+            platform = frame.platform,
+            mode = mode,
+            onIntent = frame.onIntent,
+        ),
         modifier = modifier,
     )
 }

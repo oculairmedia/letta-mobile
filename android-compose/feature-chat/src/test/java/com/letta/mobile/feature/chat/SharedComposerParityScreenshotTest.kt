@@ -33,6 +33,7 @@ import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerSnapshot
+import com.letta.mobile.ui.chat.surface.composer.ComposerSnapshotContent
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTheme
@@ -148,22 +149,24 @@ class SharedComposerParityScreenshotTest {
     @Composable
     private fun Shared(draft: Draft) {
         ChatComposerSnapshot(
-            composer = ChatComposerUiState(
-                text = draft.text,
-                attachments = draft.attachments,
-                canSend = true,
-                // On a phone the model is not in the bar.
-                model = ChatModelUiState(currentHandle = "lmstudio/MiniMax-M3", currentLabel = "lmstudio/MiniMax-M3"),
+            ComposerSnapshotContent(
+                composer = ChatComposerUiState(
+                    text = draft.text,
+                    attachments = draft.attachments,
+                    canSend = true,
+                    // On a phone the model is not in the bar.
+                    model = ChatModelUiState(currentHandle = "lmstudio/MiniMax-M3", currentLabel = "lmstudio/MiniMax-M3"),
+                ),
+                state = ChatUiState(
+                    conversationState = ConversationState.Ready("conv-parity"),
+                    isLoadingMessages = false,
+                    isStreaming = draft.streaming,
+                    agentName = "Meridian",
+                ),
+                actions = NoOpChatActions,
+                appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                platform = ChatSurfacePlatform(showKeyboardHints = false),
             ),
-            state = ChatUiState(
-                conversationState = ConversationState.Ready("conv-parity"),
-                isLoadingMessages = false,
-                isStreaming = draft.streaming,
-                agentName = "Meridian",
-            ),
-            actions = NoOpChatActions,
-            appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-            platform = ChatSurfacePlatform(showKeyboardHints = false),
         )
     }
 
