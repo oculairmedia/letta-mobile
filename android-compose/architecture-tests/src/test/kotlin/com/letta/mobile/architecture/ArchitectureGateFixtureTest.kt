@@ -2,6 +2,7 @@ package com.letta.mobile.architecture
 
 import com.lemonappdev.konsist.api.Konsist
 import com.tngtech.archunit.core.importer.ClassFileImporter
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -36,6 +37,33 @@ class ArchitectureGateFixtureTest {
     fun `ArchUnit accepts an acyclic fixture`() {
         val classes = ClassFileImporter().importPackages("com.letta.mobile.architecture.fixtures.clean")
 
-        assertFalse(repositoryBytecodeRules().any { it.evaluate(classes).hasViolation() })
+        assertFalse(repositoryBytecodeRules(allowEmpty = true).any { it.evaluate(classes).hasViolation() })
+    }
+
+    @Test
+    fun `production bytecode rules fail on an empty import`() {
+        val nothing = ClassFileImporter().importPackages("com.letta.mobile.architecture.fixtures.absent")
+
+        repositoryBytecodeRules().forEach { rule ->
+            val failed = runCatching { rule.evaluate(nothing).hasViolation() }.getOrElse { true }
+            assertTrue(failed, "${rule.description} passed on zero classes")
+        }
+    }
+
+    @Test
+    fun `isolation scan catches the type-safe accessor spelling`() {
+        val script = """
+            dependencies {
+                implementation(projects.app)
+                implementation(projects.core.androidData)
+                implementation(projects.appserverCli)
+            }
+        """.trimIndent()
+
+        assertEquals(
+            listOf(":app", ":core:android-data"),
+            GradleProjectDependencyScan.hits(script, listOf(":app", ":core:android-data", ":designsystem")),
+        )
+        assertEquals(listOf(":app"), GradleProjectDependencyScan.hits("api(project(\":app\"))", listOf(":app")))
     }
 }

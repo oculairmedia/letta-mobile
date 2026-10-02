@@ -45,6 +45,10 @@ assert_contains "$test_job" 'Run Android verification task graph'
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
 assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
 assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
+# letta-mobile-o4ygk.1: the module-boundary gate and its synthetic-graph tests
+# run inside the REQUIRED test job, not only in the advisory graph workflow.
+assert_contains "$test_job" ':build-logic:test'
+assert_contains "$test_job" 'checkArchitectureBoundaries'
 # Stacked PRs must diff additive modules against the GitHub PR base. Diffing
 # vs origin/main re-runs lower-stack modules and lets unrelated flakes fail
 # required `test` (StreamingMarkdownRecompositionGateTest on #1556).
@@ -96,6 +100,8 @@ assert_contains "$shared_job" 'Run remaining shared multiplatform verification t
 # even before Konan. JVM + CLI tests first; native compile second.
 assert_contains "$shared_job" ':appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
 assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative'
+# letta-mobile-o4ygk.2: wasmJs compiles stay in the REQUIRED shared job.
+assert_contains "$shared_job" ':sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '2'
 

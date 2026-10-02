@@ -5,6 +5,7 @@
 {"type":"module", "path":":", "directory":".", "kind":"java"}
 {"type":"module", "path":":lib", "directory":"lib", "kind":"kotlin-multiplatform"}
 {"type":"projectEdge", "from":":", "to":":lib", "configuration":"implementation"}
+{"type":"projectEdge", "from":":", "to":":lib", "configuration":"notKsp"}
 {"type":"sourceSet", "module":":lib", "name":"commonMain", "paths":"lib/src/commonMain/alpha,lib/src/commonMain/zeta"}
 {"type":"sourceSet", "module":":lib", "name":"commonTest", "paths":"lib/src/commonTest/kotlin"}
 {"type":"sourceSet", "module":":lib", "name":"jvmMain", "paths":"lib/src/jvmMain/java,lib/src/jvmMain/kotlin"}

@@ -166,6 +166,10 @@ jobs:
       # Root debug is compiled by testRootDebugUnitTest; Play is compiled by the
       # required play-release APK job. Sideload is the only unique flavor compile.
       # Architecture guardrails stay inside the required `test` job.
+      # checkArchitectureBoundaries reads the exported module graph and fails on
+      # edges into :app, feature->feature, shell->shell, library->feature and
+      # multiplatform->single-platform edges not in architecture-tests/boundary-baseline.txt
+      # (letta-mobile-o4ygk.1). :build-logic:test proves each rule on synthetic graphs.
       - name: Run Android verification task graph
         env:
           ADDITIVE_TASKS: ${{ steps.additive_modules.outputs.tasks }}
@@ -175,6 +179,8 @@ jobs:
             :core:android-data:testDebugUnitTest
             :app:testRootDebugUnitTest
             :app:testScreenshot
+            :build-logic:test
+            checkArchitectureBoundaries
             :architecture-tests:test
             :architecture-tests:architectureTest
             :quality:detekt-rules:check
@@ -319,10 +325,13 @@ jobs:
         # on follow-up PRs even when run before Konan). Desktop unit tests
         # still run in the required `test` job when android-compose/desktop
         # changes (additive module tasks). Native compile still catches
-        # JVM-only API leaks in commonMain/commonTest (b97bcf48).
+        # JVM-only API leaks in commonMain/commonTest (b97bcf48). The wasmJs
+        # compiles catch breakage in wasmJsMain/wasmJsTest and dependencies
+        # that ship no wasm artifact, without making web-wasm required
+        # (letta-mobile-o4ygk.2).
         run: |
           ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
-          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
+          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 
   web-wasm:
