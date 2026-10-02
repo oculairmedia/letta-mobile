@@ -110,8 +110,7 @@ internal data class DesktopSharedChatPageState(
     val port: DesktopChatSessionPort,
     val pagedTimeline: CanonicalTimelinePresentation?,
     val hostInputs: DesktopChatComposerHostInputs,
-    /** Drives the ambient glow, exactly as on the old page. */
-    val isThinking: Boolean,
+    /** Tints the ambient glow "failed" (the controller keeps its error until the next send). */
     val errorMessage: String?,
     /** Where the conversation's board lives, and whose it is: the docked canvas. */
     val canvasStore: CanvasDocumentStore,
@@ -148,7 +147,10 @@ internal fun DesktopSharedChatPage(
     }
     val hasConversation = state.canvasOwner.conversationId != null
     val host = rememberDesktopChatSurfaceHost(port, navigation, phone)
-    val ambientStatus = rememberDesktopAmbientStatus(state.isThinking, state.errorMessage)
+    // The run's own state, as the composer's Stop button and the docked panel's glow read it: the
+    // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
+    val uiState by port.uiState.collectAsState()
+    val ambientStatus = rememberDesktopAmbientStatus(uiState.isRunInFlight, state.errorMessage)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
     state.dockedCanvas?.let { router ->
         DisposableEffect(router, session) {

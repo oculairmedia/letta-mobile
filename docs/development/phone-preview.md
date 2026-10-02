@@ -136,9 +136,9 @@ Not faithful:
   as Android's Back does on that page.
 - **Touch.** With Ctrl+T on, the left mouse button reaches Compose as `PointerType.Touch` (drag to
   scroll, one-finger canvas pan, touch text selection). It is one pointer: no pinch or two-finger
-  gestures (use the wheel and Ctrl+wheel), no touch slop tuned to a finger, no haptics. The
-  translation reaches Compose's scene by reflection; if a Compose upgrade breaks it, it logs
-  `PHONE: mouse-as-touch unavailable` and the mouse stays a mouse.
+  gestures (use the wheel and Ctrl+wheel), no haptics. The mouse is fed to the app's own
+  `ComposeTouchInjector` (the path Windows fingers take) as one finger; if a Compose upgrade moves
+  the scene it reaches, it logs `PHONE: mouse-as-touch unavailable` and the mouse stays a mouse.
 - **Popups and sheets.** Menus, dialogs and bottom sheets are Compose Desktop layers: a full-window
   sheet covers the device frame too, and they do not read the simulated insets.
 - **Rive mascot.** The native bridge `android-compose/desktop/rive_desktop_bridge.dll` is git-ignored.

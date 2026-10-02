@@ -154,7 +154,6 @@ class DesktopPhoneShellTest {
                                 port = port,
                                 pagedTimeline = null,
                                 hostInputs = DesktopChatComposerHostInputs(),
-                                isThinking = false,
                                 errorMessage = null,
                                 canvasStore = InMemoryCanvasDocumentStore(),
                                 canvasOwner = DesktopCanvasOwner(conversationId = null, agentId = null, agentName = "Meridian"),

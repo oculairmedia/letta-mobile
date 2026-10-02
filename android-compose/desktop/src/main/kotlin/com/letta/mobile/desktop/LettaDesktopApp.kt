@@ -844,7 +844,6 @@ internal fun LettaDesktopApp(
                                         contextUsage = contextUsage,
                                         placeholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
                                     ),
-                                    isThinking = isThinkingSelected,
                                     errorMessage = chatState.errorMessage,
                                     canvasStore = canvasShell.store,
                                     canvasOwner = DesktopCanvasOwner(
