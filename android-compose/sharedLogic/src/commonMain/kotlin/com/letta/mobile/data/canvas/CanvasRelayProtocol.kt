@@ -75,10 +75,17 @@ sealed interface CanvasRelayMessage {
     /**
      * Opens [topic] on this connection. The host binds it to a canvas ([proposedCanvasId] when it is
      * the first to ask), answers [Joined], sends every op after [afterCursor] and then [CaughtUp].
+     * [features] are what this app reads ([CanvasRelayFeatures]); an app that names none (one built
+     * before them) is sent no op it could not decode.
      */
     @Serializable
     @SerialName("join")
-    data class Join(val topic: String, val proposedCanvasId: String, val afterCursor: Long = 0L) : CanvasRelayMessage
+    data class Join(
+        val topic: String,
+        val proposedCanvasId: String,
+        val afterCursor: Long = 0L,
+        val features: List<String> = emptyList(),
+    ) : CanvasRelayMessage
 
     /** An op for [topic]; answered by [Ack] once durable on the host, or [Rejected]. */
     @Serializable
@@ -110,10 +117,19 @@ sealed interface CanvasRelayMessage {
 
     // ---- Host to app ----
 
-    /** [topic] is canvas [canvasId] on host [hostId], whose log ends at [head]. */
+    /**
+     * [topic] is canvas [canvasId] on host [hostId], whose log ends at [head]. [features] are what
+     * the host reads ([CanvasRelayFeatures]); an app holds back its ops a host without them cannot.
+     */
     @Serializable
     @SerialName("joined")
-    data class Joined(val topic: String, val canvasId: String, val hostId: String, val head: Long) : CanvasRelayMessage
+    data class Joined(
+        val topic: String,
+        val canvasId: String,
+        val hostId: String,
+        val head: Long,
+        val features: List<String> = emptyList(),
+    ) : CanvasRelayMessage
 
     /**
      * An op in the host's log for [topic], at [cursor]. [origin] is who the host received it from,

@@ -22,7 +22,8 @@ internal object CanvasSceneSchemaText {
         append("Elements: ")
         append(schema.elementTypes.joinToString("; ") { "${it.type} {${it.required.joinToString(", ")}}" })
         append(". shapeType ${schema.shapeTypes.joinToString("|")}; points \"x,y\"; colors #rrggbbaa. ")
-        append("Full format and examples in the canvas_replace_scene description.")
+        append("Full format and examples in the canvas_replace_scene description. ")
+        append(PLUGIN_ELEMENTS_HINT)
     }
 
     /**
@@ -50,6 +51,12 @@ internal object CanvasSceneSchemaText {
         problem.elementId != null -> "element '${problem.elementId}'"
         else -> "the scene (or an element without an id)"
     }
+
+    /** Where a scene read puts the plugin elements ([CanvasSceneRead]) and how to write them. */
+    const val PLUGIN_ELEMENTS_HINT: String =
+        "Plugin elements (the scene root's _pluginElements) are not in scene_json: plugin_elements lists each as " +
+            "{id, type \"ext:<pluginId>/<kind>\", v, frame?, owner?, ref?, props, snapshot?, fallback, meta?}; write them " +
+            "with canvas_apply_ops set_plugin_element/remove_plugin_element, never as elements."
 
     /** The plugin element ops in a paragraph, for canvas_apply_ops' description and a plugin element refusal. */
     const val PLUGIN_OPS: String =

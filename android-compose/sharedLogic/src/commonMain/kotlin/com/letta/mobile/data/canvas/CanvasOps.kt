@@ -266,6 +266,9 @@ data class CanvasGetSceneResult(
     /** The element format in a line ([CanvasSceneSchema.hint]). */
     @SerialName("schema_hint")
     val schemaHint: String? = null,
+    /** The board's plugin elements, compact and outside [sceneJson] ([CanvasSceneRead]). */
+    @SerialName("plugin_elements")
+    val pluginElements: List<JsonObject> = emptyList(),
 )
 
 @Serializable
