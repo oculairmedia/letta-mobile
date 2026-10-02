@@ -361,7 +361,7 @@ data class ToolReturnMessage(
                 is JsonPrimitive -> when {
                     raw.isString && parsedStringPayload == null -> raw.content
                     raw.isString && parsedStringPayload.isSubagentDispatchResult() -> raw.content
-                    // letta-mobile-bglj6.12: a JSON object a tool answered with (canvas.compose's
+                    // letta-mobile-bglj6.12: a JSON object a tool answered with (canvas_compose's
                     // receipt or refusal, apply_ops' result) is the answer itself, not a content
                     // part to read text out of: with no text in it, it was read down to nothing
                     // and the chat lost the receipt the TOOL_CALL event is meant to carry.

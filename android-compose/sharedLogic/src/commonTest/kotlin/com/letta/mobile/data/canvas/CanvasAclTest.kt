@@ -174,7 +174,7 @@ class CanvasAclTest {
             id = docId,
             title = "Tool Protected",
             revision = 1L,
-            // Schema-valid scenes throughout: canvas.replace_scene validates at the agent write
+            // Schema-valid scenes throughout: canvas_replace_scene validates at the agent write
             // boundary (letta-mobile-le0z3), so a numeric bgColor is refused before the ACL is
             // consulted and every assertion below would then pass for the wrong reason.
             sceneJson = """{"bgColor":"#ffffffff","elements":[]}""",

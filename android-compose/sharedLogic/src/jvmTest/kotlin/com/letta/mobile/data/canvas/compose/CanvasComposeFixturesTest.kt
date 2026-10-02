@@ -14,7 +14,7 @@ import kotlin.test.assertFailsWith
 
 /**
  * The serialized v1 fixtures under `commonTest/resources/canvas/compose/v1/` are the wire contract
- * of canvas.compose (letta-mobile-bglj6.6, plan section 5): each one decodes through the DTOs and
+ * of canvas_compose (letta-mobile-bglj6.6, plan section 5): each one decodes through the DTOs and
  * re-encodes to the same JSON, and every request fixture is refused, at the path of the change,
  * once a field is added, a kind is unknown or a cap is exceeded. Read from the JVM classpath:
  * the browser and native targets cannot read resource files.

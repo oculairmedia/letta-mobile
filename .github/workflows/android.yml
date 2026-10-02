@@ -185,6 +185,20 @@ jobs:
           fi
           ./gradlew "${tasks[@]}"
 
+      # :sharedUI:jvmTest runs here as an additive task. Its Skiko UI tests can
+      # fail on Linux alone (font metrics), and the console log carries neither
+      # assertion messages nor stdout, so keep the reports when this job fails.
+      - name: Upload sharedUI JVM test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sharedui-jvmtest-reports-${{ github.run_id }}
+          path: |
+            android-compose/sharedUI/build/test-results/jvmTest/**
+            android-compose/sharedUI/build/reports/tests/jvmTest/**
+          if-no-files-found: warn
+          retention-days: 7
+
   detekt:
     # Advisory static analysis. Wired with continue-on-error so existing debt
     # does not block merges; findings still show on the PR checks list.

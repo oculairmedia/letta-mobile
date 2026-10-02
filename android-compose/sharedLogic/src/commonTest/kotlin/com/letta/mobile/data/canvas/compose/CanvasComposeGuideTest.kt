@@ -8,7 +8,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-bglj6.14: the guide `canvas.compose_guide` answers says what the code does. Every
+ * letta-mobile-bglj6.14: the guide `canvas_compose_guide` answers says what the code does. Every
  * cap, code and colour it states is the constant's, every refusal example is refused the way it
  * says, and the markdown rules it lists are the parser's.
  */
@@ -21,7 +21,7 @@ class CanvasComposeGuideTest {
     @Test
     fun itIsAShortRead() {
         assertTrue(guide.length <= CanvasComposeGuide.MAX_CHARS, "the guide is ${guide.length} characters")
-        println("canvas.compose_guide: ${guide.length} characters")
+        println("canvas_compose_guide: ${guide.length} characters")
     }
 
     @Test

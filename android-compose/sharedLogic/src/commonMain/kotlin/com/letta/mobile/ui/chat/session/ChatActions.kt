@@ -133,7 +133,7 @@ data class ChatSurfaceCapabilities(
 data class ChatSurfaceHost(
     val openCanvas: (() -> Unit)? = null,
     /**
-     * letta-mobile-bglj6.13: "Show on canvas" on a canvas.compose card: open the conversation's
+     * letta-mobile-bglj6.13: "Show on canvas" on a canvas_compose card: open the conversation's
      * board and frame [CanvasArtifactReceipt.bounds]. A page that draws the canvas itself binds
      * this to its own board (ChatSurface does, through ChatCanvasActions); a host that only has a
      * canvas route passes null and the card falls back to [openCanvas], without framing. An

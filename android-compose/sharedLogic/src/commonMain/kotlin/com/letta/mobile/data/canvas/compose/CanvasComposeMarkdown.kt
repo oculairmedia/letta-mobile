@@ -3,7 +3,7 @@ package com.letta.mobile.data.canvas.compose
 import com.letta.mobile.data.canvas.CanvasToolContract
 
 /**
- * The markdown subset canvas.compose accepts (letta-mobile-bglj6.8, docs/design/canvas-compose-plan.md
+ * The markdown subset canvas_compose accepts (letta-mobile-bglj6.8, docs/design/canvas-compose-plan.md
  * section 3.3), read into [MdBlock]s that [CanvasCascadeBlocks] writes as the board's block JSON.
  *
  * The subset: CommonMark paragraphs, ATX headings 1-3, `-`/`*`/`+` bullet items, `1.` numbered

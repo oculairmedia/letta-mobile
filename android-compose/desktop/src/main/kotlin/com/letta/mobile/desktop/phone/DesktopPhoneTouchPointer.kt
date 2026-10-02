@@ -1,22 +1,14 @@
-@file:OptIn(InternalComposeUiApi::class)
-
 package com.letta.mobile.desktop.phone
 
-import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.awt.ComposeWindow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.PointerButton
-import androidx.compose.ui.input.pointer.PointerButtons
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
-import androidx.compose.ui.scene.ComposeScene
+import com.letta.mobile.desktop.input.TabletBridge
+import com.letta.mobile.desktop.input.TabletPenDecoder
+import com.letta.mobile.desktop.touch.ComposeTouchInjector
 import java.awt.AWTEvent
-import java.awt.Component
 import java.awt.EventQueue
 import java.awt.Toolkit
 import java.awt.event.MouseEvent
-import java.lang.reflect.Field
-import javax.swing.JComponent
 import javax.swing.SwingUtilities
 
 /**
@@ -26,56 +18,45 @@ import javax.swing.SwingUtilities
  * text selection. Taps, long presses and drags (the bar's swipe up, the chat head's drag and snap)
  * work either way, since their detectors do not look at the pointer type.
  *
- * Compose Desktop stamps every AWT mouse event [PointerType.Mouse] inside its scene mediator, with
- * no public hook. This reaches the window's [ComposeScene] by reflection (ComposeWindow ->
- * ComposeWindowPanel -> ComposeContainer -> ComposeSceneMediator) and, from a pushed [EventQueue]
- * that sees events before Compose's own listeners, re-sends left-button press/drag/release as touch
- * events at the same position. Hover (moves without a button, enter, exit) is dropped, since a phone
- * has none; right and middle buttons and the wheel pass through as a mouse.
+ * The finger is the app's own: [ComposeTouchInjector], which hands Windows fingers to the window's
+ * scene, is fed the mouse as one contact. A pushed [EventQueue], which sees events before Compose's
+ * own listeners, turns left-button press/drag/release into its down/move/up samples and keeps them
+ * from Compose as a mouse. Hover (moves without a button, enter, exit) is dropped, since a phone has
+ * none; right and middle buttons and the wheel pass through as a mouse.
  *
- * Dev-only and best effort: if a Compose upgrade renames the fields, [install] logs why and returns
- * false, and the preview keeps working with an ordinary mouse.
+ * If the scene cannot be reached (a Compose upgrade moved it), [install] returns false and the
+ * preview keeps working with an ordinary mouse.
  */
 internal object DesktopPhoneTouchPointer {
-    /** Installs the translation for [window] while [enabled] says so. False (logged) when the hook is unavailable. */
+    /** Installs the translation for [window] while [enabled] says so. False (logged) when the scene is unavailable. */
     fun install(window: ComposeWindow, enabled: () -> Boolean): Boolean {
-        val target = runCatching { resolve(window) }.getOrElse { error ->
-            println("PHONE: mouse-as-touch unavailable (${error.javaClass.simpleName}: ${error.message}); the mouse stays a mouse.")
+        val injector = ComposeTouchInjector.bindOrNull(window)
+        if (injector == null) {
+            println("PHONE: mouse-as-touch unavailable (no Compose scene); the mouse stays a mouse.")
             return false
         }
         EventQueue.invokeLater {
-            Toolkit.getDefaultToolkit().systemEventQueue.push(TouchQueue(target, enabled))
+            Toolkit.getDefaultToolkit().systemEventQueue.push(TouchQueue(window, injector, enabled))
         }
         return true
     }
 
-    private class Target(val scene: ComposeScene, val content: Component, val container: JComponent)
-
-    private fun resolve(window: ComposeWindow): Target {
-        val panel = ComposeWindow::class.java.openField("composePanel").get(window)
-        val container = panel.javaClass.openField("_composeContainer").get(panel)
-        val mediator = container.javaClass.openField("mediator").get(container)
-        val scene = (mediator.javaClass.openField("scene\$delegate").get(mediator) as Lazy<*>).value as ComposeScene
-        val content = mediator.javaClass.getMethod("getContentComponent").invoke(mediator) as Component
-        val root = mediator.javaClass.openField("container").get(mediator) as JComponent
-        return Target(scene, content, root)
-    }
-
-    /** [name], declared on this class, made readable. */
-    private fun Class<*>.openField(name: String): Field = getDeclaredField(name).apply { isAccessible = true }
-
-    private class TouchQueue(private val target: Target, private val enabled: () -> Boolean) : EventQueue() {
+    private class TouchQueue(
+        private val window: ComposeWindow,
+        private val injector: ComposeTouchInjector,
+        private val enabled: () -> Boolean,
+    ) : EventQueue() {
         /** A left-button gesture is in flight as touch; it stays touch until release, whatever [enabled] says. */
         private var touchDown = false
 
         override fun dispatchEvent(event: AWTEvent) {
-            val handled = contentMouseEvent(event)?.let(::translate) ?: false
+            val handled = windowMouseEvent(event)?.let(::translate) ?: false
             if (!handled) super.dispatchEvent(event)
         }
 
-        /** [event] as a mouse event on the Compose content, or null for anything else. */
-        private fun contentMouseEvent(event: AWTEvent): MouseEvent? =
-            (event as? MouseEvent)?.takeIf { it.component === target.content }
+        /** [event] as a mouse event in the phone's window, or null for anything else. */
+        private fun windowMouseEvent(event: AWTEvent): MouseEvent? =
+            (event as? MouseEvent)?.takeIf { SwingUtilities.getWindowAncestor(it.component) === window }
 
         /** True when [event] was handled here (sent as touch, or dropped as hover). */
         private fun translate(event: MouseEvent): Boolean {
@@ -96,37 +77,40 @@ internal object DesktopPhoneTouchPointer {
 
         private fun press(event: MouseEvent): Boolean {
             if (!SwingUtilities.isLeftMouseButton(event)) return false
-            if (!target.content.isFocusOwner) target.content.requestFocus()
-            send(event, PointerEventType.Press, pressed = true)
+            if (!event.component.isFocusOwner) event.component.requestFocus()
+            // The injector places a finger on its first move after the down, as the pen bridge reports it.
+            sample(event, TabletBridge.KIND_DOWN)
+            sample(event, TabletBridge.KIND_MOVE)
             touchDown = true
             return true
         }
 
         private fun drag(event: MouseEvent): Boolean {
             if (!touchDown) return false
-            send(event, PointerEventType.Move, pressed = true)
+            sample(event, TabletBridge.KIND_MOVE)
             return true
         }
 
         private fun release(event: MouseEvent): Boolean {
             if (!touchDown) return false
-            send(event, PointerEventType.Release, pressed = false)
+            sample(event, TabletBridge.KIND_UP)
             touchDown = false
             return true
         }
 
-        private fun send(event: MouseEvent, type: PointerEventType, pressed: Boolean) {
-            val point = SwingUtilities.convertPoint(event.component, event.point, target.container)
-            val scale = target.content.graphicsConfiguration?.defaultTransform?.scaleX?.toFloat() ?: 1f
-            target.scene.sendPointerEvent(
-                eventType = type,
-                position = Offset(point.x * scale, point.y * scale),
-                timeMillis = event.`when`,
-                type = PointerType.Touch,
-                buttons = PointerButtons(isPrimaryPressed = pressed),
-                nativeEvent = event,
-                button = PointerButton.Primary,
+        private fun sample(event: MouseEvent, kind: Int) {
+            val x = event.x.toFloat()
+            val y = event.y.toFloat()
+            injector.onSample(
+                event.component,
+                TabletPenDecoder.DecodedSample(kind = kind, x = x, y = y, rawX = x, rawY = y, force = 1f, tool = FINGER_TOOL, contact = MOUSE_CONTACT),
             )
         }
     }
+
+    /** The one contact the mouse plays. */
+    private const val MOUSE_CONTACT = 1
+
+    /** The tool field is the pen's; the injector does not read it for fingers. */
+    private const val FINGER_TOOL = 0
 }

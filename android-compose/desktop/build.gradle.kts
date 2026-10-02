@@ -162,6 +162,8 @@ val buildDesktopTabletNative = tasks.register<Exec>("buildDesktopTabletNative") 
         manifest,
         tabletInputDir.file("Cargo.lock"),
         fileTree(tabletInputDir.dir("src")),
+        tabletInputDir.file("build.rs"),
+        fileTree(rootProject.layout.projectDirectory.dir("native/octotablet")),
     )
     outputs.file(tabletInputDir.file("target/release/$tabletNativeLibraryName"))
     commandLine(
@@ -459,14 +461,12 @@ nucleus.application {
     // text components, so the touch keyboard never pops).
     javaHome = packagingJavaHome
 
-    // Windows touch input (see desktop/.../touch/DesktopWindowsTouchInput.kt).
-    // AWT translates WM_TOUCH into ordinary MouseEvents and keeps the only
-    // "this came from a finger" flag behind sun.awt.AWTAccessor, which is not
-    // an exported package. Without this the shim degrades to a no-op (logged
-    // once) and touch drag-to-scroll plus the touch keyboard stay dead.
+    // Windows touch: AWT still turns each finger into touch-caused mouse events,
+    // and the only flag that says so sits behind sun.awt.AWTAccessor.
+    // DesktopTouchEchoFilter reads it to drop that copy, since fingers reach
+    // Compose as real touch (ComposeTouchInjector).
     //
-    // sun.awt.windows is a second, separate package (not covered by the
-    // sun.awt open above): DesktopWindowsTouchKeyboard reflects onto
+    // The Windows touch keyboard: DesktopWindowsTouchKeyboard reflects onto
     // WToolkit.showTouchKeyboard/hideTouchKeyboard to raise the touch
     // keyboard, since the COM ITipInvocation route is dead on Windows 11
     // (see that file's KDoc for the measured facts). Without this open,

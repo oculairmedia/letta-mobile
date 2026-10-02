@@ -4,8 +4,8 @@ import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract as Contract
 
 /**
- * What `canvas.compose_guide` answers: the "read me first" an agent calls once before composing
- * (Excalidraw MCP's `read_me`, Miro's composer skill), kept out of the `canvas.compose`
+ * What `canvas_compose_guide` answers: the "read me first" an agent calls once before composing
+ * (Excalidraw MCP's `read_me`, Miro's composer skill), kept out of the `canvas_compose`
  * description so that one stays short (letta-mobile-bglj6.14).
  *
  * Built from the code it describes, so it cannot drift: the caps from [CanvasComposeContract],

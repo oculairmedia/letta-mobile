@@ -92,7 +92,7 @@ import kotlin.test.assertTrue
 /**
  * The multi-card end-to-end gate on desktop (letta-mobile-bglj6.14; the 8tlf9 gate of the bglj6
  * review): the agent's mixed artifact (sharedLogic's `request-multi-card.json`) composed by the
- * Iroh host's canvas.compose next to a drawing and two notes, written as one batch, taken by an
+ * Iroh host's canvas_compose next to a drawing and two notes, written as one batch, taken by an
  * app into its notebook and read back after a restart, then RENDERED (Skiko) as the board draws
  * it. Every composed card is fully shown inside the height compose reserved for it, at full type
  * size; no two cards overlap, nothing covers the person's drawing or notes, and everything is

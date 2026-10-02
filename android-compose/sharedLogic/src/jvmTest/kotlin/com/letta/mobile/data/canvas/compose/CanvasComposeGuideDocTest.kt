@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 /**
  * letta-mobile-bglj6.14: docs/reference/canvas-compose-v1.md carries the guide an agent reads
- * (`canvas.compose_guide`) word for word between its markers, so the human copy cannot drift from
+ * (`canvas_compose_guide`) word for word between its markers, so the human copy cannot drift from
  * what the tool answers. The guide is also written to build/canvas-compose-guide.md, so a change
  * to it can be pasted into the doc.
  */
@@ -26,7 +26,7 @@ class CanvasComposeGuideDocTest {
     private companion object {
         /** From the sharedLogic module directory, where Gradle runs its tests. */
         const val DOC = "../../docs/reference/canvas-compose-v1.md"
-        const val START = "<!-- canvas.compose_guide:start -->"
-        const val END = "<!-- canvas.compose_guide:end -->"
+        const val START = "<!-- canvas_compose_guide:start -->"
+        const val END = "<!-- canvas_compose_guide:end -->"
     }
 }

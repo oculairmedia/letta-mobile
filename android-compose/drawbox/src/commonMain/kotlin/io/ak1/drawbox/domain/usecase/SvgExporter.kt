@@ -4,6 +4,8 @@ package io.ak1.drawbox.domain.usecase
 
 import androidx.compose.ui.graphics.Color
 import io.ak1.drawbox.domain.model.Element
+import io.ak1.drawbox.domain.model.linePath
+import io.ak1.drawbox.domain.model.LinePath
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.model.textBox
 import io.ak1.drawbox.domain.model.resolvedTextColor
@@ -195,14 +197,8 @@ object SvgExporter {
                 start, end, color, strokeWidth, fillAttr,
                 cornerRadius = shape.cornerRadius, dashAttr = dashAttr,
             )
-            ShapeType.ARROW -> arrowToSvg(
-                start, end, colorToHex(shape.strokeColor), shape.strokeWidth,
-                bend = shape.bend, dashAttr = dashAttr,
-            )
-            ShapeType.LINE -> lineToSvg(
-                start, end, colorToHex(shape.strokeColor), shape.strokeWidth,
-                bend = shape.bend, dashAttr = dashAttr,
-            )
+            ShapeType.ARROW -> arrowToSvg(shape.linePath(), colorToHex(shape.strokeColor), shape.strokeWidth, dashAttr)
+            ShapeType.LINE -> lineToSvg(shape.linePath(), colorToHex(shape.strokeColor), shape.strokeWidth, dashAttr)
         }
 
         return if (shape.rotation != 0f) {
@@ -329,20 +325,20 @@ object SvgExporter {
     }
 
     private fun arrowToSvg(
-        start: Offset,
-        end: Offset,
+        path: LinePath,
         color: String,
         strokeWidth: Float,
-        bend: Offset,
         dashAttr: String,
     ): String {
+        val start = path.start
+        val end = path.end
         val arrowHeadSize = max(strokeWidth * 2, 10f)
 
         val bodySvg: String
         val tangentX: Float
         val tangentY: Float
 
-        if (bend == Offset.Zero) {
+        if (path is LinePath.Straight) {
             val dx = end.x - start.x
             val dy = end.y - start.y
             val length = sqrt(dx * dx + dy * dy)
@@ -354,14 +350,9 @@ object SvgExporter {
             bodySvg = """<line x1="${start.x}" y1="${start.y}" x2="$lineEndX" y2="$lineEndY" stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round"$dashAttr/>"""
             tangentX = dx; tangentY = dy
         } else {
-            // Quadratic bezier body. Tangent at t=1 is `2 * (end - control)`
-            // (proportional — atan2 only cares about direction).
-            val midX = (start.x + end.x) * 0.5f
-            val midY = (start.y + end.y) * 0.5f
-            val cx = midX + bend.x
-            val cy = midY + bend.y
-            bodySvg = """<path d="M ${start.x} ${start.y} Q $cx $cy ${end.x} ${end.y}" stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round" fill="none"$dashAttr/>"""
-            tangentX = end.x - cx; tangentY = end.y - cy
+            bodySvg = """<path d="${pathData(path)}" stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round" fill="none"$dashAttr/>"""
+            val heading = path.endDirection()
+            tangentX = heading.x; tangentY = heading.y
         }
 
         val angle = atan2(tangentY, tangentX)
@@ -573,21 +564,24 @@ object SvgExporter {
     }
 
     private fun lineToSvg(
-        start: Offset,
-        end: Offset,
+        path: LinePath,
         color: String,
         strokeWidth: Float,
-        bend: Offset,
         dashAttr: String,
-    ): String {
-        return if (bend == Offset.Zero) {
-            """<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round"$dashAttr/>"""
-        } else {
-            // Quadratic bezier control = midpoint + bend, matching DrawBox.kt.
-            val cx = (start.x + end.x) * 0.5f + bend.x
-            val cy = (start.y + end.y) * 0.5f + bend.y
-            """<path d="M ${start.x} ${start.y} Q $cx $cy ${end.x} ${end.y}" stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round" fill="none"$dashAttr/>"""
-        }
+    ): String = if (path is LinePath.Straight) {
+        """<line x1="${path.start.x}" y1="${path.start.y}" x2="${path.end.x}" y2="${path.end.y}" stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round"$dashAttr/>"""
+    } else {
+        """<path d="${pathData(path)}" stroke="$color" stroke-width="$strokeWidth" stroke-linecap="round" fill="none"$dashAttr/>"""
+    }
+
+    /** SVG path data for [path], the same curve DrawBox renders. */
+    private fun pathData(path: LinePath): String = when (path) {
+        is LinePath.Straight -> "M ${path.start.x} ${path.start.y} L ${path.end.x} ${path.end.y}"
+        is LinePath.Quadratic ->
+            "M ${path.start.x} ${path.start.y} Q ${path.control.x} ${path.control.y} ${path.end.x} ${path.end.y}"
+        is LinePath.Cubic ->
+            "M ${path.start.x} ${path.start.y} C ${path.control1.x} ${path.control1.y} " +
+                "${path.control2.x} ${path.control2.y} ${path.end.x} ${path.end.y}"
     }
 
     private fun colorToHex(color: Color): String {

@@ -202,7 +202,7 @@ internal fun GeneratedUiCard(
 }
 
 /**
- * letta-mobile-bglj6.13: the canvas.compose artifacts a message narrates, one card each, in call
+ * letta-mobile-bglj6.13: the canvas_compose artifacts a message narrates, one card each, in call
  * order. "Show on canvas" goes to [ChatSurfaceHost.showOnCanvas] (open the board and frame the
  * artifact), else to [ChatSurfaceHost.openCanvas]; with neither the card has no action.
  */

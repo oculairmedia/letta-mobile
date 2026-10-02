@@ -225,6 +225,17 @@ private fun ChatDetailBody(
             actions = actions.queue,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.xxl),
         )
+        // "Quote" on text selected by touch drops it into this prompt while it is on screen.
+        val quoteSink = com.letta.mobile.ui.text.LocalQuoteSink.current
+        val promptText by androidx.compose.runtime.rememberUpdatedState(surface.composerText)
+        val onPromptChanged by androidx.compose.runtime.rememberUpdatedState(actions.onComposerTextChanged)
+        androidx.compose.runtime.DisposableEffect(quoteSink) {
+            val quoteHere: (String) -> Unit = { quoted ->
+                onPromptChanged(com.letta.mobile.ui.text.quoteIntoPrompt(promptText, quoted))
+            }
+            quoteSink?.target = quoteHere
+            onDispose { if (quoteSink?.target === quoteHere) quoteSink.target = null }
+        }
         ComposerBar(
             companion = companion,
             companionPresent = companionPresent,

@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/** The canvas.compose markdown subset (letta-mobile-bglj6.8): what it reads, and what it refuses and where. */
+/** The canvas_compose markdown subset (letta-mobile-bglj6.8): what it reads, and what it refuses and where. */
 class CanvasComposeMarkdownTest {
     private val path = "/items/3/markdown"
 

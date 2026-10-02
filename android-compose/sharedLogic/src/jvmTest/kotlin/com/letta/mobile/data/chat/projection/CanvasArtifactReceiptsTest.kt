@@ -30,7 +30,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-bglj6.13 (canvas.compose C8): the single-receipt rule. One part per compose call,
+ * letta-mobile-bglj6.13 (canvas_compose C8): the single-receipt rule. One part per compose call,
  * on the message that narrates it, derived from the persisted TOOL_CALL event alone.
  */
 class CanvasArtifactReceiptsTest {
@@ -159,7 +159,7 @@ class CanvasArtifactReceiptsTest {
     fun theProviderSafeToolNameIsTheComposeToolToo() {
         val events = listOf(call("t1", result = receiptJson, name = CanvasToolContract.COMPOSE.replace('.', '_')), assistant("a1", "Done."))
         assertEquals(1, CanvasArtifactReceipts.attach(events).values.single().size)
-        assertTrue(CanvasArtifactReceipts.attach(listOf(call("t2", result = receiptJson, name = "canvas.apply_ops"))).isEmpty())
+        assertTrue(CanvasArtifactReceipts.attach(listOf(call("t2", result = receiptJson, name = "canvas_apply_ops"))).isEmpty())
     }
 
     // --- status ----------------------------------------------------------------------------

@@ -6,5 +6,5 @@
   "problems": [
     { "path": "/items/2", "code": "document.size", "message": "op 2 (set_document cmp-weekend-plan-meals): the document is larger than the board allows [document.size on 'cmp-weekend-plan-meals']" }
   ],
-  "hint": "Nothing was published. Fix every problem and send the whole request again; canvas.compose_guide describes the format."
+  "hint": "Nothing was published. Fix every problem and send the whole request again; canvas_compose_guide describes the format."
 }

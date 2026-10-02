@@ -32,7 +32,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-bglj6.13: the canvas.compose cards on the full-screen page, at a desktop size in the
+ * letta-mobile-bglj6.13: the canvas_compose cards on the full-screen page, at a desktop size in the
  * Pointer idiom and at phone size (412 x 915 dp, drawn at 2x) in the Touch idiom, light and dark:
  * a published artifact on its narration, one still being added, and a refused one. Writes PNGs to
  * build/chat-surface-snapshots/canvas-artifact-*.png for a reviewer; it asserts only that each

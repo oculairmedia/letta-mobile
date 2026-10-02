@@ -23,7 +23,6 @@ import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
 import com.letta.mobile.desktop.touch.DesktopTouchKeyboardHost
-import com.letta.mobile.desktop.touch.DesktopWindowsTouchInput
 import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.SingleInstanceRestoreEffect
@@ -176,10 +175,6 @@ private fun runDesktopApplication(
                             // Windows 11 standard rounded corners + outline on the
                             // undecorated frame.
                             DesktopWindowsChrome.applyStandardChrome(window)
-                            // Touch drag-to-scroll: AWT hands Compose every
-                            // WM_TOUCH as a PointerType.Mouse event, which
-                            // Compose Foundation refuses to drag-scroll.
-                            DesktopWindowsTouchInput.attach(window)
                         }
 
                         // Ctrl+scroll scales app type, persisted across

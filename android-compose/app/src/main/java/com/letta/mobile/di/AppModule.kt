@@ -116,7 +116,7 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        // Only device actions are this phone's to answer. canvas.* is the Iroh host's: it offers them
+        // Only device actions are this phone's to answer. canvas_* is the Iroh host's: it offers them
         // on every runtime it serves, backed by the relay's log (letta-mobile-aknkw), and ignores
         // any tools an app sends with runtime_start, so a copy here never reached a runtime.
         fun provideAndroidExternalToolRegistry(

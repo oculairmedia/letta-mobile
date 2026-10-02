@@ -16,7 +16,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * canvas.compose C2 (letta-mobile-bglj6.7): who owns a block document's frame, and which compose
+ * canvas_compose C2 (letta-mobile-bglj6.7): who owns a block document's frame, and which compose
  * request made it, ride on the document entry under whole-document last-writer-wins, kept across
  * writes that do not name them, exactly like the frame and colour.
  */

@@ -8,9 +8,11 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineImageBodies
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.data.timeline.snapshot.toTimelineWithImageBodies
 import com.letta.mobile.desktop.data.DesktopConfirmedTimelineStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -114,9 +116,16 @@ internal class RealDesktopTimelineLoop private constructor(
             val routing = resolveDesktopTimelineRouting(gateway, conversation)
             val timelineScope = TimelineScope(persistence.backendId, routing.loopConversationId.value, conversation.agentId)
             val snapshot = runCatching { persistence.store.readSnapshot(timelineScope) }.getOrNull()
+            // The legacy loop holds the whole conversation, so its images are resolved here,
+            // newest first and within a byte budget; the rest stay placeholders.
+            val imageBodies = persistence.store as? ConfirmedTimelineImageBodies
+            val initialTimeline = snapshot?.let { stored ->
+                imageBodies?.let { stored.toTimelineWithImageBodies(it) }
+                    ?: TimelineSnapshotCodec.storedEnvelopeToTimeline(stored)
+            }
             return RealDesktopTimelineLoop(
                 gateway, conversation, scope, persistence.store, persistence.backendId,
-                snapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline), snapshot?.revision ?: 0L,
+                initialTimeline, snapshot?.revision ?: 0L,
             )
         }
     }

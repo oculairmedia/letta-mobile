@@ -156,7 +156,7 @@ object PhoneFixtures {
     /** The canvas.compose cards (letta-mobile-bglj6.13): a published artifact, one being added, a refused one. */
     val canvasArtifactState: ChatUiState by lazy {
         val composeCall = UiToolCall(
-            name = "canvas.compose", arguments = "{\"title\":\"Weekend plan\"}", result = "{\"ok\":true}", status = "success", toolCallId = "t1",
+            name = "canvas_compose", arguments = "{\"title\":\"Weekend plan\"}", result = "{\"ok\":true}", status = "success", toolCallId = "t1",
         )
         ChatUiState(
             conversationState = ConversationState.Ready(CONVERSATION_ID),

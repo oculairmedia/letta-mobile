@@ -1,5 +1,5 @@
 {
-  "about": "canvas.compose v1 placement goldens (letta-mobile-bglj6.9, plan section 3.4). Each case: the sized items and the board's content bounds in, the slots, group label boxes and artifact bounds out. Held by CanvasComposePlacementGoldenTest.",
+  "about": "canvas_compose v1 placement goldens (letta-mobile-bglj6.9, plan section 3.4). Each case: the sized items and the board's content bounds in, the slots, group label boxes and artifact bounds out. Held by CanvasComposePlacementGoldenTest.",
   "cases": [
     {
       "name": "empty board, five notes",

@@ -53,7 +53,7 @@ data class Placement(
 )
 
 /**
- * Deterministic placement for canvas.compose (letta-mobile-bglj6.9, plan section 3.4, D3).
+ * Deterministic placement for canvas_compose (letta-mobile-bglj6.9, plan section 3.4, D3).
  *
  * A pure function of the items and the board's content bounds: no viewport (the host has none), no
  * font, density or Compose API, so every peer and both hosts produce the same frames. The artifact

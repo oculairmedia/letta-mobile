@@ -195,7 +195,7 @@ internal class ExternalToolDispatcher(
                         agentId = request.runtime?.agentId,
                         conversationId = request.runtime?.conversationId,
                         // letta-mobile-bglj6.12: the model's tool call id, the key the
-                        // timeline files this call's return under (canvas.compose's receipt).
+                        // timeline files this call's return under (canvas_compose's receipt).
                         toolCallId = request.toolCallId,
                     )
                 } ?: run {

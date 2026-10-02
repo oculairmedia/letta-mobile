@@ -80,7 +80,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * was never placed (a legacy frameless note) gets the slot the shared placement engine gives it
  * ([framelessFrames], from `CanvasComposePlacement.placeFrameless`), so two never overlap.
  *
- * How a card is sized follows its geometry owner (canvas.compose, letta-mobile-bglj6.11): an
+ * How a card is sized follows its geometry owner (canvas_compose, letta-mobile-bglj6.11): an
  * AUTO-owned or frameless note fits its content within its booked frame (see [NoteSizing]); an
  * EXPLICIT or USER frame is drawn as stored. Fitting is local: it never writes geometry back.
  *

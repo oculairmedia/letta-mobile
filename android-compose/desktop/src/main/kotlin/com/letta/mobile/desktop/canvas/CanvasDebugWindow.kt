@@ -42,6 +42,7 @@ fun main() {
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
                     initialJson = CanvasSamples.buildCycleJson,
+                    longPressDrawsSelectionBox = true,
                 )
             }
         }
@@ -79,6 +80,7 @@ internal fun CanvasDebugWindow(
             Surface(modifier = Modifier.fillMaxSize()) {
                 CanvasWorkspace(
                     initialJson = CanvasSamples.buildCycleJson,
+                    longPressDrawsSelectionBox = true,
                     onNavigateBack = {
                         open = false
                         onClose?.invoke()

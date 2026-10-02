@@ -105,13 +105,9 @@ private fun ReproContent(window: java.awt.Window) {
         }
     }
 
-    // The app's own event queue and window chrome. The touch queue is in EVERY crash stack we
-    // have, wrapping the dispatch the disposal throws from, and it is installed by the real app
-    // and not by a plain singleWindowApplication - so the reduction without it was not the same
-    // program.
+    // The app's own window chrome, as the real app installs it.
     LaunchedEffect(window) {
         runCatching { com.letta.mobile.desktop.DesktopWindowsChrome.applyStandardChrome(window) }
-        runCatching { com.letta.mobile.desktop.touch.DesktopWindowsTouchInput.attach(window) }
     }
 
     LaunchedEffect(Unit) {

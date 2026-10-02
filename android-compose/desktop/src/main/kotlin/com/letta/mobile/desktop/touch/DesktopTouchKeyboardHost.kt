@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.touch
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.InterceptPlatformTextInput
@@ -25,6 +26,12 @@ internal fun DesktopTouchKeyboardHost(
     content: @Composable () -> Unit,
 ) {
     val gate = remember(controller, origin) { DesktopTouchKeyboardSessionGate(controller, origin) }
+    DisposableEffect(gate) {
+        DesktopTouchKeyboardTaps.gate = gate
+        onDispose {
+            if (DesktopTouchKeyboardTaps.gate === gate) DesktopTouchKeyboardTaps.gate = null
+        }
+    }
     val interceptor = remember(gate) {
         PlatformTextInputInterceptor { request, nextHandler ->
             val raised = gate.begin()

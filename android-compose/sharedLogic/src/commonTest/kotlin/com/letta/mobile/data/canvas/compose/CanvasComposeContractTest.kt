@@ -12,7 +12,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * The canvas.compose v1 wire contract (letta-mobile-bglj6.6): what a request may say, how it is
+ * The canvas_compose v1 wire contract (letta-mobile-bglj6.6): what a request may say, how it is
  * read, and what comes back. The fixture files themselves are held to it in CanvasComposeFixturesTest.
  */
 class CanvasComposeContractTest {
