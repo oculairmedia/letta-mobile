@@ -24,24 +24,22 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import java.io.File
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import org.junit.Assert.assertTrue
 import org.junit.Rule
-import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
-import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.AppTheme
-import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.feature.chat.screen.ChatMessageList
 import com.letta.mobile.feature.chat.screen.activeRunActivity
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatActions
-import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineSnapshot
@@ -199,9 +197,7 @@ class SharedTimelineParityScreenshotTest {
 
     private companion object {
         const val PngQuality = 100
-
-        private fun tool(id: String, name: String, args: String, result: String?, status: String?) =
-            UiToolCall(name = name, arguments = args, result = result, status = status, toolCallId = id, executionTimeMs = 1_200)
+        const val ToolDurationMs = 1_200L
 
         val SettledMessages: List<UiMessage> = listOf(
             UiMessage(
@@ -240,7 +236,14 @@ class SharedTimelineParityScreenshotTest {
                 runId = "run-1",
                 stepId = "s2",
                 toolCalls = listOf(
-                    tool("tc1", "Bash", """{"command":"./gradlew :feature-chat:test"}""", "FAILED: ChatRowTest > clock", "error"),
+                    UiToolCall(
+                        name = "Bash",
+                        arguments = """{"command":"./gradlew :feature-chat:test"}""",
+                        result = "FAILED: ChatRowTest > clock",
+                        status = "error",
+                        toolCallId = "tc1",
+                        executionTimeMs = ToolDurationMs,
+                    ),
                 ),
             ),
             UiMessage(
@@ -251,7 +254,14 @@ class SharedTimelineParityScreenshotTest {
                 runId = "run-1",
                 stepId = "s3",
                 toolCalls = listOf(
-                    tool("tc2", "Bash", """{"command":"git status --short"}""", " M ChatRowTest.kt", "success"),
+                    UiToolCall(
+                        name = "Bash",
+                        arguments = """{"command":"git status --short"}""",
+                        result = " M ChatRowTest.kt",
+                        status = "success",
+                        toolCallId = "tc2",
+                        executionTimeMs = ToolDurationMs,
+                    ),
                 ),
             ),
             UiMessage(
@@ -287,44 +297,39 @@ class SharedTimelineParityScreenshotTest {
                 timestamp = "",
                 runId = "run-2",
                 stepId = "s6",
-                toolCalls = listOf(tool("tc3", "Read", """{"file_path":"CHANGELOG.md"}""", null, null)),
+                toolCalls = listOf(
+                    UiToolCall(
+                        name = "Read",
+                        arguments = """{"file_path":"CHANGELOG.md"}""",
+                        result = null,
+                        status = null,
+                        toolCallId = "tc3",
+                        executionTimeMs = ToolDurationMs,
+                    ),
+                ),
             ),
         )
     }
 }
 
-/** The shared page's intents, all ignored: the comparison only draws. */
-internal object NoOpChatActions : ChatActions {
-    override fun updateComposerText(text: String) = Unit
-    override fun send() = Unit
-    override fun sendText(text: String) = Unit
-    override fun attachImage(image: MessageContentPart.Image) = Unit
-    override fun removeAttachment(index: Int) = Unit
-    override fun reportComposerError(message: String) = Unit
-    override fun clearComposerError() = Unit
-    override fun runComposerCommand(command: ChatComposerCommand) = Unit
-    override fun uninstallComposerCommand(command: ChatComposerCommand) = Unit
-    override fun stopRun() = Unit
-    override fun rerun(message: UiMessage) = Unit
-    override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) = Unit
-    override fun submitA2uiAction(action: A2uiAction) = Unit
-    override fun dismissA2uiSurface(surfaceId: String) = Unit
-    override fun markA2uiSnackbarShown(id: Long) = Unit
-    override fun cancelQueuedSend(id: QueuedSendId) = Unit
-    override fun sendQueuedNow(id: QueuedSendId) = Unit
-    override fun resumeSendQueue() = Unit
-    override fun toggleRunCollapsed(runId: String) = Unit
-    override fun toggleReasoningExpanded(messageId: String) = Unit
-    override fun loadOlderMessages() = Unit
-    override fun releaseOlderMessages() = Unit
-    override fun expandTruncatedToolResult(messageId: String) = Unit
-    override fun retryLoad() = Unit
-    override fun clearError() = Unit
-    override fun setFontScale(scale: Float) = Unit
-    override fun selectModel(handle: String, effort: ReasoningEffortChoice) = Unit
-    override fun changeWorkingDirectory(path: String) = Unit
-    override fun updateSearchQuery(query: String) = Unit
-    override fun clearSearch() = Unit
-    override fun refreshGoalStatus() = Unit
-    override fun continueGoal() = Unit
+/**
+ * The shared page's intents, all ignored: the comparison only draws. A proxy rather than a
+ * hand-written override per intent, so a new [ChatActions] member needs no edit here.
+ */
+internal val NoOpChatActions: ChatActions = Proxy.newProxyInstance(
+    ChatActions::class.java.classLoader,
+    arrayOf(ChatActions::class.java),
+    NoOpChatActionsHandler,
+) as ChatActions
+
+/** Every [ChatActions] member returns Unit; Object's own members keep an object's identity semantics. */
+private object NoOpChatActionsHandler : InvocationHandler {
+    override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any? {
+        return when (method.name) {
+            "equals" -> proxy === args?.firstOrNull()
+            "hashCode" -> System.identityHashCode(proxy)
+            "toString" -> "NoOpChatActions"
+            else -> Unit
+        }
+    }
 }
