@@ -7,7 +7,7 @@ class LoggingMap extends Map {
   delete(k) { const r = super.delete(k); dump('delete', k); return r; }
 }
 function dump(op, k) {
-  const names = Array.from(super_values()).map(t => t.name).sort();
+  const names = Array.from(super_values()).map(t => t.name).sort((a, b) => a.localeCompare(b));
   fs.appendFileSync(LOG, JSON.stringify({ t: Date.now(), op, key: String(k), names }) + '\n');
 }
 function super_values() { return Map.prototype.values.call(globalThis[KEY]); }

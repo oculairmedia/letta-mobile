@@ -2,6 +2,7 @@
 // and when does the model see the change?
 // SPIKE_NODE_MODULES: the node_modules dir of the letta-code install under test (it ships `ws`).
 import { createRequire } from 'module';
+import { randomUUID } from 'crypto';
 const WebSocket = createRequire(process.env.SPIKE_NODE_MODULES + '/')('ws');
 import fs from 'fs';
 const url = process.argv[2];
@@ -10,31 +11,53 @@ const LLM = process.env.SPIKE_LLM_LOG;
 const ws = new WebSocket(url);
 const pending = new Map();
 let onToolRequest = null;
+function onRuntimeStartResponse(m) {
+  const resolve = pending.get(m.request_id);
+  if (!resolve) return;
+  pending.delete(m.request_id);
+  resolve(m);
+}
+function onExternalToolCallRequest(m) {
+  console.log('  external_tool_call_request:', m.tool_name);
+  const result = { content: [{ type: 'text', text: `ok from ${m.tool_name}` }], is_error: false };
+  const answer = () => ws.send(JSON.stringify({ type: 'external_tool_call_response', request_id: m.request_id, result }));
+  if (onToolRequest) onToolRequest(answer); else answer();
+}
+const LOGGED_DELTAS = new Set(['tool_return_message', 'error_message']);
+function logDelta(delta) {
+  if (!LOGGED_DELTAS.has(delta?.message_type)) return;
+  const body = delta.tool_return ?? delta.tool_returns ?? delta.message ?? '';
+  console.log('  ', delta.message_type, JSON.stringify(body).slice(0, 200));
+}
+const HANDLERS = { runtime_start_response: onRuntimeStartResponse, external_tool_call_request: onExternalToolCallRequest };
 ws.on('message', (data) => {
   const m = JSON.parse(data.toString());
-  if (m.type === 'runtime_start_response' && pending.has(m.request_id)) { pending.get(m.request_id)(m); pending.delete(m.request_id); }
-  if (m.type === 'external_tool_call_request') {
-    console.log('  external_tool_call_request:', m.tool_name);
-    const answer = () => ws.send(JSON.stringify({ type: 'external_tool_call_response', request_id: m.request_id, result: { content: [{ type: 'text', text: `ok from ${m.tool_name}` }], is_error: false } }));
-    if (onToolRequest) onToolRequest(answer); else answer();
-  }
-  if (m.delta && (m.delta.message_type === 'tool_return_message' || m.delta.message_type === 'error_message')) {
-    console.log('  ', m.delta.message_type, JSON.stringify(m.delta.tool_return ?? m.delta.tool_returns ?? m.delta.message ?? '').slice(0, 200));
-  }
+  HANDLERS[m.type]?.(m);
+  logDelta(m.delta);
 });
 const tool = (name) => ({ name, description: `Spike tool ${name}.`, parameters: { type: 'object', properties: {} } });
 const tools = (...names) => [{ tools: names.map(tool) }];
 function runtimeStart(body) {
-  const request_id = `spike-${Math.random().toString(36).slice(2)}`;
+  const request_id = `spike-${randomUUID()}`;
   return new Promise((res) => { pending.set(request_id, res); ws.send(JSON.stringify({ type: 'runtime_start', request_id, ...body })); });
 }
 const lastLine = (f) => { const l = fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n') : []; return l.length ? JSON.parse(l[l.length - 1]) : null; };
 const llmSince = (k) => (fs.existsSync(LLM) ? fs.readFileSync(LLM, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : []).slice(k);
 const llmCount = () => llmSince(0).length;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+// A turn under 'unrestricted' passes requires_approval on its way to the real end.
+function terminalStopReason(delta) {
+  if (delta?.message_type !== 'stop_reason') return null;
+  return delta.stop_reason === 'requires_approval' ? null : delta.stop_reason;
+}
 function turn(scope, text) {
   const done = new Promise((res) => {
-    const h = (data) => { const m = JSON.parse(data.toString()); const d = m.delta; if (d && d.message_type === 'stop_reason' && d.stop_reason !== 'requires_approval') { ws.off('message', h); res(d.stop_reason); } };
+    const h = (data) => {
+      const stop = terminalStopReason(JSON.parse(data.toString()).delta);
+      if (!stop) return;
+      ws.off('message', h);
+      res(stop);
+    };
     ws.on('message', h);
     setTimeout(() => res('timeout'), 90000);
   });
