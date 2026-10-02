@@ -636,7 +636,7 @@ fun CanvasWorkspace(
             )
         }.collectLatest { frame ->
             if (keyboardReducedMotion && frame.ime > 0) delay(KEYBOARD_SETTLE_MS)
-            val band = keyboardBand(boardFrame, frame.obstruction, footHeight[0].toFloat(), keyboardMarginPx, frame.topReserve)
+            val band = keyboardBand(boardFrame, frame, CanvasBoardFoot(footHeight[0].toFloat(), keyboardMarginPx))
             keyboardCamera.step(frame.ime, frame.target, controller.state.value.viewport, band)?.let { delta ->
                 controller.panBy(delta)
                 keyboardCamera.moved(controller.state.value.viewport)
