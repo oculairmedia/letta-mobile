@@ -94,12 +94,12 @@ internal data class MascotSeatInfo(
     val onEdit: (() -> Unit)? get() = handlers.onEdit
 
     /** The box the character is drawn in, before the seat's own scale. */
-    val drawWidth: Float get() = seatDrawWidth(layoutWidth, bounds)
-}
+    val drawWidth: Float get() = seatDrawWidth()
 
-/** [layoutWidth] when the seat reports one, else the width of its [bounds]. */
-private fun seatDrawWidth(layoutWidth: Float, bounds: Rect): Float {
-    return if (layoutWidth > 0f) layoutWidth else bounds.width
+    /** [layoutWidth] when the seat reports one, else the width of its [bounds]. */
+    private fun seatDrawWidth(): Float {
+        return if (layoutWidth > 0f) layoutWidth else bounds.width
+    }
 }
 
 /**
@@ -114,7 +114,7 @@ internal class SeatHandlers {
     var onEdit: (() -> Unit)? = null
         set(value) {
             field = value
-            syncEditable(value != null)
+            syncEditable()
         }
 
     /**
@@ -124,7 +124,7 @@ internal class SeatHandlers {
     var onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null
         set(value) {
             field = value
-            syncDraggable(value != null)
+            syncDraggable()
         }
 
     /**
@@ -139,12 +139,14 @@ internal class SeatHandlers {
         private set
 
     /** Writes [editable] only when it changes, so an unchanged handler swap records no state write. */
-    private fun syncEditable(hasHandler: Boolean) {
+    private fun syncEditable() {
+        val hasHandler = onEdit != null
         if (editable != hasHandler) editable = hasHandler
     }
 
     /** Writes [draggable] only when it changes, so an unchanged handler swap records no state write. */
-    private fun syncDraggable(hasHandler: Boolean) {
+    private fun syncDraggable() {
+        val hasHandler = onDrag != null
         if (draggable != hasHandler) draggable = hasHandler
     }
 }
