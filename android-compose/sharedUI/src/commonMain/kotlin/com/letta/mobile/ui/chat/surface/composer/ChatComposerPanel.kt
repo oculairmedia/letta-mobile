@@ -103,7 +103,7 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
         } else {
             ComposerCompanionRow(model) { ComposerPromptCard(model, attachImage) }
             if (inputs.platform.showKeyboardHints) {
-                ComposerHintRow(visible = composerHintVisible(composer.text, composer.attachments.isNotEmpty()))
+                ComposerHintRow(visible = composerHintVisible(composer))
             }
         }
     }

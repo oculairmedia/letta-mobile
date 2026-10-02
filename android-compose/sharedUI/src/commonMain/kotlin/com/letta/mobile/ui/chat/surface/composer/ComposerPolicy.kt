@@ -39,13 +39,28 @@ internal data class ComposerDecisions(
 ) {
     companion object {
         fun of(composer: ChatComposerUiState, uiState: ChatUiState): ComposerDecisions {
-            val streaming = uiState.isStreaming
+            val run = ComposerRun.of(uiState)
             return ComposerDecisions(
-                sendEnabled = composerSendEnabled(composer, streaming),
-                action = composerAction(composer, streaming, uiState.isCancellingRun),
-                stopping = uiState.isCancellingRun,
+                sendEnabled = composerSendEnabled(composer, run),
+                action = composerAction(composer, run),
+                stopping = run.cancelling,
                 autocomplete = composerAutocompleteUi(composer),
             )
+        }
+    }
+}
+
+/** Where the conversation's run stands, as the composer reads it. */
+@Immutable
+internal data class ComposerRun(
+    /** A run is streaming. */
+    val streaming: Boolean,
+    /** A stop was requested and the terminal frame has not landed. */
+    val cancelling: Boolean,
+) {
+    companion object {
+        fun of(uiState: ChatUiState): ComposerRun {
+            return ComposerRun(streaming = uiState.isStreaming, cancelling = uiState.isCancellingRun)
         }
     }
 }
@@ -54,9 +69,9 @@ internal data class ComposerDecisions(
  * A draft can be sent when there is something in it and the owner takes it now, or, during a
  * run, when the owner queues follow-ups behind the run.
  */
-internal fun composerSendEnabled(composer: ChatComposerUiState, streaming: Boolean): Boolean {
+internal fun composerSendEnabled(composer: ChatComposerUiState, run: ComposerRun): Boolean {
     if (!composer.hasPayload) return false
-    return composer.canSend || (streaming && composer.canQueueWhileStreaming)
+    return composer.canSend || (run.streaming && composer.canQueueWhileStreaming)
 }
 
 /**
@@ -64,12 +79,8 @@ internal fun composerSendEnabled(composer: ChatComposerUiState, streaming: Boole
  * field during a run it sends (queues) instead, and Stop returns once the field is empty.
  * A pending stop keeps the Stop button so a second press can force-clear.
  */
-internal fun composerAction(
-    composer: ChatComposerUiState,
-    streaming: Boolean,
-    cancelling: Boolean,
-): ComposerAction {
-    val stops = streaming && (cancelling || !composer.canQueueWhileStreaming || !composer.hasPayload)
+internal fun composerAction(composer: ChatComposerUiState, run: ComposerRun): ComposerAction {
+    val stops = run.streaming && (run.cancelling || !composer.canQueueWhileStreaming || !composer.hasPayload)
     return if (stops) ComposerAction.Stop else ComposerAction.Send
 }
 
@@ -77,8 +88,8 @@ internal fun composerAction(
  * Whether the keyboard-affordance strip under the composer is showing: discovery copy for an
  * empty composer that fades as soon as there is something to send.
  */
-internal fun composerHintVisible(text: String, hasAttachments: Boolean): Boolean {
-    return text.isBlank() && !hasAttachments
+internal fun composerHintVisible(composer: ChatComposerUiState): Boolean {
+    return composer.text.isBlank() && composer.attachments.isEmpty()
 }
 
 @Immutable
