@@ -1,7 +1,9 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
@@ -22,6 +24,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +43,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
@@ -50,9 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.data.chat.projection.projectRunActivity
-import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_run_failure_count
 import com.letta.mobile.sharedui.resources.rows_run_for_duration
@@ -75,6 +77,7 @@ import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -99,79 +102,139 @@ internal fun RunBlockRow(
 ) {
     val messages = remember(runMessages) { runMessages.toImmutableList() }
     if (messages.isEmpty()) return
-    val active = context.itemState.isStreaming &&
-        context.streamingMessageId?.let { id -> messages.any { it.id == id || it.clientMessageId == id } } == true
+    val active = isRunStreaming(messages, context)
     val activity = remember(messages, active) { projectRunActivity(messages, active) } ?: return
-    val collapsible = messages.size > 1
-    val collapsed = collapsible && !activity.isActive && runId in context.itemState.collapsedRunIds
-    val reducedMotion = LocalReducedMotion.current
+    val run = runBlockOf(runId, messages, activity, context.itemState.collapsedRunIds)
     Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
-        AnimatedVisibility(
-            visible = activity.isActive || context.isNewest,
-            enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
-            exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
-        ) {
-            RunActivityHeader(
-                activity = activity,
-                collapsed = collapsed,
-                onToggle = if (collapsible && !activity.isActive) ({ callbacks.actions.toggleRunCollapsed(runId) }) else null,
-            )
-        }
+        RunHeaderSlot(run, visible = activity.isActive || context.isNewest, callbacks)
         // One plain message keeps its own geometry under the header; a lone tool call still
         // reaches the tool summary.
         if (messages.size == 1 && !messages.single().isRunToolCallMessage()) {
             RunMessageStep(messages.single(), GroupPosition.None, context, callbacks)
-            return@Column
+        } else {
+            RunBody(run, context, callbacks)
         }
-        val lift by animateDpAsState(
-            targetValue = if (!activity.isActive && context.isNewest) ChatRowSpacing.completedRunBodyLift else 0.dp,
-            animationSpec = if (reducedMotion) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
-            label = "RunBodyLift",
+    }
+}
+
+/** One run as its row draws it: its messages, their projected activity, and its collapse state. */
+@Immutable
+private data class RunBlock(
+    val runId: String,
+    val messages: ImmutableList<UiMessage>,
+    val activity: RunActivityProjection,
+    /** More than one message and settled: the header offers collapse. */
+    val canCollapse: Boolean,
+    val collapsed: Boolean,
+)
+
+private fun runBlockOf(
+    runId: String,
+    messages: ImmutableList<UiMessage>,
+    activity: RunActivityProjection,
+    collapsedRunIds: Set<String>,
+): RunBlock {
+    val canCollapse = messages.size > 1 && !activity.isActive
+    return RunBlock(runId, messages, activity, canCollapse, collapsed = canCollapse && runId in collapsedRunIds)
+}
+
+/** The run is the one streaming: the page streams and its streaming message is one of the run's. */
+private fun isRunStreaming(messages: List<UiMessage>, context: ChatRowContext): Boolean {
+    if (!context.itemState.isStreaming) return false
+    val id = context.streamingMessageId ?: return false
+    return messages.any { it.id == id || it.clientMessageId == id }
+}
+
+@Composable
+private fun ColumnScope.RunHeaderSlot(run: RunBlock, visible: Boolean, callbacks: ChatRowCallbacks) {
+    val reducedMotion = LocalReducedMotion.current
+    AnimatedVisibility(
+        visible = visible,
+        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
+        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+    ) {
+        RunActivityHeader(
+            activity = run.activity,
+            collapsed = run.collapsed,
+            onToggle = if (run.canCollapse) ({ callbacks.actions.toggleRunCollapsed(run.runId) }) else null,
         )
-        Box(modifier = Modifier.fillMaxWidth().pullUp { lift }) {
-            AnimatedContent(
-                targetState = collapsed,
-                transitionSpec = {
-                    val millis = if (reducedMotion) 0 else LettaMotionTokens.CONTENT_SIZE_MILLIS
-                    (fadeIn(tween(millis)) togetherWith fadeOut(tween(millis)))
-                        .using(SizeTransform(clip = true) { _, _ -> tween(millis) })
-                },
-                label = "RunBlockExpandCollapse",
-            ) { isCollapsed ->
-                val visible = if (isCollapsed) listOf(collapsedPreview(messages)) else messages
-                val steps = remember(visible) { compactRunSteps(visible) }
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    steps.forEachIndexed { index, step ->
-                        key(step.key) {
-                            when (step) {
-                                is RunStep.Message -> RunMessageStep(
-                                    message = step.message,
-                                    position = stepPosition(index, steps.size, isCollapsed),
-                                    context = context,
-                                    callbacks = callbacks,
-                                )
-                                is RunStep.ToolCalls -> ToolRunGroup(
-                                    toolCalls = step.toolCalls,
-                                    approvals = step.approvals,
-                                    context = context,
-                                    callbacks = callbacks,
-                                    startedAtTimestamp = step.startedAtTimestamp,
-                                    modifier = Modifier.padding(top = ChatRowSpacing.grouped),
-                                )
-                            }
-                        }
-                    }
-                }
+    }
+}
+
+/** The run's steps under the header, lifted under it once settled, cross-fading on collapse. */
+@Composable
+private fun RunBody(run: RunBlock, context: ChatRowContext, callbacks: ChatRowCallbacks) {
+    val reducedMotion = LocalReducedMotion.current
+    val lift by animateDpAsState(
+        targetValue = if (!run.activity.isActive && context.isNewest) ChatRowSpacing.completedRunBodyLift else 0.dp,
+        animationSpec = if (reducedMotion) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
+        label = "RunBodyLift",
+    )
+    Box(modifier = Modifier.fillMaxWidth().pullUp { lift }) {
+        AnimatedContent(
+            targetState = run.collapsed,
+            transitionSpec = { runBodyTransform(reducedMotion) },
+            label = "RunBlockExpandCollapse",
+        ) { isCollapsed ->
+            RunSteps(run.messages, isCollapsed, context, callbacks)
+        }
+    }
+}
+
+private fun AnimatedContentTransitionScope<Boolean>.runBodyTransform(reducedMotion: Boolean): ContentTransform {
+    val millis = if (reducedMotion) 0 else LettaMotionTokens.CONTENT_SIZE_MILLIS
+    return (fadeIn(tween(millis)) togetherWith fadeOut(tween(millis)))
+        .using(SizeTransform(clip = true) { _, _ -> tween(millis) })
+}
+
+@Composable
+private fun RunSteps(
+    messages: ImmutableList<UiMessage>,
+    isCollapsed: Boolean,
+    context: ChatRowContext,
+    callbacks: ChatRowCallbacks,
+) {
+    val visible = if (isCollapsed) listOf(collapsedPreview(messages)) else messages
+    val steps = remember(visible) { compactRunSteps(visible) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        steps.forEachIndexed { index, step ->
+            key(step.key) {
+                RunStepRow(step, stepPosition(index, steps.size, isCollapsed), context, callbacks)
             }
         }
     }
 }
 
-private fun stepPosition(index: Int, count: Int, collapsed: Boolean): GroupPosition = when {
-    collapsed || count == 1 -> GroupPosition.None
-    index == 0 -> GroupPosition.First
-    index == count - 1 -> GroupPosition.Last
-    else -> GroupPosition.Middle
+@Composable
+private fun RunStepRow(
+    step: RunStep,
+    position: GroupPosition,
+    context: ChatRowContext,
+    callbacks: ChatRowCallbacks,
+) {
+    when (step) {
+        is RunStep.Message -> RunMessageStep(
+            message = step.message,
+            position = position,
+            context = context,
+            callbacks = callbacks,
+        )
+        is RunStep.ToolCalls -> ToolRunGroup(
+            calls = step.calls,
+            context = context,
+            callbacks = callbacks,
+            modifier = Modifier.padding(top = ChatRowSpacing.grouped),
+        )
+    }
+}
+
+private fun stepPosition(index: Int, count: Int, collapsed: Boolean): GroupPosition {
+    return when {
+        collapsed || count == 1 -> GroupPosition.None
+        index == 0 -> GroupPosition.First
+        index == count - 1 -> GroupPosition.Last
+        else -> GroupPosition.Middle
+    }
 }
 
 /**
@@ -186,16 +249,17 @@ private fun RunMessageStep(
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
 ) {
-    val top = if (message.isReasoning || !message.toolCalls.isNullOrEmpty() ||
-        position == GroupPosition.Middle || position == GroupPosition.Last
-    ) {
-        ChatRowSpacing.grouped
-    } else {
-        ChatRowSpacing.ungrouped
-    }
+    val top = if (takesGroupedBeat(message, position)) ChatRowSpacing.grouped else ChatRowSpacing.ungrouped
     Box(modifier = Modifier.fillMaxWidth().padding(top = top)) {
         ChatMessageRow(message, context, callbacks)
     }
+}
+
+/** Reasoning and tool rows, and every step after a run's first, sit on the tight grouped beat. */
+private fun takesGroupedBeat(message: UiMessage, position: GroupPosition): Boolean {
+    val reasoningOrTools = message.isReasoning || !message.toolCalls.isNullOrEmpty()
+    val continuing = position == GroupPosition.Middle || position == GroupPosition.Last
+    return reasoningOrTools || continuing
 }
 
 /** A step of a run, in chat order. */
@@ -212,9 +276,7 @@ internal sealed interface RunStep {
     @Immutable
     data class ToolCalls(
         val firstMessageId: String,
-        val toolCalls: ImmutableList<UiToolCall>,
-        val approvals: ImmutableList<UiApprovalRequest>,
-        val startedAtTimestamp: String?,
+        val calls: ToolRunCalls,
     ) : RunStep {
         override val key: String = "tool-group-$firstMessageId"
     }
@@ -227,35 +289,53 @@ internal sealed interface RunStep {
  */
 internal fun compactRunSteps(messages: List<UiMessage>): List<RunStep> {
     if (messages.isEmpty()) return emptyList()
-    val toolMessages = messages.filter { it.isRunToolCallMessage() || it.hasProseAndToolCalls() }
-    val group = toolMessages.takeIf { it.isNotEmpty() }?.let { calls ->
-        RunStep.ToolCalls(
-            firstMessageId = calls.first().id,
-            toolCalls = calls.flatMap { it.toolCalls.orEmpty() }.toImmutableList(),
-            approvals = calls.mapNotNull { it.approvalRequest }.distinctBy { it.requestId }.toImmutableList(),
-            startedAtTimestamp = calls.first().timestamp.takeIf { it.isNotBlank() },
-        )
-    }
+    // The group is emitted once, at the first tool-bearing message.
+    var pendingGroup = runToolCallGroup(messages)
     val steps = ArrayList<RunStep>(messages.size)
-    var emittedGroup = false
-    messages.forEach { message ->
-        val toolBearing = message.isRunToolCallMessage() || message.hasProseAndToolCalls()
-        if (toolBearing && !emittedGroup && group != null) {
+    for (message in messages) {
+        val group = pendingGroup
+        if (group != null && message.isPlainAssistantStep()) {
             steps += group
-            emittedGroup = true
+            pendingGroup = null
         }
-        when {
-            message.isRunToolCallMessage() -> Unit
-            message.hasProseAndToolCalls() -> steps += RunStep.Message(message.copy(toolCalls = null, approvalRequest = null))
-            else -> steps += RunStep.Message(message)
-        }
+        message.ownRunStep()?.let { steps += it }
     }
     return steps
 }
 
-private fun UiMessage.isPlainAssistantStep(): Boolean =
-    role == "assistant" && !isReasoning && !isError && generatedUi == null &&
-        approvalResponse == null && attachments.isEmpty() && !toolCalls.isNullOrEmpty()
+/** Every tool call of the run's tool-bearing messages, folded into one step; null when none. */
+private fun runToolCallGroup(messages: List<UiMessage>): RunStep.ToolCalls? {
+    val calls = messages.filter { it.isPlainAssistantStep() }
+    if (calls.isEmpty()) return null
+    return RunStep.ToolCalls(
+        firstMessageId = calls.first().id,
+        calls = ToolRunCalls(
+            toolCalls = calls.flatMap { it.toolCalls.orEmpty() }.toImmutableList(),
+            approvals = calls.mapNotNull { it.approvalRequest }.distinctBy { it.requestId }.toImmutableList(),
+            startedAtTimestamp = calls.first().timestamp.takeIf { it.isNotBlank() },
+        ),
+    )
+}
+
+/** The message's own step: none for a tool-call-only message, the prose alone for prose with calls. */
+private fun UiMessage.ownRunStep(): RunStep.Message? {
+    return when {
+        isRunToolCallMessage() -> null
+        hasProseAndToolCalls() -> RunStep.Message(copy(toolCalls = null, approvalRequest = null))
+        else -> RunStep.Message(this)
+    }
+}
+
+/**
+ * A plain assistant message carrying tool calls: tool-bearing, so its calls fold into the run's
+ * tool summary ([isRunToolCallMessage] or [hasProseAndToolCalls]).
+ */
+private fun UiMessage.isPlainAssistantStep(): Boolean {
+    if (role != "assistant" || isReasoning) return false
+    if (isError || generatedUi != null) return false
+    if (approvalResponse != null || attachments.isNotEmpty()) return false
+    return !toolCalls.isNullOrEmpty()
+}
 
 /**
  * A tool-call-only assistant message: folds entirely into the run's tool summary. One carrying a
@@ -296,13 +376,7 @@ private fun RunActivityHeader(
     collapsed: Boolean,
     onToggle: (() -> Unit)?,
 ) {
-    val stateText = stringResource(
-        when {
-            activity.isActive -> Res.string.rows_run_state_working
-            collapsed -> Res.string.rows_run_state_collapsed
-            else -> Res.string.rows_run_state_expanded
-        },
-    )
+    val stateText = stringResource(runStateLabel(activity, collapsed))
     val clickLabel = stringResource(if (collapsed) Res.string.rows_work_expand else Res.string.rows_work_collapse)
     val click = rememberQuietClick()
     Row(
@@ -312,7 +386,7 @@ private fun RunActivityHeader(
             .heightIn(min = if (onToggle != null) LettaDimens.Orb.railSlotHeight else LettaDimens.Space.xxl)
             .semantics(mergeDescendants = true) { stateDescription = stateText }
             // No hover block: the title lifts instead (the Android disclosure has no inset).
-            .then(if (onToggle != null) Modifier.quietClickable(click, onClickLabel = clickLabel, onClick = onToggle) else Modifier)
+            .runHeaderToggle(click, clickLabel, onToggle)
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -322,30 +396,55 @@ private fun RunActivityHeader(
         Text(
             text = runActivityTitle(activity),
             style = MaterialTheme.typography.labelMedium,
-            color = when {
-                activity.isActive -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.workingTitle)
-                onToggle != null && click.lifted -> MaterialTheme.colorScheme.onSurface
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            color = runTitleColor(activity, lifted = onToggle != null && click.lifted),
         )
-        if (activity.toolCount > 0) {
-            Text(
-                text = pluralStringResource(Res.plurals.rows_run_tools, activity.toolCount, activity.toolCount),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.activityCount),
-            )
-        }
-        if (activity.failureCount > 0) {
-            Text(
-                text = pluralStringResource(Res.plurals.rows_run_failure_count, activity.failureCount, activity.failureCount),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
+        RunActivityCounts(activity)
         if (onToggle != null) {
             Spacer(Modifier.weight(1f))
             DisclosureChevron(expanded = !collapsed)
         }
+    }
+}
+
+private fun runStateLabel(activity: RunActivityProjection, collapsed: Boolean): StringResource {
+    return when {
+        activity.isActive -> Res.string.rows_run_state_working
+        collapsed -> Res.string.rows_run_state_collapsed
+        else -> Res.string.rows_run_state_expanded
+    }
+}
+
+/** A collapsible header toggles on a quiet click (no hover block: the title lifts instead). */
+private fun Modifier.runHeaderToggle(click: QuietClick, clickLabel: String, onToggle: (() -> Unit)?): Modifier {
+    if (onToggle == null) return this
+    return then(Modifier.quietClickable(click, onClickLabel = clickLabel, onClick = onToggle))
+}
+
+@Composable
+private fun runTitleColor(activity: RunActivityProjection, lifted: Boolean): Color {
+    return when {
+        activity.isActive -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.workingTitle)
+        lifted -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+/** "· 2 tools · 1 failure": each count only when nonzero. */
+@Composable
+private fun RunActivityCounts(activity: RunActivityProjection) {
+    if (activity.toolCount > 0) {
+        Text(
+            text = pluralStringResource(Res.plurals.rows_run_tools, activity.toolCount, activity.toolCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.activityCount),
+        )
+    }
+    if (activity.failureCount > 0) {
+        Text(
+            text = pluralStringResource(Res.plurals.rows_run_failure_count, activity.failureCount, activity.failureCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+        )
     }
 }
 

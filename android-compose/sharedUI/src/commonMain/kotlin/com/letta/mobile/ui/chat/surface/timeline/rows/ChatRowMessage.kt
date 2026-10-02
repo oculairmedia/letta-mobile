@@ -73,10 +73,12 @@ private fun AssistantMessageColumn(
         val toolCalls = message.toolCalls.orEmpty()
         if (toolCalls.isNotEmpty()) {
             ToolRunGroup(
-                toolCalls = remember(toolCalls) { toolCalls.toImmutableList() },
+                calls = ToolRunCalls(
+                    toolCalls = remember(toolCalls) { toolCalls.toImmutableList() },
+                    startedAtTimestamp = message.timestamp.takeIf { it.isNotBlank() },
+                ),
                 context = context,
                 callbacks = callbacks,
-                startedAtTimestamp = message.timestamp.takeIf { it.isNotBlank() },
             )
         }
         message.generatedUi?.let { GeneratedUiCard(it, context, callbacks) }

@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
+import com.letta.mobile.ui.chat.surface.timeline.rows.ToolRunCalls
 import com.letta.mobile.ui.chat.surface.timeline.rows.ToolRunGroup
 import kotlinx.collections.immutable.toImmutableList
 
@@ -25,11 +26,13 @@ internal fun ToolGroupRow(
     val toolCalls = remember(group) { group.singles.flatMap { it.message.toolCalls.orEmpty() }.toImmutableList() }
     val approvals = remember(group) { group.singles.mapNotNull { it.message.approvalRequest }.toImmutableList() }
     ToolRunGroup(
-        toolCalls = toolCalls,
+        calls = ToolRunCalls(
+            toolCalls = toolCalls,
+            approvals = approvals,
+            startedAtTimestamp = group.singles.first().message.timestamp.takeIf { it.isNotBlank() },
+        ),
         context = contexts.forItem(group.singles.last()),
         callbacks = callbacks,
-        approvals = approvals,
-        startedAtTimestamp = group.singles.first().message.timestamp.takeIf { it.isNotBlank() },
         modifier = modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
     )
 }
