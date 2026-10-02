@@ -7,9 +7,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 
 /*
- * letta-mobile-o4ygk.4.5: the page's intents, forwarded to a TimelineChatSessionPort. The raw ids
- * and values in these signatures are ChatActions' own; typed ids on the interface are
- * letta-mobile-bglj6.1.10.1.
+ * letta-mobile-o4ygk.4.5: the page's intents, forwarded to a TimelineChatSessionPort.
  */
 
 /** [ChatActions] over a [TimelineChatSessionPort]; what it cannot do is a no-op its capabilities hide. */
@@ -36,14 +34,13 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
 
     override fun rerun(message: UiMessage) = Unit
 
-    override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) =
-        port.answerApproval(ChatApprovalAnswer(requestId, toolCallIds, approve, reason))
+    override fun submitApproval(answer: ChatApprovalAnswer) = port.answerApproval(answer)
 
     override fun submitA2uiAction(action: A2uiAction) = Unit
 
-    override fun dismissA2uiSurface(surfaceId: String) = Unit
+    override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit
 
-    override fun markA2uiSnackbarShown(id: Long) = Unit
+    override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
 
     override fun cancelQueuedSend(id: QueuedSendId) = Unit
 
@@ -51,15 +48,15 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
 
     override fun resumeSendQueue() = Unit
 
-    override fun toggleRunCollapsed(runId: String) = port.updateLocal { it.toggleRun(runId) }
+    override fun toggleRunCollapsed(runId: ChatRunId) = port.updateLocal { it.toggleRun(runId.value) }
 
-    override fun toggleReasoningExpanded(messageId: String) = port.updateLocal { it.toggleReasoning(messageId) }
+    override fun toggleReasoningExpanded(messageId: ChatMessageId) = port.updateLocal { it.toggleReasoning(messageId.value) }
 
     override fun loadOlderMessages() = Unit
 
     override fun releaseOlderMessages() = Unit
 
-    override fun expandTruncatedToolResult(messageId: String) = Unit
+    override fun expandTruncatedToolResult(messageId: ChatMessageId) = Unit
 
     override fun retryLoad() = port.retryLoad()
 
@@ -71,9 +68,9 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
 
     override fun setFontScale(scale: Float) = Unit
 
-    override fun selectModel(handle: String, effort: ReasoningEffortChoice) = Unit
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = Unit
 
-    override fun changeWorkingDirectory(path: String) = Unit
+    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) = Unit
 
     override fun updateSearchQuery(query: String) = Unit
 

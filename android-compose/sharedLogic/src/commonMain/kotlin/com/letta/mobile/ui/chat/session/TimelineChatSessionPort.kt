@@ -46,14 +46,6 @@ interface TimelineChatSession {
     suspend fun send(text: String, attachments: List<MessageContentPart.Image>)
 }
 
-/** A user's answer to an approval request, as the page raises it. */
-data class ChatApprovalAnswer(
-    val requestId: String,
-    val toolCallIds: List<String>,
-    val approve: Boolean,
-    val reason: String?,
-)
-
 /**
  * The run controls the owner's transport offers. Null means the transport cannot, and the port
  * reports that through [ChatSurfaceCapabilities] so the page hides the control.

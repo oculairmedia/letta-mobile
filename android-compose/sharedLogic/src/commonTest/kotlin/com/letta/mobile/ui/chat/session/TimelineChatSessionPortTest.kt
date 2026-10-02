@@ -151,15 +151,15 @@ class TimelineChatSessionPortTest {
         val port = port(session, TimelineChatRunControls(answerApproval = { answers += it; release.await() }))
         runCurrent()
 
-        port.actions.submitApproval("req-1", listOf("call-1"), approve = true, reason = null)
-        port.actions.submitApproval("req-1", listOf("call-1"), approve = true, reason = null)
+        port.actions.submitApproval(ChatApprovalAnswer("req-1", listOf("call-1"), approve = true, reason = null))
+        port.actions.submitApproval(ChatApprovalAnswer("req-1", listOf("call-1"), approve = true, reason = null))
         runCurrent()
         assertEquals(1, answers.size)
         assertEquals(ChatApprovalAnswer("req-1", listOf("call-1"), approve = true, reason = null), answers.single())
 
         release.complete(Unit)
         runCurrent()
-        port.actions.submitApproval("req-1", listOf("call-1"), approve = false, reason = "no")
+        port.actions.submitApproval(ChatApprovalAnswer("req-1", listOf("call-1"), approve = false, reason = "no"))
         runCurrent()
         assertEquals(2, answers.size)
     }
