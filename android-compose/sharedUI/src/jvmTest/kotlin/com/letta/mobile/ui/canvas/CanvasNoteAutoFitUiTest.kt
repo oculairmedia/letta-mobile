@@ -35,6 +35,7 @@ import com.letta.mobile.ui.canvas.CanvasNoteAutoFitFixtures.B
 import io.ak1.drawbox.domain.model.Viewport
 import java.io.File
 import javax.imageio.ImageIO
+import kotlin.math.floor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -139,35 +140,33 @@ class CanvasNoteAutoFitUiTest {
     /**
      * (c) Content just over the booking: the type steps down, the card stays within the booking, nothing is cut.
      *
-     * The booking is derived from the renderer's own measurements, not a fixed offset, because the
-     * font's metrics differ by platform (Skiko on Linux CI sets the fixture shorter than on Windows):
-     * the same note is drawn at full type and, as a second note, at the ladder's next step, and the
-     * booking falls between those two heights. So full type cannot fit and the next step must.
+     * The booking is derived from the renderer's own measurements, not a fixed offset, because font
+     * metrics differ by platform: the same note is drawn at full type and, as a second note, at the
+     * ladder's next step, and the booking falls between those two heights, so full type cannot fit
+     * and the step must. The note is wrapped prose, whose height follows its type. A to-do list's
+     * does not always: on Linux CI each of the 12-item shopping list's rows is held at its
+     * checkbox's height (372 units at 1.0, 0.9 and 0.8 alike), so no step there can make it shorter.
      */
     @Test
     fun autoNoteJustOverItsBookingSetsSmallerTypeAndIsNotClipped() = runDesktopComposeUiTest(width = BOARD, height = BOARD) {
         val session = session()
+        val prose = CanvasNoteAutoFitFixtures.notes.single { it.name == "long paragraph" }.documentJson
         val step = CanvasNoteAutoFit.FONT_SCALES[1]
         val tall = CanvasDocumentFrame(80f, 80f, 320f, 4000f)
-        put(session, "n", CanvasNoteAutoFitFixtures.shoppingList, tall, CanvasGeometryOwner.AUTO)
+        put(session, "n", prose, tall, CanvasGeometryOwner.AUTO)
         // The same content with its type already at the step: what a fit to the step draws.
-        put(session, "atStep", CanvasNoteAutoFitFixtures.shoppingList, tall.copy(x = 500f), CanvasGeometryOwner.AUTO, style = CanvasTextStyle(fontScale = step))
+        put(session, "atStep", prose, tall.copy(x = 500f), CanvasGeometryOwner.AUTO, style = CanvasTextStyle(fontScale = step))
         showNotes(session)
         val natural = cardBounds("n").height
         val stepped = cardBounds("atStep").height
-        // DIAG-ONLY (removed once CI reports): the old premise, a booking 12 under natural.
-        put(session, "probe", CanvasNoteAutoFitFixtures.shoppingList, tall.copy(x = 920f, height = natural - 12f), CanvasGeometryOwner.AUTO)
-        waitForIdle()
-        val probeReadable = runCatching { assertReadable("probe", "Shopping item 12") }.exceptionOrNull()?.message ?: "readable"
-        println("autofit-diag natural=$natural stepped=$stepped ladder=${CanvasNoteAutoFit.FONT_SCALES} probe(booked=${natural - 12f}): scale=${fontScale("probe")} card=${cardBounds("probe").height} $probeReadable")
         assertEquals(1f, fontScale("n"), "note n needed smaller type in a 4000-high booking (natural $natural)")
         assertEquals(1f, fontScale("atStep"), "note atStep needed smaller type in a 4000-high booking (height $stepped)")
         assertTrue(stepped < natural, "type at $step did not make the card shorter: $stepped at $step vs natural $natural at 1.0")
 
         // Book between the two: less than the content takes at full size, enough for the step.
-        val booked = kotlin.math.floor((natural + stepped) / 2f)
+        val booked = floor((natural + stepped) / 2f)
         val diag = "natural=$natural stepped=$stepped booked=$booked"
-        put(session, "n", CanvasNoteAutoFitFixtures.shoppingList, tall.copy(height = booked), CanvasGeometryOwner.AUTO)
+        put(session, "n", prose, tall.copy(height = booked), CanvasGeometryOwner.AUTO)
         waitForIdle()
 
         val scale = assertNotNull(fontScale("n"), "note n has no fit scale; $diag")
@@ -175,7 +174,7 @@ class CanvasNoteAutoFitUiTest {
         assertEquals(step, scale, "type scale $scale, card $card; $diag")
         assertTrue(card <= booked, "card $card over its booking; $diag")
         assertEquals(stepped, card, 0.5f, "card $card is not the height the step draws at; $diag")
-        assertReadable("n", "Shopping item 12")
+        assertReadable("n", "magna aliqua")
     }
 
     /** (c) Content far over the booking: type at the floor, then the card grows; an AUTO note is never clipped. */
