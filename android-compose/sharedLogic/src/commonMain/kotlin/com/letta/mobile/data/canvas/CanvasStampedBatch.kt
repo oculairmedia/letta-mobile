@@ -12,8 +12,17 @@ package com.letta.mobile.data.canvas
  */
 object CanvasStampedBatch {
     fun of(ops: List<CanvasOp>, actorId: String, afterLamport: Long, newOpId: () -> String): CanvasOp.BatchOp {
+        val stamped = separately(ops, actorId, afterLamport, newOpId)
+        return CanvasOp.BatchOp(opId = newOpId(), actorId = actorId, lamport = stamped.lastOrNull()?.lamport ?: afterLamport, ops = stamped)
+    }
+
+    /**
+     * [ops] rebound to [actorId] and stamped after [afterLamport] in order, each its own op: what
+     * `canvas_apply_ops` publishes on both hosts (letta-mobile-s416w.5), so an update an agent sends
+     * is newer than the board it read, whatever clock the model wrote.
+     */
+    fun separately(ops: List<CanvasOp>, actorId: String, afterLamport: Long, newOpId: () -> String): List<CanvasOp> {
         var lamport = afterLamport
-        val stamped = ops.map { it.withActor(actorId).withStamp(newOpId(), ++lamport) }
-        return CanvasOp.BatchOp(opId = newOpId(), actorId = actorId, lamport = lamport, ops = stamped)
+        return ops.map { it.withActor(actorId).withStamp(newOpId(), ++lamport) }
     }
 }
