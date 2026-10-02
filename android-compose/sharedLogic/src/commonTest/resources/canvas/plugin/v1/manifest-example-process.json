@@ -1,0 +1,47 @@
+{
+  "manifestVersion": 1,
+  "id": "letta.example",
+  "name": "Example",
+  "version": "1.2.0",
+  "publisher": "oculairmedia",
+  "contract": { "version": 1 },
+  "runtime": {
+    "kind": "process",
+    "command": "node",
+    "args": ["server/main.js"],
+    "cwd": ".",
+    "env": { "EXAMPLE_URL": "${settings.baseUrl}", "EXAMPLE_QUALITY": "${settings.quality}", "EXAMPLE_TOKEN": "${secrets.apiToken}" }
+  },
+  "settings": {
+    "baseUrl": { "type": "string", "format": "uri", "required": true, "label": "Service URL" },
+    "quality": { "type": "integer", "minimum": 1, "maximum": 100, "default": 80 },
+    "mode": { "type": "enum", "values": ["fast", "best"], "default": "fast", "label": "Mode" },
+    "verbose": { "type": "boolean", "default": false }
+  },
+  "secrets": [ { "name": "apiToken", "label": "API token", "required": true } ],
+  "capabilities": ["canvas:place", "assets:write", "net:connect", "ui:pages", "ui:openLink"],
+  "net": { "connect": ["https://api.example.test", "wss://*.example.test:8443"] },
+  "elements": {
+    "widget": {
+      "schemaVersion": 2,
+      "props": { "type": "object", "additionalProperties": false, "properties": {
+        "status": { "enum": ["idle", "running", "done", "failed"] },
+        "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+        "label": { "type": "string", "maxLength": 128 } } },
+      "defaultSize": { "width": 320, "height": 240 },
+      "page": "widget",
+      "migrations": { "1": [ { "rename": ["pct", "progress"] }, { "default": ["status", "idle"] }, { "drop": "legacy" } ] }
+    }
+  },
+  "actions": {
+    "start": { "description": "Start a job and place a widget", "visibility": ["agent", "view"],
+               "input": { "type": "object", "additionalProperties": false, "required": ["label"],
+                          "properties": { "label": { "type": "string", "maxLength": 128 } } } },
+    "refresh": { "visibility": ["view"], "input": { "type": "object", "additionalProperties": false, "properties": {} } }
+  },
+  "pages": {
+    "widget": { "html": "pages/widget.html",
+                "csp": { "connectDomains": ["https://api.example.test"], "resourceDomains": [], "frameDomains": [] },
+                "permissions": ["ui:openLink"], "displayModes": ["inline", "fullscreen"] }
+  }
+}
