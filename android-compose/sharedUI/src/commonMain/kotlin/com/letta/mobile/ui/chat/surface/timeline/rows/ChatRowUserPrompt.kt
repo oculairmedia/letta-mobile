@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -62,6 +64,7 @@ import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.toImmutableList
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /** Expand/collapse and overflow state for one prompt bubble. */
@@ -73,16 +76,38 @@ private class PromptCardState {
     val canToggle: Boolean get() = overflowed || expanded
 }
 
-/** The bubble's colours: the user's own, or the inter-agent tint when another agent sent it. */
-private data class PromptBubbleColors(val container: Color, val content: Color, val label: Color)
+/**
+ * The bubble's look: the user's own colours and "You", or the inter-agent tint and "Inter-agent"
+ * when another agent sent it; and the bubble's shape.
+ */
+private data class PromptBubbleStyle(
+    val container: Color,
+    val content: Color,
+    val label: Color,
+    val role: StringResource,
+    val shape: Shape,
+)
 
 @Composable
-private fun promptBubbleColors(interAgent: Boolean): PromptBubbleColors {
+private fun promptBubbleStyle(interAgent: Boolean): PromptBubbleStyle {
     val scheme = MaterialTheme.colorScheme
+    val shape = ChatBubbleShapes.user()
     return if (interAgent) {
-        PromptBubbleColors(scheme.tertiaryContainer, scheme.onTertiaryContainer, scheme.onTertiaryContainer.copy(alpha = ChatRowAlpha.interAgentLabel))
+        PromptBubbleStyle(
+            container = scheme.tertiaryContainer,
+            content = scheme.onTertiaryContainer,
+            label = scheme.onTertiaryContainer.copy(alpha = ChatRowAlpha.interAgentLabel),
+            role = Res.string.rows_role_inter_agent,
+            shape = shape,
+        )
     } else {
-        PromptBubbleColors(scheme.primaryContainer, scheme.onPrimaryContainer, scheme.onPrimaryContainer.copy(alpha = ChatRowAlpha.userRoleLabel))
+        PromptBubbleStyle(
+            container = scheme.primaryContainer,
+            content = scheme.onPrimaryContainer,
+            label = scheme.onPrimaryContainer.copy(alpha = ChatRowAlpha.userRoleLabel),
+            role = Res.string.rows_role_you,
+            shape = shape,
+        )
     }
 }
 
@@ -97,7 +122,6 @@ private fun promptBubbleColors(interAgent: Boolean): PromptBubbleColors {
  * failed send reads "You · Not sent", and where a pointer can hover a copy action shows beside
  * the bubble.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun UserPromptRow(
     message: UiMessage,
@@ -111,9 +135,7 @@ internal fun UserPromptRow(
     val hoverSource = remember(message.id) { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
     val interAgent = message.agentMessageProvenance != null
-    val colors = promptBubbleColors(interAgent)
-    val actionsLabel = stringResource(Res.string.rows_message_actions)
-    val shape = ChatBubbleShapes.user()
+    val style = promptBubbleStyle(interAgent)
     Column(
         modifier = Modifier.fillMaxWidth().hoverable(hoverSource),
         horizontalAlignment = Alignment.End,
@@ -138,35 +160,19 @@ internal fun UserPromptRow(
                     )
                 }
                 Box {
-                    Surface(
+                    PromptBubbleSurface(
+                        style = style,
                         modifier = Modifier
                             .widthIn(max = bubbleMaxWidth)
                             // By the otid, as the list keys the row: the server's ack swaps the
                             // optimistic id mid-flight, and the row must keep its claim.
-                            .then(rememberSendFlightTarget(message.clientMessageId?.takeIf { it.isNotBlank() } ?: message.id, message.content))
+                            .then(rememberSendFlightTarget(message.sendFlightKey(), message.content))
                             .testTag(ChatRowTestTags.USER_PROMPT)
-                            .clip(shape)
-                            .combinedClickable(
-                                onClickLabel = null,
-                                onLongClickLabel = actionsLabel,
-                                onLongClick = if (availability.hasActions) ({ state.menuOpen = true }) else null,
-                                onClick = { if (state.canToggle) state.expanded = !state.expanded },
-                            ),
-                        shape = shape,
-                        color = colors.container,
-                        contentColor = colors.content,
+                            .clip(style.shape)
+                            .promptBubbleClicks(state, hasActions = availability.hasActions),
                     ) {
-                        Row(
-                            modifier = Modifier.padding(
-                                horizontal = ChatRowSpacing.bubblePaddingHorizontal,
-                                vertical = ChatRowSpacing.bubblePaddingVertical,
-                            ),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-                        ) {
-                            PromptBody(message, state, colors, interAgent, callbacks, Modifier.weight(1f, fill = false))
-                            PromptExpandToggle(state)
-                        }
+                        PromptBody(message, state, style, callbacks)
+                        PromptExpandToggle(state)
                     }
                     MessageActionsMenu(message, availability, state, callbacks)
                 }
@@ -175,33 +181,77 @@ internal fun UserPromptRow(
     }
 }
 
+/** The send-flight claim's key: the otid when the message has one, else its id. */
+private fun UiMessage.sendFlightKey(): String {
+    return clientMessageId?.takeIf { it.isNotBlank() } ?: id
+}
+
+/** A tap toggles a clamped prompt; a long press opens the message actions when there are any. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PromptBody(
+private fun Modifier.promptBubbleClicks(state: PromptCardState, hasActions: Boolean): Modifier {
+    val actionsLabel = stringResource(Res.string.rows_message_actions)
+    return combinedClickable(
+        onClickLabel = null,
+        onLongClickLabel = actionsLabel,
+        onLongClick = if (hasActions) ({ state.menuOpen = true }) else null,
+        onClick = { if (state.canToggle) state.expanded = !state.expanded },
+    )
+}
+
+/** The bubble itself: its tint and shape, its body laid out in a padded row. */
+@Composable
+private fun PromptBubbleSurface(
+    style: PromptBubbleStyle,
+    modifier: Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = style.shape,
+        color = style.container,
+        contentColor = style.content,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = ChatRowSpacing.bubblePaddingHorizontal,
+                vertical = ChatRowSpacing.bubblePaddingVertical,
+            ),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun RowScope.PromptBody(
     message: UiMessage,
     state: PromptCardState,
-    colors: PromptBubbleColors,
-    interAgent: Boolean,
+    style: PromptBubbleStyle,
     callbacks: ChatRowCallbacks,
-    modifier: Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart)) {
-        val role = stringResource(if (interAgent) Res.string.rows_role_inter_agent else Res.string.rows_role_you)
+    Column(modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart)) {
+        val role = stringResource(style.role)
         Text(
             text = if (message.isSendFailed) stringResource(Res.string.rows_role_not_sent, role) else role,
             style = ChatRowType.roleLabel,
-            color = if (message.isSendFailed) MaterialTheme.colorScheme.error else colors.label,
+            color = if (message.isSendFailed) MaterialTheme.colorScheme.error else style.label,
         )
-        if (message.attachments.isNotEmpty()) {
-            val images = remember(message.attachments) { message.attachments.toImmutableList() }
-            // Touch draws them as the legacy Android bubble did: across the bubble's width, large
-            // enough to look at (letta-mobile-bglj6.1.9); desktop keeps its compact strip.
-            if (touchStyle()) {
-                ChatPromptImageGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())
-            } else {
-                ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap))
-            }
-        }
+        if (message.attachments.isNotEmpty()) PromptImages(message, callbacks)
         if (message.content.isNotBlank()) PromptText(message.content, state)
+    }
+}
+
+@Composable
+private fun PromptImages(message: UiMessage, callbacks: ChatRowCallbacks) {
+    val images = remember(message.attachments) { message.attachments.toImmutableList() }
+    // Touch draws them as the legacy Android bubble did: across the bubble's width, large
+    // enough to look at (letta-mobile-bglj6.1.9); desktop keeps its compact strip.
+    if (touchStyle()) {
+        ChatPromptImageGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())
+    } else {
+        ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap))
     }
 }
 
