@@ -58,6 +58,7 @@ import com.letta.mobile.sharedui.resources.rows_tool_output
 import com.letta.mobile.sharedui.resources.rows_tool_result_preview
 import com.letta.mobile.sharedui.resources.rows_tool_status_duration
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
+import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.toImmutableList
@@ -113,7 +114,7 @@ internal fun ToolCard(
 private fun RequestFullResultOnExpand(toolCall: UiToolCall, expanded: Boolean, callbacks: ChatRowCallbacks) {
     val truncation = toolCall.resultTruncation ?: return
     LaunchedEffect(expanded, truncation.messageId) {
-        if (expanded) callbacks.actions.expandTruncatedToolResult(truncation.messageId)
+        if (expanded) callbacks.actions.expandTruncatedToolResult(ChatMessageId(truncation.messageId))
     }
 }
 

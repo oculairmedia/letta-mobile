@@ -10,11 +10,18 @@ import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.desktopQueuedSendActions
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.A2uiSnackbarId
+import com.letta.mobile.ui.chat.session.A2uiSurfaceId
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
+import com.letta.mobile.ui.chat.session.ChatMessageId
+import com.letta.mobile.ui.chat.session.ChatModelHandle
+import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
+import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -85,13 +92,17 @@ internal class DesktopChatSessionPort(
         controller.canSubmitApprovals,
         controller.canonicalPresentation,
         controller.state.map { controller.supportsWorkingDirectory }.distinctUntilChanged(),
-    ) { approvals, canonical, workingDirectory -> desktopCapabilities(approvals, canonical != null, workingDirectory) }
+    ) { approvals, canonical, workingDirectory ->
+        desktopCapabilities(DesktopCapabilityFacts(approvals, paged = canonical != null, workingDirectory = workingDirectory))
+    }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities())
 
     private fun currentCapabilities(): ChatSurfaceCapabilities = desktopCapabilities(
-        approvals = controller.canSubmitApprovals.value,
-        paged = controller.canonicalPresentation.value != null,
-        workingDirectory = controller.supportsWorkingDirectory,
+        DesktopCapabilityFacts(
+            approvals = controller.canSubmitApprovals.value,
+            paged = controller.canonicalPresentation.value != null,
+            workingDirectory = controller.supportsWorkingDirectory,
+        ),
     )
 
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
@@ -177,14 +188,24 @@ internal class DesktopChatSessionPort(
     }
 }
 
-internal fun desktopCapabilities(approvals: Boolean, paged: Boolean, workingDirectory: Boolean) = ChatSurfaceCapabilities(
+/** What the controller supports right now: the inputs of [desktopCapabilities]. */
+internal data class DesktopCapabilityFacts(
+    /** The active gateway can answer approvals. */
+    val approvals: Boolean,
+    /** The selected conversation is on the canonical (paged) route. */
+    val paged: Boolean,
+    /** The active gateway can change a conversation's working directory. */
+    val workingDirectory: Boolean,
+)
+
+internal fun desktopCapabilities(facts: DesktopCapabilityFacts) = ChatSurfaceCapabilities(
     attachImages = true,
     rerun = false,
-    approvals = approvals,
+    approvals = facts.approvals,
     modelSwitch = true,
-    workingDirectory = workingDirectory,
+    workingDirectory = facts.workingDirectory,
     search = false,
-    pagedHistory = paged,
+    pagedHistory = facts.paged,
     fontScale = true,
     goals = false,
 )
@@ -234,17 +255,19 @@ internal class DesktopChatActions(
 
     override fun rerun(message: UiMessage) = Unit
 
-    override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) {
+    override fun submitApproval(answer: ChatApprovalAnswer) {
         // A second press while the first answer is in flight must not answer twice.
-        if (requestId in controller.submittingApprovals.value) return
-        if (controller.canSubmitApprovals.value) controller.submitApproval(requestId, toolCallIds, approve, reason)
+        if (answer.requestId in controller.submittingApprovals.value) return
+        if (controller.canSubmitApprovals.value) {
+            controller.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)
+        }
     }
 
     override fun submitA2uiAction(action: A2uiAction) = bindings.onA2uiAction(action)
 
-    override fun dismissA2uiSurface(surfaceId: String) = Unit
+    override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit
 
-    override fun markA2uiSnackbarShown(id: Long) = Unit
+    override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
 
     override fun cancelQueuedSend(id: QueuedSendId) = queue.onCancel(id)
 
@@ -252,16 +275,16 @@ internal class DesktopChatActions(
 
     override fun resumeSendQueue() = queue.onResume()
 
-    override fun toggleRunCollapsed(runId: String) = localTimeline.update { it.toggleRun(runId) }
+    override fun toggleRunCollapsed(runId: ChatRunId) = localTimeline.update { it.toggleRun(runId.value) }
 
-    override fun toggleReasoningExpanded(messageId: String) = localTimeline.update { it.toggleReasoning(messageId) }
+    override fun toggleReasoningExpanded(messageId: ChatMessageId) = localTimeline.update { it.toggleReasoning(messageId.value) }
 
     /** The canonical paged timeline pages itself; the legacy list has no older-history window. */
     override fun loadOlderMessages() = Unit
 
     override fun releaseOlderMessages() = Unit
 
-    override fun expandTruncatedToolResult(messageId: String) = Unit
+    override fun expandTruncatedToolResult(messageId: ChatMessageId) = Unit
 
     override fun retryLoad() = controller.retryConnection()
 
@@ -277,9 +300,10 @@ internal class DesktopChatActions(
     override fun setFontScale(scale: Float) = bindings.onSetFontScale(scale)
 
     /** Desktop's model switch takes a selection value only; the effort is chosen elsewhere. */
-    override fun selectModel(handle: String, effort: ReasoningEffortChoice) = controller.setConversationModel(handle)
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = controller.setConversationModel(handle.value)
 
-    override fun changeWorkingDirectory(path: String) = controller.changeSelectedConversationWorkingDirectory(path)
+    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) =
+        controller.changeSelectedConversationWorkingDirectory(directory.path)
 
     override fun updateSearchQuery(query: String) = Unit
 
