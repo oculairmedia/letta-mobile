@@ -304,7 +304,7 @@ internal fun A2uiDropdown(
     val validation = component.raw.stringValue("validationRegexp")
     val options = component.resolveRadioOptions(surface, renderScope)
     val selectedLabel = options.firstOrNull { it.key == value }?.label.orEmpty()
-    val isError = validationFails(value, rememberValidationRegex(validation))
+    val isError = value.failsValidation(rememberValidationRegex(validation))
     var expanded by remember(component.id) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 

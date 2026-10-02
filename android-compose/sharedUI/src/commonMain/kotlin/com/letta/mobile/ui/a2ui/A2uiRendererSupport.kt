@@ -742,7 +742,7 @@ internal fun A2uiComponent.validationError(
     renderScope: A2uiRenderScope,
     legacyValidation: String?,
 ): String? {
-    if (validationFails(value, rememberValidationRegex(legacyValidation))) {
+    if (value.failsValidation(rememberValidationRegex(legacyValidation))) {
         return "Invalid value"
     }
     val checks = raw["checks"] as? JsonArray ?: return null
@@ -788,9 +788,9 @@ internal fun JsonElement?.choiceSelection(): Set<String> = when (this) {
 internal fun rememberValidationRegex(pattern: String?): Regex? =
     remember(pattern) { pattern?.let { runCatching { Regex(it) }.getOrNull() } }
 
-/** Whether a non-blank [value] fails [regex]; a missing or invalid pattern fails nothing. */
-internal fun validationFails(value: String, regex: Regex?): Boolean =
-    regex != null && value.isNotBlank() && !regex.matches(value)
+/** Whether this non-blank value fails [regex]; a missing or invalid pattern fails nothing. */
+internal fun String.failsValidation(regex: Regex?): Boolean =
+    regex != null && isNotBlank() && !regex.matches(this)
 
 internal fun String.toDateMillis(): Long? =
     runCatching {
