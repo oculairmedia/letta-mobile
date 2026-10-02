@@ -9,12 +9,12 @@
   "title": "Weekend plan",
   "bounds": { "x": 80.0, "y": 80.0, "width": 712.0, "height": 746.0 },
   "items": [
-    { "key": "heading", "kind": "TEXT", "id": "cmp-weekend-plan-heading" },
-    { "key": "shopping", "kind": "CHECKLIST", "id": "cmp-weekend-plan-shopping", "count": 3 },
-    { "key": "meals", "kind": "NOTE", "id": "cmp-weekend-plan-meals" },
-    { "key": "selfcare", "kind": "GROUP", "id": "cmp-weekend-plan-selfcare", "children": [
-      { "key": "walk", "kind": "CARD", "id": "cmp-weekend-plan-walk" },
-      { "key": "read", "kind": "NOTE", "id": "cmp-weekend-plan-read" }
+    { "key": "heading", "kind": "TEXT" },
+    { "key": "shopping", "kind": "CHECKLIST", "count": 3 },
+    { "key": "meals", "kind": "NOTE" },
+    { "key": "selfcare", "kind": "GROUP", "children": [
+      { "key": "walk", "kind": "CARD" },
+      { "key": "read", "kind": "NOTE" }
     ] }
   ],
   "warnings": []

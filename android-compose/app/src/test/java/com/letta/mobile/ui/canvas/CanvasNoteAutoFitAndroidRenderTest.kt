@@ -55,7 +55,8 @@ class CanvasNoteAutoFitAndroidRenderTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private data class B(val typeId: String, val text: String = "", val level: Int? = null, val checked: Boolean? = null, val children: List<B> = emptyList())
+    /** [indent] is `attributes.indentationLevel`: cascade stores nested list items as a flat list. */
+    private data class B(val typeId: String, val text: String = "", val level: Int? = null, val checked: Boolean? = null, val indent: Int = 0)
 
     private fun document(vararg blocks: B): String = document(blocks.toList())
 
@@ -74,6 +75,7 @@ class CanvasNoteAutoFitAndroidRenderTest {
                                 block.checked?.let { put("checked", it) }
                             },
                         )
+                        if (block.indent > 0) put("attributes", buildJsonObject { put("indentationLevel", block.indent) })
                         put(
                             "content",
                             buildJsonObject {
@@ -83,7 +85,6 @@ class CanvasNoteAutoFitAndroidRenderTest {
                                 put("spans", JsonArray(emptyList()))
                             },
                         )
-                        if (block.children.isNotEmpty()) put("children", encode(block.children))
                     },
                 )
             }
@@ -114,7 +115,9 @@ class CanvasNoteAutoFitAndroidRenderTest {
         "cjk" to document(B("paragraph", "漢字かな交じり文".repeat(8))),
         "code" to document(B("code", "fun main() {\n    println(\"hello\")\n}")),
         "nested lists" to document(
-            B("bullet_list", "Groceries for the week ahead", children = listOf(B("bullet_list", "Apples and pears from the market"))),
+            // Nested as cascade-editor and the compose compiler store it: a flat list, the child indented.
+            B("bullet_list", "Groceries for the week ahead"),
+            B("bullet_list", "Apples and pears from the market", indent = 1),
             B("numbered_list", "Call the plumber about the kitchen sink"),
             B("quote", "Simplicity is prerequisite for reliability."),
             B("divider"),

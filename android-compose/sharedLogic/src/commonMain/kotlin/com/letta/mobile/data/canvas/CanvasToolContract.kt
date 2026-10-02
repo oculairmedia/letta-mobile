@@ -181,13 +181,14 @@ object CanvasToolContract {
      */
     val compose = CanvasToolDefinition(
         COMPOSE,
-        "Put notes, checklists, cards, text and groups on a canvas in one call (with no canvas_id, the canvas " +
-            "of the conversation you are in). Each item has a \"kind\": NOTE {markdown}, CHECKLIST " +
+        "Put notes, checklists, cards, text and labelled groups on a canvas in one call (with no canvas_id, " +
+            "the canvas of the conversation you are in). Read $COMPOSE_GUIDE once first: it has the format, caps, " +
+            "markdown subset and error codes. Each item has a \"kind\": NOTE {markdown}, CHECKLIST " +
             "{items: [{text, checked?}]}, CARD {title, fields?: [{label, value}], markdown?}, TEXT " +
             "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes " +
             "everything. All or nothing: a refusal lists each problem with a JSON-pointer path " +
-            "(e.g. /items/2/markdown) and nothing is published. Call $COMPOSE_GUIDE for the format, caps and " +
-            "markdown subset. Pass dry_run: true to see the receipt without publishing.",
+            "(e.g. /items/2/markdown) and nothing is published. Pass dry_run: true to see the receipt without " +
+            "publishing. To draw, use $APPLY_OPS.",
         CanvasComposeSchema.input,
     )
 

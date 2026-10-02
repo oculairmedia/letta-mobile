@@ -20,6 +20,13 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 object CanvasComposeContract {
     const val CATALOG = "letta.canvas.compose"
+
+    /**
+     * The wire version. Changes inside v1 are additive and both ways compatible:
+     * - letta-mobile-bglj6.14: receipt items no longer carry `id` (derivable as
+     *   `cmp-<artifact_id>-<key>`); a reader still takes one when present, as in receipts already
+     *   stored in conversations.
+     */
     const val VERSION = 1
     val SUPPORTED_VERSIONS: List<Int> = listOf(VERSION)
 
@@ -30,6 +37,14 @@ object CanvasComposeContract {
     const val MAX_CARD_FIELDS = 8
     const val MAX_CARD_BODY_CHARS = 500
     const val MAX_REQUEST_BYTES = 64 * 1024
+
+    /**
+     * The receipt's budget: `message.list` ships a tool return over 4 096 bytes as a 2 KiB preview
+     * (`MessageListWireProjection.TOOL_RETURN_PROJECTION_THRESHOLD_BYTES`, held equal by
+     * CanvasComposeReceiptSizeTest), and a previewed receipt has no bounds for the chat card to
+     * frame. The largest receipt the caps allow stays under it.
+     */
+    const val MAX_RECEIPT_BYTES = 4_096
 
     /** A GROUP holds items, never another GROUP. */
     const val MAX_GROUP_DEPTH = 1
@@ -307,19 +322,32 @@ enum class ComposeStatus {
 @Serializable
 data class ComposeBounds(val x: Float, val y: Float, val width: Float, val height: Float)
 
-/** One produced item: [id] is its board id, [count] the entries of a CHECKLIST. */
+/**
+ * One produced item: its [key] and [kind], [count] the entries of a CHECKLIST.
+ *
+ * Its board id is derived, `cmp-<artifact_id>-<key>` ([boardId]), so the receipt does not carry
+ * it (letta-mobile-bglj6.14): with it, the largest receipt the caps allow was over the 4 KiB above
+ * which `message.list` ships a tool return as a 2 KiB preview, and lost its bounds on reload.
+ * [id] is still read when present, as in receipts written before the slimming; nothing writes it.
+ */
 @Serializable
 data class ComposeReceiptItem(
     val key: String,
     val kind: ComposeKind,
-    val id: String,
+    val id: String? = null,
     val count: Int? = null,
     val children: List<ComposeReceiptItem>? = null,
-)
+) {
+    /** The board id of this piece of [artifactId]: the one the receipt names, else the derived one. */
+    fun boardId(artifactId: String): String = id ?: CanvasComposeIds.piece(artifactId, key)
+}
 
 /**
  * The `canvas.compose` return, and the source of the chat's artifact card: what was made and
  * where, without layout detail. A dry run has the same shape with [status] `dry_run`.
+ *
+ * Kept under [MAX_RECEIPT_BYTES] at every cap (no per-item board ids; see [ComposeReceiptItem]),
+ * so a reload reads it whole and the card can still frame [bounds].
  */
 @Serializable
 data class ComposeReceipt(

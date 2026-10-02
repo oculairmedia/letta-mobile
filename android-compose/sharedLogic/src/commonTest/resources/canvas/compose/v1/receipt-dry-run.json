@@ -15,13 +15,11 @@
   "items": [
     {
       "key": "i0",
-      "kind": "TEXT",
-      "id": "cmp-standup-i0"
+      "kind": "TEXT"
     },
     {
       "key": "blockers",
       "kind": "CHECKLIST",
-      "id": "cmp-standup-blockers",
       "count": 1
     }
   ],

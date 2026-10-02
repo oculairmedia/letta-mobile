@@ -89,11 +89,7 @@ class CanvasComposeToolsTest {
         val guide = CanvasComposeGuide.text
         (ComposeKind.entries.map { it.name } + ComposeErrorCode.entries.map { it.name } + ComposeProblemCode.entries.map { it.name })
             .forEach { assertTrue(it in guide, "the guide does not mention $it") }
-        listOf(
-            CanvasComposeContract.MAX_ITEMS, CanvasComposeContract.MAX_CHECKLIST_ITEMS, CanvasComposeContract.MAX_MARKDOWN_CHARS,
-            CanvasComposeContract.MAX_CARD_FIELDS, CanvasComposeContract.MAX_CARD_BODY_CHARS, CanvasComposeContract.MAX_TEXT_CHARS,
-            CanvasComposeContract.MAX_TITLE_CHARS, CanvasComposeContract.MAX_LABEL_CHARS, CanvasComposeContract.MAX_VALUE_CHARS,
-        ).forEach { assertTrue(" $it " in guide, "the guide does not state the cap $it") }
+        // Each cap where it is stated: CanvasComposeGuideTest.everyStatedCapIsTheConstant.
         CanvasComposeContract.COLOR_PRESETS.forEach { assertTrue(it in guide, "colour $it") }
         assertTrue(CanvasComposeContract.CATALOG in guide)
         assertTrue(CanvasComposeGuide.EXAMPLE_REQUEST in guide)

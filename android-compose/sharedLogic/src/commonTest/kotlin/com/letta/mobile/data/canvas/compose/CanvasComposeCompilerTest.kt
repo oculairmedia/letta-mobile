@@ -129,7 +129,7 @@ class CanvasComposeCompilerTest {
     }
 
     @Test
-    fun theReceiptListsEveryItemByKeyKindAndBoardId() {
+    fun theReceiptListsEveryItemByKeyAndKindAndItsBoardIdIsDerived() {
         val ready = readyOf(compileText(WEEKEND_PLAN))
         val receipt = ready.receipt(ComposeBoard.CANVAS, ComposeStatus.PUBLISHED, 42)
         assertEquals("weekend-plan", receipt.artifactId)
@@ -137,19 +137,24 @@ class CanvasComposeCompilerTest {
         assertEquals(42L, receipt.revision)
         assertEquals(
             listOf(
-                ComposeReceiptItem("heading", ComposeKind.TEXT, "cmp-weekend-plan-heading"),
-                ComposeReceiptItem("shopping", ComposeKind.CHECKLIST, "cmp-weekend-plan-shopping", count = 3),
-                ComposeReceiptItem("meals", ComposeKind.NOTE, "cmp-weekend-plan-meals"),
+                ComposeReceiptItem("heading", ComposeKind.TEXT),
+                ComposeReceiptItem("shopping", ComposeKind.CHECKLIST, count = 3),
+                ComposeReceiptItem("meals", ComposeKind.NOTE),
                 ComposeReceiptItem(
-                    "selfcare", ComposeKind.GROUP, "cmp-weekend-plan-selfcare",
+                    "selfcare", ComposeKind.GROUP,
                     children = listOf(
-                        ComposeReceiptItem("walk", ComposeKind.CARD, "cmp-weekend-plan-walk"),
-                        ComposeReceiptItem("read", ComposeKind.NOTE, "cmp-weekend-plan-read"),
+                        ComposeReceiptItem("walk", ComposeKind.CARD),
+                        ComposeReceiptItem("read", ComposeKind.NOTE),
                     ),
                 ),
             ),
             receipt.items,
         )
+        // Every derived board id is an op the batch makes (letta-mobile-bglj6.14).
+        val made = ready.ops.map { (it as? CanvasOp.SetDocumentOp)?.documentId ?: (it as CanvasOp.AddElementOp).elementId }.toSet()
+        val derived = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.map { it.boardId(receipt.artifactId) }
+        assertEquals(listOf("cmp-weekend-plan-heading", "cmp-weekend-plan-shopping", "cmp-weekend-plan-meals", "cmp-weekend-plan-selfcare", "cmp-weekend-plan-walk", "cmp-weekend-plan-read"), derived)
+        assertTrue(made.containsAll(derived), "$derived not all in $made")
         // The bounds are the placement's: everything the artifact put on the board.
         val rects = ready.ops.mapNotNull { (it as? CanvasOp.SetDocumentOp)?.frame }
         val bounds = receipt.bounds!!

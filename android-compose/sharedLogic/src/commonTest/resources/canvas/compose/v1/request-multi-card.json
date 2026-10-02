@@ -1,0 +1,65 @@
+{
+  "catalog": "letta.canvas.compose",
+  "version": 1,
+  "artifact_id": "lisbon-trip",
+  "title": "Lisbon trip, 12-16 May",
+  "items": [
+    { "kind": "TEXT", "key": "heading", "text": "Lisbon trip, 12-16 May", "size": "heading" },
+    { "kind": "CHECKLIST", "key": "packing", "title": "Packing", "color": "yellow",
+      "items": [
+        { "text": "Passports and the printed boarding passes" },
+        { "text": "Phone charger and the travel adapter", "checked": true },
+        { "text": "Comfortable shoes for the hills" },
+        { "text": "Light rain jacket" },
+        { "text": "Sunglasses and sun cream" },
+        { "text": "Two swimsuits" },
+        { "text": "Euros in small notes for the trams", "checked": true },
+        { "text": "Reading for the flight" },
+        { "text": "Headphones" },
+        { "text": "Medicine bag" },
+        { "text": "Reusable water bottle" },
+        { "text": "A tote bag for the market" }
+      ] },
+    { "kind": "NOTE", "key": "itinerary", "title": "Itinerary", "color": "green",
+      "markdown": "## Day 1\n- Land 10:40, taxi to Alfama\n  - check in after 14:00\n  - drop the bags and walk to the miradouro\n- Dinner at the taberna on the corner\n\n## Day 2\n1. Belém tower in the morning\n2. Pastéis de Belém, before the queue\n3. MAAT by the river\n\n### Evening\n- [ ] Book the fado show\n- [x] Reserve the rooftop bar\n\n> Tram 28 is packed after ten; walk down instead.\n\n---\n\nBring **cash** for the *tram* and `PIN 4421`, see [Carris](https://www.carris.pt)." },
+    { "kind": "GROUP", "key": "bookings", "label": "Bookings",
+      "children": [
+        { "kind": "CARD", "key": "flight", "title": "Flight TP1351",
+          "fields": [
+            { "label": "Departs", "value": "Tue 12 May 07:15, LHR T2" },
+            { "label": "Arrives", "value": "10:40, LIS T1" },
+            { "label": "Seats", "value": "14A, 14B" },
+            { "label": "Reference", "value": "QX7RTP" }
+          ],
+          "markdown": "Online check-in opens **24 h** before." },
+        { "kind": "CARD", "key": "hotel", "title": "Casa do Largo",
+          "fields": [
+            { "label": "Check-in", "value": "Tue 12 May, from 14:00" },
+            { "label": "Nights", "value": "4" },
+            { "label": "Address", "value": "Largo do Chafariz de Dentro 9" }
+          ],
+          "markdown": "Ask for a room *facing the square*." },
+        { "kind": "CARD", "key": "sintra", "title": "Day trip to Sintra",
+          "fields": [ { "label": "Train", "value": "Thu 14 May 09:11 from Rossio" }, { "label": "Back", "value": "18:00" } ],
+          "markdown": "- Pena Palace\n- Quinta da Regaleira" },
+        { "kind": "CARD", "key": "food-tour", "title": "Food tour", "color": "purple",
+          "fields": [
+            { "label": "When", "value": "Fri 15 May 17:30" },
+            { "label": "Meet", "value": "Praça do Comércio, by the arch" },
+            { "label": "Guide", "value": "Rita" }
+          ] }
+      ] },
+    { "kind": "NOTE", "key": "budget", "title": "Budget", "color": "orange",
+      "markdown": "- Flights: 412\n- Hotel: 760\n- Food and trams: about 60 a day\n\n**Total:** around 1 420" },
+    { "kind": "CHECKLIST", "key": "before", "title": "Before we go",
+      "items": [
+        { "text": "Tell the bank about the trip" },
+        { "text": "Download offline maps" },
+        { "text": "Water the plants", "checked": true },
+        { "text": "Book the airport taxi" },
+        { "text": "Print the hotel confirmation" }
+      ] },
+    { "kind": "NOTE", "key": "phrases", "markdown": "Obrigado / obrigada: *thank you*\n\nUma bica, por favor: *an espresso, please*" },
+    { "kind": "TEXT", "key": "caption", "text": "Everything here can be moved; the board keeps it tidy.", "size": "body" }
+  ]
+}
