@@ -100,7 +100,7 @@ internal data class ChatAmbient(val status: AmbientMotionStatus, val streamPulse
 @Composable
 internal fun rememberChatAmbient(state: ChatUiState): ChatAmbient {
     val status = rememberChatAmbientStatus(
-        isThinking = state.isAgentTyping || state.isStreaming,
+        isThinking = state.isRunInFlight,
         failed = state.error != null || state.runFailed,
     )
     val pulse = rememberVisibleStreamPulse(state)

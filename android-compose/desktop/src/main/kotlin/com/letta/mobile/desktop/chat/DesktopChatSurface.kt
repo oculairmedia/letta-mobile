@@ -166,7 +166,8 @@ internal fun ChatDetailPane(
             submittingRequestIds = state.submittingApprovalRequestIds,
         )
     }
-    val ambientStatus = rememberDesktopAmbientStatus(state.isThinking, surface.errorMessage)
+    // Thinking clears at the first reply; the reply stream runs on to the turn's terminal.
+    val ambientStatus = rememberDesktopAmbientStatus(state.isThinking || state.isStreamingReply, surface.errorMessage)
     // No pane edge drawn here. The boundary between this pane and whatever sits
     // to its left (rail, or sidebar when open) is already drawn by RailDivider,
     // and this stroke landed immediately beside it — two 1px lines a pixel
