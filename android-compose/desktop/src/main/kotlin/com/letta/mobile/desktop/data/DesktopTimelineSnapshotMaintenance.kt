@@ -39,6 +39,7 @@ internal object DesktopTimelineSnapshotMaintenance {
         corruptSnapshots.forEach { Files.deleteIfExists(it) }
         val excess = decodedSnapshots.sortedByDescending { it.second }.map { it.first }.drop(maxRetainedConversations)
         excess.forEach { Files.deleteIfExists(it) }
+        deleteOrphanImageDirectories(backendDirectory)
         if (excess.isNotEmpty()) {
             Telemetry.event(
                 "DesktopTimelineStore", "prune",
@@ -49,4 +50,16 @@ internal object DesktopTimelineSnapshotMaintenance {
         }
     }
 
+    /** Image bodies belong to their conversation's snapshot and go when it goes. */
+    private fun deleteOrphanImageDirectories(backendDirectory: Path) {
+        val suffix = DesktopTimelineImageBodies.DIRECTORY_SUFFIX
+        val orphans = Files.list(backendDirectory).use { paths ->
+            paths.filter { path ->
+                val name = path.fileName.toString()
+                name.endsWith(suffix) && Files.isDirectory(path) &&
+                    !Files.exists(path.resolveSibling(name.removeSuffix(suffix) + ".json"))
+            }.toList()
+        }
+        orphans.forEach(DesktopTimelineImageBodies::deleteDirectory)
+    }
 }

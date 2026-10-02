@@ -70,6 +70,8 @@ object CanvasSceneSchema {
         CanvasFieldSpec("cornerRadius", CanvasFieldKind.NUMBER),
         CanvasFieldSpec("strokeStyle", CanvasFieldKind.STRING, strokeStyles),
         CanvasFieldSpec("bend", CanvasFieldKind.POINT),
+        CanvasFieldSpec("startHandle", CanvasFieldKind.POINT),
+        CanvasFieldSpec("endHandle", CanvasFieldKind.POINT),
         CanvasFieldSpec("startBinding", CanvasFieldKind.STRING),
         CanvasFieldSpec("endBinding", CanvasFieldKind.STRING),
         CanvasFieldSpec("createdAt", CanvasFieldKind.LONG),
@@ -96,12 +98,15 @@ object CanvasSceneSchema {
         type = "Shape",
         note = "points are two \"x,y\" corners (RECTANGLE, TRIANGLE), the ends of a LINE/ARROW, " +
             "or the ends of a CIRCLE's diameter; text is a label drawn inside; an ARROW's " +
-            "startBinding/endBinding name the shapes it connects",
+            "startBinding/endBinding name the shapes it connects; a LINE/ARROW curves as one arc " +
+            "through bend, or, given both startHandle and endHandle (each an \"x,y\" offset from its own " +
+            "end), as a smooth curve leaving and arriving along them; a bound ARROW's handles are " +
+            "re-aimed from each shape's centre as the shapes move",
         required = listOf("shapeType", "points"),
         defaults = drawnDefaults(strokeWidth = 2.0),
         optional = listOf(
-            "fillColor", "cornerRadius", "strokeStyle", "strokeEnabled", "rotation", "bend", "startBinding",
-            "endBinding", "text", "textColor", "fontSize", "fontFamilyKey", "alignment",
+            "fillColor", "cornerRadius", "strokeStyle", "strokeEnabled", "rotation", "bend", "startHandle",
+            "endHandle", "startBinding", "endBinding", "text", "textColor", "fontSize", "fontFamilyKey", "alignment",
         ),
         example = example("box-1", "Shape") {
             put("shapeType", "RECTANGLE")
@@ -151,13 +156,13 @@ object CanvasSceneSchema {
     val image = CanvasElementSpec(
         type = "Image",
         note = "points are the top-left and bottom-right corners; imageRef must name an image " +
-            "already on the board (copy it from canvas.get_scene)",
+            "already on the board (copy it from canvas_get_scene)",
         required = listOf("points", "imageRef"),
         defaults = drawnDefaults(strokeWidth = 0.0),
         optional = listOf("imageMediaType", "intrinsicWidth", "intrinsicHeight", "opacity", "rotation"),
         example = example("image-1", "Image") {
             put("points", points("100.0,400.0", "420.0,640.0"))
-            put("imageRef", "<imageRef from canvas.get_scene>")
+            put("imageRef", "<imageRef from canvas_get_scene>")
             put("zIndex", 0)
         },
         minPoints = 2,

@@ -99,3 +99,16 @@ interface TimelineImageBodyReader {
 interface TimelineImageBodyWriter : TimelineImageBodyReader {
     suspend fun persistImage(base64: String): StoredImageBodyReference
 }
+
+/**
+ * Optional capability of a whole-envelope [ConfirmedTimelineStore]: keeps, within [TimelineScope],
+ * the image bodies an inline snapshot pointer cannot hold. Without it an image over the inline
+ * thumbnail budget is persisted as size-only metadata and comes back as a placeholder.
+ *
+ * A body is persisted before the envelope that names it; the store owns its lifetime and must
+ * drop it with the scope.
+ */
+interface ConfirmedTimelineImageBodies {
+    suspend fun persistImage(scope: TimelineScope, base64: String): StoredImageBodyReference
+    suspend fun resolveImage(scope: TimelineScope, reference: StoredImageBodyReference): String?
+}

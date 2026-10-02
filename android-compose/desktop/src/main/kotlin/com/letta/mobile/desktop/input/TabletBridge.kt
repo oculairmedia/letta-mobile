@@ -21,15 +21,17 @@ internal object TabletBridge {
     const val KIND_MOVE = 2
     const val KIND_IN = 3
     const val KIND_OUT = 4
+    const val KIND_CANCEL = 5
 
-    /** Floats per event: kind, x, y, pressure, tool. */
-    const val STRIDE = 5
+    /** Floats per event: kind, x, y, pressure, tool, contact. */
+    const val STRIDE = 6
 
     /** Tool codes, matching the Rust side. */
     const val TOOL_UNKNOWN = -1
     const val TOOL_DRAW = 0
     const val TOOL_ERASER = 1
     const val TOOL_EMULATED = 2
+    const val TOOL_TOUCH = 3
 
     /** Reported when the tool has no pressure axis. */
     const val NO_PRESSURE = -1f
@@ -61,4 +63,14 @@ internal object TabletBridge {
     @JvmStatic external fun nativePoll(handle: Long): FloatArray
 
     @JvmStatic external fun nativeClose(handle: Long)
+
+    /**
+     * True while the pointer hook is handling a finger, including a short hold after it.
+     *
+     * Set before AWT dispatches the message, so a touch-pan wheel from that message can be
+     * swallowed instead of scrolling the board.
+     */
+    fun touchGestureActive(): Boolean = available && runCatching { nativeTouchGestureActive() }.getOrDefault(false)
+
+    @JvmStatic external fun nativeTouchGestureActive(): Boolean
 }

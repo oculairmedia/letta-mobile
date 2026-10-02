@@ -1,6 +1,9 @@
 package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.timeline.*
+import com.letta.mobile.data.timeline.snapshot.StoredImageBodyReference
+import com.letta.mobile.data.timeline.snapshot.TimelineImageBodyReader
+import com.letta.mobile.data.timeline.snapshot.TimelineImageBodyWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import java.io.ByteArrayInputStream
 import java.io.InputStream
@@ -21,7 +24,13 @@ internal interface DesktopTimelineCheckpointCodec {
     fun decode(bytes: ByteArray): TimelineDurableCheckpoint
 }
 
-/** Immutable generations plus scoped OS transaction locks. No legacy snapshot directory is modified. */
+/**
+ * Immutable generations plus scoped OS transaction locks. No legacy snapshot directory is modified.
+ *
+ * Image bodies too large for an event record live content-addressed in the scope's `images`
+ * directory, so they go wherever the scope goes. Like Room's ledger they are never reclaimed on
+ * replacement or deletion: a body reference can outlive the record that wrote it.
+ */
 internal class DesktopTimelineBoundedStore(
     private val root: Path,
     private val checkpointCodec: DesktopTimelineCheckpointCodec,
@@ -49,7 +58,11 @@ internal class DesktopTimelineBoundedStore(
                         currentCoroutineContext().ensureActive()
                         tx.commit(files)
                         result
-                    } finally { tx.active = false }
+                    } finally {
+                        tx.active = false
+                        // A rolled-back transaction leaves no body behind for a reference to find.
+                        tx.discardStagedImages()
+                    }
                 }
             }
         }
@@ -139,7 +152,7 @@ internal class DesktopTimelineBoundedStore(
     private open inner class Reader(
         val directory: Path,
         val snapshot: DesktopIndexedTimelineFiles.Snapshot?,
-    ) : TimelineStoreReader {
+    ) : TimelineStoreReader, TimelineImageBodyReader {
         // Existing v1 scopes remain readable/writable without an implicit unbounded migration.
         // Once v2 exists it is authoritative; corrupt v2 must never resurrect a stale v1 head.
         val persistent = if (Files.exists(directory.resolve("v2/active-v2")) ||
@@ -160,6 +173,13 @@ internal class DesktopTimelineBoundedStore(
         )
         var active = true
         fun checkActive() { check(active) { "Storage callback has escaped" } }
+        val imageDirectory: Path get() = directory.resolve(IMAGE_DIRECTORY)
+        override suspend fun resolveImage(reference: StoredImageBodyReference): String? {
+            checkActive()
+            return DesktopTimelineImageBodies.read(
+                DesktopTimelineImageBodies.bodyFile(imageDirectory, reference.sha256), reference,
+            )
+        }
         fun generationAuxiliary(): Path = directory.resolve(requireNotNull(snapshot).generation + ".aux")
         fun auxiliary(): Path {
             val own = generationAuxiliary()
@@ -276,8 +296,40 @@ internal class DesktopTimelineBoundedStore(
     }
 
     private inner class Transaction(directory: Path, snapshot: DesktopIndexedTimelineFiles.Snapshot?) :
-        Reader(directory, snapshot), TimelineStoreTransaction {
+        Reader(directory, snapshot), TimelineStoreTransaction, TimelineImageBodyWriter {
         val records = mutableMapOf<TimelineMessageId, TimelineStoredRecord?>()
+        // Bodies are staged on disk, not in memory, and published only when the transaction commits.
+        private val stagedImages = linkedMapOf<String, Path>()
+        override suspend fun persistImage(base64: String): StoredImageBodyReference {
+            checkActive()
+            currentCoroutineContext().ensureActive()
+            val decoded = DesktopTimelineImageBodies.decode(base64)
+            val reference = decoded.reference
+            if (resolveImage(reference) == null) {
+                // Absent, or present but corrupt: stage a fresh copy that replaces it on commit.
+                stagedImages.remove(reference.sha256)?.let(Files::deleteIfExists)
+                stagedImages[reference.sha256] = DesktopTimelineImageBodies.stage(imageDirectory, decoded.bytes)
+            }
+            return reference
+        }
+        override suspend fun resolveImage(reference: StoredImageBodyReference): String? {
+            checkActive()
+            val staged = stagedImages[reference.sha256] ?: return super.resolveImage(reference)
+            return DesktopTimelineImageBodies.read(staged, reference)
+        }
+        // Bodies land before any record that names them, so a committed reference never dangles.
+        private fun publishStagedImages() {
+            val iterator = stagedImages.entries.iterator()
+            while (iterator.hasNext()) {
+                val (sha256, staged) = iterator.next()
+                DesktopTimelineImageBodies.publish(staged, DesktopTimelineImageBodies.bodyFile(imageDirectory, sha256))
+                iterator.remove()
+            }
+        }
+        fun discardStagedImages() {
+            stagedImages.values.forEach { Files.deleteIfExists(it) }
+            stagedImages.clear()
+        }
         val evidenceChanges = mutableMapOf<String, ByteArray?>()
         val toolChanges = mutableMapOf<String, TimelineToolIndexEntry>()
         var toolGeneration: Long? = null
@@ -427,6 +479,7 @@ internal class DesktopTimelineBoundedStore(
                 selected.peekLast()?.key?.takeIf { newer }, stamp)
         }
         suspend fun commit(files: DesktopIndexedTimelineFiles) {
+            publishStagedImages()
             if (!changed) { check(revision == null); return }
             val stamp = requireNotNull(revision) { "Changed transaction needs nextRevision" }
             persistent?.let {
@@ -525,6 +578,7 @@ internal class DesktopTimelineBoundedStore(
     companion object {
         private const val MAX_BODY = 1024 * 1024
         private const val MAX_CHECKPOINT = 1024 * 1024
+        private const val IMAGE_DIRECTORY = "images"
         private fun TimelinePageKey.disk() = DesktopIndexedTimelineFiles.Key(order, identity.value)
         private fun DesktopIndexedTimelineFiles.Key.shared() = TimelinePageKey(order, TimelineMessageId(identity))
         // Preserve Kotlin String identity, including unpaired UTF-16 code units.
