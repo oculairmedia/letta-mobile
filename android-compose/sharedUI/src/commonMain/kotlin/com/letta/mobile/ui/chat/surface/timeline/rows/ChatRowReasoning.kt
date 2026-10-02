@@ -47,6 +47,7 @@ import com.letta.mobile.sharedui.resources.rows_run_for_duration
 import com.letta.mobile.sharedui.resources.rows_thinking
 import com.letta.mobile.sharedui.resources.rows_thought
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
+import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -81,7 +82,7 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
             .then(if (isActive || reducedMotion) Modifier else Modifier.animateContentSize(tween(LettaMotionTokens.CONTENT_SIZE_MILLIS)))
             .padding(vertical = LettaDimens.Space.xs),
     ) {
-        ReasoningHeader(message, disclosure) { callbacks.actions.toggleReasoningExpanded(message.id) }
+        ReasoningHeader(message, disclosure) { callbacks.actions.toggleReasoningExpanded(ChatMessageId(message.id)) }
         ReasoningExpansion(message, disclosure)
     }
 }

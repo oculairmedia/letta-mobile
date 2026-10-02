@@ -49,13 +49,13 @@ interface ChatActions {
 
     fun rerun(message: UiMessage)
 
-    fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?)
+    fun submitApproval(answer: ChatApprovalAnswer)
 
     fun submitA2uiAction(action: A2uiAction)
 
-    fun dismissA2uiSurface(surfaceId: String)
+    fun dismissA2uiSurface(surfaceId: A2uiSurfaceId)
 
-    fun markA2uiSnackbarShown(id: Long)
+    fun markA2uiSnackbarShown(id: A2uiSnackbarId)
 
     // Send queue
     fun cancelQueuedSend(id: QueuedSendId)
@@ -65,15 +65,15 @@ interface ChatActions {
     fun resumeSendQueue()
 
     // Timeline
-    fun toggleRunCollapsed(runId: String)
+    fun toggleRunCollapsed(runId: ChatRunId)
 
-    fun toggleReasoningExpanded(messageId: String)
+    fun toggleReasoningExpanded(messageId: ChatMessageId)
 
     fun loadOlderMessages()
 
     fun releaseOlderMessages()
 
-    fun expandTruncatedToolResult(messageId: String)
+    fun expandTruncatedToolResult(messageId: ChatMessageId)
 
     /** Retries the conversation or connection load after a failure. */
     fun retryLoad()
@@ -83,9 +83,9 @@ interface ChatActions {
     fun setFontScale(scale: Float)
 
     // Conversation settings
-    fun selectModel(handle: String, effort: ReasoningEffortChoice)
+    fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice)
 
-    fun changeWorkingDirectory(path: String)
+    fun changeWorkingDirectory(directory: ChatWorkingDirectory)
 
     // Search
     fun updateSearchQuery(query: String)

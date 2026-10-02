@@ -14,6 +14,7 @@ import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.openedChatViewModel
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
+import com.letta.mobile.ui.chat.session.ChatModelHandle
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -161,9 +162,9 @@ class AdminChatSessionPortTest {
         val vm = mockViewModel(ChatComposerState())
         val actions = AdminChatActions(vm, onOpenBugReport = {})
 
-        actions.selectModel("openai/gpt", ReasoningEffortChoice.Named("high"))
-        actions.selectModel("openai/gpt", ReasoningEffortChoice.ProviderDefault)
-        actions.selectModel("openai/gpt", ReasoningEffortChoice.Unchanged)
+        actions.selectModel(ChatModelHandle("openai/gpt"), ReasoningEffortChoice.Named("high"))
+        actions.selectModel(ChatModelHandle("openai/gpt"), ReasoningEffortChoice.ProviderDefault)
+        actions.selectModel(ChatModelHandle("openai/gpt"), ReasoningEffortChoice.Unchanged)
 
         verify { vm.updateActiveAgentModel("openai/gpt", EffortSelection.Set("high")) }
         verify { vm.updateActiveAgentModel("openai/gpt", EffortSelection.Set(null)) }

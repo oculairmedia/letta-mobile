@@ -27,6 +27,7 @@ import com.letta.mobile.sharedui.resources.composer_effort_header
 import com.letta.mobile.sharedui.resources.composer_model_fallback
 import com.letta.mobile.sharedui.resources.composer_model_selected
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.ChatModelHandle
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
@@ -58,7 +59,7 @@ internal fun ComposerModelControls(
         ComposerEffortChip(
             current = model.currentEffort,
             efforts = efforts,
-            onSelect = { choice -> actions.selectModel(handle, choice) },
+            onSelect = { choice -> actions.selectModel(ChatModelHandle(handle), choice) },
         )
     }
     if (sheetOpen) {
@@ -67,7 +68,7 @@ internal fun ComposerModelControls(
             onSelect = { option ->
                 sheetOpen = false
                 if (option.handle != model.currentHandle) {
-                    actions.selectModel(option.handle, ReasoningEffortChoice.Unchanged)
+                    actions.selectModel(ChatModelHandle(option.handle), ReasoningEffortChoice.Unchanged)
                 }
             },
             onDismiss = { sheetOpen = false },
