@@ -155,7 +155,6 @@ object ChatDockGeometryMath {
      * is kept. Without a frame (nothing laid out yet) only the flag changes.
      */
     fun collapse(geometry: ChatDockGeometry, frame: ChatDockFrame? = null): ChatDockGeometry {
-        if (geometry.collapsed) return geometry
         return switchCollapsed(geometry, collapsed = true, frame = frame)
     }
 
@@ -166,7 +165,6 @@ object ChatDockGeometryMath {
      * flag changes.
      */
     fun expand(geometry: ChatDockGeometry, frame: ChatDockFrame? = null): ChatDockGeometry {
-        if (!geometry.collapsed) return geometry
         return switchCollapsed(geometry, collapsed = false, frame = frame)
     }
 
@@ -175,6 +173,7 @@ object ChatDockGeometryMath {
      * where it is in [frame]: the bar is the bottom of the open panel and the whole collapsed one.
      */
     private fun switchCollapsed(geometry: ChatDockGeometry, collapsed: Boolean, frame: ChatDockFrame?): ChatDockGeometry {
+        if (geometry.collapsed == collapsed) return geometry
         val target = geometry.copy(collapsed = collapsed)
         if (frame == null) return target
         val barBottom = rect(geometry, frame).bottom
