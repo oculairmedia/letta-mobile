@@ -111,6 +111,7 @@ class ExternalToolRegistry(
      *   others ignore it. Default `null` preserves the pre-agent-context
      *   contract for the existing extras (image_hydration, goals, ...).
      * @param conversationId The conversation the agent's runtime is in, from the same scope.
+     * @param toolCallId The request's `tool_call_id` ([ExternalToolCaller.toolCallId]).
      * @return The tool result (success or error)
      * @throws ToolNotFoundException if the tool is not found or not advertised
      */
@@ -119,12 +120,13 @@ class ExternalToolRegistry(
         input: JsonObject,
         agentId: String? = null,
         conversationId: String? = null,
+        toolCallId: String? = null,
     ): ExternalToolResult {
         val tool = toolsByName[toolName]
             ?: return ExternalToolResult.Error("Tool not found or not advertised: $toolName")
 
         return try {
-            tool.invoke(input, ExternalToolCaller(agentId, conversationId))
+            tool.invoke(input, ExternalToolCaller(agentId, conversationId, toolCallId))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

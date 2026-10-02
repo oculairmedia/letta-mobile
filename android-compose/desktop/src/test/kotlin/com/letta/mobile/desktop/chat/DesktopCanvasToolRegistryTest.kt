@@ -14,8 +14,10 @@ class DesktopCanvasToolRegistryTest {
     }
 
     @Test
-    fun againstADirectAppServerItOffersAllSix() {
+    fun againstADirectAppServerItOffersEveryCanvasTool() {
         val names = desktopCanvasToolRegistry(isIroh = false, canvasSessions = CanvasSessionRegistry()).listAdvertisedTools().map { it.name }
         assertEquals(CanvasToolContract.all.map { it.name }.toSet(), names.toSet())
+        // letta-mobile-bglj6.12: canvas.compose and its guide among them.
+        assertTrue(CanvasToolContract.COMPOSE in names && CanvasToolContract.COMPOSE_GUIDE in names, "$names")
     }
 }

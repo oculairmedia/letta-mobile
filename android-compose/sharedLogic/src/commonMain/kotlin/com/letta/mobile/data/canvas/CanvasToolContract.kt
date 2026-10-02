@@ -116,6 +116,7 @@ object CanvasToolContract {
             "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}, " +
             "owner: explicit (default when a frame is given) | user | auto) and " +
             "remove_document {documentId} takes it off. opId, actorId and lamport are filled in by the host. " +
+            "To create notes, checklists, cards or text, use $COMPOSE instead: it places and sizes them for you. " +
             "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
             "drawn or the board it leaves is inconsistent (update_element/remove_element/remove_document of an id " +
             "that is not there, add_element of an id that is, a note label whose shape is gone, an arrow bound to a " +
@@ -200,10 +201,9 @@ object CanvasToolContract {
     )
 
     /**
-     * The compose pair, defined here so both hosts take one contract, and not yet in [all]: no
-     * host answers them until the compiler and the wiring land (letta-mobile-bglj6.10, .12), and a
-     * tool offered before it works only costs an agent turns. The wiring bead moves them into [all]
-     * and points [applyOps]' description at [COMPOSE].
+     * The compose pair, defined here so both hosts take one contract. Both hosts answer them
+     * (HostCanvasTools on the Iroh host, CanvasExternalTools on an app's own App Server;
+     * letta-mobile-bglj6.12), so they are in [all], and [applyOps]' description points at [COMPOSE].
      */
     val composeTools: List<CanvasToolDefinition> = listOf(compose, composeGuide)
 
@@ -212,7 +212,7 @@ object CanvasToolContract {
      * tool that always fails only costs an agent turns (see ExternalToolRegistry.factoryDefault).
      */
     // Only advertise preview when a mobile renderer bridge is actually connected.
-    val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, list)
+    val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, list) + composeTools
     val withPreview: List<CanvasToolDefinition> = all + renderPreview
 
     /** An object of [params]; the [ToolParam.required] ones are listed as required. */

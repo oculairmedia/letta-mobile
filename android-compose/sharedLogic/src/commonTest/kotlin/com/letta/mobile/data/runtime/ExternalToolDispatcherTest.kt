@@ -66,7 +66,8 @@ class ExternalToolDispatcherTest {
             }
         }
         dispatcher(RecordingClient(), registry = registryOf(tool)).answerRequest()
-        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller("agent-1", "conv-1"), seen)
+        // letta-mobile-bglj6.12: and the request's tool_call_id, which the timeline keys the call on.
+        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller("agent-1", "conv-1", TOOL_CALL_ID), seen)
     }
 
     @Test

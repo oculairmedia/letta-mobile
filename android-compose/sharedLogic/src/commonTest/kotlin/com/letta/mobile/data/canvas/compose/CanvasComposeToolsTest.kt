@@ -14,7 +14,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -44,11 +43,12 @@ class CanvasComposeToolsTest {
     }
 
     @Test
-    fun composeIsNotOfferedUntilAHostAnswersIt() {
-        // letta-mobile-bglj6.12 moves the pair into `all` with the handlers; until then an agent
-        // that saw them could only fail. Flip this assertion in that bead, not before.
+    fun composeIsOfferedNowThatBothHostsAnswerIt() {
+        // letta-mobile-bglj6.12: HostCanvasTools and CanvasExternalTools answer the pair, so it is
+        // offered, and apply_ops sends an agent that wants notes or checklists to it.
         val offered = CanvasToolContract.all.map { it.name }
-        CanvasToolContract.composeTools.forEach { assertFalse(it.name in offered, "${it.name} is offered with no host behind it") }
+        CanvasToolContract.composeTools.forEach { assertTrue(it.name in offered, "${it.name} is not offered") }
+        assertTrue(CanvasToolContract.COMPOSE in CanvasToolContract.applyOps.description)
     }
 
     @Test

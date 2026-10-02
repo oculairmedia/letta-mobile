@@ -1,11 +1,16 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.compose.ComposeErrorCode
+import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.controller.capability.Capability
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
@@ -233,6 +238,69 @@ private suspend fun executeListCanvases(
 }
 
 /**
+ * `canvas.compose` on an app's own App Server (letta-mobile-bglj6.12), the twin of the Iroh host's
+ * ([HostCanvasTools]): the canvas named by `canvas_id`, or else the caller's conversation's, held to
+ * the same read and write checks as [executeAuthorizedMutation], then [CanvasComposeHosting]
+ * compiles, checks with the batch validator and publishes through [publishComposed].
+ */
+private suspend fun executeCompose(
+    context: CanvasToolContext,
+    input: JsonObject,
+    caller: ExternalToolCaller,
+): ExternalToolResult {
+    val host = CanvasComposeHosting.APP
+    val callerId = context.resolveCallerId()
+    fun refused(code: ComposeErrorCode, message: String) = CanvasComposeHosting.refused(host, code, message, caller.toolCallId)
+    val named = (input["canvas_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+    val canvasId = named?.let(::CanvasId)
+        ?: caller.conversationId?.let { context.store.getForConversation(it)?.id }
+        ?: return refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_CONVERSATION_CANVAS)
+    val session = context.sessions.get(canvasId)
+    val doc = session?.document?.value ?: context.store.get(canvasId)
+        ?: return refused(ComposeErrorCode.CANVAS_NOT_FOUND, "Canvas not found: ${canvasId.value}")
+    if (!canRead(doc, callerId)) {
+        return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot read canvas '${doc.id.value}'")
+    }
+    if (doc.acl != null && !doc.acl.canWrite(callerId)) {
+        return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
+    }
+    return CanvasComposeHosting.compose(host, input, doc.id.value, doc.sceneJson, doc.revision, caller.toolCallId) { ops ->
+        publishComposed(context.store, session, doc, ops, callerId)
+    }
+}
+
+/**
+ * The checked compose batch written as ONE op ([CanvasStampedBatch]), the op the Iroh host sends
+ * its relay: through the live session when the board is open (logged, one revision, published to
+ * peers as one message), else straight into the store as `apply_ops` does, conditional on the
+ * revision this call read. Returns the revision it landed at.
+ */
+private suspend fun publishComposed(
+    store: CanvasDocumentStore,
+    session: CanvasSession?,
+    doc: CanvasDocument,
+    ops: List<CanvasOp>,
+    callerId: String,
+): Long {
+    if (session != null) {
+        return try {
+            session.applyAgentBatch(ops, callerId).revision
+        } catch (e: UnauthorizedCanvasMutationException) {
+            throw ComposePublishException(ComposeErrorCode.UNAUTHORIZED, e.message ?: "Unauthorized: actor '$callerId'")
+        }
+    }
+    val batch = CanvasStampedBatch.of(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) { CanvasOpDiffer.generateOpId("agent") }
+    return persistWithoutSession(store, doc, CanvasOpProjector.project(doc.sceneJson, listOf(batch)))
+        ?: throw ComposePublishException(
+            ComposeErrorCode.BOARD_REFUSED,
+            "Conflict: canvas '${doc.id.value}' changed since revision ${doc.revision} was read; retry the same call",
+        )
+}
+
+private const val NO_CONVERSATION_CANVAS =
+    "Missing required parameter: canvas_id (this conversation has no canvas yet; use canvas.list or canvas.create)"
+
+/**
  * Base class for Canvas host external tools.
  */
 abstract class BaseCanvasTool(
@@ -406,6 +474,62 @@ class CanvasListTool(
 }
 
 /**
+ * Tool: canvas.compose (letta-mobile-bglj6.12)
+ * Puts notes, checklists, cards, text and groups on a canvas by meaning; the board places them.
+ */
+class CanvasComposeTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : BaseCanvasTool(store, sessions) {
+    override val name: String = NAME
+    override val description: String = CanvasToolContract.compose.description
+    override val inputSchema: JsonObject = CanvasToolContract.compose.inputSchema
+
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        invoke(input, ExternalToolCaller(agentId))
+
+    /** The whole caller: the conversation names the default canvas, the tool call id the artifact. */
+    override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
+        val agentId = caller.agentId
+        if (agentId.isNullOrBlank()) {
+            return ExternalToolResult.Error("$FAILURE: canvas tools require an authenticated agent identity")
+        }
+        return try {
+            executeCompose(CanvasToolContext(store, sessions, agentId), input, caller)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            ExternalToolResult.Error("$FAILURE: ${e.message}")
+        }
+    }
+
+    companion object {
+        const val NAME = CanvasToolContract.COMPOSE
+        private const val FAILURE = "Failed to compose"
+    }
+}
+
+/**
+ * Tool: canvas.compose_guide (letta-mobile-bglj6.12)
+ * The canvas.compose format, caps and examples.
+ */
+class CanvasComposeGuideTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : BaseCanvasTool(store, sessions) {
+    override val name: String = NAME
+    override val description: String = CanvasToolContract.composeGuide.description
+    override val inputSchema: JsonObject = CanvasToolContract.composeGuide.inputSchema
+
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        runWithContext(agentId, "Failed to describe compose") { CanvasComposeHosting.guide() }
+
+    companion object {
+        const val NAME = CanvasToolContract.COMPOSE_GUIDE
+    }
+}
+
+/**
  * Factory for creating all Canvas [HostExternalTool] instances.
  */
 object CanvasExternalTools {
@@ -419,5 +543,7 @@ object CanvasExternalTools {
         CanvasReplaceSceneTool(store, sessions),
         CanvasApplyOpsTool(store, sessions),
         CanvasListTool(store, sessions),
+        CanvasComposeTool(store, sessions),
+        CanvasComposeGuideTool(store, sessions),
     )
 }

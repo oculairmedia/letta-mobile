@@ -194,6 +194,9 @@ internal class ExternalToolDispatcher(
                         input = request.input,
                         agentId = request.runtime?.agentId,
                         conversationId = request.runtime?.conversationId,
+                        // letta-mobile-bglj6.12: the model's tool call id, the key the
+                        // timeline files this call's return under (canvas.compose's receipt).
+                        toolCallId = request.toolCallId,
                     )
                 } ?: run {
                     Telemetry.event(

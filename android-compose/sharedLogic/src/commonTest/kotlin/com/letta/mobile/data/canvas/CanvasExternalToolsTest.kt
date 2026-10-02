@@ -47,6 +47,8 @@ class CanvasExternalToolsTest {
                 "canvas.replace_scene",
                 "canvas.apply_ops",
                 "canvas.list",
+                "canvas.compose",
+                "canvas.compose_guide",
             ),
             advertised,
         )
@@ -344,6 +346,8 @@ class CanvasExternalToolsTest {
             "canvas.apply_ops" to buildJsonObject { put("canvas_id", "canvas-open"); put("ops", buildJsonArray { }) },
             "canvas.export_svg" to buildJsonObject { put("canvas_id", "canvas-open") },
             "canvas.list" to buildJsonObject { put("conversation_id", "conv-open") },
+            "canvas.compose" to buildJsonObject { put("canvas_id", "canvas-open") },
+            "canvas.compose_guide" to buildJsonObject { },
         )
         for (tool in CanvasExternalTools.all(store, sessions)) {
             val result = tool.invoke(inputs.getValue(tool.name), agentId = null)

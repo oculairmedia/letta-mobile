@@ -419,6 +419,16 @@ class CanvasSession(
         last
     }
 
+    /**
+     * An agent's checked batch applied as one op (letta-mobile-bglj6.12, canvas.compose): stamped
+     * after this session's clock ([CanvasStampedBatch]), held to the ACL as [actorId], logged,
+     * committed as a single revision and published to peers as one message, so a peer never holds
+     * half of it.
+     */
+    suspend fun applyAgentBatch(ops: List<CanvasOp>, actorId: String): CanvasDocument = mutex.withLock {
+        applyLocalLocked(CanvasStampedBatch.of(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") })
+    }
+
     /** Shared notebook history, independent of this person's undo stack. */
     suspend fun deletedElements(): List<CanvasDeletedElement> =
         (store as? CanvasDeletedElementStore)?.deletedElements(canvasId).orEmpty()
