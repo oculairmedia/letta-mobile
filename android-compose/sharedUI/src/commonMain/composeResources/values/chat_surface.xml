@@ -31,4 +31,7 @@
     <!-- letta-mobile-bglj6.1.9: the Touch canvas's chat head. -->
     <string name="chat_surface_head">Chat with %1$s</string>
     <string name="chat_surface_head_agent">Open the agent</string>
+    <!-- The board's menu on the Touch canvas, standing in for the header it keeps off the board. -->
+    <string name="chat_surface_canvas_switch_agent">Switch agent</string>
+    <string name="chat_surface_canvas_agent_menu">Agent menu</string>
 </resources>

@@ -10,7 +10,13 @@ import com.letta.mobile.ui.chat.session.ChatDockRect
 import androidx.compose.foundation.lazy.LazyListState
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.TouchComposerDimens
+import com.letta.mobile.ui.canvas.CanvasHostChrome
+import com.letta.mobile.ui.canvas.CanvasHostMenuEntry
 import com.letta.mobile.ui.canvas.LocalCanvasChromeBottomInset
+import com.letta.mobile.ui.canvas.LocalCanvasHostChrome
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Menu
+import com.composables.icons.lucide.Users
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,7 +66,9 @@ import com.letta.mobile.ui.chat.surface.sendflight.SendFlightLayer
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightActions
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightState
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.chat_surface_canvas_agent_menu
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_share_failed
+import com.letta.mobile.sharedui.resources.chat_surface_canvas_switch_agent
 import com.letta.mobile.ui.chat.surface.timeline.A2uiSurfaceStack
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
 import org.jetbrains.compose.resources.stringResource
@@ -306,8 +314,14 @@ private fun TouchCanvasWithChat(
             val reach = minOf(TouchComposerDimens.cornerReach, barDp)
             val clear = PaddingValues(bottom = barDp - reach)
             val canvasModifier = Modifier.fillMaxSize().padding(clear).consumeWindowInsets(clear).testTag(TOUCH_CANVAS_TAG)
+            // The top of the board is clear: the host's header is not shown over it, and the board's
+            // actions join its tool bar; the agent switcher and menu are in the board's menu.
+            val hostChrome = rememberTouchCanvasChrome(frame.host)
             Box(if (fullScreen) canvasModifier.clearAndSetSemantics { } else canvasModifier) {
-                CompositionLocalProvider(LocalCanvasChromeBottomInset provides barDp) { canvas() }
+                CompositionLocalProvider(
+                    LocalCanvasChromeBottomInset provides barDp,
+                    LocalCanvasHostChrome provides hostChrome,
+                ) { canvas() }
             }
         }
         MorphBackdrop(fraction)
@@ -345,6 +359,27 @@ private fun TouchCanvasWithChat(
     }
 }
 
+/**
+ * The board's chrome under the Touch page: its actions at its foot, and the host's agent switcher
+ * and agent menu (what a phone's header carries) at the top of its overflow menu.
+ */
+@Composable
+private fun rememberTouchCanvasChrome(host: ChatSurfaceHost): CanvasHostChrome {
+    val switchLabel = stringResource(Res.string.chat_surface_canvas_switch_agent)
+    val menuLabel = stringResource(Res.string.chat_surface_canvas_agent_menu)
+    val switcher = host.openAgentSwitcher
+    val pane = host.openAgentPane
+    return remember(switcher, pane, switchLabel, menuLabel) {
+        CanvasHostChrome(
+            actionsInFoot = true,
+            menu = listOfNotNull(
+                switcher?.let { CanvasHostMenuEntry(Lucide.Users, switchLabel, it) },
+                pane?.let { CanvasHostMenuEntry(Lucide.Menu, menuLabel, it) },
+            ),
+        )
+    }
+}
+
 /** What the chat head shows and does, from the page's frame. */
 private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState): TouchHeadContent = TouchHeadContent(
     dock = dock,
@@ -353,7 +388,6 @@ private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState): Touc
     openChat = { frame.onIntent(ChatSurfaceIntent.Expand) },
     openAgent = frame.host.openAgentPane,
     turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
-    ambient = { rememberChatAmbient(frame.uiState) },
 )
 
 /** The page's one composer-companion seat, over both layers. */

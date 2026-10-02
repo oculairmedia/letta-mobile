@@ -49,7 +49,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.chat.surface.timeline.rememberTimelineFadeAlphas
+import com.letta.mobile.ui.chat.surface.timeline.timelineFadingEdges
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
@@ -355,15 +358,33 @@ private fun ReplyBubble(turn: CollapsedTurn, agentName: String, actions: BubbleA
 
 /** The reply's markdown, following the newest line while it streams. */
 @Composable
-internal fun BubbleText(turn: CollapsedTurn, maxHeight: Dp = ChatSurfaceDimens.collapsedBubbleMaxHeight) {
+internal fun BubbleText(
+    turn: CollapsedTurn,
+    maxHeight: Dp = ChatSurfaceDimens.collapsedBubbleMaxHeight,
+    /** The body's type role; null keeps the timeline's. */
+    textStyle: TextStyle? = null,
+    /** With a length, the text dissolves at whichever edge has more to scroll to (the timeline's fades). */
+    fadeLength: Dp? = null,
+) {
     val shown = if (turn.streaming) rememberSmoothedStreamingText(rawText = turn.text, isStreaming = true) else turn.text
     val scroll = rememberScrollState()
     LaunchedEffect(scroll, turn.streaming) {
         if (turn.streaming) snapshotFlow { scroll.maxValue }.collect { scroll.scrollTo(it) }
     }
+    val fade = if (fadeLength == null) {
+        Modifier
+    } else {
+        val fades = rememberTimelineFadeAlphas(
+            canScrollTowardOlder = scroll.canScrollBackward,
+            canScrollTowardNewer = scroll.canScrollForward,
+            promptPinned = false,
+        )
+        Modifier.timelineFadingEdges(fades, fadeLength, fadeLength)
+    }
     Box(
         Modifier
             .heightIn(max = maxHeight)
+            .then(fade)
             .verticalScroll(scroll)
             // The bubble announces the whole reply itself.
             .clearAndSetSemantics { },
@@ -373,6 +394,7 @@ internal fun BubbleText(turn: CollapsedTurn, maxHeight: Dp = ChatSurfaceDimens.c
             // Retaining the previous AST across a reshaped update can crash Compose Desktop.
             retainState = false,
             textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            textStyle = textStyle,
         )
     }
 }
