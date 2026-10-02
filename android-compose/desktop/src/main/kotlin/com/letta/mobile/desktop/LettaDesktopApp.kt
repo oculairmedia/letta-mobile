@@ -820,7 +820,6 @@ internal fun LettaDesktopApp(
                                         contextUsage = contextUsage,
                                         placeholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
                                     ),
-                                    isThinking = isThinkingSelected,
                                     errorMessage = chatState.errorMessage,
                                     canvasStore = canvasShell.store,
                                     canvasOwner = DesktopCanvasOwner(
@@ -1020,7 +1019,6 @@ internal fun LettaDesktopApp(
             DesktopAppOverlays(
                 visibility = overlays,
                 data = DesktopOverlayData(
-                    availableModels = availableModels,
                     composerModelLabel = chatState.composerModelLabel,
                     modelOptions = modelOptions,
                     paletteItems = paletteItems,
@@ -1035,7 +1033,7 @@ internal fun LettaDesktopApp(
                         onSelectDestination = { selectedDestination = it },
                         onOpenAgent = ::openAgent,
                         onNewCanvas = { canvasShell.createNew(selectedAgentId) },
-                        agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                        dataBindings = dataBindings,
                         selectedAgentId = selectedAgentId,
                         onIrohIdentityReset = {
                             com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()

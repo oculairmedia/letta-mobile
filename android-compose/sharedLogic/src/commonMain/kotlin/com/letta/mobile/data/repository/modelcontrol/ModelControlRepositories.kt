@@ -56,11 +56,19 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
     }
 
     /** Optimistic: flips the row first and restores it if the wrapper rejects the change. */
-    suspend fun setExposed(change: ExposureChange) {
+    suspend fun setExposed(change: ExposureChange) = setExposed(listOf(change))
+
+    /**
+     * One round trip for many decisions (a provider-wide show/hide). Rows flip
+     * first and every one of them is restored if the wrapper rejects the batch.
+     */
+    suspend fun setExposed(changes: List<ExposureChange>) {
+        if (changes.isEmpty()) return
         val before = _models.value
-        _models.update { rows -> rows.map { if (it.handle == change.handle) it.copy(exposed = change.exposed) else it } }
+        val wanted = changes.associate { it.handle to it.exposed }
+        _models.update { rows -> rows.map { row -> wanted[row.handle]?.let { row.copy(exposed = it) } ?: row } }
         try {
-            rpc.invoke(ModelControlWire.MODEL_EXPOSURE_SET, exposureParams(change))
+            rpc.invoke(ModelControlWire.MODEL_EXPOSURE_SET, exposureParams(changes))
         } catch (e: Exception) {
             _models.value = before
             throw e
@@ -71,9 +79,19 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
     fun reasoningEffortsFor(handle: ModelHandle?): List<String> =
         handle?.let { h -> _models.value.firstOrNull { it.handle == h }?.reasoningEfforts }.orEmpty()
 
-    private fun exposureParams(change: ExposureChange): JsonObject = buildJsonObject {
-        put("handle", change.handle.value)
-        put("exposed", JsonPrimitive(change.exposed))
+    /** A single change keeps the `{handle, exposed}` shape; several go as the `models` map. */
+    private fun exposureParams(changes: List<ExposureChange>): JsonObject {
+        val single = changes.singleOrNull()
+        return if (single != null) {
+            buildJsonObject {
+                put("handle", single.handle.value)
+                put("exposed", JsonPrimitive(single.exposed))
+            }
+        } else {
+            buildJsonObject {
+                put("models", JsonObject(changes.associate { it.handle.value to JsonPrimitive(it.exposed) }))
+            }
+        }
     }
 }
 

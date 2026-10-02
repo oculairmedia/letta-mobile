@@ -10,10 +10,23 @@ internal data class AgentScaffoldNavigationCallbacks(
     val onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
     val onViewSubagentConversation: ((String, String) -> Unit)? = null,
     val onNavigateToAdmin: (() -> Unit)? = null,
+    /** letta-mobile-w4q4p.6.1: the Providers screen, from the Models sheet's "Add provider…". */
+    val onNavigateToProviders: (() -> Unit)? = null,
     val onNavigateToConversationList: (() -> Unit)? = null,
     val onNavigateToSchedules: ((String) -> Unit)? = null,
     val onNavigateToProjects: (() -> Unit)? = null,
     val onNavigateToCanvas: ((agentId: String, conversationId: String?, shareRecipient: String) -> Unit)? = null,
+)
+
+/** What the chat's model picker sheet reports back (letta-mobile-w4q4p.6.1). */
+internal data class ModelPickerSheetCallbacks(
+    val onDismiss: () -> Unit,
+    /** The picked model's handle. */
+    val onModelSelected: (String) -> Unit,
+    /** Re-reads the chat's own model list (the picker's fallback when the host has no admin catalog). */
+    val onRefresh: () -> Unit,
+    /** Opens the Models sheet; null hides "Edit Models…". */
+    val onEditModels: (() -> Unit)? = null,
 )
 
 internal data class AgentScaffoldSheetVisibility(

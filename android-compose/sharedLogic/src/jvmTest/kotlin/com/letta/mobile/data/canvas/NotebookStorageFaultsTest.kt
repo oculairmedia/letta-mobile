@@ -129,7 +129,8 @@ class NotebookStorageFaultsTest {
             // Exactly where the phone died: thrown out of a task on the repository's own work-stealing pool.
             val pool = assertNotNull(NotebookStorageHealth.documentPoolOf(notebooks.repo))
             pool.execute { throw oom }
-            waitFor { notebooks.isReadOnly }
+            // The store turns read-only before it records why; wait for both.
+            waitFor { notebooks.isReadOnly && notebooks.faults.faults.value.any { it.kind == CanvasStorageFault.Kind.READ_ONLY } }
             val faults = notebooks.faults.faults.value
             val saveFailed = faults.single { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }
             assertNotNull(saveFailed.documentId)

@@ -52,13 +52,15 @@ fun buildChatRenderModel(
     val agentScoped = scopeMessagesToAgent(messages, activeAgentId)
     val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
 
-    val visibleMessages = backfillMissingAssistantRunIds(
-        attachLatencyMetadata(
-        filterMessagesForMode(
-            messages = afterReasoningDedup,
-            mode = mode,
-        )
-        )
+    val visibleMessages = chainToolRoundRunIds(
+        backfillMissingAssistantRunIds(
+            attachLatencyMetadata(
+                filterMessagesForMode(
+                    messages = afterReasoningDedup,
+                    mode = mode,
+                ),
+            ),
+        ),
     )
 
     val groupedMessages = groupMessages(
@@ -104,6 +106,65 @@ fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
     }
     return result
 }
+
+/**
+ * letta-mobile-bglj6.1: App Server opens a NEW run for every tool round of one turn (the agent
+ * stops with `requires_approval`, the tool runs, the next request is another run; see
+ * bridge-parity/multi-round-agentic.jsonl: local-run-100 -> 101 -> 102 under one
+ * `turn_finished`). Grouped by raw run id, a coding agent running Bash four times drew four
+ * "Ran 1 command" rows while the run streamed, though the durable (run-less) history of the same
+ * turn groups into one prompt-owned run.
+ *
+ * A run whose newest assistant message called a tool hands the turn on, so the run that follows
+ * it joins it under the FIRST round's id: one run block, "Working · 4 tools" over one
+ * "Ran 4 commands" group, keyed by the run that opened the turn so its slot never moves as rounds
+ * append. A run that ended in prose (end_turn) closes the turn, as does any message that is not
+ * the assistant's (the next prompt, a notice), so separate turns never merge.
+ *
+ * [messages] must be in chronological order. Returns [messages] itself when nothing chains.
+ */
+fun chainToolRoundRunIds(messages: List<UiMessage>): List<UiMessage> {
+    val chain = ToolRoundChain()
+    val chained = messages.map(chain::shown)
+    return if (chained.indices.all { chained[it] === messages[it] }) messages else chained
+}
+
+/** Walks a turn's messages in order, naming each under the run that opened its tool chain. */
+private class ToolRoundChain {
+    /** The id the current chain shows under. */
+    private var shownRunId: String? = null
+
+    /** The server run of the newest assistant message. */
+    private var serverRunId: String? = null
+
+    /** Whether that message called a tool, handing the turn to the next run. */
+    private var handsOn = false
+
+    fun shown(message: UiMessage): UiMessage {
+        val runId = message.assistantRunId() ?: return breakChain(message)
+        if (runId != serverRunId) startRound(runId)
+        handsOn = message.callsTool()
+        return if (shownRunId == runId) message else message.copy(runId = shownRunId)
+    }
+
+    private fun startRound(runId: String) {
+        if (!continuesChain()) shownRunId = runId
+        serverRunId = runId
+    }
+
+    private fun continuesChain(): Boolean = serverRunId != null && handsOn
+
+    private fun breakChain(message: UiMessage): UiMessage {
+        shownRunId = null
+        serverRunId = null
+        handsOn = false
+        return message
+    }
+}
+
+private fun UiMessage.assistantRunId(): String? = runId?.takeIf { role == "assistant" && it.isNotBlank() }
+
+private fun UiMessage.callsTool(): Boolean = !toolCalls.isNullOrEmpty() || approvalRequest != null
 
 private fun nextAssistantSegmentStart(messages: List<UiMessage>, from: Int): Int {
     var index = from
@@ -174,7 +235,7 @@ class IncrementalChatRenderItemsCache {
         // buildChatRenderModel so foreign-agent messages are scoped out.
         activeAgentId: String? = null,
     ): List<ChatRenderItem> {
-        val normalizedMessages = backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId))
+        val normalizedMessages = chainToolRoundRunIds(backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId)))
         if (normalizedMessages.isEmpty()) {
             cachedMode = mode
             previousMessages = normalizedMessages

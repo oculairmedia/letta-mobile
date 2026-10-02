@@ -24,6 +24,7 @@ fun NavGraphBuilder.chatGraph(
     onNavigateToConversationList: () -> Unit,
     onSwitchConversation: (AgentChatRoute) -> Unit,
     onNavigateToCanvas: ((agentId: String, conversationId: String?, shareRecipient: String) -> Unit)? = null,
+    onNavigateToProviders: (() -> Unit)? = null,
 ) {
     composable<AgentChatRoute>(
         enterTransition = enterTransition,
@@ -40,6 +41,7 @@ fun NavGraphBuilder.chatGraph(
             onNavigateToTools = onNavigateToTools,
             onNavigateToMemory = onNavigateToMemory,
             onNavigateToAdmin = onNavigateToAdmin,
+            onNavigateToProviders = onNavigateToProviders,
             onNavigateToSchedules = onNavigateToSchedules,
             onNavigateToProjects = onNavigateToProjects,
             onNavigateToConversationList = onNavigateToConversationList,
