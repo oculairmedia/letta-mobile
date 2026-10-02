@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
@@ -32,6 +33,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -41,6 +43,7 @@ import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.LettaDimens
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -74,7 +77,17 @@ internal data class ComposerFieldStyle(
     val imeSend: Boolean = false,
     /** The phone's placeholder copy ("Type a message…") when the owner gives none. */
     val touchPlaceholder: Boolean = false,
-)
+) {
+    /** Touch's soft keyboard shows a Send action key; elsewhere the defaults. */
+    fun keyboardOptions(): KeyboardOptions {
+        return if (imeSend) KeyboardOptions(imeAction = ImeAction.Send) else KeyboardOptions.Default
+    }
+
+    /** The placeholder copy when the owner gives none. */
+    fun placeholderRes(): StringResource {
+        return if (touchPlaceholder) Res.string.composer_touch_placeholder else Res.string.chat_surface_placeholder
+    }
+}
 
 /**
  * The prompt field. Lifted from desktop's ComposerTextField: it keeps its own
@@ -93,13 +106,11 @@ internal fun ComposerTextField(
     LaunchedEffect(text) { fieldValue = reconcileComposerFieldValue(fieldValue, text) }
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
     val primary = LocalComposerPrimary.current
-    val flightSource = if (primary) rememberSendFlightSource() else Modifier
-    // Where the user types: the agent's mascot glances here (letta-mobile-bglj6.1).
-    val gaze = if (primary) Modifier.mascotGazeTarget(MascotGazeSurface.INPUT) else Modifier
     val handoff = LocalComposerFocusHandoff.current
+    val focus = remember(primary, handoff) { FieldFocus(primary, handoff) }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(primary, handoff) {
-        if (primary && handoff?.focused == true) focusRequester.requestFocus()
+        if (focus.restores()) focusRequester.requestFocus()
     }
     BasicTextField(
         value = fieldValue,
@@ -111,11 +122,10 @@ internal fun ComposerTextField(
             .fillMaxWidth()
             .heightIn(min = LettaDimens.Space.xl, max = style.maxHeight)
             .testTag(style.testTag)
-            .then(flightSource)
-            .then(gaze)
+            .then(primaryFieldTargets(primary))
             .focusRequester(focusRequester)
             // Only the primary field speaks for the page: the outgoing one losing focus to it is not "unfocused".
-            .onFocusChanged { if (primary && handoff != null && handoff.focused != it.isFocused) handoff.focused = it.isFocused }
+            .onFocusChanged { focus.report(it) }
             .onPreviewKeyEvent { event ->
                 composerEnterKeyHandled(
                     ComposerEnterKeyParams(
@@ -134,24 +144,50 @@ internal fun ComposerTextField(
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         singleLine = style.singleLine,
         maxLines = style.maxLines,
-        keyboardOptions = if (style.imeSend) KeyboardOptions(imeAction = ImeAction.Send) else KeyboardOptions.Default,
+        keyboardOptions = style.keyboardOptions(),
         keyboardActions = KeyboardActions(onSend = { if (model.decisions.sendEnabled) model.actions.send() }),
         decorationBox = { inner ->
             // Centred in the field's height, so a one-line bar's text sits mid-bar, not at its top.
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                if (fieldValue.text.isEmpty()) {
-                    Text(
-                        text = model.composer.placeholder ?: stringResource(
-                            if (style.touchPlaceholder) Res.string.composer_touch_placeholder else Res.string.chat_surface_placeholder,
-                        ),
-                        style = textStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                if (fieldValue.text.isEmpty()) FieldPlaceholder(model, style, textStyle)
                 inner()
             }
         },
+    )
+}
+
+/**
+ * Where a prompt takes off and where the mascot glances (letta-mobile-bglj6.1): only the primary
+ * field reports them.
+ */
+@Composable
+private fun primaryFieldTargets(primary: Boolean): Modifier {
+    if (!primary) return Modifier
+    return rememberSendFlightSource().then(Modifier.mascotGazeTarget(MascotGazeSurface.INPUT))
+}
+
+/** One field's part in the page's focus handoff: only the primary field reads or reports it. */
+private class FieldFocus(private val primary: Boolean, private val handoff: ComposerFocusHandoff?) {
+    /** The page's prompt had focus as this field took over, so this field takes it. */
+    fun restores(): Boolean {
+        if (!primary) return false
+        return handoff?.focused == true
+    }
+
+    fun report(state: FocusState) {
+        if (!primary || handoff == null) return
+        if (handoff.focused != state.isFocused) handoff.focused = state.isFocused
+    }
+}
+
+/** The owner's placeholder, else the platform's own copy. */
+@Composable
+private fun FieldPlaceholder(model: ComposerModel, style: ComposerFieldStyle, textStyle: TextStyle) {
+    Text(
+        text = model.composer.placeholder ?: stringResource(style.placeholderRes()),
+        style = textStyle,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }
