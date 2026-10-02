@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import kotlinx.coroutines.channels.Channel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -35,6 +36,7 @@ sealed interface HostCanvasAccess {
  * - Who may read and write each canvas is in [directory] (letta-mobile-aknkw.2). An agent may claim
  *   the canvas of the conversation its runtime is in, and no other: the App Server's runtime scope
  *   is the proof that the conversation is its own.
+ * - A plugin element's props are held to [kinds], the plugin kinds this host has installed.
  */
 @OptIn(ExperimentalUuidApi::class)
 class HostCanvasBackend(
@@ -43,6 +45,7 @@ class HostCanvasBackend(
     private val directory: HostCanvasDirectory,
     private val newOpId: () -> String = { "agent-op-${Uuid.random()}" },
     private val ackTimeout: Duration = DEFAULT_ACK_TIMEOUT,
+    private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) {
     /** The canvas [canvasId] for [caller]: known to the directory, or its own conversation's. */
     suspend fun open(caller: HostCanvasCaller, canvasId: String): HostCanvasAccess {
@@ -140,7 +143,7 @@ class HostCanvasBackend(
             return HostCanvasCheck.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
         val scene = scene(entry)
-        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.agentId) }))
+        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.agentId) }, kinds))
     }
 
     private suspend fun send(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>, atomic: Boolean): HostCanvasPublish {

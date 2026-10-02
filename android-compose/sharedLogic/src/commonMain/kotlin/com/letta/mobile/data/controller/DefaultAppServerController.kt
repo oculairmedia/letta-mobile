@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.extras.ToolAdvertisementState
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
 import com.letta.mobile.data.controller.registry.RuntimeRecord
@@ -203,6 +204,33 @@ class DefaultAppServerController(
     private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
+    /**
+     * letta-mobile-s416w.27: when the registry's live tool sources change, every runtime in
+     * [runtimeCache] (controller- and engine-started alike) is sent a fresh `runtime_start` carrying
+     * the new set. Null without a registry.
+     */
+    private val toolReadvertiser = externalToolRegistry?.let { registry ->
+        ExternalToolReadvertiser(
+            client = client,
+            registry = registry,
+            clientInfo = clientInfo,
+            requestIdFactory = requestIdFactory,
+            activeRuntimes = { runtimeMutex.withLock { runtimeCache.values.map { it.scope } } },
+        )
+    }
+
+    /**
+     * Whether a change to the external tools is still being re-advertised; a change reaches an
+     * agent from its next turn either way (letta-code snapshots the tools per turn).
+     */
+    val toolAdvertisementState: StateFlow<ToolAdvertisementState> =
+        toolReadvertiser?.state ?: MutableStateFlow(ToolAdvertisementState()).asStateFlow()
+
+    init {
+        // After runtimeCache and runtimeMutex exist: the collector reads them.
+        toolReadvertiser?.attach(controllerScope)
+    }
+
     /** letta-mobile-qygvv.7: in-place mode changes over the controller-owned router. */
     private val deviceState = DeviceStateChanger(client, TurnInboundSource(client, eventRouter))
 
@@ -401,7 +429,8 @@ class DefaultAppServerController(
                     // registerRuntimeExternalTools() with exactly this list and will
                     // never emit an external_tool_call_request for a name absent
                     // from it. Re-sent on every runtime_start, which is also how
-                    // reconnect re-advertises (see ExternalToolRegistry.reRegisterAll).
+                    // reconnect re-advertises (see ExternalToolRegistry.reRegisterAll)
+                    // and how a live tool change does (ExternalToolReadvertiser).
                     externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
                 ),
             )
