@@ -56,7 +56,7 @@ private fun ChatSurfacePlatform.slotShape(): Int {
 }
 
 /** Bit i set when [members]`[i]` is non-null. */
-private fun presenceMask(members: List<Any?>): Int {
+private fun presenceMask(members: List<Function<*>?>): Int {
     return members.foldIndexed(0) { index, mask, member -> if (member != null) mask or (1 shl index) else mask }
 }
 
