@@ -73,6 +73,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_dock_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_dock_move
 import com.letta.mobile.sharedui.resources.chat_surface_dock_resize
+import com.letta.mobile.ui.chat.session.ChatDockDelta
 import com.letta.mobile.ui.chat.session.ChatDockEdge
 import com.letta.mobile.ui.chat.session.ChatDockFrame
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
@@ -194,7 +195,7 @@ internal class ChatDockState(initial: ChatDockGeometry) {
         val frame = frame ?: return
         snapping = false
         foldFrom = null
-        update(ChatDockGeometryMath.resize(geometry, edge, dxDp, dyDp, frame))
+        update(ChatDockGeometryMath.resize(geometry, edge, ChatDockDelta(dxDp, dyDp), frame))
     }
 
     fun toggleCollapsed() {
