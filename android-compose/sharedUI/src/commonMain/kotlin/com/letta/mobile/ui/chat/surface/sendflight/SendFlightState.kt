@@ -94,11 +94,17 @@ class SendFlightState {
     /** Starts a flight for [draft] from the last reported field bounds. False when there is none. */
     fun launch(draft: String): Boolean {
         val text = draft.trim()
-        val source = sourceBounds
-        if (text.isEmpty() || source == null || source.isEmpty) return false
+        val source = launchSource()
+        if (text.isEmpty() || source == null) return false
         generation += 1
         flight = SendFlight(generation, text, source.translate(-layerOrigin))
         return true
+    }
+
+    /** The last reported field bounds, unless none came or they are empty. */
+    private fun launchSource(): Rect? {
+        val source = sourceBounds ?: return null
+        return if (source.isEmpty) null else source
     }
 
     /**
@@ -111,9 +117,13 @@ class SendFlightState {
         if (current.claimant === row.key) current.target = boundsInRoot.translate(-layerOrigin)
     }
 
-    internal fun rowAlpha(row: SendFlightRow): Float = standingIn(row)?.rowAlpha ?: 1f
+    internal fun rowAlpha(row: SendFlightRow): Float {
+        return standingIn(row)?.rowAlpha ?: 1f
+    }
 
-    internal fun rowInsert(row: SendFlightRow): Float = standingIn(row)?.insert ?: 1f
+    internal fun rowInsert(row: SendFlightRow): Float {
+        return standingIn(row)?.insert ?: 1f
+    }
 
     internal fun finish(done: SendFlight) {
         if (flight === done) flight = null
@@ -124,10 +134,16 @@ class SendFlightState {
      * to claim. A new prompt row is hidden (and its slot closed) from its very first frame, before
      * its first layout reports it, so the real bubble never shows under the ghost.
      */
-    private fun standingIn(row: SendFlightRow): SendFlight? = flight?.takeIf { current ->
-        val claimant = current.claimant
-        claimant === row.key || (claimant == null && row.canClaim(current))
+    private fun standingIn(row: SendFlightRow): SendFlight? {
+        return flight?.takeIf { current -> row.landsOn(current) }
     }
+}
+
+/** Whether [flight] has claimed this row, or is waiting and this row can claim it. */
+private fun SendFlightRow.landsOn(flight: SendFlight): Boolean {
+    val claimant = flight.claimant
+    if (claimant === key) return true
+    return claimant == null && canClaim(flight)
 }
 
 /** One composed prompt row's identity; compared by reference, so a recomposed slot is a new row. */
@@ -135,8 +151,10 @@ internal class SendFlightRowKey
 
 /** One user-prompt row as the flight sees it. */
 internal class SendFlightRow(val key: SendFlightRowKey, val bornAt: Int, val text: String) {
-    fun canClaim(flight: SendFlight): Boolean =
-        flight.phase == SendFlightPhase.Awaiting && bornAt >= flight.id && text.trim() == flight.text
+    fun canClaim(flight: SendFlight): Boolean {
+        if (flight.phase != SendFlightPhase.Awaiting) return false
+        return bornAt >= flight.id && text.trim() == flight.text
+    }
 }
 
 /** The page's coordinator; null outside a chat page, where sources and targets do nothing. */
