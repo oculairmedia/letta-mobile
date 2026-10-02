@@ -31,7 +31,7 @@ internal class NotebookStorageHealth(
     val faults = NotebookStorageFaults()
     private val quarantined = ConcurrentHashMap.newKeySet<String>()
     private val canvases = ConcurrentHashMap<String, CanvasId>()
-    private val budgetLevel = ConcurrentHashMap<String, Int>()
+    private val budgetLevel = ConcurrentHashMap<String, BudgetLevel>()
     private val storageNames = ConcurrentHashMap<String, String>()
     private val layoutRefused = ConcurrentHashMap.newKeySet<String>()
     private val retired = ConcurrentHashMap.newKeySet<String>()
@@ -78,31 +78,32 @@ internal class NotebookStorageHealth(
                 learnRetired()
             }
         } catch (error: Exception) {
-            record(CanvasStorageFault.Kind.LOAD_FAILED, null, null, "Interrupted notebook moves could not be recovered", error)
+            record(CanvasStorageFault.Kind.LOAD_FAILED, Subject.NONE, "Interrupted notebook moves could not be recovered", error)
         }
         val keys = try {
             index.read()
         } catch (error: Exception) {
-            record(CanvasStorageFault.Kind.LOAD_FAILED, null, null, "Notebook index unreadable", error)
+            record(CanvasStorageFault.Kind.LOAD_FAILED, Subject.NONE, "Notebook index unreadable", error)
             return
         }
         for (key in keys) {
             try {
-                lock {
-                    // Re-read under the lock: another store may have moved it since.
-                    if (key in index.read()) {
-                        val bytes = archive.documentBytes(key)
-                        when {
-                            bytes > budget.maxDocumentBytes -> move(key, bytes)
-                            bytes >= budget.warnBytes -> nearBudget(key, bytes, WARNED)
-                        }
-                    }
-                }
+                lock { applyBudgetIfIndexed(key) }
             } catch (error: Exception) {
-                record(CanvasStorageFault.Kind.LOAD_FAILED, key, null, "Notebook storage could not be inspected", error)
+                record(CanvasStorageFault.Kind.LOAD_FAILED, Subject(key), "Notebook storage could not be inspected", error)
             }
         }
         runCatching { lock { learnRetired() } }
+    }
+
+    /** Under the lock: re-read the index, as another store may have moved [key] since. */
+    private fun applyBudgetIfIndexed(key: String) {
+        if (key !in index.read()) return
+        val document = Subject(key, archive.documentBytes(key))
+        when {
+            document.size > budget.maxDocumentBytes -> move(document)
+            document.size >= budget.warnBytes -> nearBudget(document, BudgetLevel.WARNED)
+        }
     }
 
     private fun learnRetired() {
@@ -121,11 +122,12 @@ internal class NotebookStorageHealth(
      * Move an over-budget document to a new one: archive its history, copy its current state, swap
      * the index, retire the old id. On failure everything is put back and the board shows why.
      */
-    private fun move(key: String, bytes: Long) {
+    private fun move(document: Subject) {
+        val key = checkNotNull(document.key)
         val result = try {
             archive.compactToNewDocument(key, System.currentTimeMillis(), index, budget.restoreListBytes)
         } catch (error: Throwable) {
-            failedMove(key, bytes, error)
+            failedMove(document, error)
             return
         } finally {
             runCatching { learnRetired() }
@@ -135,64 +137,65 @@ internal class NotebookStorageHealth(
         val leftInArchive = result.restoreEntriesArchived
         record(
             CanvasStorageFault.Kind.COMPACTED,
-            result.newKey,
-            result.bytesAfter,
-            "History of ${mb(bytes)} passed the ${mb(budget.maxDocumentBytes)} budget; archived to " +
+            Subject(result.newKey, result.bytesAfter),
+            "History of ${document.size.mb()} passed the ${budget.maxDocumentBytes.mb()} budget; archived to " +
                 "${NotebookHistoryArchive.ARCHIVE_DIRECTORY}/$key/${result.archive.fileName}, and the board continues " +
                 "in document ${result.newKey} from ${result.bytesAfter / KIB} KB" +
                 if (leftInArchive > 0) "; $leftInArchive deleted elements are restorable only from the archive" else "",
         )
     }
 
-    private fun failedMove(key: String, bytes: Long, error: Throwable) {
+    private fun failedMove(document: Subject, error: Throwable) {
+        val key = checkNotNull(document.key)
         // Finish the move if it got past its commit point; otherwise undo it.
         runCatching { archive.recoverInterrupted(index) }.exceptionOrNull()?.let(error::addSuppressed)
         runCatching { learnRetired() }
         if (runCatching { key !in index.read() && isRetired(key) }.getOrDefault(false)) {
             record(
-                CanvasStorageFault.Kind.COMPACTED, null, null,
-                "Notebook history of ${mb(bytes)} was archived and moved to a new document, with errors", error,
+                CanvasStorageFault.Kind.COMPACTED, Subject.NONE,
+                "Notebook history of ${document.size.mb()} was archived and moved to a new document, with errors", error,
             )
             return
         }
         // A document too large to move is too large for the repository to save: set it aside so
         // this process does not die on it. Its files stay where they are.
-        val tooLarge = bytes > budget.maxDocumentBytes * QUARANTINE_FACTOR
+        val tooLarge = document.size > budget.maxDocumentBytes * QUARANTINE_FACTOR
         if (tooLarge) quarantined += key
-        budgetLevel[key] = OVER
+        budgetLevel[key] = BudgetLevel.OVER
         record(
             if (tooLarge) CanvasStorageFault.Kind.QUARANTINED else CanvasStorageFault.Kind.OVER_BUDGET,
-            key,
-            bytes,
-            "Notebook history of ${mb(bytes)} is over its ${mb(budget.maxDocumentBytes)} budget and could not be " +
+            document,
+            "Notebook history of ${document.size.mb()} is over its ${budget.maxDocumentBytes.mb()} budget and could not be " +
                 "archived and moved to a new document; " +
                 if (tooLarge) "the document is set aside unopened" else "opening it as it is",
             error,
         )
     }
 
-    private fun nearBudget(key: String, bytes: Long, level: Int) {
-        if ((budgetLevel[key] ?: 0) >= level) return
+    private fun nearBudget(document: Subject, level: BudgetLevel) {
+        val key = checkNotNull(document.key)
+        val reached = budgetLevel[key]
+        if (reached != null && reached >= level) return
         budgetLevel[key] = level
-        val note = if (level == OVER) {
+        val note = if (level == BudgetLevel.OVER) {
             "it will be archived and moved to a new document the next time the notebook store opens"
         } else {
             "${(budget.warnFraction * PERCENT).toInt()}% of it"
         }
         record(
-            if (level == OVER) CanvasStorageFault.Kind.OVER_BUDGET else CanvasStorageFault.Kind.NEAR_BUDGET,
-            key,
-            bytes,
-            "Notebook history is ${mb(bytes)} of a ${mb(budget.maxDocumentBytes)} budget; $note",
+            if (level == BudgetLevel.OVER) CanvasStorageFault.Kind.OVER_BUDGET else CanvasStorageFault.Kind.NEAR_BUDGET,
+            document,
+            "Notebook history is ${document.size.mb()} of a ${budget.maxDocumentBytes.mb()} budget; $note",
         )
     }
 
     /** Check a document after a save; the repository writes in the background, so this trails by a save. */
     fun checkBudget(key: String) {
         val bytes = runCatching { archive.documentBytes(key) }.getOrNull() ?: return
+        val document = Subject(key, bytes)
         when {
-            bytes > budget.maxDocumentBytes -> nearBudget(key, bytes, OVER)
-            bytes >= budget.warnBytes -> nearBudget(key, bytes, WARNED)
+            bytes > budget.maxDocumentBytes -> nearBudget(document, BudgetLevel.OVER)
+            bytes >= budget.warnBytes -> nearBudget(document, BudgetLevel.WARNED)
         }
     }
 
@@ -272,7 +275,7 @@ internal class NotebookStorageHealth(
         val message = "Board layout $version is newer than this build reads (${NotebookBoardStorage.LAYOUT_VERSION}); " +
             "the notebook is read-only here so this build cannot overwrite what it does not understand. Update the app"
         if (layoutRefused.add(key)) {
-            record(CanvasStorageFault.Kind.READ_ONLY, key, runCatching { archive.documentBytes(key) }.getOrNull(), message)
+            record(CanvasStorageFault.Kind.READ_ONLY, Subject(key, runCatching { archive.documentBytes(key) }.getOrNull()), message)
         }
         return NotebookReadOnlyException(message)
     }
@@ -282,10 +285,9 @@ internal class NotebookStorageHealth(
         val load = operation.startsWith("load")
         record(
             if (load) CanvasStorageFault.Kind.LOAD_FAILED else CanvasStorageFault.Kind.SAVE_FAILED,
-            key,
-            key?.let { runCatching { archive.documentBytes(it) }.getOrNull() } ?: bytes,
+            Subject(key, key?.let { runCatching { archive.documentBytes(it) }.getOrNull() } ?: bytes),
             "Notebook storage $operation of ${storageKey.parts.joinToString("/")}" +
-                (bytes?.let { " (${mb(it)})" } ?: "") + " failed",
+                (bytes?.let { " (${it.mb()})" } ?: "") + " failed",
             error,
         )
     }
@@ -302,24 +304,23 @@ internal class NotebookStorageHealth(
         }.getOrNull()
         record(
             CanvasStorageFault.Kind.SAVE_FAILED,
-            suspect,
-            suspect?.let { runCatching { archive.documentBytes(it) }.getOrNull() },
+            Subject(suspect, suspect?.let { runCatching { archive.documentBytes(it) }.getOrNull() }),
             "The notebook repository failed on ${thread.name}; the largest document is named. " +
                 "Changes since this time may not be on disk",
             error,
         )
-        degrade("${error::class.java.simpleName} on ${thread.name}")
+        degrade(thread, error)
     }
 
-    private fun degrade(reason: String) {
+    private fun degrade(thread: Thread, error: Throwable) {
+        val reason = "${error::class.java.simpleName} on ${thread.name}"
         synchronized(this) {
             if (readOnlyReason != null) return
             readOnlyReason = reason
         }
         record(
             CanvasStorageFault.Kind.READ_ONLY,
-            null,
-            null,
+            Subject.NONE,
             "The notebook store hit $reason and is read-only until the app restarts; changes since this time are not saved",
         )
     }
@@ -333,13 +334,13 @@ internal class NotebookStorageHealth(
         return storageNames[name]
     }
 
-    private fun record(kind: CanvasStorageFault.Kind, key: String?, bytes: Long?, message: String, error: Throwable? = null) {
+    private fun record(kind: CanvasStorageFault.Kind, subject: Subject, message: String, error: Throwable? = null) {
         faults.record(
             CanvasStorageFault(
                 kind = kind,
-                documentId = key,
-                canvasId = key?.let(canvases::get),
-                documentBytes = bytes,
+                documentId = subject.key,
+                canvasId = subject.key?.let(canvases::get),
+                documentBytes = subject.bytes,
                 message = message,
                 atEpochMs = System.currentTimeMillis(),
             ),
@@ -351,11 +352,20 @@ internal class NotebookStorageHealth(
         AutomergeFaultGuard.unregister(guard)
     }
 
-    private fun mb(bytes: Long): String = "%.1f MB".format(bytes / (KIB * KIB).toDouble())
+    /** The document a fault is about, if any, and its stored size, if known. */
+    private class Subject(val key: String?, val bytes: Long? = null) {
+        /** The size of a document whose size is known. */
+        val size: Long get() = checkNotNull(bytes)
+
+        companion object {
+            val NONE = Subject(null)
+        }
+    }
+
+    /** How far past the budget's warning a document's history is; ordered. */
+    private enum class BudgetLevel { WARNED, OVER }
 
     companion object {
-        private const val WARNED = 1
-        private const val OVER = 2
         private const val KIB = 1024L
         private const val PERCENT = 100
 
@@ -368,6 +378,8 @@ internal class NotebookStorageHealth(
          * `org.automerge.**`. Null if this version of the library is laid out differently, and
          * then only the named `automerge-*` threads are recognised.
          */
+        private fun Long.mb(): String = "%.1f MB".format(this / (KIB * KIB).toDouble())
+
         fun documentPoolOf(repo: Repo): ExecutorService? = runCatching {
             val runtime = Repo::class.java.getDeclaredField("runtime").apply { isAccessible = true }.get(repo)
             runtime.javaClass.getDeclaredField("documentExecutor").apply { isAccessible = true }.get(runtime) as ExecutorService

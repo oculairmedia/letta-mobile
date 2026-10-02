@@ -8,11 +8,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopCommandPalette
-import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
+import com.letta.mobile.desktop.chat.DesktopModelControlHost
+import com.letta.mobile.desktop.chat.DesktopModelControlOverlays
+import com.letta.mobile.desktop.chat.DesktopModelSurfaces
 import com.letta.mobile.ui.components.ImageDropOverlay
 
 /** Avatar chips shown in the New Conversation "Recent" row. */
@@ -20,8 +21,11 @@ internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
 
 /** Mutable visibility flags for the app-level overlay stack. */
 @Stable
-internal class DesktopOverlayVisibility {
-    var modelPicker by mutableStateOf(false)
+internal class DesktopOverlayVisibility : DesktopModelSurfaces {
+    override var modelPicker by mutableStateOf(false)
+
+    /** The "Models" exposure editor opened from the picker's "Edit Models…" (letta-mobile-w4q4p.6.1). */
+    override var modelsEditor by mutableStateOf(false)
     var commandPalette by mutableStateOf(false)
     var newConversation by mutableStateOf(false)
     var newAgent by mutableStateOf(false)
@@ -30,7 +34,6 @@ internal class DesktopOverlayVisibility {
 
 @Immutable
 internal data class DesktopOverlayData(
-    val availableModels: List<LlmModel>,
     val composerModelLabel: String,
     val modelOptions: List<Pair<String, String>>,
     val paletteItems: List<PaletteItem>,
@@ -42,7 +45,8 @@ internal data class DesktopOverlayData(
 
 @Immutable
 internal data class DesktopOverlayActions(
-    val onModelSelected: (String) -> Unit,
+    /** The model picker's and Models sheet's host (letta-mobile-w4q4p.6.1). */
+    val modelControl: DesktopModelControlHost,
     val onSelectConversation: (String) -> Unit,
     val onOpenAgent: (String) -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
@@ -62,14 +66,12 @@ internal fun DesktopAppOverlays(
     data: DesktopOverlayData,
     actions: DesktopOverlayActions,
 ) {
-    if (visibility.modelPicker) {
-        DesktopModelPickerSheet(
-            models = data.availableModels,
-            selectedValue = data.composerModelLabel,
-            onSelect = actions.onModelSelected,
-            onDismiss = { visibility.modelPicker = false },
-        )
-    }
+    DesktopModelControlOverlays(
+        surfaces = visibility,
+        host = actions.modelControl,
+        selectedValue = data.composerModelLabel,
+        onOpenProviders = { actions.onNavigate(DesktopDestination.Providers) },
+    )
     if (visibility.newConversation) {
         val directoryRows = remember(data.railAgents, data.rosterAgents, data.avatarStyleByAgentId) {
             buildNewConversationRows(data.railAgents, data.rosterAgents, data.avatarStyleByAgentId)

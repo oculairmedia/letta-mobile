@@ -24,6 +24,7 @@ import com.letta.mobile.ui.navigation.ArchivalRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.navigation.AllToolsRoute
 import com.letta.mobile.ui.navigation.AdminRoute
+import com.letta.mobile.ui.navigation.ProvidersRoute
 import com.letta.mobile.ui.navigation.ConversationsRoute
 import com.letta.mobile.ui.navigation.MemoryRoute
 import com.letta.mobile.ui.navigation.HomeRoute
@@ -122,6 +123,9 @@ fun TwoPaneConversationsLayout(
                         },
                         onNavigateToAdmin = {
                             outerNavController.navigate(AdminRoute)
+                        },
+                        onNavigateToProviders = {
+                            outerNavController.navigate(ProvidersRoute)
                         },
                         onNavigateToProjects = {
                             outerNavController.navigate(HomeRoute)

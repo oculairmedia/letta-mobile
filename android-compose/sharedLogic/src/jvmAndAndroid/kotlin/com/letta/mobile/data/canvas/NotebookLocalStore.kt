@@ -417,25 +417,9 @@ class NotebookLocalStore(
     internal fun writeCanvas(id: DocumentId, doc: CanvasDocument, expectedRevision: Long?): Boolean {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         // Parsed before entering the repository's callback, which must not throw.
-        val incoming = NotebookBoardStorage.sceneBoard(doc.sceneJson)
-        val baseOfDoc = NotebookBoardStorage.sceneBaseOf(doc.sceneJson)
+        val write = CanvasWrite(doc, expectedRevision)
         val result = handle.writing(id) { document ->
-            document.startTransaction().use { tx ->
-                val current = canvasFrom(tx)
-                if (expectedRevision != null && current?.revision != expectedRevision) return@writing false
-                if (current != null && current.id != doc.id) return@writing null
-                val base = NotebookBoardStorage.readSceneBase(tx)
-                if (base == null || current?.sceneJson != doc.sceneJson) {
-                    if (base == null) NotebookBoardStorage.writeBoard(tx, incoming)
-                    else NotebookBoardStorage.mergeCanvasBoard(tx, base, incoming)
-                }
-                val metadata = Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = ""))
-                NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "canvasMetadata", metadata)
-                NotebookBoardStorage.writeSceneBase(tx, baseOfDoc)
-                NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "title", doc.title)
-                tx.commit()
-                true
-            }
+            document.startTransaction().use { tx -> applyCanvasWrite(tx, write) }
         }
         return checkNotNull(result) { "Notebook belongs to another canvas" }.also { written ->
             if (written) {
@@ -443,6 +427,34 @@ class NotebookLocalStore(
                 health.checkBudget(id.stableKey())
             }
         }
+    }
+
+    /** A canvas write, its scene parsed up front. */
+    private class CanvasWrite(val doc: CanvasDocument, private val expectedRevision: Long?) {
+        val incoming = NotebookBoardStorage.sceneBoard(doc.sceneJson)
+        val base = NotebookBoardStorage.sceneBaseOf(doc.sceneJson)
+
+        /** Whether [current] is at the revision this write expects, if it expects one. */
+        fun expects(current: CanvasDocument?): Boolean = expectedRevision == null || current?.revision == expectedRevision
+    }
+
+    /** [write] in [tx]: false on a stale revision, null if the notebook holds another canvas. */
+    private fun applyCanvasWrite(tx: Transaction, write: CanvasWrite): Boolean? {
+        val doc = write.doc
+        val current = canvasFrom(tx)
+        if (!write.expects(current)) return false
+        if (current != null && current.id != doc.id) return null
+        val base = NotebookBoardStorage.readSceneBase(tx)
+        when {
+            base == null -> NotebookBoardStorage.writeBoard(tx, write.incoming)
+            current?.sceneJson != doc.sceneJson -> NotebookBoardStorage.mergeCanvasBoard(tx, base, write.incoming)
+        }
+        val metadata = Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = ""))
+        NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "canvasMetadata", metadata)
+        NotebookBoardStorage.writeSceneBase(tx, write.base)
+        NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "title", doc.title)
+        tx.commit()
+        return true
     }
 
     fun setBoard(id: DocumentId, boardJson: String) {
