@@ -115,7 +115,8 @@ object CanvasToolContract {
             "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
             "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}, " +
             "owner: explicit (default when a frame is given) | user | auto) and " +
-            "remove_document {documentId} takes it off. opId, actorId and lamport are filled in by the host. " +
+            "remove_document {documentId} takes it off. " + CanvasSceneSchemaText.PLUGIN_OPS +
+            " opId, actorId and lamport are filled in by the host. " +
             "To create notes, checklists, cards or text, use $COMPOSE instead: it places and sizes them for you. " +
             "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
             "drawn or the board it leaves is inconsistent (update_element/remove_element/remove_document of an id " +

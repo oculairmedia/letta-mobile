@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -126,6 +127,33 @@ class CanvasConvergenceTest {
 
         assertEquals(forward, reversed, "peers diverged between forward and reverse delivery")
         assertEquals(forward, shuffled, "peers diverged on a shuffled delivery")
+    }
+
+    /** letta-mobile-s416w.1: plugin elements beside notes and drawing, under a shuffled delivery. */
+    @Test
+    fun pluginElementsMixedWithDocumentsConvergeWhateverOrderTheyArriveIn() {
+        val fixtures = CanvasPluginElementFixtures
+        val ops = listOf<CanvasOp>(
+            fixtures.place(2, id = "pe-a"),
+            CanvasOp.SetDocumentOp("d1", "peerA", 3, "note-1", """{"blocks":[]}""", frame = CanvasDocumentFrame(0f, 0f, 200f, 100f)),
+            fixtures.progress(9, 0.5, id = "pe-a"),
+            fixtures.move(6, id = "pe-a"),
+            fixtures.place(4, id = "pe-b"),
+            fixtures.remove(8, id = "pe-b"),
+            fixtures.progress(7, 0.1, id = "pe-b"),
+            CanvasOp.RemoveDocumentOp("d2", "peerB", 5, "note-1"),
+            CanvasOp.AddElementOp("e1", "peerA", 1, "box", """{"id":"box","type":"rect"}"""),
+        )
+        val forward = CanvasOpProjector.project(base, ops)
+        val reversed = CanvasOpProjector.project(base, ops.reversed())
+        val shuffled = CanvasOpProjector.project(base, listOf(ops[5], ops[2], ops[7], ops[0], ops[8], ops[3], ops[6], ops[1], ops[4]))
+
+        assertEquals(forward, reversed, "peers diverged between forward and reverse delivery")
+        assertEquals(forward, shuffled, "peers diverged on a shuffled delivery")
+        val elements = CanvasOpProjector.pluginElementsOf(forward)
+        assertEquals(listOf("pe-a"), elements.map { it.id })
+        assertEquals(fixtures.moved, elements.single().frame)
+        assertTrue(CanvasOpProjector.documentsOf(forward).isEmpty())
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -55,6 +57,7 @@ object CanvasOpProjector {
     private const val BG_PATTERN_LAMPORT = "_bgPatternLamport"
     private const val BG_PATTERN_ACTOR = "_bgPatternActorId"
     private const val DOCUMENTS = "_documents"
+    private const val PLUGIN_ELEMENTS = CanvasPluginElements.KEY
     private const val DOC_JSON = "json"
     private const val DOC_REMOVED = "_removed"
     private const val DOC_FRAME = "frame"
@@ -148,8 +151,20 @@ object CanvasOpProjector {
         is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.RemoveElementOp -> removeElementWithLww(sceneJson, op)
+        is CanvasOp.SetPluginElementOp -> writePluginElements(sceneJson) { CanvasPluginElements.set(it, op) }
+        is CanvasOp.RemovePluginElementOp -> writePluginElements(sceneJson) { CanvasPluginElements.remove(it, op) }
         is CanvasOp.BatchOp -> project(sceneJson, op.ops)
     }
+
+    /** The scene with its `_pluginElements` replaced by what [write] makes of the scene. */
+    private inline fun writePluginElements(sceneJson: String, write: (JsonObject) -> JsonArray): String {
+        val parsed = parseScene(sceneJson)
+        return canonicalScene(parsed + (PLUGIN_ELEMENTS to write(parsed)))
+    }
+
+    /** The plugin elements of [sceneJson] ordered by id: removed, partial and undecodable entries excluded. */
+    fun pluginElementsOf(sceneJson: String): List<CanvasPluginElement> =
+        if (sceneJson.isBlank()) emptyList() else CanvasPluginElements.elementsOf(parseScene(sceneJson))
 
     /**
      * A replace is authoritative over everything before it, so its elements are stamped with its
@@ -179,6 +194,8 @@ object CanvasOpProjector {
         val current = parseScene(sceneJson)
         val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else current[DOCUMENTS]
         val carriedLabelOwners = if (carriedDocuments != null && !incoming.containsKey(LABEL_OWNERS)) current[LABEL_OWNERS] else null
+        // Plugin elements are not the drawing either: a redraw keeps them unless it brings its own.
+        val carriedPluginElements = current[PLUGIN_ELEMENTS].takeUnless { incoming.containsKey(PLUGIN_ELEMENTS) }
         val provenance = WriterProvenance(op.lamport, op.actorId, op.opId)
         val stamped = stampElements(incoming["elements"]?.jsonArray, provenance)
         return canonicalScene(
@@ -186,6 +203,7 @@ object CanvasOpProjector {
                 incoming.forEach { (key, value) -> if (key != "elements") put(key, value) }
                 carriedDocuments?.let { put(DOCUMENTS, it) }
                 carriedLabelOwners?.let { put(LABEL_OWNERS, it) }
+                carriedPluginElements?.let { put(PLUGIN_ELEMENTS, it) }
                 put("elements", JsonArray(stamped))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
                 put(BG_ACTOR, JsonPrimitive(op.actorId))
