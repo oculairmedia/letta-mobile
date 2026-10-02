@@ -67,6 +67,7 @@ import com.letta.mobile.sharedui.resources.rows_run_worked
 import com.letta.mobile.sharedui.resources.rows_run_working
 import com.letta.mobile.sharedui.resources.rows_work_collapse
 import com.letta.mobile.sharedui.resources.rows_work_expand
+import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -156,7 +157,7 @@ private fun ColumnScope.RunHeaderSlot(run: RunBlock, visible: Boolean, callbacks
         RunActivityHeader(
             activity = run.activity,
             collapsed = run.collapsed,
-            onToggle = if (run.canCollapse) ({ callbacks.actions.toggleRunCollapsed(run.runId) }) else null,
+            onToggle = if (run.canCollapse) ({ callbacks.actions.toggleRunCollapsed(ChatRunId(run.runId)) }) else null,
         )
     }
 }

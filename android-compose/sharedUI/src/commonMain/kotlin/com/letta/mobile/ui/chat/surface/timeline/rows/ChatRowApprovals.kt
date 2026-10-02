@@ -47,6 +47,7 @@ import com.letta.mobile.sharedui.resources.rows_rejected
 import com.letta.mobile.sharedui.resources.rows_send_answer
 import com.letta.mobile.sharedui.resources.rows_sending
 import com.letta.mobile.sharedui.resources.rows_tool_decisions
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.pluralStringResource
@@ -80,7 +81,7 @@ private fun rememberApprovalDecider(
             requestId = approval.requestId,
             isSubmitting = isSubmitting,
             submit = if (enabled) {
-                { ids, approve, reason -> callbacks.actions.submitApproval(approval.requestId, ids, approve, reason) }
+                { ids, approve, reason -> callbacks.actions.submitApproval(ChatApprovalAnswer(approval.requestId, ids, approve, reason)) }
             } else {
                 null
             },

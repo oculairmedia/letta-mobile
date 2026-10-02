@@ -5,8 +5,15 @@ import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.ui.chat.session.A2uiSnackbarId
+import com.letta.mobile.ui.chat.session.A2uiSurfaceId
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
+import com.letta.mobile.ui.chat.session.ChatMessageId
+import com.letta.mobile.ui.chat.session.ChatModelHandle
+import com.letta.mobile.ui.chat.session.ChatRunId
+import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 
 /**
  * letta-mobile-bglj6.1: the one recording [ChatActions] for the shared page's tests (composer,
@@ -88,21 +95,21 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
         reruns += message
     }
 
-    override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) {
+    override fun submitApproval(answer: ChatApprovalAnswer) {
         record("submitApproval")
-        approvals += Approval(requestId, toolCallIds, approve, reason)
+        approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)
     }
 
     override fun submitA2uiAction(action: A2uiAction) = record("submitA2uiAction")
 
-    override fun dismissA2uiSurface(surfaceId: String) {
+    override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) {
         record("dismissA2uiSurface")
-        dismissedSurfaces += surfaceId
+        dismissedSurfaces += surfaceId.value
     }
 
-    override fun markA2uiSnackbarShown(id: Long) {
+    override fun markA2uiSnackbarShown(id: A2uiSnackbarId) {
         record("markA2uiSnackbarShown")
-        shownSnackbars += id
+        shownSnackbars += id.value
     }
 
     override fun cancelQueuedSend(id: QueuedSendId) = record("cancelQueuedSend:${id.value}")
@@ -111,23 +118,23 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
 
     override fun resumeSendQueue() = record("resumeSendQueue")
 
-    override fun toggleRunCollapsed(runId: String) {
+    override fun toggleRunCollapsed(runId: ChatRunId) {
         record("toggleRunCollapsed")
-        toggledRuns += runId
+        toggledRuns += runId.value
     }
 
-    override fun toggleReasoningExpanded(messageId: String) {
+    override fun toggleReasoningExpanded(messageId: ChatMessageId) {
         record("toggleReasoningExpanded")
-        toggledReasoning += messageId
+        toggledReasoning += messageId.value
     }
 
     override fun loadOlderMessages() = record("loadOlderMessages")
 
     override fun releaseOlderMessages() = record("releaseOlderMessages")
 
-    override fun expandTruncatedToolResult(messageId: String) {
+    override fun expandTruncatedToolResult(messageId: ChatMessageId) {
         record("expandTruncatedToolResult")
-        expandedTruncations += messageId
+        expandedTruncations += messageId.value
     }
 
     override fun retryLoad() = record("retryLoad")
@@ -139,12 +146,12 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
         fontScales += scale
     }
 
-    override fun selectModel(handle: String, effort: ReasoningEffortChoice) {
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) {
         record("selectModel")
-        models += handle to effort
+        models += handle.value to effort
     }
 
-    override fun changeWorkingDirectory(path: String) = record("changeWorkingDirectory")
+    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) = record("changeWorkingDirectory")
 
     override fun updateSearchQuery(query: String) = record("updateSearchQuery")
 

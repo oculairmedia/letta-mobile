@@ -54,6 +54,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
 import com.letta.mobile.ui.chat.surface.ChatSurface
@@ -288,7 +289,7 @@ private fun rememberDesktopChatSurfaceHost(
     val directoryPicker = rememberDirectoryPickerLauncher(
         dialogSettings = FileKitDialogSettings(title = "Choose working directory"),
     ) { directory ->
-        directory?.let { port.actions.changeWorkingDirectory(it.file.absolutePath) }
+        directory?.let { port.actions.changeWorkingDirectory(ChatWorkingDirectory(it.file.absolutePath)) }
     }
     val supportsWorkingDirectory = port.capabilities.collectAsState().value.workingDirectory
     // The shell rebuilds [navigation] with fresh lambdas on every recomposition (a stream token);

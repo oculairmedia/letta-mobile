@@ -7,8 +7,15 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.ui.chat.session.A2uiSnackbarId
+import com.letta.mobile.ui.chat.session.A2uiSurfaceId
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
+import com.letta.mobile.ui.chat.session.ChatMessageId
+import com.letta.mobile.ui.chat.session.ChatModelHandle
+import com.letta.mobile.ui.chat.session.ChatRunId
+import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 
 /**
  * letta-mobile-bglj6.1: the shared chat page's [ChatActions], each forwarded to the
@@ -59,14 +66,14 @@ internal class AdminChatActions(
 
     override fun rerun(message: UiMessage) = viewModel.rerunMessage(message)
 
-    override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) =
-        viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+    override fun submitApproval(answer: ChatApprovalAnswer) =
+        viewModel.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)
 
     override fun submitA2uiAction(action: A2uiAction) = viewModel.submitA2uiAction(action)
 
-    override fun dismissA2uiSurface(surfaceId: String) = viewModel.dismissA2uiSurface(surfaceId)
+    override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = viewModel.dismissA2uiSurface(surfaceId.value)
 
-    override fun markA2uiSnackbarShown(id: Long) = viewModel.markA2uiActionSnackbarShown(id)
+    override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = viewModel.markA2uiActionSnackbarShown(id.value)
 
     // Send queue
     override fun cancelQueuedSend(id: QueuedSendId) = viewModel.queuedSendActions.onCancel(id)
@@ -76,16 +83,16 @@ internal class AdminChatActions(
     override fun resumeSendQueue() = viewModel.queuedSendActions.onResume()
 
     // Timeline
-    override fun toggleRunCollapsed(runId: String) = viewModel.toggleRunCollapsed(runId)
+    override fun toggleRunCollapsed(runId: ChatRunId) = viewModel.toggleRunCollapsed(runId.value)
 
-    override fun toggleReasoningExpanded(messageId: String) = viewModel.toggleReasoningExpanded(messageId)
+    override fun toggleReasoningExpanded(messageId: ChatMessageId) = viewModel.toggleReasoningExpanded(messageId.value)
 
     override fun loadOlderMessages() = viewModel.loadOlderMessages()
 
     override fun releaseOlderMessages() = viewModel.releaseOlderMessages()
 
-    override fun expandTruncatedToolResult(messageId: String) {
-        viewModel.onTruncatedToolResultExpanded(messageId)
+    override fun expandTruncatedToolResult(messageId: ChatMessageId) {
+        viewModel.onTruncatedToolResultExpanded(messageId.value)
     }
 
     override fun retryLoad() = viewModel.retryConversationLoad()
@@ -95,12 +102,12 @@ internal class AdminChatActions(
     override fun setFontScale(scale: Float) = viewModel.setChatFontScale(scale)
 
     // Conversation settings
-    override fun selectModel(handle: String, effort: ReasoningEffortChoice) {
-        viewModel.updateActiveAgentModel(handle, AdminChatComposerMapping.effortSelection(effort))
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) {
+        viewModel.updateActiveAgentModel(handle.value, AdminChatComposerMapping.effortSelection(effort))
     }
 
     /** Android's backend has no working directory; [AdminChatSessionPort] reports the capability off. */
-    override fun changeWorkingDirectory(path: String) = Unit
+    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) = Unit
 
     // Search
     override fun updateSearchQuery(query: String) = viewModel.updateChatSearchQuery(query)
