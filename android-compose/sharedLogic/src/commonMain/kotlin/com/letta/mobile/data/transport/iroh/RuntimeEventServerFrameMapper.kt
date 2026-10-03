@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
@@ -9,8 +11,9 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolExecutionStatus
 import kotlinx.serialization.json.JsonPrimitive
-import java.time.Instant
-import java.util.UUID
+import kotlin.time.Clock
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Shared payload -> [ServerFrame] projection used by BOTH the initiator send
@@ -141,7 +144,7 @@ object RuntimeEventServerFrameMapper {
             val failure = payload.reason?.takeIf { it.isNotBlank() }?.let { reason ->
                 val kind = terminalReasonKind(reason) ?: "other"
                 ServerFrame.Error(
-                    id = "turn_error-${UUID.randomUUID()}",
+                    id = "turn_error-${Uuid.random()}",
                     ts = nowIso(),
                     // Sanitized family token — never the raw provider/run reason
                     // (letta-mobile-o0atv).
@@ -156,7 +159,7 @@ object RuntimeEventServerFrameMapper {
         }
         RuntimeRunStatus.Cancelled -> listOf(
             ServerFrame.Error(
-                id = "turn_cancelled-${UUID.randomUUID()}",
+                id = "turn_cancelled-${Uuid.random()}",
                 ts = nowIso(),
                 code = TurnFailureNotices.CANCELLED_KIND,
                 message = TurnFailureNotices.CANCELLED_MESSAGE,
@@ -176,7 +179,7 @@ object RuntimeEventServerFrameMapper {
      */
     private fun queuedFrame(payload: RuntimeEventPayload.RunLifecycleChanged, context: Context): ServerFrame.TurnQueued? =
         ServerFrame.TurnQueued(
-            id = "turn_queued-${UUID.randomUUID()}",
+            id = "turn_queued-${Uuid.random()}",
             ts = nowIso(),
             turnId = context.turnId,
             conversationId = context.conversationId,
@@ -184,12 +187,12 @@ object RuntimeEventServerFrameMapper {
 
     private fun turnDone(context: Context, status: String): ServerFrame.TurnDone =
         ServerFrame.TurnDone(
-            id = "turn_done-${UUID.randomUUID()}",
+            id = "turn_done-${Uuid.random()}",
             ts = nowIso(),
             turnId = context.turnId,
             runId = context.runId,
             status = status,
         )
 
-    private fun nowIso(): String = Instant.now().toString()
+    private fun nowIso(): String = Clock.System.now().toString()
 }

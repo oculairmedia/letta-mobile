@@ -8,8 +8,11 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -41,7 +44,8 @@ internal data class PinnedOwner(
  * ChatSurfacePlatform.topChromeInset) the list draws up under the chrome, so the visible top is
  * [stickLinePx] down: there the prompt is a sticky header. Its copy rides its own row until the row
  * reaches the visible top, then holds there, never travelling up under the chrome, and the next
- * prompt coming up pushes it out from below. The row it stands in for is hidden meanwhile.
+ * prompt coming up pushes it out from below. The row it stands in for is hidden meanwhile. The copy
+ * is the prompt's bubble alone, without the row's leading space, so it holds snug under the chrome.
  */
 @Stable
 internal class PinnedPrompt(
@@ -58,10 +62,19 @@ internal class PinnedPrompt(
     /** The row keyed [key] is the one the sticky copy stands in for. */
     fun standsInFor(key: String): Boolean = sticky && owner.value?.item?.key == key
 
+    /**
+     * The sticky copy's bottom edge as last placed, in px from the list's top edge: the timeline's
+     * pinned fade clears the rows down to it (read at draw time only).
+     */
+    var copyBottomPx by mutableIntStateOf(0)
+        private set
+
     /** Where the sticky copy's top goes, in px from the list's top edge, for a copy [heightPx] tall. */
     fun copyTop(heightPx: Int): Int {
-        val current = owner.value ?: return stickLinePx
-        return stickyCopyTop(listState.layoutInfo, current, stickLinePx, heightPx)
+        val current = owner.value
+        val top = if (current == null) stickLinePx else stickyCopyTop(listState.layoutInfo, current, stickLinePx, heightPx)
+        copyBottomPx = top + heightPx
+        return top
     }
 }
 
