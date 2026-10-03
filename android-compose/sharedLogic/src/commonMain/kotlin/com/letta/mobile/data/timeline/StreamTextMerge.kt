@@ -15,6 +15,10 @@ enum class StreamTextMergeBranch {
     // prefix/suffix relationship. Appending them would duplicate/garble the
     // text, so we keep the longer (more complete) snapshot instead.
     SNAPSHOT_CONFLICT,
+    // letta-mobile-bglj6.1.12: a newer snapshot of a cumulative stream that shares
+    // a long opening with the text held, then says something else. The reply was
+    // rewritten upstream; the newer body replaces the old one.
+    SNAPSHOT_REWRITE,
     APPEND,
 }
 
@@ -165,6 +169,8 @@ fun mergeStreamText(
             incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
         canUseSnapshotMerge && !forwardIncrement && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
         canUseSnapshotMerge && !forwardIncrement && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
+        isCumulativeStream && incomingIsForwardDelta && isRewrittenSnapshot(existing, incoming) ->
+            StreamTextMergeBranch.SNAPSHOT_REWRITE
         // letta-mobile-mvcr4: near-overlap forward snapshot -> coalesce
         // to the longer complete text instead of duplicating.
         nearOverlaps -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
@@ -181,7 +187,8 @@ fun mergeStreamText(
         StreamTextMergeBranch.EQUAL,
         StreamTextMergeBranch.STALE,
         StreamTextMergeBranch.SUFFIX_DUPLICATE -> existing
-        StreamTextMergeBranch.CUMULATIVE -> incoming
+        StreamTextMergeBranch.CUMULATIVE,
+        StreamTextMergeBranch.SNAPSHOT_REWRITE -> incoming
         StreamTextMergeBranch.SNAPSHOT_CONFLICT -> if (incoming.length > existing.length) incoming else existing
         StreamTextMergeBranch.APPEND -> existing + incoming
     }
@@ -194,6 +201,21 @@ fun mergeStreamText(
             incoming.length < existing.length / 2,
     )
 }
+
+/**
+ * True when [incoming] is a whole snapshot of the reply [existing] holds, rewritten past a shared
+ * opening: both run on after [REWRITE_MIN_SHARED_OPENING] or more characters in common, each in its
+ * own direction. Appending such a snapshot to a cumulative stream stacks a near-copy of the reply
+ * under itself on every frame (the owner's desktop panel, 2026-10-03). An incremental token never
+ * opens with that much of the reply and then diverges; a repeat of the reply is EQUAL, a growth
+ * CUMULATIVE, and both are decided before this.
+ */
+private fun isRewrittenSnapshot(existing: String, incoming: String): Boolean {
+    val shared = longestCommonPrefixLength(existing, incoming)
+    return shared >= REWRITE_MIN_SHARED_OPENING && shared < existing.length && shared < incoming.length
+}
+
+private const val REWRITE_MIN_SHARED_OPENING = 24
 
 private fun longestCommonPrefixLength(a: String, b: String): Int {
     val n = minOf(a.length, b.length)

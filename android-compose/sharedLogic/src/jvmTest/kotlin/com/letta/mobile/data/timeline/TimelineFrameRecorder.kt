@@ -110,7 +110,8 @@ internal class TimelineFrameRecorder private constructor(
         awaitCondition({ "overlay never drained: ${frames.lastOrNull()}" }) {
             owner.session.live.value == null && presentation.live.value.isEmpty()
         }
-        presenter.awaitIdle()
+        // Not awaitIdle: a prepend racing the reconcile may end in a stale-request error, which
+        // the list shows as nothing and which says nothing about the handover.
         settleUi()
     }
 
