@@ -58,7 +58,7 @@ class BrowserRuntimeTest {
             Dispatchers.Default,
         )
         withTimeout(WAIT_MS) { runtime.await() }
-        assertEquals(listOf(BrowserRuntimeState.Preparing("downloading", 0.5f), BrowserRuntimeState.Preparing("extracting", null)), seen)
+        assertEquals<List<BrowserRuntimeState<String>>>(listOf(BrowserRuntimeState.Preparing("downloading", 0.5f), BrowserRuntimeState.Preparing("extracting", null)), seen)
     }
 
     @Test
