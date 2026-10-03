@@ -6,6 +6,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -20,6 +21,10 @@ import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
+import com.letta.mobile.data.plugin.view.ViewPlatform
+import com.letta.mobile.pluginview.PluginViewEnvironment
+import com.letta.mobile.pluginview.ProvidePluginViews
+import com.letta.mobile.pluginview.WebViewPluginViewHost
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -93,16 +98,24 @@ fun CanvasScreen(
     val session by viewModel.session.collectAsStateWithLifecycle()
     val activeSession = session
     if (activeSession != null) {
-        CanvasWorkspace(
-            session = activeSession,
-            presenceTransport = viewModel.presenceTransport,
-            assets = viewModel.assets,
-            onNavigateBack = onNavigateBack,
-            onShareToChat = onShareToChat,
-            showTitle = showTitle,
-            chromeTopInset = chromeTopInset,
-            cameraRequest = cameraRequest,
-        )
+        // Live plugin pages (letta-mobile-s416w.13): the WebView host. The plugin catalog and the
+        // page transport arrive with the live-view integration (s416w.15/.32); until then the
+        // transport is offline and every plugin element keeps its fallback card.
+        val pluginViews = remember(activeSession.canvasId) {
+            PluginViewEnvironment(canvasId = activeSession.canvasId.value, platform = ViewPlatform.ANDROID)
+        }
+        ProvidePluginViews(host = WebViewPluginViewHost, environment = pluginViews, plugins = emptyList()) {
+            CanvasWorkspace(
+                session = activeSession,
+                presenceTransport = viewModel.presenceTransport,
+                assets = viewModel.assets,
+                onNavigateBack = onNavigateBack,
+                onShareToChat = onShareToChat,
+                showTitle = showTitle,
+                chromeTopInset = chromeTopInset,
+                cameraRequest = cameraRequest,
+            )
+        }
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
