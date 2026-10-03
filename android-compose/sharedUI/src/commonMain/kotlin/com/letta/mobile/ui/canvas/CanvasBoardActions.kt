@@ -3,8 +3,11 @@ package com.letta.mobile.ui.canvas
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.KeyEvent
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.ui.canvas.plugin.PluginElementEdits
+import com.letta.mobile.ui.canvas.plugin.PluginElementFrames
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
@@ -28,6 +31,18 @@ import kotlin.time.ExperimentalTime
  */
 internal suspend fun CanvasBoard.recordingDocuments(label: String, block: suspend () -> Unit) {
     CanvasWorkspaceSupport.recordDocumentChange(work.recorder, DocumentChangeRequest(label = label), block)
+}
+
+/** The recorder editors composed inside the board record their changes through. */
+internal fun boardDocumentRecorder(board: CanvasBoard): CanvasDocumentRecorder = object : CanvasDocumentRecorder {
+    override suspend fun recording(label: String, block: suspend () -> Unit) = board.recordingDocuments(label, block)
+
+    override fun record(step: CanvasHistory.Step.Documents) = board.recordStep(step)
+}
+
+/** Records [step] as one undoable step, unless it is undo or redo being applied. */
+internal fun CanvasBoard.recordStep(step: CanvasHistory.Step.Documents) {
+    if (!work.recorder.isApplyingHistory()) work.recorder.history.record(step)
 }
 
 /**
@@ -293,11 +308,12 @@ internal fun CanvasBoard.redoBoard() {
 }
 
 /**
- * Fits everything on the board (elements and notes) with padding; an empty board just goes back
+ * Fits everything on the board (elements, notes and plugin elements) with padding; an empty board just goes back
  * to 100% at the origin. [maxScale] lets the open-time fit shrink a board without enlarging it.
  */
 internal fun CanvasBoard.fitToContent(maxScale: Float = CanvasViewportFit.MAX_SCALE): Boolean {
-    val bounds = CanvasViewportFit.contentBounds(state.elements, documents)
+    val plugins = session?.let { PluginElementFrames.boundsOf(PluginElementEdits.elementsOf(it)) }.orEmpty()
+    val bounds = CanvasViewportFit.contentBounds(state.elements, documents, plugins)
     val fit = CanvasViewportFit.fitOrNull(bounds, ui.boardSize, maxScale)
     if (fit == null) {
         controller.resetCamera()
