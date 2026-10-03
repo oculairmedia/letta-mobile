@@ -54,7 +54,7 @@ class ChatRowRunAlignmentUiTest {
         ).map { it to GroupPosition.None },
     )
 
-    private fun ComposeUiTest.show(item: ChatRenderItem, newest: String, details: ChatToolDetails, widthDp: Int = 400) {
+    private fun ComposeUiTest.show(item: ChatRenderItem, newest: String?, details: ChatToolDetails, widthDp: Int = 400) {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(widthDp.dp)) {
@@ -115,8 +115,8 @@ class ChatRowRunAlignmentUiTest {
 
     @Test
     fun anOlderRunDropsItsLabelAndKeepsItsToolSummaryFlush() = runComposeUiTest {
-        // The newest row is elsewhere: the settled run reads as its steps alone.
-        show(run, newest = "elsewhere", details = ChatToolDetails.Inline)
+        // Not the newest row (the row context carries no newest id): the settled run reads as its steps alone.
+        show(run, newest = null, details = ChatToolDetails.Inline)
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertDoesNotExist()
         val tools = onNodeWithText("Ran 2 commands", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
         assertTrue(abs(tools - proseLeft()) < TOLERANCE_PX, "the tool summary is inset: $tools vs the prose at ${proseLeft()}")

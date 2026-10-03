@@ -13,7 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -123,7 +124,7 @@ class RunSummarySnapshotTest {
         }
         repeat(SETTLE_FRAMES) { mainClock.advanceTimeBy(FRAME_MILLIS) }
         if (shot.expandTools) {
-            onAllNodesWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).let { it[it.fetchSemanticsNodes().size - 1] }.performClick()
+            onNode(hasTestTag(ChatRowTestTags.TOOL_RUN_SUMMARY) and hasText("4 commands", substring = true)).performClick()
             repeat(SETTLE_FRAMES) { mainClock.advanceTimeBy(FRAME_MILLIS) }
         }
         val image = onRoot().captureToImage().toAwtImage()
