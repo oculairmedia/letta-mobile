@@ -215,12 +215,13 @@ internal fun TimelineItemRow(
 
 /**
  * The space above an item (feature-chat RenderChatMessage / ChatMessageListRenderRunItem): a
- * run of tool calls, a reasoning or tool row, or the continuation of one speaker's group takes
- * the tight beat; anything that starts a new speaker or a new run takes the section break.
+ * lone reasoning or tool row, or the continuation of one speaker's group, takes the tight beat;
+ * anything that starts a new speaker or a new run takes the section break.
  */
 internal fun timelineLeadingSpace(item: ChatRenderItem): Dp = when (item) {
-    is ChatRenderItem.RunBlock ->
-        if (item.messages.all { !it.first.toolCalls.isNullOrEmpty() }) ChatRowSpacing.grouped else ChatRowSpacing.ungrouped
+    // A run is a new turn: the section break above it, the same one the next speaker takes
+    // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11).
+    is ChatRenderItem.RunBlock -> ChatRowSpacing.ungrouped
     is ChatRenderItem.Single -> when {
         item.stableRunKey != null -> ChatRowSpacing.ungrouped
         item.message.isReasoning || !item.message.toolCalls.isNullOrEmpty() -> ChatRowSpacing.grouped

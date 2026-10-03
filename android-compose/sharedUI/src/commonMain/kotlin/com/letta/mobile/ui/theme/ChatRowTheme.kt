@@ -25,6 +25,13 @@ object ChatRowType {
     val listItemSupporting: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
 
+    /**
+     * A run's one summary line ("Worked for 1m 7s · Ran 4 commands"): the muted label every run
+     * summary, tool summary and its counts share, no heavier than the prose it sits over.
+     */
+    val summaryLine: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodyMedium
+
     /** The "You" label on a prompt bubble: ChatTypography.roleLabel. */
     val roleLabel: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelMedium.copy(
@@ -61,8 +68,12 @@ object ChatRowSpacing {
     /** A prompt bubble never spans the whole column: it reads as the reader's own card. */
     const val bubbleMaxWidthFraction: Float = 0.88f
 
-    /** How far a settled run's body tucks up under its "Thought for 4s" header. */
-    val completedRunBodyLift: Dp = 22.dp
+    /**
+     * A run's summary line ("Worked for 1m 7s", "Ran 4 commands"): the same floor and the same
+     * vertical inset whether or not it carries a chevron, so the two read as one rail.
+     */
+    val summaryLineMinHeight: Dp = LettaDimens.Control.icon
+    val summaryLineVertical: Dp = LettaDimens.Space.xs
 
     /** The thinking row's reserved height and its text's floor. */
     val thinkingRowHeight: Dp = LettaDimens.Space.xxl

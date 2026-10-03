@@ -19,7 +19,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.longClick
@@ -186,9 +188,8 @@ class ChatRowInteractionUiTest {
     }
 
     @Test
-    fun runCollapseIsOwnerStateAndShowsOnlyTheFinalNarration() = runComposeUiTest {
+    fun aSettledRunSummaryIsAPlainLabelThatNeverCollapsesTheRun() = runComposeUiTest {
         val actions = RecordingChatActions()
-        var collapsed by mutableStateOf(emptySet<String>())
         val block = ChatRenderItem.RunBlock(
             runId = "run-1",
             messages = listOf(
@@ -197,16 +198,21 @@ class ChatRowInteractionUiTest {
             ).map { it to GroupPosition.None },
         )
         setContent {
-            // The settled header (and its collapse control) shows on the conversation's newest row.
-            MaterialTheme { RenderRow(block, rowContext(itemState = renderState(collapsedRunIds = collapsed), newestMessageId = "b"), rowCallbacks(actions)) }
+            // A stale collapsed id from the owner no longer hides the run's steps: the run has no
+            // collapse of its own (letta-mobile-bglj6.1.11).
+            MaterialTheme {
+                RenderRow(
+                    block,
+                    rowContext(itemState = renderState(collapsedRunIds = setOf("run-1")), newestMessageId = "b"),
+                    rowCallbacks(actions),
+                )
+            }
         }
 
-        onNodeWithText("Looking into it.").assertExists()
+        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists().assert(hasClickAction().not())
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).performClick()
-        runOnIdle { assertEquals(listOf("run-1"), actions.toggledRuns) }
-
-        runOnIdle { collapsed = setOf("run-1") }
-        onNodeWithText("Looking into it.").assertDoesNotExist()
+        runOnIdle { assertEquals(emptyList(), actions.toggledRuns) }
+        onNodeWithText("Looking into it.").assertExists()
         onNodeWithText("All done here.").assertExists()
     }
 

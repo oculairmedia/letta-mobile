@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * letta-mobile-bglj6.1: a coding agent mid-run, four Bash rounds in, each round under its own App
- * Server run id and the fourth still running. The page draws ONE run: "Working · 4 tools" over
+ * Server run id and the fourth still running. The page draws ONE run: "Working" leading
  * one "Running Bash · 4 commands" group, with the page's glow up. Writes PNGs to
  * build/chat-surface-snapshots for review.
  */
@@ -121,8 +121,8 @@ class StackedToolRunSnapshotTest {
             }
         }
         repeat(SETTLE_FRAMES) { mainClock.advanceTimeBy(FRAME_MILLIS) }
-        // One run, not one per round: one header counting every tool, one group holding them.
-        assertEquals(1, onAllNodesWithText("4 tools", substring = true).fetchSemanticsNodes().size)
+        // One run, not one per round: one "Working" label leading one group that holds them all.
+        assertEquals(1, onAllNodesWithText("Working", substring = true).fetchSemanticsNodes().size)
         assertEquals(1, onAllNodesWithText("4 commands", substring = true).fetchSemanticsNodes().size)
         assertEquals(0, onAllNodesWithText("1 command", substring = true).fetchSemanticsNodes().size)
         assertTrue(onAllNodesWithText("Running Bash", substring = true).fetchSemanticsNodes().isNotEmpty())
