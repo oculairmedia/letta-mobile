@@ -10,7 +10,16 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
-        google()
+        // google() only serves Google/AndroidX/AGP coordinates. Filtering it keeps
+        // third-party artifacts (leakcanary, ...) from being probed there, so a
+        // negative-cache entry from Google's mirror cannot shadow Maven Central.
+        google {
+            content {
+                includeGroupByRegex("com[.]android.*")
+                includeGroupByRegex("com[.]google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
         mavenCentral()
         // Kotzilla SDK artifacts (e.g. kotzilla-sdk-compose-jvm) are published
         // to the Gradle Plugin Portal, not Maven Central. The plugin itself
