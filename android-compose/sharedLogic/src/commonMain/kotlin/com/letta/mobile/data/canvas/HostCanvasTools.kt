@@ -41,10 +41,14 @@ object HostCanvasTools {
         },
         HostCanvasTool(CanvasToolContract.applyOps, "Failed to apply ops") { caller, input ->
             val opsJson = input["ops"] ?: return@HostCanvasTool missing("ops")
-            val ops = HostCanvasToolInputs.ops(opsJson)
             withCanvas(backend, caller, input) { entry ->
-                if (CanvasDryRun.requested(input)) return@withCanvas dryRun(backend, caller, entry, ops)
-                published(backend.publish(caller, entry, ops)) { CanvasApplyOpsResult(ok = true, revision = it, canvasId = entry.canvasId) }
+                when (val prepared = CanvasBatchSteps.prepare(backend.scene(entry).sceneJson, opsJson)) {
+                    is CanvasOpsRead.Refused -> ExternalToolResult.Error(prepared.message)
+                    is CanvasOpsRead.Ready -> {
+                        if (CanvasDryRun.requested(input)) return@withCanvas dryRun(backend, caller, entry, prepared.ops)
+                        published(backend.publish(caller, entry, prepared.ops)) { CanvasApplyOpsResult(ok = true, revision = it, canvasId = entry.canvasId) }
+                    }
+                }
             }
         },
         HostCanvasTool(CanvasToolContract.list, "Failed to list canvases") { caller, input -> list(backend, caller, input) },

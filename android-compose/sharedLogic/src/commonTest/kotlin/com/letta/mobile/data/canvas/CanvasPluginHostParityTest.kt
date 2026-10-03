@@ -50,6 +50,22 @@ class CanvasPluginHostParityTest {
         assertEquals(unstamped(iroh.logged()), unstamped(open.logged()), "the same ops, in the same order, with the same clocks")
     }
 
+    @Test
+    fun bothHostsConnectTwoNotesTheSame() = runTest {
+        val hosts = PluginToolHost.all()
+        val ops = arrayOf(
+            """{"type":"set_document","documentId":"n-a","documentJson":{"version":2,"blocks":[]},"frame":{"x":16,"y":24,"width":140,"height":80}}""",
+            """{"type":"set_document","documentId":"n-b","documentJson":{"version":2,"blocks":[]},"frame":{"x":240,"y":24,"width":140,"height":80}}""",
+            """{"type":"connect","id":"a-sort","from":"n-a","to":"n-b","label":"sort"}""",
+        )
+        hosts.forEach { host -> assertIs<ExternalToolResult.Success>(host.applyOps(*ops)) }
+        val raw = hosts.map { it.scene().sceneJson }
+        val scenes = raw.map { withoutOpIds(it) }
+        assertEquals(scenes[0], scenes[1])
+        assertEquals(scenes[0], scenes[2])
+        assertEquals(CanvasEndBinding("n-a", "right"), CanvasOpProjector.arrowBindingsOf(raw[0]).getValue("a-sort").start)
+    }
+
     /** A result without what each host counts or mints for itself: its revision. */
     private fun comparable(result: ExternalToolResult, dryRun: Boolean): Any {
         val content = (result as? ExternalToolResult.Success)?.content ?: return result
