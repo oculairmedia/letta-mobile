@@ -23,6 +23,8 @@ data class NativeReadTiers(
     val agentChanges: AgentChangeNotifier? = null,
     /** Pushes `conversation_updated` to connected clients after conversation writes; null sends nothing. */
     val conversationChanges: ConversationChangeNotifier? = null,
+    /** Serves `logical_message_id` / `turn_id` on `message.list` rows; null serves rows as stored. */
+    val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 )
 
 object AdminRpcRegistry {
@@ -118,6 +120,8 @@ object AdminRpcRegistry {
          * for the router's lifetime (tests, stub CLI).
          */
         modelExposureFile: String? = null,
+        /** See [NativeReadTiers.turnIdentity]. */
+        turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -130,7 +134,7 @@ object AdminRpcRegistry {
         val agentMetadata = localBackendDir
             ?.takeIf { it.isNotBlank() }
             ?.let { AgentMetadataSidecar.inLocalBackend(java.io.File(it)) }
-        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata, agentChanges, conversationChanges)
+        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata, agentChanges, conversationChanges, turnIdentity)
 
         HealthAdminHandlers.register(router, controller)
         AgentAdminHandlers.register(router, controller, tiers)

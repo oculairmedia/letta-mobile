@@ -148,6 +148,8 @@ internal class ConversationTurnFanout(
      * the host synthesizes itself (tool projection, user echo, dangling-call settlement).
      */
     turnId: String? = null,
+    /** letta-mobile-r1xkl: joins this turn's stamped messages to their stored rows at the end. */
+    private val identity: TurnIdentityBinding? = null,
 ) {
     private val synthesizedIdentity = turnStreamIdentityFor(turnId)
     private val openToolCalls = OpenToolCallTracker()
@@ -163,6 +165,16 @@ internal class ConversationTurnFanout(
      */
     @Volatile
     private var initiatorDetached = false
+
+    /** The turn is over: join its messages to the stored rows. Releases the `message.list` hold. */
+    suspend fun settleIdentity() {
+        identity?.settle()
+    }
+
+    /** The turn ended without settling (failure, cancel): stop holding `message.list` back. */
+    fun abandonIdentity() {
+        identity?.abandon()
+    }
 
     /** Stop delivering to the initiator handle; the turn and its other viewers carry on. */
     fun detachInitiator() {
@@ -256,6 +268,7 @@ internal class ConversationTurnFanout(
      */
     private suspend fun emitRawFrameBody(body: String): Boolean {
         openToolCalls.observe(body)
+        identity?.noteFrame(body)
         val delta = innerDeltaOf(body) ?: run {
             // Not a stream_delta we can re-frame (e.g. usage_statistics-only or a
             // malformed body) — nothing to fan out; not a terminal.
@@ -402,6 +415,7 @@ internal class ConversationTurnFanout(
         contentParts: JsonElement?,
     ) {
         val content: JsonElement = contentParts ?: JsonPrimitive(text)
+        identity?.noteUser(clientMessageId)
         val delta = buildJsonObject {
             put("message_type", "user_message")
             // Stable, idempotent server id keyed on the sender otid.

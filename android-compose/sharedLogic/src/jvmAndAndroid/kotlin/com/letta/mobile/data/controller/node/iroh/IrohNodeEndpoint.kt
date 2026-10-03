@@ -65,6 +65,8 @@ class IrohNodeEndpoint(
     private val canvasRelay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay? = null,
     /** Additional protocols on this host-owned endpoint; handlers own their connection lifecycle. */
     private val protocolHandlers: List<IrohNodeProtocolHandler> = emptyList(),
+    /** letta-mobile-r1xkl: the host's stream-to-stored identity join, shared by every connection. */
+    private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
     /** Live App Server connections by peer id, to gate that peer's canvas connections. */
     private val appServerConnections =
@@ -376,6 +378,7 @@ class IrohNodeEndpoint(
             remoteEndpointId = remoteId,
             connectionRegistry = connectionRegistry,
             turnHost = turnHost,
+            turnIdentity = turnIdentity,
         )
         val peerConnections = appServerConnections.computeIfAbsent(remoteId) {
             java.util.concurrent.ConcurrentHashMap.newKeySet()

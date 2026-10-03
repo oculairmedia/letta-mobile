@@ -344,6 +344,8 @@ class AppServerServeIrohCommand : CliktCommand(
             },
         ) {
             val authPolicy = resolveAuthPolicy()
+            val identityRows = com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows()
+            val turnIdentity = newTurnIdentityLedger(identityRows)
 
             val pairingService = pairingStoreFile?.let { storePath ->
                 println("[iroh-app-server] Pairing enabled (store: $storePath)")
@@ -366,6 +368,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 pairingService = pairingService,
                 canvasRelay = canvasRelay,
                 protocolHandlers = listOfNotNull(notebookProtocol),
+                turnIdentity = turnIdentity,
             )
             irohEndpoint = endpoint
             endpoint.create()
@@ -384,7 +387,7 @@ class AppServerServeIrohCommand : CliktCommand(
 
             setupAdminRpc(
                 endpoint = endpoint,
-                admin = AdminContext(controller, nativeAdminClient, pairingService),
+                admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows),
                 scope = scope,
             )
 
@@ -482,6 +485,23 @@ class AppServerServeIrohCommand : CliktCommand(
         val controller: DefaultAppServerController,
         val nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient?,
         val pairingService: IrohPairingService?,
+        val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger,
+        val identityRows: com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows,
+    )
+
+    /**
+     * letta-mobile-r1xkl: the host's stream-to-stored identity ledger, persisted under
+     * `turn-identity/` in the directory that already holds the model-exposure file. Its rows source
+     * is bound to the App Server client once [setupAdminRpc] has it.
+     */
+    private fun newTurnIdentityLedger(
+        rows: com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows,
+    ) = com.letta.mobile.data.runtime.TurnIdentityLedger(
+        store = com.letta.mobile.data.controller.node.iroh.FileTurnIdentityStore.inHostState(
+            java.io.File(resolvedModelExposureFile()).absoluteFile.parentFile,
+        ),
+        rows = rows,
+        clock = System::currentTimeMillis,
     )
 
     private fun setupAdminRpc(
@@ -489,6 +509,7 @@ class AppServerServeIrohCommand : CliktCommand(
         admin: AdminContext,
         scope: CoroutineScope,
     ) {
+        admin.nativeClient?.let(admin.identityRows::bind)
         val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
         val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
         val adminRpcRouter = buildProductionAdminRouter(
@@ -503,6 +524,7 @@ class AppServerServeIrohCommand : CliktCommand(
             agentChanges = agentChanges,
             conversationChanges = conversationChanges,
             modelExposureFile = resolvedModelExposureFile(),
+            turnIdentity = admin.turnIdentity,
         )
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
         agentChanges.attach(endpoint.agentChangeTarget())

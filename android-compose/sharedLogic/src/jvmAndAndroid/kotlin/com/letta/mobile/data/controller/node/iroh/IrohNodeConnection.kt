@@ -121,6 +121,8 @@ class IrohNodeConnection(
      * initiator's connection (it is detached, not cancelled), so it must not be a child of it.
      */
     private val turnHost: NodeTurnHost = NodeTurnHost.SHARED,
+    /** letta-mobile-r1xkl: the host's stream-to-stored identity join; null leaves rows unjoined. */
+    private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
     // base — replaces the shared mutable companion var that raced across
@@ -837,6 +839,7 @@ class IrohNodeConnection(
         input: AppServerCommand.Input,
         streamSend: SendStream,
         tracker: TurnFrameTracker?,
+        clientMessageId: String?,
     ) = ConversationTurnFanout(
         conversationId = input.runtime.conversationId,
         runtime = input.runtime,
@@ -847,6 +850,7 @@ class IrohNodeConnection(
         observerWrites = turnHost.observerWrites,
         initiatorWrites = observerWrites,
         turnId = firstUserMessage(input)?.clientMessageId,
+        identity = turnIdentity?.let { TurnIdentityBinding(it, input.runtime.conversationId, clientMessageId) },
     )
 
     private fun firstUserMessage(input: AppServerCommand.Input): AppServerInputMessage? =
@@ -914,7 +918,7 @@ class IrohNodeConnection(
         )
         // Mid-turn redial fix: the INITIATOR-ONLY parking record for this turn.
         val tracker = clientMsgId?.let { TurnFrameTracker() }
-        val fanout = createTurnFanout(input, streamSend, tracker)
+        val fanout = createTurnFanout(input, streamSend, tracker, clientMsgId)
         val echo = clientMsgId?.let { RelayedUserEcho(it, text, contentParts) }
         val turn = RelayedInputTurn(input, clientMsgId, fanout, relayedTurnProtocol(input, fanout, echo, ::writeControl), tracker)
         // letta-mobile-qygvv.3: the collector runs on the node-owned host. If this
@@ -929,9 +933,23 @@ class IrohNodeConnection(
                 tracker = tracker ?: TurnFrameTracker(),
                 parkedTerminals = parkedTerminals,
             ) {
-                relayTurn(controller, command, turn.protocol.onHost(turnHost)) { handleInputFailure(it, turn) }
+                relayAndSettle(command, turn)
             },
         )
+    }
+
+    /** Runs the relayed turn, then joins its messages to the stored rows (letta-mobile-r1xkl). */
+    private suspend fun relayAndSettle(command: TurnCommand, turn: RelayedInputTurn) {
+        var rejectedBusy = false
+        try {
+            relayTurn(controller, command, turn.protocol.onHost(turnHost)) { error ->
+                rejectedBusy = isTurnAlreadyActiveMessage(error.message ?: error.toString())
+                handleInputFailure(error, turn)
+            }
+            if (!rejectedBusy) turn.fanout.settleIdentity()
+        } finally {
+            if (!rejectedBusy) turn.fanout.abandonIdentity()
+        }
     }
 
     /** letta-mobile-qygvv.12: a redial re-send still gets its ack; the original turn owns the input. */
