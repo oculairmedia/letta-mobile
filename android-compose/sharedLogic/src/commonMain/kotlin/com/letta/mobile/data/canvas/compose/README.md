@@ -97,7 +97,7 @@ event, so nothing new is stored in the timeline; `CanvasArtifactReceipts.attach`
 (`UiMessage.artifacts`), stable across replay and hydration.
 
 Items carry no board id: it is `cmp-<artifact_id>-<key>` (`ComposeReceiptItem.boardId`). That keeps
-the largest receipt the caps allow at about 2.4 KB, under the 4 096 bytes above which
+the largest receipt the caps allow at about 3.1 KB, under the 4 096 bytes above which
 `message.list` ships a tool return as a 2 KiB preview (`CanvasComposeContract.MAX_RECEIPT_BYTES`,
 `CanvasComposeReceiptSizeTest`). Receipts written before that still carry `id` and still read.
 
