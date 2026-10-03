@@ -97,7 +97,7 @@ object CanvasToolContract {
             "the board places it. An ARROW's bindings are {from, to}, each a note id, an element id, or null. " +
             "Rows are ordered by id. limit defaults to 200 and is at most 500; a page also ends at 16 KiB and " +
             "returns nextCursor as r<revision>:<index>. A cursor from another revision is refused as " +
-            "{\"error\":\"stale_cursor\",\"revision\":<current>}; a cursor that does not decode is refused. " +
+            "{\"error\":\"stale_cursor\",\"revision\":<current>}; any other cursor that was not a nextCursor is refused." +
             "Call again with no cursor.",
         objectSchema(
             canvasIdParam,

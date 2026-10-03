@@ -170,12 +170,16 @@ internal object CanvasLayoutCursor {
         return Decoded(revision, index)
     }
 
-    /** Where the next page starts. A cursor that does not decode is [Start.Bad], not a stale revision. */
+    /**
+     * Where the next page starts. A cursor that does not decode, or whose index is not a row with a
+     * row after it (so never one [CanvasLayoutPage] minted), is [Start.Bad], not a stale revision.
+     */
     fun start(rows: List<CanvasLayoutRow>, revision: LayoutRevision, cursor: String?): Start {
         if (cursor == null) return Start.At(RowIndex(0))
         val decoded = decode(cursor) ?: return Start.Bad
         if (decoded.revision != revision) return Start.Stale
-        if (decoded.index.raw !in rows.indices) return Start.Bad
+        // A minted cursor always names a row before the last one; the last row has no next page.
+        if (decoded.index.raw + 1 !in rows.indices) return Start.Bad
         return Start.At(RowIndex(decoded.index.raw + 1))
     }
 

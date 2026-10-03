@@ -172,7 +172,8 @@ class CanvasGetLayoutTest {
             note(id = "note-b", title = "B", body = "b", frame = CanvasDocumentFrame(50f, 0f, 40f, 40f)),
         ).content()
         val revision = layout(host, limit = RowLimit(1)).revision
-        listOf("nope", "r$revision:", "1\u001fnote-a", "r$revision:99").forEach { cursor ->
+        // r<rev>:1 names the last row: no page ever mints it, so it is refused rather than read as an empty page.
+        listOf("nope", "r$revision:", "1\u001fnote-a", "r$revision:99", "r$revision:1").forEach { cursor ->
             val refused = host.call(CanvasToolContract.GET_LAYOUT, buildJsonObject { put("cursor", cursor) }).error()
             assertTrue("stale_cursor" !in refused, "$cursor was $refused")
             assertTrue("cursor must be" in refused, refused)
@@ -201,8 +202,12 @@ class CanvasGetLayoutTest {
         val title = "\uD83D\uDE00".repeat(40)
         host.applyOps(note(id = "emoji", title = title, body = "e", frame = CanvasDocumentFrame(0f, 0f, 40f, 40f))).content()
         val raw = host.call(CanvasToolContract.GET_LAYOUT, layoutInput(RowLimit(50), null)).content()
-        assertTrue(raw.encodeToByteArray().size <= CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES)
-        val row = json.decodeFromString(CanvasLayoutResult.serializer(), raw).rows.single()
+        val size = raw.encodeToByteArray().size
+        assertTrue(size <= CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES)
+        val page = json.decodeFromString(CanvasLayoutResult.serializer(), raw)
+        assertTrue(size > raw.length, "the emoji label makes UTF-8 bytes outnumber UTF-16 units")
+        assertEquals(size, CanvasLayoutJson.bytes(page), "page accounting counts UTF-8 bytes, not UTF-16 units")
+        val row = page.rows.single()
         assertEquals(clipLabel(title), row.label)
     }
 

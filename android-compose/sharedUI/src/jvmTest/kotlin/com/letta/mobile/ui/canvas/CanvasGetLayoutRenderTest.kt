@@ -174,7 +174,7 @@ class CanvasGetLayoutRenderTest {
             planFrames.forEach { (id, frame) ->
                 val inside = mid.x > frame.x + 2f && mid.x < frame.x + frame.width - 2f &&
                     mid.y > frame.y + 2f && mid.y < frame.y + frame.height - 2f
-                assertTrue(!inside, "${arrow.id} label midpoint sits inside $id")
+                assertTrue(!inside, "${arrow.id} shaft midpoint sits inside $id")
             }
         }
     }
@@ -248,18 +248,18 @@ class CanvasGetLayoutRenderTest {
     }
 
     private fun arrows(): List<JsonObject> = listOf(
-        arrow("a-sort", ArrowLink(Anchor("n-inbox", "right"), Anchor("n-triage", "left"), "")),
-        arrow("a-next", ArrowLink(Anchor("n-triage", "bottom"), Anchor("n-plan", "top"), "")),
-        arrow("a-check", ArrowLink(Anchor("n-plan", "bottom"), Anchor("n-review", "top"), "")),
-        arrow("a-file", ArrowLink(Anchor("n-ship", "right"), Anchor("n-notes", "left"), "")),
-        arrowToShape("a-box", ArrowLink(Anchor("n-done", "right"), Anchor("shape-box", "left"), "")),
+        arrow("a-sort", ArrowLink(Anchor("n-inbox", "right"), Anchor("n-triage", "left"))),
+        arrow("a-next", ArrowLink(Anchor("n-triage", "bottom"), Anchor("n-plan", "top"))),
+        arrow("a-check", ArrowLink(Anchor("n-plan", "bottom"), Anchor("n-review", "top"))),
+        arrow("a-file", ArrowLink(Anchor("n-ship", "right"), Anchor("n-notes", "left"))),
+        arrowToShape("a-box", ArrowLink(Anchor("n-done", "right"), Anchor("shape-box", "left"))),
     ).flatten()
 
     private fun arrow(id: String, link: ArrowLink): List<JsonObject> {
         val from = CanvasSnap.anchorOn(noteFrame(link.from.id), link.from.side)
         val to = CanvasSnap.anchorOn(noteFrame(link.to.id), link.to.side)
         return listOf(
-            element(id, shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}"), ARROW_PAINT.copy(label = link.label))),
+            element(id, shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}"), ARROW_PAINT)),
             bind(id, link.from, link.to),
         )
     }
@@ -270,7 +270,7 @@ class CanvasGetLayoutRenderTest {
         return listOf(
             element(
                 id,
-                shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}", endBinding = link.to.id), ARROW_PAINT.copy(label = link.label)),
+                shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}", endBinding = link.to.id), ARROW_PAINT),
             ),
             bind(id, link.from, to = null),
         )
@@ -362,7 +362,7 @@ class CanvasGetLayoutRenderTest {
     private data class BoardSize(val width: Int, val height: Int)
     private data class NoteCopy(val title: String, val body: String, val color: String)
     private data class Anchor(val id: String, val side: String)
-    private data class ArrowLink(val from: Anchor, val to: Anchor, val label: String)
+    private data class ArrowLink(val from: Anchor, val to: Anchor)
     private data class ShapePaint(val shapeType: String, val label: String, val stroke: String, val fill: String?)
 }
 
