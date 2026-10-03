@@ -31,13 +31,13 @@ internal fun ChatRenderItemRow(
     WithRowFontScale(context.fontScale) {
         Column(modifier = modifier.fillMaxWidth()) {
             when (item) {
-                is ChatRenderItem.RunBlock -> RunBlockRow(item.runId, item.messages.map { it.first }, context, callbacks)
+                is ChatRenderItem.RunBlock -> RunBlockRow(item.messages.map { it.first }, context, callbacks)
                 // A lone message holding its run's key draws as that run, as Android does, so the
                 // row keeps its shape when a sibling step lands and it becomes a run block.
                 is ChatRenderItem.Single -> {
-                    val runId = item.stableRunId ?: item.stableRunKey?.removePrefix(RUN_KEY_PREFIX)
-                    if (runId != null) {
-                        RunBlockRow(runId, listOf(item.message), context, callbacks)
+                    val inRun = item.stableRunId != null || item.stableRunKey != null
+                    if (inRun) {
+                        RunBlockRow(listOf(item.message), context, callbacks)
                     } else {
                         ChatMessageRow(item.message, context, callbacks)
                     }
@@ -46,8 +46,6 @@ internal fun ChatRenderItemRow(
         }
     }
 }
-
-private const val RUN_KEY_PREFIX = "run-"
 
 /**
  * Test seam: told the item's key each time a row composes, so tests can prove what does not
