@@ -26,15 +26,17 @@ sealed interface ComposeCompilation {
         val alreadyPublished: Boolean = false,
     ) : ComposeCompilation {
         fun receipt(canvasId: String, status: ComposeStatus, revision: Long?, warnings: List<String> = emptyList()): ComposeReceipt =
-            ComposeReceipt(
-                artifactId = artifactId,
-                canvasId = canvasId,
-                revision = revision,
-                status = status,
-                title = title,
-                bounds = bounds,
-                items = items,
-                warnings = warnings,
+            ComposeReceiptFrames.fit(
+                ComposeReceipt(
+                    artifactId = artifactId,
+                    canvasId = canvasId,
+                    revision = revision,
+                    status = status,
+                    title = title,
+                    bounds = bounds,
+                    items = items,
+                    warnings = warnings,
+                ),
             )
     }
 
@@ -94,18 +96,31 @@ object CanvasComposeCompiler {
             artifactId = artifactId,
             title = request.title,
             bounds = placement.bounds,
-            items = built.map(::receiptItem),
+            items = built.map { receiptItem(it, placement) },
             dryRun = request.dryRun == true,
         )
         val existing = ExistingArtifact.of(sceneJson, artifactId)
         return when {
             existing.isEmpty() -> ready
-            existing.matches(emitted) -> ready.copy(ops = emptyList(), itemPaths = emptyList(), bounds = existing.bounds(), alreadyPublished = true)
+            existing.matches(emitted) -> retryOf(ready, existing)
             else -> artifactExists(request, artifactId)
         }
     }
 
-    /** The artifact is on the board with other content: compose never changes an artifact. */
+    /** A retry reports the frames the pieces have now, not a fresh placement beside them. */
+    private fun retryOf(ready: ComposeCompilation.Ready, existing: ExistingArtifact): ComposeCompilation.Ready {
+        val frames = existing.frames()
+        return ready.copy(
+            ops = emptyList(),
+            itemPaths = emptyList(),
+            bounds = existing.bounds(),
+            items = ready.items.map { it.withFrames(frames, ready.artifactId) },
+            alreadyPublished = true,
+        )
+    }
+
+    private fun ComposeReceiptItem.withFrames(frames: Map<String, List<Int>>, artifactId: String): ComposeReceiptItem =
+        copy(frame = frames[boardId(artifactId)], children = children?.map { it.withFrames(frames, artifactId) })
     private fun artifactExists(request: ComposeRequest, artifactId: String): ComposeCompilation.Refused {
         val problem = ComposeProblem(
             if (request.artifactId != null) "/artifact_id" else "",
@@ -222,11 +237,12 @@ object CanvasComposeCompiler {
         is Built.Group -> error("a group is not a leaf")
     }
 
-    /** Without its board id: that is `cmp-<artifactId>-<key>`, derived by a reader (ComposeReceiptItem.boardId). */
-    private fun receiptItem(built: Built): ComposeReceiptItem = ComposeReceiptItem(
+    /** The placement slot, as integers: the same rectangle the emitter writes onto the board. */
+    private fun receiptItem(built: Built, placement: Placement): ComposeReceiptItem = ComposeReceiptItem(
         key = built.entry.key,
         kind = built.entry.item.kind,
         count = (built.entry.item as? ComposeItem.Checklist)?.items?.size,
-        children = (built as? Built.Group)?.children?.map(::receiptItem),
+        frame = placement.slots.getValue(built.entry.key).frameInts(),
+        children = (built as? Built.Group)?.children?.map { receiptItem(it, placement) },
     )
 }
