@@ -23,9 +23,18 @@ Each line is `{recv_ms, …, frame|wire}`, in arrival order. Turn 2 also re-subs
 phone client mid-stream: `message.list` runs about 4 s after the send, as if the phone opened
 the chat while the desktop turn was still running.
 
-Models: `minimax-m3` (`lmstudio/MiniMax-M3`), `qwen3.8-max`, `claude-sonnet-5-5`
-(`lmstudio/claude-sonnet-5-5`), `kat-coder-pro-v2.5`. The findings below hold for all
-8 turns. No secrets: the frames contain only the prompts, `date`/`uptime` output, the
+Models, named by what the LiteLLM proxy actually **served** (from its
+`x-litellm-model-group` / `attempted-fallbacks` headers). Some providers were out of
+quota, so the proxy silently failed requests over to MiniMax-M3:
+
+| directory | requested | served |
+|---|---|---|
+| `minimax-m3` | `lmstudio/MiniMax-M3` | MiniMax-M3 |
+| `minimax-m3-fallback-from-qwen3.8-max` | `lmstudio/qwen3.8-max` | MiniMax-M3 (fallback) |
+| `minimax-m3-fallback-from-kat-coder` | `lmstudio/KAT-Coder-Pro-V2.5` | MiniMax-M3 (fallback) |
+| `claude-sonnet-5-5` | `lmstudio/claude-sonnet-5-5` | Claude Sonnet 5.5 |
+
+So these are two real model families, not four. The findings below hold for all 8 turns. No secrets: the frames contain only the prompts, `date`/`uptime` output, the
 model replies, and the App Server's own device-info `system-reminder`.
 
 ## Findings
@@ -69,6 +78,14 @@ model replies, and the App Server's own device-info `system-reminder`.
 2. **The upstream message `id` is the only stable assistant identity.** It is stable for
    the whole stream and equals the stored row id. That supports minting `logical_message_id`
    from `message_id`/`id` first, as jdcoj's precedence rule says.
+   **The same collision happens on the sender within one turn.** A later capture on a
+   working agent (not committed here, since it's a real agent's conversation) wrote **two
+   assistant messages per turn**: a short preamble, then the real reply, with different
+   upstream `id`s. On the desktop they shared one `otid` (`iroh-assistant-<turnId>` is per
+   turn, not per message). On the phone all four messages across both turns shared one
+   `otid`. That is the "two messages, one otid" shape behind stacked copies. A fixture
+   for it should be built synthetically, or recaptured on a test agent that splits its
+   reply.
 3. **Tool rows have three ids, and only `tool_call_id` joins them.** The `tc-<callId>`/`tr-<callId>`
    rule in jdcoj removes the 3-ids-per-return and 2-copies-per-call duplication seen here.
 4. **`run_id` is not a turn key.** It rotates inside a turn, and the two clients disagree
@@ -81,12 +98,13 @@ model replies, and the App Server's own device-info `system-reminder`.
 
 ## Gaps
 
-- **No reasoning part.** None of these routes produced `reasoning_message` frames or
-  stored thinking: `lmstudio` MiniMax-M3 / qwen3.8-max / claude-sonnet-5-5 / KAT-Coder /
-  deepseek-v4-flash (provider error), and `anthropic/claude-sonnet-5` with
-  `thinking.enabled`. qwen3.8-max with `reasoning_effort: medium` also produced none.
-  `usage.reasoning_tokens` was 0 throughout. On this host, thinking currently shows up
-  only for existing working agents (qwen3.8-max, created earlier).
+- **No reasoning part.** None of the models served produced reasoning. The thinking
+  models (qwen3.8-max, KAT-Coder) were out of quota and the proxy fell back to MiniMax-M3,
+  which streams no reasoning. Called directly, the proxy returns only `content` deltas.
+  `anthropic/claude-sonnet-5` with `thinking.enabled` is served for real, but the proxy
+  returns only a text block, never a thinking block. The last stored thinking on this host
+  is from 2026-09-30 (qwen3.8-max). `usage.reasoning_tokens` was 0 throughout. A reasoning
+  capture needs a route that actually serves a thinking model.
 - The "desktop" role is a headless `IrohChannelTransport`, not the Compose Desktop UI. The
   in-process `chatHotPathDebug`/`frameFlowDiag` flags were on (`gate1.emit`/`FrameFlowDiag`
   gates logged), but no timeline reducer ran, so these captures contain no

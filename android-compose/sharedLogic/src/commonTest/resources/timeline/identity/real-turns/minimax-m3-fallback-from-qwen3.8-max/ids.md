@@ -1,4 +1,4 @@
-## qwen3.8-max
+## minimax-m3-fallback-from-qwen3.8-max
 
 
 ### Raw wire (stream_delta.delta + envelope), viewer connection

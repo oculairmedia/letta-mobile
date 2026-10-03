@@ -1,4 +1,4 @@
-## kat-coder-pro-v2.5
+## minimax-m3-fallback-from-kat-coder
 
 
 ### Raw wire (stream_delta.delta + envelope), viewer connection
