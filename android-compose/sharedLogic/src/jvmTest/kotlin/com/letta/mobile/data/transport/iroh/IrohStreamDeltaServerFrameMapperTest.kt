@@ -71,7 +71,7 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
-    fun mapsReasoningToolCallAndToolReturnDeltasToTypedFrames() {
+    fun mapsReasoningDeltaToTypedFrame() {
         val reasoning = assertIs<ServerFrame.ReasoningMessage>(
             map(
                 """
@@ -95,7 +95,10 @@ class IrohStreamDeltaServerFrameMapperTest {
         assertEquals("run-app", reasoning.runId)
         assertEquals("lm-r", reasoning.id)
         assertEquals("turn-wire", reasoning.turnId)
+    }
 
+    @Test
+    fun mapsToolCallDeltaToTypedFrame() {
         val toolCall = assertIs<ServerFrame.ToolCallMessage>(
             map(
                 """
@@ -123,7 +126,10 @@ class IrohStreamDeltaServerFrameMapperTest {
         assertEquals("call-1", toolCall.toolCall?.toolCallId)
         assertEquals("search", toolCall.toolCall?.name)
         assertEquals("""{"q":"iroh"}""", toolCall.toolCall?.arguments)
+    }
 
+    @Test
+    fun mapsToolReturnDeltaToTypedFrame() {
         val toolReturn = assertIs<ServerFrame.ToolReturnMessage>(
             map(
                 """
