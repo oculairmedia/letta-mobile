@@ -7,7 +7,9 @@ data instead of hand-made frames.
 
 ## What was captured
 
-Each model directory holds two turns run on the `probe` agent, each in a new conversation.
+Each model directory holds two turns, each in a new conversation. The first four ran on the
+`probe` agent. The `openrouter-*` ones ran on `identity-capture`, a test agent with a short
+system prompt, through OpenRouter routes on the LiteLLM gateway that have reasoning enabled.
 Every turn has one tool call (a `Bash` command, `date` or `uptime`) and a streamed reply
 of two paragraphs. Three clients were connected to the same conversation at the same time:
 
@@ -33,21 +35,29 @@ quota, so the proxy silently failed requests over to MiniMax-M3:
 | `minimax-m3-fallback-from-qwen3.8-max` | `lmstudio/qwen3.8-max` | MiniMax-M3 (fallback) |
 | `minimax-m3-fallback-from-kat-coder` | `lmstudio/KAT-Coder-Pro-V2.5` | MiniMax-M3 (fallback) |
 | `claude-sonnet-5-5` | `lmstudio/claude-sonnet-5-5` | Claude Sonnet 5.5 |
+| `openrouter-gpt-6.1-sol` | `lmstudio/or-gpt-6.1-sol` | openai/gpt-6.1-sol via OpenRouter (**reasoning**) |
+| `openrouter-gemini-3.8-flash` | `lmstudio/or-gemini-3.8-flash` | google/gemini-3.8-flash (**reasoning**, one non-streamed frame) |
+| `openrouter-deepseek-v4.1-flash` | `lmstudio/or-deepseek-v4.1-flash` | deepseek/deepseek-v4.1-flash (**reasoning**) |
+| `openrouter-qwen3.8-flash` | `lmstudio/or-qwen3.8-flash` | qwen/qwen3.8-flash (**reasoning**) |
+| `openrouter-glm-5.3-flash` | `lmstudio/or-glm-5.3-flash` | z-ai/glm-5.3-flash (**reasoning**) |
+| `openrouter-grok-4.7` | `lmstudio/or-grok-4.7` | x-ai/grok-4.7 (**reasoning**, and **two assistant messages per turn**) |
 
-So these are two real model families, not four. The findings below hold for all 8 turns. No secrets: the frames contain only the prompts, `date`/`uptime` output, the
+That makes 8 model families and 20 turns. Claude Sonnet 5.5 through OpenRouter produced no
+reasoning and is left out. The findings below hold for every turn. No secrets: the frames contain only the prompts, `date`/`uptime` output, the
 model replies, and the App Server's own device-info `system-reminder`.
 
 ## Findings
 
 ### Text: cumulative, never rewritten
 
-- **The wire to a viewer carries cumulative snapshots.** Every `assistant_message` frame
-  holds the full text so far. Across 1,107 assistant frames in 8 messages, each frame after
-  the first is a strict superset of the one before (`new.startsWith(old)`). There are
-  **zero non-superset rewrites** and zero pure-increment frames.
+- **The wire to a viewer carries cumulative snapshots.** Every `assistant_message` and
+  `reasoning_message` frame holds the full text so far. Across 2,655 assistant frames and
+  256 reasoning frames, each frame after the first is a strict superset of the one before
+  (`new.startsWith(old)`). There are **zero non-superset rewrites** and zero pure-increment
+  frames. Gemini sends its reasoning as one complete frame.
 - Both clients' mapped `ServerFrame`s keep the same cumulative shape, frame for frame.
-- The final streamed text **equals** the stored `message.list` text for all 8 assistant
-  messages.
+- The final streamed text **equals** the stored `message.list` text for all 35 messages
+  (8 + 27 OpenRouter assistant and reasoning messages).
 - The stacked-copies symptom did **not** appear at the frame level, on either client or
   in either turn, including after the mid-turn re-subscribe. Each client's assistant frame
   count matches the wire one-for-one (no duplicated or replayed text frames).
@@ -56,7 +66,8 @@ model replies, and the App Server's own device-info `system-reminder`.
 
 | entity | wire (viewer) | desktop ServerFrame (sender) | phone ServerFrame (observer) | message.list | stream→stored join |
 |---|---|---|---|---|---|
-| assistant message | `id = ui-msg-N`, stable on every frame. **No `otid`.** `seq_id` +1 per frame | `id` same; `otid = iroh-assistant-<turnId>` (client-minted, **per turn**) | `id` same; `otid = iroh-assistant-iroh-observer-turn-<conversationId>` (client-minted, **per conversation**) | `id = ui-msg-N`, no otid or run_id | **`id`** (exact) |
+| assistant message | `id = ui-msg-N`, or **`ui-msg-N:assistant:1` when the same message has a reasoning part first**; stable on every frame. **No `otid`.** `seq_id` +1 per frame | `id` same; `otid = iroh-assistant-<turnId>` (client-minted, **per turn**) | `id` same; `otid = iroh-assistant-iroh-observer-turn-<conversationId>` (client-minted, **per conversation**) | `id = ui-msg-N`, no otid or run_id | **`id`** (exact) |
+| reasoning | `id = ui-msg-N:reasoning:0` (a **part id**: message N, part 0), stable on every frame. No `otid` | **wire id dropped.** Minted `id = iroh-reasoning_message-<runId>-<turnId>`, `otid = null` | minted `iroh-reasoning_message-<runId>-iroh-observer-turn-<conversationId>` | `id = ui-msg-N:reasoning:0` | **wire `id`**. The clients' minted id never matches the stored row |
 | user message | `id = cm-user-<clientOtid>`, `otid = clientOtid` | same | same | `id = ui-msg-N`, `otid = clientOtid` | **`otid`** only. The first stored user message has a `<system-reminder>` prepended (1311 vs 276 chars), so content matching fails |
 | tool call | no `id`, no `otid`. Only `run_id` and `tool_call.tool_call_id` | `id = toolcall-<callId>` (minted), **emitted twice** (second copy has no `seq`) | same, twice | `approval_request_message`, `id = ui-msg-N:tool:<callId>:request` | **`tool_call_id`** |
 | tool return | **2 frames, 2 different ids** for one call: `synthetic-tool-return-stream-<callId>` and `synthetic-tool-return-<uuid>` | 3 frames: the 2 above + minted `toolreturn-<callId>` | same 3 | `id = ui-msg-N`, `tool_call_id` | **`tool_call_id`** only |
@@ -78,33 +89,37 @@ model replies, and the App Server's own device-info `system-reminder`.
 2. **The upstream message `id` is the only stable assistant identity.** It is stable for
    the whole stream and equals the stored row id. That supports minting `logical_message_id`
    from `message_id`/`id` first, as jdcoj's precedence rule says.
-   **The same collision happens on the sender within one turn.** A later capture on a
-   working agent (not committed here, since it's a real agent's conversation) wrote **two
-   assistant messages per turn**: a short preamble, then the real reply, with different
-   upstream `id`s. On the desktop they shared one `otid` (`iroh-assistant-<turnId>` is per
-   turn, not per message). On the phone all four messages across both turns shared one
-   `otid`. That is the "two messages, one otid" shape behind stacked copies. A fixture
-   for it should be built synthetically, or recaptured on a test agent that splits its
-   reply.
-3. **Tool rows have three ids, and only `tool_call_id` joins them.** The `tc-<callId>`/`tr-<callId>`
+   **The same collision happens on the sender within one turn**, and `openrouter-grok-4.7`
+   captures it. Grok writes **two assistant messages per turn**: a short preamble, then
+   the real reply after the tool, with different upstream ids (`ui-msg-9184646` and
+   `ui-msg-9184648:assistant:1`). On the desktop both carry one `otid`
+   (`iroh-assistant-iroh-turn-18aee1…`), because the minted otid is per turn, not per
+   message. On the phone all four messages across both turns carry one `otid`. That is the
+   "two messages, one otid" shape behind stacked copies, as a real fixture.
+3. **Reasoning loses its identity on the client.** The wire gives each reasoning part a
+   stable id equal to the stored row id (`ui-msg-N:reasoning:0`). Both clients throw it away
+   and mint `iroh-reasoning_message-<runId>-<turnId>`, which never matches `message.list`.
+   After the turn settles, the live reasoning row can only be re-joined by position or
+   content, which is the same class of re-matching 4vtng deletes. Because the minted id
+   is keyed by run, two reasoning parts in one run would collide.
+4. **Tool rows have three ids, and only `tool_call_id` joins them.** The `tc-<callId>`/`tr-<callId>`
    rule in jdcoj removes the 3-ids-per-return and 2-copies-per-call duplication seen here.
-4. **`run_id` is not a turn key.** It rotates inside a turn, and the two clients disagree
+5. **`run_id` is not a turn key.** It rotates inside a turn, and the two clients disagree
    on `turn_done.run_id`. Keying anything on `run_id` (`CumulativeStreamText`, run-keyed
    settle) splits one turn into two runs.
-5. **Append-always is safe for the viewer wire**, but only because the host already
+6. **Append-always is safe for the viewer wire**, but only because the host already
    accumulates (`CumulativeStreamText`). The viewer wire has no increments left to append.
    jdcoj's `RecordedTurnsStampDeterministicallyTest` should treat these files as
    `CumulativeSnapshot` input.
 
 ## Gaps
 
-- **No reasoning part.** None of the models served produced reasoning. The thinking
-  models (qwen3.8-max, KAT-Coder) were out of quota and the proxy fell back to MiniMax-M3,
-  which streams no reasoning. Called directly, the proxy returns only `content` deltas.
-  `anthropic/claude-sonnet-5` with `thinking.enabled` is served for real, but the proxy
-  returns only a text block, never a thinking block. The last stored thinking on this host
-  is from 2026-09-30 (qwen3.8-max). `usage.reasoning_tokens` was 0 throughout. A reasoning
-  capture needs a route that actually serves a thinking model.
+- **No Anthropic reasoning.** Claude via the `lmstudio` and `anthropic` routes, and via
+  OpenRouter, returned no thinking. Reasoning comes from the 6 OpenRouter models above.
+  The original thinking routes (qwen3.8-max, KAT-Coder) were out of quota and silently
+  fell back to MiniMax-M3.
+- **First-call prompt is about 29k tokens** whatever the system prompt, because about 30
+  tool schemas are advertised (see letta-mobile-y44ux and letta-mobile-7rigo).
 - The "desktop" role is a headless `IrohChannelTransport`, not the Compose Desktop UI. The
   in-process `chatHotPathDebug`/`frameFlowDiag` flags were on (`gate1.emit`/`FrameFlowDiag`
   gates logged), but no timeline reducer ran, so these captures contain no
