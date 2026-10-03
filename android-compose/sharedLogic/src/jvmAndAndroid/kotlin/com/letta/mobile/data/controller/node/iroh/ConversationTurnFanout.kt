@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.runtime.turnStreamIdentityFor
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.canonicalToolCalls
@@ -142,7 +143,13 @@ internal class ConversationTurnFanout(
      * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
      */
     private val initiatorWrites: ObserverWriteQueue? = observerWrites,
+    /**
+     * letta-mobile-4vtng.1: the turn's prompt client message id, the turn id stamped on the deltas
+     * the host synthesizes itself (tool projection, user echo, dangling-call settlement).
+     */
+    turnId: String? = null,
 ) {
+    private val synthesizedIdentity = turnStreamIdentityFor(turnId)
     private val openToolCalls = OpenToolCallTracker()
     private val toolProjection = RelayedToolProjection()
 
@@ -408,7 +415,7 @@ internal class ConversationTurnFanout(
             put("seq_id", USER_ECHO_SEQ_ID)
             put("content", content)
         }
-        broadcastDeltaBodyNoPark(delta)
+        broadcastDeltaBodyNoPark(synthesizedIdentity.stampDelta(delta))
     }
 
     /**
@@ -418,7 +425,8 @@ internal class ConversationTurnFanout(
      * failing observer never breaks the loop or the turn. Initiator-only parking
      * is recorded ONCE here (not per-viewer).
      */
-    private suspend fun broadcastDeltaBody(delta: JsonObject) {
+    private suspend fun broadcastDeltaBody(unstamped: JsonObject) {
+        val delta = synthesizedIdentity.stampDelta(unstamped)
         if (deltaEndsRun(delta)) terminalDeltaRelayed = true
         // Initiator-only redial parking (q71yi): record the untagged-equivalent
         // delta JSON once, matching the pre-fanout writeStreamDelta which tracked

@@ -846,6 +846,7 @@ class IrohNodeConnection(
         unregisterViewer = { conversationId, viewer -> connectionRegistry?.unregister(conversationId, viewer) },
         observerWrites = turnHost.observerWrites,
         initiatorWrites = observerWrites,
+        turnId = firstUserMessage(input)?.clientMessageId,
     )
 
     private fun firstUserMessage(input: AppServerCommand.Input): AppServerInputMessage? =
