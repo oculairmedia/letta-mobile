@@ -204,21 +204,12 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             existing.seqId != null && confirmed.seqId != null && confirmed.seqId > existing.seqId
         val snapshotReplacement = syntheticLiveToRealFinal && !promotedForwardDelta
         val canUseSnapshotMerge = snapshotReplacement || (existing.seqId != null && confirmed.seqId != null)
-        // letta-mobile-bn008 + letta-mobile-wucn: derive isCumulativeStream
-        // from a STREAM-SHAPE signal (not per-frame seq-id availability). The
-        // Iroh client boundary stamps a stable `cm-stream-<otid>` id AND a
-        // stable otid on every cumulative frame (the App Server's
-        // CumulativeStreamText emits cumulative text, and
-        // tagStreamDeltaForOptimisticDedup rewrites the id to cm-stream-<otid>;
-        // if the upstream has no otid, IrohStreamDeltaServerFrameMapper falls
-        // back to a per-turn synthesized otid). An incremental HTTP-API SSE
-        // stream only stamps otid on the FIRST frame and leaves subsequent
-        // frames otid=null. So `confirmed.otid != null && confirmed.otid ==
-        // existing.otid` is true on a cumulative stream and false on an
-        // incremental stream — the same signal that distinguishes the bn008
-        // production cascade from the wucn counterexample at this exact merge
-        // point.
-        val isCumulativeStream = confirmed.otid == existing.otid
+        // letta-mobile-bn008 + letta-mobile-wucn: derive isCumulativeStream from a STREAM-SHAPE
+        // signal. The host stream stamper (letta-mobile-jdcoj) numbers every text frame with
+        // `text_seq` and always carries the full text so far, so a stamped frame is cumulative.
+        // An incremental HTTP-API SSE stream is never stamped (textSeq stays 0). The otid can no
+        // longer tell the two apart: both name the row by one id (letta-mobile-ys9it).
+        val isCumulativeStream = confirmed.textSeq > 0
         // letta-mobile-k9y5d: a frame is a forward (newer) delta only when its
         // seq id is strictly greater than the text we already hold. A frame with
         // a lower-or-equal seq id is a replayed / out-of-order re-delivery and

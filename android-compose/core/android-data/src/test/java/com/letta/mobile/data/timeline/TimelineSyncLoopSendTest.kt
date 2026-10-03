@@ -65,7 +65,7 @@ class TimelineSyncLoopSendTest {
         val api = FakeSyncApi()
         api.sendResponseGate = CompletableDeferred()
         api.nextStreamMessages = listOf(
-            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
+            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), logicalMessageId = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(dispatcher)
@@ -96,7 +96,7 @@ class TimelineSyncLoopSendTest {
     fun `send then stream appends confirmed assistant event`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
-            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
+            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), logicalMessageId = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(dispatcher)

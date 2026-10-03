@@ -133,6 +133,14 @@ sealed class TimelineEvent {
         val toolReturnTruncationByCallId: PersistentMap<String, ToolReturnTruncation> = persistentMapOf(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
         val seqId: Int? = null,
+        // letta-mobile-ys9it: the one identity of this row, read from the wire stamp
+        // (`logical_message_id`); stored history the stamper never saw is "<serverId>:<type>".
+        // User prompts keep [otid] == the client message id.
+        val logicalId: String = "$serverId:${messageType.name}",
+        // The wire `turn_id` only. `run_id` is not a turn and is never copied here.
+        val turnId: String? = null,
+        // Position of the latest text frame folded into this row (1, 2, 3 ...); 0 when unstamped.
+        val textSeq: Int = 0,
     ) : TimelineEvent()
 }
 

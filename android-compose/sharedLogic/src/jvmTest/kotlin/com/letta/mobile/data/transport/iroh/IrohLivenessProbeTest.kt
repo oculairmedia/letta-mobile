@@ -599,7 +599,7 @@ class IrohLivenessProbeTest {
     }
 
     private fun assistantDelta(id: String, content: String) =
-        """{"message_type": "assistant_message", "id": "$id", "content": "$content"}"""
+        """{"message_type": "assistant_message", "id": "$id", "logical_message_id": "lm-$id", "content": "$content"}"""
 
     private companion object {
         /**

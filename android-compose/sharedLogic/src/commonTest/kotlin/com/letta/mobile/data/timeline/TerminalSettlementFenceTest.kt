@@ -75,7 +75,7 @@ class TerminalSettlementFenceTest {
         id = id.value,
         contentRaw = JsonPrimitive(content.value),
         runId = kind.runId,
-        otid = if (kind.carriesOtid) "otid-${id.value}" else null,
+        logicalMessageId = if (kind.carriesOtid) "otid-${id.value}" else null,
         seqId = sequence.value,
     )
 

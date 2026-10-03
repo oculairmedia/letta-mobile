@@ -156,7 +156,7 @@ class IrohSessionLossCutOffTest {
         """
         {"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"${CONVERSATION.value}"},
          "event_seq":7,"emitted_at":"2026-09-25T00:00:07Z","idempotency_key":"evt-continued",
-         "delta":{"id":"letta-msg-9","message_type":"assistant_message","content":"still going","run_id":"$RUN_ID"}}
+         "delta":{"id":"letta-msg-9","logical_message_id":"lm-9","message_type":"assistant_message","content":"still going","run_id":"$RUN_ID"}}
         """.trimIndent(),
         AppServerChannel.Stream,
     )

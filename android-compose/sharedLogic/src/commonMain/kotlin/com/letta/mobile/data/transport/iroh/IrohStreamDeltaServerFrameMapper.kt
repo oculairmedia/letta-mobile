@@ -4,6 +4,7 @@ import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.runtime.RuntimeEventPayload
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -26,8 +27,10 @@ internal object IrohStreamDeltaServerFrameMapper {
     data class Context(
         val agentId: String,
         val conversationId: String,
-        val turnId: String,
-        val runId: String,
+        // Lifecycle only (error / stop / usage frames with no turn of their own). A message
+        // row's turn is the wire `turn_id`; these never name a message.
+        val turnId: String?,
+        val runId: String?,
         val timestamp: String,
     )
 
@@ -41,7 +44,7 @@ internal object IrohStreamDeltaServerFrameMapper {
         context: Context,
     ): List<ServerFrame> {
         val envelope = payload.body.parseObjectOrNull()
-            ?: return mapPlainBody(payload, context)
+            ?: return mapPlainBody(payload)
         val delta = envelope["delta"].objectOrNull() ?: envelope
         val messageType = delta.string("message_type") ?: payload.messageType
             ?: return emptyList()
@@ -70,61 +73,19 @@ internal object IrohStreamDeltaServerFrameMapper {
                     ts = meta.timestamp,
                     agentId = meta.agentId,
                     conversationId = meta.conversationId,
-                    turnId = meta.turnId,
+                    turnId = meta.wireTurnId,
                     runId = meta.runId,
                     contentRaw = delta["content"]?.takeIf { it != JsonNull } ?: JsonPrimitive(delta.contentText()),
                     otid = delta.string("otid") ?: delta.string("client_message_id"),
                     seq = meta.eventSeq,
                     seqId = meta.seqId,
+                    logicalMessageId = meta.logicalId,
                 ),
             )
 
-            "assistant_message" -> listOf(
-                ServerFrame.AssistantMessage(
-                    id = meta.logicalMessageId(),
-                    ts = meta.timestamp,
-                    agentId = meta.agentId,
-                    conversationId = meta.conversationId,
-                    turnId = meta.turnId,
-                    runId = meta.runId,
-                    content = delta.contentText(),
-                    // letta-mobile-x1xnl (root cause): App Server assistant
-                    // stream_delta frames carry NO `otid`/`client_message_id`
-                    // (those are user-message echo fields), and over Iroh the
-                    // backend `id` ROTATES per streamed fragment. The client
-                    // projection then synthesizes `effectiveOtid` off that
-                    // rotating id (server-<id>-assistant-<runId>), so every
-                    // fragment gets a DIFFERENT otid — defeating every otid- and
-                    // serverId-keyed dedup/merge branch in the reducer and
-                    // stranding the trailing fragment(s) as a duplicate row.
-                    // Anchor a STABLE otid on the (stable, per-turn) turn id
-                    // instead so all fragments of one assistant message group
-                    // into one row. A wire-provided otid still wins when present.
-                    // The WS path is unaffected: it keeps a stable backend id and
-                    // its own otid derivation.
-                    otid = delta.string("otid")
-                        ?: delta.string("client_message_id")
-                        ?: meta.assistantStreamOtid(),
-                    seq = meta.eventSeq,
-                    seqId = meta.seqId,
-                ),
-            )
-
+            "assistant_message",
             "reasoning_message",
-            "hidden_reasoning_message" -> listOf(
-                ServerFrame.ReasoningMessage(
-                    id = meta.messageIdFor(messageType),
-                    ts = meta.timestamp,
-                    agentId = meta.agentId,
-                    conversationId = meta.conversationId,
-                    turnId = meta.turnId,
-                    runId = meta.runId,
-                    reasoning = delta.reasoningText(),
-                    signature = delta.string("signature"),
-                    seq = meta.eventSeq,
-                    seqId = meta.seqId,
-                ),
-            )
+            "hidden_reasoning_message" -> mapTextRow(messageType, delta, meta)
 
             "tool_call_message",
             "approval_request_message" -> mapToolCall(messageType, delta, meta)
@@ -159,6 +120,64 @@ internal object IrohStreamDeltaServerFrameMapper {
         }
     }
 
+    /**
+     * An assistant / reasoning text frame is named by the `logical_message_id` the stream stamper
+     * minted, and nothing else: no id is derived here. A frame without that stamp cannot be placed
+     * in the timeline, so it is dropped and counted rather than appended under a guessed identity.
+     */
+    private fun mapTextRow(messageType: String, delta: JsonObject, meta: Metadata): List<ServerFrame> {
+        val logicalId = meta.logicalId ?: return dropUnstampedText(messageType, meta.frameId)
+        return listOf(
+            if (messageType == "assistant_message") {
+                assistantRow(logicalId, delta, meta)
+            } else {
+                reasoningRow(logicalId, delta, meta)
+            },
+        )
+    }
+
+    private fun assistantRow(logicalId: String, delta: JsonObject, meta: Metadata) =
+        ServerFrame.AssistantMessage(
+            id = logicalId,
+            ts = meta.timestamp,
+            agentId = meta.agentId,
+            conversationId = meta.conversationId,
+            turnId = meta.wireTurnId,
+            runId = meta.runId,
+            content = delta.contentText(),
+            otid = delta.string("otid") ?: delta.string("client_message_id"),
+            seq = meta.eventSeq,
+            seqId = meta.seqId,
+            logicalMessageId = logicalId,
+            textSeq = meta.textSeq,
+        )
+
+    private fun reasoningRow(logicalId: String, delta: JsonObject, meta: Metadata) =
+        ServerFrame.ReasoningMessage(
+            id = logicalId,
+            ts = meta.timestamp,
+            agentId = meta.agentId,
+            conversationId = meta.conversationId,
+            turnId = meta.wireTurnId,
+            runId = meta.runId,
+            reasoning = delta.reasoningText(),
+            signature = delta.string("signature"),
+            seq = meta.eventSeq,
+            seqId = meta.seqId,
+            logicalMessageId = logicalId,
+            textSeq = meta.textSeq,
+        )
+
+    private fun dropUnstampedText(messageType: String, frameId: String): List<ServerFrame> {
+        Telemetry.event(
+            "IrohStreamDelta", "live.unstampedFrame",
+            "messageType" to messageType,
+            "frameId" to frameId,
+            level = Telemetry.Level.WARN,
+        )
+        return emptyList()
+    }
+
     private fun mapErrorMessage(delta: JsonObject, meta: Metadata): List<ServerFrame> {
         val message = delta.errorText()
         val busy = isTurnAlreadyActiveMessage(message)
@@ -183,8 +202,8 @@ internal object IrohStreamDeltaServerFrameMapper {
             ServerFrame.TurnDone(
                 id = meta.frameId,
                 ts = meta.timestamp,
-                turnId = meta.turnId,
-                runId = meta.runId,
+                turnId = meta.turnId.orEmpty(),
+                runId = meta.runId.orEmpty(),
                 status = "failed",
                 seq = meta.eventSeq,
             ),
@@ -193,35 +212,12 @@ internal object IrohStreamDeltaServerFrameMapper {
 
     private const val INITIATOR_BUSY_REJECTION = "initiator_busy"
 
-    private fun mapPlainBody(
-        payload: RuntimeEventPayload.RemoteStreamFrame,
-        context: Context,
-    ): List<ServerFrame> =
-        when (payload.messageType) {
-            null,
-            "assistant_message" -> listOf(
-                ServerFrame.AssistantMessage(
-                    id = payload.messageId ?: payload.frameId,
-                    ts = context.timestamp,
-                    agentId = context.agentId,
-                    conversationId = context.conversationId,
-                    turnId = context.turnId,
-                    runId = context.runId,
-                    content = payload.body,
-                ),
-            )
+    /** A body that is not a JSON envelope carries no stamp, so a text one cannot be placed in the timeline. */
+    private fun mapPlainBody(payload: RuntimeEventPayload.RemoteStreamFrame): List<ServerFrame> =
+        when (val type = payload.messageType ?: "assistant_message") {
+            "assistant_message",
             "reasoning_message",
-            "hidden_reasoning_message" -> listOf(
-                ServerFrame.ReasoningMessage(
-                    id = payload.messageId ?: payload.frameId,
-                    ts = context.timestamp,
-                    agentId = context.agentId,
-                    conversationId = context.conversationId,
-                    turnId = context.turnId,
-                    runId = context.runId,
-                    reasoning = payload.body,
-                ),
-            )
+            "hidden_reasoning_message" -> dropUnstampedText(type, payload.frameId)
             else -> emptyList()
         }
 
@@ -242,11 +238,12 @@ internal object IrohStreamDeltaServerFrameMapper {
                 ts = meta.timestamp,
                 agentId = meta.agentId,
                 conversationId = meta.conversationId,
-                turnId = meta.turnId,
+                turnId = meta.wireTurnId,
                 runId = meta.runId,
                 toolCall = firstCall,
                 toolCalls = calls.takeIf { it.isNotEmpty() },
                 seq = meta.eventSeq,
+                logicalMessageId = meta.logicalId,
             ),
         )
     }
@@ -261,7 +258,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             ts = meta.timestamp,
             agentId = meta.agentId,
             conversationId = meta.conversationId,
-            turnId = meta.turnId,
+            turnId = meta.wireTurnId,
             runId = meta.runId,
             toolCallId = canonical.toolCallId,
             status = canonical.status,
@@ -269,6 +266,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             stdout = delta["stdout"].stringArrayOrNull(),
             stderr = delta["stderr"].stringArrayOrNull(),
             seq = meta.eventSeq,
+            logicalMessageId = meta.logicalId,
         )
     }
 
@@ -296,62 +294,19 @@ internal object IrohStreamDeltaServerFrameMapper {
         val timestamp: String,
         val agentId: String,
         val conversationId: String,
-        val turnId: String,
-        val runId: String,
+        /** The `turn_id` the stream stamper wrote on the wire; null when the frame carries none. */
+        val wireTurnId: String?,
+        /** [wireTurnId] or the caller's lifecycle turn: for error / stop / usage frames only. */
+        val turnId: String?,
+        val runId: String?,
         private val messageId: String?,
-        private val stableMessageId: String?,
+        /** The stamped `logical_message_id`; null when the frame was never stamped. */
+        val logicalId: String?,
+        val textSeq: Int?,
     ) {
         fun messageId(): String = messageId ?: frameId
 
-        /** Logical identity is separate from the per-delivery envelope/frame id. */
-        fun logicalMessageId(): String = stableMessageId ?: messageId()
-
-        fun messageIdFor(messageType: String): String = when (messageType) {
-            "reasoning_message",
-            "hidden_reasoning_message" -> "iroh-$messageType-$runId-$turnId"
-            else -> messageId ?: frameId
-        }
-        /**
-         * Stable synthetic otid for an assistant stream_delta whose wire frame
-         * carries no otid.
-         *
-         * Anchor priority is the PER-MESSAGE stable id: since the serve-path
-         * IrohAssistantAccumulator retags assistant deltas with a stable
-         * `cm-stream-<uuid>` id per logical assistant message, that id is both
-         * stable across a message's fragments AND distinct between separate
-         * assistant messages in one turn. That distinction matters for
-         * tool-mediated turns: the pre-tool preamble and the post-tool final
-         * response are DIFFERENT messages, and giving them one shared per-turn
-         * otid made the reducer's findByOtid merge fold the final response into
-         * the earlier preamble row — mutating an old row instead of appending,
-         * so the final text only became visible after the next reconcile
-         * (the "populates after I respond" bug).
-         *
-         * The per-turn [turnId] fallback remains ONLY for legacy frames with no
-         * stable message id at all (pre-accumulator servers), where grouping the
-         * whole turn is still safer than a per-fragment split
-         * (letta-mobile-x1xnl).
-         */
-        fun assistantStreamOtid(): String {
-            // Only trust ids the serve-path accumulator stamped: raw backend
-            // ids (`letta-msg-*`) ROTATE per fragment and would re-split one
-            // message into per-fragment rows (the original x1xnl bug).
-            val stableMessageId = stableMessageId?.takeIf { it.isNotBlank() }
-            return if (stableMessageId != null) {
-                "iroh-assistant-$stableMessageId"
-            } else {
-                "iroh-assistant-$turnId"
-            }
-        }
         companion object {
-            private fun stableLogicalMessageId(delta: JsonObject): String? {
-                val id = delta.string("id")?.takeIf { it.isNotBlank() }
-                if (id?.startsWith("cm-stream-") == true) return id
-                return delta.string("message_id")?.takeIf { it.isNotBlank() }
-                    ?: delta.string("otid")?.takeIf { it.isNotBlank() }?.let { "cm-stream-$it" }
-                    ?: delta.string("client_message_id")?.takeIf { it.isNotBlank() }?.let { "cm-stream-$it" }
-            }
-
             fun from(
                 payload: RuntimeEventPayload.RemoteStreamFrame,
                 envelope: JsonObject,
@@ -360,6 +315,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             ): Metadata {
                 val runtime = envelope["runtime"].objectOrNull()
                 val eventSeq = envelope.long("event_seq") ?: delta.long("event_seq")
+                val wireTurnId = (delta.string("turn_id") ?: envelope.string("turn_id"))?.takeIf { it.isNotBlank() }
                 return Metadata(
                     frameId = envelope.string("idempotency_key") ?: payload.frameId,
                     eventSeq = eventSeq,
@@ -374,14 +330,14 @@ internal object IrohStreamDeltaServerFrameMapper {
                     conversationId = runtime?.string("conversation_id")
                         ?: delta.string("conversation_id")
                         ?: context.conversationId,
-                    turnId = envelope.string("turn_id")
-                        ?: delta.string("turn_id")
-                        ?: context.turnId,
+                    wireTurnId = wireTurnId,
+                    turnId = wireTurnId ?: context.turnId,
                     runId = delta.string("run_id")
                         ?: envelope.string("run_id")
                         ?: context.runId,
                     messageId = delta.string("id") ?: delta.string("message_id") ?: payload.messageId,
-                    stableMessageId = stableLogicalMessageId(delta),
+                    logicalId = delta.string("logical_message_id")?.takeIf { it.isNotBlank() },
+                    textSeq = delta.long("text_seq")?.takeIf { it in 0L..Int.MAX_VALUE.toLong() }?.toInt(),
                 )
             }
         }

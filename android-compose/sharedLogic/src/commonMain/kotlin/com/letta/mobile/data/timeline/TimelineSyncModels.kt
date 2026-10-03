@@ -65,12 +65,10 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
         is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
         is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }
-    val stableRunId = runId?.takeIf { it.isNotBlank() }
-    val effectiveOtid = otid ?: if (stableRunId == null) {
-        "server-$id-${type.name.lowercase()}"
-    } else {
-        "server-$id-${type.name.lowercase()}-$stableRunId"
-    }
+    val logicalId = logicalMessageId?.takeIf { it.isNotBlank() } ?: "$id:${type.name}"
+    // A user prompt's otid is the client message id (stored history without one keeps its
+    // server-derived name); every other row is named by its logical id alone.
+    val effectiveOtid = if (type == TimelineMessageType.USER) otid ?: legacyUserOtid(id, runId) else logicalId
     val date = date?.let(::parseTimelineInstantOrNull) ?: timelineNow()
     val toolCallsList = when (this) {
         is ToolCallMessage -> effectiveToolCalls
@@ -95,7 +93,15 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
         approvalRequestId = approvalId,
         seqId = seqId,
         agentId = agentId,
+        logicalId = logicalId,
+        turnId = turnId?.takeIf { it.isNotBlank() },
+        textSeq = textSeq ?: 0,
     )
+}
+
+private fun legacyUserOtid(id: String, runId: String?): String {
+    val stableRunId = runId?.takeIf { it.isNotBlank() }
+    return if (stableRunId == null) "server-$id-user" else "server-$id-user-$stableRunId"
 }
 
 /**

@@ -71,7 +71,7 @@ class IrohObserverIngestionTest {
         """{"message_type": "user_message", "id": "cm-user-$otid", "otid": "$otid", "content": "$text"}"""
 
     private fun assistantDelta(id: String, content: String) =
-        """{"message_type": "assistant_message", "id": "$id", "content": "$content"}"""
+        """{"message_type": "assistant_message", "id": "$id", "logical_message_id": "lm-$id", "content": "$content"}"""
 
     private fun stopReasonDelta(reason: String = "end_turn") =
         """{"message_type": "stop_reason", "stop_reason": "$reason"}"""

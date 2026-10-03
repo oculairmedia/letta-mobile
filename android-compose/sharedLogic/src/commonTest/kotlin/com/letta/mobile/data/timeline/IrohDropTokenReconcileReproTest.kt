@@ -44,8 +44,18 @@ import kotlin.test.assertEquals
 class IrohDropTokenReconcileReproTest {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
-    /** The REAL captured Iroh assistant fragments (single reply). */
-    private val realFrames: List<String> = IrohRealCapturedFrames.FRAMES
+    /**
+     * The REAL captured Iroh assistant fragments (single reply), with the `logical_message_id` the
+     * host's stream stamper now adds to every text frame (the capture predates it). The capture's
+     * shared `otid` was the only thing that grouped the fragments; the stamp replaces it.
+     */
+    private val realFrames: List<String> = IrohRealCapturedFrames.FRAMES.map { raw ->
+        val fields = json.parseToJsonElement(raw) as JsonObject
+        json.encodeToString(
+            JsonObject.serializer(),
+            JsonObject(fields + ("logical_message_id" to JsonPrimitive("lm-h30cy-reply"))),
+        )
+    }
 
     /** Ground-truth full reply: the exact concatenation of every streamed token. */
     private fun fullAssistantText(): String = buildString {
