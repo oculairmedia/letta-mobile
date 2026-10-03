@@ -67,7 +67,7 @@ class RealTurnMapperIdentityTest {
     }
 
     @Test
-    fun twoRepliesInOneObservedConversationStayDistinct() {
+    fun observerContextIdsDoNotLeakIntoTwoRepliesOfOneConversation() {
         listOf("minimax-m3", "claude-sonnet-5-5", "openrouter-gpt-6.1-sol").forEach { model ->
             val replies = listOf(1, 2).map { turn ->
                 mapTurn(wireOf(model, turn)).filterIsInstance<ServerFrame.AssistantMessage>()

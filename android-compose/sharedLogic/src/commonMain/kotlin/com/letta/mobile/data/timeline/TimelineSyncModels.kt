@@ -99,6 +99,9 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
     )
 }
 
+// Stored user rows that never carried a client message id keep their server-derived name until the
+// ledger persists logical ids for every row (letta-mobile-hrrb2 / C3, with key cleanup in C5
+// letta-mobile-1tekk); the run suffix goes with it.
 private fun legacyUserOtid(id: String, runId: String?): String {
     val stableRunId = runId?.takeIf { it.isNotBlank() }
     return if (stableRunId == null) "server-$id-user" else "server-$id-user-$stableRunId"

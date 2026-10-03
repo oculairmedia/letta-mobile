@@ -117,12 +117,18 @@ class DesktopHybridAppServerChatGatewayTest {
         val status: String? = null,
         val output: String? = null,
         val stopReason: String? = null,
+        /** The id the host stream stamper mints; text deltas without it are dropped by the mapper. */
+        val logicalMessageId: String? = null,
     )
 
     private fun streamDeltaEnvelope(spec: DeltaSpec): String {
         val delta = buildJsonObject {
             put("message_type", spec.messageType)
             spec.messageId?.let { put("id", it) }
+            spec.logicalMessageId?.let {
+                put("logical_message_id", it)
+                put("text_seq", 1)
+            }
             spec.runId?.let { put("run_id", it) }
             spec.toolCallId?.let { put("tool_call_id", it) }
             spec.toolName?.let { put("tool_name", it) }
@@ -157,9 +163,9 @@ class DesktopHybridAppServerChatGatewayTest {
     // wrapper functions, so the file doesn't just relocate the retired
     // multi-String-param builders one level down.
     private val assistantDelta =
-        DeltaSpec(messageType = "assistant_message", messageId = "cm-stream-a1", runId = "run-1", content = "Hello")
+        DeltaSpec(messageType = "assistant_message", messageId = "letta-msg-a1", logicalMessageId = "lm-a1", runId = "run-1", content = "Hello")
     private val reasoningDelta =
-        DeltaSpec(messageType = "reasoning_message", messageId = "cm-reason-a1", runId = "run-1", content = "thinking")
+        DeltaSpec(messageType = "reasoning_message", messageId = "letta-msg-r1", logicalMessageId = "lm-r1", runId = "run-1", content = "thinking")
     private val clientToolStartDelta = DeltaSpec(
         messageType = "client_tool_start",
         toolCallId = "tc-42",
@@ -247,10 +253,10 @@ class DesktopHybridAppServerChatGatewayTest {
         val messages = gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
 
         val assistant = assertIs<AssistantMessage>(messages.single { it is AssistantMessage })
-        assertEquals("cm-stream-a1", assistant.id)
+        assertEquals("lm-a1", assistant.id)
         assertEquals("Hello", assistant.content)
         assertEquals("run-1", assistant.runId)
-        assertEquals("iroh-assistant-cm-stream-a1", assistant.otid)
+        assertEquals(null, assistant.otid)
 
         assertTrue(messages.any { it is ReasoningMessage }, "reasoning message present: $messages")
 
