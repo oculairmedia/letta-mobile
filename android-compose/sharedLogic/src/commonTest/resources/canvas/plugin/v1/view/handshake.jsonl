@@ -1,0 +1,15 @@
+{"from":"view","message":{"jsonrpc":"2.0","id":1,"method":"view.action","params":{"action":"refresh"}}}
+{"from":"host","message":{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"send view.ready first"}}}
+{"from":"view","message":{"jsonrpc":"2.0","id":2,"method":"view.ready","params":{"pageId":"widget","viewVersion":"1"}}}
+{"from":"host","message":{"jsonrpc":"2.0","id":2,"result":{"theme":"dark","cssVariables":{"--md-sys-color-primary":"#6750a4"},"element":{"id":"el-1","type":"ext:letta.example/widget","v":2,"frame":{"x":10.0,"y":20.0,"width":320.0,"height":240.0},"props":{"status":"idle"},"fallback":{"title":"Widget"}},"settingsPublic":{"quality":80},"displayMode":"inline","locale":"en-CA","platform":"desktop","safeArea":{"top":0.0,"right":0.0,"bottom":0.0,"left":0.0}}}}
+{"from":"view","message":{"jsonrpc":"2.0","id":3,"method":"view.action","params":{"action":"start","input":{"label":"render"}}}}
+{"from":"host","message":{"jsonrpc":"2.0","id":3,"result":{"text":"started","structured":{"jobId":"j1"}}}}
+{"from":"view","message":{"jsonrpc":"2.0","method":"view.resize","params":{"width":480,"height":360}}}
+{"from":"view","message":{"jsonrpc":"2.0","id":4,"method":"view.displayMode","params":{"mode":"fullscreen"}}}
+{"from":"host","message":{"jsonrpc":"2.0","id":4,"result":{"mode":"fullscreen"}}}
+{"from":"view","message":{"jsonrpc":"2.0","method":"view.log","params":{"level":"info","message":"rendered"}}}
+{"do":"pushContext"}
+{"from":"host","message":{"jsonrpc":"2.0","method":"host.context","params":{"theme":"dark","cssVariables":{"--md-sys-color-primary":"#6750a4"},"element":{"id":"el-1","type":"ext:letta.example/widget","v":2,"frame":{"x":10.0,"y":20.0,"width":320.0,"height":240.0},"props":{"status":"idle"},"fallback":{"title":"Widget"}},"settingsPublic":{"quality":80},"displayMode":"inline","locale":"en-CA","platform":"desktop","safeArea":{"top":0.0,"right":0.0,"bottom":0.0,"left":0.0}}}}
+{"do":"teardown","reason":"collapsed"}
+{"from":"host","message":{"jsonrpc":"2.0","id":"host-1","method":"host.teardown","params":{"reason":"collapsed"}}}
+{"from":"view","message":{"jsonrpc":"2.0","id":"host-1","result":{}}}
