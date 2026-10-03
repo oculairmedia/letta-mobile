@@ -65,10 +65,7 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
         is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
         is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }
-    val logicalId = logicalMessageId?.takeIf { it.isNotBlank() } ?: "$id:${type.name}"
-    // A user prompt's otid is the client message id (stored history without one keeps its
-    // server-derived name); every other row is named by its logical id alone.
-    val effectiveOtid = if (type == TimelineMessageType.USER) otid ?: legacyUserOtid(id, runId) else logicalId
+    val identity = rowIdentity(type)
     val date = date?.let(::parseTimelineInstantOrNull) ?: timelineNow()
     val toolCallsList = when (this) {
         is ToolCallMessage -> effectiveToolCalls
@@ -81,7 +78,7 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
     }
     return TimelineEvent.Confirmed(
         position = position,
-        otid = effectiveOtid,
+        otid = identity.otid,
         content = text,
         serverId = id,
         messageType = type,
@@ -93,10 +90,21 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
         approvalRequestId = approvalId,
         seqId = seqId,
         agentId = agentId,
-        logicalId = logicalId,
-        turnId = turnId?.takeIf { it.isNotBlank() },
-        textSeq = textSeq ?: 0,
+        logicalId = identity.logicalId,
+        turnId = identity.turnId,
+        textSeq = identity.textSeq,
     )
+}
+
+/** What names a timeline row, all read from the wire (letta-mobile-ys9it); nothing is derived from run ids. */
+private data class RowIdentity(val logicalId: String, val otid: String, val turnId: String?, val textSeq: Int)
+
+private fun LettaMessage.rowIdentity(type: TimelineMessageType): RowIdentity {
+    val logicalId = logicalMessageId?.takeIf { it.isNotBlank() } ?: "$id:${type.name}"
+    // A user prompt's otid is the client message id (stored history without one keeps its
+    // server-derived name); every other row is named by its logical id alone.
+    val otid = if (type == TimelineMessageType.USER) this.otid ?: legacyUserOtid(id, runId) else logicalId
+    return RowIdentity(logicalId, otid, turnId?.takeIf { it.isNotBlank() }, textSeq ?: 0)
 }
 
 // Stored user rows that never carried a client message id keep their server-derived name until the

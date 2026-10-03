@@ -31,66 +31,11 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 object WsFrameMapper {
     fun toLettaMessage(frame: ServerFrame): LettaMessage? = when (frame) {
-        is ServerFrame.UserMessage -> UserMessage(
-            id = frame.id,
-            // letta-mobile-utw4u: pass `contentRaw` verbatim so a multimodal
-            // `content_parts` array survives the wire-frame → model hop and
-            // [extractAttachments] can pull the image base64 out at the
-            // projector. The pre-utw4u [JsonPrimitive(frame.content)] collapsed
-            // the array into a string and dropped every image on observers.
-            // Falls back to the text projection for legacy frames that only
-            // set [frame.content] (pre-utw4u wire shapes).
-            contentRaw = frame.contentRaw ?: JsonPrimitive(frame.content),
-            date = frame.ts,
-            runId = frame.runId,
-            otid = frame.otid,
-            seqId = frame.seqId ?: frame.seq.toSeqId(),
-            logicalMessageId = frame.logicalMessageId,
-            turnId = frame.turnId,
-        )
-
-        is ServerFrame.AssistantMessage -> AssistantMessage(
-            id = frame.id,
-            // The wire shape carries content as a bare string; the
-            // model's `contentRaw` accepts JsonElement and unwraps
-            // primitive strings through extractContent.
-            contentRaw = JsonPrimitive(frame.content),
-            date = frame.ts,
-            runId = frame.runId,
-            otid = frame.otid,
-            seqId = frame.seqId ?: frame.seq.toSeqId(),
-            logicalMessageId = frame.logicalMessageId,
-            turnId = frame.turnId,
-            textSeq = frame.textSeq,
-        )
-
-        is ServerFrame.ReasoningMessage -> ReasoningMessage(
-            id = frame.id,
-            reasoning = frame.reasoning,
-            date = frame.ts,
-            runId = frame.runId,
-            signature = frame.signature,
-            seqId = frame.seqId ?: frame.seq.toSeqId(),
-            logicalMessageId = frame.logicalMessageId,
-            turnId = frame.turnId,
-            textSeq = frame.textSeq,
-        )
-
+        is ServerFrame.UserMessage -> frame.toModel()
+        is ServerFrame.AssistantMessage -> frame.toModel()
+        is ServerFrame.ReasoningMessage -> frame.toModel()
         is ServerFrame.ToolCallMessage -> frame.toLettaToolMessage()
-
-        is ServerFrame.ToolReturnMessage -> ToolReturnMessage(
-            id = frame.id,
-            toolCallId = frame.toolCallId,
-            status = frame.status,
-            stdout = frame.stdout,
-            stderr = frame.stderr,
-            toolReturnRaw = frame.toolReturn,
-            date = frame.ts,
-            runId = frame.runId,
-            seqId = frame.seq.toSeqId(),
-            logicalMessageId = frame.logicalMessageId,
-            turnId = frame.turnId,
-        )
+        is ServerFrame.ToolReturnMessage -> frame.toModel()
 
         is ServerFrame.Welcome,
         is ServerFrame.Error,
@@ -128,6 +73,60 @@ object WsFrameMapper {
         is ServerFrame.TurnQueued,
         is ServerFrame.Unknown -> null
     }
+
+    // letta-mobile-utw4u: pass `contentRaw` verbatim so a multimodal `content_parts` array survives the
+    // wire-frame -> model hop and [extractAttachments] can pull the image base64 out at the projector.
+    // Falls back to the text projection for legacy frames that only set [content].
+    private fun ServerFrame.UserMessage.toModel() = UserMessage(
+        id = id,
+        contentRaw = contentRaw ?: JsonPrimitive(content),
+        date = ts,
+        runId = runId,
+        otid = otid,
+        seqId = seqId ?: seq.toSeqId(),
+        logicalMessageId = logicalMessageId,
+        turnId = turnId,
+    )
+
+    // The wire shape carries content as a bare string; the model's `contentRaw` accepts JsonElement.
+    private fun ServerFrame.AssistantMessage.toModel() = AssistantMessage(
+        id = id,
+        contentRaw = JsonPrimitive(content),
+        date = ts,
+        runId = runId,
+        otid = otid,
+        seqId = seqId ?: seq.toSeqId(),
+        logicalMessageId = logicalMessageId,
+        turnId = turnId,
+        textSeq = textSeq,
+    )
+
+    private fun ServerFrame.ReasoningMessage.toModel() = ReasoningMessage(
+        id = id,
+        reasoning = reasoning,
+        date = ts,
+        runId = runId,
+        signature = signature,
+        seqId = seqId ?: seq.toSeqId(),
+        logicalMessageId = logicalMessageId,
+        turnId = turnId,
+        textSeq = textSeq,
+    )
+
+    private fun ServerFrame.ToolReturnMessage.toModel() = ToolReturnMessage(
+        id = id,
+        toolCallId = toolCallId,
+        status = status,
+        stdout = stdout,
+        stderr = stderr,
+        toolReturnRaw = toolReturn,
+        date = ts,
+        runId = runId,
+        seqId = seq.toSeqId(),
+        logicalMessageId = logicalMessageId,
+        turnId = turnId,
+    )
+
 
     private fun ToolCallPayload.toModel(): ToolCall = ToolCall(
         id = toolCallId,

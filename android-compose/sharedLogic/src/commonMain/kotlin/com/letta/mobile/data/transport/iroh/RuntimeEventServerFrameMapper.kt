@@ -80,8 +80,7 @@ object RuntimeEventServerFrameMapper {
                     name = payload.request.toolName.value,
                     arguments = payload.request.argumentsPreview ?: "{}",
                 ),
-                type = "approval_request_message",
-            ),
+            ).copy(type = "approval_request_message"),
         )
         is RuntimeEventPayload.RunLifecycleChanged -> lifecycleFrames(payload, context)
         else -> emptyList()
@@ -109,16 +108,15 @@ object RuntimeEventServerFrameMapper {
      * [RuntimeEventPayload.ApprovalRequested] arm (an approval request
      * re-shaped as a tool call, per the §4.1 approval_request_message <->
      * tool_call_message contract above) in [map]. Both call sites only differ
-     * in id/toolCall/type.
+     * in id/toolCall (the approval arm re-types the result).
      */
     private fun toolCallMessage(
         context: Context,
         id: String,
         toolCall: ToolCallPayload,
-        type: String? = null,
         logicalMessageId: String? = null,
-    ): ServerFrame.ToolCallMessage {
-        val message = ServerFrame.ToolCallMessage(
+    ): ServerFrame.ToolCallMessage =
+        ServerFrame.ToolCallMessage(
             id = id,
             ts = nowIso(),
             agentId = context.agentId,
@@ -128,8 +126,6 @@ object RuntimeEventServerFrameMapper {
             seq = null,
             logicalMessageId = logicalMessageId,
         )
-        return if (type == null) message else message.copy(type = type)
-    }
 
     private fun lifecycleFrames(
         payload: RuntimeEventPayload.RunLifecycleChanged,
