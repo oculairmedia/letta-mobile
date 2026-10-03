@@ -12,6 +12,9 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
 import io.ak1.drawbox.DrawingPreview
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.ShapeType
@@ -32,47 +35,63 @@ import kotlin.test.assertTrue
  */
 class CanvasConnectorLabelRenderTest {
 
+    /** A board to render on: its colour and its size in pixels, one world unit to a pixel. */
+    private data class Board(val colour: Color, val size: IntSize)
+
+    /** One rendered pixel. */
+    @JvmInline
+    private value class Pixel(val argb: Int) {
+        private val channels: List<Int> get() = listOf((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
+
+        fun near(colour: Color, tolerance: Int = 40): Boolean =
+            channels.zip(Pixel(colour.toArgb()).channels).all { (a, b) -> abs(a - b) <= tolerance }
+
+        /** The label's amber, even blended into the board at a glyph's edge: red well above blue. */
+        val amber: Boolean get() = channels.let { (r, _, b) -> r > 90 && r - b > 60 }
+    }
+
     @Test
     fun onADarkBoardTheChipIsTheBoardNotTheStrokeOrWhite() {
         val arrow = arrow(Offset(100f, 200f), Offset(500f, 200f), text = "ship")
-        val image = render(listOf(arrow), DARK, 600, 400, "dark-board.png")
+        val image = render(listOf(arrow), DARK_600, "dark-board.png")
         // Without a label the shaft runs through the midpoint in the stroke's colour.
-        val bare = render(listOf(arrow.copy(text = "")), DARK, 600, 400, "dark-board-bare.png")
-        assertTrue(bare.near(300, 200, STROKE), "the bare shaft should cross the midpoint")
+        val bare = render(listOf(arrow.copy(text = "")), DARK_600, "dark-board-bare.png")
+        assertTrue(bare.at(IntOffset(300, 200)).near(STROKE), "the bare shaft should cross the midpoint")
 
         // The chip spans about 300 +- 24 on the shaft; sample well inside it.
-        val row = (284..316).map { x -> image.getRGB(x, 200) }
-        assertTrue(row.none { near(it, STROKE) }, "the shaft shows through the label")
-        assertTrue(row.any { near(it, DARK, tolerance = 2) }, "no board-coloured chip on the shaft")
-        assertTrue(region(image, 300, 200, 18, 10).none { near(it, Color.White, tolerance = 15) }, "a white chip")
-        assertTrue(region(image, 300, 200, 18, 10).any(::amber), "the label's text is not drawn")
+        val row = image.row(200, 284..316)
+        assertTrue(row.none { it.near(STROKE) }, "the shaft shows through the label")
+        assertTrue(row.any { it.near(DARK, tolerance = 2) }, "no board-coloured chip on the shaft")
+        val label = image.pixels(around(IntOffset(300, 200), IntSize(18, 10)))
+        assertTrue(label.none { it.near(Color.White, tolerance = 15) }, "a white chip")
+        assertTrue(label.any { it.amber }, "the label's text is not drawn")
         // The rest of the shaft is still drawn.
-        assertTrue(image.near(150, 200, STROKE))
-        assertTrue(image.near(440, 200, STROKE))
+        assertTrue(image.at(IntOffset(150, 200)).near(STROKE))
+        assertTrue(image.at(IntOffset(440, 200)).near(STROKE))
     }
 
     @Test
     fun aBentArrowsLabelSitsOnTheCurveNotTheChord() {
         // The curve passes 80 above the chord's midpoint: half the bend.
-        val bent = arrow(Offset(100f, 300f), Offset(500f, 300f), text = "ship", bend = Offset(0f, -160f))
-        val image = render(listOf(bent), DARK, 600, 400, "dark-board-bent.png")
-        assertTrue(region(image, 300, 220, 50, 16).any(::amber), "no label on the curve's midpoint")
-        assertTrue(region(image, 300, 300, 50, 16).none(::amber), "the label is on the chord")
-        assertTrue((286..314).none { x -> image.near(x, 220, STROKE) }, "the curve shows through the label")
+        val bent = arrow(Offset(100f, 300f), Offset(500f, 300f), text = "ship").copy(bend = Offset(0f, -160f))
+        val image = render(listOf(bent), DARK_600, "dark-board-bent.png")
+        assertTrue(image.pixels(around(IntOffset(300, 220), IntSize(50, 16))).any { it.amber }, "no label on the curve's midpoint")
+        assertTrue(image.pixels(around(IntOffset(300, 300), IntSize(50, 16))).none { it.amber }, "the label is on the chord")
+        assertTrue(image.row(220, 286..314).none { it.near(STROKE) }, "the curve shows through the label")
     }
 
     @Test
     fun aShortArrowKeepsItsShaftAndHeadAndTakesTheLabelAboveIt() {
         // 84 units at the default font size: a chip on the shaft would leave no line, only a head.
         val short = arrow(Offset(100f, 200f), Offset(184f, 200f), text = "sort")
-        val image = render(listOf(short), DARK, 300, 300, "dark-board-short.png")
+        val image = render(listOf(short), Board(DARK, IntSize(300, 300)), "dark-board-short.png")
         val headStart = 184 - 26
-        (104 until headStart - 2).forEach { x ->
-            assertTrue(image.near(x, 200, STROKE), "the shaft is broken at $x")
+        image.row(200, 104 until headStart - 2).forEachIndexed { i, pixel ->
+            assertTrue(pixel.near(STROKE), "the shaft is broken at ${104 + i}")
         }
-        assertTrue(region(image, 142, 180, 40, 14).any(::amber), "no label above the shaft")
-        assertTrue(region(image, 142, 222, 40, 14).none(::amber), "the label is below the shaft")
-        assertTrue((150..186).all { x -> image.getRGB(x, 200).let { !amber(it) } }, "the label is over the arrowhead")
+        assertTrue(image.pixels(around(IntOffset(142, 180), IntSize(40, 14))).any { it.amber }, "no label above the shaft")
+        assertTrue(image.pixels(around(IntOffset(142, 222), IntSize(40, 14))).none { it.amber }, "the label is below the shaft")
+        assertTrue(image.row(200, 150..186).none { it.amber }, "the label is over the arrowhead")
     }
 
     /**
@@ -82,12 +101,11 @@ class CanvasConnectorLabelRenderTest {
      */
     @Test
     fun rendersTheReviewGallery() {
-        listOf(PHONE, DESKTOP).forEach { (name, size) ->
-            val (width, height) = size
+        listOf("phone" to PHONE, "desktop" to DESKTOP).forEach { (name, size) ->
             listOf("light" to (Color.White to INK), "dark" to (DARK to STROKE)).forEach { (theme, colours) ->
                 val (board, ink) = colours
-                val image = render(gallery(width.toFloat(), ink), board, width, height, "gallery-$name-$theme.png")
-                assertEquals(width, image.width)
+                val image = render(gallery(size.width.toFloat(), ink), Board(board, size), "gallery-$name-$theme.png")
+                assertEquals(size.width, image.width)
             }
         }
     }
@@ -95,53 +113,44 @@ class CanvasConnectorLabelRenderTest {
     private fun gallery(width: Float, ink: Color): List<Element> {
         val right = width - MARGIN
         val half = width / 2f
-        fun a(start: Offset, end: Offset, text: String, size: Float, block: Element.Shape.() -> Element.Shape = { this }) =
-            arrow(start, end, text = text, fontSize = size, stroke = ink, textColor = null).block()
+        fun a(from: Offset, to: Offset, text: String, size: Float) =
+            arrow(from, to, text).copy(fontSize = size, strokeColor = ink, textColor = null)
         return listOf(
             a(Offset(MARGIN, 70f), Offset(right, 70f), "ship it", 20f),
-            a(Offset(MARGIN, 220f), Offset(right, 220f), "bent label", 16f) { copy(bend = Offset(0f, -120f)) },
-            a(Offset(MARGIN + 16f, 270f), Offset(right - 16f, 380f), "smoothed", 13f) {
-                copy(startHandle = Offset(0f, 110f), endHandle = Offset(-(right - MARGIN) * 0.4f, 0f))
-            },
+            a(Offset(MARGIN, 220f), Offset(right, 220f), "bent label", 16f).copy(bend = Offset(0f, -120f)),
+            a(Offset(MARGIN + 16f, 270f), Offset(right - 16f, 380f), "smoothed", 13f)
+                .copy(startHandle = Offset(0f, 110f), endHandle = Offset(-(right - MARGIN) * 0.4f, 0f)),
             a(Offset(MARGIN, 470f), Offset(MARGIN + 84f, 470f), "sort", 13f),
             a(Offset(half, 470f), Offset(half + 90f, 470f), "next", 20f),
-            a(Offset(MARGIN, 470f + 90f), Offset(MARGIN + 84f, 470f + 90f), "file", 20f),
-            a(Offset(half, 470f + 90f), Offset(half + 90f, 470f + 90f), "ok", 13f),
+            a(Offset(MARGIN, 560f), Offset(MARGIN + 84f, 560f), "file", 20f),
+            a(Offset(half, 560f), Offset(half + 90f, 560f), "ok", 13f),
             a(Offset(MARGIN, 660f), Offset(right, 660f), "a much longer label that keeps going until it has to wrap onto another line", 14f),
             a(Offset(MARGIN, 760f), Offset(half - 10f, 760f), "流程图", 16f),
-            a(Offset(half + 10f, 760f), Offset(right, 760f), "线 line", 16f) { copy(shapeType = ShapeType.LINE) },
+            a(Offset(half + 10f, 760f), Offset(right, 760f), "线 line", 16f).copy(shapeType = ShapeType.LINE),
             a(Offset(right - 40f, 800f), Offset(right - 40f, 890f), "up", 13f),
             a(Offset(MARGIN + 40f, 800f), Offset(MARGIN + 40f, 890f), "down", 20f),
         )
     }
 
-    private fun arrow(
-        start: Offset,
-        end: Offset,
-        text: String,
-        bend: Offset = Offset.Zero,
-        fontSize: Float = 20f,
-        stroke: Color = STROKE,
-        textColor: Color? = TEXT,
-    ) = Element.Shape(
+    /** A 3-unit arrow in [STROKE] with [text] in amber at the default size, 20. */
+    private fun arrow(start: Offset, end: Offset, text: String) = Element.Shape(
         id = "arrow-${start.x}-${start.y}-${end.x}-${end.y}",
         shapeType = ShapeType.ARROW,
         points = listOf(start, end),
-        strokeColor = stroke,
+        strokeColor = STROKE,
         strokeWidth = 3f,
-        bend = bend,
         text = text,
-        textColor = textColor,
-        fontSize = fontSize,
+        textColor = TEXT,
+        fontSize = 20f,
     )
 
     /** [elements] drawn by DrawingPreview on [board] at zoom 1, one world unit to a pixel. */
-    private fun render(elements: List<Element>, board: Color, width: Int, height: Int, snapshot: String): BufferedImage {
+    private fun render(elements: List<Element>, board: Board, snapshot: String): BufferedImage {
         lateinit var image: BufferedImage
-        runDesktopComposeUiTest(width = width, height = height) {
+        runDesktopComposeUiTest(width = board.size.width, height = board.size.height) {
             setContent {
                 CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
-                    DrawingPreview(elements = elements, bgColor = board)
+                    DrawingPreview(elements = elements, bgColor = board.colour)
                 }
             }
             waitForIdle()
@@ -149,27 +158,19 @@ class CanvasConnectorLabelRenderTest {
         }
         val file = File("build/canvas-connector-labels").apply { mkdirs() }.resolve(snapshot)
         ImageIO.write(image, "png", file)
-        println("canvas-connector-labels snapshot: ${file.absolutePath} (${width}x$height)")
+        println("canvas-connector-labels snapshot: ${file.absolutePath} (${board.size})")
         return image
     }
 
-    private fun region(image: BufferedImage, cx: Int, cy: Int, halfWidth: Int, halfHeight: Int): List<Int> =
-        (cy - halfHeight..cy + halfHeight).flatMap { y -> (cx - halfWidth..cx + halfWidth).map { x -> image.getRGB(x, y) } }
+    private fun around(centre: IntOffset, half: IntSize) =
+        IntRect(centre.x - half.width, centre.y - half.height, centre.x + half.width, centre.y + half.height)
 
-    private fun BufferedImage.near(x: Int, y: Int, colour: Color): Boolean = near(getRGB(x, y), colour)
+    private fun BufferedImage.at(point: IntOffset) = Pixel(getRGB(point.x, point.y))
 
-    private fun near(argb: Int, colour: Color, tolerance: Int = 40): Boolean {
-        val want = colour.toArgb()
-        return channels(argb).zip(channels(want)).all { (a, b) -> abs(a - b) <= tolerance }
-    }
+    private fun BufferedImage.row(y: Int, xs: IntRange): List<Pixel> = xs.map { x -> Pixel(getRGB(x, y)) }
 
-    private fun channels(argb: Int) = listOf((argb shr 16) and 0xFF, (argb shr 8) and 0xFF, argb and 0xFF)
-
-    /** The label's amber, even blended into the board at a glyph's edge: red well above blue. */
-    private fun amber(argb: Int): Boolean {
-        val (r, _, b) = channels(argb)
-        return r > 90 && r - b > 60
-    }
+    private fun BufferedImage.pixels(area: IntRect): List<Pixel> =
+        (area.top..area.bottom).flatMap { y -> row(y, area.left..area.right) }
 
     private companion object {
         val DARK = Color(0xFF101418)
@@ -177,7 +178,8 @@ class CanvasConnectorLabelRenderTest {
         val TEXT = Color(0xFFF59E0B)
         val INK = Color(0xFF1F2937)
         const val MARGIN = 24f
-        val PHONE = "phone" to (412 to 915)
-        val DESKTOP = "desktop" to (1440 to 900)
+        val PHONE = IntSize(412, 915)
+        val DESKTOP = IntSize(1440, 900)
+        val DARK_600 = Board(DARK, IntSize(600, 400))
     }
 }
