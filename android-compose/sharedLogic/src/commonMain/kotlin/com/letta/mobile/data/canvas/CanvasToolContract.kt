@@ -186,8 +186,9 @@ object CanvasToolContract {
         "Put notes, checklists, cards, text and labelled groups on the conversation canvas in one call (or pass canvas_id). " +
             "Read $COMPOSE_GUIDE once: format, caps, markdown, errors. kind is NOTE {markdown}, CHECKLIST " +
             "{items: [{text, checked?}]}, CARD {title, fields?: [{label, value}], markdown?}, TEXT " +
-            "{text, size: heading|body}, GROUP {label?, children}. No coordinates. A refusal lists each problem " +
-            "at a JSON-pointer path (e.g. /items/2/markdown) and publishes nothing. dry_run: true returns the receipt only. " +
+            "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes everything. " +
+            "All or nothing: a refusal lists each problem at a JSON-pointer path (e.g. /items/2/markdown) and publishes nothing. " +
+            "dry_run: true returns the receipt only. " +
             "Items carry frame [x, y, w, h]; framesOmitted means call canvas_get_layout. To draw, use $APPLY_OPS.",
         CanvasComposeSchema.input,
     )

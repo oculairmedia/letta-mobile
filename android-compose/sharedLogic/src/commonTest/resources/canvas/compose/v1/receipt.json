@@ -9,12 +9,12 @@
   "title": "Weekend plan",
   "bounds": { "x": 80.0, "y": 80.0, "width": 712.0, "height": 746.0 },
   "items": [
-    { "key": "heading", "kind": "TEXT" },
-    { "key": "shopping", "kind": "CHECKLIST", "count": 3 },
-    { "key": "meals", "kind": "NOTE" },
-    { "key": "selfcare", "kind": "GROUP", "children": [
-      { "key": "walk", "kind": "CARD" },
-      { "key": "read", "kind": "NOTE" }
+    { "key": "heading", "kind": "TEXT", "frame": [80, 80, 480, 63] },
+    { "key": "shopping", "kind": "CHECKLIST", "count": 3, "frame": [816, 80, 320, 175] },
+    { "key": "meals", "kind": "NOTE", "frame": [80, 279, 320, 290] },
+    { "key": "selfcare", "kind": "GROUP", "frame": [816, 279, 712, 276], "children": [
+      { "key": "walk", "kind": "CARD", "frame": [840, 335, 320, 196] },
+      { "key": "read", "kind": "NOTE", "frame": [1184, 335, 320, 120] }
     ] }
   ],
   "warnings": []

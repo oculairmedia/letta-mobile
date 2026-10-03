@@ -58,6 +58,10 @@ internal class ExistingArtifact(
     private fun groupFrameSlot(element: JsonObject): Slot? =
         element.takeIf { it.string("type") == "Shape" }?.let { CanvasComposePlacement.elementBounds(it, conservative = false) }
 
+    /**
+     * TEXT stores a top-left and a wrap width, not a height, so a retry reports the reserved
+     * slot again rather than a height read off the element.
+     */
     private fun textSlot(element: JsonObject): Slot? {
         val (x, y) = element.string("textTopLeft")?.split(",")?.mapNotNull { it.toFloatOrNull() }?.takeIf { it.size == 2 } ?: return null
         val size = if ((element.number("fontSize") ?: 0.0) >= CanvasComposeReserve.TEXT_HEADING_FONT) ComposeTextSize.HEADING else ComposeTextSize.BODY

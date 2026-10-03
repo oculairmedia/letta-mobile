@@ -61,14 +61,9 @@ class CanvasComposeReceiptSizeTest {
             assertTrue(withIds > CanvasComposeContract.MAX_RECEIPT_BYTES, "grouped=$grouped: the ids were what put it over ($withIds bytes)")
             assertEquals(CanvasComposeContract.MAX_ITEMS, receipt.items.sumOf { 1 + (it.children?.size ?: 0) })
             val pieces = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }
-            if (pieces.any { it.frame == null }) {
-                assertEquals(true, receipt.framesOmitted, "grouped=$grouped: a missing frame must be announced")
-                assertEquals(com.letta.mobile.data.canvas.compose.ComposeReceiptFrames.HINT, receipt.framesHint)
-            } else {
-                assertNull(receipt.framesOmitted, "grouped=$grouped")
-                assertNull(receipt.framesHint, "grouped=$grouped")
-                pieces.forEach { assertEquals(4, it.frame!!.size) }
-            }
+            assertNull(receipt.framesOmitted, "grouped=$grouped")
+            assertNull(receipt.framesHint, "grouped=$grouped")
+            pieces.forEach { assertEquals(4, it.frame?.size, "${it.key} grouped=$grouped") }
         }
     }
 

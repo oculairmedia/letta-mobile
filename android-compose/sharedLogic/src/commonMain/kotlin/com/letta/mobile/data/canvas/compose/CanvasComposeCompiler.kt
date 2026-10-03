@@ -120,7 +120,7 @@ object CanvasComposeCompiler {
     }
 
     private fun ComposeReceiptItem.withFrames(frames: Map<String, List<Int>>, artifactId: String): ComposeReceiptItem =
-        copy(frame = frames[boardId(artifactId)] ?: frame, children = children?.map { it.withFrames(frames, artifactId) })
+        copy(frame = frames[boardId(artifactId)], children = children?.map { it.withFrames(frames, artifactId) })
     private fun artifactExists(request: ComposeRequest, artifactId: String): ComposeCompilation.Refused {
         val problem = ComposeProblem(
             if (request.artifactId != null) "/artifact_id" else "",

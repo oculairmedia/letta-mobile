@@ -2,15 +2,23 @@ package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasOpProjector
+import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest
+import com.letta.mobile.data.controller.extras.ExternalToolResult
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -22,11 +30,11 @@ class CanvasComposeReceiptFramesTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun framesMatchPublishedFrames() = kotlinx.coroutines.test.runTest {
+    fun framesMatchPublishedFrames() = runTest {
         val host = HostCanvasComposeToolsTest.Host()
         val receipt = json.decodeFromString(
             ComposeReceipt.serializer(),
-            (host.compose(REQUEST) as com.letta.mobile.data.controller.extras.ExternalToolResult.Success).content,
+            (host.compose(REQUEST) as ExternalToolResult.Success).content,
         )
         val scene = host.scene().sceneJson
         val documents = CanvasOpProjector.documentsOf(scene).associateBy { it.id }
@@ -61,10 +69,71 @@ class CanvasComposeReceiptFramesTest {
         assertTrue(bytes(fittedAll) <= CanvasComposeContract.MAX_RECEIPT_BYTES)
         assertEquals(true, fittedAll.framesOmitted)
         assertEquals(ComposeReceiptFrames.HINT, fittedAll.framesHint)
-        fittedAll.items.forEach { item ->
-            assertNull(item.frame, item.key)
-            item.children.orEmpty().forEach { assertNull(it.frame) }
+        fittedAll.items.forEach { item -> item.children.orEmpty().forEach { assertNull(it.frame) } }
+        val kept = fittedAll.items.map { it.frame }
+        assertEquals(FRAME, kept.first(), "frames drop from the end, so the first item keeps its frame")
+        assertNull(kept.last(), "the last frame is the one that was over the cap")
+        assertTrue(kept.any { it == null } && kept.any { it != null })
+    }
+
+    @Test
+    fun aRetryReportsTheFrameAPersonMoved() = runTest {
+        val host = HostCanvasComposeToolsTest.Host()
+        val first = HostCanvasComposeToolsTest.receipt(host.compose(REQUEST))
+        val noteId = "cmp-frames-n1"
+        val document = CanvasOpProjector.documentsOf(host.scene().sceneJson).single { it.id == noteId }
+        val moved = buildJsonObject {
+            put("ops", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", "set_document")
+                    put("documentId", noteId)
+                    put("documentJson", document.json)
+                    putJsonObject("frame") {
+                        put("x", 400)
+                        put("y", 20)
+                        put("width", 140)
+                        put("height", 80)
+                    }
+                })
+            })
         }
+        assertTrue(host.registry.invoke(
+            CanvasToolContract.APPLY_OPS,
+            moved,
+            agentId = HostCanvasComposeToolsTest.AGENT,
+            conversationId = HostCanvasComposeToolsTest.CONVERSATION,
+        ) is ExternalToolResult.Success)
+        val again = HostCanvasComposeToolsTest.receipt(host.compose(REQUEST))
+        val note = again.items.single { it.key == "n1" }
+        assertEquals(listOf(400, 20, 140, 80), note.frame)
+        assertNull(again.framesOmitted)
+        assertEquals(first.items.single { it.key == "g1" }.frame, again.items.single { it.key == "g1" }.frame)
+    }
+
+    @Test
+    fun aRetryOmitsAFrameTheBoardNoLongerHas() = runTest {
+        val host = HostCanvasComposeToolsTest.Host()
+        HostCanvasComposeToolsTest.receipt(host.compose(REQUEST))
+        val scene = json.parseToJsonElement(host.scene().sceneJson).jsonObject.toMutableMap()
+        val documents = (scene["_documents"] as JsonArray).map { entry ->
+            val obj = entry.jsonObject
+            if (obj.string("id") == "cmp-frames-n1") JsonObject(obj.filterKeys { it != "frame" }) else obj
+        }
+        scene["_documents"] = JsonArray(documents)
+        val ready = assertIs<ComposeCompilation.Ready>(
+            CanvasComposeCompiler.compile(json.parseToJsonElement(REQUEST), JsonObject(scene).toString()) { error("named") },
+        )
+        val note = ready.receipt(ComposeBoard.CANVAS, ComposeStatus.PUBLISHED, 2)
+            .items.single { it.key == "n1" }
+        assertNull(note.frame, "a missing stored frame is omitted, not a fresh placement")
+    }
+
+    @Test
+    fun frameIntsRoundsEdgesHalfUp() {
+        assertEquals(listOf(3, -2, 0, 0), Slot(2.5f, -2.5f, 0f, 0f).frameInts())
+        assertEquals(listOf(-2, 2, 0, 0), Slot(-2.4f, 2.4999f, 0f, 0f).frameInts())
+        assertEquals(listOf(1_000_001, 0, 0, 0), Slot(1_000_000.5f, 0f, 0f, 0f).frameInts())
+        assertEquals(listOf(11, 0, 30, 1), Slot(10.5f, 0f, 30.5f, 1f).frameInts())
     }
 
     private fun elementFrame(scene: String, id: String): List<Int> {

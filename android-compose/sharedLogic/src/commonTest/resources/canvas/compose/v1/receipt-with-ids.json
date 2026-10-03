@@ -9,12 +9,12 @@
   "title": "Weekend plan",
   "bounds": { "x": 80.0, "y": 80.0, "width": 712.0, "height": 746.0 },
   "items": [
-    { "key": "heading", "kind": "TEXT", "id": "cmp-weekend-plan-heading" },
-    { "key": "shopping", "kind": "CHECKLIST", "id": "cmp-weekend-plan-shopping", "count": 3 },
-    { "key": "meals", "kind": "NOTE", "id": "cmp-weekend-plan-meals" },
-    { "key": "selfcare", "kind": "GROUP", "id": "cmp-weekend-plan-selfcare", "children": [
-      { "key": "walk", "kind": "CARD", "id": "cmp-weekend-plan-walk" },
-      { "key": "read", "kind": "NOTE", "id": "cmp-weekend-plan-read" }
+    { "key": "heading", "kind": "TEXT", "id": "cmp-weekend-plan-heading", "frame": [80, 80, 480, 63] },
+    { "key": "shopping", "kind": "CHECKLIST", "id": "cmp-weekend-plan-shopping", "count": 3, "frame": [816, 80, 320, 175] },
+    { "key": "meals", "kind": "NOTE", "id": "cmp-weekend-plan-meals", "frame": [80, 279, 320, 290] },
+    { "key": "selfcare", "kind": "GROUP", "id": "cmp-weekend-plan-selfcare", "frame": [816, 279, 712, 276], "children": [
+      { "key": "walk", "kind": "CARD", "id": "cmp-weekend-plan-walk", "frame": [840, 335, 320, 196] },
+      { "key": "read", "kind": "NOTE", "id": "cmp-weekend-plan-read", "frame": [1184, 335, 320, 120] }
     ] }
   ],
   "warnings": []
