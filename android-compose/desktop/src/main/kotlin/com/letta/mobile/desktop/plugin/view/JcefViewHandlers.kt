@@ -41,9 +41,13 @@ internal class JcefQueryHandler(private val queries: PluginViewQueryRouter) {
 
     private fun dispatch(method: Method, args: Array<Any?>?, fallback: CefMessageRouterHandler): Any? {
         if (method.name != "onQuery" || args == null || args.size != ON_QUERY_ARITY) return invokeFallback(method, args, fallback)
-        handle(JcefQueryCall(args[FRAME_INDEX] as? CefFrame, args[REQUEST_INDEX] as? String, args[CALLBACK_INDEX] as? CefQueryCallback))
+        val frame = queryArgs[FRAME_INDEX] as? CefFrame
+        val request = queryArgs[REQUEST_INDEX] as? String
+        handle(JcefQueryCall(frame, request, queryArgs[CALLBACK_INDEX] as? CefQueryCallback))
         return true
     }
+
+    private fun isOnQuery(method: Method, args: Array<Any?>?): Boolean = method.name == "onQuery" && args?.size == ON_QUERY_ARITY
 
     private fun invokeFallback(method: Method, args: Array<Any?>?, fallback: CefMessageRouterHandler): Any? = try {
         method.invoke(fallback, *(args ?: emptyArray()))
