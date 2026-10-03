@@ -16,6 +16,7 @@ class CanvasToolNamesTest {
         val names = listOf(
             CanvasToolContract.CREATE,
             CanvasToolContract.GET_SCENE,
+            CanvasToolContract.GET_LAYOUT,
             CanvasToolContract.REPLACE_SCENE,
             CanvasToolContract.APPLY_OPS,
             CanvasToolContract.EXPORT_SVG,
