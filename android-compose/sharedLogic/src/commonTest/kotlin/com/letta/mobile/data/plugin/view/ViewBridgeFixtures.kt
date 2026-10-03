@@ -97,7 +97,7 @@ internal class FakeViewHost(var current: ViewHostContext = ViewBridgeFixtures.co
 internal class FakeViewTransport(var outcome: PluginViewActionOutcome = PluginViewActionOutcome.Done("started")) : PluginViewTransport {
     val calls = mutableListOf<PluginViewActionCall>()
 
-    override suspend fun readPage(pluginId: String, version: String, pageId: String): ByteArray = "<html></html>".encodeToByteArray()
+    override suspend fun readPage(page: PluginViewPageRef): ByteArray = "<html>$page</html>".encodeToByteArray()
 
     override suspend fun action(call: PluginViewActionCall): PluginViewActionOutcome {
         calls += call

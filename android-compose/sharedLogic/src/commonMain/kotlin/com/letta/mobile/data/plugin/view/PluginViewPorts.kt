@@ -44,19 +44,24 @@ sealed interface PluginViewActionOutcome {
  * loopback in desktop direct mode; [Unavailable] is the offline transport.
  */
 interface PluginViewTransport {
-    /** The page's HTML from the package of [pluginId] at [version]; throws [PluginViewUnavailableException] when it cannot. */
-    suspend fun readPage(pluginId: String, version: String, pageId: String): ByteArray
+    /** The page's HTML from the package [page] names; throws [PluginViewUnavailableException] when it cannot. */
+    suspend fun readPage(page: PluginViewPageRef): ByteArray
 
     suspend fun action(call: PluginViewActionCall): PluginViewActionOutcome
 
     /** No host: pages cannot load and actions answer [PluginViewActionOutcome.Unavailable]. */
     object Unavailable : PluginViewTransport {
-        override suspend fun readPage(pluginId: String, version: String, pageId: String): ByteArray =
-            throw PluginViewUnavailableException("no host connection for $pluginId@$version page $pageId")
+        override suspend fun readPage(page: PluginViewPageRef): ByteArray =
+            throw PluginViewUnavailableException("no host connection for $page")
 
         override suspend fun action(call: PluginViewActionCall): PluginViewActionOutcome =
             PluginViewActionOutcome.Unavailable("no host connection")
     }
+}
+
+/** One page of one installed plugin version: the key a client caches page HTML by. */
+data class PluginViewPageRef(val pluginId: String, val version: String, val pageId: String) {
+    override fun toString(): String = "$pluginId@$version/$pageId"
 }
 
 class PluginViewUnavailableException(message: String) : Exception(message)

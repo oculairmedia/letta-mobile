@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -242,6 +243,14 @@ class ViewBridgeTest {
         assertFalse(h.bridge.teardown("scrolled out"))
         assertEquals(ViewBridgeState.CLOSED, h.bridge.state.value)
         assertEquals(emptyList(), h.port.drain())
+    }
+
+    @Test
+    fun pagesAreReadByTheirRefAndTheOfflineTransportHasNone() = runTest {
+        val ref = ViewBridgeFixtures.spec().pageRef
+        assertEquals(PluginViewPageRef("letta.example", "1.2.0", "widget"), ref)
+        assertEquals("<html>letta.example@1.2.0/widget</html>", FakeViewTransport().readPage(ref).decodeToString())
+        assertFailsWith<PluginViewUnavailableException> { PluginViewTransport.Unavailable.readPage(ref) }
     }
 
     @Test

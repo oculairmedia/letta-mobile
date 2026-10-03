@@ -14,7 +14,7 @@ class LcpViewShimTest {
 
     @Test
     fun itExposesTheDocumentedApi() {
-        val api = LcpViewShim.SOURCE.substringAfter("w.lettaView={").let(::topLevelKeys)
+        val api = apiMembers(LcpViewShim.SOURCE)
         assertEquals(LcpViewShim.API, api)
         assertTrue("version:\"${LcpViewShim.VERSION}\"" in LcpViewShim.SOURCE)
         assertTrue(LcpViewShim.VERSION in LcpView.SUPPORTED_VIEW_VERSIONS)
@@ -42,46 +42,34 @@ class LcpViewShimTest {
         assertEquals("", unbalanced(hostile))
     }
 
-    /** What is left open (or closed without an opener) in [source], skipping string literals. */
+    /** What is left open (or closed without an opener) in [source] once its string literals are removed. */
     private fun unbalanced(source: String): String {
-        val pairs = mapOf(')' to '(', ']' to '[', '}' to '{')
+        val code = STRING_LITERAL.replace(source, "\"\"")
         val stack = ArrayDeque<Char>()
-        var quote: Char? = null
-        var escaped = false
-        for (char in source) {
-            when {
-                quote != null -> {
-                    if (escaped) escaped = false else if (char == '\\') escaped = true else if (char == quote) quote = null
-                }
-                char == '"' || char == '\'' -> quote = char
-                char in "([{" -> stack.addLast(char)
-                char in pairs -> if (stack.removeLastOrNull() != pairs[char]) return "unexpected $char"
-            }
+        for (char in code.filter { it in OPENERS || it in CLOSERS }) {
+            if (char in OPENERS) stack.addLast(char) else if (stack.removeLastOrNull() != OPENERS[CLOSERS.indexOf(char)]) return "unexpected $char"
         }
-        return (stack.joinToString("") + (quote?.toString() ?: ""))
+        return stack.joinToString("")
     }
 
-    /** The keys of the object literal that [body] opens, at its top level. */
-    private fun topLevelKeys(body: String): List<String> {
-        val keys = mutableListOf<String>()
-        var depth = 0
-        var token = StringBuilder()
-        var quote: Char? = null
-        for (char in body) {
-            if (quote != null) {
-                if (char == quote) quote = null
-                continue
-            }
-            when (char) {
-                '"' -> quote = char
-                '(', '[', '{' -> depth++
-                ')', ']' -> depth--
-                '}' -> if (depth == 0) return keys else depth--
-                ':' -> if (depth == 0) keys += token.toString().trim().substringAfterLast(',')
-                else -> if (depth == 0) token.append(char)
-            }
-            if (char == ',' && depth == 0) token = StringBuilder()
-        }
-        return keys
+    /** The members of the `w.lettaView={…}` literal, in order: each `name:` that follows `{` or `,` at its top level. */
+    private fun apiMembers(source: String): List<String> {
+        val literal = STRING_LITERAL.replace(source.substringAfter("w.lettaView=").substringBefore(";w.__lettaViewReceive"), "\"\"")
+        return MEMBER.findAll(topLevel(literal)).map { it.groupValues[1] }.toList()
+    }
+
+    /** [literal] (one object literal) with every nested bracketed span removed, so only its own members remain. */
+    private fun topLevel(literal: String): String {
+        var text = literal.removePrefix("{").removeSuffix("}")
+        while (NESTED.containsMatchIn(text)) text = NESTED.replace(text, "")
+        return text
+    }
+
+    private companion object {
+        const val OPENERS = "([{"
+        const val CLOSERS = ")]}"
+        val STRING_LITERAL = Regex("\"(\\\\.|[^\"\\\\])*\"")
+        val NESTED = Regex("\\([^()\\[\\]{}]*\\)|\\[[^()\\[\\]{}]*\\]|\\{[^()\\[\\]{}]*\\}")
+        val MEMBER = Regex("(?:^|,)([A-Za-z]+):")
     }
 }

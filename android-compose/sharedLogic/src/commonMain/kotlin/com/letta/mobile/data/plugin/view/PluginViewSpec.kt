@@ -20,6 +20,9 @@ data class PluginViewSpec(
     val page: PluginPage,
     val viewActions: Map<String, JsonObject>,
 ) {
+    /** The page this view loads, as the transport fetches it. */
+    val pageRef: PluginViewPageRef get() = PluginViewPageRef(pluginId, pluginVersion, pageId)
+
     companion object {
         /** The view of [element] on [canvasId] through [manifest]'s page [pageId], or null when the manifest has no such page. */
         fun of(manifest: PluginManifest, pageId: String, canvasId: String, element: ViewElement): PluginViewSpec? {
