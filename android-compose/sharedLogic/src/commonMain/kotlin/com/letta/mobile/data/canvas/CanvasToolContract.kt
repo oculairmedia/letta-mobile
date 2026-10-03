@@ -135,7 +135,13 @@ object CanvasToolContract {
             "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
             "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}, " +
             "owner: explicit (default when a frame is given) | user | auto) and " +
-            "remove_document {documentId} takes it off. " + CanvasSceneSchemaText.PLUGIN_OPS +
+            "remove_document {documentId} takes it off. " +
+            "connect {id, from, to, label?, style?: {strokeColor? #rrggbb or #rrggbbaa, strokeWidth?, dashed?}} draws an arrow " +
+            "between two framed notes or boxed shapes (not lines or arrows), from the midpoint of the side that faces the other " +
+            "to the midpoint of its facing side; the two must not overlap or touch, and a rotated shape is joined at its unrotated box; " +
+            "set_arrow_binding {elementId, binding: {start?: {documentId, side}, end?}} attaches an existing arrow to notes " +
+            "(side is left, top, right or bottom; a null end stays free). " +
+            CanvasSceneSchemaText.PLUGIN_OPS +
             " opId, actorId and lamport are filled in by the host. " +
             "To create notes, checklists, cards or text, use $COMPOSE instead: it places and sizes them for you. " +
             "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
@@ -202,14 +208,13 @@ object CanvasToolContract {
      */
     val compose = CanvasToolDefinition(
         COMPOSE,
-        "Put notes, checklists, cards, text and labelled groups on a canvas in one call (with no canvas_id, " +
-            "the canvas of the conversation you are in). Read $COMPOSE_GUIDE once first: it has the format, caps, " +
-            "markdown subset and error codes. Each item has a \"kind\": NOTE {markdown}, CHECKLIST " +
+        "Put notes, checklists, cards, text and labelled groups on the conversation canvas in one call (or pass canvas_id). " +
+            "Read $COMPOSE_GUIDE once: format, caps, markdown, errors. kind is NOTE {markdown}, CHECKLIST " +
             "{items: [{text, checked?}]}, CARD {title, fields?: [{label, value}], markdown?}, TEXT " +
-            "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes " +
-            "everything. All or nothing: a refusal lists each problem with a JSON-pointer path " +
-            "(e.g. /items/2/markdown) and nothing is published. Pass dry_run: true to see the receipt without " +
-            "publishing. To draw, use $APPLY_OPS.",
+            "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes everything. " +
+            "All or nothing: a refusal lists each problem at a JSON-pointer path (e.g. /items/2/markdown) and publishes nothing. " +
+            "dry_run: true returns the receipt only. " +
+            "Items carry frame [x, y, w, h]; framesOmitted means call canvas_get_layout. To draw, use $APPLY_OPS.",
         CanvasComposeSchema.input,
     )
 
