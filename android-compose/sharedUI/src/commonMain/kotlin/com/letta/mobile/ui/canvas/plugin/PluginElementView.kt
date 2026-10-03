@@ -24,6 +24,8 @@ data class PluginElementView(
     val snapshot: PluginSnapshotImage = PluginSnapshotImage.None,
     /** True once a registered renderer gave up on this element; the board then draws the fallback card. */
     val faulted: Boolean = false,
+    /** The canvas the element is on: a live renderer opens the element's view for it. Null off a board. */
+    val canvasId: String? = null,
 ) {
     /** The props the fallback card may read: `status` and `progress`, nothing else. */
     val status: PluginElementStatus? = PluginElementStatus.of(element.props)

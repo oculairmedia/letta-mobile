@@ -159,7 +159,7 @@ private fun PluginElementHost(
     val latestStored = rememberUpdatedState(stored)
     val commit: () -> Unit = remember(gesture, edits) { { gesture.end(latestStored.value)?.let(edits::move) } }
     val resize: (ResizeHandle, Offset) -> Unit = remember(gesture) { gesture::resize }
-    val view = rememberPluginElementView(element, board.snapshots)
+    val view = rememberPluginElementView(element, board)
     val chrome = rememberPluginChrome(element, view, gesture, commit)
 
     val frame = gesture.frame
@@ -195,11 +195,14 @@ private class PluginViewHolder(val value: PluginElementView, val fault: (String)
 
 /** The view of [element]: its snapshot as it arrives, what the board knows of its plugin, its fault. */
 @Composable
-private fun rememberPluginElementView(element: CanvasPluginElement, snapshots: PluginSnapshotSources): PluginViewHolder {
+private fun rememberPluginElementView(element: CanvasPluginElement, board: PluginBoard): PluginViewHolder {
     var faulted by remember(element.id, element.type) { mutableStateOf(false) }
-    val snapshot = rememberPluginSnapshot(element.snapshot, snapshots)
+    val snapshot = rememberPluginSnapshot(element.snapshot, board.snapshots)
     val availability = LocalPluginAvailability.current.availabilityOf(element)
-    val view = remember(element, snapshot, availability, faulted) { PluginElementView(element, availability, snapshot, faulted) }
+    val canvasId = board.session.canvasId.value
+    val view = remember(element, snapshot, availability, faulted, canvasId) {
+        PluginElementView(element, availability, snapshot, faulted, canvasId)
+    }
     return remember(view) { PluginViewHolder(view) { faulted = true } }
 }
 
