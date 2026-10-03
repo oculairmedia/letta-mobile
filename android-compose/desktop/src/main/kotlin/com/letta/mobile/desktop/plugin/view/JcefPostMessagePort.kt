@@ -58,9 +58,15 @@ internal enum class PluginQueryOutcome { ACCEPTED, REFUSED_FRAME, REFUSED_FULL }
  * to the [port] as it came.
  */
 internal class PluginViewQueryRouter(private val page: PluginViewPageRef, private val port: JcefPostMessagePort) {
-    fun route(mainFrame: Boolean, frameUrl: String?, request: String): PluginQueryOutcome = when {
-        !mainFrame || frameUrl == null || PluginViewScheme.pageOf(frameUrl) != page -> PluginQueryOutcome.REFUSED_FRAME
-        !port.post(request) -> PluginQueryOutcome.REFUSED_FULL
+    fun route(query: PluginPageQuery): PluginQueryOutcome = when {
+        !query.fromPage(page) -> PluginQueryOutcome.REFUSED_FRAME
+        !port.post(query.request) -> PluginQueryOutcome.REFUSED_FULL
         else -> PluginQueryOutcome.ACCEPTED
     }
+}
+
+/** One message a page posted through the router: from which frame (the main one or not, at which URL), and its text. */
+internal data class PluginPageQuery(val mainFrame: Boolean, val frameUrl: String?, val request: String) {
+    /** Whether it came from the main frame while that frame shows [page]. */
+    fun fromPage(page: PluginViewPageRef): Boolean = mainFrame && frameUrl != null && PluginViewScheme.pageOf(frameUrl) == page
 }

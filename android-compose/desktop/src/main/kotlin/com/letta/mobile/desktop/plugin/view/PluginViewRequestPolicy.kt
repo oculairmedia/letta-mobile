@@ -7,6 +7,12 @@ import com.letta.mobile.data.plugin.view.ViewLink
 import com.letta.mobile.data.plugin.view.covers
 import java.net.URI
 
+/** What a request loads: the view's main frame, a subframe in it, or anything else the page fetches. */
+internal enum class PluginRequestKind { MAIN_FRAME, SUB_FRAME, RESOURCE }
+
+/** One request a live view's browser is about to send. */
+internal data class PluginRequest(val url: String, val kind: PluginRequestKind)
+
 /** What a live view's browser does with one resource request. */
 internal enum class PluginResourceDecision {
     /** The view's own page: the [PluginPageServer] answers it. */
@@ -36,11 +42,14 @@ internal class PluginViewRequestPolicy(private val page: PluginViewPageRef, csp:
     private val frameOrigins = origins(csp.frameDomains)
     private val networkOrigins = origins(csp.resourceDomains + csp.connectDomains + csp.frameDomains)
 
-    /** Whether a frame may navigate to [url]; the main frame only to the page, a subframe to a framed origin or `about:blank`. */
-    fun allowsNavigation(url: String, mainFrame: Boolean): Boolean = when {
-        mainFrame -> PluginViewScheme.pageOf(url) == page
-        url == ABOUT_BLANK -> true
-        else -> covered(url, frameOrigins)
+    /**
+     * Whether [request] may be sent: the main frame only ever loads the page, a subframe a framed
+     * origin or `about:blank`, and anything else what [resource] does not block.
+     */
+    fun admits(request: PluginRequest): Boolean = when (request.kind) {
+        PluginRequestKind.MAIN_FRAME -> PluginViewScheme.pageOf(request.url) == page
+        PluginRequestKind.SUB_FRAME -> request.url == ABOUT_BLANK || covered(request.url, frameOrigins)
+        PluginRequestKind.RESOURCE -> resource(request.url) != PluginResourceDecision.BLOCKED
     }
 
     fun resource(url: String): PluginResourceDecision = when {

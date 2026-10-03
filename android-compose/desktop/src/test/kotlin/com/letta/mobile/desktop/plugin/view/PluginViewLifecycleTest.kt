@@ -4,6 +4,7 @@ import com.letta.mobile.data.plugin.view.ViewBridge
 import com.letta.mobile.data.plugin.view.ViewBridgeOptions
 import com.letta.mobile.data.plugin.view.ViewBridgeServices
 import com.letta.mobile.data.plugin.view.ViewAuditSink
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -74,10 +75,10 @@ class PluginViewLifecycleTest {
     fun onlyTheMainFrameShowingThePageMayPost() {
         val ready = """{"jsonrpc":"2.0","id":1,"method":"view.ready","params":{}}"""
         val page = PluginViewTestFixtures.pageUrl
-        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = false, frameUrl = page, request = ready))
-        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = true, frameUrl = FRAMED, request = ready))
-        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = true, frameUrl = null, request = ready))
-        assertEquals(PluginQueryOutcome.ACCEPTED, router.route(mainFrame = true, frameUrl = page, request = ready))
+        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(PluginPageQuery(false, page, ready)))
+        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(PluginPageQuery(true, FRAMED, ready)))
+        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(PluginPageQuery(true, null, ready)))
+        assertEquals(PluginQueryOutcome.ACCEPTED, router.route(PluginPageQuery(true, page, ready)))
     }
 
     @Test
@@ -85,9 +86,9 @@ class PluginViewLifecycleTest {
         val small = JcefPostMessagePort(PageScriptRunner { }, capacity = 2)
         val smallRouter = PluginViewQueryRouter(PluginViewTestFixtures.pageRef, small)
         val url = PluginViewTestFixtures.pageUrl
-        assertEquals(PluginQueryOutcome.ACCEPTED, smallRouter.route(true, url, "1"))
-        assertEquals(PluginQueryOutcome.ACCEPTED, smallRouter.route(true, url, "2"))
-        assertEquals(PluginQueryOutcome.REFUSED_FULL, smallRouter.route(true, url, "3"))
+        assertEquals(PluginQueryOutcome.ACCEPTED, smallRouter.route(PluginPageQuery(true, url, "1")))
+        assertEquals(PluginQueryOutcome.ACCEPTED, smallRouter.route(PluginPageQuery(true, url, "2")))
+        assertEquals(PluginQueryOutcome.REFUSED_FULL, smallRouter.route(PluginPageQuery(true, url, "3")))
         small.close()
         assertFalse(small.post("4"))
     }
@@ -122,6 +123,25 @@ class PluginViewLifecycleTest {
     }
 
     @Test
+    fun aPageThatNeverSendsReadyIsReportedStalledAndAReadyOneIsNot() = runBlocking {
+        val stalled = CompletableDeferred<String>()
+        val silent = PluginViewSession(bridge, port, FakeBrowserHandle(), PluginReadyWatch(TEARDOWN_MS) { stalled.complete(it) })
+        silent.start(PluginViewWork(scope))
+        assertEquals(PluginReadyWatch.STALLED, withTimeout(WAIT_MS) { stalled.await() })
+        silent.close(PluginViewTeardown.CLOSED)
+
+        val readyPort = JcefPostMessagePort(PageScriptRunner { })
+        val readyBridge = ViewBridge(PluginViewTestFixtures.spec(), readyPort, ViewBridgeServices(host, FakePageTransport()))
+        val reports = mutableListOf<String>()
+        val ready = PluginViewSession(readyBridge, readyPort, FakeBrowserHandle(), PluginReadyWatch(TEARDOWN_MS) { reports += it })
+        ready.start(PluginViewWork(scope))
+        assertTrue(readyPort.post("""{"jsonrpc":"2.0","id":1,"method":"view.ready","params":{"pageId":"widget","viewVersion":"1"}}"""))
+        delay(TEARDOWN_MS * 2)
+        ready.close(PluginViewTeardown.CLOSED)
+        assertEquals(emptyList(), reports)
+    }
+
+    @Test
     fun aSilentReadyPageIsDisposedAfterTheTeardownTimeout() = runBlocking {
         val handle = FakeBrowserHandle()
         val session = PluginViewSession(bridge, port, handle).also { it.start(PluginViewWork(scope)) }
@@ -138,7 +158,7 @@ class PluginViewLifecycleTest {
     }
 
     private fun post(json: String) {
-        assertEquals(PluginQueryOutcome.ACCEPTED, router.route(mainFrame = true, frameUrl = PluginViewTestFixtures.pageUrl, request = json))
+        assertEquals(PluginQueryOutcome.ACCEPTED, router.route(PluginPageQuery(true, PluginViewTestFixtures.pageUrl, json)))
     }
 
     private suspend fun next(): JsonObject = withTimeout(WAIT_MS) { toPage.receive() }

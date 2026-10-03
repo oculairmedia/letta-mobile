@@ -6,17 +6,7 @@ import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.browser.CefMessageRouter
 import org.cef.browser.CefRequestContext
-import org.cef.callback.CefBeforeDownloadCallback
-import org.cef.callback.CefContextMenuParams
-import org.cef.callback.CefDownloadItem
-import org.cef.callback.CefMenuModel
-import org.cef.callback.CefQueryCallback
-import org.cef.handler.CefContextMenuHandlerAdapter
-import org.cef.handler.CefDownloadHandlerAdapter
-import org.cef.handler.CefLifeSpanHandlerAdapter
-import org.cef.handler.CefLoadHandler
 import org.cef.handler.CefLoadHandlerAdapter
-import org.cef.handler.CefMessageRouterHandlerAdapter
 import org.cef.handler.CefRequestHandler
 import org.cef.handler.CefRequestHandlerAdapter
 import org.cef.handler.CefResourceHandler
@@ -67,12 +57,12 @@ internal class JcefPluginBrowser private constructor(
             val client = app.createClient()
             val config = CefMessageRouter.CefMessageRouterConfig(PluginPageShim.QUERY_FUNCTION, PluginPageShim.CANCEL_FUNCTION)
             val router = CefMessageRouter.create(config)
-            router.addHandler(QueryHandler(wiring.queries), true)
+            router.addHandler(JcefQueryHandler(wiring.queries), true)
             client.addMessageRouter(router)
             client.addRequestHandler(RequestHandler(wiring))
-            client.addLifeSpanHandler(NoPopups)
-            client.addDownloadHandler(NoDownloads)
-            client.addContextMenuHandler(NoContextMenu)
+            client.addLifeSpanHandler(JcefNoPopups)
+            client.addDownloadHandler(JcefNoDownloads)
+            client.addContextMenuHandler(JcefNoContextMenu)
             client.addLoadHandler(LoadFaults(wiring))
             val context = CefRequestContext.createContext(null)
             val browser = client.createBrowser(wiring.server.url, false, false, context)
@@ -81,40 +71,9 @@ internal class JcefPluginBrowser private constructor(
     }
 }
 
-/** The page's `__lettaCefQuery` calls: accepted into the port or refused, never answered with data. */
-private class QueryHandler(private val queries: PluginViewQueryRouter) : CefMessageRouterHandlerAdapter() {
-    override fun onQuery(
-        browser: CefBrowser?,
-        frame: CefFrame?,
-        queryId: Long,
-        request: String?,
-        persistent: Boolean,
-        callback: CefQueryCallback?,
-    ): Boolean {
-        val outcome = queries.route(frame?.isMain == true, frame?.url, request.orEmpty())
-        if (outcome == PluginQueryOutcome.ACCEPTED) callback?.success("") else callback?.failure(QUERY_REFUSED, outcome.name)
-        return true
-    }
-
-    companion object {
-        const val QUERY_REFUSED = 403
-    }
-}
-
-/** Navigation and resources through the [PluginViewRequestPolicy]; the page itself from the [PluginPageServer]. */
+/** Every request through the [PluginViewRequestPolicy]; a renderer that dies hands its element back to the card. */
 private class RequestHandler(private val wiring: JcefViewWiring) : CefRequestHandlerAdapter() {
     private val resources = ResourceHandler(wiring)
-
-    override fun onBeforeBrowse(
-        browser: CefBrowser?,
-        frame: CefFrame?,
-        request: CefRequest?,
-        userGesture: Boolean,
-        isRedirect: Boolean,
-    ): Boolean =
-        !wiring.policy.allowsNavigation(request?.url.orEmpty(), mainFrame = frame?.isMain != false)
-
-    override fun onOpenURLFromTab(browser: CefBrowser?, frame: CefFrame?, targetUrl: String?, userGesture: Boolean): Boolean = true
 
     override fun getResourceRequestHandler(
         browser: CefBrowser?,
@@ -139,52 +98,35 @@ private class RequestHandler(private val wiring: JcefViewWiring) : CefRequestHan
     }
 }
 
+/**
+ * Navigations are resource loads of the main frame or a subframe, so one check covers them and every
+ * other resource: a request the policy does not admit is cancelled before it is sent. The view's own
+ * page (and 404s on its origin) come from the [PluginPageServer].
+ */
 private class ResourceHandler(private val wiring: JcefViewWiring) : CefResourceRequestHandlerAdapter() {
     override fun onBeforeResourceLoad(browser: CefBrowser?, frame: CefFrame?, request: CefRequest?): Boolean =
-        wiring.policy.resource(request?.url.orEmpty()) == PluginResourceDecision.BLOCKED
+        !wiring.policy.admits(PluginRequest(request?.url.orEmpty(), kindOf(request?.resourceType)))
 
     override fun getResourceHandler(browser: CefBrowser?, frame: CefFrame?, request: CefRequest?): CefResourceHandler? =
         when (wiring.policy.resource(request?.url.orEmpty())) {
             PluginResourceDecision.PAGE, PluginResourceDecision.NOT_FOUND -> PluginPageResourceHandler(wiring.server, wiring.work)
             else -> null
         }
+
+    private fun kindOf(type: CefRequest.ResourceType?): PluginRequestKind = when (type) {
+        CefRequest.ResourceType.RT_MAIN_FRAME -> PluginRequestKind.MAIN_FRAME
+        CefRequest.ResourceType.RT_SUB_FRAME -> PluginRequestKind.SUB_FRAME
+        else -> PluginRequestKind.RESOURCE
+    }
 }
 
-/** A page that fails to load, or loads with anything but 200, hands its element back to the card. */
+/**
+ * A page that loads with anything but 200 hands its element back to the card at once. One that fails
+ * before it commits never sends `view.ready`, and the session's ready watch catches it.
+ */
 private class LoadFaults(private val wiring: JcefViewWiring) : CefLoadHandlerAdapter() {
     override fun onLoadEnd(browser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
         if (frame?.isMain != true || httpStatusCode == PluginPageResponse.STATUS_OK) return
         wiring.onFault(wiring.server.failure ?: "the page answered $httpStatusCode")
-    }
-
-    override fun onLoadError(
-        browser: CefBrowser?,
-        frame: CefFrame?,
-        errorCode: CefLoadHandler.ErrorCode?,
-        errorText: String?,
-        failedUrl: String?,
-    ) {
-        if (frame?.isMain != true || errorCode == CefLoadHandler.ErrorCode.ERR_ABORTED) return
-        wiring.onFault(wiring.server.failure ?: "the page did not load (${errorText ?: errorCode?.name})")
-    }
-}
-
-private object NoPopups : CefLifeSpanHandlerAdapter() {
-    override fun onBeforePopup(browser: CefBrowser?, frame: CefFrame?, targetUrl: String?, targetFrameName: String?): Boolean = true
-}
-
-/** Handled and never continued: CEF cancels the download when the callback is released. */
-private object NoDownloads : CefDownloadHandlerAdapter() {
-    override fun onBeforeDownload(
-        browser: CefBrowser?,
-        downloadItem: CefDownloadItem?,
-        suggestedName: String?,
-        callback: CefBeforeDownloadCallback?,
-    ): Boolean = true
-}
-
-private object NoContextMenu : CefContextMenuHandlerAdapter() {
-    override fun onBeforeContextMenu(browser: CefBrowser?, frame: CefFrame?, params: CefContextMenuParams?, model: CefMenuModel?) {
-        model?.clear()
     }
 }

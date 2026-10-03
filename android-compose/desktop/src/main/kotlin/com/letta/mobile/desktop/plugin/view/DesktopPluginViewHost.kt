@@ -61,7 +61,8 @@ internal class DesktopPluginViewHost(
         )
         val browser = JcefPluginBrowser.open(app, wiring)
         target.set(browser.browser)
-        val session = PluginViewSession(ViewBridge(live.spec, port, live.services), port, browser)
+        val watch = PluginReadyWatch(PluginReadyWatch.DEFAULT_TIMEOUT_MS, onFault)
+        val session = PluginViewSession(ViewBridge(live.spec, port, live.services), port, browser, watch)
         sessions += session
         session.start(work)
         return session
