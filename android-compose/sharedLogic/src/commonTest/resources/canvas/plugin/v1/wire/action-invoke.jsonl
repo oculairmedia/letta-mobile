@@ -1,0 +1,6 @@
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":3,"method":"action.invoke","params":{"action":"start","input":{"label":"Render"},"context":{"origin":{"kind":"agent","agentId":"agent-1","conversationId":"conv-1","toolCallId":"call-1"}}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":3,"result":{"text":"Started Render","structured":{"elementId":"el-1"},"emit":{"update":[{"elementId":"el-1","props":{"status":"running"}}]}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":5,"method":"action.invoke","params":{"action":"cancel","input":{"elementId":"el-1"},"context":{"origin":{"kind":"view","elementId":"el-1","peerId":"peer-7"},"canvasId":"canvas-1","elementId":"el-1"}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":5,"error":{"code":-32010,"message":"the job already finished","data":{"code":"not_running"}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":7,"method":"action.invoke","params":{"action":"refresh","input":{},"context":{"origin":{"kind":"host","reason":"freshness"},"elementId":"el-1"}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":7,"result":{"text":"refreshed"}}}

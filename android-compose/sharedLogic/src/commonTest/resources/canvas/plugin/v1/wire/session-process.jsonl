@@ -1,0 +1,25 @@
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":1,"method":"plugin.initialize","params":{"contractVersion":1,"contractVersions":[1],"pluginId":"letta.example","settings":{"baseUrl":"https://api.example.test","quality":80},"hostInfo":{"name":"letta-host","version":"1.0.0"}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":1,"result":{"ok":true,"contractVersion":1,"pluginInfo":{"name":"Example","version":"1.2.0"}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":2,"method":"plugin.activate","params":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","method":"host.log","params":{"level":"info","message":"activated","fields":{"quality":"80"}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":2,"result":{}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":3,"method":"action.invoke","params":{"action":"start","input":{"label":"Render"},"context":{"origin":{"kind":"agent","agentId":"agent-1","conversationId":"conv-1","toolCallId":"call-1"}}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-1","method":"host.putAsset.begin","params":{"mediaType":"image/png","byteSize":5}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-1","result":{"uploadId":"upload-1"}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-2","method":"host.putAsset.chunk","params":{"uploadId":"upload-1","index":0,"base64":"aGVsbG8="}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-2","result":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-3","method":"host.putAsset.end","params":{"uploadId":"upload-1","sha256":"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-3","result":{"ref":"sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-4","method":"host.emit","params":{"place":[{"kind":"widget","v":2,"props":{"status":"running","label":"Render"},"fallback":{"title":"Render","subtitle":"queued"},"frame":{"x":40.0,"y":80.0,"width":320.0,"height":240.0},"snapshot":{"kind":"asset","ref":"sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"}}]}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-4","result":{"receipt":{"placed":["el-1"]}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-5","method":"host.readElements","params":{"query":{"kinds":["widget"]}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-5","result":{"elements":[{"id":"el-1","type":"ext:letta.example/widget"}]}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":3,"result":{"text":"Started Render","structured":{"elementId":"el-1"}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","method":"element.event","params":{"kind":"widget","elementId":"el-1","event":"moved","frame":{"x":40.0,"y":80.0,"width":320.0,"height":240.0}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","method":"host.settingsChanged","params":{"settings":{"baseUrl":"https://api.example.test","quality":90}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":4,"method":"plugin.health","params":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":4,"result":{"status":"ok"}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":5,"method":"action.invoke","params":{"action":"cancel","input":{"elementId":"el-1"},"context":{"origin":{"kind":"view","elementId":"el-1","peerId":"peer-7"},"canvasId":"canvas-1","elementId":"el-1"}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":5,"error":{"code":-32010,"message":"the job already finished","data":{"code":"not_running"}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":6,"method":"plugin.deactivate","params":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":6,"result":{}}}

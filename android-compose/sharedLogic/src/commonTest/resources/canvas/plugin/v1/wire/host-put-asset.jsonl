@@ -1,0 +1,6 @@
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-1","method":"host.putAsset.begin","params":{"mediaType":"image/png","byteSize":5}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-1","result":{"uploadId":"upload-1"}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-2","method":"host.putAsset.chunk","params":{"uploadId":"upload-1","index":0,"base64":"aGVsbG8="}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-2","result":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-3","method":"host.putAsset.end","params":{"uploadId":"upload-1","sha256":"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-3","result":{"ref":"sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"}}}
