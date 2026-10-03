@@ -132,15 +132,7 @@ fun mergeStreamText(
     // (>= 4 chars in common AND overlap covers all but a few chars of
     // the shorter side) so genuine tiny forward deltas like "Y" + "es ..."
     // still APPEND.
-    val shortLen = minOf(existing.length, incoming.length)
-    val maxMatch = maxOf(existing.length, incoming.length)
-    val overlapLen = if (shortLen >= 4) {
-        // best suffix-of-incoming equal to prefix-of-existing length
-        val k = longestCommonPrefixLength(existing, incoming)
-        maxOf(k, longestCommonSuffixLength(existing, incoming))
-    } else 0
-    val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
-        (overlapLen.toDouble() / maxMatch.toDouble() >= 0.75)
+    val nearOverlaps = canUseSnapshotMerge && nearlyOverlaps(existing, incoming)
     // letta-mobile-bn008 + letta-mobile-wucn: an identical frame is only dropped
     // when the stream is known to be cumulative. Ungating EQUAL broke wucn: an
     // incremental token can be byte-identical to the accumulator and must APPEND.
@@ -182,24 +174,36 @@ fun mergeStreamText(
         canUseSnapshotMerge && !incomingIsForwardDelta -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
         else -> StreamTextMergeBranch.APPEND
     }
-    val text = when (branch) {
-        StreamTextMergeBranch.EMPTY_INCOMING,
-        StreamTextMergeBranch.EQUAL,
-        StreamTextMergeBranch.STALE,
-        StreamTextMergeBranch.SUFFIX_DUPLICATE -> existing
-        StreamTextMergeBranch.CUMULATIVE,
-        StreamTextMergeBranch.SNAPSHOT_REWRITE -> incoming
-        StreamTextMergeBranch.SNAPSHOT_CONFLICT -> if (incoming.length > existing.length) incoming else existing
-        StreamTextMergeBranch.APPEND -> existing + incoming
-    }
     return StreamTextMergeResult(
-        text = text,
+        text = mergedText(branch, existing, incoming),
         branch = branch,
-        garbleRisk = branch == StreamTextMergeBranch.APPEND &&
-            existing.isNotEmpty() &&
-            incoming.isNotEmpty() &&
-            incoming.length < existing.length / 2,
+        garbleRisk = branch == StreamTextMergeBranch.APPEND && isShortAppend(existing, incoming),
     )
+}
+
+private fun mergedText(branch: StreamTextMergeBranch, existing: String, incoming: String): String = when (branch) {
+    StreamTextMergeBranch.EMPTY_INCOMING,
+    StreamTextMergeBranch.EQUAL,
+    StreamTextMergeBranch.STALE,
+    StreamTextMergeBranch.SUFFIX_DUPLICATE -> existing
+    StreamTextMergeBranch.CUMULATIVE,
+    StreamTextMergeBranch.SNAPSHOT_REWRITE -> incoming
+    StreamTextMergeBranch.SNAPSHOT_CONFLICT -> if (incoming.length > existing.length) incoming else existing
+    StreamTextMergeBranch.APPEND -> existing + incoming
+}
+
+/** An append of a chunk under half the held text: where a garbled merge would show. */
+private fun isShortAppend(existing: String, incoming: String): Boolean =
+    existing.isNotEmpty() && incoming.isNotEmpty() && incoming.length < existing.length / 2
+
+/**
+ * letta-mobile-mvcr4: the two texts share all but a few characters at one end: at least 4 in
+ * common, covering three quarters of the longer side.
+ */
+private fun nearlyOverlaps(existing: String, incoming: String): Boolean {
+    if (minOf(existing.length, incoming.length) < 4) return false
+    val overlapLen = maxOf(longestCommonPrefixLength(existing, incoming), longestCommonSuffixLength(existing, incoming))
+    return overlapLen >= 4 && overlapLen.toDouble() / maxOf(existing.length, incoming.length).toDouble() >= 0.75
 }
 
 /**

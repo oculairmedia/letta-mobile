@@ -178,29 +178,35 @@ internal fun UiMessage.logicalId(): String =
     if (role == "user") clientMessageId?.takeIf(String::isNotBlank) ?: id else id.removeSuffix(":REASONING")
 
 /** Every frame-to-frame flicker [frames] show; empty when the sequence is seamless. */
-internal fun handoverFlickers(frames: List<TimelineFrameRecorder.Frame>): List<String> {
-    val problems = mutableListOf<String>()
+internal fun handoverFlickers(frames: List<TimelineFrameRecorder.Frame>): List<String> =
+    frames.flatMap(::drawnTwice) + frames.zipWithNext().flatMap { (before, after) -> movedKeys(before, after) } +
+        returningKeys(frames)
+
+private val TimelineFrameRecorder.Frame.label: String get() = "frame $index [$step]"
+
+private fun TimelineFrameRecorder.Frame.keyByMessage(): List<Pair<String, String>> =
+    rows.flatMap { row -> row.messages.map { it to row.key } }
+
+/** One message in two rows of one frame. */
+private fun drawnTwice(frame: TimelineFrameRecorder.Frame): List<String> =
+    frame.keyByMessage().groupBy({ it.first }, { it.second }).filterValues { it.size > 1 }
+        .map { (message, keys) -> "${frame.label}: $message drawn twice under $keys" }
+
+/** A message whose row changed key between two frames. */
+private fun movedKeys(before: TimelineFrameRecorder.Frame, after: TimelineFrameRecorder.Frame): List<String> {
+    val keyOf = before.keyByMessage().toMap()
+    return after.keyByMessage().mapNotNull { (message, key) ->
+        keyOf[message]?.takeIf { it != key }?.let { "${after.label}: $message moved from key $it to $key" }
+    }
+}
+
+/** A key that left the list and later came back: its row was removed and re-inserted. */
+private fun returningKeys(frames: List<TimelineFrameRecorder.Frame>): List<String> {
     val gone = mutableMapOf<String, Int>()
-    frames.forEach { frame ->
-        frame.rows.flatMap { row -> row.messages.map { it to row.key } }.groupBy({ it.first }, { it.second })
-            .filterValues { it.size > 1 }
-            .forEach { (message, keys) -> problems += "frame ${frame.index} [${frame.step}]: $message drawn twice under $keys" }
-    }
-    frames.zipWithNext().forEach { (before, after) ->
-        val keyOf = before.rows.flatMap { row -> row.messages.map { it to row.key } }.toMap()
-        after.rows.forEach { row ->
-            row.messages.forEach { message ->
-                val was = keyOf[message]
-                if (was != null && was != row.key) {
-                    problems += "frame ${after.index} [${after.step}]: $message moved from key $was to ${row.key}"
-                }
-            }
-        }
+    return frames.zipWithNext().flatMap { (before, after) ->
         (before.keys - after.keys.toSet()).forEach { gone[it] = after.index }
-        after.keys.filter { it in gone }.forEach { key ->
-            problems += "frame ${after.index} [${after.step}]: key $key left at frame ${gone[key]} and came back"
-            gone.remove(key)
+        after.keys.mapNotNull { key ->
+            gone.remove(key)?.let { left -> "${after.label}: key $key left at frame $left and came back" }
         }
     }
-    return problems
 }
