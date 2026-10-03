@@ -130,13 +130,20 @@ private value class LogicalMessageId(val value: String)
 private data class FrameIdentity(val logicalId: LogicalMessageId, val turnId: String)
 
 /** What decides which logical message a text frame belongs to: its type, then `message_id`, then `otid`. */
-private data class TextFrameKey(val type: String, val messageId: String?, val otid: String?)
+private data class TextFrameKey(
+    val type: String,
+    val messageId: String?,
+    val otid: String?,
+    /** The App Server's stable stored-row id (`ui-msg-N`, `ui-msg-N:reasoning:0`), else null. */
+    val storedRowId: String?,
+)
 
 private data class StampedText(val text: String, val seq: Int)
 
 /**
  * Where one assistant / reasoning message ends and the next begins within a turn, in precedence
- * order: the upstream `message_id`, else its `otid`, else "a frame of a different message_type was
+ * order: the upstream `message_id`, else its `otid`, else the App Server's stable stored-row id
+ * (`ui-msg-*`, used as the logical id itself), else "a frame of a different message_type was
  * seen since the last text frame of this type". `run_id` and the rotating delta `id` never count.
  */
 private class TextMessageBoundaries(private val mintId: () -> LogicalMessageId) {
@@ -145,10 +152,17 @@ private class TextMessageBoundaries(private val mintId: () -> LogicalMessageId) 
     private var lastStampedType: String? = null
 
     fun textMessageId(key: TextFrameKey): LogicalMessageId {
+        key.takeIf { it.messageId == null && it.otid == null }?.storedRowId?.let { return storedRowMessageId(key.type, it) }
         val explicitKey = listOfNotNull(key.messageId?.let { "m:$it" }, key.otid?.let { "o:$it" }).firstOrNull()
         val id = explicitKey?.let { explicit.getOrPut("${key.type}|$it", mintId) } ?: segmentedId(key.type)
         lastStampedType = key.type
         return id
+    }
+
+    /** The wire id is stable on every frame and equals the stored row id, so it is the logical id. */
+    private fun storedRowMessageId(type: String, rowId: String): LogicalMessageId {
+        lastStampedType = type
+        return LogicalMessageId(rowId)
     }
 
     fun noteNonTextFrame(type: String) {
@@ -183,7 +197,12 @@ private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject) {
 
     private val textField: String get() = if (type == "assistant_message") "content" else "reasoning"
 
-    fun boundaryKey() = TextFrameKey(type.orEmpty(), delta.stampString("message_id"), delta.stampString("otid"))
+    fun boundaryKey() = TextFrameKey(
+        type.orEmpty(),
+        delta.stampString("message_id"),
+        delta.stampString("otid"),
+        delta.stampString("id")?.takeIf { it.startsWith("ui-msg-") },
+    )
 
     fun textChunk(): String? =
         textFrom(delta[textField]) ?: textFrom(delta["content"]) ?: textFrom(delta["text"])
