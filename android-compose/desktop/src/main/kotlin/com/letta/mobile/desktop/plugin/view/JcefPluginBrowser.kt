@@ -12,7 +12,6 @@ import org.cef.handler.CefRequestHandlerAdapter
 import org.cef.handler.CefResourceHandler
 import org.cef.handler.CefResourceRequestHandler
 import org.cef.handler.CefResourceRequestHandlerAdapter
-import org.cef.misc.BoolRef
 import org.cef.network.CefRequest
 import java.awt.Component
 import javax.swing.SwingUtilities
@@ -59,35 +58,30 @@ internal class JcefPluginBrowser private constructor(
             val router = CefMessageRouter.create(config)
             router.addHandler(JcefQueryHandler(wiring.queries), true)
             client.addMessageRouter(router)
-            client.addRequestHandler(RequestHandler(wiring))
+            client.addRequestHandler(RenderFaults(wiring))
             client.addLifeSpanHandler(JcefNoPopups)
             client.addDownloadHandler(JcefNoDownloads)
             client.addContextMenuHandler(JcefNoContextMenu)
             client.addLoadHandler(LoadFaults(wiring))
-            val context = CefRequestContext.createContext(null)
+            val context = isolatedContext(ResourceHandler(wiring))
             val browser = client.createBrowser(wiring.server.url, false, false, context)
             return JcefPluginBrowser(client, context, router, browser)
         }
+
+        /**
+         * The view's own in-memory request context; every request made in it, navigations included,
+         * goes through [resources]. A download is never handed to CEF's default handling.
+         */
+        private fun isolatedContext(resources: CefResourceRequestHandler): CefRequestContext =
+            CefRequestContext.createContext { _, _, _, _, isDownload, _, disableDefaultHandling ->
+                disableDefaultHandling?.set(isDownload)
+                resources
+            }
     }
 }
 
-/** Every request through the [PluginViewRequestPolicy]; a renderer that dies hands its element back to the card. */
-private class RequestHandler(private val wiring: JcefViewWiring) : CefRequestHandlerAdapter() {
-    private val resources = ResourceHandler(wiring)
-
-    override fun getResourceRequestHandler(
-        browser: CefBrowser?,
-        frame: CefFrame?,
-        request: CefRequest?,
-        isNavigation: Boolean,
-        isDownload: Boolean,
-        requestInitiator: String?,
-        disableDefaultHandling: BoolRef?,
-    ): CefResourceRequestHandler {
-        disableDefaultHandling?.set(isDownload)
-        return resources
-    }
-
+/** A renderer that dies hands its element back to the card. */
+private class RenderFaults(private val wiring: JcefViewWiring) : CefRequestHandlerAdapter() {
     override fun onRenderProcessTerminated(
         browser: CefBrowser?,
         status: CefRequestHandler.TerminationStatus?,
