@@ -138,9 +138,9 @@ class ConversationTurnFanoutInitiatorBackpressureTest {
         val fanout = fanoutFor(registry, initiator, ObserverWriteQueue(backgroundScope))
 
         val start = testScheduler.currentTime
-        fanout.onDraft(assistantDelta("Hel"))
-        fanout.onDraft(assistantDelta("lo wor"))
-        fanout.onDraft(assistantDelta("ld"))
+        fanout.onStampedDraft(assistantDelta("Hel"))
+        fanout.onStampedDraft(assistantDelta("lo wor"))
+        fanout.onStampedDraft(assistantDelta("ld"))
         val elapsed = testScheduler.currentTime - start
 
         // Before this change each of these awaited a 5s write: 15s of drain
@@ -158,9 +158,9 @@ class ConversationTurnFanoutInitiatorBackpressureTest {
 
         val fanout = fanoutFor(registry, initiator, ObserverWriteQueue(backgroundScope))
 
-        fanout.onDraft(assistantDelta("Hel"))
-        fanout.onDraft(assistantDelta("lo world"))
-        fanout.onDraft(terminal())
+        fanout.onStampedDraft(assistantDelta("Hel"))
+        fanout.onStampedDraft(assistantDelta("lo world"))
+        fanout.onStampedDraft(terminal())
 
         // The terminal drains the chain, so everything queued ahead of it has
         // landed by the time onDraft returns -- the turn cannot complete with
@@ -185,8 +185,8 @@ class ConversationTurnFanoutInitiatorBackpressureTest {
         // sequence of prefixes.
         val chunks = listOf("a", "b", "c", "d", "e")
         val expectedOnWire = listOf("a", "ab", "abc", "abcd", "abcde")
-        chunks.forEach { fanout.onDraft(assistantDelta(it)) }
-        fanout.onDraft(terminal())
+        chunks.forEach { fanout.onStampedDraft(assistantDelta(it)) }
+        fanout.onStampedDraft(terminal())
 
         val frames = sinkInit.frames()
         assertEquals(expectedOnWire, assistantContents(frames), "per-viewer frame order preserved")
@@ -222,12 +222,12 @@ class ConversationTurnFanoutInitiatorBackpressureTest {
         // Legacy/test construction: no ObserverWriteQueue wired in.
         val fanout = fanoutFor(registry, initiator, observerWrites = null)
 
-        fanout.onDraft(assistantDelta("Hel"))
+        fanout.onStampedDraft(assistantDelta("Hel"))
         // With no queue the write completed inline, before onDraft returned.
         assertTrue(sinkInit.frames().isNotEmpty(), "no-queue path writes synchronously")
 
-        fanout.onDraft(assistantDelta("lo world"))
-        fanout.onDraft(terminal())
+        fanout.onStampedDraft(assistantDelta("lo world"))
+        fanout.onStampedDraft(terminal())
         val frames = sinkInit.frames()
         assertEquals(listOf("Hel", "Hello world"), assistantContents(frames))
         assertEquals(1, countTerminals(frames))

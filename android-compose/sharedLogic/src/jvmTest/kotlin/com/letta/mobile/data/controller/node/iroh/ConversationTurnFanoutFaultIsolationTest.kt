@@ -138,9 +138,9 @@ class ConversationTurnFanoutFaultIsolationTest {
 
         val fanout = fanoutFor(registry, initiator)
         // Full ordered turn: two assistant deltas + terminal. Must NOT throw.
-        fanout.onDraft(assistantDelta("Hel"))
-        fanout.onDraft(assistantDelta("lo world"))
-        fanout.onDraft(terminal())
+        fanout.onStampedDraft(assistantDelta("Hel"))
+        fanout.onStampedDraft(assistantDelta("lo world"))
+        fanout.onStampedDraft(terminal())
 
         // Initiator got the full ordered sequence + exactly one terminal.
         val frames = sinkInit.frames()
@@ -175,9 +175,9 @@ class ConversationTurnFanoutFaultIsolationTest {
         )
 
         val start = testScheduler.currentTime
-        fanout.onDraft(assistantDelta("Hel"))       // first delta: observer times out -> dropped
-        fanout.onDraft(assistantDelta("lo world"))
-        fanout.onDraft(terminal())
+        fanout.onStampedDraft(assistantDelta("Hel"))       // first delta: observer times out -> dropped
+        fanout.onStampedDraft(assistantDelta("lo world"))
+        fanout.onStampedDraft(terminal())
         val elapsed = testScheduler.currentTime - start
 
         // Initiator got the full sequence + terminal.
@@ -207,8 +207,8 @@ class ConversationTurnFanoutFaultIsolationTest {
 
         val fanout = fanoutFor(registry, initiator)
         // Two deltas broadcast BEFORE the observer joins.
-        fanout.onDraft(assistantDelta("Hel"))
-        fanout.onDraft(assistantDelta("lo wor"))
+        fanout.onStampedDraft(assistantDelta("Hel"))
+        fanout.onStampedDraft(assistantDelta("lo wor"))
 
         // Observer registers mid-turn (as its own message.list subscribe would).
         val sinkObs = FakeSink()
@@ -216,8 +216,8 @@ class ConversationTurnFanoutFaultIsolationTest {
         registry.register(conversationId, observer)
 
         // Remaining cumulative delta + terminal.
-        fanout.onDraft(assistantDelta("ld"))
-        fanout.onDraft(terminal())
+        fanout.onStampedDraft(assistantDelta("ld"))
+        fanout.onStampedDraft(terminal())
 
         // The mid-turn joiner received the REMAINING cumulative delta (which
         // carries the full text so far) + the terminal — converges to final.
@@ -239,7 +239,7 @@ class ConversationTurnFanoutFaultIsolationTest {
         val observerRegistration = registry.register(conversationId, observer)
 
         val fanout = fanoutFor(registry, initiator)
-        fanout.onDraft(assistantDelta("Hel"))
+        fanout.onStampedDraft(assistantDelta("Hel"))
 
         // Observer disconnects mid-stream and releases its exact generation.
         registry.release(observerRegistration)
@@ -250,8 +250,8 @@ class ConversationTurnFanoutFaultIsolationTest {
 
         // Broadcaster stops writing to it: it received only the pre-disconnect delta.
         val before = sinkObs.frames().size
-        fanout.onDraft(assistantDelta("lo world"))
-        fanout.onDraft(terminal())
+        fanout.onStampedDraft(assistantDelta("lo world"))
+        fanout.onStampedDraft(terminal())
         assertEquals(before, sinkObs.frames().size, "no writes after disconnect")
 
         // Initiator unaffected: full sequence + terminal.
