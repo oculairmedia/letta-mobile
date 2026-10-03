@@ -196,9 +196,11 @@ private suspend fun executeApplyOps(
     input: JsonObject,
 ): ExternalToolResult {
     val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
-    // Read as the host reads it: identity optional, embedded JSON as string or object.
-    val suppliedOps = HostCanvasToolInputs.ops(opsJson)
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
+        val suppliedOps = when (val prepared = CanvasBatchSteps.prepare(doc.sceneJson, opsJson)) {
+            is CanvasOpsRead.Refused -> return@executeAuthorizedMutation ExternalToolResult.Error(prepared.message)
+            is CanvasOpsRead.Ready -> prepared.ops
+        }
         // The caller has already passed the write check; every op it sends is its own, whatever
         // actor the input named, so the log, the broadcast and scene provenance all carry it.
         val callerOps = suppliedOps.map { it.withActor(callerId) }
@@ -214,6 +216,22 @@ private suspend fun executeApplyOps(
         ExternalToolResult.Success(
             canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision, canvasId = doc.id.value))
         )
+    }
+}
+
+/**
+ * A `dry_run` of canvas_apply_ops. Connect is expanded against the board first, so a check
+ * sees the arrow the batch would publish and a refusal publishes nothing.
+ */
+private suspend fun applyOpsDryRun(context: CanvasToolContext, input: JsonObject): ExternalToolResult? {
+    if (!CanvasDryRun.requested(input)) return null
+    val opsJson = input["ops"] ?: return null
+    return when (val lookup = findCanvasDocument(context, input)) {
+        is CanvasLookupResult.Error -> lookup.result
+        is CanvasLookupResult.Found -> when (val prepared = CanvasBatchSteps.prepare(lookup.doc.sceneJson, opsJson)) {
+            is CanvasOpsRead.Refused -> ExternalToolResult.Error(prepared.message)
+            is CanvasOpsRead.Ready -> CanvasAppDryRun.answer(lookup.doc, prepared.ops, context.resolveCallerId(), context.kinds)
+        }
     }
 }
 
@@ -461,7 +479,7 @@ class CanvasApplyOpsTool(
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
         runWithContext(agentId, "Failed to apply ops") { context ->
-            dryRun(context, input, CanvasAppDryRun::applyOps) ?: executeApplyOps(context, input)
+            applyOpsDryRun(context, input) ?: executeApplyOps(context, input)
         }
 
     companion object {
