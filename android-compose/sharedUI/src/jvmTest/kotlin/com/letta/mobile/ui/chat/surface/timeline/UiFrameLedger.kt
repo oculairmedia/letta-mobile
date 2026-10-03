@@ -15,11 +15,12 @@ import java.util.TreeMap
 /**
  * letta-mobile-29sxj: the rows, evidence, tool index and checkpoint of one conversation, held in
  * memory for the frame harness. [save] and [restore] give [UiFrameTimelineStore] the rollback a
- * real store's transaction has.
+ * real store's transaction has. Paging reads on its own threads while the engine writes, so every
+ * access is synchronized; the real stores get that from their database.
  */
 internal class UiFrameLedger {
-    var checkpoint = TimelineDurableCheckpoint(0, TimelineContinuation.Initial, true)
-    var toolSweepGeneration = 0L
+    @Volatile var checkpoint = TimelineDurableCheckpoint(0, TimelineContinuation.Initial, true)
+    @Volatile var toolSweepGeneration = 0L
     private var rows = TreeMap<TimelinePageKey, TimelineStoredRecord>()
     private var evidence = HashMap<String, ByteArray>()
     private var tools = HashMap<String, TimelineToolIndexEntry>()
@@ -33,9 +34,9 @@ internal class UiFrameLedger {
         val tools: HashMap<String, TimelineToolIndexEntry>,
     )
 
-    fun save() = Saved(checkpoint, toolSweepGeneration, TreeMap(rows), HashMap(evidence), HashMap(tools))
+    @Synchronized fun save() = Saved(checkpoint, toolSweepGeneration, TreeMap(rows), HashMap(evidence), HashMap(tools))
 
-    fun restore(saved: Saved) {
+    @Synchronized fun restore(saved: Saved) {
         checkpoint = saved.checkpoint
         toolSweepGeneration = saved.toolSweepGeneration
         rows = saved.rows
@@ -43,21 +44,21 @@ internal class UiFrameLedger {
         tools = saved.tools
     }
 
-    fun put(record: TimelineStoredRecord) {
+    @Synchronized fun put(record: TimelineStoredRecord) {
         rows[record.key] = record.copy(body = record.body.copyOf())
     }
 
-    fun remove(identity: TimelineMessageId) {
+    @Synchronized fun remove(identity: TimelineMessageId) {
         rows.keys.removeAll { it.identity == identity }
     }
 
-    fun locate(identity: TimelineMessageId): TimelinePageKey? = rows.keys.singleOrNull { it.identity == identity }
+    @Synchronized fun locate(identity: TimelineMessageId): TimelinePageKey? = rows.keys.singleOrNull { it.identity == identity }
 
-    fun body(pointer: TimelineBodyPointer): ByteArray =
+    @Synchronized fun body(pointer: TimelineBodyPointer): ByteArray =
         rows.values.single { it.key.identity.value == pointer.value }.body
 
     /** The rows a read at [position] selects, with the exclusive neighbours either side. */
-    fun page(position: TimelineReadPosition, limit: Int): TimelineMetadataPage {
+    @Synchronized fun page(position: TimelineReadPosition, limit: Int): TimelineMetadataPage {
         val selected = select(position, limit)
         val older = selected.firstOrNull()?.let { rows.lowerKey(it.key) }
         val newer = selected.lastOrNull()?.let { rows.higherKey(it.key) }
@@ -75,24 +76,24 @@ internal class UiFrameLedger {
         is TimelineReadPosition.Around -> listOfNotNull(rows[position.key])
     }
 
-    fun evidenceFor(key: String): ByteArray? = evidence[key]?.copyOf()
+    @Synchronized fun evidenceFor(key: String): ByteArray? = evidence[key]?.copyOf()
 
-    fun putEvidence(key: String, value: ByteArray) {
+    @Synchronized fun putEvidence(key: String, value: ByteArray) {
         evidence[key] = value.copyOf()
     }
 
-    fun deleteEvidence(key: String) {
+    @Synchronized fun deleteEvidence(key: String) {
         evidence.remove(key)
     }
 
-    fun toolCall(callId: String): TimelineToolIndexEntry? = tools[callId]
+    @Synchronized fun toolCall(callId: String): TimelineToolIndexEntry? = tools[callId]
 
-    fun putToolCall(entry: TimelineToolIndexEntry) {
+    @Synchronized fun putToolCall(entry: TimelineToolIndexEntry) {
         tools[entry.callId] = entry
     }
 
     /** Owned, unreturned tool calls strictly after [afterCallId], ascending, at most [limit]. */
-    fun unresolvedTools(afterCallId: String?, limit: Int): List<TimelineToolIndexEntry> =
+    @Synchronized fun unresolvedTools(afterCallId: String?, limit: Int): List<TimelineToolIndexEntry> =
         tools.values.filter { it.owner != null && !it.returned && (afterCallId == null || it.callId > afterCallId) }
             .sortedBy { it.callId }.take(limit)
 }

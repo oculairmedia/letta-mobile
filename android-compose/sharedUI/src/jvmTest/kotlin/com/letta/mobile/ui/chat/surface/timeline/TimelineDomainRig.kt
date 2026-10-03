@@ -38,7 +38,11 @@ internal class TimelineDomainRig private constructor(
     private val ui: CoroutineScope,
     val presentation: CanonicalTimelinePresentation,
     private val transport: MutableDurableTransport,
+    private val store: UiFrameTimelineStore,
 ) {
+    /** Why the store failed, if it did: the first thing to read when a step stalls. */
+    val storeFailures: String get() = store.failures.joinToString { it.toString() }
+
     /** The App Server `message.list` recent page, swapped per test step. Every other call fails the test. */
     class MutableDurableTransport : TimelineTransport by unexpectedTransport() {
         @Volatile var durable: List<LettaMessage> = emptyList()
@@ -97,11 +101,12 @@ internal class TimelineDomainRig private constructor(
 
         suspend fun open(scope: TimelineScope): TimelineDomainRig {
             val transport = MutableDurableTransport()
-            val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(READ_LATENCY_MILLIS), transport)
+            val store = UiFrameTimelineStore(READ_LATENCY_MILLIS)
+            val coordinator = CanonicalTimelineCoordinator(store, transport)
             val owner = coordinator.acquire(scope)
             val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
-            return TimelineDomainRig(coordinator, owner, ui, presentation, transport)
+            return TimelineDomainRig(coordinator, owner, ui, presentation, transport, store)
         }
 
         /** A transport whose every call fails the test; subclasses override only what a step expects. */

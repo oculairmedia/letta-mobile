@@ -90,7 +90,7 @@ internal class TimelineUiFrameRecorder(
         advance(step, minFrames)
         var extra = 0
         while (!done()) {
-            check(extra++ < MAX_EXTRA_FRAMES) { "$step never finished; last frame: ${recorded.last()}" }
+            check(extra++ < MAX_EXTRA_FRAMES) { "$step never finished (store failures: [${rig.storeFailures}]); last frame: ${recorded.last()}" }
             advance(step, 1)
         }
     }
