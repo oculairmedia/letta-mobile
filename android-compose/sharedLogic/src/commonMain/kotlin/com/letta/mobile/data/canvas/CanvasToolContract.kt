@@ -135,7 +135,13 @@ object CanvasToolContract {
             "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
             "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}, " +
             "owner: explicit (default when a frame is given) | user | auto) and " +
-            "remove_document {documentId} takes it off. " + CanvasSceneSchemaText.PLUGIN_OPS +
+            "remove_document {documentId} takes it off. " +
+            "connect {id, from, to, label?, style?: {strokeColor? #rrggbb or #rrggbbaa, strokeWidth?, dashed?}} draws an arrow " +
+            "between two framed notes or boxed shapes (not lines or arrows), from the midpoint of the side that faces the other " +
+            "to the midpoint of its facing side; the two must not overlap or touch, and a rotated shape is joined at its unrotated box; " +
+            "set_arrow_binding {elementId, binding: {start?: {documentId, side}, end?}} attaches an existing arrow to notes " +
+            "(side is left, top, right or bottom; a null end stays free). " +
+            CanvasSceneSchemaText.PLUGIN_OPS +
             " opId, actorId and lamport are filled in by the host. " +
             "To create notes, checklists, cards or text, use $COMPOSE instead: it places and sizes them for you. " +
             "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
