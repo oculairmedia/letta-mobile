@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop.plugin.view
 
 import java.lang.reflect.InvocationTargetException
-import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
@@ -31,30 +30,24 @@ internal class JcefQueryHandler(private val queries: PluginViewQueryRouter) {
      * The router handler JCEF registers. Its fixed six-argument `onQuery` callback is captured into one
      * [JcefQueryCall] by a dynamic proxy, so no hand-written function here takes six parameters.
      */
-    fun asRouterHandler(): CefMessageRouterHandler {
-        val fallback = JcefInertRouterHandler
-        return Proxy.newProxyInstance(
-            CefMessageRouterHandler::class.java.classLoader,
-            arrayOf(CefMessageRouterHandler::class.java),
-        ) { _, method, args -> dispatch(method, args, fallback) } as CefMessageRouterHandler
-    }
-
-    private fun dispatch(method: Method, args: Array<Any?>?, fallback: CefMessageRouterHandler): Any? {
-        if (!isOnQuery(method, args)) return invokeFallback(method, args, fallback)
-        val queryArgs = requireNotNull(args)
-        val frame = queryArgs[FRAME_INDEX] as? CefFrame
-        val request = queryArgs[REQUEST_INDEX] as? String
-        handle(JcefQueryCall(frame, request, queryArgs[CALLBACK_INDEX] as? CefQueryCallback))
-        return true
-    }
-
-    private fun isOnQuery(method: Method, args: Array<Any?>?): Boolean = method.name == "onQuery" && args?.size == ON_QUERY_ARITY
-
-    private fun invokeFallback(method: Method, args: Array<Any?>?, fallback: CefMessageRouterHandler): Any? = try {
-        method.invoke(fallback, *(args ?: emptyArray()))
-    } catch (e: InvocationTargetException) {
-        throw e.targetException
-    }
+    fun asRouterHandler(): CefMessageRouterHandler = Proxy.newProxyInstance(
+        CefMessageRouterHandler::class.java.classLoader,
+        arrayOf(CefMessageRouterHandler::class.java),
+    ) { _, method, args ->
+        val call = args?.takeIf { method.name == "onQuery" && it.size == ON_QUERY_ARITY }?.let {
+            JcefQueryCall(it[FRAME_INDEX] as? CefFrame, it[REQUEST_INDEX] as? String, it[CALLBACK_INDEX] as? CefQueryCallback)
+        }
+        if (call != null) {
+            handle(call)
+            true
+        } else {
+            try {
+                method.invoke(JcefInertRouterHandler, *(args ?: emptyArray()))
+            } catch (e: InvocationTargetException) {
+                throw e.targetException
+            }
+        }
+    } as CefMessageRouterHandler
 
     private companion object {
         const val QUERY_REFUSED = 403
