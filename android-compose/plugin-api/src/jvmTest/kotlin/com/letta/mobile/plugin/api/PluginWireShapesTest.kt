@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 /** The SPI's DTOs are the LCP wire shapes (plan section 5): their JSON spelling is part of the contract. */
@@ -41,11 +42,11 @@ class PluginWireShapesTest {
 
     @Test
     fun `snapshot bytes travel as base64`() {
-        assertWire(
-            SnapshotSource.serializer(),
-            SnapshotSource.Bytes("image/png", byteArrayOf(1, 2, 3)),
-            """{"type":"bytes","mediaType":"image/png","bytes":"AQID"}""",
-        )
+        val wire = """{"type":"bytes","mediaType":"image/png","bytes":"AQID"}"""
+        assertEquals(wire, json.encodeToString(SnapshotSource.serializer(), SnapshotSource.Bytes("image/png", byteArrayOf(1, 2, 3))))
+        val decoded = json.decodeFromString(SnapshotSource.serializer(), wire) as SnapshotSource.Bytes
+        assertEquals("image/png", decoded.mediaType)
+        assertContentEquals(byteArrayOf(1, 2, 3), decoded.bytes)
         assertWire(SnapshotSource.serializer(), SnapshotSource.Asset("sha256:ab"), """{"type":"asset","ref":"sha256:ab"}""")
     }
 

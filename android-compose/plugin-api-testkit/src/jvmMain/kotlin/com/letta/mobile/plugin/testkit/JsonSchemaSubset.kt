@@ -13,7 +13,11 @@ import kotlinx.serialization.json.longOrNull
 /** A JSON pointer (RFC 6901) into the value being checked; the root is the empty pointer. */
 @JvmInline
 internal value class JsonPointer(private val path: String) {
-    fun child(segment: Any): JsonPointer = JsonPointer("$path/$segment")
+    /** The pointer to the field [name] (escaped as RFC 6901 says). */
+    fun child(name: String): JsonPointer = JsonPointer("$path/" + name.replace("~", "~0").replace("/", "~1"))
+
+    /** The pointer to the array item at [index]. */
+    fun child(index: Int): JsonPointer = JsonPointer("$path/$index")
 
     override fun toString(): String = path.ifEmpty { "(root)" }
 

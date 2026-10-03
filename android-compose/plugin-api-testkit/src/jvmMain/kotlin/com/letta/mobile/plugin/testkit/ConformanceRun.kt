@@ -10,6 +10,7 @@ import com.letta.mobile.plugin.api.ElementEventType
 import com.letta.mobile.plugin.api.LcpMethod
 import com.letta.mobile.plugin.api.PluginElementView
 import com.letta.mobile.plugin.api.PluginHealth
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -47,16 +48,18 @@ internal class ConformanceRun(
     private val plugin: CanvasPlugin,
     private val manifest: ConformanceManifest,
     private val options: ConformanceOptions,
+    scope: CoroutineScope,
 ) {
     private val findings = CopyOnWriteArrayList<ConformanceFinding>()
     private val secrets = options.secretsFor(manifest)
     private val host = FakePluginHost(
         manifest = manifest,
+        scope = scope,
         settings = options.settings ?: manifest.defaultSettings(),
         secrets = secrets,
         httpHandler = options.httpHandler,
     )
-    private val caller = DeadlineCaller(options) { findings += it }
+    private val caller = DeadlineCaller(options, finding = { findings += it })
     private val said = PluginOutputs()
     private var calls = 0
 
@@ -64,17 +67,16 @@ internal class ConformanceRun(
         host.phase = HostPhase.INITIALIZING
         if (start()) exercise()
         stop()
-        caller.close()
         val leaks = SecretScan.leaks(secrets, said.with(host))
         return ConformanceReport(findings + host.violations + leaks)
     }
 
     private suspend fun start(): Boolean {
-        val info = caller.call(LcpMethod.INITIALIZE) { plugin.initialize(host) }
+        val info = caller.callBlocking(LcpMethod.INITIALIZE) { plugin.initialize(host) }
         if (info is CallOutcome.Answered) said.add("the plugin info", info.value.toString())
         if (!completed(info, LifecycleStep.INITIALIZE)) return false
         host.phase = HostPhase.ACTIVE
-        return completed(caller.call(LcpMethod.ACTIVATE) { plugin.activate() }, LifecycleStep.ACTIVATE)
+        return completed(caller.callBlocking(LcpMethod.ACTIVATE) { plugin.activate() }, LifecycleStep.ACTIVATE)
     }
 
     private suspend fun exercise() {
@@ -82,18 +84,18 @@ internal class ConformanceRun(
         manifest.actions.forEach { (name, action) -> invokeDeclared(requestFor(name, action)) }
         invokeUndeclared()
         host.elements.forEach { sendEvents(it) }
-        lifecycleCall(LifecycleStep.SETTINGS_CHANGED) { plugin.onSettingsChanged(host.settings) }
+        blockingStep(LifecycleStep.SETTINGS_CHANGED) { plugin.onSettingsChanged(host.settings) }
     }
 
     private suspend fun stop() {
-        lifecycleCall(LifecycleStep.DEACTIVATE) { plugin.deactivate() }
-        lifecycleCall(LifecycleStep.SECOND_DEACTIVATE) { plugin.deactivate() }
+        blockingStep(LifecycleStep.DEACTIVATE) { plugin.deactivate() }
+        blockingStep(LifecycleStep.SECOND_DEACTIVATE) { plugin.deactivate() }
         host.close()
         delay(options.settleMillis)
     }
 
     private suspend fun checkHealth() {
-        val outcome = caller.call(LcpMethod.HEALTH) { plugin.health() }
+        val outcome = caller.callBlocking(LcpMethod.HEALTH) { plugin.health() }
         completed(outcome, LifecycleStep.HEALTH)
         val health = (outcome as? CallOutcome.Answered)?.value ?: return
         said.add("health", health.toString())
@@ -150,6 +152,10 @@ internal class ConformanceRun(
 
     private suspend fun lifecycleCall(step: LifecycleStep, block: suspend () -> Unit) {
         completed(caller.call(step.method, block), step)
+    }
+
+    private suspend fun blockingStep(step: LifecycleStep, block: () -> Unit) {
+        completed(caller.callBlocking(step.method, block), step)
     }
 
     /** Whether the call answered; a throw is a [ConformanceRule.LIFECYCLE] finding (a late call is already a deadline one). */

@@ -76,7 +76,11 @@ public sealed interface SnapshotSource {
     @SerialName("asset")
     public data class Asset(public val ref: String) : SnapshotSource
 
-    /** Raw [bytes] of [mediaType] (base64 on the wire), stored by the host on emit. */
+    /**
+     * Raw [bytes] of [mediaType] (base64 on the wire), stored by the host on emit. A carrier, not
+     * a value: two instances are equal only when they are the same instance (compare [bytes] with
+     * `contentEquals`).
+     */
     @Serializable
     @SerialName("bytes")
     public class Bytes(
@@ -84,11 +88,6 @@ public sealed interface SnapshotSource {
         @Serializable(with = Base64ByteArraySerializer::class)
         public val bytes: ByteArray,
     ) : SnapshotSource {
-        override fun equals(other: Any?): Boolean =
-            other is Bytes && other.mediaType == mediaType && other.bytes.contentEquals(bytes)
-
-        override fun hashCode(): Int = 31 * mediaType.hashCode() + bytes.contentHashCode()
-
         override fun toString(): String = "Bytes(mediaType=$mediaType, size=${bytes.size})"
     }
 }

@@ -7,6 +7,8 @@ import com.letta.mobile.plugin.api.PlaceElement
 import com.letta.mobile.plugin.api.PluginEmit
 import com.letta.mobile.plugin.api.PluginHostException
 import com.letta.mobile.plugin.api.PluginHttpResponse
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,7 +20,8 @@ import kotlin.test.assertTrue
 
 /** The fake host on its own, as a plugin's unit tests use it. */
 class FakePluginHostTest {
-    private val host = FakePluginHost(SamplePlugin.manifest, secrets = mapOf("apiToken" to "t0ken-value"))
+    private val scope = CoroutineScope(SupervisorJob())
+    private val host = FakePluginHost(SamplePlugin.manifest, scope, secrets = mapOf("apiToken" to "t0ken-value"))
 
     private fun card(label: String) = PlaceElement(
         kind = "card",
@@ -51,7 +54,7 @@ class FakePluginHostTest {
 
     @Test
     fun `the http client answers allowed origins and refuses others`() = runBlocking {
-        val answering = FakePluginHost(SamplePlugin.manifest, httpHandler = { PluginHttpResponse(204, emptyMap(), ByteArray(0)) })
+        val answering = FakePluginHost(SamplePlugin.manifest, scope, httpHandler = { PluginHttpResponse(204, emptyMap(), ByteArray(0)) })
         assertEquals(204, answering.httpClient.get("https://api.sample.test/x").status)
         val refused = assertFailsWith<PluginHostException> { answering.httpClient.get("https://api.sample.test.evil/x") }
         assertEquals(PluginHostException.ORIGIN_DENIED, refused.code)
