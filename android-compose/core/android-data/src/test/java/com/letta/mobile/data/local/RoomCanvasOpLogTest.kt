@@ -3,8 +3,20 @@ package com.letta.mobile.data.local
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.data.canvas.CanvasAcl
+import com.letta.mobile.data.canvas.CanvasConversationOptions
+import com.letta.mobile.data.canvas.CanvasCreateOptions
+import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasGeometryOwner
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.canvas.CanvasOpProjector
+import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.movePluginElement
+import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
+import com.letta.mobile.data.canvas.removePluginElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -128,5 +140,80 @@ class RoomCanvasOpLogTest {
         val retrieved = opLog.getOps(canvasId, 0L)
         assertEquals(1, retrieved.size)
         assertEquals(batch, retrieved.first())
+    }
+
+    /**
+     * letta-mobile-s416w.3: plugin elements on Android, the Room document store and the Room op log
+     * together, with no schema change. After a restart (new store and log over the same database)
+     * the board holds the same elements, the log replays to them, and a person's move still lands.
+     */
+    @Test
+    fun pluginElementsRoundTripThroughRoomAndARestart() = runBlocking {
+        val canvasId = CanvasId("canvas-ops-plugin")
+        val agent = "agent:room"
+        val frame = CanvasDocumentFrame(100f, 100f, 320f, 240f)
+        val moved = CanvasDocumentFrame(500f, 40f, 320f, 240f)
+        fun place(id: String) = CanvasOp.SetPluginElementOp(
+            opId = "place-$id", actorId = agent, lamport = 0L, elementId = id,
+            elementType = "ext:letta.example/widget", frame = frame,
+            props = JsonObject(mapOf("status" to JsonPrimitive("queued"))),
+            fallback = CanvasPluginFallback("Widget $id", openUrl = "https://example.test/$id"),
+        )
+        val update = CanvasOp.SetPluginElementOp(
+            opId = "progress-a", actorId = agent, lamport = 0L, elementId = "pe-a",
+            props = JsonObject(mapOf("status" to JsonPrimitive("done"))),
+        )
+        val session = CanvasSession.create(
+            RoomCanvasDocumentStore(database.canvasDocumentDao()),
+            CanvasCreateOptions(
+                canvasId = canvasId,
+                acl = CanvasAcl(CanvasSession.LOCAL_USER_ACTOR_ID, writerAgentIds = setOf(agent)),
+                opLog = opLog,
+            ),
+        )
+        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), agent)
+        assertTrue(session.movePluginElement("pe-a", moved) != null)
+        session.applyAgentBatch(listOf(update), agent)
+        assertTrue(session.removePluginElement("pe-b") != null)
+        val before = session.pluginElements()
+
+        val restartedLog = RoomCanvasOpLog(database.canvasOpDao())
+        val reopened = CanvasSession.open(
+            RoomCanvasDocumentStore(database.canvasDocumentDao()),
+            canvasId,
+            CanvasConversationOptions(opLog = restartedLog),
+        )!!
+        assertEquals(before, reopened.pluginElements())
+        val element = reopened.pluginElements().single()
+        assertEquals(moved, element.frame)
+        assertEquals(CanvasGeometryOwner.USER, element.owner)
+        assertEquals(JsonPrimitive("done"), element.props["status"])
+        val logged = restartedLog.getOps(canvasId, 0L)
+        assertEquals(session.opLog.getOps(canvasId, 0L), logged)
+        assertEquals(before, CanvasOpProjector.pluginElementsOf(CanvasOpProjector.project(CanvasOpProjector.emptySceneJson(), logged)))
+
+        assertTrue(reopened.movePluginElement("pe-a", frame) != null)
+        val stored = RoomCanvasDocumentStore(database.canvasDocumentDao()).get(canvasId)!!
+        assertEquals(frame, CanvasOpProjector.pluginElementsOf(stored.sceneJson).single().frame)
+    }
+
+    @Test
+    fun pluginElementOpsKeepTheirTypeNamesAndLoadFromANewerBuild() = runBlocking {
+        val canvasId = CanvasId("canvas-ops-plugin-newer")
+        val remove = CanvasOp.RemovePluginElementOp("rm-1", "local_user", 1L, "pe-1")
+        assertEquals("remove_plugin_element", CanvasOpEntity.fromCanvasOp(canvasId, remove).opType)
+        val set = CanvasOp.SetPluginElementOp("set-1", "local_user", 2L, "pe-1", frame = CanvasDocumentFrame(1f, 2f, 3f, 4f))
+        assertEquals("set_plugin_element", CanvasOpEntity.fromCanvasOp(canvasId, set).opType)
+
+        // A row a newer build wrote: fields this build does not know are ignored, not fatal.
+        val newer = """{"type":"set_plugin_element","opId":"newer-1","actorId":"plugin:x","lamport":3,"elementId":"pe-1",""" +
+            """"props":{"status":"done"},"layer":"top","snapshot":{"assetRef":"sha256:ab","blurhash":"L6PZ"}}"""
+        database.canvasOpDao().insert(
+            CanvasOpEntity("newer-1", canvasId.value, 3L, "plugin:x", "set_plugin_element", newer, 0L),
+        )
+        val loaded = opLog.getOps(canvasId, 0L).single() as CanvasOp.SetPluginElementOp
+        assertEquals("pe-1", loaded.elementId)
+        assertEquals("sha256:ab", loaded.snapshot?.assetRef)
+        assertEquals(JsonPrimitive("done"), loaded.props?.get("status"))
     }
 }
