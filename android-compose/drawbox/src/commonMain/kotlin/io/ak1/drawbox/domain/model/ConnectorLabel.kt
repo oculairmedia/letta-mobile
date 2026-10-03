@@ -18,9 +18,11 @@ import kotlin.math.max
  *   visible on each side, the arrowhead's depth ([arrowHeadDepth]) not counting as shaft. So the
  *   chip never covers the arrowhead and a connector never reads as a chip with no line.
  * - **Beside the shaft, without a chip**, otherwise: the label is moved off the midpoint along
- *   the shaft's normal until its box clears the stroke by [BESIDE_GAP_EMS] em. It goes on the
- *   outside of a bent or smoothed curve; on a straight connector, above it when it runs mostly
- *   across and to its left when it runs mostly up or down.
+ *   the shaft's normal until its box clears the stroke by [BESIDE_GAP_EMS] em, and back from the
+ *   arrowhead by half its depth, so it is centred on the shaft the head leaves; a label longer
+ *   than that shaft also clears the head's barbs. It goes on the outside of a bent or smoothed
+ *   curve; on a straight connector, above it when it runs mostly across and to its left when it
+ *   runs mostly up or down.
  *
  * Everything is in world units, so the label scales with the board like the connector does. A
  * selected connector's bend handle is drawn at [bezierMidpoint], over an on-shaft label; that is
@@ -61,20 +63,36 @@ fun Element.Shape.connectorLabelCentre(width: Float, height: Float): Offset {
     val path = linePath()
     val mid = path.pointAt(MID)
     if (fitsOnShaft(path, width, height)) return mid
+    val along = unitOr(path.midDirection(), ACROSS)
     val away = sideAwayFromShaft(path, mid)
-    val clearance = abs(away.x) * width / 2f + abs(away.y) * height / 2f +
-        strokeWidth / 2f + fontSize * BESIDE_GAP_EMS
-    return mid + away * clearance
+    val clearance = halfExtent(away, width, height) + besideLift(path, along, width, height) + fontSize * BESIDE_GAP_EMS
+    // Centred on the stretch of shaft the arrowhead leaves, so the label does not stand over the head.
+    return mid - along * (arrowHeadDepth() / 2f) + away * clearance
 }
 
 private fun Element.Shape.fitsOnShaft(path: LinePath, width: Float, height: Float): Boolean {
     val chord = distance(path.start, path.end)
     val along = unitOr(path.midDirection(), ACROSS)
-    // Half the chip's extent along the shaft: its box projected on the shaft's direction.
-    val halfAlong = abs(along.x) * (width / 2f + CONNECTOR_CHIP_PAD) + abs(along.y) * (height / 2f + CONNECTOR_CHIP_PAD)
+    val halfAlong = halfExtent(along, width + CONNECTOR_CHIP_PAD * 2, height + CONNECTOR_CHIP_PAD * 2)
     val shaftLeft = chord / 2f - arrowHeadDepth() - halfAlong
     return halfAlong * 2f <= chord * MAX_CHIP_SHARE && shaftLeft >= fontSize * SHAFT_SHOWN_EMS
 }
+
+/**
+ * How far a label beside the shaft keeps from the shaft's centre line, besides its gap: half the
+ * stroke, or half the arrowhead's width when the label is longer than the shaft the head leaves,
+ * so it would otherwise stand over the head's barbs.
+ */
+private fun Element.Shape.besideLift(path: LinePath, along: Offset, width: Float, height: Float): Float {
+    val head = arrowHeadDepth()
+    val shaft = distance(path.start, path.end) - head
+    val overHead = head > 0f && halfExtent(along, width, height) * 2f > shaft
+    return if (overHead) max(strokeWidth, arrowHeadSize()) / 2f else strokeWidth / 2f
+}
+
+/** Half a [width] by [height] box's extent along the unit [direction]: its projection on it. */
+private fun halfExtent(direction: Offset, width: Float, height: Float): Float =
+    abs(direction.x) * width / 2f + abs(direction.y) * height / 2f
 
 /**
  * The unit normal of the shaft at its middle on the side the label goes: the outside of the
@@ -106,7 +124,7 @@ private const val ARROW_HEAD_PER_STROKE = 3f
 private val COS_30 = cos(PI / 6).toFloat()
 private const val LABEL_MAX_EMS = 12f
 private const val MAX_CHIP_SHARE = 0.6f
-private const val SHAFT_SHOWN_EMS = 0.5f
+private const val SHAFT_SHOWN_EMS = 1f
 private const val BESIDE_GAP_EMS = 0.3f
 private const val MIN_BULGE = 0.5f
 private const val MIN_DIRECTION = 1e-3f

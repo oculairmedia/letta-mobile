@@ -6,6 +6,7 @@ import io.ak1.drawbox.domain.model.CONNECTOR_CHIP_PAD
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.arrowHeadDepth
+import io.ak1.drawbox.domain.model.arrowHeadSize
 import io.ak1.drawbox.domain.model.bezierMidpoint
 import io.ak1.drawbox.domain.model.connectorLabelCentre
 import io.ak1.drawbox.domain.model.connectorLabelOnChip
@@ -78,9 +79,19 @@ class ConnectorLabelTest {
         val short = arrow(Offset(100f, 200f), Offset(184f, 200f))
         assertFalse(short.connectorLabelOnChip(41f, 16f))
         val centre = short.connectorLabelCentre(41f, 16f)
-        assertEquals(142f, centre.x, 0.01f)
+        // Centred on the shaft the head leaves: from the tail to where the head starts.
+        assertEquals((100f + 184f - short.arrowHeadDepth()) / 2f, centre.x, 0.01f)
+        assertTrue(centre.x + 20.5f <= 184f - short.arrowHeadDepth(), "label stands over the head")
         // Its bottom edge is clear of the 3-unit stroke.
         assertTrue(centre.y + 8f <= 200f - 1.5f, "label bottom ${centre.y + 8f} reaches the shaft")
+    }
+
+    @Test
+    fun aLabelLongerThanTheShaftClearsTheArrowheadsBarbs() {
+        val stub = arrow(Offset(100f, 200f), Offset(160f, 200f))
+        assertFalse(stub.connectorLabelOnChip(80f, 16f))
+        val bottom = stub.connectorLabelCentre(80f, 16f).y + 8f
+        assertTrue(bottom <= 200f - stub.arrowHeadSize() / 2f, "label bottom $bottom is over the head")
     }
 
     @Test
@@ -88,7 +99,7 @@ class ConnectorLabelTest {
         val short = arrow(Offset(100f, 100f), Offset(100f, 190f), fontSize = 20f)
         assertFalse(short.connectorLabelOnChip(62f, 24f))
         val centre = short.connectorLabelCentre(62f, 24f)
-        assertEquals(145f, centre.y, 0.01f)
+        assertTrue(centre.y + 12f <= 190f - short.arrowHeadDepth(), "label stands over the head")
         assertTrue(centre.x + 31f <= 100f - 1.5f, "label right edge ${centre.x + 31f} reaches the shaft")
     }
 

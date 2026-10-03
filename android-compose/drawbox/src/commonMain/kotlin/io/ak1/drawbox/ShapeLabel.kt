@@ -43,7 +43,7 @@ internal fun DrawScope.drawShapeText(
         fontFamilyKey = shape.fontFamilyKey,
         fontSize = shape.fontSize,
         alignment = shape.textAlignment,
-        wrapWidth = box.width.coerceAtLeast(1f),
+        wrap = TextWrap.box(box.width.coerceAtLeast(1f)),
         measurer = textMeasurer,
     )
     drawText(
@@ -73,9 +73,8 @@ private fun DrawScope.drawConnectorLabel(
         fontFamilyKey = shape.fontFamilyKey,
         fontSize = shape.fontSize,
         alignment = shape.textAlignment,
-        wrapWidth = shape.connectorLabelMaxWidth(),
+        wrap = TextWrap.upTo(shape.connectorLabelMaxWidth()),
         measurer = textMeasurer,
-        fitToText = true,
     )
     val width = layout.size.width.toFloat()
     val height = layout.size.height.toFloat()

@@ -258,7 +258,7 @@ fun DrawBox(
     // hidden variant only for the shape whose text an editor is showing.
     val shapeText = remember(state.bgColor) { ShapeTextPaint(hidden = false, chip = state.bgColor) }
     val editedShapeText = remember(shapeText) { shapeText.copy(hidden = true) }
-    fun shapeTextFor(id: String): ShapeTextPaint = if (id in hiddenTextElementIds) editedShapeText else shapeText
+    fun shapeTextFor(element: Element): ShapeTextPaint = if (element.id in hiddenTextElementIds) editedShapeText else shapeText
 
     // Pre-measure every text element at composition time (cache hit when
     // unchanged) and dispatch SyncTextMeasuredHeight when the rendered
@@ -280,7 +280,7 @@ fun DrawBox(
                 fontFamilyKey = el.fontFamilyKey,
                 fontSize = el.fontSize,
                 alignment = el.alignment,
-                wrapWidth = el.wrapWidth.coerceAtLeast(1f),
+                wrap = TextWrap.box(el.wrapWidth.coerceAtLeast(1f)),
                 measurer = textMeasurer,
             )
             val measured = layout.size.height.toFloat()
@@ -947,7 +947,7 @@ fun DrawBox(
                     }) {
                         orderedElements.forEach { el ->
                             if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el.id))
+                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el))
                             }
                         }
                     }
@@ -969,7 +969,7 @@ fun DrawBox(
             }) {
                 if (activeIds.isNotEmpty()) {
                     orderedElements.forEach { el ->
-                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el.id))
+                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el))
                     }
                 }
                 drawSelectionChrome(
@@ -1728,7 +1728,7 @@ private fun DrawScope.drawTextElement(
         fontFamilyKey = element.fontFamilyKey,
         fontSize = element.fontSize,
         alignment = element.alignment,
-        wrapWidth = wrapWidth,
+        wrap = TextWrap.box(wrapWidth),
         measurer = textMeasurer,
     )
     drawText(
