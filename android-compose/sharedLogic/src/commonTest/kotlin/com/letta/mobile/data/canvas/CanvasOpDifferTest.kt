@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -167,5 +168,27 @@ class CanvasOpDifferTest {
             ops.isEmpty(),
             "Autosave comparing metadata-tagged session against clean DrawBox export must produce zero phantom ops (N1), got: $ops"
         )
+    }
+
+    /**
+     * letta-mobile-s416w.3: plugin elements are never DrawBox's. The session scene carries
+     * `_pluginElements` and DrawBox's export does not (the projector strips it before DrawBox), so
+     * autosave must not take the difference for a change: no op, and above all no removal.
+     */
+    @Test
+    fun diff_ignoresPluginElements() {
+        val place = CanvasOp.SetPluginElementOp(
+            opId = "place-1", actorId = "agent:a", lamport = 3L, elementId = "pe-1",
+            elementType = "ext:letta.example/widget", frame = CanvasDocumentFrame(0f, 0f, 100f, 80f),
+            fallback = CanvasPluginFallback("Widget", openUrl = "https://example.test/1"),
+        )
+        val drawing = """{"bgColor":"#ffffffff","elements":[{"id":"el-1","type":"Text","text":"Hi"}]}"""
+        val session = CanvasOpProjector.project(drawing, listOf(place))
+        assertEquals(1, CanvasOpProjector.pluginElementsOf(session).size)
+
+        val noOps = { old: String, new: String -> CanvasOpDiffer.diff(old, new, "local_user", lamportSupplier = { 4L }) }
+        assertTrue(noOps(session, drawing).isEmpty(), "DrawBox's export without _pluginElements is not a change")
+        val moved = CanvasOpProjector.project(session, listOf(place.copy(opId = "move-1", lamport = 4L, frame = CanvasDocumentFrame(9f, 9f, 100f, 80f))))
+        assertTrue(noOps(session, moved).isEmpty(), "a plugin element write is not a drawing change")
     }
 }

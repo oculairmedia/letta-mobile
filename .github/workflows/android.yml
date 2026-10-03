@@ -62,6 +62,10 @@ env:
   # can affect the daemon. CI runs on Java 26, so acknowledge this access at the
   # workflow boundary and keep project-level flags scoped to daemon/test workers.
   GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
+  # Bump to discard the shared Gradle User Home caches. A transient Maven Central
+  # 404 (leakcanary-android .aar, 2026-10-02) was persisted into the main-written
+  # cache as a missing-artifact entry and failed build-apk until it was replaced.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v2
 
 jobs:
   test:
@@ -377,7 +381,11 @@ jobs:
           cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
 
       - name: Build and test Compose web client
-        run: ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
+        # The wasm test executable links all of sharedUI; at the repo-wide
+        # 4 GiB Kotlin daemon heap it thrashes GC for ~50 min, then OOMs.
+        run: >-
+          ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
+          "-Pkotlin.daemon.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
 
       - name: Locate WASM distribution
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

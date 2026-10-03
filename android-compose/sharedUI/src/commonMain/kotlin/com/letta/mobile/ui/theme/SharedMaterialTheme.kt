@@ -13,11 +13,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.collections.immutable.persistentListOf
 
 /**
- * Shared Material 3 Theme for Desktop (JVM) and Web (Wasm).
- * Sourced directly from shared [LettaColorTokens] and [CustomColors] in `:sharedLogic`.
+ * letta-mobile-o4ygk.4.5: the Material 3 theme for hosts of the shared UI that have no platform
+ * theme of their own (the web client): the cool-slate palette from the shared [LettaColorTokens],
+ * the shared [CustomColors], and compact desktop-density type and shapes. Desktop's own
+ * `DesktopMaterialTheme` still draws the same palette from its own copy (letta-mobile-o4ygk.4.8).
  */
 @Composable
 fun SharedMaterialTheme(
@@ -107,14 +108,6 @@ fun SharedMaterialTheme(
             agentAColor = Color(0xFF8B7CF0),
             agentBColor = Color(0xFF4C9AFF),
             agentCColor = Color(0xFFE36FB3),
-            agentGradientColors = persistentListOf(
-                Color(0xFFF0A03C), Color(0xFFE0457B),
-                Color(0xFFE0457B), Color(0xFF8E5CFF),
-                Color(0xFF3FA0F0), Color(0xFF3FE0C0),
-                Color(0xFF7AD08F), Color(0xFF3FA0A0),
-                Color(0xFF8E7CFF), Color(0xFF3F6EF0),
-                Color(0xFF3FC0D0), Color(0xFF3F90A0),
-            ),
             onSurfaceMutedColor = scheme.onSurfaceVariant.copy(alpha = 0.72f),
             categoryPersonaColor = Color(LettaColorTokens.DARK_CATEGORY_PERSONA),
             categoryHumanColor = Color(LettaColorTokens.DARK_CATEGORY_HUMAN),

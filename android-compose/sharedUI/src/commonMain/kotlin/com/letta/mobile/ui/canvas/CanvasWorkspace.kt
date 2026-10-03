@@ -106,9 +106,7 @@ private fun CanvasWorkspaceBoard(host: CanvasWorkspaceHost, modifier: Modifier) 
         // Everything composed inside the board records its document edits into the board's
         // history, so an editor writing a note's text produces undo steps of its own rather than
         // leaving undo with nothing between "the note exists" and "it does not".
-        val documentRecorder = remember(board.session) {
-            CanvasDocumentRecorder { label, block -> board.recordingDocuments(label, block) }
-        }
+        val documentRecorder = remember(board.session) { boardDocumentRecorder(board) }
         CompositionLocalProvider(
             LocalCanvasDocumentRecorder provides documentRecorder,
             LocalCanvasFocusRequest provides board.ui.focusRequest,

@@ -1,13 +1,17 @@
 package com.letta.mobile.web.data
 
-import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.buildContentParts
-import com.letta.mobile.data.model.toJsonArray
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.runtime.BackendId
+import com.letta.mobile.data.transport.appserver.AppServerApprovalAnswer
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerRunControls
+import com.letta.mobile.data.transport.appserver.AppServerTimelineConnection
+import com.letta.mobile.data.transport.appserver.AppServerTimelineTransport
+import com.letta.mobile.ui.chat.session.TimelineChatRunControls
+import com.letta.mobile.ui.chat.session.TimelineChatTarget
+import com.letta.mobile.web.chat.WebChatBinding
 import com.letta.mobile.web.iroh.IrohWasmAppServerTransport
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
@@ -18,22 +22,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.random.Random
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import com.letta.mobile.runtime.BackendId
-import com.letta.mobile.runtime.ConversationId
-import com.letta.mobile.runtime.RuntimeEventPayload
-import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.RuntimeRunStatus
-import com.letta.mobile.runtime.TurnCommand
-import com.letta.mobile.runtime.TurnInput
 
 class WasmAppServerClientGateway(
     private val scope: CoroutineScope,
@@ -104,69 +98,30 @@ class WasmAppServerClientGateway(
         session?.close()
     }
 
-    fun conversation(agentId: String): Flow<WebConversationUpdate> = flow {
+    /**
+     * letta-mobile-o4ygk.4.5: what the shared chat page needs for [agent]'s conversation on the
+     * live session: the conversation (its most recent one, or a new one), a timeline transport over
+     * the session's turn engine and `admin_rpc`, and the run controls (stop, approvals).
+     */
+    suspend fun openChat(agent: AgentItemState): WebChatBinding {
         val session = activeSession ?: error("Connect to an App Server first")
-        val conversationId = session.ensureConversation(agentId, ::nextRequestId)
-        val (subscriberId, events) = session.router.subscribe(AgentId(agentId), ConversationId(conversationId))
-        try {
-            val response = session.admin(
-                method = "message.list",
-                params = buildJsonObject {
-                    put("conversation_id", conversationId)
-                    put("limit", "100")
-                    put("order", "asc")
-                },
-                nextRequestId = ::nextRequestId,
-            )
-            val messages = response as? JsonArray ?: JsonArray(emptyList())
-            val entries = AppServerProtocol.json
-                .decodeFromJsonElement(ListSerializer(LettaMessage.serializer()), messages)
-                .mapNotNull(LettaMessage::toWebEntry)
-            emit(WebConversationUpdate.Snapshot(entries))
-            events.collect { received ->
-                decodeWebConversationUpdate(received)?.let { emit(it) }
-            }
-        } finally {
-            session.router.unsubscribe(subscriberId)
-        }
-    }
-
-    fun sendMessage(
-        agentId: String,
-        text: String,
-        images: List<MessageContentPart.Image> = emptyList(),
-    ): Flow<String> = flow {
-        val session = activeSession ?: error("Connect to an App Server first")
-        val conversationId = session.ensureConversation(agentId, ::nextRequestId)
-        var assistantText = ""
-        session.engine.runTurn(
-            TurnCommand(
-                backendId = BackendId("web-app-server"),
-                runtimeId = RuntimeId("web-app-server"),
-                agentId = AgentId(agentId),
-                conversationId = ConversationId(conversationId),
-                input = TurnInput.UserMessage(
-                    localMessageId = nextRequestId("message"),
-                    text = text,
-                    contentPartsJson = images.takeIf { it.isNotEmpty() }
-                        ?.let { buildContentParts(text, it).toJsonArray().toString() },
-                ),
+        val conversationId = session.ensureConversation(agent.id, ::nextRequestId)
+        val transport = AppServerTimelineTransport(
+            AppServerTimelineConnection(
+                turnEngine = session.engine,
+                events = session.client.events,
+                isConnected = session.transport.isConnected,
+                admin = { method, params -> session.admin(method.value, params, ::nextRequestId) },
+                agentIdFor = { AgentId(agent.id) },
+                backendId = BackendId(WEB_BACKEND_ID),
             ),
-        ).collect { event ->
-            when (val payload = event.payload) {
-                is RuntimeEventPayload.RemoteStreamFrame -> {
-                    val delta = decodeAssistantDelta(payload) ?: return@collect
-                    assistantText = mergeAssistantText(assistantText, delta)
-                    emit(assistantText)
-                }
-                is RuntimeEventPayload.RunLifecycleChanged -> {
-                    if (payload.status == RuntimeRunStatus.Failed) {
-                        error(payload.reason ?: "Agent turn failed")
-                    }
-                }
-                else -> Unit
-            }
-        }
+        )
+        val target = TimelineChatTarget(agentId = agent.id, agentName = agent.name, conversationId = conversationId)
+        return WebChatBinding(
+            target = target,
+            transport = transport,
+            controls = webRunControls(AppServerRunControls(session.engine), target),
+        )
     }
 
     private fun monitor(session: WasmAppServerSession) {
@@ -193,8 +148,26 @@ class WasmAppServerClientGateway(
 
     private companion object {
         const val AGENT_LIMIT = 100
+        const val WEB_BACKEND_ID = "web-app-server"
     }
 }
+
+/** The page's stop and approval answers, scoped to [target]'s conversation. */
+private fun webRunControls(controls: AppServerRunControls, target: TimelineChatTarget) = TimelineChatRunControls(
+    stopRun = { controls.stop(AgentId(target.agentId), ConversationId(target.conversationId)) },
+    answerApproval = { answer ->
+        controls.answer(
+            AppServerApprovalAnswer(
+                agentId = target.agentId,
+                conversationId = target.conversationId,
+                requestId = answer.requestId,
+                toolCallId = answer.toolCallIds.firstOrNull(),
+                approve = answer.approve,
+                reason = answer.reason,
+            ),
+        )
+    },
+)
 
 internal fun webRequestId(sessionId: String, prefix: String, sequence: Int): String =
     "web-$sessionId-$prefix-$sequence"

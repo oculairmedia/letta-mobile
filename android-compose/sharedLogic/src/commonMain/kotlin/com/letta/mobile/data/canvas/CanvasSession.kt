@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -591,6 +592,19 @@ class CanvasSession(
                     documentId = documentId,
                 ),
             )
+        }
+
+    /** The plugin elements on the board as of the current scene; a person moves them with [movePluginElement]. */
+    fun pluginElements(): List<CanvasPluginElement> = CanvasOpProjector.pluginElementsOf(sceneJsonOrEmpty())
+
+    /**
+     * Applies the local op [build] makes of the current scene and the next lamport, testing the
+     * scene and writing under one lock; nothing when [build] makes nothing.
+     */
+    internal suspend fun applyLocalBuilt(build: (sceneJson: String, lamport: Long) -> CanvasOp?): CanvasDocument? =
+        mutex.withLock {
+            val op = build(sceneJsonOrEmpty(), lamportClock + 1) ?: return@withLock null
+            applyLocalLocked(op)
         }
 
     suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {

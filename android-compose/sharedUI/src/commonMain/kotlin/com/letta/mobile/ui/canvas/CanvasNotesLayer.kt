@@ -541,7 +541,7 @@ private fun NoteSelectionChrome(
  * A drag that reports its deltas and treats cancel as an end: the one gesture the handle bar,
  * the text grip and the resize corner all share.
  */
-private fun Modifier.dragHandle(onDragStart: () -> Unit, onDrag: (Offset) -> Unit, onDragEnd: () -> Unit): Modifier =
+internal fun Modifier.dragHandle(onDragStart: () -> Unit, onDrag: (Offset) -> Unit, onDragEnd: () -> Unit): Modifier =
     pointerInput(Unit) {
         detectDragGestures(
             onDragStart = { onDragStart() },

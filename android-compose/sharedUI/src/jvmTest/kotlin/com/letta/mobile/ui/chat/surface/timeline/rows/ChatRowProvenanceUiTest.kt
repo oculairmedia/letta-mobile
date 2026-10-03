@@ -18,6 +18,7 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-bglj6.1: DesktopAgentMessageProvenanceUiTest's cases against the shared rows.
@@ -62,6 +63,19 @@ class ChatRowProvenanceUiTest {
         onNodeWithText("PM-letta-mobile", substring = true).assertExists()
         onNodeWithText("Agent message", substring = true).assertExists()
         onNodeWithText("Deploy finished cleanly.").assertExists()
+    }
+
+    /** The provenance line heads the bubble, inside it, with the expand chevron (Pixel report). */
+    @Test
+    fun theInterAgentIndicatorLivesInsideThePromptBubble() = runComposeUiTest {
+        setContent { MaterialTheme { RenderRow(single(inbound("inbound-in-bubble", "Inter-agent status line."))) } }
+
+        val bubble = onNodeWithTag(ChatRowTestTags.USER_PROMPT, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val label = onNodeWithTag(ChatRowTestTags.PROMPT_PROVENANCE, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val body = onNodeWithText("Inter-agent status line.", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(bubble.intersect(label) == label, "the indicator $label sits inside the bubble $bubble")
+        assertTrue(label.bottom <= body.top, "the indicator $label heads the body $body")
+        onNodeWithContentDescription("Expand agent message details", useUnmergedTree = true).assertExists()
     }
 
     @Test
