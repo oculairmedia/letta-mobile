@@ -1,0 +1,3 @@
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":8,"method":"action.invoke","params":{"action":"start","input":{"label":"Slow"},"context":{"origin":{"type":"agent","agentId":"agent-1","conversationId":"conv-1","toolCallId":"call-1"}}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","method":"$/cancel","params":{"id":8}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":8,"error":{"code":-32800,"message":"action.invoke was cancelled"}}}

@@ -1,0 +1,1 @@
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","method":"host.settingsChanged","params":{"settings":{"baseUrl":"https://api.example.test","quality":90}}}}
