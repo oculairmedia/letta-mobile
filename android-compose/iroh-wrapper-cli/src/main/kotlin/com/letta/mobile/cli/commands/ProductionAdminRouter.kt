@@ -45,6 +45,8 @@ fun buildProductionAdminRouter(
     conversationChanges: com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier? = null,
     /** letta-mobile-w4q4p: persisted model exposure decisions; null keeps them in memory. */
     modelExposureFile: String? = null,
+    /** letta-mobile-r1xkl: serves stream-joined ids on `message.list`; null serves rows as stored. */
+    turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ): AdminRpcRouter {
     val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
@@ -93,5 +95,6 @@ fun buildProductionAdminRouter(
         agentChanges = agentChanges,
         conversationChanges = conversationChanges,
         modelExposureFile = modelExposureFile,
+        turnIdentity = turnIdentity,
     )
 }

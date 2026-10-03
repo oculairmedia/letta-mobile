@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.util.Telemetry
@@ -62,7 +63,7 @@ object ConversationAdminHandlers {
         val nativeClient = tiers.nativeClient
         registerConversationReadRoutes(router, nativeClient, tiers)
         registerConversationWriteRoutes(router, nativeClient, controller, tiers.conversationChanges)
-        registerMessageRoutes(router, nativeClient, tiers.localBackendStore)
+        registerMessageRoutes(router, nativeClient, tiers.localBackendStore, tiers.turnIdentity)
     }
 
     private fun registerConversationReadRoutes(
@@ -242,6 +243,7 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
         localStore: LocalBackendAdminStore?,
+        turnIdentity: TurnIdentityLedger?,
     ) {
         router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
@@ -289,7 +291,7 @@ object ConversationAdminHandlers {
                 })
             }
             MessageListPageGuard.bound(
-                projected,
+                MessageListIdentity.enrich(turnIdentity, convId, projected),
                 newestLast = param(params, AdminParamKey("order"))?.lowercase() != "desc",
             )
         }
