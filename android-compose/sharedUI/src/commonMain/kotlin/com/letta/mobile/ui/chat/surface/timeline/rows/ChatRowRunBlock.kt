@@ -388,7 +388,9 @@ private fun RunActivityHeader(
             .semantics(mergeDescendants = true) { stateDescription = stateText }
             // No hover block: the title lifts instead (the Android disclosure has no inset).
             .runHeaderToggle(click, clickLabel, onToggle)
-            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair),
+            // Flush with the agent's prose and the tool summary at the timeline's gutter; only the
+            // trailing chevron keeps its inset from the end.
+            .padding(end = LettaDimens.Space.xs, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
