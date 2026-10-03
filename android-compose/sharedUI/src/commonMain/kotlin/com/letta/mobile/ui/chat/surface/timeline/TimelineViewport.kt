@@ -3,13 +3,9 @@ package com.letta.mobile.ui.chat.surface.timeline
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
-import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -97,38 +93,3 @@ internal fun OlderHistoryEffect(
 }
 
 private data class OlderEdgeProbe(val nearOldest: Boolean, val newestVisible: Int, val gate: OlderHistoryGate)
-
-/**
- * How far above the viewport the owning prompt is looked for. Bounded because it runs per scroll
- * frame; past it the transcript scrolls with no pinned prompt (desktop PinnedPromptScanLimit).
- */
-private const val PINNED_PROMPT_SCAN_LIMIT = 400
-
-/**
- * The user prompt that owns what is on screen, to pin as a header (desktop rememberPinnedPrompt).
- *
- * In a reversed list the visual top is the HIGHEST visible index, and a prompt's answer (newer)
- * sits at a LOWER index beneath it, so the owner is the first prompt at or above the topmost
- * visible row. Compose's stickyHeader cannot express this: in a reversed list it pins to the
- * bottom. Null while the prompt's own row is on screen, so it is never drawn twice, and null while
- * ANY prompt is on screen: the pinned copy would sit over it (two "You" bubbles overlapping), and
- * a prompt in view already says what the rows below it answer.
- */
-@Composable
-internal fun rememberPinnedPrompt(
-    listState: LazyListState,
-    itemCount: Int,
-    itemAt: (Int) -> ChatRenderItem?,
-): State<ChatRenderItem?> {
-    val currentCount = rememberUpdatedState(itemCount)
-    val currentItemAt = rememberUpdatedState(itemAt)
-    return remember(listState) {
-        derivedStateOf {
-            val visible = listState.layoutInfo.visibleItemsInfo
-            val top = visible.maxOfOrNull { it.index } ?: return@derivedStateOf null
-            if (visible.any { row -> currentItemAt.value(row.index)?.isUserPrompt() == true }) return@derivedStateOf null
-            val end = minOf(currentCount.value, top + PINNED_PROMPT_SCAN_LIMIT)
-            (top until end).firstNotNullOfOrNull { index -> currentItemAt.value(index)?.takeIf(ChatRenderItem::isUserPrompt) }
-        }
-    }
-}
