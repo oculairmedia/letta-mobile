@@ -15,12 +15,14 @@
   "items": [
     {
       "key": "i0",
-      "kind": "TEXT"
+      "kind": "TEXT",
+      "frame": [80, 80, 480, 63]
     },
     {
       "key": "blockers",
       "kind": "CHECKLIST",
-      "count": 1
+      "count": 1,
+      "frame": [584, 80, 320, 120]
     }
   ],
   "warnings": []
