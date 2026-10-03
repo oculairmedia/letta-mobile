@@ -9,7 +9,6 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -166,11 +165,11 @@ private fun ColumnScope.RunHeaderSlot(run: RunBlock, visible: Boolean, callbacks
 @Composable
 private fun RunBody(run: RunBlock, context: ChatRowContext, callbacks: ChatRowCallbacks) {
     val reducedMotion = LocalReducedMotion.current
-    val lift by animateDpAsState(
-        targetValue = if (!run.activity.isActive && context.isNewest) ChatRowSpacing.completedRunBodyLift else 0.dp,
-        animationSpec = if (reducedMotion) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
-        label = "RunBodyLift",
-    )
+    // The lift is a layout-time decision, not an animated transition: the row geometry snaps to its
+    // settled shape on the first frame after `isActive` flips false. Animating it (a 22dp shift over
+    // CONTENT_SIZE_MILLIS) makes the timeline visibly slide at the very moment the user wants it
+    // to be still — a "things are moving at that point" settle glitch.
+    val lift = if (!run.activity.isActive && context.isNewest) ChatRowSpacing.completedRunBodyLift else 0.dp
     Box(modifier = Modifier.fillMaxWidth().pullUp { lift }) {
         AnimatedContent(
             targetState = run.collapsed,
