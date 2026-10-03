@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
@@ -35,6 +36,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.mascot.FakeMascotHost
 import com.letta.mobile.ui.mascot.FakeMascotShell
+import com.letta.mobile.ui.mascot.PointerObservingMascotHost
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,6 +73,7 @@ class TouchCanvasDockUiTest {
     private class Harness {
         val intents = mutableListOf<ChatSurfaceIntent>()
         val geometries = mutableListOf<ChatDockGeometry>()
+        var agentPaneOpened = 0
     }
 
     private fun ComposeUiTest.show(port: Port, presentation: ChatSurfacePresentation, withCanvas: Boolean = true): Harness {
@@ -194,7 +197,8 @@ class TouchCanvasDockUiTest {
      * As the Android app draws the page: the window's mascot shell knows the agent, and no
      * transport layer is mounted, so the page's one seat draws the character itself.
      */
-    private fun ComposeUiTest.showWithoutALayer(shell: FakeMascotShell) {
+    private fun ComposeUiTest.showWithoutALayer(shell: FakeMascotShell): Harness {
+        val harness = Harness()
         // The live mascot keeps a frame loop running, so the page never idles: step the clock.
         mainClock.autoAdvance = false
         setContent {
@@ -203,18 +207,57 @@ class TouchCanvasDockUiTest {
                     ChatSurface(
                         port = Port(),
                         presentation = ChatSurfacePresentation.CanvasFirst,
-                        onIntent = {},
-                        host = ChatSurfaceHost(openCanvas = {}),
+                        onIntent = { harness.intents += it },
+                        host = ChatSurfaceHost(openCanvas = {}, openAgentPane = { harness.agentPaneOpened++ }),
                         modifier = Modifier.fillMaxSize(),
                         appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
                         platform = ChatSurfacePlatform(showKeyboardHints = false),
                         canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                        onDockGeometryChange = { harness.geometries += it },
                     )
                 }
             }
         }
+        settle()
+        return harness
+    }
+
+    private fun ComposeUiTest.settle() {
         mainClock.advanceTimeBy(SETTLE_MILLIS)
         waitForIdle()
+    }
+
+    /**
+     * The Android composition: no transport layer, so the page's one seat draws the live mascot
+     * over the head itself, and the renderer carries Rive's pointer filter (it watches, consumes
+     * nothing). A hit on it once ended the page's hit test at the seat's overlay, so the head never
+     * saw its drag, tap or long press; with the fake renderer drawing no input this could not show.
+     */
+    @Test
+    fun underAndroidsSeatTheHeadStillDragsSnapsAndRemembers() = runComposeUiTest {
+        val harness = showWithoutALayer(FakeMascotShell("agent-1", layerMounted = false, host = PointerObservingMascotHost))
+        onAllNodesWithTag(FakeMascotHost.SURFACE_TAG, useUnmergedTree = true).assertCountEquals(1)
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput {
+            swipe(start = center, end = Offset(center.x - DRAG_PX, center.y - DRAG_PX / 2), durationMillis = 300)
+        }
+        settle()
+        val placed = harness.geometries.last()
+        assertEquals(0f, placed.anchorX, "the head snapped to the nearer (left) edge")
+        assertTrue(placed.anchorY < 1f, "the head kept the height it was dropped at: $placed")
+        val head = onNodeWithTag(TOUCH_HEAD_TAG).fetchSemanticsNode().boundsInRoot
+        val page = onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue(head.center.x < page.center.x, "the head did not move: $head")
+    }
+
+    @Test
+    fun underAndroidsSeatTheHeadStillTakesTapAndLongPress() = runComposeUiTest {
+        val harness = showWithoutALayer(FakeMascotShell("agent-1", layerMounted = false, host = PointerObservingMascotHost))
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { click() }
+        settle()
+        assertEquals(listOf<ChatSurfaceIntent>(ChatSurfaceIntent.Expand), harness.intents)
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { longClick() }
+        settle()
+        assertEquals(1, harness.agentPaneOpened)
     }
 
     @Test
