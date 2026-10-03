@@ -1709,6 +1709,8 @@ dependencies {
     implementation(project(":designsystem"))
     implementation(project(":feature-chat"))
     implementation(project(":feature-editagent"))
+    // Live plugin pages on the canvas: the sandboxed WebView host (letta-mobile-s416w.13).
+    implementation(project(":plugin-view"))
     implementation(libs.filekit.core)
     implementation(libs.filekit.dialogs.compose)
 

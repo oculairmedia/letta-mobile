@@ -125,3 +125,22 @@ The host defines `window.__lettaViewPost(text)` (its native channel), injects
 page lives, and calls `teardown(reason)` to end it. `PluginViewTransport` (pages and actions) is
 implemented by the `meridian/plugin-view/1` ALPN (s416w.32). `PluginViewTransport.Unavailable` is
 the offline case.
+
+### Desktop (JCEF)
+
+The desktop host (`desktop/src/main/kotlin/com/letta/mobile/desktop/plugin/view/`,
+letta-mobile-s416w.14) serves each page at `letta-plugin://<pluginId>/<pageId>?v=<version>`, a
+standard, secure custom scheme, so every plugin is its own origin. The response carries the CSP and
+`Permissions-Policy` above as real headers, plus `nosniff`, `no-store` and `no-referrer`. The shim
+is an inline script placed first in the page's `<head>`, and `__lettaViewPost` goes through JCEF's
+message router under the name `__lettaCefQuery`. Only the main frame showing the page may post.
+Each view gets its own `CefClient` and an in-memory request context. A request handler holds the
+main frame to the page, subframes to `frameDomains`, and resources to the page's allowlists plus
+`data:`/`blob:`. It refuses popups, downloads and the context menu.
+
+The JCEF native bundle (about 360 MB on disk for Windows x64) is downloaded by jcefmaven the first
+time a live view shows. It goes to `~/.letta-mobile/jcef/bundle` (override with
+`-Dletta.pluginViews.jcefDir=<dir>`), and later runs reuse it. While it downloads, the card shows the
+progress. If the download fails (offline on first run), the platform is unsupported, there is no
+display, or `-Dletta.pluginViews.jcef=false` is set, every element stays its fallback card with the
+reason, and the app carries on.

@@ -393,6 +393,38 @@ class CanvasGetSceneTool(
 }
 
 /**
+ * Tool: canvas_get_layout
+ * Geometry and identity of everything on the board, paged, without the full payloads.
+ */
+class CanvasGetLayoutTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : BaseCanvasTool(store, sessions) {
+    override val name: String = NAME
+    override val description: String = CanvasToolContract.getLayout.description
+    override val inputSchema: JsonObject = CanvasToolContract.getLayout.inputSchema
+
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        runWithContext(agentId, "Failed to read layout") { context ->
+            when (val lookup = findCanvasDocument(context, input)) {
+                is CanvasLookupResult.Error -> lookup.result
+                is CanvasLookupResult.Found -> layoutAnswer(
+                    CanvasLayoutRead.answer(lookup.doc.sceneJson, LayoutRevision(lookup.doc.revision), input),
+                )
+            }
+        }
+
+    private fun layoutAnswer(answer: CanvasLayoutAnswer): ExternalToolResult = when (answer) {
+        is CanvasLayoutAnswer.Page -> ExternalToolResult.Success(answer.json)
+        is CanvasLayoutAnswer.Refused -> ExternalToolResult.Error(answer.message)
+    }
+
+    companion object {
+        const val NAME = CanvasToolContract.GET_LAYOUT
+    }
+}
+
+/**
  * Tool: canvas_replace_scene
  * Replaces the DrawBox scene JSON for a canvas, incrementing revision.
  */
@@ -557,6 +589,7 @@ object CanvasExternalTools {
     ): List<HostExternalTool> = listOf(
         CanvasCreateTool(store, sessions),
         CanvasGetSceneTool(store, sessions),
+        CanvasGetLayoutTool(store, sessions),
         CanvasReplaceSceneTool(store, sessions),
         CanvasApplyOpsTool(store, sessions, kinds),
         CanvasListTool(store, sessions),

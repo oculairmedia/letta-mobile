@@ -302,6 +302,11 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // letta-mobile-s416w.14: the live JCEF plugin-view tests need a display and the JCEF native
+    // bundle, so they run only on request: -PrunJcefUiTest=true (or -DrunJcefUiTest=true).
+    providers.gradleProperty("runJcefUiTest").orElse(providers.systemProperty("runJcefUiTest")).orNull
+        ?.let { systemProperty("runJcefUiTest", it) }
+    providers.gradleProperty("jcefDir").orNull?.let { systemProperty("letta.pluginViews.jcefDir", it) }
 }
 
 // letta-mobile-0s5bi spike: native Rive (rive-runtime + D3D11 Rive Renderer) as a Compose node.

@@ -21,6 +21,8 @@ class SharedUiIsolationTest {
             ":feature-editagent",
             ":desktop",
             ":web",
+            // :plugin-view hosts live plugin pages on top of this module; the reverse edge would be a cycle.
+            ":plugin-view",
         )
         // Matches project(":x") and the projects.x type-safe accessor.
         val hits = GradleProjectDependencyScan.hits(gradle, forbiddenProjectDeps)

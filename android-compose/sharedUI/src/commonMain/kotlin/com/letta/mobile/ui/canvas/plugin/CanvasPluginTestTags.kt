@@ -8,6 +8,9 @@ object CanvasPluginTestTags {
     /** The fallback card drawn inside it. */
     fun card(id: String): String = "canvas-plugin-card:$id"
 
+    /** The live page a [PluginViewHost] shows in place of the card (letta-mobile-s416w.13). */
+    fun live(id: String): String = "canvas-plugin-live:$id"
+
     /** The handle bar an element is dragged by. */
     fun handle(id: String): String = "canvas-plugin-handle:$id"
 
