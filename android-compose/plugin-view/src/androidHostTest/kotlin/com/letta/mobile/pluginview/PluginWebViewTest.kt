@@ -25,6 +25,10 @@ import com.letta.mobile.data.plugin.view.ViewHostContext
 import com.letta.mobile.data.plugin.view.ViewLink
 import com.letta.mobile.ui.canvas.plugin.PluginPageChannel
 import com.letta.mobile.ui.canvas.plugin.PluginViewSession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -52,6 +56,9 @@ class PluginWebViewTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val failures = mutableListOf<String>()
 
+    /** The screen's scope: the main thread, like a view model's. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     private object StaticHost : ViewBridgeHost {
         override fun context(): ViewHostContext = PluginViewFixtures.context
 
@@ -74,7 +81,7 @@ class PluginWebViewTest {
 
     private fun open(session: PluginViewSession = session()): PluginWebView {
         opened = session
-        return PluginWebView(WebView(context), session, onFailure = { failures += it }, nonce = NONCE)
+        return PluginWebView(WebView(context), session, scope, onFailure = { failures += it }, nonce = NONCE)
     }
 
     private fun bridgeState(): ViewBridgeState = opened.bridge.state.value
@@ -253,6 +260,16 @@ class PluginWebViewTest {
         idle()
         assertTrue(shadowOf(view.webView).wasDestroyCalled())
         assertEquals(ViewBridgeState.CLOSED, bridgeState())
+    }
+
+    @Test
+    fun aViewClosedAfterItsScreenScopeEndedIsStillDestroyed() {
+        val view = open()
+        connect(view)
+        scope.cancel()
+
+        view.close(PluginWebView.REASON_REMOVED)
+        assertTrue(shadowOf(view.webView).wasDestroyCalled())
     }
 
     @Test

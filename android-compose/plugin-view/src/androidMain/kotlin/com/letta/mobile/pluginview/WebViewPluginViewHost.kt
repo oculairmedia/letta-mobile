@@ -13,19 +13,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.letta.mobile.ui.canvas.plugin.PluginViewHost
 import com.letta.mobile.ui.canvas.plugin.PluginViewSession
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * The Android [PluginViewHost] (letta-mobile-s416w.13): each live element is a sandboxed
  * [PluginWebView]. A device without a usable WebView, a page that fails, or a renderer that dies
  * hands the element back to its fallback card. When the element leaves the board the bridge is
- * torn down and the WebView destroyed.
+ * torn down and the WebView destroyed, in [scope]: a main-thread scope the screen owns (its view
+ * model's), which outlives the element's composition.
  */
-object WebViewPluginViewHost : PluginViewHost {
+class WebViewPluginViewHost(private val scope: CoroutineScope) : PluginViewHost {
     @Composable
     override fun View(session: PluginViewSession, modifier: Modifier, onFailure: (reason: String) -> Unit) {
         val context = LocalContext.current
         val failure by rememberUpdatedState(onFailure)
-        val slot = remember(session) { PluginWebViewSlot(context, session) { reason -> failure(reason) } }
+        val slot = remember(session) { PluginWebViewSlot(context, session, scope) { reason -> failure(reason) } }
         val live = slot.live
         if (live == null) {
             LaunchedEffect(slot) { failure(UNAVAILABLE) }
@@ -34,7 +36,9 @@ object WebViewPluginViewHost : PluginViewHost {
         }
     }
 
-    internal const val UNAVAILABLE: String = "WebView is not available on this device"
+    internal companion object {
+        const val UNAVAILABLE: String = "WebView is not available on this device"
+    }
 }
 
 /**
@@ -42,8 +46,13 @@ object WebViewPluginViewHost : PluginViewHost {
  * destroy) when forgotten, and destroyed outright when the composition that made it was abandoned.
  * [live] is null when this device cannot make a WebView.
  */
-internal class PluginWebViewSlot(context: Context, session: PluginViewSession, onFailure: (String) -> Unit) : RememberObserver {
-    val live: PluginWebView? = runCatching { WebView(context) }.getOrNull()?.let { PluginWebView(it, session, onFailure) }
+internal class PluginWebViewSlot(
+    context: Context,
+    session: PluginViewSession,
+    scope: CoroutineScope,
+    onFailure: (String) -> Unit,
+) : RememberObserver {
+    val live: PluginWebView? = runCatching { WebView(context) }.getOrNull()?.let { PluginWebView(it, session, scope, onFailure) }
 
     override fun onRemembered() {
         live?.start()

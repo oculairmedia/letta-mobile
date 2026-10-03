@@ -11,12 +11,10 @@ import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.ui.canvas.plugin.PluginViewSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -40,19 +38,21 @@ import kotlin.concurrent.Volatile
  * channel over. What the page posts before then waits in the page.
  *
  * Lifecycle: [start] reads the page, loads it and runs the bridge; [close] tears the bridge down
- * (the page gets `host.teardown` and up to its timeout to answer), then destroys the WebView. It
- * runs on its own scope, so it outlives the composition that removed the element.
+ * (the page gets `host.teardown` and up to its timeout to answer), then destroys the WebView. Both
+ * run in [scope], a main-thread scope owned by the screen (not the composition), so the teardown
+ * outlives the composition that removed the element. A screen scope that is already gone still
+ * gets the WebView destroyed.
  */
 internal class PluginWebView(
     val webView: WebView,
     private val session: PluginViewSession,
+    private val scope: CoroutineScope,
     private val onFailure: (reason: String) -> Unit,
-    dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
     private val nonce: String = newNonce(),
 ) {
     private val policy = PluginPagePolicy(session.spec)
-    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val port = CompletableDeferred<WebMessagePort>()
+    private var running: Job? = null
 
     /** The composed page, set before the WebView is asked to load it; read on the WebView's IO thread. */
     @Volatile
@@ -94,9 +94,12 @@ internal class PluginWebView(
 
     /** Reads the page, loads it, and runs the bridge and the delivery of its messages to the page. */
     fun start() {
-        scope.launch { session.bridge.run() }
-        scope.launch { deliverToPage() }
-        scope.launch { load() }
+        if (closed || running != null) return
+        running = scope.launch {
+            launch { session.bridge.run() }
+            launch { deliverToPage() }
+            load()
+        }
     }
 
     private suspend fun load() {
@@ -110,17 +113,18 @@ internal class PluginWebView(
     }
 
     /** The answer to a request the page makes, or null to let the WebView load it. */
-    fun intercept(url: String): WebResourceResponse? = when (val decision = policy.decide(url)) {
-        PluginPageRequest.Page -> document?.let(::pageResponse) ?: refusal(STATUS_UNAVAILABLE, "the page is not ready")
+    fun intercept(url: String): WebResourceResponse? = when (policy.decide(url)) {
+        PluginPageRequest.Page -> document?.let(::pageResponse) ?: refusal(STATUS_UNAVAILABLE, "Service Unavailable")
         PluginPageRequest.Allowed -> null
-        is PluginPageRequest.Refused -> refusal(STATUS_FORBIDDEN, decision.reason)
+        // A fixed phrase: the refused URL is the page's to choose and never echoed back to it.
+        is PluginPageRequest.Refused -> refusal(STATUS_FORBIDDEN, "Forbidden")
     }
 
     private fun pageResponse(bytes: ByteArray): WebResourceResponse =
         WebResourceResponse(HTML, UTF_8, STATUS_OK, "OK", policy.headers(session.permissions), ByteArrayInputStream(bytes))
 
-    private fun refusal(status: Int, reason: String): WebResourceResponse =
-        WebResourceResponse(TEXT, UTF_8, status, reason, mapOf("Cache-Control" to "no-store"), ByteArrayInputStream(ByteArray(0)))
+    private fun refusal(status: Int, phrase: String): WebResourceResponse =
+        WebResourceResponse(TEXT, UTF_8, status, phrase, mapOf("Cache-Control" to "no-store"), ByteArrayInputStream(ByteArray(0)))
 
     /** The page finished loading: hand it its end of the channel, once. */
     fun onPageFinished(url: String?) {
@@ -150,13 +154,24 @@ internal class PluginWebView(
     fun close(reason: String) {
         if (closed) return
         closed = true
-        scope.launch {
-            withContext(NonCancellable) { session.bridge.teardown(reason) }
-            session.page.close()
-            hostPort?.close()
-            webView.destroy()
-            scope.cancel()
+        if (!scope.isActive) {
+            release()
+            return
         }
+        scope.launch {
+            try {
+                withContext(NonCancellable) { session.bridge.teardown(reason) }
+            } finally {
+                release()
+            }
+        }
+    }
+
+    private fun release() {
+        session.page.close()
+        hostPort?.close()
+        running?.cancel()
+        webView.destroy()
     }
 
     companion object {

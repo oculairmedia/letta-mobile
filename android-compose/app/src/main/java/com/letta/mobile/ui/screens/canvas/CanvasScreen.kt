@@ -104,7 +104,9 @@ fun CanvasScreen(
         val pluginViews = remember(activeSession.canvasId) {
             PluginViewEnvironment(canvasId = activeSession.canvasId.value, platform = ViewPlatform.ANDROID)
         }
-        ProvidePluginViews(host = WebViewPluginViewHost, environment = pluginViews, plugins = emptyList()) {
+        // The view model's scope outlives a removed element, so a page's teardown can finish.
+        val pluginHost = remember(viewModel) { WebViewPluginViewHost(viewModel.viewModelScope) }
+        ProvidePluginViews(host = pluginHost, environment = pluginViews, plugins = emptyList()) {
             CanvasWorkspace(
                 session = activeSession,
                 presenceTransport = viewModel.presenceTransport,
