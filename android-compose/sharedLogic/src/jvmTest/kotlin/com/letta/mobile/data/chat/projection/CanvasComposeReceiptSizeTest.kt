@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.compose.CanvasComposeService
 import com.letta.mobile.data.canvas.compose.ComposeBounds
 import com.letta.mobile.data.canvas.compose.ComposeCompilation
 import com.letta.mobile.data.canvas.compose.ComposeReceipt
+import com.letta.mobile.data.canvas.compose.ComposeReceiptFrames
 import com.letta.mobile.data.canvas.compose.ComposeReceiptItem
 import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.controller.node.iroh.MessageListWireProjection
@@ -64,6 +65,25 @@ class CanvasComposeReceiptSizeTest {
             assertNull(receipt.framesOmitted, "grouped=$grouped")
             assertNull(receipt.framesHint, "grouped=$grouped")
             pieces.forEach { assertEquals(4, it.frame?.size, "${it.key} grouped=$grouped") }
+        }
+    }
+
+    /**
+     * ComposeReceiptFrames' last resort (every frame dropped, framesOmitted and the hint set) is
+     * returned unchecked because the artifact is already published; this pins that it never
+     * exceeds the cap, on the largest receipt the v1 caps allow.
+     */
+    @Test
+    fun theLargestReceiptWithEveryFrameDroppedAndMarkedIsUnderTheBudget() {
+        listOf(false, true).forEach { grouped ->
+            val receipt = maxReceipt(grouped)
+            val emptied = receipt.copy(
+                items = receipt.items.map { item -> item.copy(frame = null, children = item.children?.map { it.copy(frame = null) }) },
+                framesOmitted = true,
+                framesHint = ComposeReceiptFrames.HINT,
+            )
+            val size = bytes(emptied)
+            assertTrue(size <= CanvasComposeContract.MAX_RECEIPT_BYTES, "grouped=$grouped: $size bytes with no frames")
         }
     }
 

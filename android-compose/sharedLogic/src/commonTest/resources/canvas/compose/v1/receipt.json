@@ -7,7 +7,7 @@
   "revision": 42,
   "status": "published",
   "title": "Weekend plan",
-  "bounds": { "x": 80.0, "y": 80.0, "width": 712.0, "height": 746.0 },
+  "bounds": { "x": 80.0, "y": 80.0, "width": 1448.0, "height": 489.0 },
   "items": [
     { "key": "heading", "kind": "TEXT", "frame": [80, 80, 480, 63] },
     { "key": "shopping", "kind": "CHECKLIST", "count": 3, "frame": [816, 80, 320, 175] },

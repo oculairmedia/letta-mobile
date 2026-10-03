@@ -49,6 +49,7 @@ import io.ak1.drawbox.domain.model.Viewport
 import java.io.File
 import java.nio.file.Files
 import javax.imageio.ImageIO
+import kotlin.math.floor
 import kotlin.math.min
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -172,7 +173,7 @@ class CanvasComposeReceiptRenderTest {
         }
     }
 
-    private fun halfUp(value: Float): Int = (if (value >= 0f) value + 0.5f else value - 0.5f).toInt()
+    private fun halfUp(value: Float): Int = floor(value + 0.5f).toInt()
     private fun fit(bounds: ComposeBounds, size: BoardSize): Viewport {
         val room = Size(size.width - 2f * MARGIN, size.height - 2f * MARGIN)
         val scale = min(room.width / bounds.width, room.height / bounds.height).coerceIn(Viewport.MIN_SCALE, 1f)

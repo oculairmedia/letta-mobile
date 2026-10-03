@@ -56,8 +56,8 @@ The presets are the board's note tints, so red shows as pink, cyan as blue and p
 
 ## Receipt
 {"ok": true, "artifact_id", "canvas_id", "revision", "status": "published" | "dry_run", "title", "bounds": {x, y, width, height}, "items": [{key, kind, count?, frame?, children?}], "warnings", "framesOmitted?", "framesHint?"}
-bounds is the rectangle the artifact covers, in board units; count is a checklist's entries. frame is [x, y, w, h] integers from placement. frame is the reserved slot; a short note is drawn shorter inside it, so attach to its left, right or top side.
-Over 4096 bytes, frames drop from group children first, then top-level items from the end; framesOmitted is true and framesHint is "call canvas_get_layout for geometry".
+bounds is the artifact's rectangle; count is a checklist's entries. frame is the reserved slot, [x, y, w, h] integers; a short note is drawn shorter inside it, so attach to its left, right or top side.
+Over 4096 bytes, frames drop from group children first, then top-level items from the end; framesOmitted is true and framesHint is "call canvas_get_layout for geometry". A retry omits frame if the board no longer stores it.
 
 ## What you will see
 The artifact goes right of what is on the board (below it once the board is wider than 2400), as a grid in reading order: 1 column for 1 item, 2 columns for 2 to 4 items, 3 columns for 5 to 9 items, 4 columns for 10 or more.

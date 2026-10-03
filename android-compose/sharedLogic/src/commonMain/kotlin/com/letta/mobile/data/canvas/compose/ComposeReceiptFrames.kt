@@ -20,7 +20,11 @@ internal object ComposeReceiptFrames {
         return dropTail(withoutChildren)
     }
 
-    /** Drop top-level frames from the end until the marked receipt fits. The last step has no frames. */
+    /**
+     * Drop top-level frames from the end until the marked receipt fits. The last step has no frames
+     * and is returned as it is: this runs after the artifact is published, so it must not fail. That
+     * a frame-less receipt fits is pinned on the largest receipt by CanvasComposeReceiptSizeTest.
+     */
     private fun dropTail(receipt: ComposeReceipt): ComposeReceipt {
         val items = receipt.items.toMutableList()
         for (index in items.indices.reversed()) {
@@ -29,11 +33,7 @@ internal object ComposeReceiptFrames {
             val marked = mark(receipt.copy(items = items.toList()))
             if (within(marked)) return marked
         }
-        val emptied = mark(dropEveryFrame(receipt.copy(items = items.toList())))
-        check(within(emptied)) {
-            "a receipt with no frames is ${bytes(emptied)} bytes, over ${CanvasComposeContract.MAX_RECEIPT_BYTES}"
-        }
-        return emptied
+        return mark(dropEveryFrame(receipt.copy(items = items.toList())))
     }
 
     private fun within(receipt: ComposeReceipt): Boolean = bytes(receipt) <= CanvasComposeContract.MAX_RECEIPT_BYTES

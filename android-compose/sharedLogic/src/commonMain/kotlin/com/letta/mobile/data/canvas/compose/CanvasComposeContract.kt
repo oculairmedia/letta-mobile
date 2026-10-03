@@ -336,7 +336,11 @@ data class ComposeReceiptItem(
     val kind: ComposeKind,
     val id: String? = null,
     val count: Int? = null,
-    /** `[x, y, w, h]` in world units, integers, half-up. Absent when the receipt had to drop it. */
+    /**
+     * `[x, y, w, h]` in world units, integers, half-up. Absent when the receipt had to drop it
+     * ([ComposeReceipt.framesOmitted] is then true), or, on a retry, when the board no longer stores
+     * this piece's frame ([ComposeReceipt.framesOmitted] stays null).
+     */
     val frame: List<Int>? = null,
     val children: List<ComposeReceiptItem>? = null,
 ) {
