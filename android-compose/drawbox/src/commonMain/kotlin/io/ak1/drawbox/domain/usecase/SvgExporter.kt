@@ -7,9 +7,8 @@ import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.linePath
 import io.ak1.drawbox.domain.model.LinePath
 import io.ak1.drawbox.domain.model.bounds
-import io.ak1.drawbox.domain.model.textBox
-import io.ak1.drawbox.domain.model.resolvedTextColor
 import io.ak1.drawbox.domain.model.canHoldText
+import io.ak1.drawbox.domain.model.isConnector
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.domain.model.bounds
@@ -28,10 +27,15 @@ import kotlin.math.sqrt
 
 object SvgExporter {
 
+    /**
+     * [elements] as an SVG document. [bgColor] is the board's colour, which a connector label's
+     * chip is painted in as on the canvas; without it labels are exported without their chip.
+     */
     fun exportToSvg(
         elements: List<Element>,
         width: Int = 1000,
-        height: Int = 1000
+        height: Int = 1000,
+        bgColor: Color? = null,
     ): String {
         val svgElements = mutableListOf<String>()
 
@@ -50,7 +54,7 @@ object SvgExporter {
                 is Element.Path -> svgElements.add(pathToSvg(element))
                 is Element.Shape -> {
                     svgElements.add(shapeToSvg(element))
-                    shapeTextToSvg(element)?.let(svgElements::add)
+                    shapeTextToSvg(element, bgColor)?.let(svgElements::add)
                 }
                 is Element.Image -> svgElements.add(imageToSvg(element))
                 is Element.Text -> svgElements.add(textToSvg(element))
@@ -379,29 +383,19 @@ object SvgExporter {
      * A shape's text as a text block in the shape's text box, centred top to bottom by the same
      * line estimate [wrapTextForSvg] makes, and turned with the shape.
      */
-    private fun shapeTextToSvg(shape: Element.Shape): String? {
-        if (shape.text.isEmpty() || !shape.canHoldText) return null
-        val box = shape.textBox()
-        val lines = wrapTextForSvg(shape.text, box.width, shape.fontSize, shape.fontFamilyKey).size
-        val height = shape.fontSize + (lines - 1) * shape.fontSize * 1.25f
-        val block = Element.Text(
-            id = shape.id,
-            text = shape.text,
-            fontFamilyKey = shape.fontFamilyKey,
-            fontSize = shape.fontSize,
-            color = shape.resolvedTextColor,
-            alignment = shape.textAlignment,
-            topLeft = androidx.compose.ui.geometry.Offset(box.left, box.center.y - height / 2f),
-            wrapWidth = box.width,
-            measuredHeight = height,
-        )
-        val svg = textToSvg(block)
+    private fun shapeTextToSvg(shape: Element.Shape, bgColor: Color?): String? {
+        if (shape.text.isEmpty()) return null
+        val svg = when {
+            shape.isConnector -> connectorLabelToSvg(shape, bgColor)
+            shape.canHoldText -> boxedShapeTextToSvg(shape)
+            else -> return null
+        }
         if (shape.rotation == 0f) return svg
         val c = shape.bounds().center
         return """<g transform="rotate(${shape.rotation}, ${c.x}, ${c.y})">$svg</g>"""
     }
 
-    private fun textToSvg(text: Element.Text): String {
+    internal fun textToSvg(text: Element.Text): String {
         if (text.text.isEmpty()) return ""
         val x = text.topLeft.x
         val y = text.topLeft.y
@@ -449,18 +443,14 @@ object SvgExporter {
      * actually wraps. Aligning the multiplier with family keeps the SVG
      * `<tspan>` breaks consistent with the renderer's measured wraps.
      */
-    private fun wrapTextForSvg(
+    internal fun wrapTextForSvg(
         text: String,
         widthWorld: Float,
         fontSize: Float,
         fontFamilyKey: String,
     ): List<String> {
         if (widthWorld <= 0f || fontSize <= 0f) return text.split('\n')
-        val charWidthMul = when (fontFamilyKey) {
-            io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.MONO -> 0.6f
-            else -> 0.55f
-        }
-        val approxCharWidth = fontSize * charWidthMul
+        val approxCharWidth = fontSize * charWidthMultiplier(fontFamilyKey)
         val charsPerLine = (widthWorld / approxCharWidth).toInt().coerceAtLeast(1)
         val out = mutableListOf<String>()
         for (hardLine in text.split('\n')) {
@@ -584,7 +574,7 @@ object SvgExporter {
                 "${path.control2.x} ${path.control2.y} ${path.end.x} ${path.end.y}"
     }
 
-    private fun colorToHex(color: Color): String {
+    internal fun colorToHex(color: Color): String {
         val r = (color.red * 255).toInt().toString(16).padStart(2, '0')
         val g = (color.green * 255).toInt().toString(16).padStart(2, '0')
         val b = (color.blue * 255).toInt().toString(16).padStart(2, '0')

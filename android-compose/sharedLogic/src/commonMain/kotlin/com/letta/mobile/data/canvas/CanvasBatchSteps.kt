@@ -1,9 +1,14 @@
 package com.letta.mobile.data.canvas
 
+import kotlinx.serialization.json.JsonElement
+
 /** One op of a batch as the projector applies it: nested batch ops opened out, each labelled by where it sat. */
 internal data class CanvasBatchStep(val label: String, val op: CanvasOp, val scratch: CanvasOp)
 
 internal object CanvasBatchSteps {
+    /** Agent ops, with each `connect` already expanded into an arrow and its binding. */
+    fun prepare(sceneJson: String, opsJson: JsonElement): CanvasOpsRead = CanvasConnect.read(sceneJson, opsJson)
+
     /**
      * [ops] opened out in the order the projector applies them. Each carries a [CanvasBatchStep.scratch]
      * copy stamped after [baseLamport], the scene's newest write: published, the host stamps them
