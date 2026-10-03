@@ -85,7 +85,7 @@ class TimelineUiFramesTest {
                 recorder.mount()
                 recorder.advance("open", OPEN_FRAMES)
                 recorder.writeFrameImage("reply-first")
-                runBlocking { rig.send(PROMPT_OTID, prompt.content, echo.date!!) }
+                runBlocking { rig.send(echo) }
                 recorder.advance("send")
                 val stream = runBlocking { rig.beginStream() }
                 runBlocking { stream.emit(echo) }

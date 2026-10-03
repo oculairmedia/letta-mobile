@@ -1,11 +1,12 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.data.timeline.TimelineEnginePageOutcome
+import com.letta.mobile.data.timeline.TimelineLiveFence
 import com.letta.mobile.data.timeline.TimelineMessageId
 import com.letta.mobile.data.timeline.TimelinePageProgress
 import com.letta.mobile.data.timeline.TimelineRemotePageRequest
@@ -18,9 +19,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * letta-mobile-29sxj: one conversation's real coordinator and presentation, driven through the
@@ -38,8 +39,8 @@ internal class TimelineDomainRig private constructor(
     val presentation: CanonicalTimelinePresentation,
     private val transport: MutableDurableTransport,
 ) {
-    /** The App Server `message.list` recent page, swapped per test step. */
-    class MutableDurableTransport : TimelineTransport {
+    /** The App Server `message.list` recent page, swapped per test step. Every other call fails the test. */
+    class MutableDurableTransport : TimelineTransport by unexpectedTransport() {
         @Volatile var durable: List<LettaMessage> = emptyList()
 
         override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
@@ -48,20 +49,6 @@ internal class TimelineDomainRig private constructor(
                 durable.map { TimelineRemoteRecord(TimelineMessageId(it.id), it, 0) },
                 null, false, 0,
             )
-
-        override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> =
-            error("the rig never sends through the transport")
-
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-            error("the rig feeds the stream itself")
-
-        override suspend fun listConversationMessages(
-            conversationId: String, limit: Int?, after: String?, order: String?,
-        ): List<LettaMessage> = error("the rig pages through listConversationMessagePage")
-
-        override suspend fun listAgentMessages(
-            agentId: String, limit: Int?, order: String?, conversationId: String?,
-        ): List<LettaMessage> = error("the rig never lists an agent")
     }
 
     /** Opens on history the ledger already holds. */
@@ -70,15 +57,15 @@ internal class TimelineDomainRig private constructor(
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
     }
 
-    /** A prompt the user just sent, before the server has seen it. */
-    suspend fun send(otid: String, content: String, sentAt: String) {
-        coordinator.appendPending(owner, CanonicalPendingLocalStore.Record(otid, content, emptyList(), sentAt))
+    /** A prompt the user just sent, before the server has seen it: [echo] carries its otid, text and time. */
+    suspend fun send(echo: UserMessage) {
+        coordinator.appendPending(owner, CanonicalPendingLocalStore.Record(echo.otid.orEmpty(), echo.content, emptyList(), echo.date.orEmpty()))
     }
 
     /** Begins a turn's live stream. */
     suspend fun beginStream(): Stream = Stream(coordinator.beginLive(owner))
 
-    inner class Stream internal constructor(private val fence: com.letta.mobile.data.timeline.TimelineLiveFence) {
+    inner class Stream internal constructor(private val fence: TimelineLiveFence) {
         suspend fun emit(message: LettaMessage) {
             assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(message)))
         }
@@ -88,7 +75,10 @@ internal class TimelineDomainRig private constructor(
         }
     }
 
-    /** The durable turn lands: the ledger reconciles, Paging re-presents, the overlay drains. */
+    /**
+     * The durable turn lands: the ledger reconciles and Paging re-presents. The overlay drains once
+     * the list reports the new rows resident, which takes Compose frames; see [drained].
+     */
     suspend fun settle(durable: List<LettaMessage>) {
         transport.durable = durable
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
@@ -107,11 +97,17 @@ internal class TimelineDomainRig private constructor(
 
         suspend fun open(scope: TimelineScope): TimelineDomainRig {
             val transport = MutableDurableTransport()
-            val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(readLatencyMillis = READ_LATENCY_MILLIS), transport)
+            val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(READ_LATENCY_MILLIS), transport)
             val owner = coordinator.acquire(scope)
             val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
             return TimelineDomainRig(coordinator, owner, ui, presentation, transport)
         }
+
+        /** A transport whose every call fails the test; subclasses override only what a step expects. */
+        private fun unexpectedTransport(): TimelineTransport = java.lang.reflect.Proxy.newProxyInstance(
+            TimelineTransport::class.java.classLoader,
+            arrayOf(TimelineTransport::class.java),
+        ) { _, method, _ -> fail("unexpected transport call: ${method.name}") } as TimelineTransport
     }
 }
