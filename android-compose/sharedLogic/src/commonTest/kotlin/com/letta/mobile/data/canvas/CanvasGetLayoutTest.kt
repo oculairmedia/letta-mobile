@@ -52,7 +52,7 @@ class CanvasGetLayoutTest {
         val byId = rows.associateBy { it.id }
         assertEquals(CanvasLayoutRead.KIND_NOTE, byId.getValue("note-body").kind)
         assertEquals("First line of the note", byId.getValue("note-body").label)
-        assertEquals(listOf(11, 20, 31, 40), byId.getValue("note-title").frame)
+        assertEquals(listOf(11, 20, 30, 40), byId.getValue("note-title").frame)
         assertEquals(60, byId.getValue("note-title").label!!.length)
         assertTrue(byId.getValue("note-title").label!!.endsWith("…"))
 
@@ -125,11 +125,108 @@ class CanvasGetLayoutTest {
         val rawPages = rawPages(host, limit = RowLimit(CanvasLayoutRead.MAX_LIMIT))
         assertTrue(rawPages.size >= 2, "220 labelled notes must span pages under ${CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES} bytes")
         rawPages.forEach { raw ->
-            assertTrue(raw.encodeToByteArray().size <= CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES, "${raw.encodeToByteArray().size} bytes")
+            val size = raw.encodeToByteArray().size
+            assertTrue(size <= CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES, "$size bytes")
+            val page = json.decodeFromString(CanvasLayoutResult.serializer(), raw)
+            assertEquals(size, CanvasLayoutJson.bytes(page), "row bytes plus the page shell")
         }
         val rows = rawPages.map { json.decodeFromString(CanvasLayoutResult.serializer(), it) }.flatMap { it.rows }
         assertEquals(count, rows.map { it.id }.toSet().size)
         assertEquals(sceneIds(host.scene()), rows.map { it.id }.toSet())
+    }
+
+    @Test
+    fun aSharedIdIsNotSkipped() = runTest {
+        val host = PluginToolHost.Iroh()
+        host.applyOps(
+            note(id = "same", title = "Note", body = "n", frame = CanvasDocumentFrame(0f, 0f, 40f, 40f)),
+            element(
+                "same",
+                buildJsonObject {
+                    put("type", "Path")
+                    put("samples", points(listOf("0.0,0.0,1.0", "4.0,4.0,1.0")))
+                },
+            ),
+        ).content()
+        val paged = pages(host, limit = RowLimit(1)).flatMap { it.rows }
+        val whole = layout(host, limit = RowLimit(50)).rows
+        assertEquals(whole, paged, "limit 1 still returns every row when a note and a path share an id")
+        assertEquals(listOf("same", "same"), paged.map { it.id })
+        assertEquals(setOf(CanvasLayoutRead.KIND_NOTE, CanvasLayoutRead.KIND_PATH), paged.map { it.kind }.toSet())
+    }
+
+    @Test
+    fun clipLabelKeepsASurrogatePair() {
+        val emoji = "\uD83D\uDE00"
+        val clipped = clipLabel("a".repeat(58) + emoji + "tail")
+        assertEquals("a".repeat(58) + "…", clipped)
+        assertEquals(60, clipLabel("b".repeat(60))!!.length)
+        assertTrue(clipped!!.none { it.isHighSurrogate() })
+    }
+
+    @Test
+    fun aMalformedCursorIsRefused() = runTest {
+        val host = PluginToolHost.Iroh()
+        host.applyOps(
+            note(id = "note-a", title = "A", body = "a", frame = CanvasDocumentFrame(0f, 0f, 40f, 40f)),
+            note(id = "note-b", title = "B", body = "b", frame = CanvasDocumentFrame(50f, 0f, 40f, 40f)),
+        ).content()
+        val revision = layout(host, limit = RowLimit(1)).revision
+        listOf("nope", "r$revision:", "1\u001fnote-a", "r$revision:99").forEach { cursor ->
+            val refused = host.call(CanvasToolContract.GET_LAYOUT, buildJsonObject { put("cursor", cursor) }).error()
+            assertTrue("stale_cursor" !in refused, "$cursor was $refused")
+            assertTrue("cursor must be" in refused, refused)
+        }
+    }
+
+    @Test
+    fun staleCursorRefusedOnEveryHost() = runTest {
+        for (host in PluginToolHost.all()) {
+            host.applyOps(
+                note(id = "note-a", title = "A", body = "a", frame = CanvasDocumentFrame(0f, 0f, 40f, 40f)),
+                note(id = "note-b", title = "B", body = "b", frame = CanvasDocumentFrame(50f, 0f, 40f, 40f)),
+            ).content()
+            val first = layout(host, limit = RowLimit(1))
+            host.applyOps(note(id = "note-c", title = "C", body = "c", frame = CanvasDocumentFrame(100f, 0f, 40f, 40f))).content()
+            val refused = host.call(CanvasToolContract.GET_LAYOUT, buildJsonObject { put("cursor", first.nextCursor) }).error()
+            val body = json.decodeFromString(CanvasLayoutRefusal.serializer(), refused)
+            assertEquals("stale_cursor", body.error)
+            assertEquals(host.scene().revision, body.revision)
+        }
+    }
+
+    @Test
+    fun aMultibyteLabelStaysUnderTheByteCap() = runTest {
+        val host = PluginToolHost.Iroh()
+        val title = "\uD83D\uDE00".repeat(40)
+        host.applyOps(note(id = "emoji", title = title, body = "e", frame = CanvasDocumentFrame(0f, 0f, 40f, 40f))).content()
+        val raw = host.call(CanvasToolContract.GET_LAYOUT, layoutInput(RowLimit(50), null)).content()
+        assertTrue(raw.encodeToByteArray().size <= CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES)
+        val row = json.decodeFromString(CanvasLayoutResult.serializer(), raw).rows.single()
+        assertEquals(clipLabel(title), row.label)
+    }
+
+    @Test
+    fun aLongPluginKindIsClippedLikeALabel() = runTest {
+        val host = PluginToolHost.Iroh()
+        val kind = "k".repeat(70)
+        host.applyOps(
+            """{"type":"set_plugin_element","elementId":"pe-long","elementType":"ext:letta.example/$kind","v":1,""" +
+                """"frame":{"x":1,"y":2,"width":3,"height":4},"fallback":{"title":"T","openUrl":"https://example.test/k"}}""",
+        ).content()
+        val row = layout(host, limit = RowLimit(10)).rows.single { it.id == "pe-long" }
+        assertEquals(clipLabel(kind), row.pluginKind)
+        assertEquals(60, row.pluginKind!!.length)
+    }
+
+    @Test
+    fun aFramelessNoteReportsWhereTheBoardPlacesIt() = runTest {
+        val host = PluginToolHost.Iroh()
+        host.applyOps(note(id = "bare", title = "Bare", body = "x", frame = null)).content()
+        val row = layout(host, limit = RowLimit(10)).rows.single()
+        assertEquals(CanvasLayoutRead.KIND_NOTE, row.kind)
+        assertEquals(listOf(80, 80, 320), row.frame!!.take(3), "empty board: origin 80 and the frameless width")
+        assertTrue(row.frame!![3] > 0)
     }
 
     @Test
@@ -248,16 +345,18 @@ class CanvasGetLayoutTest {
         PluginToolHost.PLACE,
     )
 
-    private fun note(id: String, title: String?, body: String, frame: CanvasDocumentFrame): String = buildJsonObject {
+    private fun note(id: String, title: String?, body: String, frame: CanvasDocumentFrame?): String = buildJsonObject {
         put("type", "set_document")
         put("documentId", id)
         put("documentJson", """{"version":2,"blocks":[{"id":"b","content":{"text":${JsonPrimitive(body)}}}]}""")
         title?.let { put("title", it) }
-        putJsonObject("frame") {
-            put("x", frame.x)
-            put("y", frame.y)
-            put("width", frame.width)
-            put("height", frame.height)
+        frame?.let {
+            putJsonObject("frame") {
+                put("x", it.x)
+                put("y", it.y)
+                put("width", it.width)
+                put("height", it.height)
+            }
         }
     }.toString()
 

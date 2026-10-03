@@ -96,19 +96,14 @@ internal object CanvasLayoutRead {
 
     private fun page(sceneJson: String, revision: LayoutRevision, cursor: String?, limit: PageLimit): CanvasLayoutAnswer {
         val rows = CanvasLayoutRows.of(sceneJson)
-        val start = startAfter(rows, revision, cursor) ?: return stale(revision)
-        val picked = CanvasLayoutPage.of(revision, rows, start, limit)
-        return CanvasLayoutAnswer.Page(CanvasLayoutJson.encode(picked))
-    }
-
-    /** Null when [cursor] is not a cursor for [revision]: the caller restarts with no cursor. */
-    private fun startAfter(rows: List<CanvasLayoutRow>, revision: LayoutRevision, cursor: String?): Int? {
-        if (cursor == null) return 0
-        val decoded = CanvasLayoutCursor.decode(cursor) ?: return null
-        if (decoded.revision != revision) return null
-        val at = rows.indexOfLast { it.id == decoded.lastId }
-        if (at < 0) return null
-        return at + 1
+        return when (val start = CanvasLayoutCursor.start(rows, revision, cursor)) {
+            is CanvasLayoutCursor.Start.Bad -> CanvasLayoutAnswer.Refused(BAD_CURSOR)
+            is CanvasLayoutCursor.Start.Stale -> stale(revision)
+            is CanvasLayoutCursor.Start.At -> {
+                val picked = CanvasLayoutPage.of(revision, rows, start.index, limit)
+                CanvasLayoutAnswer.Page(CanvasLayoutJson.encode(picked))
+            }
+        }
     }
 
     private fun stale(revision: LayoutRevision): CanvasLayoutAnswer.Refused = CanvasLayoutAnswer.Refused(CanvasLayoutJson.stale(revision))
@@ -150,22 +145,39 @@ internal object CanvasLayoutRead {
         "cursor must be the nextCursor string from a previous canvas_get_layout page, or omitted to start from the first row."
 }
 
-/** Opaque `(revision, last id)`. The agent sends it back unchanged. */
+/**
+ * A printable cursor `r<revision>:<index>`: the revision the page was read at, and the index of
+ * the last row on that page. The next page starts at index + 1, so two rows that share an id are
+ * both returned. The agent sends it back unchanged.
+ */
 internal object CanvasLayoutCursor {
-    private const val SEPARATOR = "\u001f"
+    private val CURSOR = Regex("""r(\d+):(\d+)""")
 
-    fun encode(revision: LayoutRevision, lastId: String): String = "${revision.raw}$SEPARATOR$lastId"
+    fun encode(revision: LayoutRevision, index: Int): String = "r${revision.raw}:$index"
 
     fun decode(cursor: String): Decoded? {
-        val split = cursor.indexOf(SEPARATOR)
-        if (split <= 0) return null
-        val revision = cursor.substring(0, split).toLongOrNull()?.let(::LayoutRevision) ?: return null
-        val lastId = cursor.substring(split + SEPARATOR.length)
-        if (lastId.isEmpty()) return null
-        return Decoded(revision, lastId)
+        val match = CURSOR.matchEntire(cursor) ?: return null
+        val revision = match.groupValues[1].toLongOrNull()?.let(::LayoutRevision) ?: return null
+        val index = match.groupValues[2].toIntOrNull() ?: return null
+        return Decoded(revision, index)
     }
 
-    data class Decoded(val revision: LayoutRevision, val lastId: String)
+    /** Where the next page starts. A cursor that does not decode is [Start.Bad], not a stale revision. */
+    fun start(rows: List<CanvasLayoutRow>, revision: LayoutRevision, cursor: String?): Start {
+        if (cursor == null) return Start.At(0)
+        val decoded = decode(cursor) ?: return Start.Bad
+        if (decoded.revision != revision) return Start.Stale
+        if (decoded.index !in rows.indices) return Start.Bad
+        return Start.At(decoded.index + 1)
+    }
+
+    data class Decoded(val revision: LayoutRevision, val index: Int)
+
+    sealed interface Start {
+        data class At(val index: Int) : Start
+        data object Bad : Start
+        data object Stale : Start
+    }
 }
 
 /** The rows of one page, in id order, stopping at the limit or the byte cap. */
@@ -173,24 +185,23 @@ internal object CanvasLayoutPage {
     fun of(revision: LayoutRevision, rows: List<CanvasLayoutRow>, start: Int, limit: PageLimit): CanvasLayoutResult {
         val chosen = ArrayList<CanvasLayoutRow>()
         var index = start
+        var packed = 0
         while (index < rows.size && chosen.size < limit.raw) {
-            val moreAfter = index + 1 < rows.size
-            if (chosen.isNotEmpty() && !fits(revision, chosen, rows[index], moreAfter)) break
+            val rowSize = CanvasLayoutJson.rowBytes(rows[index])
+            val comma = if (chosen.isEmpty()) 0 else 1
+            val cursor = if (index + 1 < rows.size) CanvasLayoutCursor.encode(revision, index) else null
+            val total = CanvasLayoutJson.shellBytes(revision, cursor) + packed + comma + rowSize
+            if (chosen.isNotEmpty() && total > CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES) break
             chosen.add(rows[index])
+            packed += comma + rowSize
             index += 1
         }
         val cursor = if (index < rows.size && chosen.isNotEmpty()) {
-            CanvasLayoutCursor.encode(revision, chosen.last().id)
+            CanvasLayoutCursor.encode(revision, index - 1)
         } else {
             null
         }
         return CanvasLayoutResult(revision.raw, chosen, cursor)
-    }
-
-    private fun fits(revision: LayoutRevision, chosen: List<CanvasLayoutRow>, extra: CanvasLayoutRow, moreAfter: Boolean): Boolean {
-        val cursor = if (moreAfter) CanvasLayoutCursor.encode(revision, extra.id) else null
-        val page = CanvasLayoutResult(revision.raw, chosen + extra, cursor)
-        return CanvasLayoutJson.bytes(page) <= CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES
     }
 }
 
@@ -202,7 +213,17 @@ internal object CanvasLayoutJson {
         page.nextCursor?.let { put("nextCursor", it) }
     }.toString()
 
-    fun bytes(page: CanvasLayoutResult): Int = encode(page).encodeToByteArray().size
+    fun bytes(page: CanvasLayoutResult): Int {
+        val rows = page.rows.sumOf { rowBytes(it) }
+        val commas = if (page.rows.size > 1) page.rows.size - 1 else 0
+        return shellBytes(LayoutRevision(page.revision), page.nextCursor) + rows + commas
+    }
+
+    /** The page JSON with an empty `rows` array: the wrapper the row bytes are added to. */
+    fun shellBytes(revision: LayoutRevision, cursor: String?): Int =
+        encode(CanvasLayoutResult(revision.raw, emptyList(), cursor)).encodeToByteArray().size
+
+    fun rowBytes(row: CanvasLayoutRow): Int = rowJson(row).toString().encodeToByteArray().size
 
     fun stale(revision: LayoutRevision): String = buildJsonObject {
         put("error", "stale_cursor")
@@ -235,9 +256,15 @@ internal object CanvasLayoutRows {
     fun of(sceneJson: String): List<CanvasLayoutRow> {
         val arrows = CanvasOpProjector.arrowBindingsOf(sceneJson)
         val drawn = elementsOf(sceneJson).mapNotNull { elementRow(it, arrows) }
-        val notes = CanvasOpProjector.documentsOf(sceneJson).map(::noteRow)
+        val notes = notesOf(sceneJson)
         val plugins = CanvasOpProjector.pluginElementsOf(sceneJson).map(::pluginRow)
         return (drawn + notes + plugins).sortedWith(compareBy({ it.id }, { it.kind }))
+    }
+
+    private fun notesOf(sceneJson: String): List<CanvasLayoutRow> {
+        val documents = CanvasOpProjector.documentsOf(sceneJson)
+        val placed = CanvasComposePlacement.placeFrameless(documents, CanvasComposePlacement.contentBounds(sceneJson))
+        return documents.map { noteRow(it, placed) }
     }
 
     private fun elementsOf(sceneJson: String): List<JsonObject> {
@@ -260,19 +287,22 @@ internal object CanvasLayoutRows {
         )
     }
 
-    private fun noteRow(document: CanvasSceneDocument): CanvasLayoutRow = CanvasLayoutRow(
-        id = document.id,
-        kind = CanvasLayoutRead.KIND_NOTE,
-        frame = document.frame?.let { integersOf(Slot(it.x, it.y, it.width, it.height)) },
-        label = noteLabel(document),
-    )
+    private fun noteRow(document: CanvasSceneDocument, frameless: Map<String, Slot>): CanvasLayoutRow {
+        val stored = document.frame?.let { Slot(it.x, it.y, it.width, it.height) }
+        return CanvasLayoutRow(
+            id = document.id,
+            kind = CanvasLayoutRead.KIND_NOTE,
+            frame = (stored ?: frameless[document.id])?.let(::integersOf),
+            label = noteLabel(document),
+        )
+    }
 
     private fun pluginRow(element: CanvasPluginElement): CanvasLayoutRow = CanvasLayoutRow(
         id = element.id,
         kind = CanvasLayoutRead.KIND_PLUGIN,
         frame = element.frame?.let { integersOf(Slot(it.x, it.y, it.width, it.height)) },
         label = clipLabel(element.fallback.title),
-        pluginKind = element.kind.takeIf { it.isNotBlank() },
+        pluginKind = clipLabel(element.kind),
     )
 
     private fun kindOf(element: JsonObject): String = when (element.string("type")?.lowercase()) {
@@ -307,7 +337,14 @@ internal object CanvasLayoutRows {
         return integersOf(slot)
     }
 
-    private fun integersOf(box: Slot): List<Int> = listOf(roundHalfUp(box.x), roundHalfUp(box.y), roundHalfUp(box.width), roundHalfUp(box.height))
+    /** Edges first, then the span, so two boxes that touch stay touching after rounding. */
+    private fun integersOf(box: Slot): List<Int> {
+        val left = roundHalfUp(box.x)
+        val top = roundHalfUp(box.y)
+        val right = roundHalfUp(box.x + box.width)
+        val bottom = roundHalfUp(box.y + box.height)
+        return listOf(left, top, right - left, bottom - top)
+    }
 
     private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
@@ -320,9 +357,14 @@ internal fun roundHalfUp(value: Float): Int {
     return shifted.toInt()
 }
 
-/** At most [CanvasLayoutRead.LABEL_MAX_CHARS], with an ellipsis when the text was longer. Blank is omitted. */
+/**
+ * At most [CanvasLayoutRead.LABEL_MAX_CHARS] UTF-16 units, with an ellipsis when the text was
+ * longer. Blank is omitted. The cut backs up one unit when it would split a surrogate pair.
+ */
 internal fun clipLabel(raw: String?): String? {
     val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     if (text.length <= CanvasLayoutRead.LABEL_MAX_CHARS) return text
-    return text.take(CanvasLayoutRead.LABEL_MAX_CHARS - 1) + "…"
+    var cut = CanvasLayoutRead.LABEL_MAX_CHARS - 1
+    if (cut > 0 && text[cut - 1].isHighSurrogate()) cut -= 1
+    return text.take(cut) + "…"
 }

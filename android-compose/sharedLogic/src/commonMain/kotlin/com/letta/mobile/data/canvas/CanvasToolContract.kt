@@ -91,12 +91,14 @@ object CanvasToolContract {
     val getLayout = CanvasToolDefinition(
         GET_LAYOUT,
         "Read a canvas's geometry without its full payloads (with no canvas_id, the conversation's canvas). " +
-            "Each row is {id, kind, frame:[x,y,w,h]}. kind is shape (plus shape, such as RECTANGLE or ARROW), " +
-            "text, path, image, note or plugin (plus pluginKind). label is at most 60 characters. An ARROW's " +
-            "bindings are {from, to}, each a note id, an element id, or null. Rows are ordered by id. limit " +
-            "defaults to 200 and is at most 500; a page also ends at 16 KiB and returns nextCursor for the rest. " +
-            "A cursor from another revision is refused as {\"error\":\"stale_cursor\",\"revision\":<current>}; " +
-            "call again with no cursor.",
+            "Each row is {id, kind, frame:[x,y,w,h]}. frame is the point box before rotation. kind is shape " +
+            "(plus shape, such as RECTANGLE or ARROW), text, path, image, note or plugin (plus pluginKind). " +
+            "label and pluginKind are at most 60 UTF-16 units. A note with no stored frame is reported where " +
+            "the board places it. An ARROW's bindings are {from, to}, each a note id, an element id, or null. " +
+            "Rows are ordered by id. limit defaults to 200 and is at most 500; a page also ends at 16 KiB and " +
+            "returns nextCursor as r<revision>:<index>. A cursor from another revision is refused as " +
+            "{\"error\":\"stale_cursor\",\"revision\":<current>}; a cursor that does not decode is refused. " +
+            "Call again with no cursor.",
         objectSchema(
             canvasIdParam,
             ToolParam("cursor", description = "The nextCursor from the previous page. Omit it to start from the first row."),

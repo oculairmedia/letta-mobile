@@ -248,11 +248,11 @@ class CanvasGetLayoutRenderTest {
     }
 
     private fun arrows(): List<JsonObject> = listOf(
-        arrow("a-sort", ArrowLink(Anchor("n-inbox", "right"), Anchor("n-triage", "left"), "sort")),
-        arrow("a-next", ArrowLink(Anchor("n-triage", "bottom"), Anchor("n-plan", "top"), "next")),
-        arrow("a-check", ArrowLink(Anchor("n-plan", "bottom"), Anchor("n-review", "top"), "check")),
-        arrow("a-file", ArrowLink(Anchor("n-ship", "right"), Anchor("n-notes", "left"), "file")),
-        arrowToShape("a-box", ArrowLink(Anchor("n-done", "right"), Anchor("shape-box", "left"), "ship")),
+        arrow("a-sort", ArrowLink(Anchor("n-inbox", "right"), Anchor("n-triage", "left"), "")),
+        arrow("a-next", ArrowLink(Anchor("n-triage", "bottom"), Anchor("n-plan", "top"), "")),
+        arrow("a-check", ArrowLink(Anchor("n-plan", "bottom"), Anchor("n-review", "top"), "")),
+        arrow("a-file", ArrowLink(Anchor("n-ship", "right"), Anchor("n-notes", "left"), "")),
+        arrowToShape("a-box", ArrowLink(Anchor("n-done", "right"), Anchor("shape-box", "left"), "")),
     ).flatten()
 
     private fun arrow(id: String, link: ArrowLink): List<JsonObject> {
