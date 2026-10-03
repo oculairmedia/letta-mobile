@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.TextAlignment
 import io.ak1.drawbox.text.FontRegistry
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -278,21 +279,22 @@ internal class TextLayoutCache {
         val fontFamilyKey: String,
         val fontSize: Float,
         val alignment: TextAlignment,
-        val wrapWidth: Float,
+        val wrap: TextWrap,
     )
     private data class Entry(val key: Key, val layout: TextLayoutResult)
     private val byId = HashMap<String, Entry>()
 
+    /** The layout of [text], wrapped as [wrap] says. One measure per change, cached under [id]. */
     fun layoutFor(
         id: String,
         text: String,
         fontFamilyKey: String,
         fontSize: Float,
         alignment: TextAlignment,
-        wrapWidth: Float,
+        wrap: TextWrap,
         measurer: TextMeasurer,
     ): TextLayoutResult {
-        val key = Key(text, fontFamilyKey, fontSize, alignment, wrapWidth)
+        val key = Key(text, fontFamilyKey, fontSize, alignment, wrap)
         val existing = byId[id]
         if (existing != null && existing.key == key) return existing.layout
         val style = TextStyle(
@@ -303,10 +305,7 @@ internal class TextLayoutCache {
         val layout = measurer.measure(
             text = text,
             style = style,
-            // The full wrap width, not just a cap on it: with only a maximum the layout shrinks to
-            // the text, and centring or right-aligning then happens inside that shrunken box, so
-            // a short centred line sat at the left of its box.
-            constraints = Constraints.fixedWidth(wrapWidth.toInt().coerceAtLeast(1)),
+            constraints = wrap.constraints(),
             softWrap = true,
             // World units: the font size is world px whatever the display's density or the
             // person's font-size setting (see WorldDensity).
@@ -323,6 +322,39 @@ internal class TextLayoutCache {
     }
 
     fun size(): Int = byId.size
+}
+
+/**
+ * How a block of text is wrapped, packed into one long so the per-frame cache lookup allocates
+ * nothing: at a [width], and whether the layout fills that width ([box]) or is only as wide as
+ * the text's longest line up to it ([upTo]).
+ */
+@JvmInline
+internal value class TextWrap private constructor(private val packed: Long) {
+    val width: Float get() = Float.fromBits(packed.toInt())
+    private val fitsText: Boolean get() = (packed ushr FIT_BIT) != 0L
+
+    /**
+     * A box layout gets the full width, not just a cap on it: with only a maximum the layout
+     * shrinks to the text, and centring or right-aligning then happens inside that shrunken box,
+     * so a short centred line sat at the left of its box. A fitted layout gets only the cap, and
+     * the measurer lays it out min(max intrinsic width, cap) wide: a label sized to its text.
+     */
+    fun constraints(): Constraints {
+        val px = width.toInt().coerceAtLeast(1)
+        return if (fitsText) Constraints(maxWidth = px) else Constraints.fixedWidth(px)
+    }
+
+    companion object {
+        private const val FIT_BIT = 32
+        private const val LOW_BITS = 0xFFFFFFFFL
+
+        /** Text wrapped to [width] and laid out across all of it, aligned inside it. */
+        fun box(width: Float): TextWrap = TextWrap(width.toBits().toLong() and LOW_BITS)
+
+        /** Text as wide as its longest line, wrapping once it reaches [width]. */
+        fun upTo(width: Float): TextWrap = TextWrap((width.toBits().toLong() and LOW_BITS) or (1L shl FIT_BIT))
+    }
 }
 
 private fun TextAlignment.toComposeAlign(): TextAlign = when (this) {

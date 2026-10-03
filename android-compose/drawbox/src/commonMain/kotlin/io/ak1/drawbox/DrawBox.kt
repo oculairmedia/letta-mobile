@@ -91,6 +91,8 @@ import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.domain.model.Viewport
 import io.ak1.drawbox.domain.model.angleFromCenter
 import io.ak1.drawbox.domain.model.bezierMidpoint
+import io.ak1.drawbox.domain.model.arrowHeadDepth
+import io.ak1.drawbox.domain.model.arrowHeadSize
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.model.positions
 import io.ak1.drawbox.domain.model.controlPoint
@@ -100,10 +102,6 @@ import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBoundsForElement
 import io.ak1.drawbox.domain.model.rotateAround
 import io.ak1.drawbox.domain.model.topmostHit
-import io.ak1.drawbox.domain.model.textTopLeft
-import io.ak1.drawbox.domain.model.textBox
-import io.ak1.drawbox.domain.model.resolvedTextColor
-import io.ak1.drawbox.domain.model.canHoldText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -256,6 +254,11 @@ fun DrawBox(
     // composition-scoped and must come from rememberTextMeasurer.
     val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
     val textCache = remember { TextLayoutCache() }
+    // How shape text is painted: built once per board colour, not per element per frame, and the
+    // hidden variant only for the shape whose text an editor is showing.
+    val shapeText = remember(state.bgColor) { ShapeTextPaint(hidden = false, chip = state.bgColor) }
+    val editedShapeText = remember(shapeText) { shapeText.copy(hidden = true) }
+    fun shapeTextFor(element: Element): ShapeTextPaint = if (element.id in hiddenTextElementIds) editedShapeText else shapeText
 
     // Pre-measure every text element at composition time (cache hit when
     // unchanged) and dispatch SyncTextMeasuredHeight when the rendered
@@ -277,7 +280,7 @@ fun DrawBox(
                 fontFamilyKey = el.fontFamilyKey,
                 fontSize = el.fontSize,
                 alignment = el.alignment,
-                wrapWidth = el.wrapWidth.coerceAtLeast(1f),
+                wrap = TextWrap.box(el.wrapWidth.coerceAtLeast(1f)),
                 measurer = textMeasurer,
             )
             val measured = layout.size.height.toFloat()
@@ -944,7 +947,7 @@ fun DrawBox(
                     }) {
                         orderedElements.forEach { el ->
                             if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
+                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el))
                             }
                         }
                     }
@@ -966,7 +969,7 @@ fun DrawBox(
             }) {
                 if (activeIds.isNotEmpty()) {
                     orderedElements.forEach { el ->
-                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
+                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el))
                     }
                 }
                 drawSelectionChrome(
@@ -1010,7 +1013,7 @@ fun DrawBox(
                         translate(vp.offset.x, vp.offset.y)
                         scale(vp.scale, vp.scale, pivot = Offset.Zero)
                     }) {
-                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale) }
+                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeText) }
                     }
                 }
                 capturePending = false
@@ -1062,6 +1065,7 @@ fun DrawingPreview(
     val textCache = remember { TextLayoutCache() }
     val previewScope = rememberCoroutineScope()
     val imageCache = remember(previewScope) { ImageBitmapCache(previewScope) }
+    val shapeText = remember(bgColor) { ShapeTextPaint(hidden = false, chip = bgColor) }
     Canvas(modifier = modifier) {
         drawRect(color = bgColor)
         withTransform({
@@ -1078,6 +1082,7 @@ fun DrawingPreview(
                         textCache = textCache,
                         textMeasurer = textMeasurer,
                         viewportScale = viewport.scale,
+                        shapeText = shapeText,
                     )
                 }
         }
@@ -1616,13 +1621,13 @@ private fun DrawScope.renderElement(
     textCache: TextLayoutCache? = null,
     textMeasurer: androidx.compose.ui.text.TextMeasurer? = null,
     viewportScale: Float = 1f,
-    hideShapeText: Boolean = false,
+    shapeText: ShapeTextPaint,
 ) {
     if (element.rotation == 0f) {
-        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
+        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, shapeText)
     } else {
         withTransform({ rotate(element.rotation, pivot = element.bounds().center) }) {
-            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
+            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, shapeText)
         }
     }
 }
@@ -1634,7 +1639,7 @@ private fun DrawScope.renderElementContent(
     textCache: TextLayoutCache?,
     textMeasurer: androidx.compose.ui.text.TextMeasurer?,
     viewportScale: Float,
-    hideShapeText: Boolean = false,
+    shapeText: ShapeTextPaint,
 ) {
     when (element) {
         is Element.Path -> {
@@ -1680,7 +1685,7 @@ private fun DrawScope.renderElementContent(
         }
         is Element.Shape -> {
             drawShape(element)
-            if (!hideShapeText) drawShapeText(element, textCache, textMeasurer)
+            if (!shapeText.hidden) drawShapeText(element, textCache, textMeasurer, shapeText.chip)
         }
         is Element.Image -> {
             drawImageElement(element, imageCache, viewportScale)
@@ -1689,35 +1694,6 @@ private fun DrawScope.renderElementContent(
             drawTextElement(element, textCache, textMeasurer)
         }
     }
-}
-
-/**
- * A shape's text, wrapped to [textBox] and centred in it. Laid out through the same
- * [TextLayoutCache] as text elements, under the shape's id plus [SHAPE_TEXT_KEY]. Skipped on
- * the read-only preview path, which has no measurer.
- */
-private fun DrawScope.drawShapeText(
-    shape: Element.Shape,
-    textCache: TextLayoutCache?,
-    textMeasurer: androidx.compose.ui.text.TextMeasurer?,
-) {
-    if (shape.text.isEmpty() || !shape.canHoldText) return
-    if (textCache == null || textMeasurer == null) return
-    val box = shape.textBox()
-    val layout = textCache.layoutFor(
-        id = shape.id + SHAPE_TEXT_KEY,
-        text = shape.text,
-        fontFamilyKey = shape.fontFamilyKey,
-        fontSize = shape.fontSize,
-        alignment = shape.textAlignment,
-        wrapWidth = box.width.coerceAtLeast(1f),
-        measurer = textMeasurer,
-    )
-    drawText(
-        textLayoutResult = layout,
-        color = shape.resolvedTextColor,
-        topLeft = shape.textTopLeft(layout.size.height.toFloat()),
-    )
 }
 
 /**
@@ -1752,7 +1728,7 @@ private fun DrawScope.drawTextElement(
         fontFamilyKey = element.fontFamilyKey,
         fontSize = element.fontSize,
         alignment = element.alignment,
-        wrapWidth = wrapWidth,
+        wrap = TextWrap.box(wrapWidth),
         measurer = textMeasurer,
     )
     drawText(
@@ -2322,8 +2298,8 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
     val end = shape.points.last()
     val color = shape.strokeColor
     val strokeWidth = shape.strokeWidth
-    val arrowSize = maxOf(30f, strokeWidth * 3f)
-    val arrowDepth = arrowSize * cos(PI / 6).toFloat()
+    val arrowSize = shape.arrowHeadSize()
+    val arrowDepth = shape.arrowHeadDepth()
 
     val angle: Float
     val linePath = shape.linePath()
