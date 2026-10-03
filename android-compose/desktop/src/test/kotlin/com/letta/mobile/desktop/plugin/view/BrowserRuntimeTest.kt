@@ -1,16 +1,11 @@
 package com.letta.mobile.desktop.plugin.view
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -23,15 +18,10 @@ import kotlin.test.assertTrue
  * final and non-fatal, carrying the reason the cards show.
  */
 class BrowserRuntimeTest {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    @AfterTest
-    fun cancelScope() = scope.cancel()
-
     @Test
     fun itStartsOnceAndOnlyWhenAViewAsks() = runBlocking {
         val starts = AtomicInteger()
-        val runtime = BrowserRuntime(BrowserStarter { starts.incrementAndGet(); "browser" }, scope, Dispatchers.Default)
+        val runtime = BrowserRuntime(BrowserStarter { starts.incrementAndGet(); "browser" })
         assertEquals(BrowserRuntimeState.Idle, runtime.state.value)
         assertEquals(0, starts.get())
 
@@ -54,11 +44,10 @@ class BrowserRuntimeTest {
                 seen += runtime.state.value
                 "browser"
             },
-            scope,
-            Dispatchers.Default,
         )
         withTimeout(WAIT_MS) { runtime.await() }
-        assertEquals<List<BrowserRuntimeState<String>>>(listOf(BrowserRuntimeState.Preparing("downloading", 0.5f), BrowserRuntimeState.Preparing("extracting", null)), seen)
+        val expected = listOf(BrowserRuntimeState.Preparing("downloading", 0.5f), BrowserRuntimeState.Preparing("extracting", null))
+        assertEquals<List<BrowserRuntimeState<String>>>(expected, seen)
     }
 
     @Test
@@ -66,8 +55,6 @@ class BrowserRuntimeTest {
         val starts = AtomicInteger()
         val runtime = BrowserRuntime<String>(
             BrowserStarter { starts.incrementAndGet(); throw IOException("Could not download bundle\n\tat somewhere") },
-            scope,
-            Dispatchers.Default,
         )
         assertNull(withTimeout(WAIT_MS) { runtime.await() })
         val state = assertIs<BrowserRuntimeState.Unavailable>(runtime.state.value)
@@ -80,7 +67,7 @@ class BrowserRuntimeTest {
 
     @Test
     fun aMissingNativeLibraryIsUnavailableNotACrash() = runBlocking {
-        val runtime = BrowserRuntime<String>(BrowserStarter { throw UnsatisfiedLinkError() }, scope, Dispatchers.Default)
+        val runtime = BrowserRuntime<String>(BrowserStarter { throw UnsatisfiedLinkError() })
         assertNull(withTimeout(WAIT_MS) { runtime.await() })
         assertEquals("Web view unavailable: UnsatisfiedLinkError", assertIs<BrowserRuntimeState.Unavailable>(runtime.state.value).reason)
     }
@@ -89,7 +76,7 @@ class BrowserRuntimeTest {
     fun aDisabledRuntimeNeverStarts() = runBlocking {
         val starts = AtomicInteger()
         val config = JcefConfig(File("bundle"), File("cache"), enabled = false, headless = false)
-        val runtime = BrowserRuntime(BrowserStarter { starts.incrementAndGet(); "browser" }, scope, Dispatchers.Default, config.disabledReason)
+        val runtime = BrowserRuntime(BrowserStarter { starts.incrementAndGet(); "browser" }, config.disabledReason)
         assertNull(runtime.await())
         assertEquals(0, starts.get())
         assertTrue(assertIs<BrowserRuntimeState.Unavailable>(runtime.state.value).reason.contains("letta.pluginViews.jcef=false"))
@@ -103,8 +90,10 @@ class BrowserRuntimeTest {
         assertEquals(1f, JcefAppStarter.fractionOf(140f))
         assertNull(JcefAppStarter.fractionOf(-1f))
         assertEquals("downloading", JcefAppStarter.stageOf(me.friwi.jcefmaven.EnumProgress.DOWNLOADING))
-        assertEquals("Downloading the web view 42% (first run)", PluginViewNotices.preparing(BrowserRuntimeState.Preparing("downloading", 0.42f)))
-        assertEquals("Starting the web view", PluginViewNotices.preparing(BrowserRuntimeState.Preparing(BrowserRuntime.STAGE_STARTING, null)))
+        val downloading = BrowserRuntimeState.Preparing("downloading", 0.42f)
+        assertEquals("Downloading the web view 42% (first run)", PluginViewNotices.preparing(downloading))
+        val starting = BrowserRuntimeState.Preparing(BrowserRuntime.STAGE_STARTING, null)
+        assertEquals("Starting the web view", PluginViewNotices.preparing(starting))
     }
 
     private companion object {

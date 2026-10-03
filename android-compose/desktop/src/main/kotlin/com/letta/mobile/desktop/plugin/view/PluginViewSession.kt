@@ -2,9 +2,7 @@ package com.letta.mobile.desktop.plugin.view
 
 import com.letta.mobile.data.plugin.view.ViewBridge
 import com.letta.mobile.data.plugin.view.ViewElement
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import java.awt.Component
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -33,9 +31,9 @@ internal class PluginViewSession(
 
     val isClosed: Boolean get() = closed.get()
 
-    /** Starts reading the page's messages in [scope]. */
-    fun start(scope: CoroutineScope) {
-        if (reader == null && !closed.get()) reader = scope.launch { bridge.run() }
+    /** Starts reading the page's messages as [work]. */
+    fun start(work: PluginViewWork) {
+        if (reader == null && !closed.get()) reader = work.launch { bridge.run() }
     }
 
     /** Tells a ready page its element changed (`host.element.changed`); nothing once the view is closing. */

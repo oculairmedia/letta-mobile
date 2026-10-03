@@ -56,7 +56,7 @@ class PluginViewLifecycleTest {
 
     @Test
     fun theReadyHandshakeRoundTripsThroughTheRouterAndTheScripts() = runBlocking {
-        val session = PluginViewSession(bridge, port, FakeBrowserHandle()).also { it.start(scope) }
+        val session = PluginViewSession(bridge, port, FakeBrowserHandle()).also { it.start(PluginViewWork(scope)) }
         post("""{"jsonrpc":"2.0","id":1,"method":"view.ready","params":{"pageId":"widget","viewVersion":"1"}}""")
         val answer = next()
         assertEquals("1", answer.getValue("id").jsonPrimitive.content)
@@ -73,10 +73,11 @@ class PluginViewLifecycleTest {
     @Test
     fun onlyTheMainFrameShowingThePageMayPost() {
         val ready = """{"jsonrpc":"2.0","id":1,"method":"view.ready","params":{}}"""
-        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = false, frameUrl = PluginViewTestFixtures.pageUrl, request = ready))
-        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = true, frameUrl = "https://embed.example.com/", request = ready))
+        val page = PluginViewTestFixtures.pageUrl
+        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = false, frameUrl = page, request = ready))
+        assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = true, frameUrl = FRAMED, request = ready))
         assertEquals(PluginQueryOutcome.REFUSED_FRAME, router.route(mainFrame = true, frameUrl = null, request = ready))
-        assertEquals(PluginQueryOutcome.ACCEPTED, router.route(mainFrame = true, frameUrl = PluginViewTestFixtures.pageUrl, request = ready))
+        assertEquals(PluginQueryOutcome.ACCEPTED, router.route(mainFrame = true, frameUrl = page, request = ready))
     }
 
     @Test
@@ -95,7 +96,7 @@ class PluginViewLifecycleTest {
     fun closingTearsTheBridgeDownBeforeTheBrowserIsDisposedAndOnlyOnce() = runBlocking {
         val events = mutableListOf<String>()
         val handle = FakeBrowserHandle { events += "dispose" }
-        val session = PluginViewSession(bridge, port, handle).also { it.start(scope) }
+        val session = PluginViewSession(bridge, port, handle).also { it.start(PluginViewWork(scope)) }
         post("""{"jsonrpc":"2.0","id":1,"method":"view.ready","params":{"pageId":"widget","viewVersion":"1"}}""")
         next()
 
@@ -114,7 +115,7 @@ class PluginViewLifecycleTest {
     @Test
     fun aPageThatNeverAnsweredIsDisposedWithoutWaitingForATeardown() = runBlocking {
         val handle = FakeBrowserHandle()
-        val session = PluginViewSession(bridge, port, handle).also { it.start(scope) }
+        val session = PluginViewSession(bridge, port, handle).also { it.start(PluginViewWork(scope)) }
         assertFalse(session.close(PluginViewTeardown.CLOSED), "no handshake, so no teardown to acknowledge")
         assertEquals(1, handle.disposals)
         assertTrue(toPage.tryReceive().isFailure, "a page that never sent view.ready is sent nothing")
@@ -123,7 +124,7 @@ class PluginViewLifecycleTest {
     @Test
     fun aSilentReadyPageIsDisposedAfterTheTeardownTimeout() = runBlocking {
         val handle = FakeBrowserHandle()
-        val session = PluginViewSession(bridge, port, handle).also { it.start(scope) }
+        val session = PluginViewSession(bridge, port, handle).also { it.start(PluginViewWork(scope)) }
         post("""{"jsonrpc":"2.0","id":1,"method":"view.ready","params":{"pageId":"widget","viewVersion":"1"}}""")
         next()
         assertFalse(session.close(PluginViewTeardown.CLOSED))
@@ -146,6 +147,7 @@ class PluginViewLifecycleTest {
         const val WAIT_MS = 5_000L
         const val TEARDOWN_MS = 300L
         const val POLL_MS = 5L
+        const val FRAMED = "https://embed.example.com/"
 
         /** The message a delivery script hands to `__lettaViewReceive`. */
         fun messageIn(script: String): JsonObject {

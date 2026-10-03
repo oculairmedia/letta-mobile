@@ -5,10 +5,6 @@ import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.view.PluginViewSpec
 import com.letta.mobile.data.plugin.view.ViewBridge
 import com.letta.mobile.data.plugin.view.ViewBridgeServices
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import org.cef.CefApp
 import org.cef.browser.CefBrowser
 import java.util.concurrent.ConcurrentHashMap
@@ -40,12 +36,12 @@ fun interface PluginLiveViewSource {
 /**
  * Opens and closes the desktop's live views (letta-mobile-s416w.14) on the one shared [runtime].
  * Each view gets its own JCEF client and request context, a [ViewBridge] over a
- * [JcefPostMessagePort], and is torn down (bridge first, browser after) on [close], which runs in
- * the host's own scope so it finishes after the board that showed it is gone.
+ * [JcefPostMessagePort], and is torn down (bridge first, browser after) on [close], which runs as
+ * the host's [work] so it finishes after the board that showed it is gone.
  */
 internal class DesktopPluginViewHost(
     val runtime: BrowserRuntime<CefApp>,
-    private val scope: CoroutineScope,
+    private val work: PluginViewWork,
 ) {
     private val sessions = ConcurrentHashMap.newKeySet<PluginViewSession>()
 
@@ -60,19 +56,19 @@ internal class DesktopPluginViewHost(
             server = server,
             policy = PluginViewRequestPolicy(live.spec.pageRef, live.spec.page.csp),
             queries = PluginViewQueryRouter(live.spec.pageRef, port),
-            scope = scope,
+            work = work,
             onFault = onFault,
         )
         val browser = JcefPluginBrowser.open(app, wiring)
         target.set(browser.browser)
         val session = PluginViewSession(ViewBridge(live.spec, port, live.services), port, browser)
         sessions += session
-        session.start(scope)
+        session.start(work)
         return session
     }
 
     fun close(session: PluginViewSession, reason: String) {
-        scope.launch {
+        work.launch {
             try {
                 session.close(reason)
             } finally {
@@ -82,13 +78,11 @@ internal class DesktopPluginViewHost(
     }
 }
 
-/** The desktop app's live-view host: one per process, its browser started only when a live view first shows. */
+/** The process's embedded browser: one per process (CEF initialises once), started only when a live view first shows. */
 internal object DesktopPluginViews {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    val host: DesktopPluginViewHost by lazy {
+    val runtime: BrowserRuntime<CefApp> by lazy {
         val config = JcefConfig.fromSystem()
-        DesktopPluginViewHost(BrowserRuntime(JcefAppStarter(config), scope, disabledReason = config.disabledReason), scope)
+        BrowserRuntime(JcefAppStarter(config), disabledReason = config.disabledReason)
     }
 }
 

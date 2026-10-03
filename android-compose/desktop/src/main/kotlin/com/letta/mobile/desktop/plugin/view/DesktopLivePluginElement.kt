@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +66,11 @@ class DesktopPluginBindings(
 /** [content] with the board drawing [bindings]' plugin elements live through JCEF (letta-mobile-s416w.14). */
 @Composable
 fun ProvideDesktopPluginViews(bindings: DesktopPluginBindings, content: @Composable () -> Unit) {
-    ProvideDesktopPluginViews(bindings, DesktopPluginViews.host, content)
+    // The views' work runs in this composition's scope: it outlives every board under it, so a
+    // view closed with its board still finishes its teardown.
+    val scope = rememberCoroutineScope()
+    val host = remember(scope) { DesktopPluginViewHost(DesktopPluginViews.runtime, PluginViewWork(scope)) }
+    ProvideDesktopPluginViews(bindings, host, content)
 }
 
 @Composable

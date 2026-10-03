@@ -1,8 +1,6 @@
 package com.letta.mobile.desktop.plugin.view
 
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import org.cef.callback.CefCallback
 import org.cef.handler.CefResourceHandlerAdapter
 import org.cef.misc.IntRef
@@ -17,7 +15,7 @@ import org.cef.network.CefResponse
  */
 internal class PluginPageResourceHandler(
     private val server: PluginPageServer,
-    private val scope: CoroutineScope,
+    private val work: PluginViewWork,
 ) : CefResourceHandlerAdapter() {
     @Volatile
     private var response: PluginPageResponse? = null
@@ -26,7 +24,7 @@ internal class PluginPageResourceHandler(
 
     override fun processRequest(request: CefRequest, callback: CefCallback): Boolean {
         val url = request.url
-        job = scope.launch {
+        job = work.launch {
             val answer = server.respond(url)
             body = PluginPageBody(answer.body)
             response = answer

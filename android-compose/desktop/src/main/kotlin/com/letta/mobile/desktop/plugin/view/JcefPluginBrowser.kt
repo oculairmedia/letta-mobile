@@ -24,7 +24,6 @@ import org.cef.handler.CefResourceRequestHandler
 import org.cef.handler.CefResourceRequestHandlerAdapter
 import org.cef.misc.BoolRef
 import org.cef.network.CefRequest
-import kotlinx.coroutines.CoroutineScope
 import java.awt.Component
 import javax.swing.SwingUtilities
 
@@ -33,7 +32,7 @@ internal class JcefViewWiring(
     val server: PluginPageServer,
     val policy: PluginViewRequestPolicy,
     val queries: PluginViewQueryRouter,
-    val scope: CoroutineScope,
+    val work: PluginViewWork,
     val onFault: (String) -> Unit,
 )
 
@@ -66,7 +65,8 @@ internal class JcefPluginBrowser private constructor(
     companion object {
         fun open(app: CefApp, wiring: JcefViewWiring): JcefPluginBrowser {
             val client = app.createClient()
-            val router = CefMessageRouter.create(CefMessageRouter.CefMessageRouterConfig(PluginPageShim.QUERY_FUNCTION, PluginPageShim.CANCEL_FUNCTION))
+            val config = CefMessageRouter.CefMessageRouterConfig(PluginPageShim.QUERY_FUNCTION, PluginPageShim.CANCEL_FUNCTION)
+            val router = CefMessageRouter.create(config)
             router.addHandler(QueryHandler(wiring.queries), true)
             client.addMessageRouter(router)
             client.addRequestHandler(RequestHandler(wiring))
@@ -105,7 +105,13 @@ private class QueryHandler(private val queries: PluginViewQueryRouter) : CefMess
 private class RequestHandler(private val wiring: JcefViewWiring) : CefRequestHandlerAdapter() {
     private val resources = ResourceHandler(wiring)
 
-    override fun onBeforeBrowse(browser: CefBrowser?, frame: CefFrame?, request: CefRequest?, userGesture: Boolean, isRedirect: Boolean): Boolean =
+    override fun onBeforeBrowse(
+        browser: CefBrowser?,
+        frame: CefFrame?,
+        request: CefRequest?,
+        userGesture: Boolean,
+        isRedirect: Boolean,
+    ): Boolean =
         !wiring.policy.allowsNavigation(request?.url.orEmpty(), mainFrame = frame?.isMain != false)
 
     override fun onOpenURLFromTab(browser: CefBrowser?, frame: CefFrame?, targetUrl: String?, userGesture: Boolean): Boolean = true
@@ -123,7 +129,12 @@ private class RequestHandler(private val wiring: JcefViewWiring) : CefRequestHan
         return resources
     }
 
-    override fun onRenderProcessTerminated(browser: CefBrowser?, status: CefRequestHandler.TerminationStatus?, errorCode: Int, errorString: String?) {
+    override fun onRenderProcessTerminated(
+        browser: CefBrowser?,
+        status: CefRequestHandler.TerminationStatus?,
+        errorCode: Int,
+        errorString: String?,
+    ) {
         wiring.onFault("the page stopped (${status?.name?.lowercase() ?: "terminated"})")
     }
 }
@@ -134,7 +145,7 @@ private class ResourceHandler(private val wiring: JcefViewWiring) : CefResourceR
 
     override fun getResourceHandler(browser: CefBrowser?, frame: CefFrame?, request: CefRequest?): CefResourceHandler? =
         when (wiring.policy.resource(request?.url.orEmpty())) {
-            PluginResourceDecision.PAGE, PluginResourceDecision.NOT_FOUND -> PluginPageResourceHandler(wiring.server, wiring.scope)
+            PluginResourceDecision.PAGE, PluginResourceDecision.NOT_FOUND -> PluginPageResourceHandler(wiring.server, wiring.work)
             else -> null
         }
 }
@@ -146,7 +157,13 @@ private class LoadFaults(private val wiring: JcefViewWiring) : CefLoadHandlerAda
         wiring.onFault(wiring.server.failure ?: "the page answered $httpStatusCode")
     }
 
-    override fun onLoadError(browser: CefBrowser?, frame: CefFrame?, errorCode: CefLoadHandler.ErrorCode?, errorText: String?, failedUrl: String?) {
+    override fun onLoadError(
+        browser: CefBrowser?,
+        frame: CefFrame?,
+        errorCode: CefLoadHandler.ErrorCode?,
+        errorText: String?,
+        failedUrl: String?,
+    ) {
         if (frame?.isMain != true || errorCode == CefLoadHandler.ErrorCode.ERR_ABORTED) return
         wiring.onFault(wiring.server.failure ?: "the page did not load (${errorText ?: errorCode?.name})")
     }

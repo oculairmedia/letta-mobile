@@ -53,7 +53,7 @@ class JcefPluginViewLiveTest {
     @Test
     fun aPageRoundTripsThroughTheShimAndAcknowledgesItsTeardown() {
         val app = startedApp()
-        val host = DesktopPluginViewHost(sharedRuntime, scope)
+        val host = DesktopPluginViewHost(sharedRuntime, PluginViewWork(scope))
         val viewHost = RecordingViewHost()
         val faults = mutableListOf<String>()
         val frame = AtomicReference<JFrame>()
@@ -78,7 +78,7 @@ class JcefPluginViewLiveTest {
     @Test
     fun aLiveElementOnACanvasSurvivesOpeningAnotherCanvas() {
         startedApp()
-        val host = DesktopPluginViewHost(sharedRuntime, scope)
+        val host = DesktopPluginViewHost(sharedRuntime, PluginViewWork(scope))
         val viewHost = RecordingViewHost()
         val failure = AtomicReference<Throwable?>(null)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
@@ -165,7 +165,7 @@ class JcefPluginViewLiveTest {
 
         /** One runtime for the whole test JVM: CEF initialises once per process. */
         val sharedRuntime: BrowserRuntime<CefApp> by lazy {
-            BrowserRuntime(JcefAppStarter(JcefConfig.fromSystem()), CoroutineScope(SupervisorJob() + Dispatchers.Default))
+            BrowserRuntime(JcefAppStarter(JcefConfig.fromSystem()))
         }
 
         val PAGE = """

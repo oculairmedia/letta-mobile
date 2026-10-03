@@ -44,7 +44,8 @@ class PluginPageServingTest {
 
     @Test
     fun everyResponseCarriesTheCspAndPermissionsPolicy() = runBlocking {
-        val server = PluginPageServer(PluginViewTestFixtures.spec(), FakePageTransport(), consented = setOf(PluginCapability.UI_CAMERA, PluginCapability.UI_MICROPHONE))
+        val consented = setOf(PluginCapability.UI_CAMERA, PluginCapability.UI_MICROPHONE)
+        val server = PluginPageServer(PluginViewTestFixtures.spec(), FakePageTransport(), consented)
         val page = server.respond(server.url)
         val missing = server.respond("letta-plugin://letta.example/secret?v=1.2.0%2Bbuild.7")
 
@@ -98,14 +99,17 @@ class PluginPageServingTest {
         assertFalse(response.ok)
         assertEquals("no host connection for $ref", offline.failure)
 
-        val broken = PluginPageServer(PluginViewTestFixtures.spec(), FakePageTransport(failure = IllegalStateException("disk")), consented = emptySet())
+        val broken = serverFailingWith(IllegalStateException("disk"))
         assertEquals(PluginPageResponse.STATUS_UNAVAILABLE, broken.respond(broken.url).status)
         assertEquals("disk", broken.failure)
 
-        val unread = PluginPageServer(PluginViewTestFixtures.spec(), FakePageTransport(failure = PluginViewUnavailableException("gone")), consented = emptySet())
+        val unread = serverFailingWith(PluginViewUnavailableException("gone"))
         assertEquals(PluginPageResponse.STATUS_NOT_FOUND, unread.respond("letta-plugin://letta.example/other?v=1").status)
         assertNull(unread.failure, "a request for another page never reaches the transport")
     }
+
+    private fun serverFailingWith(failure: Throwable) =
+        PluginPageServer(PluginViewTestFixtures.spec(), FakePageTransport(failure = failure), consented = emptySet())
 
     @Test
     fun aBodyIsReadOutInTheChunksCefAsksFor() {

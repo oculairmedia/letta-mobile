@@ -1,15 +1,11 @@
 package com.letta.mobile.desktop.plugin.view
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 /** Where the embedded browser is: not asked for yet, being installed or started, ready, or not available here. */
 internal sealed interface BrowserRuntimeState<out T> {
@@ -37,14 +33,14 @@ internal fun interface BrowserStarter<T> {
 /**
  * The one embedded browser runtime of the process (one shared, lazy `CefApp`), started the first
  * time a live view asks for it and never again: a failure is final for the process and every live
- * view falls back to its card with the [BrowserRuntimeState.Unavailable] reason. Starting runs on
- * [dispatcher] (the first run downloads the native bundle), never on the UI thread.
+ * view falls back to its card with the [BrowserRuntimeState.Unavailable] reason. The start blocks
+ * (the first run downloads the native bundle), so it runs on its own thread through [launcher],
+ * never on the UI thread, and no view's lifecycle can cut it short.
  */
 internal class BrowserRuntime<T : Any>(
     private val starter: BrowserStarter<T>,
-    private val scope: CoroutineScope,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     disabledReason: String? = null,
+    private val launcher: (Runnable) -> Unit = { work -> thread(name = "letta-browser-runtime", isDaemon = true) { work.run() } },
 ) {
     private val started = AtomicBoolean(false)
     private val mutableState = MutableStateFlow<BrowserRuntimeState<T>>(
@@ -56,7 +52,7 @@ internal class BrowserRuntime<T : Any>(
     /** Starts the runtime unless it was started (or is disabled) already. */
     fun ensureStarted() {
         if (mutableState.value is BrowserRuntimeState.Unavailable || !started.compareAndSet(false, true)) return
-        scope.launch(dispatcher) { mutableState.value = startOrReason() }
+        launcher { mutableState.value = startOrReason() }
     }
 
     /** The runtime once ready, or null when it is unavailable. */
@@ -72,7 +68,6 @@ internal class BrowserRuntime<T : Any>(
     private fun startOrReason(): BrowserRuntimeState<T> {
         mutableState.value = BrowserRuntimeState.Preparing(STAGE_STARTING, null)
         return runCatching { starter.start { stage, progress -> mutableState.value = BrowserRuntimeState.Preparing(stage, progress) } }
-            .onFailure { if (it is CancellationException) throw it }
             .fold(
                 onSuccess = { BrowserRuntimeState.Ready(it) },
                 onFailure = { BrowserRuntimeState.Unavailable(unavailableReason(it)) },
