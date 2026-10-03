@@ -386,7 +386,7 @@ class IrohChannelTransportConcurrentConversationsTest {
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
         suspend fun emitAssistant(conversationId: String, id: String, content: String, seq: Long) =
-            emit(conversationId, seq, """{"message_type": "assistant_message", "id": "$id", "content": "$content"}""")
+            emit(conversationId, seq, """{"message_type": "assistant_message", "id": "$id", "logical_message_id": "lm-$id", "content": "$content"}""")
 
         suspend fun emitStopReason(conversationId: String, seq: Long) =
             emit(conversationId, seq, """{"message_type": "stop_reason", "stop_reason": "end_turn"}""")

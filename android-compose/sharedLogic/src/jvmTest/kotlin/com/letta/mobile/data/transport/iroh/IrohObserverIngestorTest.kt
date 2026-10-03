@@ -128,7 +128,7 @@ class IrohObserverIngestorTest {
             agentId = "agent-1",
             conversationId = "conv-1",
             seq = 1L,
-            delta = """{"message_type": "assistant_message", "content": "hello from engine"}""",
+            delta = """{"message_type": "assistant_message", "logical_message_id": "lm-engine", "content": "hello from engine"}""",
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(streamFrame, 1L))
         assertTrue(emittedFrames.isEmpty(), "Engine-owned non-terminal delta must not be emitted by observer")
@@ -261,7 +261,7 @@ class IrohObserverIngestorTest {
             agentId = "agent-1",
             conversationId = "conv-passive",
             seq = 1L,
-            delta = """{"message_type": "assistant_message", "id": "m1", "content": "passive hello"}""",
+            delta = """{"message_type": "assistant_message", "id": "m1", "logical_message_id": "lm-m1", "text_seq": 1, "content": "passive hello"}""",
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(assistantFrame, 1L))
 
@@ -345,7 +345,7 @@ class IrohObserverIngestorTest {
         )
 
         listOf(
-            """{"message_type":"assistant_message","content":"public child progress"}""",
+            """{"message_type":"assistant_message","logical_message_id":"lm-child","content":"public child progress"}""",
             """{"message_type":"reasoning_message","reasoning":"hidden child reasoning"}""",
             """{"message_type":"tool_call_message","tool_call":{"name":"Bash","tool_call_id":"inner"}}""",
         ).forEachIndexed { index, delta ->
@@ -430,7 +430,7 @@ class IrohObserverIngestorTest {
             agentId = "agent-1",
             conversationId = "conv-1",
             seq = 1L,
-            delta = """{"message_type": "assistant_message", "run_id": "run-retired", "content": "afterlife message"}""",
+            delta = """{"message_type": "assistant_message", "run_id": "run-retired", "logical_message_id": "lm-late", "content": "afterlife message"}""",
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(delta, 1L))
 

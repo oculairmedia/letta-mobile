@@ -45,6 +45,8 @@ object WsFrameMapper {
             runId = frame.runId,
             otid = frame.otid,
             seqId = frame.seqId ?: frame.seq.toSeqId(),
+            logicalMessageId = frame.logicalMessageId,
+            turnId = frame.turnId,
         )
 
         is ServerFrame.AssistantMessage -> AssistantMessage(
@@ -57,6 +59,9 @@ object WsFrameMapper {
             runId = frame.runId,
             otid = frame.otid,
             seqId = frame.seqId ?: frame.seq.toSeqId(),
+            logicalMessageId = frame.logicalMessageId,
+            turnId = frame.turnId,
+            textSeq = frame.textSeq,
         )
 
         is ServerFrame.ReasoningMessage -> ReasoningMessage(
@@ -66,6 +71,9 @@ object WsFrameMapper {
             runId = frame.runId,
             signature = frame.signature,
             seqId = frame.seqId ?: frame.seq.toSeqId(),
+            logicalMessageId = frame.logicalMessageId,
+            turnId = frame.turnId,
+            textSeq = frame.textSeq,
         )
 
         is ServerFrame.ToolCallMessage -> frame.toLettaToolMessage()
@@ -80,6 +88,8 @@ object WsFrameMapper {
             date = frame.ts,
             runId = frame.runId,
             seqId = frame.seq.toSeqId(),
+            logicalMessageId = frame.logicalMessageId,
+            turnId = frame.turnId,
         )
 
         is ServerFrame.Welcome,
@@ -140,6 +150,8 @@ object WsFrameMapper {
                 date = ts,
                 runId = runId,
                 seqId = resolvedSeqId,
+                logicalMessageId = logicalMessageId,
+                turnId = turnId,
             )
         } else {
             ToolCallMessage(
@@ -149,6 +161,8 @@ object WsFrameMapper {
                 date = ts,
                 runId = runId,
                 seqId = resolvedSeqId,
+                logicalMessageId = logicalMessageId,
+                turnId = turnId,
             )
         }
     }

@@ -26,18 +26,23 @@ class IrohStreamDeltaServerFrameMapperTest {
                 "id": "letta-msg-1",
                 "message_type": "assistant_message",
                 "text": "pong",
-                "run_id": "run-app"
+                "run_id": "run-app",
+                "logical_message_id": "lm-1",
+                "turn_id": "turn-wire",
+                "text_seq": 3
               }
             }
             """.trimIndent(),
         )
 
         val frame = assertIs<ServerFrame.AssistantMessage>(frames.single())
-        assertEquals("letta-msg-1", frame.id)
+        assertEquals("lm-1", frame.id)
+        assertEquals("lm-1", frame.logicalMessageId)
+        assertEquals(3, frame.textSeq)
         assertEquals("pong", frame.content)
         assertEquals("agent-stream", frame.agentId)
         assertEquals("conv-stream", frame.conversationId)
-        assertEquals("turn-fallback", frame.turnId)
+        assertEquals("turn-wire", frame.turnId)
         assertEquals("run-app", frame.runId)
         assertEquals(7L, frame.seq)
         assertEquals(7, frame.seqId)
@@ -45,45 +50,24 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
-    fun mapsRotatingAssistantFragmentsByStableMessageId() {
+    fun rotatingDeltaIdsOfOneLogicalMessageShareOneRowId() {
         fun assistant(id: String, content: String) = assertIs<ServerFrame.AssistantMessage>(map(
-            """{"type":"stream_delta","idempotency_key":"$id","delta":{"id":"$id","message_id":"logical-1","message_type":"assistant_message","content":"$content"}}""",
+            """{"type":"stream_delta","idempotency_key":"$id","delta":{"id":"$id","logical_message_id":"lm-1","text_seq":1,"message_type":"assistant_message","content":"$content"}}""",
         ).single())
 
         val first = assistant("delivery-1", "not a prefix")
         val second = assistant("delivery-2", "completely different")
 
-        assertEquals("logical-1", first.id)
+        assertEquals("lm-1", first.id)
         assertEquals(first.id, second.id)
     }
 
     @Test
-    fun stableCmStreamIdWinsOverMessageId() {
-        val frame = assertIs<ServerFrame.AssistantMessage>(map(
-            """{"type":"stream_delta","delta":{"id":"cm-stream-authoritative","message_id":"other","message_type":"assistant_message","content":"x"}}""",
-        ).single())
-        assertEquals("cm-stream-authoritative", frame.id)
-    }
-
-    @Test
-    fun distinctMessageIdsProduceDistinctAssistantOtids() {
-        fun assistant(messageId: String) = assertIs<ServerFrame.AssistantMessage>(map(
-            """{"type":"stream_delta","delta":{"id":"delivery","message_id":"$messageId","message_type":"assistant_message","content":"same"}}""",
-        ).single())
-
-        val first = assistant("logical-a")
-        val second = assistant("logical-b")
-        assertEquals("iroh-assistant-logical-a", first.otid)
-        assertEquals("iroh-assistant-logical-b", second.otid)
-    }
-
-    @Test
-    fun blankStableAliasesFallBackWithoutProducingBlankIdentity() {
-        val frame = assertIs<ServerFrame.AssistantMessage>(map(
-            """{"type":"stream_delta","delta":{"id":"delivery","message_id":" ","otid":"stable-otid","message_type":"assistant_message","content":"x"}}""",
-        ).single())
-        assertEquals("cm-stream-stable-otid", frame.id)
-        assertEquals("stable-otid", frame.otid)
+    fun aBlankLogicalIdIsNotAnIdentity() {
+        val frames = map(
+            """{"type":"stream_delta","delta":{"id":"delivery","message_id":"m-1","otid":"stable-otid","logical_message_id":" ","message_type":"assistant_message","content":"x"}}""",
+        )
+        assertTrue(frames.isEmpty())
     }
 
     @Test
@@ -99,7 +83,9 @@ class IrohStreamDeltaServerFrameMapperTest {
                     "id": "reasoning-1",
                     "message_type": "reasoning_message",
                     "reasoning": "thinking",
-                    "run_id": "run-app"
+                    "run_id": "run-app",
+                    "logical_message_id": "lm-r",
+                    "turn_id": "turn-wire"
                   }
                 }
                 """.trimIndent(),
@@ -107,6 +93,8 @@ class IrohStreamDeltaServerFrameMapperTest {
         )
         assertEquals("thinking", reasoning.reasoning)
         assertEquals("run-app", reasoning.runId)
+        assertEquals("lm-r", reasoning.id)
+        assertEquals("turn-wire", reasoning.turnId)
 
         val toolCall = assertIs<ServerFrame.ToolCallMessage>(
             map(
@@ -162,85 +150,34 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
-    fun synthesizesStableReasoningIdWhenDeltaHasNoMessageId() {
-        val first = assertIs<ServerFrame.ReasoningMessage>(
+    fun reasoningChunksOfOneLogicalMessageShareTheStampedIdEvenWithUniqueDeltaIds() {
+        fun reasoning(n: Int, wireId: String?) = assertIs<ServerFrame.ReasoningMessage>(
             map(
                 """
                 {
                   "type": "stream_delta",
-                  "event_seq": 1,
-                  "idempotency_key": "evt-reasoning-1",
+                  "event_seq": $n,
+                  "idempotency_key": "evt-reasoning-$n",
                   "delta": {
+                    ${wireId?.let { "\"id\": \"$it\"," } ?: ""}
                     "message_type": "reasoning_message",
-                    "reasoning": "The",
-                    "run_id": "run-app"
+                    "reasoning": "chunk $n",
+                    "run_id": "run-app",
+                    "logical_message_id": "lm-r",
+                    "text_seq": $n
                   }
                 }
                 """.trimIndent(),
             ).single(),
         )
-        val second = assertIs<ServerFrame.ReasoningMessage>(
-            map(
-                """
-                {
-                  "type": "stream_delta",
-                  "event_seq": 2,
-                  "idempotency_key": "evt-reasoning-2",
-                  "delta": {
-                    "message_type": "reasoning_message",
-                    "reasoning": " user",
-                    "run_id": "run-app"
-                  }
-                }
-                """.trimIndent(),
-            ).single(),
-        )
+        val first = reasoning(1, null)
+        val second = reasoning(2, "reasoning-word-2")
 
+        assertEquals("lm-r", first.id)
         assertEquals(first.id, second.id)
-        assertEquals("iroh-reasoning_message-run-app-turn-fallback", first.id)
+        assertEquals(listOf(1, 2), listOf(first.textSeq, second.textSeq))
         assertEquals(1, first.seqId)
         assertEquals(2, second.seqId)
-    }
-
-    @Test
-    fun usesStableReasoningIdEvenWhenDeltaChunksCarryUniqueIds() {
-        val first = assertIs<ServerFrame.ReasoningMessage>(
-            map(
-                """
-                {
-                  "type": "stream_delta",
-                  "event_seq": 1,
-                  "idempotency_key": "evt-reasoning-1",
-                  "delta": {
-                    "id": "reasoning-word-1",
-                    "message_type": "reasoning_message",
-                    "reasoning": "Still",
-                    "run_id": "run-app"
-                  }
-                }
-                """.trimIndent(),
-            ).single(),
-        )
-        val second = assertIs<ServerFrame.ReasoningMessage>(
-            map(
-                """
-                {
-                  "type": "stream_delta",
-                  "event_seq": 2,
-                  "idempotency_key": "evt-reasoning-2",
-                  "delta": {
-                    "id": "reasoning-word-2",
-                    "message_type": "reasoning_message",
-                    "reasoning": " responsive",
-                    "run_id": "run-app"
-                  }
-                }
-                """.trimIndent(),
-            ).single(),
-        )
-
-        assertEquals("iroh-reasoning_message-run-app-turn-fallback", first.id)
-        assertEquals(first.id, second.id)
     }
 
     @Test
@@ -334,7 +271,7 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
-    fun preservesPlainAssistantFramesForLegacyControllers() {
+    fun plainTextBodiesCarryNoStampAndAreDropped() {
         val frames = IrohStreamDeltaServerFrameMapper.map(
             payload = RuntimeEventPayload.RemoteStreamFrame(
                 frameId = "plain-frame",
@@ -345,67 +282,45 @@ class IrohStreamDeltaServerFrameMapperTest {
             context = context,
         )
 
-        val assistant = assertIs<ServerFrame.AssistantMessage>(frames.single())
-        assertEquals("plain-message", assistant.id)
-        assertEquals("plain text", assistant.content)
-        assertEquals("run-fallback", assistant.runId)
+        assertTrue(frames.isEmpty())
     }
 
     @Test
-    fun assistantFragmentsWithRotatingIdsShareStableOtidAnchoredOnTurn() {
-        // letta-mobile-x1xnl root-cause guard. App Server assistant deltas carry
-        // NO otid/client_message_id, and over Iroh the backend `id` ROTATES per
-        // streamed fragment. Before the fix, the client projection synthesized a
-        // NEW effectiveOtid per fragment (server-<id>-assistant-<runId>), so the
-        // reducer's otid/serverId dedup never matched and the trailing fragment
-        // stranded as a duplicate row. The mapper must instead emit a STABLE otid
-        // for all fragments of one assistant message so they merge into one row.
-        val first = assertIs<ServerFrame.AssistantMessage>(
+    fun fragmentsWithRotatingDeltaIdsAndRunsStayOneRowByTheStamp() {
+        // The backend `id` and `run_id` rotate across the fragments of one message; the host's
+        // stamp is the only identity, so the mapper never re-derives one from them.
+        fun fragment(n: Int, id: String, run: String) = assertIs<ServerFrame.AssistantMessage>(
             map(
                 """
                 {
                   "type": "stream_delta",
-                  "event_seq": 1,
-                  "idempotency_key": "evt-a1",
+                  "event_seq": $n,
+                  "idempotency_key": "evt-a$n",
                   "delta": {
-                    "id": "letta-msg-5020",
+                    "id": "$id",
                     "message_type": "assistant_message",
-                    "content": "Got",
-                    "run_id": "iroh-run-synthetic"
+                    "content": "fragment $n",
+                    "run_id": "$run",
+                    "logical_message_id": "lm-1",
+                    "turn_id": "cm-turn",
+                    "text_seq": $n
                   }
                 }
                 """.trimIndent(),
             ).single(),
         )
-        val second = assertIs<ServerFrame.AssistantMessage>(
-            map(
-                """
-                {
-                  "type": "stream_delta",
-                  "event_seq": 2,
-                  "idempotency_key": "evt-a2",
-                  "delta": {
-                    "id": "letta-msg-5021",
-                    "message_type": "assistant_message",
-                    "content": " it — streaming works.",
-                    "run_id": "run-real-app-server"
-                  }
-                }
-                """.trimIndent(),
-            ).single(),
-        )
+        val first = fragment(1, "letta-msg-5020", "iroh-run-synthetic")
+        val second = fragment(2, "letta-msg-5021", "run-real-app-server")
 
-        // Backend ids AND run ids rotate across fragments...
-        assertEquals("letta-msg-5020", first.id)
-        assertEquals("letta-msg-5021", second.id)
-        // ...but the otid is stable (anchored on the invariant turn id), so the
-        // reducer groups both fragments into a single assistant row.
-        assertEquals("iroh-assistant-turn-fallback", first.otid)
-        assertEquals(first.otid, second.otid)
+        assertEquals("lm-1", first.id)
+        assertEquals(first.id, second.id)
+        assertEquals(first.turnId, second.turnId)
+        assertEquals(null, first.otid)
+        assertEquals(null, second.otid)
     }
 
     @Test
-    fun wireProvidedOtidStillWinsOverSyntheticTurnAnchor() {
+    fun aWireProvidedOtidIsCopiedAndNeverSynthesized() {
         val frame = assertIs<ServerFrame.AssistantMessage>(
             map(
                 """
@@ -418,7 +333,8 @@ class IrohStreamDeltaServerFrameMapperTest {
                     "message_type": "assistant_message",
                     "content": "hi",
                     "otid": "wire-otid-123",
-                    "run_id": "run-app"
+                    "run_id": "run-app",
+                    "logical_message_id": "lm-9"
                   }
                 }
                 """.trimIndent(),

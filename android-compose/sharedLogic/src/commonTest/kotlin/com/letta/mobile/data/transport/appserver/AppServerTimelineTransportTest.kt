@@ -148,6 +148,6 @@ class AppServerTimelineTransportTest {
 
     private companion object {
         const val ASSISTANT_ROW = """{"message_type":"assistant_message","id":"msg-1","content":"hello","date":"2026-10-02T00:00:00Z"}"""
-        const val ASSISTANT_DELTA = """{"message_type":"assistant_message","id":"msg-1","content":"hello"}"""
+        const val ASSISTANT_DELTA = """{"message_type":"assistant_message","id":"msg-1","logical_message_id":"lm-msg-1","content":"hello"}"""
     }
 }

@@ -282,6 +282,7 @@ sealed interface ServerFrame {
         val otid: String? = null,
         val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
+        @SerialName("logical_message_id") val logicalMessageId: String? = null,
     ) : ServerFrame {
         /**
          * Text-only projection of [contentRaw]. Returns the bare string
@@ -330,6 +331,8 @@ sealed interface ServerFrame {
         val otid: String? = null,
         val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
+        @SerialName("logical_message_id") val logicalMessageId: String? = null,
+        @SerialName("text_seq") val textSeq: Int? = null,
     ) : ServerFrame
 
     @Serializable
@@ -340,12 +343,14 @@ sealed interface ServerFrame {
         override val ts: String,
         @SerialName("agent_id") val agentId: String,
         @SerialName("conversation_id") val conversationId: String,
-        @SerialName("turn_id") val turnId: String,
-        @SerialName("run_id") val runId: String,
+        @SerialName("turn_id") val turnId: String? = null,
+        @SerialName("run_id") val runId: String? = null,
         val reasoning: String,
         val signature: String? = null,
         val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
+        @SerialName("logical_message_id") val logicalMessageId: String? = null,
+        @SerialName("text_seq") val textSeq: Int? = null,
     ) : ServerFrame
 
     /**
@@ -365,11 +370,12 @@ sealed interface ServerFrame {
         override val ts: String,
         @SerialName("agent_id") val agentId: String,
         @SerialName("conversation_id") val conversationId: String,
-        @SerialName("turn_id") val turnId: String,
-        @SerialName("run_id") val runId: String,
+        @SerialName("turn_id") val turnId: String? = null,
+        @SerialName("run_id") val runId: String? = null,
         @SerialName("tool_call") val toolCall: ToolCallPayload? = null,
         @SerialName("tool_calls") val toolCalls: List<ToolCallPayload>? = null,
         val seq: Long? = null,
+        @SerialName("logical_message_id") val logicalMessageId: String? = null,
     ) : ServerFrame
 
     @Serializable
@@ -388,6 +394,7 @@ sealed interface ServerFrame {
         val stdout: List<String>? = null,
         val stderr: List<String>? = null,
         val seq: Long? = null,
+        @SerialName("logical_message_id") val logicalMessageId: String? = null,
     ) : ServerFrame
 
     /**

@@ -39,6 +39,19 @@ sealed interface LettaMessage {
     val senderId: String?
     val isErr: Boolean?
     val seqId: Int?
+
+    /**
+     * The one identity of this row, minted once by the App Server stream stamper (letta-mobile-jdcoj)
+     * and copied here untouched (letta-mobile-ys9it). Null for rows the stamper never saw (stored history
+     * from before the feature, non-row frames); readers then use `"<id>:<type>"`.
+     */
+    val logicalMessageId: String? get() = null
+
+    /** The wire `turn_id` only. `run_id` is not a turn and is never used as one. */
+    val turnId: String? get() = null
+
+    /** Position of this text frame within its logical message (1, 2, 3 ...); null when not stamped. */
+    val textSeq: Int? get() = null
 }
 
 private fun generatedMessageId(prefix: String): String =
@@ -78,6 +91,9 @@ data class UserMessage(
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
     @SerialName("message_type") override val messageType: String = "user_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage {
     val content: String
         get() = extractContent(contentRaw)
@@ -99,6 +115,9 @@ data class AssistantMessage(
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
     @SerialName("message_type") override val messageType: String = "assistant_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage {
     val content: String
         get() = extractContent(contentRaw)
@@ -295,6 +314,9 @@ data class ReasoningMessage(
     val source: String? = null,
     val signature: String? = null,
     @SerialName("message_type") override val messageType: String = "reasoning_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage
 
 @Serializable
@@ -320,6 +342,9 @@ data class ToolCallMessage(
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
     @SerialName("message_type") override val messageType: String = "tool_call_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage {
     val effectiveToolCalls: List<ToolCall>
         get() = toolCalls ?: listOfNotNull(toolCall)
@@ -352,6 +377,9 @@ data class ToolReturnMessage(
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
     @SerialName("message_type") override val messageType: String = "tool_return_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage {
     val toolReturn: ToolReturn
         get() {
@@ -447,6 +475,9 @@ data class ApprovalRequestMessage(
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
     @SerialName("message_type") override val messageType: String = "approval_request_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage {
     val effectiveToolCalls: List<ToolCall>
         get() = toolCalls ?: listOfNotNull(toolCall)
@@ -466,6 +497,9 @@ data class HiddenReasoningMessage(
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
     @SerialName("message_type") override val messageType: String = "hidden_reasoning_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage
 
 @Serializable
@@ -500,6 +534,9 @@ data class ApprovalResponseMessage(
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
     @SerialName("message_type") override val messageType: String = "approval_response_message",
+    @SerialName("logical_message_id") override val logicalMessageId: String? = null,
+    @SerialName("turn_id") override val turnId: String? = null,
+    @SerialName("text_seq") override val textSeq: Int? = null,
 ) : LettaMessage
 
 @Serializable

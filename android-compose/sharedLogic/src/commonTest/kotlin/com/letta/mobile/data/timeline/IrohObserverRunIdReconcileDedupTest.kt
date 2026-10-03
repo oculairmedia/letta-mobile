@@ -25,6 +25,8 @@ import kotlin.test.assertEquals
  * changed — the observer stamp value is left as-is and only its downstream
  * classification is corrected.
  */
+// TODO(D2 letta-mobile-qhj9o): this test models the pre-stamp, run-id/otid-derived identity; it is deleted with the
+// reconcile heuristics it covers.
 class IrohObserverRunIdReconcileDedupTest {
     @AfterTest
     fun tearDown() {

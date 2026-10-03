@@ -14,6 +14,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+// TODO(D3 letta-mobile-1qhcc): this test models the pre-stamp, run-id/otid-derived identity; it is deleted with the
+// reconcile heuristics it covers.
 class MessageIdentityMatrixTest {
 
     @Test

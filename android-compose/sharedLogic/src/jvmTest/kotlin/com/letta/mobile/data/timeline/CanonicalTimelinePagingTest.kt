@@ -435,7 +435,7 @@ class CanonicalTimelinePagingTest {
                     TimelineMessageId("m-$index"),
                     AssistantMessage(
                         id = "m-$index", contentRaw = JsonPrimitive("reply $index"),
-                        date = "2026-01-01T00:00:0${index}Z", otid = "otid-m-$index",
+                        date = "2026-01-01T00:00:0${index}Z", logicalMessageId = "otid-m-$index",
                     ),
                     0,
                 )

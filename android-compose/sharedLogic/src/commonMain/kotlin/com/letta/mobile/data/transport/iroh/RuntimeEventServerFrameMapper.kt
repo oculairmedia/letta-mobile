@@ -29,15 +29,18 @@ import kotlin.uuid.Uuid
  *
  * Desktop's App Server controller gateway reuses this SAME object so its
  * turn/stream projections stay byte-identical to the Android iroh path
- * (cm-stream- ids, toolcall-/toolreturn- prefixes, the x1xnl stable assistant
- * otid) instead of re-deriving these hard-won conventions.
+ * (the stamped logical_message_id / turn_id / text_seq, toolcall-/toolreturn-
+ * prefixes) instead of re-deriving these hard-won conventions. A message row is
+ * named by the stamp on the wire and nothing in [Context]: the context's turn and
+ * run ids belong to lifecycle frames only (letta-mobile-ys9it).
  */
 object RuntimeEventServerFrameMapper {
     data class Context(
         val agentId: String,
         val conversationId: String,
-        val turnId: String,
-        val runId: String,
+        // Lifecycle frames only (turn_done / turn_queued / errors). Never names a message row.
+        val turnId: String?,
+        val runId: String?,
     )
 
     fun map(payload: RuntimeEventPayload, context: Context): List<ServerFrame> = when (payload) {
@@ -64,6 +67,7 @@ object RuntimeEventServerFrameMapper {
                     name = payload.toolName.value,
                     arguments = payload.argumentsJson ?: "{}",
                 ),
+                logicalMessageId = "tc-${payload.toolCallId.value}",
             ),
         )
         is RuntimeEventPayload.ToolReturnObserved -> listOf(toolReturnFrame(payload, context))
@@ -91,11 +95,11 @@ object RuntimeEventServerFrameMapper {
         ts = nowIso(),
         agentId = context.agentId,
         conversationId = context.conversationId,
-        turnId = context.turnId,
         runId = context.runId,
         toolCallId = payload.toolCallId.value,
         status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
         toolReturn = JsonPrimitive(payload.body),
+        logicalMessageId = "tr-${payload.toolCallId.value}",
     )
 
     /**
@@ -112,16 +116,17 @@ object RuntimeEventServerFrameMapper {
         id: String,
         toolCall: ToolCallPayload,
         type: String? = null,
+        logicalMessageId: String? = null,
     ): ServerFrame.ToolCallMessage {
         val message = ServerFrame.ToolCallMessage(
             id = id,
             ts = nowIso(),
             agentId = context.agentId,
             conversationId = context.conversationId,
-            turnId = context.turnId,
             runId = context.runId,
             toolCall = toolCall,
             seq = null,
+            logicalMessageId = logicalMessageId,
         )
         return if (type == null) message else message.copy(type = type)
     }
@@ -181,7 +186,7 @@ object RuntimeEventServerFrameMapper {
         ServerFrame.TurnQueued(
             id = "turn_queued-${Uuid.random()}",
             ts = nowIso(),
-            turnId = context.turnId,
+            turnId = context.turnId.orEmpty(),
             conversationId = context.conversationId,
         ).takeIf { payload.reason == INPUT_QUEUED_REASON }
 
@@ -189,8 +194,8 @@ object RuntimeEventServerFrameMapper {
         ServerFrame.TurnDone(
             id = "turn_done-${Uuid.random()}",
             ts = nowIso(),
-            turnId = context.turnId,
-            runId = context.runId,
+            turnId = context.turnId.orEmpty(),
+            runId = context.runId.orEmpty(),
             status = status,
         )
 

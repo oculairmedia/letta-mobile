@@ -271,18 +271,25 @@ internal class IrohObserverIngestor(
     }
 
     private suspend fun projectPassiveObserverDelta(scope: ObserverProjectionScope, received: AppServerReceivedFrame) {
+        // The observer has no turn of its own: a row is named by the host's stamp on the frame, and the
+        // context carries only what the frame itself says (never a per-conversation stand-in id).
+        val frameTurnId = wireTurnId(received)
         observerMapper.map(observerTurnCommand(scope.agentId, scope.conversationId), received).forEach { draft ->
             RuntimeEventServerFrameMapper.map(
                 payload = draft.payload,
                 context = RuntimeEventServerFrameMapper.Context(
                     agentId = draft.agentId?.value ?: scope.agentId,
                     conversationId = draft.conversationId?.value ?: scope.conversationId,
-                    turnId = "iroh-observer-turn-${scope.conversationId}",
-                    runId = draft.runId?.value ?: "iroh-observer-run-${scope.conversationId}",
+                    turnId = frameTurnId,
+                    runId = draft.runId?.value,
                 ),
             ).forEach { emitBoth(it) }
         }
     }
+
+    private fun wireTurnId(received: AppServerReceivedFrame): String? =
+        ((received.frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject)
+            ?.string("turn_id")?.takeIf { it.isNotBlank() }
 
     private suspend fun projectEngineOwnedObserverDelta(
         scope: ObserverProjectionScope,

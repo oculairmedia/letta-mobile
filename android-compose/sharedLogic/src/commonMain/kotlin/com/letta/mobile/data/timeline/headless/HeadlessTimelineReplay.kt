@@ -475,7 +475,7 @@ class HeadlessTimelineReplaySession(
                 frame.toolCallIds().forEach { id ->
                     toolCallIdsByRun.getOrPut(runKey) { linkedSetOf() } += id
                     if (frame.type == "approval_request_message") {
-                        approvalRunByToolCallId[id] = frame.runId
+                        frame.runId?.let { run -> approvalRunByToolCallId[id] = run }
                     }
                 }
             }

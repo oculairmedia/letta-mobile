@@ -264,7 +264,7 @@ class TimelineStreamReducerTest {
                 id = "letta-msg-5020",
                 contentRaw = JsonPrimitive("Got"),
                 runId = "run-real-app-server",
-                otid = "otid-assistant-1",
+                logicalMessageId = "otid-assistant-1",
                 seqId = 1,
             )
         ).next
@@ -275,7 +275,7 @@ class TimelineStreamReducerTest {
                 id = "letta-msg-5021",
                 contentRaw = JsonPrimitive("Got it — Iroh transport is streaming the response."),
                 runId = "run-real-app-server",
-                otid = "otid-assistant-1",
+                logicalMessageId = "otid-assistant-1",
                 seqId = 2,
             ),
         )
@@ -1011,6 +1011,7 @@ class TimelineStreamReducerTest {
                 contentRaw = JsonPrimitive("Hello"),
                 runId = "iroh-run-client-synthetic",
                 seqId = 1,
+                logicalMessageId = "lm-301",
             ),
         ).next
 
@@ -1106,6 +1107,7 @@ class TimelineStreamReducerTest {
                 contentRaw = JsonPrimitive("hello from iro"),
                 runId = "local-run-new",
                 seqId = 1,
+                logicalMessageId = "lm-203-new",
             ),
         )
 
@@ -1304,7 +1306,7 @@ class TimelineStreamReducerTest {
                 contentRaw = JsonPrimitive("Y"),
                 runId = "run-1",
                 seqId = 1,  // FIRST frame for this new otid — genuinely new message
-                otid = "post-tool-otid",
+                logicalMessageId = "post-tool-otid",
             ),
         )
 
@@ -1322,7 +1324,7 @@ class TimelineStreamReducerTest {
                 contentRaw = JsonPrimitive("es — confirmed working at both layers:"),
                 runId = "run-1",
                 seqId = 2,
-                otid = "post-tool-otid",
+                logicalMessageId = "post-tool-otid",
             ),
         )
 
@@ -1815,7 +1817,7 @@ class TimelineStreamReducerTest {
                 id = "letta-msg-1799",
                 contentRaw = JsonPrimitive("m Lester, a dedicated test agent"), // first-word-lag: missing "I'"
                 runId = "local-run-30",
-                otid = "provider-assistant-1-abc",
+                logicalMessageId = "provider-assistant-1-abc",
                 seqId = 42,
             ),
         ).next
@@ -1843,7 +1845,7 @@ class TimelineStreamReducerTest {
         var tl = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-1799", contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
-                runId = "local-run-30", otid = "provider-assistant-1-abc", seqId = 42,
+                runId = "local-run-30", logicalMessageId = "provider-assistant-1-abc", seqId = 42,
             ),
         ).next
         // liveCursor moves OFF the streamed row (a later user/other event advances it).
@@ -1869,12 +1871,12 @@ class TimelineStreamReducerTest {
         var tl = reduce(
             frame = AssistantMessage(
                 id = "letta-msg-3255", contentRaw = JsonPrimitive("Hey"),
-                runId = "local-run-43", otid = "provider-assistant-1-x", seqId = 22,
+                runId = "local-run-43", logicalMessageId = "provider-assistant-1-x", seqId = 22,
             ),
         ).next
         tl = reduce(prev = tl, frame = AssistantMessage(
             id = "letta-msg-3256", contentRaw = JsonPrimitive("."),
-            runId = "local-run-43", otid = "provider-assistant-1-x", seqId = 23,
+            runId = "local-run-43", logicalMessageId = "provider-assistant-1-x", seqId = 23,
         )).next
         // streamed row is now "Hey."; reconcile returns TWO identical "Hey." finals.
         val reconciled = listOf(
@@ -1890,8 +1892,8 @@ class TimelineStreamReducerTest {
     @Test
     fun `identical ui-msg finals in later polls remain distinct without aliases h30cy`() {
         // Poll timing and identical content do not establish identity.
-        var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 1)).next
-        tl = reduce(prev = tl, frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("."), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 2)).next
+        var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"), runId = "local-run-1", logicalMessageId = "provider-assistant-1-x", seqId = 1)).next
+        tl = reduce(prev = tl, frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("."), runId = "local-run-1", logicalMessageId = "provider-assistant-1-x", seqId = 2)).next
         // poll 1
         tl = tl.mergeServerMessages(listOf(AssistantMessage(id = "ui-msg-596", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-596", seqId = null))).first
         // poll 2 (8s later): a NEW server-persisted identical copy
@@ -1911,7 +1913,7 @@ class TimelineStreamReducerTest {
         // the actual STREAMED row being finalized (real run id).
         tl = reduce(prev = tl, frame = AssistantMessage(
             id = "letta-msg-9", contentRaw = JsonPrimitive("Hey there, how are"),
-            runId = "local-run-9", otid = "provider-assistant-1-z", seqId = 9,
+            runId = "local-run-9", logicalMessageId = "provider-assistant-1-z", seqId = 9,
         )).next
         // reconcile final "Hey there, how are you?" contains BOTH "Hey" (old) and
         // the streamed "Hey there, how are". Must replace the STREAMED row only.
@@ -1932,14 +1934,14 @@ class TimelineStreamReducerTest {
             id = "cm-stream-provider-assistant-old",
             contentRaw = JsonPrimitive(", got it — so the original theory still holds. Clean on restart dupes only in streaming path The persistence layer is fine"),
             runId = "local-run-103",
-            otid = "provider-assistant-old",
+            logicalMessageId = "provider-assistant-old",
             seqId = 1,
         )).next
         tl = reduce(prev = tl, frame = AssistantMessage(
             id = "cm-stream-provider-assistant-new",
             contentRaw = JsonPrimitive("Newer turn has already started"),
             runId = "local-run-104",
-            otid = "provider-assistant-new",
+            logicalMessageId = "provider-assistant-new",
             seqId = 1,
         )).next
 
@@ -2005,7 +2007,7 @@ class TimelineStreamReducerTest {
                 id = "letta-msg-9",
                 contentRaw = JsonPrimitive("Hey there, how are"),
                 runId = "local-run-9",
-                otid = "provider-assistant-1-z",
+                logicalMessageId = "provider-assistant-1-z",
                 seqId = 9,
             ),
         ).next

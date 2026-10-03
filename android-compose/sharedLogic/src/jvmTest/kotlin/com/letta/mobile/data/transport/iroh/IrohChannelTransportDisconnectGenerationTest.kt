@@ -178,7 +178,7 @@ class IrohChannelTransportDisconnectGenerationTest {
                   "event_seq": ${frame.sequence},
                   "emitted_at": "2026-08-23T00:00:00Z",
                   "idempotency_key": "disc-$CONVERSATION-${frame.sequence}",
-                  "delta": {"message_type": "assistant_message", "id": "msg-${frame.sequence}", "content": "${frame.content}"}
+                  "delta": {"message_type": "assistant_message", "id": "msg-${frame.sequence}", "logical_message_id": "lm-msg-${frame.sequence}", "content": "${frame.content}"}
                 }
             """.trimIndent()
             return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)

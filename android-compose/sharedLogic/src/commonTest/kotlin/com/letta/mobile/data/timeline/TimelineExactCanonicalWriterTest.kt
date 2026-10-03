@@ -1046,7 +1046,7 @@ class TimelineExactCanonicalWriterTest {
         val streamedId = "cm-stream-provider-assistant-0-1732a7f3"
         val streamed = AssistantMessage(
             id = streamedId, contentRaw = kotlinx.serialization.json.JsonPrimitive("hello"),
-            date = "2026-01-01T00:00:00Z", otid = "server-reply-assistant",
+            date = "2026-01-01T00:00:00Z", logicalMessageId = "server-reply-assistant",
         )
         store.transaction(scope) {
             TimelineExactCanonicalWriter(scope, 100_000)

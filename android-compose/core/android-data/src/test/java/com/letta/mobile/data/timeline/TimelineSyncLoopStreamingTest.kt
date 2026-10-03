@@ -215,7 +215,7 @@ class TimelineSyncLoopStreamingTest {
             AssistantMessage(
                 id = "gateway-assistant",
                 contentRaw = JsonPrimitive("Hello "),
-                otid = "gateway-otid",
+                logicalMessageId = "gateway-otid",
             )
         )
         sync.submitStreamEvent(

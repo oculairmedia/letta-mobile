@@ -588,8 +588,8 @@ internal const val SELF_TODO_SENTINEL_PREFIX = "selftodo-"
  * be additive — this prefix check stays as the source of truth.
  */
 internal fun ServerFrame.ToolCallMessage.isSelfTodoChipFrame(): Boolean {
-    if (runId.startsWith(SELF_TODO_SENTINEL_PREFIX)) return true
-    if (turnId.startsWith(SELF_TODO_SENTINEL_PREFIX)) return true
+    if (runId?.startsWith(SELF_TODO_SENTINEL_PREFIX) == true) return true
+    if (turnId?.startsWith(SELF_TODO_SENTINEL_PREFIX) == true) return true
     val calls = buildList {
         toolCall?.let { add(it) }
         toolCalls?.let { addAll(it) }

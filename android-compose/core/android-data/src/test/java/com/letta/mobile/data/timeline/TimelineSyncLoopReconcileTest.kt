@@ -59,7 +59,7 @@ class TimelineSyncLoopReconcileTest {
     fun `reconcile swaps local user event to confirmed`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
-            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
+            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), logicalMessageId = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(dispatcher)
@@ -208,7 +208,7 @@ class TimelineSyncLoopReconcileTest {
         // Confirmed — no user-visible error.
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
-            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
+            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), logicalMessageId = "reply-otid")
         )
         api.listMessagesFailuresBeforeSuccess = 2  // two 503s, then succeed
         api.listMessagesFailure = ApiException(503, "Service Unavailable")
@@ -256,7 +256,7 @@ class TimelineSyncLoopReconcileTest {
         // only the post-stream swap of Local→Confirmed is lost.
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
-            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
+            AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), logicalMessageId = "reply-otid")
         )
         // Fail every listMessages call — the retry budget (3 attempts) will be exhausted
         api.listMessagesFailuresBeforeSuccess = Int.MAX_VALUE

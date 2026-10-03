@@ -190,12 +190,12 @@ class RuntimeEventServerFrameMapperTest {
     }
 
     @Test
-    fun remoteStreamFrame_assistantDelta_mapsToAssistantMessageWithStableOtid() {
-        val body = """{"message_type":"assistant_message","id":"cm-stream-x","content":"Hi"}"""
+    fun remoteStreamFrame_assistantDelta_mapsToAssistantMessageNamedByItsStamp() {
+        val body = """{"message_type":"assistant_message","id":"letta-msg-1","logical_message_id":"lm-x","text_seq":1,"content":"Hi"}"""
         val frames = RuntimeEventServerFrameMapper.map(
             RuntimeEventPayload.RemoteStreamFrame(
                 frameId = "frame-1",
-                messageId = "cm-stream-x",
+                messageId = "letta-msg-1",
                 messageType = "assistant_message",
                 body = body,
             ),
@@ -203,6 +203,7 @@ class RuntimeEventServerFrameMapperTest {
         )
         val assistant = assertIs<ServerFrame.AssistantMessage>(frames.single())
         assertEquals("Hi", assistant.content)
-        assertEquals("iroh-assistant-cm-stream-x", assistant.otid)
+        assertEquals("lm-x", assistant.id)
+        assertEquals(null, assistant.otid)
     }
 }

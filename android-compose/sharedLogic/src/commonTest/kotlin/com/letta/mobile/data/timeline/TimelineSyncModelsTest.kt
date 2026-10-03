@@ -27,17 +27,33 @@ class TimelineSyncModelsTest {
         assertNotNull(event)
         assertEquals(TimelineMessageType.ASSISTANT, event.messageType)
         assertEquals("a_text", event.content)
-        assertEquals("server-msg2-assistant-r1", event.otid)
+        assertEquals("msg2:ASSISTANT", event.logicalId)
+        assertEquals("msg2:ASSISTANT", event.otid)
         assertEquals("msg2", event.serverId)
     }
 
     @Test
-    fun `test toTimelineEvent preserves legacy server otid when run id is absent`() {
-        val msg = AssistantMessage(id = "msg2", contentRaw = JsonPrimitive("a_text"))
+    fun `test toTimelineEvent names a stamped row by its logical id and ignores run and wire otid`() {
+        val msg = AssistantMessage(
+            id = "msg2", contentRaw = JsonPrimitive("a_text"), runId = "r1", otid = "wire-otid",
+            logicalMessageId = "lm-9", turnId = "turn-4", textSeq = 6,
+        )
         val event = msg.toTimelineEvent(2.0)
 
         assertNotNull(event)
-        assertEquals("server-msg2-assistant", event.otid)
+        assertEquals("lm-9", event.logicalId)
+        assertEquals("lm-9", event.otid)
+        assertEquals("turn-4", event.turnId)
+        assertEquals(6, event.textSeq)
+    }
+
+    @Test
+    fun `test toTimelineEvent never takes a run id as the turn`() {
+        val event = AssistantMessage(id = "msg2", contentRaw = JsonPrimitive("a"), runId = "r1").toTimelineEvent(2.0)
+
+        assertNotNull(event)
+        assertEquals(null, event.turnId)
+        assertEquals(0, event.textSeq)
     }
 
     @Test
