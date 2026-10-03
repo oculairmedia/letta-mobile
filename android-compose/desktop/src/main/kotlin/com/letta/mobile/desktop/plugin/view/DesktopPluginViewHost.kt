@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.cef.CefApp
 import org.cef.browser.CefBrowser
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -46,10 +47,15 @@ internal class DesktopPluginViewHost(
     val runtime: BrowserRuntime<CefApp>,
     private val scope: CoroutineScope,
 ) {
+    private val sessions = ConcurrentHashMap.newKeySet<PluginViewSession>()
+
+    /** How many views are open now (opened and not yet fully closed). */
+    val openViews: Int get() = sessions.size
+
     fun open(app: CefApp, live: PluginLiveView, onFault: (String) -> Unit): PluginViewSession {
         val server = PluginPageServer(live.spec, live.services.transport, live.consented)
         val target = AtomicReference<CefBrowser?>()
-        val port = JcefPostMessagePort { script -> target.get()?.executeJavaScript(script, server.url, 0) }
+        val port = JcefPostMessagePort(PageScriptRunner { script -> target.get()?.executeJavaScript(script, server.url, 0) })
         val wiring = JcefViewWiring(
             server = server,
             policy = PluginViewRequestPolicy(live.spec.pageRef, live.spec.page.csp),
@@ -59,11 +65,20 @@ internal class DesktopPluginViewHost(
         )
         val browser = JcefPluginBrowser.open(app, wiring)
         target.set(browser.browser)
-        return PluginViewSession(ViewBridge(live.spec, port, live.services), port, browser).also { it.start(scope) }
+        val session = PluginViewSession(ViewBridge(live.spec, port, live.services), port, browser)
+        sessions += session
+        session.start(scope)
+        return session
     }
 
     fun close(session: PluginViewSession, reason: String) {
-        scope.launch { session.close(reason) }
+        scope.launch {
+            try {
+                session.close(reason)
+            } finally {
+                sessions -= session
+            }
+        }
     }
 }
 

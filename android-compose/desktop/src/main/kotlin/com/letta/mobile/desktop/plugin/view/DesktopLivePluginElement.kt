@@ -40,6 +40,7 @@ import com.letta.mobile.ui.canvas.plugin.PluginFallbackCard
 import com.letta.mobile.ui.theme.LettaDimens
 import org.cef.CefApp
 import javax.swing.SwingUtilities
+import kotlin.math.roundToInt
 
 /**
  * What the desktop shell binds for plugin views: the element type prefixes that may render live
@@ -190,7 +191,7 @@ internal object PluginViewNotices {
     private const val PERCENT = 100
 
     fun preparing(state: BrowserRuntimeState.Preparing): String {
-        val percent = state.progress?.let { " ${(it * PERCENT).toInt()}%" }.orEmpty()
+        val percent = state.progress?.let { " ${(it * PERCENT).roundToInt()}%" }.orEmpty()
         return when (state.stage) {
             "downloading" -> "Downloading the web view$percent (first run)"
             "extracting", "install" -> "Installing the web view$percent (first run)"

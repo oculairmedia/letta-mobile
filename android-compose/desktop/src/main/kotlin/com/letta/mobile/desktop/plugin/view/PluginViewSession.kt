@@ -41,11 +41,14 @@ internal class PluginViewSession(
     /** Tells a ready page its element changed (`host.element.changed`); nothing once the view is closing. */
     suspend fun elementChanged(element: ViewElement): Boolean = !closed.get() && bridge.elementChanged(element)
 
-    /** Ends the view for [reason] (`removed`, `closed`, …): teardown, then the port, then the browser. */
-    suspend fun close(reason: String) {
-        if (!closed.compareAndSet(false, true)) return
+    /**
+     * Ends the view for [reason] (`closed`, …): teardown, then the port, then the browser. True when a
+     * ready page acknowledged the teardown in time; false when it did not, or the view was closed already.
+     */
+    suspend fun close(reason: String): Boolean {
+        if (!closed.compareAndSet(false, true)) return false
         try {
-            bridge.teardown(reason)
+            return bridge.teardown(reason)
         } finally {
             port.close()
             reader?.cancel()
