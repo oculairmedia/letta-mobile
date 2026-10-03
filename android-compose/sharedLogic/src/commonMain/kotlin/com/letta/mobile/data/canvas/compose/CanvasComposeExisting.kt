@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasComposeProvenance
+import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneDocument
@@ -29,23 +30,38 @@ internal class ExistingArtifact(
     /** Whether [emitted] is this very artifact again: the same pieces with the same content. */
     fun matches(emitted: List<Emitted>): Boolean = signatures == emitted.associate { idOf(it.op) to signature(it.op) }
 
-    /** Where the pieces are now: document frames, group frames and TEXT items as compose books them. */
-    fun bounds(): ComposeBounds? {
-        val rects = documents.mapNotNull { document -> document.frame?.let { Slot(it.x, it.y, it.width, it.height) } } +
-            elements.mapNotNull { element ->
-                when (kindOf(element)) {
-                    ComposeKind.GROUP.name -> groupFrameSlot(element)
-                    ComposeKind.TEXT.name -> textSlot(element)
-                    else -> null
-                }
-            }
-        return CanvasComposePlacement.union(rects)
+    /** Board id to the frame that piece has now, so a retry's receipt names where it sits. */
+    fun frames(): Map<String, List<Int>> {
+        val notes = documents.mapNotNull { document -> document.frame?.let { document.id to slotOf(it).frameInts() } }
+        val drawn = elements.mapNotNull { element ->
+            val id = element.string("id") ?: return@mapNotNull null
+            elementSlot(element)?.let { id to it.frameInts() }
+        }
+        return (notes + drawn).toMap()
     }
+
+    /** The rectangle around every piece, where they sit now. */
+    fun bounds(): ComposeBounds? = CanvasComposePlacement.union(pieceSlots())
+
+    private fun pieceSlots(): List<Slot> =
+        documents.mapNotNull { document -> document.frame?.let(::slotOf) } + elements.mapNotNull(::elementSlot)
+
+    private fun elementSlot(element: JsonObject): Slot? = when (kindOf(element)) {
+        ComposeKind.GROUP.name -> groupFrameSlot(element)
+        ComposeKind.TEXT.name -> textSlot(element)
+        else -> null
+    }
+
+    private fun slotOf(frame: CanvasDocumentFrame): Slot = Slot(frame.x, frame.y, frame.width, frame.height)
 
     /** A group's frame; its label, a Text element of the same kind, is not counted. */
     private fun groupFrameSlot(element: JsonObject): Slot? =
         element.takeIf { it.string("type") == "Shape" }?.let { CanvasComposePlacement.elementBounds(it, conservative = false) }
 
+    /**
+     * TEXT stores a top-left and a wrap width, not a height, so a retry reports the reserved
+     * slot again rather than a height read off the element.
+     */
     private fun textSlot(element: JsonObject): Slot? {
         val (x, y) = element.string("textTopLeft")?.split(",")?.mapNotNull { it.toFloatOrNull() }?.takeIf { it.size == 2 } ?: return null
         val size = if ((element.number("fontSize") ?: 0.0) >= CanvasComposeReserve.TEXT_HEADING_FONT) ComposeTextSize.HEADING else ComposeTextSize.BODY

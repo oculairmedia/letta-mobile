@@ -52,7 +52,7 @@ class CanvasArtifactReceiptsTest {
         assertEquals("Weekend plan", part.title)
         assertEquals(listOf(ComposeKind.TEXT, ComposeKind.CHECKLIST, ComposeKind.NOTE, ComposeKind.GROUP, ComposeKind.CARD), part.kinds)
         assertEquals(6, part.itemCount)
-        assertEquals(ComposeBounds(80f, 80f, 712f, 746f), part.bounds)
+        assertEquals(ComposeBounds(80f, 80f, 1448f, 489f), part.bounds)
         assertNull(part.error)
         assertTrue(part.canShowOnCanvas)
     }

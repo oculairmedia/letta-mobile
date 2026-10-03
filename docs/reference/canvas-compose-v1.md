@@ -51,12 +51,13 @@ The presets are the board's note tints, so red shows as pink, cyan as blue and p
 ## Ids and retries
 - Each item is on the board as cmp-<artifact_id>-<key>; a group's label is cmp-<artifact_id>-<key>-label.
 - An item without a key is keyed by its 0-based place: i0, i1, and i3-c0 for the first child of the group at i3.
-- The same artifact_id with the same content again is a safe retry: nothing is written and the receipt comes back with a warning. Where the pieces are does not count, so it is still a retry after a person moved them.
+- The same artifact_id and the same content is a retry: nothing is written, and the receipt warns. Moving the pieces does not change that.
 - The same artifact_id with other content is ARTIFACT_EXISTS.
 
 ## Receipt
-{"ok": true, "artifact_id", "canvas_id", "revision", "status": "published" | "dry_run", "title", "bounds": {x, y, width, height}, "items": [{key, kind, count?, children?}], "warnings"}
-bounds is the rectangle the artifact covers, in board units; count is a checklist's entries. The chat shows it as a card with "Show on canvas".
+{"ok": true, "artifact_id", "canvas_id", "revision", "status": "published" | "dry_run", "title", "bounds": {x, y, width, height}, "items": [{key, kind, count?, frame?, children?}], "warnings", "framesOmitted?", "framesHint?"}
+bounds is the artifact's rectangle; count is a checklist's entries. frame is the reserved slot, [x, y, w, h] integers; a short note is drawn shorter inside it, so attach to its left, right or top side.
+Over 4096 bytes, frames drop from group children first, then top-level items from the end; framesOmitted is true and framesHint is "call canvas_get_layout for geometry". A retry omits frame if the board no longer stores it.
 
 ## What you will see
 The artifact goes right of what is on the board (below it once the board is wider than 2400), as a grid in reading order: 1 column for 1 item, 2 columns for 2 to 4 items, 3 columns for 5 to 9 items, 4 columns for 10 or more.
