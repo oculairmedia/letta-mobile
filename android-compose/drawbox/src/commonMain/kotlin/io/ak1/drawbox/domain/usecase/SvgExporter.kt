@@ -10,6 +10,11 @@ import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.model.textBox
 import io.ak1.drawbox.domain.model.resolvedTextColor
 import io.ak1.drawbox.domain.model.canHoldText
+import io.ak1.drawbox.domain.model.CONNECTOR_CHIP_PAD
+import io.ak1.drawbox.domain.model.connectorLabelCentre
+import io.ak1.drawbox.domain.model.connectorLabelMaxWidth
+import io.ak1.drawbox.domain.model.connectorLabelOnChip
+import io.ak1.drawbox.domain.model.isConnector
 import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.domain.model.bounds
@@ -28,10 +33,15 @@ import kotlin.math.sqrt
 
 object SvgExporter {
 
+    /**
+     * [elements] as an SVG document. [bgColor] is the board's colour, which a connector label's
+     * chip is painted in as on the canvas; without it labels are exported without their chip.
+     */
     fun exportToSvg(
         elements: List<Element>,
         width: Int = 1000,
-        height: Int = 1000
+        height: Int = 1000,
+        bgColor: Color? = null,
     ): String {
         val svgElements = mutableListOf<String>()
 
@@ -50,7 +60,7 @@ object SvgExporter {
                 is Element.Path -> svgElements.add(pathToSvg(element))
                 is Element.Shape -> {
                     svgElements.add(shapeToSvg(element))
-                    shapeTextToSvg(element)?.let(svgElements::add)
+                    shapeTextToSvg(element, bgColor)?.let(svgElements::add)
                 }
                 is Element.Image -> svgElements.add(imageToSvg(element))
                 is Element.Text -> svgElements.add(textToSvg(element))
@@ -379,27 +389,61 @@ object SvgExporter {
      * A shape's text as a text block in the shape's text box, centred top to bottom by the same
      * line estimate [wrapTextForSvg] makes, and turned with the shape.
      */
-    private fun shapeTextToSvg(shape: Element.Shape): String? {
-        if (shape.text.isEmpty() || !shape.canHoldText) return null
-        val box = shape.textBox()
-        val lines = wrapTextForSvg(shape.text, box.width, shape.fontSize, shape.fontFamilyKey).size
-        val height = shape.fontSize + (lines - 1) * shape.fontSize * 1.25f
-        val block = Element.Text(
-            id = shape.id,
-            text = shape.text,
-            fontFamilyKey = shape.fontFamilyKey,
-            fontSize = shape.fontSize,
-            color = shape.resolvedTextColor,
-            alignment = shape.textAlignment,
-            topLeft = androidx.compose.ui.geometry.Offset(box.left, box.center.y - height / 2f),
-            wrapWidth = box.width,
-            measuredHeight = height,
-        )
-        val svg = textToSvg(block)
+    private fun shapeTextToSvg(shape: Element.Shape, bgColor: Color?): String? {
+        if (shape.text.isEmpty()) return null
+        val svg = when {
+            shape.isConnector -> connectorLabelToSvg(shape, bgColor)
+            shape.canHoldText -> boxedShapeTextToSvg(shape)
+            else -> return null
+        }
         if (shape.rotation == 0f) return svg
         val c = shape.bounds().center
         return """<g transform="rotate(${shape.rotation}, ${c.x}, ${c.y})">$svg</g>"""
     }
+
+    private fun boxedShapeTextToSvg(shape: Element.Shape): String {
+        val box = shape.textBox()
+        val height = svgTextHeight(shape, wrapTextForSvg(shape.text, box.width, shape.fontSize, shape.fontFamilyKey).size)
+        return textToSvg(shapeTextBlock(shape, Offset(box.left, box.center.y - height / 2f), box.width, height))
+    }
+
+    /**
+     * A connector's label where the canvas draws it (see `ConnectorLabel.kt`), sized by the same
+     * per-character estimate the rest of the export wraps with: on the curve's midpoint over a
+     * chip of the board's [bgColor] when the shaft has room, beside the shaft otherwise. With no
+     * board colour there is no chip to paint, so only the text is written.
+     */
+    private fun connectorLabelToSvg(shape: Element.Shape, bgColor: Color?): String {
+        val charWidth = shape.fontSize * charWidthMultiplier(shape.fontFamilyKey)
+        val lines = wrapTextForSvg(shape.text, shape.connectorLabelMaxWidth(), shape.fontSize, shape.fontFamilyKey)
+        // A hair over the longest line, so the export's own wrap does not break it again.
+        val width = (lines.maxOf { it.length } * charWidth).coerceAtMost(shape.connectorLabelMaxWidth()) + LABEL_WIDTH_SLACK
+        val height = svgTextHeight(shape, lines.size)
+        val centre = shape.connectorLabelCentre(width, height)
+        val topLeft = Offset(centre.x - width / 2f, centre.y - height / 2f)
+        val text = textToSvg(shapeTextBlock(shape, topLeft, width, height))
+        if (bgColor == null || !shape.connectorLabelOnChip(width, height)) return text
+        val pad = CONNECTOR_CHIP_PAD
+        val chip = """<rect x="${topLeft.x - pad}" y="${topLeft.y - pad}" width="${width + pad * 2}" height="${height + pad * 2}" rx="$pad" ry="$pad" fill="${colorToHex(bgColor)}"/>"""
+        return "$chip\n  $text"
+    }
+
+    private fun svgTextHeight(shape: Element.Shape, lines: Int): Float =
+        shape.fontSize + (lines - 1) * shape.fontSize * 1.25f
+
+    private fun shapeTextBlock(shape: Element.Shape, topLeft: Offset, width: Float, height: Float) = Element.Text(
+        id = shape.id,
+        text = shape.text,
+        fontFamilyKey = shape.fontFamilyKey,
+        fontSize = shape.fontSize,
+        color = shape.resolvedTextColor,
+        alignment = shape.textAlignment,
+        topLeft = topLeft,
+        wrapWidth = width,
+        measuredHeight = height,
+    )
+
+    private const val LABEL_WIDTH_SLACK = 0.01f
 
     private fun textToSvg(text: Element.Text): String {
         if (text.text.isEmpty()) return ""
@@ -456,11 +500,7 @@ object SvgExporter {
         fontFamilyKey: String,
     ): List<String> {
         if (widthWorld <= 0f || fontSize <= 0f) return text.split('\n')
-        val charWidthMul = when (fontFamilyKey) {
-            io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.MONO -> 0.6f
-            else -> 0.55f
-        }
-        val approxCharWidth = fontSize * charWidthMul
+        val approxCharWidth = fontSize * charWidthMultiplier(fontFamilyKey)
         val charsPerLine = (widthWorld / approxCharWidth).toInt().coerceAtLeast(1)
         val out = mutableListOf<String>()
         for (hardLine in text.split('\n')) {
@@ -501,6 +541,12 @@ object SvgExporter {
             if (current.isNotEmpty()) out += current.toString()
         }
         return out
+    }
+
+    /** Average glyph width as a share of the em, by family: mono glyphs are wider. */
+    private fun charWidthMultiplier(fontFamilyKey: String): Float = when (fontFamilyKey) {
+        io.ak1.drawbox.domain.model.BuiltinFontFamilyKeys.MONO -> 0.6f
+        else -> 0.55f
     }
 
     private fun escapeXml(s: String): String = s

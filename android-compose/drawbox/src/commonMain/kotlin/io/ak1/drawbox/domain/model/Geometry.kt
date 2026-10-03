@@ -83,6 +83,16 @@ sealed interface LinePath {
         }
     }
 
+    /**
+     * Which way the curve is heading at its middle, t = 0.5 (not normalised): the derivative there,
+     * scaled. A quadratic's is parallel to its chord whatever the bend.
+     */
+    fun midDirection(): Offset = when (this) {
+        is Straight -> end - start
+        is Quadratic -> end - start
+        is Cubic -> end + control2 - control1 - start
+    }
+
     /** Which way the curve is heading as it reaches [end]; what an arrowhead points along. */
     fun endDirection(): Offset = when (this) {
         is Straight -> end - start

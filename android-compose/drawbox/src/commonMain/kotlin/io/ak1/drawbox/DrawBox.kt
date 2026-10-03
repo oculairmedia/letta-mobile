@@ -91,6 +91,8 @@ import io.ak1.drawbox.domain.model.StrokeStyle
 import io.ak1.drawbox.domain.model.Viewport
 import io.ak1.drawbox.domain.model.angleFromCenter
 import io.ak1.drawbox.domain.model.bezierMidpoint
+import io.ak1.drawbox.domain.model.arrowHeadDepth
+import io.ak1.drawbox.domain.model.arrowHeadSize
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.model.positions
 import io.ak1.drawbox.domain.model.controlPoint
@@ -252,6 +254,11 @@ fun DrawBox(
     // composition-scoped and must come from rememberTextMeasurer.
     val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
     val textCache = remember { TextLayoutCache() }
+    // How shape text is painted: built once per board colour, not per element per frame, and the
+    // hidden variant only for the shape whose text an editor is showing.
+    val shapeText = remember(state.bgColor) { ShapeTextPaint(hidden = false, chip = state.bgColor) }
+    val editedShapeText = remember(shapeText) { shapeText.copy(hidden = true) }
+    fun shapeTextFor(id: String): ShapeTextPaint = if (id in hiddenTextElementIds) editedShapeText else shapeText
 
     // Pre-measure every text element at composition time (cache hit when
     // unchanged) and dispatch SyncTextMeasuredHeight when the rendered
@@ -940,7 +947,7 @@ fun DrawBox(
                     }) {
                         orderedElements.forEach { el ->
                             if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, ShapeTextPaint(el.id in hiddenTextElementIds, state.bgColor))
+                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el.id))
                             }
                         }
                     }
@@ -962,7 +969,7 @@ fun DrawBox(
             }) {
                 if (activeIds.isNotEmpty()) {
                     orderedElements.forEach { el ->
-                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, ShapeTextPaint(el.id in hiddenTextElementIds, state.bgColor))
+                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el.id))
                     }
                 }
                 drawSelectionChrome(
@@ -1006,7 +1013,7 @@ fun DrawBox(
                         translate(vp.offset.x, vp.offset.y)
                         scale(vp.scale, vp.scale, pivot = Offset.Zero)
                     }) {
-                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale, ShapeTextPaint(hidden = false, chip = state.bgColor)) }
+                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeText) }
                     }
                 }
                 capturePending = false
@@ -1058,6 +1065,7 @@ fun DrawingPreview(
     val textCache = remember { TextLayoutCache() }
     val previewScope = rememberCoroutineScope()
     val imageCache = remember(previewScope) { ImageBitmapCache(previewScope) }
+    val shapeText = remember(bgColor) { ShapeTextPaint(hidden = false, chip = bgColor) }
     Canvas(modifier = modifier) {
         drawRect(color = bgColor)
         withTransform({
@@ -1074,7 +1082,7 @@ fun DrawingPreview(
                         textCache = textCache,
                         textMeasurer = textMeasurer,
                         viewportScale = viewport.scale,
-                        shapeText = ShapeTextPaint(hidden = false, chip = bgColor),
+                        shapeText = shapeText,
                     )
                 }
         }
@@ -2007,6 +2015,8 @@ private fun StrokeStyle.offLength(width: Float): Float = when (this) {
 private fun lerp(a: Offset, b: Offset, t: Float): Offset =
     Offset(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
 
+private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
+
 /**
  * Render a variable-width pen-pressure stroke that also respects [style].
  *
@@ -2288,8 +2298,8 @@ private fun DrawScope.drawArrowShape(shape: Element.Shape) {
     val end = shape.points.last()
     val color = shape.strokeColor
     val strokeWidth = shape.strokeWidth
-    val arrowSize = maxOf(30f, strokeWidth * 3f)
-    val arrowDepth = arrowSize * cos(PI / 6).toFloat()
+    val arrowSize = shape.arrowHeadSize()
+    val arrowDepth = shape.arrowHeadDepth()
 
     val angle: Float
     val linePath = shape.linePath()

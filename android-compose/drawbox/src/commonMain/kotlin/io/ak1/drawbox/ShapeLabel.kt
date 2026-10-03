@@ -7,18 +7,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.drawText
+import io.ak1.drawbox.domain.model.CONNECTOR_CHIP_PAD
 import io.ak1.drawbox.domain.model.Element
-import io.ak1.drawbox.domain.model.ShapeType
 import io.ak1.drawbox.domain.model.canHoldText
+import io.ak1.drawbox.domain.model.connectorLabelCentre
+import io.ak1.drawbox.domain.model.connectorLabelMaxWidth
+import io.ak1.drawbox.domain.model.connectorLabelOnChip
+import io.ak1.drawbox.domain.model.isConnector
 import io.ak1.drawbox.domain.model.resolvedTextColor
 import io.ak1.drawbox.domain.model.textBox
 import io.ak1.drawbox.domain.model.textTopLeft
 
 /**
- * A shape's text, wrapped to [textBox] and centred in it. Laid out through the same
- * [TextLayoutCache] as text elements, under the shape's id plus [SHAPE_TEXT_KEY].
- * An arrow or a line has no interior, so its label sits on the midpoint of its endpoints,
- * on a chip the colour of the board ([chip]).
+ * A shape's text. Laid out through the same [TextLayoutCache] as text elements, under the shape's
+ * id plus [SHAPE_TEXT_KEY]. A closed shape's text is wrapped to its [textBox] and centred in it;
+ * an arrow's or a line's is a label on its curve (see [drawConnectorLabel]).
  */
 internal fun DrawScope.drawShapeText(
     shape: Element.Shape,
@@ -27,12 +30,12 @@ internal fun DrawScope.drawShapeText(
     chip: Color,
 ) {
     if (shape.text.isEmpty()) return
-    if (shape.shapeType == ShapeType.ARROW || shape.shapeType == ShapeType.LINE) {
+    if (textCache == null || textMeasurer == null) return
+    if (shape.isConnector) {
         drawConnectorLabel(shape, textCache, textMeasurer, chip)
         return
     }
     if (!shape.canHoldText) return
-    if (textCache == null || textMeasurer == null) return
     val box = shape.textBox()
     val layout = textCache.layoutFor(
         id = shape.id + SHAPE_TEXT_KEY,
@@ -51,17 +54,18 @@ internal fun DrawScope.drawShapeText(
 }
 
 /**
- * A connector has no interior ([canHoldText] is false), so its label is drawn on the
- * midpoint of the two endpoints, on a chip of [chip] (the board background), instead of
- * inside a box.
+ * A connector's label, placed by the rule in `ConnectorLabel.kt`: on the curve's midpoint over a
+ * chip of [chip] (the board's own colour, so the chip only knocks the shaft and any pattern out
+ * behind the text) when the shaft has room for it, otherwise beside the shaft with no chip. The
+ * text is laid out as wide as it is, up to [connectorLabelMaxWidth], then wraps; its colour falls
+ * back to the stroke's. All in world units, so it scales with the board.
  */
 private fun DrawScope.drawConnectorLabel(
     shape: Element.Shape,
-    textCache: TextLayoutCache?,
-    textMeasurer: TextMeasurer?,
+    textCache: TextLayoutCache,
+    textMeasurer: TextMeasurer,
     chip: Color,
 ) {
-    if (textCache == null || textMeasurer == null) return
     if (shape.points.size < 2) return
     val layout = textCache.layoutFor(
         id = shape.id + SHAPE_TEXT_KEY,
@@ -69,31 +73,27 @@ private fun DrawScope.drawConnectorLabel(
         fontFamilyKey = shape.fontFamilyKey,
         fontSize = shape.fontSize,
         alignment = shape.textAlignment,
-        wrapWidth = connectorLabelWidth(shape),
+        wrapWidth = shape.connectorLabelMaxWidth(),
         measurer = textMeasurer,
+        fitToText = true,
     )
-    val mid = labelMidpoint(shape.points.first(), shape.points.last())
-    val topLeft = Offset(mid.x - layout.size.width / 2f, mid.y - layout.size.height / 2f)
-    val pad = 3f
-    drawRoundRect(
-        color = connectorChip(chip),
-        topLeft = Offset(topLeft.x - pad, topLeft.y - pad),
-        size = Size(layout.size.width.toFloat() + pad * 2, layout.size.height.toFloat() + pad * 2),
-        cornerRadius = CornerRadius(3f, 3f),
-    )
+    val width = layout.size.width.toFloat()
+    val height = layout.size.height.toFloat()
+    val centre = shape.connectorLabelCentre(width, height)
+    val topLeft = Offset(centre.x - width / 2f, centre.y - height / 2f)
+    if (shape.connectorLabelOnChip(width, height)) {
+        drawRoundRect(
+            color = chip,
+            topLeft = Offset(topLeft.x - CONNECTOR_CHIP_PAD, topLeft.y - CONNECTOR_CHIP_PAD),
+            size = Size(width + CONNECTOR_CHIP_PAD * 2, height + CONNECTOR_CHIP_PAD * 2),
+            cornerRadius = CornerRadius(CONNECTOR_CHIP_PAD, CONNECTOR_CHIP_PAD),
+        )
+    }
     drawText(textLayoutResult = layout, color = shape.resolvedTextColor, topLeft = topLeft)
 }
 
-/** Whether a shape's text is hidden, and the board colour a connector's chip is painted with. */
+/**
+ * How shape text is painted in one draw pass: whether it is hidden (an editor is showing it), and
+ * the board colour a connector label's chip is painted with. Built once per board colour.
+ */
 internal data class ShapeTextPaint(val hidden: Boolean, val chip: Color)
-internal fun connectorChip(board: Color): Color = board
-
-/** Wide enough for the glyphs, tight enough that the chip stays off the cards it joins. */
-private fun connectorLabelWidth(shape: Element.Shape): Float =
-    (shape.text.length * shape.fontSize * 0.72f + 4f).coerceAtLeast(shape.fontSize)
-
-internal fun labelMidpoint(start: Offset, end: Offset): Offset =
-    Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
-
-/** Shared with the stroke sampler in DrawBox. Three floats, no objects, so it lives beside the label math. */
-internal fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t

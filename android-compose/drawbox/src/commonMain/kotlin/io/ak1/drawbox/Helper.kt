@@ -279,10 +279,17 @@ internal class TextLayoutCache {
         val fontSize: Float,
         val alignment: TextAlignment,
         val wrapWidth: Float,
+        val fitToText: Boolean,
     )
     private data class Entry(val key: Key, val layout: TextLayoutResult)
     private val byId = HashMap<String, Entry>()
 
+    /**
+     * The layout of [text], wrapped at [wrapWidth]. The layout is [wrapWidth] wide, so alignment
+     * happens inside the whole box; with [fitToText] it is instead as wide as the text's longest
+     * line (its max intrinsic width) up to [wrapWidth], which is what a label that is sized to its
+     * text, such as a connector's, wants. Either way it is one measure per change, cached.
+     */
     fun layoutFor(
         id: String,
         text: String,
@@ -291,8 +298,9 @@ internal class TextLayoutCache {
         alignment: TextAlignment,
         wrapWidth: Float,
         measurer: TextMeasurer,
+        fitToText: Boolean = false,
     ): TextLayoutResult {
-        val key = Key(text, fontFamilyKey, fontSize, alignment, wrapWidth)
+        val key = Key(text, fontFamilyKey, fontSize, alignment, wrapWidth, fitToText)
         val existing = byId[id]
         if (existing != null && existing.key == key) return existing.layout
         val style = TextStyle(
@@ -305,8 +313,11 @@ internal class TextLayoutCache {
             style = style,
             // The full wrap width, not just a cap on it: with only a maximum the layout shrinks to
             // the text, and centring or right-aligning then happens inside that shrunken box, so
-            // a short centred line sat at the left of its box.
-            constraints = Constraints.fixedWidth(wrapWidth.toInt().coerceAtLeast(1)),
+            // a short centred line sat at the left of its box. Text fitted to its own width takes
+            // only the cap: the measurer then lays it out min(max intrinsic width, cap) wide.
+            constraints = wrapWidth.toInt().coerceAtLeast(1).let { width ->
+                if (fitToText) Constraints(maxWidth = width) else Constraints.fixedWidth(width)
+            },
             softWrap = true,
             // World units: the font size is world px whatever the display's density or the
             // person's font-size setting (see WorldDensity).

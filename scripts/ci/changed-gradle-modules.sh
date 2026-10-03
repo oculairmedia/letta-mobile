@@ -51,6 +51,8 @@ while IFS= read -r file; do
     android-compose/feature-editagent/*) TASKS[":feature-editagent:testDebugUnitTest"]=1 ;;
     android-compose/designsystem/*) TASKS[":designsystem:testDebugUnitTest"]=1 ;;
     android-compose/sharedUI/*) TASKS[":sharedUI:jvmTest"]=1 ;;
+    # sharedUI renders the canvas through DrawBox and checks its pixels: a DrawBox change re-runs those too.
+    android-compose/drawbox/*) TASKS[":drawbox:jvmTest"]=1; TASKS[":sharedUI:jvmTest"]=1 ;;
     android-compose/plugin-view/*) TASKS[":plugin-view:jvmTest"]=1; TASKS[":plugin-view:testAndroidHostTest"]=1 ;;
     android-compose/core/android-data/*) TASKS[":core:android-data:testDebugUnitTest"]=1 ;;
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
@@ -67,6 +69,7 @@ ORDERED=(
   ":feature-chat:testDebugUnitTest"
   ":feature-editagent:testDebugUnitTest"
   ":designsystem:testDebugUnitTest"
+  ":drawbox:jvmTest"
   ":sharedUI:jvmTest"
   ":plugin-view:jvmTest"
   ":plugin-view:testAndroidHostTest"
