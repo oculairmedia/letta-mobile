@@ -97,8 +97,8 @@ internal fun ToolRunGroup(
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
     modifier: Modifier = Modifier,
-    title: RunSummaryTitle? = null,
 ) {
+    val title = calls.title
     val toolCalls = calls.toolCalls
     val approvals = calls.approvals
     if (toolCalls.isEmpty()) return
@@ -115,8 +115,7 @@ internal fun ToolRunGroup(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             title?.let { RunSummaryLead(it) }
             ToolRunSummaryRow(
-                summary = summary,
-                startedAtEpochMs = startedAtEpochMs,
+                line = ToolRunLine(summary, startedAtEpochMs),
                 disclosure = toolRunDisclosure(inline, detailsOpen),
                 onClick = { detailsOpen = if (inline) !detailsOpen else true },
                 modifier = Modifier.weight(1f),
@@ -126,7 +125,7 @@ internal fun ToolRunGroup(
         approvals.filter { it.requiresUserInput() }.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
     if (detailsOpen && !inline) {
-        ToolRunDetailsSheet(toolCalls, ToolRunSheetHeading(summary, startedAtEpochMs), callbacks) { detailsOpen = false }
+        ToolRunDetailsSheet(toolCalls, ToolRunLine(summary, startedAtEpochMs), callbacks) { detailsOpen = false }
     }
 }
 
@@ -139,6 +138,8 @@ internal data class ToolRunCalls(
     val toolCalls: ImmutableList<UiToolCall>,
     val approvals: ImmutableList<UiApprovalRequest> = persistentListOf(),
     val startedAtTimestamp: String? = null,
+    /** The run's plain label, when the line opens its run (bglj6.1.11). */
+    val title: RunSummaryTitle? = null,
 )
 
 private fun toolRunDisclosure(inline: Boolean, detailsOpen: Boolean): ToolRunDisclosure {
@@ -166,9 +167,9 @@ private fun ColumnScope.ToolRunInlineCards(
     }
 }
 
-/** What the sheet's title says: the summary line's own words, approvals and running clock included. */
+/** What the summary line (and the sheet titled after it) says: its words, approvals and running clock included. */
 @Immutable
-private class ToolRunSheetHeading(val summary: ToolRunSummary, val startedAtEpochMs: Long?)
+private class ToolRunLine(val summary: ToolRunSummary, val startedAtEpochMs: Long?)
 
 /** What the summary line's chevron promises: a sheet, or an in-place disclosure and its state. */
 @Immutable
@@ -203,13 +204,13 @@ internal fun summarizeToolRun(toolCalls: List<UiToolCall>, approvals: List<UiApp
 
 @Composable
 private fun ToolRunSummaryRow(
-    summary: ToolRunSummary,
-    startedAtEpochMs: Long?,
+    line: ToolRunLine,
     disclosure: ToolRunDisclosure,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val elapsed by rememberElapsedSeconds(summary.running, startedAtEpochMs)
+    val summary = line.summary
+    val elapsed by rememberElapsedSeconds(summary.running, line.startedAtEpochMs)
     val click = rememberQuietClick()
     val color = toolRunColor(summary, click.lifted)
     val description = stringResource(Res.string.rows_tool_run_summary)
@@ -299,7 +300,7 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 @Composable
 private fun ToolRunDetailsSheet(
     toolCalls: ImmutableList<UiToolCall>,
-    heading: ToolRunSheetHeading,
+    heading: ToolRunLine,
     callbacks: ChatRowCallbacks,
     onDismiss: () -> Unit,
 ) {

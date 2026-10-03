@@ -89,7 +89,7 @@ internal fun RunBlockRow(
     Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
         if (lead != null) {
             // The label leads the tool summary's own line: one line, one chevron.
-            ToolRunGroup(lead.calls, context, callbacks, title = title)
+            ToolRunGroup(lead.calls.copy(title = title), context, callbacks)
             RunSteps(steps.drop(1), context, callbacks, leadingGap = true)
         } else {
             RunSummaryLine(title)
