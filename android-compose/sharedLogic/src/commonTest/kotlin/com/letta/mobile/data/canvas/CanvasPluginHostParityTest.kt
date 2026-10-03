@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-s416w.5, the CanvasComposeHostParityTest of plugin elements: the same canvas_apply_ops
@@ -48,6 +49,14 @@ class CanvasPluginHostParityTest {
             }
         }
         assertEquals(unstamped(iroh.logged()), unstamped(open.logged()), "the same ops, in the same order, with the same clocks")
+    }
+
+    @Test
+    fun bothHostsExposeGetLayout() = runTest {
+        PluginToolHost.all().forEach { host ->
+            val names = host.registry.advertisedToolsCommandGroups()!!.flatMap { group -> group.tools.map { it.name } }
+            assertTrue(CanvasToolContract.GET_LAYOUT in names, "$host advertised $names")
+        }
     }
 
     /** A result without what each host counts or mints for itself: its revision. */
