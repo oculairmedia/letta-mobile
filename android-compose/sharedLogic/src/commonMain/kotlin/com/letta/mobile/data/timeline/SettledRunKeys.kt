@@ -30,11 +30,15 @@ internal data class LiveRowPresentation(
 )
 
 /**
- * The live row that [events] settle, or null when none of them is on the overlay or the two copies
- * do not share a shape (a live run whose rows settled as separate bubbles keeps its own keys, since
- * several settled rows cannot all take one live key). A row is matched by the id either side knows
- * it under: its own server id, its canonical identity, a stream id aliased to it, or the otid a sent
- * prompt keeps from its optimistic echo to its stored row.
+ * The live row that [events] settle, or null when none of them is on the overlay. A row is matched
+ * by the id either side knows it under: its own server id, its canonical identity, a stream id
+ * aliased to it, or the otid a sent prompt keeps from its optimistic echo to its stored row.
+ *
+ * A live row of the same shape wins. Failing that, a settled run takes the place of the live bubble
+ * it absorbed (a reply streamed with no run settles inside its prompt's run): a fresh key there
+ * would draw the reply twice for a frame and then drop the live row, the flash at the end of a turn
+ * (letta-mobile-bglj6.1.12). The other way round never adopts: a live run whose rows settled as
+ * separate bubbles keeps its own keys, since several settled rows cannot all take one live key.
  */
 internal fun ChatRenderItem.livePresentationFor(
     events: List<TimelineResidentEvent>,
@@ -43,8 +47,8 @@ internal fun ChatRenderItem.livePresentationFor(
 ): LiveRowPresentation? {
     val names = events.flatMapTo(mutableSetOf()) { it.namesKnownTo(aliases) }
     if (names.isEmpty()) return null
-    val match = live.firstOrNull { item -> item.rows().any { it.isNamedBy(names) } && sharesShapeWith(item) }
-        ?: return null
+    val named = live.filter { item -> item.rows().any { it.isNamedBy(names) } }
+    val match = named.firstOrNull(::sharesShapeWith) ?: named.firstOrNull { isRunItem && !it.isRunItem } ?: return null
     return LiveRowPresentation(match.key, match.runIdentity(), match.rows().firstNotNullOfOrNull { it.latencyMs })
 }
 

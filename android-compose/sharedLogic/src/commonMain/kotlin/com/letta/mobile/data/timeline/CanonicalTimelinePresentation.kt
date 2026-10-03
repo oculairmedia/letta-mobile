@@ -162,7 +162,10 @@ class CanonicalTimelinePresentation private constructor(
             )
         }
         val active = buildChatRenderModel(
-            messages = activeMessages,
+            // A run-less reply settles as its prompt's run (aggregatePreparedRuns); the live render
+            // takes the same shape, or the settled row could not take the live row's place and the
+            // reply would be drawn twice and then jump at settle (letta-mobile-bglj6.1.12).
+            messages = activeMessages.withPromptOwnedRunIds(),
             mode = ChatDisplayMode.Interactive,
             activeAgentId = owner.selection.scope.agentId,
         ).renderItems
