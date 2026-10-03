@@ -1,9 +1,6 @@
 package com.letta.mobile.pluginview
 
-import android.os.Message
 import android.webkit.GeolocationPermissions
-import android.webkit.JsPromptResult
-import android.webkit.JsResult
 import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
@@ -46,7 +43,9 @@ internal class PluginWebViewClient(private val view: PluginWebView) : WebViewCli
 
 /**
  * The plugin page's [WebChromeClient]: device permissions only as far as [permissions] (what the
- * page declares and the person granted) reach, no windows, and no JavaScript dialogs.
+ * page declares and the person granted) reach. Windows and JavaScript dialogs need no handling
+ * here: the page's `sandbox allow-scripts` policy allows neither popups nor modals, and the WebView
+ * does not support multiple windows.
  */
 internal class PluginWebChromeClient(private val permissions: Set<PluginCapability>) : WebChromeClient() {
     override fun onPermissionRequest(request: PermissionRequest) {
@@ -56,22 +55,6 @@ internal class PluginWebChromeClient(private val permissions: Set<PluginCapabili
 
     override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback) {
         callback.invoke(origin, PluginCapability.UI_GEOLOCATION in permissions, false)
-    }
-
-    override fun onCreateWindow(webView: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
-
-    override fun onJsAlert(webView: WebView, url: String?, message: String?, result: JsResult): Boolean = result.refuse()
-
-    override fun onJsConfirm(webView: WebView, url: String?, message: String?, result: JsResult): Boolean = result.refuse()
-
-    override fun onJsPrompt(webView: WebView, url: String?, message: String?, defaultValue: String?, result: JsPromptResult): Boolean =
-        result.refuse()
-
-    override fun onJsBeforeUnload(webView: WebView, url: String?, message: String?, result: JsResult): Boolean = result.refuse()
-
-    private fun JsResult.refuse(): Boolean {
-        cancel()
-        return true
     }
 
     private companion object {

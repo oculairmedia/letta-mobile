@@ -29,7 +29,8 @@ class PluginViewHostsTest {
         assertNotNull(renderers.registeredFor("ext:letta.example/widget"))
         assertNull(renderers.registeredFor("ext:letta.example/plain"))
         assertNull(renderers.registeredFor("ext:letta.other/widget"))
-        assertEquals(PluginElementRenderers.Core.prefixes, PluginViewHosts.register(PluginElementRenderers.Core, emptyList(), environment).prefixes)
+        val none = PluginViewHosts.register(PluginElementRenderers.Core, emptyList(), environment)
+        assertEquals(PluginElementRenderers.Core.prefixes, none.prefixes)
     }
 
     @Test

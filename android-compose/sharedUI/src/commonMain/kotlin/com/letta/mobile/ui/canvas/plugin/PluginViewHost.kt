@@ -91,7 +91,8 @@ fun PluginLiveCard(
         shadowElevation = LettaDimens.Space.xs,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            PluginCardHeader(title = title, icon = pluginIcon(view.element.fallback.icon), handle = chrome.moveHandle, touch = LocalCanvasCompact.current)
+            val icon = pluginIcon(view.element.fallback.icon)
+            PluginCardHeader(title = title, icon = icon, handle = chrome.moveHandle, touch = LocalCanvasCompact.current)
             content(Modifier.weight(1f).fillMaxWidth())
         }
     }

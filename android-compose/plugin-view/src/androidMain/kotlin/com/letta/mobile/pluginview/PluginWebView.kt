@@ -128,7 +128,7 @@ internal class PluginWebView(
 
     /** The page finished loading: hand it its end of the channel, once. */
     fun onPageFinished(url: String?) {
-        if (url != policy.pageUrl || port.isCompleted || closed) return
+        if (!awaitsHandshake(url)) return
         val (host, page) = webView.createWebMessageChannel()
         host.setWebMessageCallback(object : WebMessagePort.WebMessageCallback() {
             override fun onMessage(port: WebMessagePort, message: WebMessage?) {
@@ -139,6 +139,9 @@ internal class PluginWebView(
         hostPort = host
         port.complete(host)
     }
+
+    /** Whether [url] is the page having loaded while it has no channel yet. */
+    private fun awaitsHandshake(url: String?): Boolean = url == policy.pageUrl && !port.isCompleted && !closed
 
     private suspend fun deliverToPage() {
         val host = port.await()

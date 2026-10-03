@@ -34,7 +34,8 @@ sealed interface PluginPageRequest {
  */
 class PluginPagePolicy(private val spec: PluginViewSpec) {
     /** Where the page is loaded from. */
-    val pageUrl: String = "https://$PAGE_HOST/" + listOf(spec.pluginId, spec.pluginVersion, spec.pageId).joinToString("/", transform = ::pathSegment)
+    val pageUrl: String = "https://$PAGE_HOST/" +
+        listOf(spec.pluginId, spec.pluginVersion, spec.pageId).joinToString("/", transform = ::pathSegment)
 
     private val allowed: List<PluginOrigin> = with(spec.page.csp) { connectDomains + resourceDomains + frameDomains }
         .mapNotNull(PluginOrigin::parse)
@@ -89,8 +90,12 @@ class PluginPagePolicy(private val spec: PluginViewSpec) {
             else -> null
         }
 
+        /** [text] as one URL path segment: unreserved characters as they are, every other byte percent-encoded. */
         private fun pathSegment(text: String): String = text.map { char ->
-            if (SAFE_PATH.matches(char.toString())) char.toString() else char.toString().encodeToByteArray().joinToString("") { "%" + it.toUByte().toString(16).padStart(2, '0') }
+            val single = char.toString()
+            if (SAFE_PATH.matches(single)) single else single.encodeToByteArray().joinToString("", transform = ::percent)
         }.joinToString("")
+
+        private fun percent(byte: Byte): String = "%" + byte.toUByte().toString(16).uppercase().padStart(2, '0')
     }
 }

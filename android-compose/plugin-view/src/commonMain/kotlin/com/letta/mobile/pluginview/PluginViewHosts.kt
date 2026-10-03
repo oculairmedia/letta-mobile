@@ -19,11 +19,15 @@ object PluginViewHosts {
      * element is still drawn by its fallback card while no host is provided, the host is offline,
      * or its page cannot be shown.
      */
-    fun register(renderers: PluginElementRenderers, plugins: List<PluginViewPlugin>, environment: PluginViewEnvironment): PluginElementRenderers =
+    fun register(
+        renderers: PluginElementRenderers,
+        plugins: List<PluginViewPlugin>,
+        environment: PluginViewEnvironment,
+    ): PluginElementRenderers =
         plugins.fold(renderers) { registered, plugin ->
             plugin.livePages.entries.fold(registered) { withKinds, (kind, pageId) ->
-                val page = LivePage(plugin, kind, pageId)
-                withKinds.register(page.elementType) { view, chrome -> LivePluginElement(page, environment, view, chrome) }
+                val binding = LiveBinding(LivePage(plugin, kind, pageId), environment)
+                withKinds.register(binding.page.elementType) { view, chrome -> LivePluginElement(binding, view, chrome) }
             }
         }
 }

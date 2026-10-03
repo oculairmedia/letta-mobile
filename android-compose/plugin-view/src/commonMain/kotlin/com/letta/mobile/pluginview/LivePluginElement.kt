@@ -29,6 +29,10 @@ internal data class LivePage(val plugin: PluginViewPlugin, val kind: String, val
     val elementType: String get() = plugin.manifest.elementType(kind)
 }
 
+/** One live renderer's inputs: the [page] it shows and the board's [environment]. */
+@Immutable
+internal data class LiveBinding(val page: LivePage, val environment: PluginViewEnvironment)
+
 /**
  * The live renderer of every plugin element kind with a page (letta-mobile-s416w.13): the element
  * drawn by the provided [PluginViewHost] inside the card's frame, or by its fallback card when no
@@ -36,22 +40,17 @@ internal data class LivePage(val plugin: PluginViewPlugin, val kind: String, val
  * prefix also matches longer kind names).
  */
 @Composable
-internal fun LivePluginElement(page: LivePage, environment: PluginViewEnvironment, view: PluginElementView, chrome: PluginElementChrome) {
-    if (view.element.type != page.elementType || !environment.online) {
+internal fun LivePluginElement(binding: LiveBinding, view: PluginElementView, chrome: PluginElementChrome) {
+    if (view.element.type != binding.page.elementType || !binding.environment.online) {
         PluginFallbackCard(view, chrome)
         return
     }
-    PluginViewSlot(view, chrome) { host -> HostedPluginElement(host, page, environment, view, chrome) }
+    PluginViewSlot(view, chrome) { host -> HostedPluginElement(host, binding, view, chrome) }
 }
 
 @Composable
-private fun HostedPluginElement(
-    host: PluginViewHost,
-    page: LivePage,
-    environment: PluginViewEnvironment,
-    view: PluginElementView,
-    chrome: PluginElementChrome,
-) {
+private fun HostedPluginElement(host: PluginViewHost, binding: LiveBinding, view: PluginElementView, chrome: PluginElementChrome) {
+    val (page, environment) = binding
     val element = ViewElement.of(view.element)
     val context = rememberViewContext(page, environment, element)
     val uriHandler = LocalUriHandler.current
@@ -73,7 +72,8 @@ private fun HostedPluginElement(
 private fun sessionOf(spec: PluginViewSpec, bridgeHost: CanvasViewBridgeHost, environment: PluginViewEnvironment): PluginViewSession {
     val channel = PluginPageChannel()
     val services = ViewBridgeServices(bridgeHost, environment.transport, environment.links, environment.consent)
-    return PluginViewSession(ViewBridge(spec, channel, services), channel, environment.transport, environment.granted[spec.pluginId].orEmpty())
+    val granted = environment.granted[spec.pluginId].orEmpty()
+    return PluginViewSession(ViewBridge(spec, channel, services), channel, environment.transport, granted)
 }
 
 /** What `host.context` says right now: the board's theme and colours, the element, the plugin's public settings. */

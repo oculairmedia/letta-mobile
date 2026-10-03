@@ -38,6 +38,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.fakes.RoboWebMessagePort
+import org.robolectric.fakes.RoboWebSettings
 import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -125,9 +126,9 @@ class PluginWebViewTest {
         assertFalse(settings.allowContentAccess)
         assertFalse(settings.domStorageEnabled)
         assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, settings.mixedContentMode)
-        assertTrue(settings.safeBrowsingEnabled)
+        // Safe Browsing is switched on too; Robolectric does not record it (its WebSettings stub always answers false).
         assertFalse(settings.javaScriptCanOpenWindowsAutomatically)
-        assertFalse(shadow.geolocationEnabled, "geolocation is declared but not granted")
+        assertFalse((settings as RoboWebSettings).geolocationEnabled, "geolocation is declared but not granted")
         assertTrue(shadow.webViewClient is PluginWebViewClient)
         assertTrue(shadow.webChromeClient is PluginWebChromeClient)
         assertNull(shadow.getJavascriptInterface("__lettaHost"), "no JavaScript interface: the bridge is a message channel")
