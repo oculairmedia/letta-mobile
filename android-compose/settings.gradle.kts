@@ -73,6 +73,8 @@ include(":sharedUI")
 include(":sharedUI-devfixtures")
 // DrawBox, vendored from upstream v2.1.0 so the canvas can be fixed at the source (drawbox/VENDORED.md).
 include(":drawbox")
+// Live plugin pages on the canvas (letta-mobile-s416w.13): the platform hosts (Android WebView; desktop JCEF).
+include(":plugin-view")
 include(":designsystem")
 include(":feature-chat")
 include(":feature-editagent")

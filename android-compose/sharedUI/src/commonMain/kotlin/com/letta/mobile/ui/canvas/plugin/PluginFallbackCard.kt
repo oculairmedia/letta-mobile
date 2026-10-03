@@ -134,7 +134,7 @@ internal fun badgesOf(view: PluginElementView): List<PluginCardBadge> = buildLis
 }
 
 @Composable
-private fun PluginCardHeader(title: String, icon: ImageVector, handle: Modifier, touch: Boolean) {
+internal fun PluginCardHeader(title: String, icon: ImageVector, handle: Modifier, touch: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

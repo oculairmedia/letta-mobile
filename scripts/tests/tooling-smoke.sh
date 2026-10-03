@@ -134,7 +134,11 @@ fi
 # (letta-mobile-o4ygk), so a gate change may update it alongside the stack.
 stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|android-compose/architecture-tests/src/.*|android-compose/build-logic/src/(main|test)/kotlin/com/letta/mobile/architecture/.*|android-compose/build-logic/src/test/resources/fixtures/.*|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|tools/architecture_query/.*)$'
 stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/ci-policy-scripts-test\.sh|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$'
-if ! printf '%s\n' "$changed_files" | rg -q "$stack_touch_pattern"; then
+# Module-boundary *IsolationTest.kt files pin each module's allowed edges; adding
+# a module needs its isolation test in the same PR, so they never count as a
+# stack touch.
+stack_candidates=$(printf '%s\n' "$changed_files" | rg -v '^android-compose/architecture-tests/src/.*IsolationTest\.kt$' || true)
+if ! printf '%s\n' "$stack_candidates" | rg -q "$stack_touch_pattern"; then
   pass 'Code-intelligence stack changes stay within declared boundaries'
 elif printf '%s\n' "$changed_files" | rg -v "$stack_allowlist_pattern" | rg -q .; then
   fail 'Code-intelligence stack changes stay within declared boundaries'

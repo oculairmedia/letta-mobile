@@ -209,6 +209,7 @@ dependencies {
     kover(project(":core:android-data"))
     kover(project(":sharedLogic"))
     kover(project(":sharedUI"))
+    kover(project(":plugin-view"))
     kover(project(":designsystem"))
     kover(project(":feature-chat"))
     kover(project(":feature-editagent"))
