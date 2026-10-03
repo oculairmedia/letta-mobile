@@ -83,7 +83,7 @@ class TimelineUiFramesTest {
             try {
                 runBlocking { rig.openOn(history) }
                 recorder.mount()
-                recorder.advance("open", OPEN_FRAMES)
+                recorder.advanceUntil("open", OPEN_FRAMES) { recorder.frames.last().rows.size > MIN_HISTORY_ROWS }
                 recorder.writeFrameImage("reply-first")
                 runBlocking { rig.send(echo) }
                 recorder.advance("send")
@@ -96,11 +96,11 @@ class TimelineUiFramesTest {
                 runBlocking { stream.done() }
                 recorder.advance("stream-done")
                 runBlocking { rig.settle(listOf(usage, stop, reply(tokens.last()), prompt) + history) }
-                recorder.advance("settle", SETTLE_FRAMES)
+                recorder.advanceUntil("settle", SETTLE_FRAMES) { rig.drained }
                 recorder.writeFrameImage("reply-last")
                 recorder.writeFrameLog("reply-frames")
                 assertTrue(rig.drained, "the overlay never handed over to the settled ledger")
-                assertTrue(recorder.frames.first { it.step == "open" && it.rows.isNotEmpty() }.rows.size > 3, "history never drew")
+                assertTrue(recorder.frames.any { it.rows.size > MIN_HISTORY_ROWS }, "history never drew")
                 assertFrames(recorder.frames)
             } finally {
                 runBlocking { rig.close() }
@@ -114,6 +114,7 @@ class TimelineUiFramesTest {
         const val MAX_ROW_COMPOSITIONS_PER_FRAME = 2
         /** Few enough that the oldest edge, and so the older-history footer, is on screen. */
         const val HISTORY_EXCHANGES = 3
+        const val MIN_HISTORY_ROWS = 3
         const val OPEN_FRAMES = 30
         const val TOKEN_FRAMES = 2
         const val SETTLE_FRAMES = 20

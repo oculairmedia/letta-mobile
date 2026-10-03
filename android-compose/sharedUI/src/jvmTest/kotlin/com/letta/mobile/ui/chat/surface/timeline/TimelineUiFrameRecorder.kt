@@ -82,6 +82,19 @@ internal class TimelineUiFrameRecorder(
         }
     }
 
+    /**
+     * Advances at least [minFrames] frames of [step], then keeps going until [done] holds: a slow
+     * machine takes more frames to the same place, and the frames in between are still recorded.
+     */
+    fun advanceUntil(step: String, minFrames: Int, done: () -> Boolean) {
+        advance(step, minFrames)
+        var extra = 0
+        while (!done()) {
+            check(extra++ < MAX_EXTRA_FRAMES) { "$step never finished; last frame: ${recorded.last()}" }
+            advance(step, 1)
+        }
+    }
+
     private fun record(step: String) {
         var frame: UiFrame? = null
         test.runOnIdle { frame = observe(step) }
@@ -136,6 +149,7 @@ internal class TimelineUiFrameRecorder(
         const val FRAME_MILLIS = 16L
         const val FRAMES_PER_STEP = 6
         private const val REAL_MILLIS_PER_FRAME = 12L
+        private const val MAX_EXTRA_FRAMES = 500
         private const val FOOTER_LOADING_KEY = "canonical-loading"
         private val SPINNER_TAGS = listOf(ChatTimelineTags.SKELETON, TimelineMascotTags.LOADING)
     }
