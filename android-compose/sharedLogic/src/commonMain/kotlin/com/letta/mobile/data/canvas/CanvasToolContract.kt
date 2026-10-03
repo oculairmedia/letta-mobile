@@ -82,7 +82,8 @@ object CanvasToolContract {
     val getScene = CanvasToolDefinition(
         GET_SCENE,
         "Get a canvas's current scene (DrawBox JSON) and revision. With no canvas_id, reads the canvas of the " +
-            "conversation you are in. The result's schema_hint summarises the element format.",
+            "conversation you are in. The result's schema_hint summarises the element format; plugin_elements " +
+            "lists the plugin elements on it (change them with $APPLY_OPS set_plugin_element).",
         objectSchema(canvasIdParam),
     )
 

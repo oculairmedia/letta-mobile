@@ -57,13 +57,13 @@ internal class FakeChatSessionPort : ChatSessionPort {
 
         override fun rerun(message: UiMessage) = Unit
 
-        override fun submitApproval(requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) = Unit
+        override fun submitApproval(answer: ChatApprovalAnswer) = Unit
 
         override fun submitA2uiAction(action: A2uiAction) = Unit
 
-        override fun dismissA2uiSurface(surfaceId: String) = Unit
+        override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit
 
-        override fun markA2uiSnackbarShown(id: Long) = Unit
+        override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
 
         override fun cancelQueuedSend(id: QueuedSendId) = Unit
 
@@ -71,15 +71,15 @@ internal class FakeChatSessionPort : ChatSessionPort {
 
         override fun resumeSendQueue() = Unit
 
-        override fun toggleRunCollapsed(runId: String) = Unit
+        override fun toggleRunCollapsed(runId: ChatRunId) = Unit
 
-        override fun toggleReasoningExpanded(messageId: String) = Unit
+        override fun toggleReasoningExpanded(messageId: ChatMessageId) = Unit
 
         override fun loadOlderMessages() = Unit
 
         override fun releaseOlderMessages() = Unit
 
-        override fun expandTruncatedToolResult(messageId: String) = Unit
+        override fun expandTruncatedToolResult(messageId: ChatMessageId) = Unit
 
         override fun retryLoad() = Unit
 
@@ -87,9 +87,9 @@ internal class FakeChatSessionPort : ChatSessionPort {
 
         override fun setFontScale(scale: Float) = Unit
 
-        override fun selectModel(handle: String, effort: ReasoningEffortChoice) = Unit
+        override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = Unit
 
-        override fun changeWorkingDirectory(path: String) = Unit
+        override fun changeWorkingDirectory(directory: ChatWorkingDirectory) = Unit
 
         override fun updateSearchQuery(query: String) = Unit
 

@@ -59,14 +59,7 @@ object HostCanvasTools {
 
     private suspend fun getScene(backend: HostCanvasBackend, entry: HostCanvasEntry): ExternalToolResult {
         val scene = backend.scene(entry)
-        return success(
-            CanvasGetSceneResult(
-                sceneJson = scene.sceneJson,
-                revision = scene.revision,
-                canvasId = entry.canvasId,
-                schemaHint = CanvasSceneSchema.hint,
-            ),
-        )
+        return success(CanvasSceneRead.result(scene.sceneJson, scene.revision, entry.canvasId))
     }
 
     private suspend fun create(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {

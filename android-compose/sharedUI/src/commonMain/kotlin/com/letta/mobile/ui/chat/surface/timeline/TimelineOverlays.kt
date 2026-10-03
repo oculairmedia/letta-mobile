@@ -51,6 +51,8 @@ import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.render.A2uiActionSnackbarUi
 import com.letta.mobile.ui.chat.render.ChatSnackbarDuration
 import com.letta.mobile.ui.chat.render.GoalStatusUi
+import com.letta.mobile.ui.chat.session.A2uiSnackbarId
+import com.letta.mobile.ui.chat.session.A2uiSurfaceId
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.icons.LettaIcons
@@ -79,7 +81,7 @@ internal fun A2uiSurfaceStack(
     ) {
         ordered.forEach { surface ->
             key(surface.surfaceId) {
-                DismissibleA2uiSurface(surface.surfaceId, actions::dismissA2uiSurface) {
+                DismissibleA2uiSurface(surface.surfaceId, { id -> actions.dismissA2uiSurface(A2uiSurfaceId(id)) }) {
                     A2uiSurfaceRenderer(
                         surface = surface,
                         modifier = Modifier.fillMaxWidth(),
@@ -125,7 +127,7 @@ internal fun A2uiSnackbarEffect(
             actionLabel = shown.actionLabel,
             duration = shown.duration.toMaterial(),
         )
-        currentActions.markA2uiSnackbarShown(shown.id)
+        currentActions.markA2uiSnackbarShown(A2uiSnackbarId(shown.id))
         val retry: A2uiAction? = shown.retryAction
         if (result == SnackbarResult.ActionPerformed && retry != null) currentActions.submitA2uiAction(retry)
     }

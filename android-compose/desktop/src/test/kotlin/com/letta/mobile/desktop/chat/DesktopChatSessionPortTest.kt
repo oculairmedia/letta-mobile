@@ -11,6 +11,8 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.session.ChatMessageId
+import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
@@ -92,13 +94,13 @@ class DesktopChatSessionPortTest {
     fun timelineToggleStateLivesInTheAdapter() = runTest {
         val (controller, port) = startedPort()
 
-        port.actions.toggleRunCollapsed("run-1")
-        port.actions.toggleReasoningExpanded("msg-1")
+        port.actions.toggleRunCollapsed(ChatRunId("run-1"))
+        port.actions.toggleReasoningExpanded(ChatMessageId("msg-1"))
         runCurrent()
         assertEquals(setOf("run-1"), port.uiState.value.collapsedRunIds)
         assertEquals(setOf("msg-1"), port.uiState.value.expandedReasoningMessageIds)
 
-        port.actions.toggleRunCollapsed("run-1")
+        port.actions.toggleRunCollapsed(ChatRunId("run-1"))
         runCurrent()
         assertTrue(port.uiState.value.collapsedRunIds.isEmpty())
 
