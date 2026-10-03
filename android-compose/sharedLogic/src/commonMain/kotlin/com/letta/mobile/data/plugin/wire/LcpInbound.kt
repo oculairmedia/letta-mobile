@@ -114,23 +114,15 @@ internal class LcpInbound(
     private suspend fun execute(call: InboundCall): JsonRpcMessage {
         val outcome = try {
             JsonRpcMessage.Success(call.id, withTimeout(deadlineOf(call.method)) { call.handler.handle(call.params) })
-        } catch (_: TimeoutCancellationException) {
-            failure(call, LcpErrorCode.DEADLINE_EXCEEDED, "${call.method.wire} passed its deadline")
-        } catch (e: LcpCallException) {
-            JsonRpcMessage.Failure(call.id, e.error)
         } catch (e: CancellationException) {
-            if (!calls.wasCancelledByRemote(call.id)) throw e
-            failure(call, LcpErrorCode.REQUEST_CANCELLED, "${call.method.wire} was cancelled")
-        } catch (e: IllegalArgumentException) {
-            failure(call, LcpErrorCode.INVALID_PARAMS, e.message ?: "invalid params")
+            if (e !is TimeoutCancellationException && !calls.wasCancelledByRemote(call.id)) throw e
+            JsonRpcMessage.Failure(call.id, errorFor(call.method, e))
         } catch (e: Exception) {
-            failure(call, LcpErrorCode.INTERNAL_ERROR, e.message ?: "the handler failed")
+            JsonRpcMessage.Failure(call.id, errorFor(call.method, e))
         }
         config.guard.completed(call.method, outcome is JsonRpcMessage.Success)
         return outcome
     }
-
-    private fun failure(call: InboundCall, code: Int, message: String) = JsonRpcMessage.Failure(call.id, JsonRpcError(code, message))
 
     private suspend fun onNotification(side: LcpSide, notification: JsonRpcMessage.Notification) {
         val method = LcpMethod.of(notification.method)?.takeIf { it.direction.deliversTo(side) && !it.isRequest } ?: return
@@ -164,4 +156,13 @@ internal class LcpInbound(
     private companion object {
         const val NOTIFICATION_QUEUE = 256
     }
+}
+
+/** The error that answers a request of [method] whose handler ended with [cause]. */
+internal fun errorFor(method: LcpMethod, cause: Exception): JsonRpcError = when (cause) {
+    is TimeoutCancellationException -> JsonRpcError(LcpErrorCode.DEADLINE_EXCEEDED, "${method.wire} passed its deadline")
+    is CancellationException -> JsonRpcError(LcpErrorCode.REQUEST_CANCELLED, "${method.wire} was cancelled")
+    is LcpCallException -> cause.error
+    is IllegalArgumentException -> JsonRpcError(LcpErrorCode.INVALID_PARAMS, cause.message ?: "invalid params")
+    else -> JsonRpcError(LcpErrorCode.INTERNAL_ERROR, cause.message ?: "the handler failed")
 }
