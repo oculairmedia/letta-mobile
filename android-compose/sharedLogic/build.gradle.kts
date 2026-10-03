@@ -86,6 +86,8 @@ kotlin {
             dependencies {
                 api(project(":core:ids"))
                 api(project(":core:runtime"))
+                // The canvas plugin SPI and its LCP wire DTOs (letta-mobile-s416w.26): KMP -> KMP.
+                api(project(":plugin-api"))
                 api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api(libs.kotlinx.serialization.json)

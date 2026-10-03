@@ -1,0 +1,31 @@
+{
+  "manifestVersion": 1,
+  "id": "letta.sample",
+  "name": "Sample",
+  "version": "1.0.0",
+  "publisher": "letta",
+  "contract": { "version": 1 },
+  "runtime": { "kind": "jvm", "jar": "plugin.jar", "entry": "com.letta.mobile.plugin.testkit.SamplePlugin" },
+  "settings": {
+    "greeting": { "type": "string", "default": "hello", "label": "Greeting" }
+  },
+  "secrets": [ { "name": "apiToken", "label": "API token" } ],
+  "capabilities": ["canvas:place", "canvas:read", "assets:write", "net:connect"],
+  "net": { "connect": ["https://api.sample.test"] },
+  "elements": {
+    "card": {
+      "schemaVersion": 2,
+      "props": { "type": "object", "additionalProperties": false, "properties": {
+        "label": { "type": "string", "maxLength": 64 },
+        "status": { "enum": ["idle", "done"] } } },
+      "defaultSize": { "width": 240, "height": 160 }
+    }
+  },
+  "actions": {
+    "place": { "description": "Place a card", "visibility": ["agent"],
+               "input": { "type": "object", "additionalProperties": false, "required": ["label"],
+                          "properties": { "label": { "type": "string", "maxLength": 64 } } } },
+    "echo": { "description": "Say something back", "visibility": ["agent", "view"],
+              "input": { "type": "object", "additionalProperties": false, "properties": { "text": { "type": "string" } } } }
+  }
+}
