@@ -100,10 +100,6 @@ import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBoundsForElement
 import io.ak1.drawbox.domain.model.rotateAround
 import io.ak1.drawbox.domain.model.topmostHit
-import io.ak1.drawbox.domain.model.textTopLeft
-import io.ak1.drawbox.domain.model.textBox
-import io.ak1.drawbox.domain.model.resolvedTextColor
-import io.ak1.drawbox.domain.model.canHoldText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -944,7 +940,7 @@ fun DrawBox(
                     }) {
                         orderedElements.forEach { el ->
                             if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
+                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds, state.bgColor)
                             }
                         }
                     }
@@ -966,7 +962,7 @@ fun DrawBox(
             }) {
                 if (activeIds.isNotEmpty()) {
                     orderedElements.forEach { el ->
-                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds)
+                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds, state.bgColor)
                     }
                 }
                 drawSelectionChrome(
@@ -1010,7 +1006,7 @@ fun DrawBox(
                         translate(vp.offset.x, vp.offset.y)
                         scale(vp.scale, vp.scale, pivot = Offset.Zero)
                     }) {
-                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale) }
+                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale, chip = state.bgColor) }
                     }
                 }
                 capturePending = false
@@ -1078,6 +1074,7 @@ fun DrawingPreview(
                         textCache = textCache,
                         textMeasurer = textMeasurer,
                         viewportScale = viewport.scale,
+                        chip = bgColor,
                     )
                 }
         }
@@ -1617,12 +1614,13 @@ private fun DrawScope.renderElement(
     textMeasurer: androidx.compose.ui.text.TextMeasurer? = null,
     viewportScale: Float = 1f,
     hideShapeText: Boolean = false,
+    chip: Color,
 ) {
     if (element.rotation == 0f) {
-        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
+        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText, chip)
     } else {
         withTransform({ rotate(element.rotation, pivot = element.bounds().center) }) {
-            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText)
+            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText, chip)
         }
     }
 }
@@ -1635,6 +1633,7 @@ private fun DrawScope.renderElementContent(
     textMeasurer: androidx.compose.ui.text.TextMeasurer?,
     viewportScale: Float,
     hideShapeText: Boolean = false,
+    chip: Color,
 ) {
     when (element) {
         is Element.Path -> {
@@ -1680,7 +1679,7 @@ private fun DrawScope.renderElementContent(
         }
         is Element.Shape -> {
             drawShape(element)
-            if (!hideShapeText) drawShapeText(element, textCache, textMeasurer)
+            if (!hideShapeText) drawShapeText(element, textCache, textMeasurer, chip)
         }
         is Element.Image -> {
             drawImageElement(element, imageCache, viewportScale)
@@ -1689,35 +1688,6 @@ private fun DrawScope.renderElementContent(
             drawTextElement(element, textCache, textMeasurer)
         }
     }
-}
-
-/**
- * A shape's text, wrapped to [textBox] and centred in it. Laid out through the same
- * [TextLayoutCache] as text elements, under the shape's id plus [SHAPE_TEXT_KEY]. Skipped on
- * the read-only preview path, which has no measurer.
- */
-private fun DrawScope.drawShapeText(
-    shape: Element.Shape,
-    textCache: TextLayoutCache?,
-    textMeasurer: androidx.compose.ui.text.TextMeasurer?,
-) {
-    if (shape.text.isEmpty() || !shape.canHoldText) return
-    if (textCache == null || textMeasurer == null) return
-    val box = shape.textBox()
-    val layout = textCache.layoutFor(
-        id = shape.id + SHAPE_TEXT_KEY,
-        text = shape.text,
-        fontFamilyKey = shape.fontFamilyKey,
-        fontSize = shape.fontSize,
-        alignment = shape.textAlignment,
-        wrapWidth = box.width.coerceAtLeast(1f),
-        measurer = textMeasurer,
-    )
-    drawText(
-        textLayoutResult = layout,
-        color = shape.resolvedTextColor,
-        topLeft = shape.textTopLeft(layout.size.height.toFloat()),
-    )
 }
 
 /**
@@ -2038,8 +2008,6 @@ private fun StrokeStyle.offLength(width: Float): Float = when (this) {
 
 private fun lerp(a: Offset, b: Offset, t: Float): Offset =
     Offset(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
-
-private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
 /**
  * Render a variable-width pen-pressure stroke that also respects [style].
