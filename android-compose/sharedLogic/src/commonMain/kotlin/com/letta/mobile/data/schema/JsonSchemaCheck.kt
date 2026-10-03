@@ -66,8 +66,10 @@ interface JsonSchemaHooks {
  * JSON-pointer paths the same way.
  *
  * The vocabulary is: `type` (object, array, string, boolean, integer, number, null), `properties`,
- * `required`, `additionalProperties: false`, `enum`, `pattern`, `minLength`/`maxLength`,
- * `minItems`/`maxItems`, `items`, `minimum`/`maximum`, and `anyOf`. An `anyOf` is told apart by
+ * `required`, `additionalProperties` (`false`, or a schema every undeclared field is held to, for
+ * maps), `propertyNames` (a string schema every field name is held to, refused at that field's
+ * pointer), `maxProperties`, `enum`, `pattern`, `minLength`/`maxLength`, `minItems`/`maxItems`,
+ * `items`, `minimum`/`maximum`, and `anyOf`. An `anyOf` is told apart by
  * [discriminator], a field each branch fixes to one value with a one-value `enum` (`kind`), so a
  * problem is reported against the branch that was meant; without one, the instance must match
  * some branch. Keywords outside the vocabulary are ignored.
@@ -112,9 +114,13 @@ class JsonSchemaCheck(
         private fun visitObject(node: SchemaNode, value: JsonObject) {
             val properties = node.schema["properties"]?.jsonObject ?: JsonObject(emptyMap())
             requireFields(node, value)
-            val closed = (node.schema["additionalProperties"] as? JsonPrimitive)?.booleanOrNull == false
+            countFields(node, value)
+            val additional = node.schema["additionalProperties"]
+            val closed = (additional as? JsonPrimitive)?.booleanOrNull == false
+            val names = node.schema["propertyNames"] as? JsonObject
             value.forEach { (name, child) ->
-                val childSchema = properties[name]?.jsonObject
+                val childSchema = properties[name]?.jsonObject ?: additional as? JsonObject
+                names?.let { visit(SchemaNode(it, JsonPrimitive(name), node.pointer(name))) }
                 when {
                     childSchema != null -> visit(SchemaNode(childSchema, child, node.pointer(name)))
                     closed -> out += SchemaProblem(
@@ -122,6 +128,12 @@ class JsonSchemaCheck(
                         "'$name' is not a field here; allowed: ${properties.keys.joinToString()}",
                     )
                 }
+            }
+        }
+
+        private fun countFields(node: SchemaNode, value: JsonObject) {
+            node.schema.int("maxProperties")?.takeIf { value.size > it }?.let { max ->
+                out += SchemaProblem(node.path, SchemaProblemCode.TOO_MANY_ITEMS, "at most $max fields here (got ${value.size})")
             }
         }
 
