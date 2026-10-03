@@ -1,6 +1,9 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.StreamTextFrameSource
+import com.letta.mobile.data.runtime.TurnStreamIdentity
+import com.letta.mobile.data.runtime.stampPayload
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.controller.node.iroh.ViewerFrameSink
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
@@ -124,9 +127,10 @@ class ConversationTurnFanoutTest {
         frames: List<AssistantTestFrame>,
         expected: List<String>,
     ) {
-        val accumulator = CumulativeStreamText()
+        var minted = 0
+        val identity = TurnStreamIdentity("turn-1") { "lm-${++minted}" }
         val actual = frames.map { frame ->
-            assistantContent(accumulator.applyToRawFrame(assistantFrame(frame), source))
+            assistantContent(checkNotNull(identity.stamp(assistantFrame(frame), source)))
         }
         assertEquals(expected, actual)
     }
@@ -184,10 +188,13 @@ class ConversationTurnFanoutTest {
         fanout: ConversationTurnFanout,
         drafts: List<RuntimeEventPayload>,
     ) {
-        for (payload in drafts) {
-            if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) continue
-            if (fanout.isFailureOrCancelLifecycle(payload)) fanout.flushOpenToolCalls()
-            fanout.onDraft(payload)
+        var minted = 0
+        val identity = TurnStreamIdentity("turn-1") { "lm-${++minted}" }
+        for (draft in drafts) {
+            if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(draft)) continue
+            if (fanout.isFailureOrCancelLifecycle(draft)) fanout.flushOpenToolCalls()
+            // The stamp the turn's TurnDraftProcessor applies before the fanout sees a draft.
+            identity.stampPayload(draft)?.let { fanout.onDraft(it) }
         }
     }
 
@@ -227,12 +234,13 @@ class ConversationTurnFanoutTest {
             val keys = frames.map { it["idempotency_key"]!!.jsonPrimitive.content }
             assertEquals(keys.toSet().size, keys.size, "$who idempotency_key unique")
             assertTrue(keys.all { it.startsWith("iroh-delta-") }, "$who idempotency_key format")
-            // cm-stream tag applied to assistant deltas (h30cy dedup).
-            val assistantIds = frames.mapNotNull {
-                it["delta"]?.jsonObject?.get("id")?.jsonPrimitive?.content
-            }.filter { it.startsWith("cm-stream-") }
-            assertEquals(2, assistantIds.size, "$who cm-stream tagged assistant deltas")
-            assertTrue(assistantIds.all { it == "cm-stream-otid-1" }, "$who cm-stream id")
+            // Identity stamped once by TurnStreamIdentity; delta.id is no longer rewritten.
+            val assistantDeltas = frames.mapNotNull { it["delta"]?.jsonObject }
+                .filter { it["message_type"]?.jsonPrimitive?.content == "assistant_message" }
+            assertEquals(2, assistantDeltas.size, "$who assistant deltas")
+            assertEquals(1, assistantDeltas.map { it["logical_message_id"]?.jsonPrimitive?.content }.toSet().size, "$who one logical id")
+            assertEquals(listOf("1", "2"), assistantDeltas.map { it["text_seq"]?.jsonPrimitive?.content }, "$who text_seq")
+            assertTrue(assistantDeltas.all { it["id"]?.jsonPrimitive?.content == "letta-msg-1" }, "$who id untouched")
             // Cumulative accumulation: last assistant delta carries full text.
             val assistantContents = frames.mapNotNull {
                 val d = it["delta"]?.jsonObject ?: return@mapNotNull null
@@ -305,7 +313,7 @@ class ConversationTurnFanoutTest {
     @Test
     fun longerChunkThatContainsTheReplyReplacesIt() = runTest {
         assertAccumulatedText(
-            source = StreamTextFrameSource.AppServerDelta,
+            source = StreamTextFrameSource.CumulativeSnapshot,
             frames = listOf(
                 AssistantTestFrame("a", "overlap-1", "otid-overlap"),
                 AssistantTestFrame("aa", "overlap-2", "otid-overlap"),
@@ -315,12 +323,12 @@ class ConversationTurnFanoutTest {
     }
 
     @Test
-    fun appServerSnapshotsOfOneReplyDoNotStack() = runTest {
+    fun snapshotsOfOneReplyDoNotStack() = runTest {
         val prefix = "I downloaded the latest production APK, v0.19.0"
         val mid = "$prefix, but couldn't install it. Reconnecting to 192.168.50.234:555"
         val full = "$mid" + "5 returned \"No route to host.\""
         assertAccumulatedText(
-            source = StreamTextFrameSource.AppServerDelta,
+            source = StreamTextFrameSource.CumulativeSnapshot,
             frames = listOf(
                 AssistantTestFrame(prefix, "apk-1", otid = "reply-1", runId = "run-apk"),
                 AssistantTestFrame(mid, "apk-2", otid = "reply-1", runId = "run-apk"),
@@ -344,9 +352,9 @@ class ConversationTurnFanoutTest {
 
     /**
      * letta-mobile-64ies: rotating per-fragment `id` values without otid used
-     * to create one byKey entry per fragment. With run_id present, fragments of
-     * one run share one body. A longer chunk that already contains that body
-     * replaces it; a chunk that does not ("H") still appends.
+     * to create one byKey entry per fragment. Fragments of one message (no ids
+     * beyond the rotating `id`, no tool/other frame between them) share one logical
+     * message, and every chunk appends.
      */
     @Test
     fun rotatingFragmentIdsWithoutOtidAccumulateUnderRunId() = runTest {
@@ -360,7 +368,7 @@ class ConversationTurnFanoutTest {
                     runId = "run-64ies",
                 ),
                 AssistantTestFrame(
-                    content = "Hey.",
+                    content = ".",
                     idempotencyKey = "frag-b",
                     id = "cm-stream-b",
                     runId = "run-64ies",
@@ -464,7 +472,7 @@ class ConversationTurnFanoutTest {
                 ?: return@mapNotNull null
             bodyDelta["content"]?.jsonPrimitive?.content
         }
-        assertEquals(listOf("same", "same"), assistantContents)
+        assertEquals(listOf("same"), assistantContents)
     }
 
     @Test

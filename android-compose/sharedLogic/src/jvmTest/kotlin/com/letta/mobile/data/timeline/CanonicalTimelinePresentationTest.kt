@@ -248,7 +248,7 @@ class CanonicalTimelinePresentationTest {
     }
 
     private fun contents(items: List<ChatRenderItem>) =
-        items.map { (it as ChatRenderItem.Single).message.content }
+        items.flatMap { item -> item.messageRows().asReversed().map { it.content } }
 
     private fun thoughtCount(items: List<ChatRenderItem>) = items.count { item ->
         (item as? ChatRenderItem.Single)?.message?.isReasoning == true

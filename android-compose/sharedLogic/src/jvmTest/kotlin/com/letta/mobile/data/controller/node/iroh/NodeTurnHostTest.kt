@@ -68,9 +68,9 @@ class NodeTurnHostTest {
             tracker = tracker,
             parkedTerminals = parked,
         ) {
-            // Stands in for controller.runTurn(command).collect { fanout.onDraft(...) }.
+            // Stands in for controller.runTurn(command).collect { fanout.onStampedDraft(...) }.
             try {
-                for (payload in drafts) fanout.onDraft(payload)
+                for (payload in drafts) fanout.onStampedDraft(payload)
             } catch (cancelled: CancellationException) {
                 scripted.collectorCancelled = true
                 throw cancelled

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.runtime.StreamTextFrameSource
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -10,12 +11,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-
-/** Identifies whether a text frame contains a provider delta or a complete snapshot. */
-internal enum class StreamTextFrameSource {
-    AppServerDelta,
-    CumulativeSnapshot,
-}
 
 /**
  * Collapses streamed assistant and reasoning text into one cumulative body per

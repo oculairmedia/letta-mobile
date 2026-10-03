@@ -529,6 +529,7 @@ private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (bran
     // letta-mobile-k9y5d: surface snapshot collisions resolved by keeping the
     // longer text so the replay-garble path stays observable in telemetry.
     StreamTextMergeBranch.SNAPSHOT_CONFLICT -> "streamSubscriber.snapshotConflictKeptLonger"
+    StreamTextMergeBranch.SNAPSHOT_REWRITE -> "streamSubscriber.snapshotRewriteReplaced"
     StreamTextMergeBranch.EMPTY_INCOMING,
     StreamTextMergeBranch.EQUAL,
     StreamTextMergeBranch.APPEND -> null

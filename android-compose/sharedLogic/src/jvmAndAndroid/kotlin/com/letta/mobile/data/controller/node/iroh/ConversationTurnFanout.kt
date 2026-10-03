@@ -61,14 +61,13 @@ internal class ObserverWriteQueue(
 
 /**
  * eaczz.4 — the fanout core. Owns a single turn's per-connection frame-shaping
- * state (cumulative assistant text + open-tool_call tracking + terminal-dedup)
- * and fans EACH already-cumulated+tagged wire DELTA BODY out to EVERY viewer of
+ * state (open-tool_call tracking + terminal-dedup)
+ * and fans EACH already-stamped wire DELTA BODY out to EVERY viewer of
  * the turn's conversation — not just the initiator.
  *
  * Design (uniform initiator-is-just-a-viewer):
  *  - The delta body is computed ONCE, initiator-side, preserving the exact
- *    [CumulativeStreamText] accumulation, [OpenToolCallTracker] observation,
- *    cm-stream optimistic-dedup tagging, and terminal-duplicate-skip semantics
+ *    [OpenToolCallTracker] observation and terminal-duplicate-skip semantics
  *    the single-connection path had.
  *  - That one body is then published to [ConnectionRegistry.viewersFor] and each
  *    [ViewerHandle] (including the initiator's selfViewer) re-wraps it with ITS
@@ -162,7 +161,6 @@ internal class ConversationTurnFanout(
     fun detachInitiator() {
         initiatorDetached = true
     }
-    private val cumulativeText = CumulativeStreamText()
     private val broadcastToolSignatures = mutableSetOf<String>()
     private var terminalWritten = false
 
@@ -189,14 +187,8 @@ internal class ConversationTurnFanout(
      */
     suspend fun onDraft(payload: RuntimeEventPayload, runId: RunId? = null): Boolean {
         return when (payload) {
-            is RuntimeEventPayload.RemoteStreamFrame -> emitRawFrameBody(
-                payload.body,
-                StreamTextFrameSource.AppServerDelta,
-            )
-            is RuntimeEventPayload.ExternalTransportFrame -> emitRawFrameBody(
-                payload.body,
-                StreamTextFrameSource.CumulativeSnapshot,
-            )
+            is RuntimeEventPayload.RemoteStreamFrame -> emitRawFrameBody(payload.body)
+            is RuntimeEventPayload.ExternalTransportFrame -> emitRawFrameBody(payload.body)
             is RuntimeEventPayload.ToolCallObserved -> {
                 toolProjection.toolCall(payload, runId)?.let { broadcastToolDelta(it) }
                 false
@@ -229,7 +221,7 @@ internal class ConversationTurnFanout(
      * (its terminal `error_message`, the `stop_reason` after it), shaped like any relayed delta.
      */
     suspend fun relayServerDelta(raw: JsonObject) {
-        emitRawFrameBody(raw.toString(), StreamTextFrameSource.AppServerDelta)
+        emitRawFrameBody(raw.toString())
     }
 
     /** The turn's terminal went out from the App Server's own frames. */
@@ -247,29 +239,24 @@ internal class ConversationTurnFanout(
 
     /**
      * RemoteStreamFrame / ExternalTransportFrame path: the [body] is the FULL
-     * upstream wire frame ({type,runtime,event_seq,...,delta}). Preserve the
-     * exact single-connection shaping — observe open tool_calls, normalize text
-     * using the payload type's source contract, cm-stream tag the inner delta
-     * — then extract that inner delta body and fan IT out. Each viewer re-wraps
+     * upstream wire frame ({type,runtime,event_seq,...,delta}), already stamped
+     * by [com.letta.mobile.data.runtime.TurnStreamIdentity] (identity fields and
+     * cumulative text) inside the turn's draft processor. Observe open
+     * tool_calls, then extract the inner delta body and fan IT out unchanged. Each viewer re-wraps
      * the delta with its own event_seq + idempotency_key (uniform with the
      * synthesized paths), so the initiator's per-connection monotonic event_seq
      * semantics match what the synthesized `writeStreamDelta` produced.
      */
-    private suspend fun emitRawFrameBody(
-        body: String,
-        source: StreamTextFrameSource,
-    ): Boolean {
+    private suspend fun emitRawFrameBody(body: String): Boolean {
         openToolCalls.observe(body)
-        val cumulated = cumulativeText.applyToRawFrame(body, source)
-        val delta = innerDeltaOf(cumulated) ?: run {
+        val delta = innerDeltaOf(body) ?: run {
             // Not a stream_delta we can re-frame (e.g. usage_statistics-only or a
             // malformed body) — nothing to fan out; not a terminal.
             return false
         }
-        val tagged = tagStreamDeltaForOptimisticDedup(delta)
-        toolProjection.noteRelayed(tagged)
-        broadcastToolDeltaIfNew(tagged)
-        return deltaIsTerminal(tagged)
+        toolProjection.noteRelayed(delta)
+        broadcastToolDeltaIfNew(delta)
+        return deltaIsTerminal(delta)
     }
 
     private suspend fun broadcastToolDeltaIfNew(delta: JsonObject) {
