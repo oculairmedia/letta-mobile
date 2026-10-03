@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
+import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerChannel
@@ -13,6 +14,12 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
+import computer.iroh.Connection
+import computer.iroh.Endpoint
+import computer.iroh.EndpointOptions
+import computer.iroh.RelayMode
+import kotlinx.coroutines.CompletableDeferred
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -85,6 +92,69 @@ class IrohChannelTransportEndToEndTest {
         clientScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 
+    private suspend fun runNotebookProtocolRoutingTest(
+        createHandler: (CompletableDeferred<String>) -> IrohNodeProtocolHandler,
+    ): String {
+        val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
+        val resultPeer = CompletableDeferred<String>()
+        val server = IrohNodeEndpoint(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("other-app-server-peer")),
+            protocolHandlers = listOf(createHandler(resultPeer)),
+        )
+        val client = Endpoint.bind(EndpointOptions(relayMode = RelayMode.disabled()))
+        try {
+            server.create()
+            server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
+            val connection = client.connect(server.addr(), notebookAlpn)
+            val actualPeer = withTimeout(15.seconds) { resultPeer.await() }
+            assertEquals(
+                IrohDiagnostics.endpointIdHex(client.addr().id()),
+                actualPeer,
+            )
+            connection.close(0L, ByteArray(0))
+            return actualPeer
+        } finally {
+            client.shutdown()
+            client.close()
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun hostRoutesNotebookAlpnWithoutAppServerAuthentication() = runBlocking {
+        val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
+        val routed = runNotebookProtocolRoutingTest { acceptedPeer ->
+            object : IrohNodeProtocolHandler {
+                override val alpn = notebookAlpn
+                override fun authorize(remoteEndpointId: String) = true
+                override suspend fun accept(connection: Connection, remoteEndpointId: String) {
+                    acceptedPeer.complete(remoteEndpointId)
+                    connection.close(0L, ByteArray(0))
+                }
+            }
+        }
+        assertTrue(routed.isNotEmpty())
+    }
+
+    @Test
+    fun notebookHandlerRejectsUnauthorizedPeerWithoutCallingAccept() = runBlocking {
+        val notebookAlpn = "/letta/notebook/1".encodeToByteArray()
+        val denied = runNotebookProtocolRoutingTest { denied ->
+            object : IrohNodeProtocolHandler {
+                override val alpn = notebookAlpn
+                override fun authorize(remoteEndpointId: String): Boolean {
+                    denied.complete(remoteEndpointId)
+                    return false
+                }
+                override suspend fun accept(connection: Connection, remoteEndpointId: String) {
+                    error("Unauthorized peer reached notebook handler")
+                }
+            }
+        }
+        assertTrue(denied.isNotEmpty())
+    }
+
     @Test
     fun deviceSendOverIrohRoundTripsAssistantResponse() = runBlocking {
         val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO), authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly)
@@ -155,23 +225,10 @@ class IrohChannelTransportEndToEndTest {
      * Stub controller that starts any runtime and, on runTurn, emits a single assistant
      * stream frame followed by a Completed lifecycle — the minimal real-response shape.
      */
-    private class EchoAssistantController(private val reply: String) : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-
-        override suspend fun startRuntime(
-            agentId: AgentId,
-            conversationId: ConversationId,
-            cwd: String?,
-            mode: AppServerPermissionMode?,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = CanonicalRuntime(
-            scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value, actingUserId = null),
-            agent = null,
-            conversation = null,
-            created = null,
-        )
-
+    private class EchoAssistantController(
+        private val reply: String,
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
             emit(
                 RuntimeEventDraft(
@@ -195,21 +252,12 @@ class IrohChannelTransportEndToEndTest {
                     agentId = command.agentId,
                     conversationId = command.conversationId,
                     source = RuntimeEventSource.LocalRuntime,
-                    payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
+                    payload = RuntimeEventPayload.RunLifecycleChanged(
+                        status = RuntimeRunStatus.Completed,
+                    ),
                 ),
             )
         }
-
-        override suspend fun sync(
-            runtime: AppServerRuntimeScope,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-
-        override suspend fun abort(
-            runtime: AppServerRuntimeScope,
-            runId: String?,
-        ): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     @Test
@@ -410,10 +458,14 @@ class IrohChannelTransportEndToEndTest {
      * Controller that adds a configurable delay before emitting each turn's response,
      * simulating real LLM latency.
      */
-    private class LatentEchoController(private val delayMs: Long) : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-        override suspend fun startRuntime(agentId: AgentId, conversationId: ConversationId, cwd: String?, mode: AppServerPermissionMode?, recoverApprovals: Boolean, forceDeviceStatus: Boolean): CanonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value), agent = null, conversation = null, created = null)
-
+    /**
+     * Controller that adds a configurable delay before emitting each turn's response,
+     * simulating real LLM latency.
+     */
+    private class LatentEchoController(
+        private val delayMs: Long,
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> {
             val turnN = (command.input as? TurnInput.UserMessage)?.text?.let { t -> t.substringAfterLast('-').ifEmpty { "1" } } ?: "1"
             return flow {
@@ -423,25 +475,12 @@ class IrohChannelTransportEndToEndTest {
                 emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
             }
         }
-        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     /** Emits one assistant reply per turn, echoing the input text so each turn is distinguishable. */
-    private class PerTurnEchoController : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-        override suspend fun startRuntime(
-            agentId: AgentId,
-            conversationId: ConversationId,
-            cwd: String?,
-            mode: AppServerPermissionMode?,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = CanonicalRuntime(
-            scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value, actingUserId = null),
-            agent = null, conversation = null, created = null,
-        )
-
+    private class PerTurnEchoController(
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
             val turnText = (command.input as? TurnInput.UserMessage)?.text ?: "?"
             val n = turnText.substringAfterLast('-')
@@ -465,16 +504,12 @@ class IrohChannelTransportEndToEndTest {
                 ),
             )
         }
-
-        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     /** Emits a single excessively large frame to exercise the OOM guard line buffer. */
-    private class BigFrameController : AppServerController {
-        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
-        override suspend fun startRuntime(agentId: AgentId, conversationId: ConversationId, cwd: String?, mode: AppServerPermissionMode?, recoverApprovals: Boolean, forceDeviceStatus: Boolean): CanonicalRuntime =
-            CanonicalRuntime(scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value), agent = null, conversation = null, created = null)
+    private class BigFrameController(
+        delegate: AppServerController = FakeAppServerController(),
+    ) : AppServerController by delegate {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
             // Emit a frame larger than MAX_LINE_BYTES (1MB) to trigger the overflow guard
             val big = "x".repeat(2_000_000)
@@ -483,8 +518,6 @@ class IrohChannelTransportEndToEndTest {
             emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime,
                 payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
         }
-        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
-        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     @Test

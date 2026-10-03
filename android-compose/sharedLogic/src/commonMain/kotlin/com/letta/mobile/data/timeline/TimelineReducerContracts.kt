@@ -50,6 +50,8 @@ sealed interface TimelineMutation {
     data class RetryLocal(val otid: String) : TimelineMutation
     data class MarkLocalSent(val otid: String) : TimelineMutation
     data class MarkLocalFailed(val otid: String) : TimelineMutation
+    /** A completed turn supersedes connection-loss notices from prior turns in this conversation. */
+    data object RetireTurnFailureNotices : TimelineMutation
     data class StreamFrame(
         val message: LettaMessage,
         val agentId: String? = null,
@@ -79,6 +81,11 @@ sealed interface TimelineMutation {
         val candidateRunIds: Set<String> = emptySet(),
     ) : TimelineMutation
     data class RepairFullToolReturn(val message: ToolReturnMessage) : TimelineMutation
+    /** Fills the size-only image placeholders of row [serverId] with server-held [images]. */
+    data class RestoreImagePlaceholders(
+        val serverId: String,
+        val images: List<MessageContentPart.Image>,
+    ) : TimelineMutation
     data class AdvanceDanglingSweep(val generation: Long) : TimelineMutation
     data class SettleDanglingToolCalls(
         val generation: Long,
@@ -321,6 +328,7 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
     is TimelineMutation.RetryLocal -> reduceRetryLocal(state, mutation.otid)
     is TimelineMutation.MarkLocalSent -> reduceMarkLocalSent(state, mutation.otid)
     is TimelineMutation.MarkLocalFailed -> reduceMarkLocalFailed(state, mutation.otid)
+    TimelineMutation.RetireTurnFailureNotices -> reduceTurnFailureNoticeRetirement(state)
     is TimelineMutation.StreamFrame -> reduceStreamMutation(state, mutation)
     is TimelineMutation.SnapshotEnrichment -> reduceSnapshotEnrichment(state, mutation.messages)
     is TimelineMutation.HydrateSnapshot -> reduceHydrateMutation(state, mutation)
@@ -335,12 +343,33 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
         mutation.candidateRunIds,
     )
     is TimelineMutation.RepairFullToolReturn -> reduceFullToolReturnRepair(state, mutation.message)
+    is TimelineMutation.RestoreImagePlaceholders -> reduceImagePlaceholderRestore(state, mutation)
     is TimelineMutation.AdvanceDanglingSweep -> changedIfNeeded(
         state,
         state.copy(danglingSweepGeneration = maxOf(state.danglingSweepGeneration, mutation.generation)),
     )
     is TimelineMutation.SettleDanglingToolCalls -> reduceDanglingToolSettlement(state, mutation)
     is TimelineMutation.LifecycleReset -> changedIfNeeded(state, state.copy(lifecycleEpoch = mutation.epoch))
+}
+
+private const val TURN_FAILURE_NOTICE_ID_PREFIX = "turn-failed-"
+
+private fun reduceTurnFailureNoticeRetirement(state: TimelineReducerState): TimelineReduction {
+    val retained = state.timeline.events.filterNot { event ->
+        val confirmed = event as? TimelineEvent.Confirmed
+        confirmed?.messageType == TimelineMessageType.ERROR &&
+            confirmed.serverId.startsWith(TURN_FAILURE_NOTICE_ID_PREFIX)
+    }.toTimelinePersistentList()
+    if (retained.size == state.timeline.events.size) return unchanged(state)
+    val timeline = state.timeline.copy(
+        events = retained,
+        stablePrefixVersion = retained.stablePrefixFingerprint(),
+    )
+    return TimelineReduction(
+        next = state.copy(timeline = timeline),
+        result = TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
+        persistenceDelta = exactConfirmedDelta(state.timeline, timeline),
+    )
 }
 
 private fun reduceFullToolReturnRepair(
@@ -370,6 +399,19 @@ private fun reduceFullToolReturnRepair(
     return TimelineReduction(
         next = state.copy(timeline = nextTimeline),
         result = TimelineReductionResult.FullToolReturnRepaired(message.id, nextTimeline != state.timeline),
+    )
+}
+
+private fun reduceImagePlaceholderRestore(
+    state: TimelineReducerState,
+    mutation: TimelineMutation.RestoreImagePlaceholders,
+): TimelineReduction {
+    val next = state.timeline.withImagePlaceholdersFilled(mutation.serverId, mutation.images)
+    if (next === state.timeline) return unchanged(state)
+    return TimelineReduction(
+        next = state.copy(timeline = next),
+        result = TimelineReductionResult.Changed(TimelineChangeKind.RECONCILED),
+        persistenceDelta = exactConfirmedDelta(state.timeline, next),
     )
 }
 

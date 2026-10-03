@@ -13,6 +13,9 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
+import com.letta.mobile.data.transport.iroh.NotebookPeerProvisioning
+import java.nio.file.Path
+import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.data.DesktopCanonicalSendInstall
@@ -47,6 +50,10 @@ private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
         // d6e8g.9: reuse the persisted, vault-encrypted desktop identity so this
         // machine keeps one stable NodeId across reconnects (enables pairing).
         secretKeyStore = { com.letta.mobile.desktop.security.DesktopIrohIdentity.loadOrCreate() },
+        notebookStore = DesktopNotebookCanvasStore.notebooks,
+        notebookPeers = {
+            NotebookPeerProvisioning.read(Path.of(System.getProperty("user.home"), ".letta-mobile", "notebooks", "peers.json"))
+        },
     ).also { transport ->
         // Canvases ride beside the App Server on the same host, so every app on it shares them.
         com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.client.attach(transport.readyHandle)

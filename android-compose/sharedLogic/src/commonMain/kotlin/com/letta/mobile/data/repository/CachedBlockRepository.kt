@@ -61,6 +61,31 @@ open class CachedBlockRepository(
     override suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block =
         updateAgentBlock(target.agentId, target.label, params)
 
+    /**
+     * bfooy.5: Iroh uses the committed agent-scoped route; plain HTTP Letta has
+     * global blocks, so it creates one and attaches it to the agent.
+     */
+    override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =
+        withIrohOrRemote(
+            iroh = { it.createAgentBlock(target, value) },
+            http = {
+                remote.createBlock(BlockCreateParams(label = target.label, value = value)).also { created ->
+                    remote.attachBlock(target.agentId, created.id.value)
+                }
+            },
+        )
+
+    override suspend fun deleteAgentBlock(target: AgentBlockTarget) {
+        withIrohOrRemote(
+            iroh = { it.deleteAgentBlock(target) },
+            http = {
+                val block = remote.listBlocks(target.agentId).firstOrNull { it.label == target.label }
+                    ?: error("Block ${target.label} not found on agent ${target.agentId}")
+                remote.deleteBlock(block.id.value)
+            },
+        )
+    }
+
     override suspend fun updateGlobalBlock(
         blockId: String,
         params: BlockUpdateParams,

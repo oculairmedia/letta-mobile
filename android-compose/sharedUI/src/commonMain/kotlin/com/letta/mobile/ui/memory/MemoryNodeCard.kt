@@ -12,11 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -122,21 +125,32 @@ private fun ColumnScope.MemoryNodeBody(selection: MemoryNodeSelection, actions: 
     selection.detail.metadataLabels.takeIf { it.isNotEmpty() }?.let { labels ->
         Text(labels.joinToString("  ·  "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    if (selection.canEdit) {
+    if (selection.canEdit || selection.canDelete) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = actions::beginEdit) {
-                Icon(LettaIcons.Edit, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
-                Spacer(Modifier.size(LettaDimens.Space.sm))
-                Text("Edit")
+            if (selection.canDelete) {
+                MemoryCardAction(LettaIcons.Delete, "Delete", actions::requestDelete, MaterialTheme.colorScheme.error)
+            }
+            if (selection.canEdit) {
+                MemoryCardAction(LettaIcons.Edit, "Edit", actions::beginEdit)
             }
         }
     }
 }
 
 @Composable
+private fun MemoryCardAction(icon: ImageVector, label: String, onClick: () -> Unit, tint: Color = Color.Unspecified) {
+    TextButton(onClick = onClick) {
+        val color = tint.takeOrElse { LocalContentColor.current }
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(LettaDimens.Control.icon))
+        Spacer(Modifier.size(LettaDimens.Space.sm))
+        Text(label, color = color)
+    }
+}
+
+@Composable
 private fun ColumnScope.MemoryNodeText(text: String, monospace: Boolean) {
     val shown = text.ifBlank { "(empty)" }
-    SelectionContainer(Modifier.weight(1f, fill = false)) {
+    LettaSelectionContainer(Modifier.weight(1f, fill = false)) {
         Text(
             shown,
             style = MaterialTheme.typography.bodyMedium,

@@ -1,13 +1,19 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.compose.ComposeErrorCode
+import com.letta.mobile.data.canvas.compose.ComposePublishException
+import com.letta.mobile.data.canvas.compose.ComposeTarget
+import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import com.letta.mobile.data.controller.capability.Capability
+import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 
 private val canvasJson = Json {
@@ -19,12 +25,14 @@ private val canvasJson = Json {
 /**
  * [agentId] is the transport-authenticated caller: the runtime scope the App Server stamped on
  * the tool-call frame. It is never read from the tool input, which the model controls, so a
- * caller cannot name a different agent to read or write as it.
+ * caller cannot name a different agent to read or write as it. [kinds] are the plugin kinds whose
+ * props a plugin element write is held to.
  */
 private data class CanvasToolContext(
     val store: CanvasDocumentStore,
     val sessions: CanvasSessionRegistry,
     val agentId: String,
+    val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) {
     fun resolveCallerId(): String = agentId
 }
@@ -164,15 +172,23 @@ private suspend fun executeReplaceScene(
     }
 }
 
+/**
+ * [ops] written as the caller's, each stamped after the board's clock as the Iroh host stamps them
+ * ([CanvasStampedBatch.separately], letta-mobile-s416w.5): through the live session when the board is
+ * open, else into the store, conditional on the revision this call read.
+ */
 private suspend fun commitOpsUpdate(
-    store: CanvasDocumentStore,
+    context: CanvasToolContext,
     activeSession: CanvasSession?,
     doc: CanvasDocument,
     ops: List<CanvasOp>,
-): Long? = if (activeSession != null) {
-    activeSession.applyOps(ops).revision
-} else {
-    persistWithoutSession(store, doc, CanvasOpProjector.project(doc.sceneJson, ops))
+): Long? {
+    val callerId = context.resolveCallerId()
+    if (activeSession != null) return activeSession.applyAgentOps(ops, callerId).revision
+    val stamped = CanvasStampedBatch.separately(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) {
+        CanvasOpDiffer.generateOpId("agent")
+    }
+    return persistWithoutSession(context.store, doc, CanvasOpProjector.project(doc.sceneJson, stamped))
 }
 
 private suspend fun executeApplyOps(
@@ -180,19 +196,23 @@ private suspend fun executeApplyOps(
     input: JsonObject,
 ): ExternalToolResult {
     val opsJson = input["ops"] ?: return ExternalToolResult.Error("Missing required parameter: ops")
-    val suppliedOps = canvasJson.decodeFromJsonElement<List<CanvasOp>>(opsJson)
+    // Read as the host reads it: identity optional, embedded JSON as string or object.
+    val suppliedOps = HostCanvasToolInputs.ops(opsJson)
     return executeAuthorizedMutation(context, input) { doc, callerId, activeSession ->
         // The caller has already passed the write check; every op it sends is its own, whatever
         // actor the input named, so the log, the broadcast and scene provenance all carry it.
         val callerOps = suppliedOps.map { it.withActor(callerId) }
-        val ops = when (val checked = CanvasSceneValidator.ops(callerOps)) {
-            is CanvasOpsCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
-            is CanvasOpsCheck.Valid -> checked.ops
+        // Held to the board it lands on, as the Iroh host holds it (letta-mobile-s416w.5): a plugin
+        // element's first write must be whole, a removal must find what it removes, and props are
+        // held to the installed kinds.
+        val ops = when (val checked = CanvasBatchValidator.check(doc.sceneJson, callerOps, context.kinds)) {
+            is CanvasBatchCheck.Invalid -> return@executeAuthorizedMutation ExternalToolResult.Error(checked.message)
+            is CanvasBatchCheck.Valid -> checked.ops
         }
-        val revision = commitOpsUpdate(context.store, activeSession, doc, ops)
+        val revision = commitOpsUpdate(context, activeSession, doc, ops)
             ?: return@executeAuthorizedMutation revisionConflict(doc)
         ExternalToolResult.Success(
-            canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision))
+            canvasJson.encodeToString(CanvasApplyOpsResult(ok = true, revision = revision, canvasId = doc.id.value))
         )
     }
 }
@@ -210,7 +230,7 @@ private suspend fun dryRun(
     val ops = opsOf(input) ?: return null
     return when (val lookup = findCanvasDocument(context, input)) {
         is CanvasLookupResult.Error -> lookup.result
-        is CanvasLookupResult.Found -> CanvasAppDryRun.answer(lookup.doc, ops, context.resolveCallerId())
+        is CanvasLookupResult.Found -> CanvasAppDryRun.answer(lookup.doc, ops, context.resolveCallerId(), context.kinds)
     }
 }
 
@@ -233,11 +253,75 @@ private suspend fun executeListCanvases(
 }
 
 /**
+ * `canvas_compose` on an app's own App Server (letta-mobile-bglj6.12), the twin of the Iroh host's
+ * ([HostCanvasTools]): the canvas named by `canvas_id`, or else the caller's conversation's, held to
+ * the same read and write checks as [executeAuthorizedMutation], then [CanvasComposeHosting]
+ * compiles, checks with the batch validator and publishes through [publishComposed].
+ */
+private suspend fun executeCompose(
+    context: CanvasToolContext,
+    input: JsonObject,
+    caller: ExternalToolCaller,
+): ExternalToolResult {
+    val hosting = CanvasComposeHosting(CanvasComposeHosting.APP, caller.toolCallId)
+    val callerId = context.resolveCallerId()
+    fun refused(code: ComposeErrorCode, message: String) = hosting.refused(code, message)
+    val named = (input["canvas_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+    val canvasId = named?.let(::CanvasId)
+        ?: caller.conversationId?.let { context.store.getForConversation(it)?.id }
+        ?: return refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_CONVERSATION_CANVAS)
+    val session = context.sessions.get(canvasId)
+    val doc = session?.document?.value ?: context.store.get(canvasId)
+        ?: return refused(ComposeErrorCode.CANVAS_NOT_FOUND, "Canvas not found: ${canvasId.value}")
+    if (!canRead(doc, callerId)) {
+        return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot read canvas '${doc.id.value}'")
+    }
+    if (doc.acl != null && !doc.acl.canWrite(callerId)) {
+        return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
+    }
+    return hosting.compose(input, ComposeTarget(doc.id.value, doc.sceneJson, doc.revision)) { ops ->
+        publishComposed(context, session, doc, ops)
+    }
+}
+
+/**
+ * The checked compose batch written as ONE op ([CanvasStampedBatch]), the op the Iroh host sends
+ * its relay: through the live session when the board is open (logged, one revision, published to
+ * peers as one message), else straight into the store as `apply_ops` does, conditional on the
+ * revision this call read. Returns the revision it landed at.
+ */
+private suspend fun publishComposed(
+    context: CanvasToolContext,
+    session: CanvasSession?,
+    doc: CanvasDocument,
+    ops: List<CanvasOp>,
+): Long {
+    val callerId = context.resolveCallerId()
+    if (session != null) {
+        return try {
+            session.applyAgentBatch(ops, callerId).revision
+        } catch (e: UnauthorizedCanvasMutationException) {
+            throw ComposePublishException(ComposeErrorCode.UNAUTHORIZED, e.message ?: "Unauthorized: actor '$callerId'")
+        }
+    }
+    val batch = CanvasStampedBatch.of(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) { CanvasOpDiffer.generateOpId("agent") }
+    return persistWithoutSession(context.store, doc, CanvasOpProjector.project(doc.sceneJson, listOf(batch)))
+        ?: throw ComposePublishException(
+            ComposeErrorCode.BOARD_REFUSED,
+            "Conflict: canvas '${doc.id.value}' changed since revision ${doc.revision} was read; retry the same call",
+        )
+}
+
+private const val NO_CONVERSATION_CANVAS =
+    "Missing required parameter: canvas_id (this conversation has no canvas yet; use canvas_list or canvas_create)"
+
+/**
  * Base class for Canvas host external tools.
  */
 abstract class BaseCanvasTool(
     val store: CanvasDocumentStore,
     val sessions: CanvasSessionRegistry,
+    val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) : HostExternalTool {
     override val capability: Capability = Capability.ImageHydration
 }
@@ -255,12 +339,12 @@ private inline fun BaseCanvasTool.runWithContext(
         return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
     }
     return runCatching {
-        action(CanvasToolContext(store, sessions, agentId))
+        action(CanvasToolContext(store, sessions, agentId, kinds))
     }.getOrElse { ExternalToolResult.Error("$failurePrefix: ${it.message}") }
 }
 
 /**
- * Tool: canvas.create
+ * Tool: canvas_create
  * Creates a new canvas document or resolves an existing conversation canvas.
  */
 class CanvasCreateTool(
@@ -282,7 +366,7 @@ class CanvasCreateTool(
 }
 
 /**
- * Tool: canvas.get_scene
+ * Tool: canvas_get_scene
  * Retrieves the current DrawBox scene JSON and revision for a canvas.
  */
 class CanvasGetSceneTool(
@@ -298,12 +382,7 @@ class CanvasGetSceneTool(
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
                 is CanvasLookupResult.Found -> ExternalToolResult.Success(
-                    canvasJson.encodeToString(
-                        CanvasGetSceneResult(
-                            sceneJson = lookup.doc.sceneJson,
-                            revision = lookup.doc.revision,
-                        )
-                    )
+                    canvasJson.encodeToString(CanvasSceneRead.result(lookup.doc.sceneJson, lookup.doc.revision, lookup.doc.id.value)),
                 )
             }
         }
@@ -314,7 +393,39 @@ class CanvasGetSceneTool(
 }
 
 /**
- * Tool: canvas.replace_scene
+ * Tool: canvas_get_layout
+ * Geometry and identity of everything on the board, paged, without the full payloads.
+ */
+class CanvasGetLayoutTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : BaseCanvasTool(store, sessions) {
+    override val name: String = NAME
+    override val description: String = CanvasToolContract.getLayout.description
+    override val inputSchema: JsonObject = CanvasToolContract.getLayout.inputSchema
+
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        runWithContext(agentId, "Failed to read layout") { context ->
+            when (val lookup = findCanvasDocument(context, input)) {
+                is CanvasLookupResult.Error -> lookup.result
+                is CanvasLookupResult.Found -> layoutAnswer(
+                    CanvasLayoutRead.answer(lookup.doc.sceneJson, LayoutRevision(lookup.doc.revision), input),
+                )
+            }
+        }
+
+    private fun layoutAnswer(answer: CanvasLayoutAnswer): ExternalToolResult = when (answer) {
+        is CanvasLayoutAnswer.Page -> ExternalToolResult.Success(answer.json)
+        is CanvasLayoutAnswer.Refused -> ExternalToolResult.Error(answer.message)
+    }
+
+    companion object {
+        const val NAME = CanvasToolContract.GET_LAYOUT
+    }
+}
+
+/**
+ * Tool: canvas_replace_scene
  * Replaces the DrawBox scene JSON for a canvas, incrementing revision.
  */
 class CanvasReplaceSceneTool(
@@ -336,13 +447,14 @@ class CanvasReplaceSceneTool(
 }
 
 /**
- * Tool: canvas.apply_ops
+ * Tool: canvas_apply_ops
  * Applies a list of Canvas operations to the canvas.
  */
 class CanvasApplyOpsTool(
     store: CanvasDocumentStore,
     sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-) : BaseCanvasTool(store, sessions) {
+    kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+) : BaseCanvasTool(store, sessions, kinds) {
     override val name: String = NAME
     override val description: String = CanvasToolContract.applyOps.description
     override val inputSchema: JsonObject = CanvasToolContract.applyOps.inputSchema
@@ -358,7 +470,7 @@ class CanvasApplyOpsTool(
 }
 
 /**
- * Tool: canvas.export_svg
+ * Tool: canvas_export_svg
  * Returns the SVG export representation of a canvas.
  */
 class CanvasExportSvgTool(
@@ -383,7 +495,7 @@ class CanvasExportSvgTool(
 }
 
 /**
- * Tool: canvas.list
+ * Tool: canvas_list
  * Lists canvas IDs by conversation or agent.
  */
 class CanvasListTool(
@@ -406,18 +518,82 @@ class CanvasListTool(
 }
 
 /**
+ * Tool: canvas_compose (letta-mobile-bglj6.12)
+ * Puts notes, checklists, cards, text and groups on a canvas by meaning; the board places them.
+ */
+class CanvasComposeTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : BaseCanvasTool(store, sessions) {
+    override val name: String = NAME
+    override val description: String = CanvasToolContract.compose.description
+    override val inputSchema: JsonObject = CanvasToolContract.compose.inputSchema
+
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        invoke(input, ExternalToolCaller(agentId))
+
+    /** The whole caller: the conversation names the default canvas, the tool call id the artifact. */
+    override suspend fun invoke(input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
+        val agentId = caller.agentId
+        if (agentId.isNullOrBlank()) {
+            return ExternalToolResult.Error("$FAILURE: canvas tools require an authenticated agent identity")
+        }
+        return try {
+            executeCompose(CanvasToolContext(store, sessions, agentId), input, caller)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            ExternalToolResult.Error("$FAILURE: ${e.message}")
+        }
+    }
+
+    companion object {
+        const val NAME = CanvasToolContract.COMPOSE
+        private const val FAILURE = "Failed to compose"
+    }
+}
+
+/**
+ * Tool: canvas_compose_guide (letta-mobile-bglj6.12)
+ * The canvas_compose format, caps and examples.
+ */
+class CanvasComposeGuideTool(
+    store: CanvasDocumentStore,
+    sessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+) : BaseCanvasTool(store, sessions) {
+    override val name: String = NAME
+    override val description: String = CanvasToolContract.composeGuide.description
+    override val inputSchema: JsonObject = CanvasToolContract.composeGuide.inputSchema
+
+    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
+        runWithContext(agentId, "Failed to describe compose") { CanvasComposeHosting.guide() }
+
+    companion object {
+        const val NAME = CanvasToolContract.COMPOSE_GUIDE
+    }
+}
+
+/**
  * Factory for creating all Canvas [HostExternalTool] instances.
  */
 object CanvasExternalTools {
     /**
      * [sessions] must be the same registry the canvas UI registers into, or every tool falls back
-     * to the store and an agent's edits never reach the session the user is looking at.
+     * to the store and an agent's edits never reach the session the user is looking at. [kinds]
+     * are the plugin kinds this app holds plugin element props to.
      */
-    fun all(store: CanvasDocumentStore, sessions: CanvasSessionRegistry): List<HostExternalTool> = listOf(
+    fun all(
+        store: CanvasDocumentStore,
+        sessions: CanvasSessionRegistry,
+        kinds: PluginKindCatalog = PluginKindCatalog.Empty,
+    ): List<HostExternalTool> = listOf(
         CanvasCreateTool(store, sessions),
         CanvasGetSceneTool(store, sessions),
+        CanvasGetLayoutTool(store, sessions),
         CanvasReplaceSceneTool(store, sessions),
-        CanvasApplyOpsTool(store, sessions),
+        CanvasApplyOpsTool(store, sessions, kinds),
         CanvasListTool(store, sessions),
+        CanvasComposeTool(store, sessions),
+        CanvasComposeGuideTool(store, sessions),
     )
 }

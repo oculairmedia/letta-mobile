@@ -66,6 +66,7 @@ class DualLaneAppServerClient(
     override suspend fun updateModel(command: AppServerCommand.UpdateModel) = runtime.updateModel(command)
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = runtime.skillDisable(command)
     override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile) = runtime.writeMemoryFile(command)
+    override suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile) = runtime.deleteMemoryFile(command)
     override suspend fun cronList(command: AppServerCommand.CronList) = admin.cronList(command)
     override suspend fun cronAdd(command: AppServerCommand.CronAdd) = runtime.cronAdd(command)
     override suspend fun cronGet(command: AppServerCommand.CronGet) = admin.cronGet(command)

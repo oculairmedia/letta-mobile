@@ -28,18 +28,23 @@ class RepositoryArchitectureTest {
     }
 }
 
-internal fun repositoryBytecodeRules(): List<ArchRule> = listOf(
+/**
+ * Production evaluation fails closed: an empty import (or an empty layer) is a
+ * failure, never a pass. Only fixture tests that deliberately populate a subset
+ * of the layers pass [allowEmpty] = true.
+ */
+internal fun repositoryBytecodeRules(allowEmpty: Boolean = false): List<ArchRule> = listOf(
     slices()
         .matching("com.letta.mobile.(**)..")
         .should().beFreeOfCycles()
-        .allowEmptyShould(true),
+        .allowEmptyShould(allowEmpty),
     layeredArchitecture()
         .consideringOnlyDependenciesInLayers()
         .layer("Model").definedBy("com.letta.mobile.data.model..")
         .layer("RepositoryApi").definedBy("com.letta.mobile.data.repository.api..")
         .whereLayer("Model").mayNotAccessAnyLayer()
         .whereLayer("RepositoryApi").mayOnlyAccessLayers("Model")
-        .allowEmptyShould(true),
+        .allowEmptyShould(allowEmpty),
 )
 
 private fun importCoreClasses(projectRoot: Path): JavaClasses {
@@ -52,11 +57,15 @@ private fun importCoreClasses(projectRoot: Path): JavaClasses {
         "Compile :core:ids:jvmMainClasses and :sharedLogic:jvmMainClasses before running architectureTest"
     }
 
-    return ClassFileImporter()
+    val classes = ClassFileImporter()
         .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
         .withImportOption(ExcludeGeneratedClasses)
         .withImportOption(DomainContractSurface)
         .importPaths(classDirectories)
+    check(classes.isNotEmpty()) {
+        "No data.model / data.repository.api classes under $classDirectories; the bytecode rules would check nothing"
+    }
+    return classes
 }
 
 /**

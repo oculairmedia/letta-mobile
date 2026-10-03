@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 /**
  * Composable-side wrapper around [StreamingDisplayTextSmoother].
  *
@@ -65,7 +66,7 @@ fun rememberSmoothedStreamingText(
     // clamped back to a true prefix and the head is never dropped. Folding the
     // verification into updateTarget makes the seed/update ordering unable to
     // clip the head.
-    val nowMs = { System.nanoTime() / 1_000_000L }
+    val nowMs = { StreamSmootherClockOrigin.elapsedNow().inWholeMilliseconds }
     remember {
         smoother.seed(seedText, isStreaming, nowMs())
         true
@@ -114,3 +115,9 @@ fun rememberSmoothedStreamingText(
 
     return displayedText
 }
+
+/**
+ * Monotonic origin for the smoother's millisecond clock. The smoother only ever subtracts two
+ * readings, so any fixed origin paints the same cadence as System.nanoTime did on the JVM.
+ */
+private val StreamSmootherClockOrigin = TimeSource.Monotonic.markNow()

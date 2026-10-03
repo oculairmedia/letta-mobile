@@ -8,7 +8,9 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 
 class ModelControlRepositoriesTest {
     @Test
@@ -120,5 +122,61 @@ class ModelControlRepositoriesTest {
         val repo = ConversationModelRepository(RecordingInvoker { _, _ -> JsonNull })
 
         assertFailsWith<IllegalArgumentException> { repo.updateModel(ConversationModelTarget("a", "c"), null) }
+    }
+
+    @Test
+    fun conversationScopedSwitchBecomesTheConversationsSelectedModel() = runTest {
+        // letta-mobile-okvyf: update_model on a conversation leaves agent.model alone, so the
+        // picker must read the recorded conversation selection or it never moves.
+        val repo = ConversationModelRepository(
+            RecordingInvoker { _, _ ->
+                buildJsonObject {
+                    put("applied_to", "conversation")
+                    put("model_handle", "openai/gpt-sol")
+                }
+            },
+        )
+
+        repo.updateModel(ConversationModelTarget("agent-1", "conv-1"), ModelHandle("openai/gpt-sol"))
+
+        assertEquals(mapOf("conv-1" to "openai/gpt-sol"), repo.selections.byConversation.value)
+        assertEquals("openai/gpt-sol", repo.selections.effectiveModel("conv-1", agentModel = "anthropic/old"))
+        assertEquals("anthropic/old", repo.selections.effectiveModel("conv-2", agentModel = "anthropic/old"))
+    }
+
+    @Test
+    fun switchWithoutAHandleInTheReplyRecordsTheRequestedModel() = runTest {
+        val repo = ConversationModelRepository(RecordingInvoker { _, _ -> JsonNull })
+
+        repo.updateModel(ConversationModelTarget("agent-1", "conv-1"), ModelHandle("openai/gpt-sol"))
+
+        assertEquals("openai/gpt-sol", repo.selections["conv-1"])
+    }
+
+    @Test
+    fun agentScopedSwitchDefersToTheAgentsModel() = runTest {
+        val repo = ConversationModelRepository(
+            RecordingInvoker { _, _ -> buildJsonObject { put("applied_to", "agent") } },
+        )
+        repo.selections.record("conv-1", "stale/model")
+
+        repo.updateModel(ConversationModelTarget("agent-1", "conv-1"), ModelHandle("openai/gpt-sol"))
+
+        assertEquals(null, repo.selections["conv-1"])
+    }
+
+    @Test
+    fun effortOnlyUpdateAndFailedSwitchLeaveTheSelectionAlone() = runTest {
+        val repo = ConversationModelRepository(RecordingInvoker { _, _ -> error("rejected") })
+        repo.selections.record("conv-1", "openai/gpt-sol")
+
+        assertFailsWith<IllegalStateException> {
+            repo.updateModel(ConversationModelTarget("agent-1", "conv-1"), ModelHandle("openai/other"))
+        }
+        assertEquals("openai/gpt-sol", repo.selections["conv-1"])
+
+        val effortOnly = ConversationModelRepository(RecordingInvoker { _, _ -> JsonNull }, repo.selections)
+        effortOnly.updateModel(ConversationModelTarget("agent-1", "conv-1"), null, ReasoningEffortChoice.Named("high"))
+        assertEquals("openai/gpt-sol", repo.selections["conv-1"])
     }
 }

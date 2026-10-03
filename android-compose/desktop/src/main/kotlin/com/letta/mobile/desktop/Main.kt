@@ -23,7 +23,6 @@ import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
 import com.letta.mobile.desktop.touch.DesktopTouchKeyboardHost
-import com.letta.mobile.desktop.touch.DesktopWindowsTouchInput
 import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.SingleInstanceRestoreEffect
@@ -60,6 +59,12 @@ fun main(args: Array<String>) {
     // ContentProvider; Desktop (and any future WasmJS) call this wrapper
     // explicitly. See sharedLogic/commonMain/.../KotzillaKmpMonitoring.kt.
     com.letta.mobile.data.observability.startKotzillaMonitoring()
+    // Phone preview (`:desktop:runPhone`, docs/development/phone-preview.md): the same app in a
+    // phone-sized window. Off unless the launch asks for it; the normal launch below is untouched.
+    if (com.letta.mobile.desktop.phone.desktopPhoneModeRequested()) {
+        com.letta.mobile.desktop.phone.runDesktopPhoneApplication(args)
+        return
+    }
     if (Platform.Current == Platform.Windows) {
         System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
         WindowsJumpListManager.setProcessAppId(LETTA_WINDOWS_AUMID)
@@ -170,10 +175,6 @@ private fun runDesktopApplication(
                             // Windows 11 standard rounded corners + outline on the
                             // undecorated frame.
                             DesktopWindowsChrome.applyStandardChrome(window)
-                            // Touch drag-to-scroll: AWT hands Compose every
-                            // WM_TOUCH as a PointerType.Mouse event, which
-                            // Compose Foundation refuses to drag-scroll.
-                            DesktopWindowsTouchInput.attach(window)
                         }
 
                         // Ctrl+scroll scales app type, persisted across
@@ -262,12 +263,18 @@ internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFacto
             append("\n\nA crash log was written to:\n")
             append(DesktopCrashReporter.crashLogPath())
         }
-        runCatching {
-            JOptionPane.showMessageDialog(window, message, "Letta Desktop", JOptionPane.ERROR_MESSAGE)
+        crashShutdown.request {
+            runCatching {
+                JOptionPane.showMessageDialog(window, message, "Letta Desktop", JOptionPane.ERROR_MESSAGE)
+            }
         }
-        exitProcess(1)
     }
 }
+
+private val crashShutdown = DesktopCrashShutdown(
+    dispatch = { action -> java.awt.EventQueue.invokeLater { action() } },
+    terminate = { exitProcess(1) },
+)
 
 /** How many frames this session has lost to the disposed-layer race. */
 private val recoverableRenderFrames = java.util.concurrent.atomic.AtomicLong(0)

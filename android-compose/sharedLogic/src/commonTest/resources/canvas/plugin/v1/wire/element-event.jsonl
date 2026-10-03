@@ -1,0 +1,2 @@
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","method":"element.event","params":{"kind":"widget","elementId":"el-1","event":"moved","frame":{"x":40.0,"y":80.0,"width":320.0,"height":240.0}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","method":"element.event","params":{"kind":"widget","elementId":"el-1","event":"removed"}}}

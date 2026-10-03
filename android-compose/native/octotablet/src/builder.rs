@@ -1,0 +1,215 @@
+//! Builder-style configuration for connecting to the system tablet API.
+//!
+//! For a default configuration, `Builder::new().build_{shared, raw}` is all you need!
+
+use crate::{Backing, Manager};
+
+#[derive(thiserror::Error, Debug)]
+pub enum BuildError {
+    /// The given window handle doesn't use a supported connection type.
+    /// This includes cases where the platform is otherwise supported but the feature was disabled at compile-time.
+    #[error("handle doesn't contain a supported display type")]
+    Unsupported,
+    /// Failed to acquire a window handle
+    #[error("{0:?}")]
+    HandleError(raw_window_handle::HandleError),
+    /// Windows Ink refused to start, including `SetSingleTabletMode`.
+    #[cfg(ink_rts)]
+    #[error("windows ink: {0}")]
+    Ink(windows::core::Error),
+}
+// #[from] thiserror attribute breaks horribly D:
+impl From<raw_window_handle::HandleError> for BuildError {
+    fn from(value: raw_window_handle::HandleError) -> Self {
+        Self::HandleError(value)
+    }
+}
+
+/// Pre-construction configuration for a [`Manager`].
+// Not every integration will use every field, leaving some "unread" on some targets.
+#[allow(unused)]
+pub struct Builder {
+    pub(crate) emulate_tool_from_mouse: bool,
+    /// When set, RealTimeStylus listens to this one tablet instead of every tablet.
+    pub(crate) ink_single_tablet: Option<i32>,
+}
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            emulate_tool_from_mouse: true,
+            ink_single_tablet: None,
+        }
+    }
+}
+
+/// # Configuration
+#[allow(clippy::needless_update)]
+impl Builder {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Set whether an emulated tablet and tool should be created from mouse input.
+    /// This functionality is *not* provided by this crate, but by the system backend.
+    ///
+    /// Defaults to `true`.
+    ///
+    /// # Supprted platforms
+    /// * Windows Ink
+    #[must_use]
+    pub fn emulate_tool_from_mouse(self, emulate: bool) -> Self {
+        Self {
+            emulate_tool_from_mouse: emulate,
+            ..self
+        }
+    }
+
+    /// Limit Windows Ink to one tablet, by the index from [`ink_tablets`].
+    /// `None` keeps the default, which is every tablet.
+    #[must_use]
+    pub fn ink_single_tablet(self, index: Option<i32>) -> Self {
+        Self {
+            ink_single_tablet: index,
+            ..self
+        }
+    }
+}
+
+/// What kind of digitizer an Ink tablet is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InkTabletKind {
+    Mouse,
+    Pen,
+    Touch,
+    Unknown,
+}
+
+/// One tablet Windows Ink can see.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InkTabletInfo {
+    pub index: i32,
+    pub name: String,
+    pub kind: InkTabletKind,
+}
+
+/// The tablets Ink currently enumerates. Empty when Ink cannot be asked.
+#[cfg(ink_rts)]
+pub fn ink_tablets() -> Vec<InkTabletInfo> {
+    use windows::core::Interface;
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
+    use windows::Win32::UI::TabletPC::{self as tablet_pc, IInkTablet2};
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        let tablets: tablet_pc::IInkTablets = match CoCreateInstance(
+            &tablet_pc::InkTablets,
+            None,
+            CLSCTX_INPROC_SERVER,
+        ) {
+            Ok(tablets) => tablets,
+            Err(_) => return Vec::new(),
+        };
+        let count = tablets.Count().unwrap_or(0);
+        let mut listed = Vec::with_capacity(count.max(0) as usize);
+        for index in 0..count {
+            let Ok(tablet) = tablets.Item(index) else { continue };
+            let name = tablet.Name().map(|value| value.to_string()).unwrap_or_default();
+            let kind = match tablet.cast::<IInkTablet2>() {
+                Ok(tablet2) => match tablet2.DeviceKind() {
+                    Ok(kind) if kind == tablet_pc::TDK_Mouse => InkTabletKind::Mouse,
+                    Ok(kind) if kind == tablet_pc::TDK_Pen => InkTabletKind::Pen,
+                    Ok(kind) if kind == tablet_pc::TDK_Touch => InkTabletKind::Touch,
+                    _ => InkTabletKind::Unknown,
+                },
+                Err(_) => InkTabletKind::Unknown,
+            };
+            listed.push(InkTabletInfo { index, name, kind });
+        }
+        listed
+    }
+}
+/// # Finishing
+impl Builder {
+    /// Build from a shared display handle carrier. Internally, this `Arc` is kept alive for as
+    /// long as the returned `Manager` is around ensuring safe operation.
+    // Unimplementable on `rwh_05`, as its safety conditions are not strong enough to ensure this
+    // is sound!
+    // Silly clippy, it's a self-describing err type!
+    #[allow(clippy::missing_errors_doc)]
+    pub fn build_shared<Holder>(self, rwh: &std::sync::Arc<Holder>) -> Result<Manager, BuildError>
+    where
+        Holder: raw_window_handle::HasDisplayHandle + raw_window_handle::HasWindowHandle + 'static,
+    {
+        // Unsize - erase the type, we don't care during runtime. We just need to be able to `Drop` it and to keep it around as
+        // long as we need!
+        // We can *kind of* skip the clone using an identity `transmute` to extent it's life - the ref remains valid even after unsizing.
+        // butttttt the safety is nuanced and may actually be instantaneous UB at the end of scope if `build` returns `Err`. Defeated by borrowchk again!
+        let backing = Backing::Arc(rwh.clone() as _);
+        // Safety - The returned `display_handle` is valid for as long as `rwh` is due to
+        // safety bound on `DisplayHandle::borrow_raw`. Since we keep the `rwh` alive inside the manager,
+        // the pointer is thus valid for the lifetime of the manager.
+        unsafe { self.build(rwh as &Holder, backing) }
+    }
+    /// Build from a display handle carrier, such as a reference to a `winit` window, with unbound lifetime.
+    ///
+    /// # Safety
+    /// The given display handle carrier must be keep the window and display pointers valid as long as the returned `Manager` is alive.
+    ///
+    /// ***`rwh` is dropped at the end of scope** - not kept alive within the `Manager` - thus cannot be used to ensure safety!*
+    // Silly clippy, it's a self-describing err type!
+    #[allow(clippy::missing_errors_doc)]
+    pub unsafe fn build_raw(
+        self,
+        rwh: impl raw_window_handle::HasDisplayHandle + raw_window_handle::HasWindowHandle,
+    ) -> Result<Manager, BuildError> {
+        // Safety: forwarded to this fn's contract.
+        unsafe { self.build(rwh, Backing::Raw) }
+    }
+    /// Private, raw builder that the others delegate into.
+    ///
+    /// The `rwh` implementor object is *not* kept.
+    /// # Safety
+    /// The given display handle carrier must be keep the window and display pointers valid as long as the returned `Manager` is alive.
+    /// This may be insured by using the `Backing` parameter which will be kept alive for as long as the returned Manager is.
+    unsafe fn build(
+        self,
+        rwh: impl raw_window_handle::HasDisplayHandle + raw_window_handle::HasWindowHandle,
+        backing: Backing,
+    ) -> Result<Manager, BuildError> {
+        let internal = match rwh.display_handle()?.as_raw() {
+            #[cfg(wl_tablet)]
+            raw_window_handle::RawDisplayHandle::Wayland(wlh) => {
+                Ok(crate::platform::PlatformManager::Wayland(
+                    // Safety: forwarded to this fn's contract.
+                    unsafe {
+                        crate::platform::wl::Manager::build_wayland_display(
+                            self,
+                            wlh.display.as_ptr().cast(),
+                        )
+                    },
+                ))
+            }
+            #[cfg(ink_rts)]
+            raw_window_handle::RawDisplayHandle::Windows(_) => {
+                // We need the window handle for this :V
+                // Notably, WinRT is unsupported - It doesn't have the IRealTimeStylus API at all.
+                if let raw_window_handle::RawWindowHandle::Win32(wh) = rwh.window_handle()?.as_raw()
+                {
+                    Ok(crate::platform::PlatformManager::Ink(
+                        // Safety: forwarded to this fn's contract.
+                        unsafe {
+                            crate::platform::ink::Manager::build_hwnd(self, wh.hwnd).map_err(BuildError::Ink)?
+                        },
+                    ))
+                } else {
+                    Err(BuildError::Unsupported)
+                }
+            }
+            _ => Err(BuildError::Unsupported),
+        }?;
+
+        Ok(Manager {
+            internal,
+            _backing: backing,
+        })
+    }
+}

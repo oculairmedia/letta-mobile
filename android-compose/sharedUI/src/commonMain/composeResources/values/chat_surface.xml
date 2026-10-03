@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-bglj6.1: the shared chat page's shell strings. -->
+    <string name="chat_surface_placeholder">Message…</string>
+    <string name="chat_surface_canvas_share_failed">Couldn’t attach the canvas to the message</string>
+    <string name="chat_surface_docked_reply_expand">Open the full chat</string>
+    <string name="chat_surface_docked_reply_dismiss">Hide this reply</string>
+    <string name="chat_surface_canvas_pending">Send a message to start this conversation’s canvas</string>
+    <string name="chat_surface_dock_collapse">Minimise the chat to its bar</string>
+    <string name="chat_surface_dock_restore">Show the conversation</string>
+    <string name="chat_surface_dock_move">Move the chat. Double-click or double-tap to reset its place.</string>
+    <string name="chat_surface_dock_resize">Resize the chat</string>
+    <string name="chat_surface_show_canvas">Show the canvas</string>
+    <string name="chat_surface_dock_empty">Messages you send from the canvas appear here.</string>
+    <!-- The docked panel's accessibility actions, so keyboard and screen-reader users can place it. -->
+    <string name="chat_surface_dock_panel">Chat panel</string>
+    <string name="chat_surface_dock_move_up">Move the chat up</string>
+    <string name="chat_surface_dock_move_down">Move the chat down</string>
+    <string name="chat_surface_dock_move_left">Move the chat left</string>
+    <string name="chat_surface_dock_move_right">Move the chat right</string>
+    <string name="chat_surface_dock_grow">Make the chat bigger</string>
+    <string name="chat_surface_dock_shrink">Make the chat smaller</string>
+    <string name="chat_surface_dock_reset">Put the chat back in its place</string>
+    <!-- The collapsed dock: the agent's mascot over its bar, its reply in a speech bubble. -->
+    <string name="chat_surface_collapsed_reply">%1$s replied: %2$s</string>
+    <string name="chat_surface_collapsed_reply_unnamed">The agent replied: %1$s</string>
+    <string name="chat_surface_collapsed_thinking">%1$s is thinking</string>
+    <string name="chat_surface_collapsed_thinking_unnamed">The agent is thinking</string>
+    <string name="chat_surface_collapsed_working">Working…</string>
+    <string name="chat_surface_collapsed_needs_input">Needs your input — open</string>
+    <!-- letta-mobile-bglj6.1.9: the Touch canvas's chat head. -->
+    <string name="chat_surface_head">Chat with %1$s</string>
+    <string name="chat_surface_head_agent">Open the agent</string>
+    <!-- The board's menu on the Touch canvas, standing in for the header it keeps off the board. -->
+    <string name="chat_surface_canvas_switch_agent">Switch agent</string>
+    <string name="chat_surface_canvas_agent_menu">Agent menu</string>
+</resources>

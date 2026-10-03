@@ -18,6 +18,7 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import io.ak1.drawbox.domain.model.State as DrawBoxState
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
+import io.ak1.drawbox.domain.model.topmostHit
 import io.ak1.drawbox.domain.model.bounds
 import io.ak1.drawbox.domain.model.canHoldText
 import io.ak1.drawbox.domain.model.resolvedTextColor
@@ -73,6 +74,10 @@ internal data class PenConsumerParams(
     val penDensity: Float,
     val penPreview: MutableList<Element.PathSample>,
     val onEraseArea: (EraserArea) -> Unit,
+    /** A pen double tap landed on somewhere to type while drawing. Opens its text. */
+    val onDoubleTapText: (Element) -> Unit = {},
+    val penTaps: CanvasDoubleTap = CanvasDoubleTap(),
+    val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 )
 
 internal data class DrawPhaseParams(
@@ -239,7 +244,9 @@ internal object CanvasWorkspaceSupport {
     ): Boolean {
         if (activeNoteId == null || session == null) return false
         val note = documents.firstOrNull { it.id == activeNoteId } ?: return false
-        val baseFrame = note.frame ?: defaultNoteFrame(0)
+        val baseFrame = note.frame
+            ?: framelessFramesOf(documents) { CanvasViewportFit.contentBounds(emptyList(), documents) }[note.id]
+            ?: framelessFallbackFrame()
         val frame = baseFrame.copy(x = baseFrame.x + DUPLICATE_OFFSET, y = baseFrame.y + DUPLICATE_OFFSET)
         val id = "${note.id.substringBefore('-')}-${Clock.System.now().toEpochMilliseconds()}"
         onCreated(id, note, frame, session)
@@ -263,13 +270,20 @@ internal object CanvasWorkspaceSupport {
             rect.overlaps(Rect(f.x, f.y, f.x + f.width, f.y + f.height))
         }.map { it.id }.toSet()
 
+    /**
+     * Each selected note's frame moved by [offset]. A note shown auto-fitted lands at the height it
+     * was shown at ([shownHeights]), not the booking under it: the move makes it the person's.
+     */
     fun buildMoveFrames(
         documents: List<CanvasSceneDocument>,
         selectedIds: Set<String>,
         offset: Offset,
+        shownHeights: Map<String, Float> = emptyMap(),
     ): Map<String, CanvasDocumentFrame> =
         documents.filter { it.id in selectedIds }.mapNotNull { doc ->
-            doc.frame?.let { doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y) }
+            doc.frame?.let {
+                doc.id to it.copy(x = it.x + offset.x, y = it.y + offset.y, height = shownHeights[doc.id] ?: it.height)
+            }
         }.toMap()
 
     fun isPointInsideBounds(point: Offset, bounds: Rect): Boolean =
@@ -501,25 +515,92 @@ internal object CanvasWorkspaceSupport {
         }
     }
 
-    fun createPenConsumer(params: PenConsumerParams): (CanvasPenEvent) -> Boolean {
-        var stroke: CanvasPenStroke? = null
-        var strokeStartedOnDocument = false
-        return consumer@{ event ->
-            val world = validatePenPosition(event, params) ?: return@consumer false
+    fun createPenConsumer(params: PenConsumerParams): (CanvasPenEvent) -> Boolean = PenInk(params)::consume
+
+    /**
+     * The pen on the board: ink in the drawing tools, the eraser anywhere, and a double tap that
+     * opens a shape's text. Anything else is declined, for the platform to deliver as a click.
+     */
+    private class PenInk(private val params: PenConsumerParams) {
+        private var stroke: CanvasPenStroke? = null
+        private var strokeStartedOnDocument = false
+
+        /** The second tap of a double tap opened text; the rest of that contact draws nothing. */
+        private var swallowing = false
+
+        fun consume(event: CanvasPenEvent): Boolean {
+            if (swallowing) return swallow(event)
+            val world = validatePenPosition(event, params) ?: return false
             if (event.tool == CanvasPenTool.ERASER) {
-                return@consumer handleEraserEvent(event, world, params.controller, params.onEraseArea)
+                params.penTaps.clear()
+                return handleEraserEvent(event, world, params.controller, params.onEraseArea)
             }
-            val current = params.controller.state.value
-            if (event.tool != CanvasPenTool.DRAW || !current.mode.isFreehandDrawing()) return@consumer false
-            if (event.phase == CanvasPenEvent.Phase.DOWN) {
-                strokeStartedOnDocument = isWorldPointInDocuments(world, params.session?.documents().orEmpty())
+            if (!inks(event)) {
+                params.penTaps.clear()
+                return false
             }
-            if (strokeStartedOnDocument) return@consumer false
-            val drawParams = DrawPhaseParams(event, world, params.controller, params.penPreview)
-            val (updatedStroke, handled) = handleDrawPhase(drawParams, stroke)
-            stroke = updatedStroke
-            handled
+            if (event.phase == CanvasPenEvent.Phase.DOWN && startOrOpenText(event, world)) return true
+            if (strokeStartedOnDocument) return false
+            return draw(event, world)
         }
+
+        private fun swallow(event: CanvasPenEvent): Boolean {
+            if (event.isLift()) swallowing = false
+            return true
+        }
+
+        /** The draw nib in a freehand tool. */
+        private fun inks(event: CanvasPenEvent): Boolean =
+            event.tool == CanvasPenTool.DRAW && params.controller.state.value.mode.isFreehandDrawing()
+
+        /** A down: note whether it is on a note card, and open text when it finishes a double tap. */
+        private fun startOrOpenText(event: CanvasPenEvent, world: Offset): Boolean {
+            strokeStartedOnDocument = isWorldPointInDocuments(world, params.session?.documents().orEmpty())
+            if (strokeStartedOnDocument || !openTextOnPenDoubleTap(event, world, params)) return false
+            params.penPreview.clear()
+            stroke = null
+            swallowing = true
+            return true
+        }
+
+        private fun draw(event: CanvasPenEvent, world: Offset): Boolean {
+            if (event.phase == CanvasPenEvent.Phase.MOVE) params.penTaps.move(event.x, event.y)
+            val (updatedStroke, handled) = handleDrawPhase(DrawPhaseParams(event, world, params.controller, params.penPreview), stroke)
+            if (event.isLift()) {
+                // A tap's dot, so a double tap can take it back.
+                val dot = params.controller.state.value.elements.lastOrNull()?.takeIf { it is Element.Path }?.id
+                params.penTaps.up(event.x, event.y, params.clock(), dot.takeIf { stroke != null })
+            }
+            stroke = updatedStroke
+            return handled
+        }
+    }
+
+    private fun CanvasPenEvent.isLift(): Boolean = phase == CanvasPenEvent.Phase.UP || phase == CanvasPenEvent.Phase.OUT
+
+    /**
+     * A pen down that finishes a double tap on a shape or text: takes back the first tap's dot
+     * (as one undo step with it) and opens the text. False leaves the down to draw as usual.
+     */
+    private fun openTextOnPenDoubleTap(event: CanvasPenEvent, world: Offset, params: PenConsumerParams): Boolean {
+        val first = params.penTaps.down(event.x, event.y, params.clock()) ?: return false
+        val state = params.controller.state.value
+        val tolerance = FINGER_PICK_TOLERANCE.value * params.penDensity / state.viewport.scale
+        val target = topmostHit(
+            state.elements.filter { it.id != first.mark },
+            world,
+            tolerance,
+            state.selectInsideHollowShapes,
+        )
+        if (!holdsText(target) || target == null) return false
+        first.mark?.let { dot ->
+            if (state.elements.any { it.id == dot }) {
+                params.controller.onIntent(Intent.DeleteElement(dot))
+                params.controller.onIntent(Intent.MergeUndoSteps(2))
+            }
+        }
+        params.onDoubleTapText(target)
+        return true
     }
 
     fun evaluateExternalDocSync(params: ExternalSyncParams): ExternalSyncResult? {

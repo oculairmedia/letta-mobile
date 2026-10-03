@@ -20,6 +20,8 @@ import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.desktop.chat.DesktopModelControlHost
+import com.letta.mobile.desktop.data.DesktopDataBindings
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
@@ -394,7 +396,7 @@ internal fun conversationRecency(label: String): java.time.Instant =
 
 internal data class OpenDesktopCanvasParams(
     val scope: CoroutineScope,
-    val store: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val store: com.letta.mobile.data.canvas.CanvasDocumentStore,
     val conversationId: String?,
     val agentId: String?,
     val agentName: String,
@@ -426,12 +428,14 @@ internal data class DesktopComposerCommandsParams(
     val selectedAgentId: String?,
     val selectedAgentName: String,
     val selectedDestination: DesktopDestination,
-    val canvasStore: com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore,
+    val canvasStore: com.letta.mobile.data.canvas.CanvasDocumentStore,
     val chatScope: CoroutineScope,
     val onNavigate: (DesktopDestination) -> Unit,
     val onCreateAgent: () -> Unit,
     val onEditAgent: (String?) -> Unit,
     val onCanvasSessionChange: (com.letta.mobile.data.canvas.CanvasSession?) -> Unit,
+    /** Set while the shared chat page docks the conversation's board: the canvas command shows it. */
+    val showDockedCanvas: (() -> Unit)? = null,
 )
 
 @Composable
@@ -441,7 +445,9 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
         params.agentSlashCommands,
         params.selectedDestination,
         params.selectedAgentId,
+        params.showDockedCanvas != null,
     ) {
+        val showDocked = params.showDockedCanvas
         buildComposerCommands(
             BuildComposerCommandsParams(
                 chatController = params.chatController,
@@ -449,7 +455,7 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
                 onCreateAgent = params.onCreateAgent,
                 onEditAgent = { params.onEditAgent(params.selectedAgentId) },
                 onNavigate = params.onNavigate,
-                onOpenCanvas = {
+                onOpenCanvas = showDocked ?: {
                     openDesktopCanvasSession(
                         OpenDesktopCanvasParams(
                             scope = params.chatScope,
@@ -536,7 +542,8 @@ internal data class CreateDesktopOverlayActionsParams(
     val chatController: DesktopChatController,
     val onSelectDestination: (DesktopDestination) -> Unit,
     val onOpenAgent: (String) -> Unit,
-    val agentRepository: IAgentRepository,
+    /** The agent repository (new-agent defaults) and the host's model control live here. */
+    val dataBindings: DesktopDataBindings,
     val selectedAgentId: String?,
     val onIrohIdentityReset: () -> Unit,
     val onNewCanvas: () -> Unit = {},
@@ -545,7 +552,12 @@ internal data class CreateDesktopOverlayActionsParams(
 internal fun createDesktopOverlayActions(
     params: CreateDesktopOverlayActionsParams,
 ): DesktopOverlayActions = DesktopOverlayActions(
-    onModelSelected = params.chatController::setConversationModel,
+    modelControl = DesktopModelControlHost(
+        session = params.dataBindings.modelControl,
+        chatModels = params.chatController.availableModels,
+        reloadChatModels = params.chatController::reloadModelCatalog,
+        onModelSelected = params.chatController::setConversationModel,
+    ),
     onSelectConversation = {
         params.chatController.selectConversation(it)
         params.onSelectDestination(DesktopDestination.Conversations)
@@ -555,7 +567,7 @@ internal fun createDesktopOverlayActions(
     onNewCanvas = params.onNewCanvas,
     onCreateAgent = { name, modelValue ->
         val (model, embedding) = resolveNewAgentDefaults(
-            agentRepository = params.agentRepository,
+            agentRepository = params.dataBindings.sessionGraphProvider.current.agentRepository,
             templateAgentId = params.selectedAgentId,
             modelValue = modelValue,
         )

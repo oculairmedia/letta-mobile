@@ -9,6 +9,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Dp
@@ -88,6 +89,51 @@ class SettledTimelineSpacingContractTest {
     @Test fun dismissedA2uiStackReservesNoSpace() {
         assertEquals(96.dp, chatListBottomPadding(composerPadding = 96.dp, a2uiShown = false, a2uiStackHeight = 180.dp))
         assertEquals(276.dp, chatListBottomPadding(composerPadding = 96.dp, a2uiShown = true, a2uiStackHeight = 180.dp))
+    }
+
+    /**
+     * Dogfood-reported contract: every disclosure row in a settled run shares one leading edge.
+     * The tool-run summary must not be inset relative to the "Thought" rows or bubble-less
+     * prose; a row-internal horizontal pad on only the summary row is the regression this
+     * catches (it fails on revert of the `vertical = xs` self-pad alignment).
+     */
+    @Test fun toolSummarySharesLeadingEdgeWithThoughtAndProseRows() {
+        renderSettledTurn(bottomPadding = 96.dp)
+
+        // Unmerged tree: the summary Row is clickable and merges its descendants, so the
+        // merged node's bounds are the whole row (row-internal padding included) and hide
+        // any inset the padding creates. Only the raw Text bounds expose the leading edge.
+        val thoughtLeft = compose.onAllNodesWithText("Thought", useUnmergedTree = true)[0]
+            .fetchSemanticsNode().boundsInRoot.left
+        val toolLeft = compose.onNodeWithText("Ran 4 commands", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.left
+        val proseLeft = compose.onNodeWithText("I'll inspect the files.", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.left
+
+        assertNear("tool summary leading edge", thoughtLeft, toolLeft)
+        assertNear("prose leading edge", thoughtLeft, proseLeft)
+    }
+
+    /**
+     * Dogfood-reported contract: the summary row's own height is its label plus the shared
+     * 4dp self-pad — the step beat comes from the card's grouped top padding, not from
+     * row-internal space. Re-introducing the `md` row pad grows the surface by 24dp and
+     * this fails on revert.
+     */
+    @Test fun toolSummaryRowSelfPadIsTheSharedXsBeat() {
+        renderSettledTurn(bottomPadding = 96.dp)
+
+        val row = taggedBounds(ToolRunSummaryTestTags.Row).single()
+        // Unmerged tree: the merged node for the clickable Row IS the row bounds, which made
+        // `label` and `row` the same rect and the bound trivially true (false pass observed
+        // with the md pad reverted). The raw Text node gives the label's own height.
+        val label = compose.onNodeWithText("Ran 4 commands", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+
+        assertTrue(
+            "summary row carries more than the xs self-pad: row ${row.height}px vs label ${label.height}px",
+            row.height <= label.height + 2 * px(4.dp) + 1f,
+        )
     }
 
     /** One composition per test; later renders only move the bottom reserve. */

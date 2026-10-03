@@ -68,8 +68,11 @@ internal fun CanvasQuickCreateTargets(
 ) {
     val gapPx = with(LocalDensity.current) { (if (compact) TOUCH_OFFSET else OFFSET).toPx() }
     fun centreOf(direction: QuickCreateDirection): Offset = CanvasQuickCreate.targetCentre(anchor, direction, gapPx)
-    // The drag outlives recompositions (the anchor moves as the board pans), so it reads these fresh.
-    val centre by rememberUpdatedState(::centreOf)
+    // The drag outlives recompositions (the element moves, the board pans), so it reads the anchor
+    // itself fresh. A remembered reference to centreOf kept the first anchor: a shape moved after it
+    // was selected pulled its arrow out of where it used to be.
+    val liveAnchor by rememberUpdatedState(anchor)
+    val liveGap by rememberUpdatedState(gapPx)
     val latest by rememberUpdatedState(actions)
     Layout(
         modifier = modifier,
@@ -80,7 +83,11 @@ internal fun CanvasQuickCreateTargets(
                     compact = compact,
                     chromeRegions = chromeRegions,
                     onClick = { latest.onCreate(direction) },
-                    pull = Modifier.pullArrow(direction, { centre(direction) }, { latest }),
+                    pull = Modifier.pullArrow(
+                        direction,
+                        { CanvasQuickCreate.targetCentre(liveAnchor, direction, liveGap) },
+                        { latest },
+                    ),
                 )
             }
         },
@@ -131,8 +138,8 @@ private fun QuickCreateTarget(
 
 /**
  * An arrow pulled out of the target for [direction]: it starts at the target's centre ([from], read
- * fresh as the board pans) and follows the pointer, reported to [actions] as it moves and where it
- * is let go.
+ * fresh on every step, so it stays on the element as the board pans under the drag) and follows
+ * the pointer, reported to [actions] as it moves and where it is let go.
  */
 private fun Modifier.pullArrow(
     direction: QuickCreateDirection,
@@ -156,7 +163,7 @@ private fun Modifier.pullArrow(
         onDragCancel = { report(null) },
     ) { change, amount ->
         change.consume()
-        report(drag?.let { it.copy(to = it.to + amount) })
+        report(drag?.let { it.copy(from = from(), to = it.to + amount) })
     }
 }
 
@@ -208,6 +215,14 @@ internal object CanvasQuickCreate {
         QuickCreateDirection.LEFT -> Offset(from.left, from.center.y) to Offset(to.right, to.center.y)
     }
 
+    /**
+     * The control point of the arrow shown while it is pulled out of the [direction] target:
+     * straight out from [start] along that side, so it leaves the element square to its edge and
+     * bends round to the pointer. Reaches half the run. The arrow it makes is a smooth connector.
+     */
+    fun pullControl(start: Offset, end: Offset, direction: QuickCreateDirection): Offset =
+        start + Offset(direction.dx, direction.dy) * ((end - start).getDistance() * PULL_HANDLE)
+
     /** Which side of [from] faces [point]: the one along the axis it is furthest out on. */
     fun directionToward(from: Rect, point: Offset): QuickCreateDirection {
         val d = point - from.center
@@ -235,6 +250,16 @@ internal object CanvasQuickCreate {
             QuickCreateKind.TRIANGLE -> CanvasReshape.reshaped(moved, ShapeType.TRIANGLE)
             QuickCreateKind.SAME, QuickCreateKind.NOTE, QuickCreateKind.TEXT -> moved
         }
+    }
+
+    /**
+     * Where a shape made from [base] will land when the arrow is let go at [drop] (board units):
+     * [shapeAt] centres it there at [base]'s size, whichever kind is picked. Brought into view on
+     * release, so making the shape moves nothing.
+     */
+    fun landing(base: Element.Shape, drop: Offset): Rect {
+        val size = base.bounds().size
+        return Rect(drop - Offset(size.width / 2f, size.height / 2f), size)
     }
 
     /** A plain box to size new shapes from when the arrow comes out of a note rather than a shape. */
@@ -267,6 +292,7 @@ enum class QuickCreateKind(val label: String) {
 }
 
 private const val ROUNDED_CORNER = 0.2f
+private const val PULL_HANDLE = 0.5f
 private const val DEFAULT_WIDTH = 160f
 private const val DEFAULT_HEIGHT = 100f
 

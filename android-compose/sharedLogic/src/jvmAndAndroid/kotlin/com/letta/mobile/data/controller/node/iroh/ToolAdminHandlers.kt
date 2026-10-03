@@ -1,7 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -29,7 +28,9 @@ import kotlinx.serialization.json.put
  *  - `block.update_agent` (agent + label, the memory editor's write) maps 1:1
  *    onto the native `write_memory_file` command, so the App Server — the
  *    store's single writer — performs the write. The controller never writes the
- *    local-backend root itself (epic constraint: one writer per root);
+ *    local-backend root itself (epic constraint: one writer per root).
+ *    bfooy.5 adds `block.create_agent` / `block.delete_agent` on the same
+ *    footing (see [AgentBlockWriteHandlers]);
  *  - `block.create`, `block.update`, `block.delete`, `block.attach` and
  *    `block.detach` address a block by a GLOBAL id that admin-shim synthesises
  *    (`sha256(agentId:label)`) and no native command accepts. Global creation and
@@ -44,7 +45,7 @@ object ToolAdminHandlers {
     ) {
         registerToolMethods(router)
         registerBlockReads(router, store)
-        registerBlockWrites(router, nativeClient)
+        registerBlockWrites(router, store, nativeClient)
     }
 
     private fun registerToolMethods(router: AdminRpcRouter) {
@@ -154,46 +155,21 @@ object ToolAdminHandlers {
         }
     }
 
-    private fun registerBlockWrites(router: AdminRpcRouter, nativeClient: AppServerClient?) {
+    private fun registerBlockWrites(
+        router: AdminRpcRouter,
+        store: LocalBackendAdminStore?,
+        nativeClient: AppServerClient?,
+    ) {
         CapabilityUnavailable.denyFailClosed(
             router,
             BLOCK_DENIED_METHODS,
             reason = "the letta-code local backend has no globally addressable block entity — blocks are " +
                 "per-agent memfs files, so global create and agent attach/detach have no meaning and " +
-                "admin-shim 404s those routes; use block.update_agent (agent_id + label), which the App " +
-                "Server owns natively",
+                "admin-shim 404s those routes; use block.update_agent / block.create_agent / " +
+                "block.delete_agent (agent_id + label), which the App Server owns natively",
         )
-        router.register("block.update_agent") { params ->
-            val agentId = requireSafeMemfsSegment(
-                params.requireParam(AdminParamKey("agent_id")),
-                "agent_id",
-            )
-            val label = requireSafeMemfsSegment(
-                params.requireParam(AdminParamKey("label")),
-                "label",
-            )
-            val value = param(params, AdminParamKey("value"))
-                ?: adminError("value required: block.update_agent writes the memory file contents")
-            val client = nativeClient
-                ?: adminError("capability_unavailable: block.update_agent requires the native App Server client")
-            val response = client.writeMemoryFile(
-                AppServerCommand.WriteMemoryFile(
-                    requestId = NativeAdmin.requestId(),
-                    agentId = agentId,
-                    path = memoryPathFor(label),
-                    content = value,
-                    commitMessage = "block.update_agent: $label",
-                ),
-            )
-            if (!response.success) adminError(response.error ?: "write_memory_file failed")
-            // Echo the post-write block using the SAME projection block.get serves,
-            // so the client decodes one shape regardless of which route it used.
-            LocalBackendBlockReader.projectBlock(agentId, label, value)
-        }
+        AgentBlockWriteHandlers.register(router, store, nativeClient)
     }
-
-    /** MemFS path for a core-memory block label, mirroring `memory/system/<label>.md`. */
-    private fun memoryPathFor(label: String): String = "system/$label.md"
 
     /** Constant catalog reads (no datastore). */
     val TOOL_CATALOG_METHODS: Set<String> = setOf("tool.list", "tool.get")
@@ -230,8 +206,8 @@ object ToolAdminHandlers {
     /** Hard ceiling for tool.list paging, matching the block list contract. */
     const val MAX_TOOL_LIST_LIMIT: Int = 200
 
-    /** Served by the native `write_memory_file` command. */
-    val BLOCK_NATIVE_WRITE_METHODS: Set<String> = setOf("block.update_agent")
+    /** Served by the native `write_memory_file` / `delete_memory_file` commands. */
+    val BLOCK_NATIVE_WRITE_METHODS: Set<String> = AgentBlockWriteHandlers.METHODS
 
     /** Permanently denied: no global block entity, no native command. */
     val BLOCK_DENIED_METHODS: Set<String> = setOf(
@@ -244,4 +220,13 @@ object ToolAdminHandlers {
 
     val METHODS: Set<String> = TOOL_CATALOG_METHODS + TOOL_WRITE_METHODS +
         BLOCK_READ_METHODS + BLOCK_NATIVE_WRITE_METHODS + BLOCK_DENIED_METHODS
+
+    /**
+     * bfooy.5: agent-scoped block create/delete were added after the admin REST
+     * adapter retired; they were native (App Server v2) from the start.
+     */
+    val POST_RETIREMENT_METHODS: Set<String> = AgentBlockWriteHandlers.CREATE_DELETE_METHODS
+
+    /** Methods the retired admin REST adapter used to own (lgns8.9 inventory). */
+    val FORMER_ADMIN_REST_METHODS: Set<String> = METHODS - POST_RETIREMENT_METHODS
 }

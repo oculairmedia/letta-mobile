@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-bglj6.1: the shared chat timeline rows. -->
+
+    <!-- Copy and message actions -->
+    <string name="rows_copy">Copy</string>
+    <string name="rows_copied">Copied</string>
+    <string name="rows_copy_message">Copy message</string>
+    <string name="rows_copy_response">Copy response</string>
+    <string name="rows_copy_tool_call">Copy tool call</string>
+    <string name="rows_copy_output">Copy output</string>
+    <string name="rows_message_actions">Message actions</string>
+    <string name="rows_send_again">Send again</string>
+    <string name="rows_not_sent">Not sent</string>
+    <string name="rows_expand_prompt">Expand prompt</string>
+    <string name="rows_collapse_prompt">Collapse prompt</string>
+
+    <!-- Disclosure -->
+    <string name="rows_expand">Expand</string>
+    <string name="rows_collapse">Collapse</string>
+    <string name="rows_state_expanded">Expanded</string>
+    <string name="rows_state_collapsed">Collapsed</string>
+
+    <!-- Reasoning and run activity -->
+    <string name="rows_thought">Thought</string>
+    <string name="rows_thinking">Thinking…</string>
+    <string name="rows_reasoning_shown">Shown</string>
+    <string name="rows_reasoning_empty">No reasoning recorded</string>
+    <string name="rows_reasoning_expand">Expand reasoning</string>
+    <string name="rows_reasoning_collapse">Collapse reasoning</string>
+    <string name="rows_reasoning_state_collapsed">Reasoning collapsed</string>
+    <string name="rows_reasoning_state_expanded">Reasoning expanded</string>
+    <string name="rows_reasoning_state_working">Reasoning in progress</string>
+    <string name="rows_run_working">Working</string>
+    <string name="rows_run_thought">Thought</string>
+    <string name="rows_run_worked">Worked</string>
+    <string name="rows_run_for_duration">%1$s for %2$s</string>
+    <string name="rows_work_expand">Expand agent work</string>
+    <string name="rows_work_collapse">Collapse agent work</string>
+    <string name="rows_run_state_working">Agent work in progress</string>
+    <string name="rows_run_state_collapsed">Agent work collapsed</string>
+    <string name="rows_run_state_expanded">Agent work expanded</string>
+    <string name="rows_list_separator"> · </string>
+    <string name="rows_duration_ms">%1$d ms</string>
+    <string name="rows_duration_ms_compact">%1$dms</string>
+    <string name="rows_duration_tenths">%1$d.%2$ds</string>
+    <string name="rows_duration_seconds">%1$ds</string>
+    <string name="rows_duration_minutes">%1$dm %2$ds</string>
+    <plurals name="rows_run_tools">
+        <item quantity="one">%1$d tool</item>
+        <item quantity="other">%1$d tools</item>
+    </plurals>
+    <plurals name="rows_run_failure_count">
+        <item quantity="one">%1$d failure</item>
+        <item quantity="other">%1$d failures</item>
+    </plurals>
+
+    <!-- Tool run summary (one line per run's tool calls) -->
+    <plurals name="rows_command_count">
+        <item quantity="one">%1$d command</item>
+        <item quantity="other">%1$d commands</item>
+    </plurals>
+    <string name="rows_tool_run_ran">Ran %1$s</string>
+    <string name="rows_tool_run_failed">%1$d ran - %2$d failed</string>
+    <string name="rows_tool_run_running">Running %1$s - %2$s - %3$s</string>
+    <string name="rows_tool_run_approval">Approval needed - %1$s</string>
+    <string name="rows_tool_run_default_name">tool</string>
+    <string name="rows_tool_run_open">Open command details</string>
+    <string name="rows_tool_run_show">Show command details</string>
+    <string name="rows_tool_run_hide">Hide command details</string>
+    <string name="rows_tool_run_summary">Tool run summary</string>
+    <string name="rows_tool_run_state">%1$d tools, %2$d failed, %3$d awaiting approval</string>
+    <string name="rows_role_you">You</string>
+    <string name="rows_role_error">Error</string>
+    <string name="rows_role_inter_agent">Inter-agent</string>
+    <string name="rows_role_not_sent">%1$s · Not sent</string>
+    <string name="rows_step_done">done</string>
+    <string name="rows_step_failed">failed</string>
+    <string name="rows_step_running">running</string>
+
+    <!-- Tool cards -->
+    <string name="rows_tool_output">Output</string>
+    <string name="rows_tool_argument_line">$ %1$s</string>
+    <string name="rows_tool_status_duration">%1$s · %2$d ms</string>
+    <string name="rows_tool_done">Done</string>
+    <string name="rows_tool_step_label">%1$s  %2$s</string>
+    <string name="rows_tool_verb_ran">Ran</string>
+    <string name="rows_tool_verb_read">Read</string>
+    <string name="rows_tool_verb_wrote">Wrote</string>
+    <string name="rows_tool_verb_edited">Edited</string>
+    <string name="rows_tool_verb_searched">Searched</string>
+    <string name="rows_tool_verb_fetched">Fetched</string>
+    <string name="rows_tool_output_truncated">Showing %1$d of %2$d lines · Copy includes all output</string>
+    <string name="rows_tool_output_scroll_hint">Tool output. Use left and right arrow keys to scroll horizontally.</string>
+    <string name="rows_tool_result_preview">Showing a preview · loading the full output…</string>
+    <string name="rows_agent_message_state">%1$s, %2$s</string>
+
+    <!-- Approvals -->
+    <string name="rows_approval_requested">Approval requested</string>
+    <string name="rows_approval_body">The agent wants to run this tool.</string>
+    <string name="rows_approve">Approve</string>
+    <string name="rows_reject">Reject</string>
+    <string name="rows_cancel">Cancel</string>
+    <string name="rows_sending">Sending…</string>
+    <string name="rows_reject_reason">Reason (optional)</string>
+    <string name="rows_approved">Approved</string>
+    <string name="rows_rejected">Rejected</string>
+    <string name="rows_approval_response">Approval response</string>
+    <plurals name="rows_tool_decisions">
+        <item quantity="one">%1$d tool decision</item>
+        <item quantity="other">%1$d tool decisions</item>
+    </plurals>
+    <string name="rows_question">Question</string>
+    <string name="rows_dismiss">Dismiss</string>
+    <string name="rows_send_answer">Send answer</string>
+    <string name="rows_other">Other</string>
+    <string name="rows_option_description">%1$s: %2$s</string>
+
+    <!-- Images -->
+    <string name="rows_attached_image">Attached image</string>
+    <string name="rows_image_not_loaded">Image not loaded</string>
+    <string name="rows_image_fullscreen">Attachment fullscreen</string>
+    <string name="rows_image_decode_failed">Image could not be decoded</string>
+    <string name="rows_image_counter">%1$d / %2$d</string>
+    <string name="rows_close_viewer">Close image viewer</string>
+    <string name="rows_more_count">+%1$d</string>
+
+    <!-- Subagents -->
+    <string name="rows_subagent_dispatched">Dispatched: %1$s</string>
+    <string name="rows_subagent_background">background</string>
+    <string name="rows_show_prompt">Show prompt</string>
+    <string name="rows_hide_prompt">Hide prompt</string>
+    <string name="rows_dispatch_done">Sub-agent dispatched</string>
+    <string name="rows_dispatch_failed">Dispatch failed</string>
+    <string name="rows_dispatch_running">Sub-agent dispatching</string>
+    <string name="rows_activity_command">Command</string>
+    <string name="rows_activity_subagent">Subagent</string>
+    <string name="rows_activity_task">Task</string>
+    <string name="rows_notification_headline">%1$s %2$s</string>
+    <string name="rows_status_unknown">unknown</string>
+    <string name="rows_completed">Completed</string>
+    <string name="rows_view_conversation">View conversation</string>
+    <string name="rows_show_full_report">Show full report</string>
+    <string name="rows_hide_full_report">Hide full report</string>
+    <string name="rows_show_details">Show details</string>
+    <string name="rows_hide_details">Hide details</string>
+    <string name="rows_show_transcript">Show transcript</string>
+    <string name="rows_hide_transcript">Hide transcript</string>
+    <string name="rows_transcript">Transcript: %1$s</string>
+
+    <!-- letta-mobile-bglj6.13: the canvas.compose card on the message that narrates it. -->
+    <string name="rows_canvas_untitled">Board update</string>
+    <string name="rows_canvas_show">Show on canvas</string>
+    <string name="rows_canvas_pending">Adding to the board…</string>
+    <string name="rows_canvas_published">On the board</string>
+    <string name="rows_canvas_dry_run">Preview only: nothing was added</string>
+    <string name="rows_canvas_failed">Not added to the board</string>
+    <string name="rows_canvas_card_description">%1$s, %2$s</string>
+    <string name="rows_canvas_kind_note">Note</string>
+    <string name="rows_canvas_kind_checklist">Checklist</string>
+    <string name="rows_canvas_kind_card">Card</string>
+    <string name="rows_canvas_kind_text">Text</string>
+    <string name="rows_canvas_kind_group">Group</string>
+    <string name="rows_canvas_summary">%1$s · %2$s</string>
+    <plurals name="rows_canvas_items">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <plurals name="rows_canvas_more_problems">
+        <item quantity="one">and %1$d more problem</item>
+        <item quantity="other">and %1$d more problems</item>
+    </plurals>
+</resources>

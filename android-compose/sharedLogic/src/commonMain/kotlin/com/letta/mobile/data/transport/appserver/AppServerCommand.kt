@@ -303,6 +303,21 @@ sealed interface AppServerCommand {
         @SerialName("commit_message") val commitMessage: String? = null,
     ) : AppServerCommand
 
+    /**
+     * bfooy.5: the native owner of an agent memory-block delete. Removes one
+     * MemFS file and commits the deletion so HEAD moves (idempotent upstream:
+     * an already-absent file succeeds without a commit).
+     */
+    @Serializable
+    @SerialName("delete_memory_file")
+    data class DeleteMemoryFile(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+        /** Relative to the agent's memory root; rejected upstream if it escapes. */
+        val path: String,
+        @SerialName("commit_message") val commitMessage: String? = null,
+    ) : AppServerCommand
+
     @Serializable
     @SerialName("cron_list")
     data class CronList(

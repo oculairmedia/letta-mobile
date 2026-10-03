@@ -45,6 +45,10 @@ assert_contains "$test_job" 'Run Android verification task graph'
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
 assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
 assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
+# letta-mobile-o4ygk.1: the module-boundary gate and its synthetic-graph tests
+# run inside the REQUIRED test job, not only in the advisory graph workflow.
+assert_contains "$test_job" ':build-logic:test'
+assert_contains "$test_job" 'checkArchitectureBoundaries'
 # Stacked PRs must diff additive modules against the GitHub PR base. Diffing
 # vs origin/main re-runs lower-stack modules and lets unrelated flakes fail
 # required `test` (StreamingMarkdownRecompositionGateTest on #1556).
@@ -96,6 +100,10 @@ assert_contains "$shared_job" 'Run remaining shared multiplatform verification t
 # even before Konan. JVM + CLI tests first; native compile second.
 assert_contains "$shared_job" ':appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist'
 assert_contains "$shared_job" ':sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative'
+# letta-mobile-o4ygk.2: wasmJs compiles stay in the REQUIRED shared job.
+assert_contains "$shared_job" ':sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs'
+# letta-mobile-o4ygk.4: the shared Compose UI compiles for wasm in the same required job.
+assert_contains "$shared_job" ':sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs'
 shared_gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$shared_job")"
 assert_eq "$shared_gradle_invocations" '2'
 
@@ -137,12 +145,13 @@ repo="$TMP/mapping"
 new_repo "$repo"
 base="$(git -C "$repo" rev-parse HEAD)"
 mkdir -p "$repo/android-compose/feature-chat/src" "$repo/android-compose/designsystem/src" \
-  "$repo/android-compose/desktop/src" "$repo/android-compose/cli/src"
+  "$repo/android-compose/sharedUI/src" "$repo/android-compose/desktop/src" "$repo/android-compose/cli/src"
 touch "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/designsystem/src/Theme.kt" \
+  "$repo/android-compose/sharedUI/src/Surface.kt" \
   "$repo/android-compose/desktop/src/Main.kt" "$repo/android-compose/cli/src/Cli.kt"
 git -C "$repo" add . && git -C "$repo" commit -qm modules
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base")"
-assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :desktop:test :cli:testDebugUnitTest"
+assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :sharedUI:jvmTest :desktop:test :cli:testDebugUnitTest"
 
 # Stacked PR: designsystem landed on the lower branch; this commit only
 # touches app/. Diff vs the stack base must not schedule designsystem.
@@ -191,6 +200,17 @@ printf '#!/usr/bin/env bash\necho world' > "$repo/android-compose/appserver-cli/
 git -C "$repo" add . && git -C "$repo" commit -qm "add appserver-cli file"
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base2")"
 assert_eq "$actual" ":appserver-cli:test"
+
+# An SPI change re-runs the conformance kit; a kit change runs only the kit.
+mkdir -p "$repo/android-compose/plugin-api/src" "$repo/android-compose/plugin-api-testkit/src"
+touch "$repo/android-compose/plugin-api/src/CanvasPlugin.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch plugin-api"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" ":plugin-api:jvmTest :plugin-api-testkit:jvmTest"
+touch "$repo/android-compose/plugin-api-testkit/src/PluginConformance.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch plugin-api-testkit"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" ":plugin-api-testkit:jvmTest"
 
 repo="$TMP/policy"
 new_repo "$repo"

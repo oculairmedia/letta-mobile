@@ -1,5 +1,10 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.desktop.phone.ClosePhoneDrawerOnNavigation
+import com.letta.mobile.desktop.phone.LocalDesktopPhone
+import com.letta.mobile.desktop.phone.PhoneAwareContent
+import com.letta.mobile.desktop.phone.isBareChatPage
+
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
@@ -20,6 +25,7 @@ import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
+import com.letta.mobile.desktop.chat.showsCanvasSidePane
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.desktop.memory.DesktopBlockApi
@@ -42,6 +48,13 @@ internal data class DesktopMainContentInputs(
     val subagentRepository: SubagentRepository?,
     val activeSubagents: List<SubagentEntry>,
     val activeCanvasSession: CanvasSession? = null,
+    /** The board the shared page has docked; the side pane never shows it a second time. */
+    val dockedCanvasId: com.letta.mobile.data.canvas.CanvasId? = null,
+    /**
+     * letta-mobile-bglj6.1: the shared KMP chat page, set only while DesktopSharedChatPageFlag is
+     * on. Null keeps [ChatDetailPane], the default.
+     */
+    val sharedChatPage: (@Composable (Modifier) -> Unit)? = null,
 )
 
 internal data class DesktopMainContentActions(
@@ -60,6 +73,17 @@ internal fun DesktopMainContentPane(
     actions: DesktopMainContentActions,
     modifier: Modifier = Modifier,
 ) {
+    // The phone preview frames every destination but the chat page in a phone app bar; null on the desktop.
+    val phone = LocalDesktopPhone.current
+    ClosePhoneDrawerOnNavigation(phone, inputs.selectedDestination, inputs.chatDetailState.surface.selectedConversationId, inputs.editingAgentId)
+    val bare = isBareChatPage(inputs.selectedDestination, inputs.sharedChatPage != null, inputs.editingAgentId)
+    PhoneAwareContent(phone, title = inputs.selectedDestination.label, bare = bare, modifier = modifier) { paneModifier ->
+        MainContentRow(inputs, actions, paneModifier)
+    }
+}
+
+@Composable
+private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions, modifier: Modifier) {
     val editing = inputs.editingAgentId
     val canvas = inputs.activeCanvasSession
     // The editor is a panel beside the chat, not a page: the conversation stays in view.
@@ -69,7 +93,7 @@ internal fun DesktopMainContentPane(
         }
         when {
             editing != null -> EditAgentSidePane(editing, inputs, actions)
-            canvas != null -> CanvasSidePane(canvas, actions)
+            canvas != null && showsCanvasSidePane(canvas.canvasId, inputs.dockedCanvasId) -> CanvasSidePane(canvas, actions)
         }
     }
 }
@@ -89,12 +113,18 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
         )
         return
     }
-    ChatDetailPane(
-        state = inputs.chatDetailState,
-        actions = actions.chatDetailActions,
-        modifier = Modifier.fillMaxSize(),
-    )
-    if (!inputs.showBackgroundTasks && inputs.subagentRepository != null) {
+    val sharedChatPage = inputs.sharedChatPage
+    if (sharedChatPage != null) {
+        sharedChatPage(Modifier.fillMaxSize())
+    } else {
+        ChatDetailPane(
+            state = inputs.chatDetailState,
+            actions = actions.chatDetailActions,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+    // The shared page draws it in the canvas header (see DesktopShellMainPane's canvasHeaderTrailing).
+    if (inputs.showsBackgroundTasksToggle()) {
         DesktopBackgroundTasksToggle(
             runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
             onClick = actions.onShowBackgroundTasks,
@@ -103,6 +133,15 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
                 .padding(top = LettaDimens.Space.md, end = LettaDimens.Space.lg),
         )
     }
+}
+
+/**
+ * The conversation's background-tasks toggle: only over [ChatDetailPane] (the shared page draws
+ * its own), while the tasks pane is closed and there is a repository to list.
+ */
+private fun DesktopMainContentInputs.showsBackgroundTasksToggle(): Boolean {
+    if (sharedChatPage != null) return false
+    return !showBackgroundTasks && subagentRepository != null
 }
 
 @Composable
@@ -138,6 +177,8 @@ private fun CanvasSidePane(session: CanvasSession, actions: DesktopMainContentAc
             assets = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.assets,
             onNavigateBack = actions.onCloseCanvas,
             onShareToChat = actions.onShareCanvasToChat,
+            // No right button on a finger: holding one on open board is how it picks several.
+            longPressDrawsSelectionBox = true,
             modifier = Modifier.fillMaxSize(),
         )
     }

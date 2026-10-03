@@ -2,6 +2,7 @@ package com.letta.mobile.architecture
 
 import com.lemonappdev.konsist.api.Konsist
 import com.tngtech.archunit.core.importer.ClassFileImporter
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -25,6 +26,31 @@ class ArchitectureGateFixtureTest {
     }
 
     @Test
+    fun `Konsist policy catches implicit java lang use in commonMain`() {
+        val scope = Konsist.scopeFromExternalDirectory(resources.resolve("violation").toString())
+        val violations = KotlinSourcePolicy.violations(scope).filter { "ImplicitJvm.kt" in it }
+
+        assertEquals(
+            listOf("System.", "Math.", "::class.java", "synchronized("),
+            violations.map { it.substringAfter("uses JVM-only ") },
+        )
+    }
+
+    @Test
+    fun `implicit JVM scan ignores comments strings and common clocks`() {
+        val source = """
+            import kotlinx.atomicfu.locks.synchronized
+            // System.currentTimeMillis() in a comment
+            val label = "Math.max in a string"
+            val now = kotlin.time.Clock.System.now()
+            val sized = ChatDockGeometryMath.rect()
+            fun locked() = synchronized(lock) { 1 }
+        """.trimIndent()
+
+        assertEquals(emptyList<String>(), ImplicitJvmApiScan.hits(source))
+    }
+
+    @Test
     fun `ArchUnit catches a fixture package cycle`() {
         val classes = ClassFileImporter().importPackages("com.letta.mobile.architecture.fixtures.violation.cycle")
         val cycleRule = repositoryBytecodeRules().first()
@@ -36,6 +62,33 @@ class ArchitectureGateFixtureTest {
     fun `ArchUnit accepts an acyclic fixture`() {
         val classes = ClassFileImporter().importPackages("com.letta.mobile.architecture.fixtures.clean")
 
-        assertFalse(repositoryBytecodeRules().any { it.evaluate(classes).hasViolation() })
+        assertFalse(repositoryBytecodeRules(allowEmpty = true).any { it.evaluate(classes).hasViolation() })
+    }
+
+    @Test
+    fun `production bytecode rules fail on an empty import`() {
+        val nothing = ClassFileImporter().importPackages("com.letta.mobile.architecture.fixtures.absent")
+
+        repositoryBytecodeRules().forEach { rule ->
+            val failed = runCatching { rule.evaluate(nothing).hasViolation() }.getOrElse { true }
+            assertTrue(failed, "${rule.description} passed on zero classes")
+        }
+    }
+
+    @Test
+    fun `isolation scan catches the type-safe accessor spelling`() {
+        val script = """
+            dependencies {
+                implementation(projects.app)
+                implementation(projects.core.androidData)
+                implementation(projects.appserverCli)
+            }
+        """.trimIndent()
+
+        assertEquals(
+            listOf(":app", ":core:android-data"),
+            GradleProjectDependencyScan.hits(script, listOf(":app", ":core:android-data", ":designsystem")),
+        )
+        assertEquals(listOf(":app"), GradleProjectDependencyScan.hits("api(project(\":app\"))", listOf(":app")))
     }
 }

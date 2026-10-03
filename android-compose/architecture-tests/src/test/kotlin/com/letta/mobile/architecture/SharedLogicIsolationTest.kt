@@ -12,19 +12,22 @@ class SharedLogicIsolationTest {
     fun `sharedLogic must not depend on platform app or Android feature modules`() {
         val gradle = sharedLogicBuild.readText()
         val forbiddenProjectDeps = listOf(
-            """project(":app")""",
-            """project(":core:android-data")""",
-            """project(":core:data")""",
-            """project(":core:domain")""",
-            """project(":designsystem")""",
-            """project(":feature-chat")""",
-            """project(":feature-editagent")""",
-            """project(":desktop")""",
-            """project(":web")""",
+            ":app",
+            ":core:android-data",
+            ":core:data",
+            ":core:domain",
+            ":designsystem",
+            ":feature-chat",
+            ":feature-editagent",
+            ":desktop",
+            ":web",
             // sharedUI depends on sharedLogic; reverse edge would be a cycle
-            """project(":sharedUI")""",
+            ":sharedUI",
+            // :plugin-view hosts live plugin pages on top of this module; the reverse edge would be a cycle.
+            ":plugin-view",
         )
-        val hits = forbiddenProjectDeps.filter { it in gradle }
+        // Matches project(":x") and the projects.x type-safe accessor.
+        val hits = GradleProjectDependencyScan.hits(gradle, forbiddenProjectDeps)
         check(hits.isEmpty()) {
             "sharedLogic/build.gradle.kts must not depend on platform modules: $hits"
         }

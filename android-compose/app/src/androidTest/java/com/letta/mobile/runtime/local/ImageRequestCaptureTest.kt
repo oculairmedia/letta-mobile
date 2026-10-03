@@ -6,8 +6,6 @@ import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.*
-import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
-import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
@@ -78,10 +76,7 @@ class ImageRequestCaptureTest {
                 nodeBridge = nodeBridge,
                 runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
                 localBackendStore = LettaCodeLocalBackendStore(context),
-                androidNetworkBridge = LocalAndroidNetworkBridge(
-                    sensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context),
-                    hardwareControlProvider = AndroidDeviceHardwareControlProvider(context),
-                ),
+                androidNetworkBridge = networkBridge(context),
                 onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
                     override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
                         error("on-device bridge must not start when a custom provider is configured")

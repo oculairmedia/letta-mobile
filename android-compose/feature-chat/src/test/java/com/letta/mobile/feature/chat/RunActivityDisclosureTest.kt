@@ -5,10 +5,12 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,6 +24,7 @@ import com.letta.mobile.feature.chat.screen.RunActivityState
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -181,6 +184,60 @@ class RunActivityDisclosureTest {
             .assert(hasNoClickAction())
             .assert(hasNoStateDescription())
         composeRule.runOnIdle { assertEquals(0, toggles) }
+    }
+
+    /**
+     * Product feedback, 2026-09-28: the collapsible header's chevron must sit
+     * trailing the counts — like every other disclosure row in the app (thought
+     * blocks, tool run details) — not leading the label.
+     */
+    @Test
+    fun collapsibleHeaderTrailsItsChevronLikeOtherDisclosureRows() {
+        setContent(
+            activity = RunActivityProjection(
+                state = RunActivityState.Worked,
+                durationMs = 2_400L,
+                toolCount = 2,
+                failureCount = 0,
+            ),
+        )
+
+        val chevron = composeRule.onNodeWithTag(
+            RunActivityDisclosureTestTags.Chevron,
+            useUnmergedTree = true,
+        )
+        chevron.assertIsDisplayed()
+        // Unmerged bounds: the header merges descendant semantics, so the
+        // merged node would report the whole row, not the counts' position.
+        val countsRight = composeRule
+            .onNodeWithText("2 tools", useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .right
+        val chevronLeft = chevron.fetchSemanticsNode().boundsInRoot.left
+        assertTrue(
+            "chevron at $chevronLeft must trail the counts ending at $countsRight",
+            chevronLeft >= countsRight,
+        )
+    }
+
+    /** A non-collapsible single-step header renders no chevron at all. */
+    @Test
+    fun nonCollapsibleHeaderRendersNoChevron() {
+        setContent(
+            activity = RunActivityProjection(
+                state = RunActivityState.Worked,
+                durationMs = 1_000L,
+                toolCount = 0,
+                failureCount = 0,
+            ),
+            disclosure = DisclosureConfiguration(collapsible = false),
+        )
+
+        composeRule.onAllNodesWithTag(
+            RunActivityDisclosureTestTags.Chevron,
+            useUnmergedTree = true,
+        ).assertCountEquals(0)
     }
 
     private fun setContent(

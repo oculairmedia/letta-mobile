@@ -1,8 +1,11 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -54,12 +57,15 @@ object CanvasOpProjector {
     private const val BG_PATTERN_LAMPORT = "_bgPatternLamport"
     private const val BG_PATTERN_ACTOR = "_bgPatternActorId"
     private const val DOCUMENTS = "_documents"
+    private const val PLUGIN_ELEMENTS = CanvasPluginElements.KEY
     private const val DOC_JSON = "json"
     private const val DOC_REMOVED = "_removed"
     private const val DOC_FRAME = "frame"
     private const val DOC_COLOR = "color"
     private const val DOC_STYLE = "style"
     private const val DOC_TITLE = "title"
+    private const val DOC_OWNER = "owner"
+    private const val DOC_COMPOSE = "compose"
 
     /**
      * How many tombstones a scene keeps. They cannot grow without bound, and the ones that matter
@@ -145,8 +151,20 @@ object CanvasOpProjector {
         is CanvasOp.AddElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.UpdateElementOp -> upsertElementWithLww(sceneJson, op)
         is CanvasOp.RemoveElementOp -> removeElementWithLww(sceneJson, op)
+        is CanvasOp.SetPluginElementOp -> writePluginElements(sceneJson) { CanvasPluginElements.set(it, op) }
+        is CanvasOp.RemovePluginElementOp -> writePluginElements(sceneJson) { CanvasPluginElements.remove(it, op) }
         is CanvasOp.BatchOp -> project(sceneJson, op.ops)
     }
+
+    /** The scene with its `_pluginElements` replaced by what [write] makes of the scene. */
+    private inline fun writePluginElements(sceneJson: String, write: (JsonObject) -> JsonArray): String {
+        val parsed = parseScene(sceneJson)
+        return canonicalScene(parsed + (PLUGIN_ELEMENTS to write(parsed)))
+    }
+
+    /** The plugin elements of [sceneJson] ordered by id: removed, partial and undecodable entries excluded. */
+    fun pluginElementsOf(sceneJson: String): List<CanvasPluginElement> =
+        if (sceneJson.isBlank()) emptyList() else CanvasPluginElements.elementsOf(parseScene(sceneJson))
 
     /**
      * A replace is authoritative over everything before it, so its elements are stamped with its
@@ -176,6 +194,8 @@ object CanvasOpProjector {
         val current = parseScene(sceneJson)
         val carriedDocuments = if (incoming.containsKey(DOCUMENTS)) null else current[DOCUMENTS]
         val carriedLabelOwners = if (carriedDocuments != null && !incoming.containsKey(LABEL_OWNERS)) current[LABEL_OWNERS] else null
+        // Plugin elements are not the drawing either: a redraw keeps them unless it brings its own.
+        val carriedPluginElements = current[PLUGIN_ELEMENTS].takeUnless { incoming.containsKey(PLUGIN_ELEMENTS) }
         val provenance = WriterProvenance(op.lamport, op.actorId, op.opId)
         val stamped = stampElements(incoming["elements"]?.jsonArray, provenance)
         return canonicalScene(
@@ -183,6 +203,7 @@ object CanvasOpProjector {
                 incoming.forEach { (key, value) -> if (key != "elements") put(key, value) }
                 carriedDocuments?.let { put(DOCUMENTS, it) }
                 carriedLabelOwners?.let { put(LABEL_OWNERS, it) }
+                carriedPluginElements?.let { put(PLUGIN_ELEMENTS, it) }
                 put("elements", JsonArray(stamped))
                 put(BG_LAMPORT, JsonPrimitive(op.lamport))
                 put(BG_ACTOR, JsonPrimitive(op.actorId))
@@ -391,6 +412,8 @@ object CanvasOpProjector {
                     color = documentColor(entry),
                     style = documentStyle(entry),
                     title = documentTitle(entry),
+                    owner = documentOwner(entry),
+                    compose = documentCompose(entry),
                 )
             }
             .sortedBy { it.id }
@@ -418,6 +441,17 @@ object CanvasOpProjector {
 
     private fun documentTitle(entry: JsonObject): String? =
         runCatching { entry[DOC_TITLE]?.jsonPrimitive?.content }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    /** The entry's owner; null when it has none, or one this build does not know (still kept on write). */
+    private fun documentOwner(entry: JsonObject): CanvasGeometryOwner? {
+        val raw = entry[DOC_OWNER] ?: return null
+        return runCatching { json.decodeFromJsonElement(CanvasGeometryOwner.serializer(), raw) }.getOrNull()
+    }
+
+    private fun documentCompose(entry: JsonObject): CanvasComposeProvenance? {
+        val raw = runCatching { entry[DOC_COMPOSE]?.jsonObject }.getOrNull() ?: return null
+        return runCatching { json.decodeFromJsonElement(CanvasComposeProvenance.serializer(), raw) }.getOrNull()
+    }
 
     private fun documentStyle(entry: JsonObject): CanvasTextStyle? {
         val raw = runCatching { entry[DOC_STYLE]?.jsonObject }.getOrNull() ?: return null
@@ -448,6 +482,8 @@ object CanvasOpProjector {
         val color: String? = null,
         val style: CanvasTextStyle? = null,
         val title: String? = null,
+        val owner: CanvasGeometryOwner? = null,
+        val compose: CanvasComposeProvenance? = null,
     )
 
     /**
@@ -494,13 +530,37 @@ object CanvasOpProjector {
         put(OP_ID, JsonPrimitive(input.provenance.opId))
     }
 
-    /** A write without a frame, colour, style or title keeps [existing]'s; an empty title clears it. */
+    /**
+     * A write without a frame, colour, style, title, owner or compose provenance keeps [existing]'s;
+     * an empty title clears it. See [ownerField] for the one owner that is inferred.
+     */
     private fun keptFields(input: DocumentWriteInput, existing: JsonObject?): Map<String, JsonElement> = buildMap {
         (input.frame ?: existing?.let(::documentFrame))?.let { put(DOC_FRAME, frameJson(it)) }
         (input.color ?: existing?.let(::documentColor))?.let { put(DOC_COLOR, JsonPrimitive(it)) }
         (input.style ?: existing?.let(::documentStyle))?.let { put(DOC_STYLE, styleJson(it)) }
         (input.title ?: existing?.let(::documentTitle))?.takeIf { it.isNotBlank() }?.let { put(DOC_TITLE, JsonPrimitive(it)) }
+        ownerField(input, existing)?.let { put(DOC_OWNER, it) }
+        composeField(input, existing)?.let { put(DOC_COMPOSE, it) }
     }
+
+    /** The provenance a write names, else the stored one as stored, so what a later catalog version wrote survives. */
+    private fun composeField(input: DocumentWriteInput, existing: JsonObject?): JsonElement? =
+        input.compose?.let { json.encodeToJsonElement(CanvasComposeProvenance.serializer(), it) }
+            ?: existing?.get(DOC_COMPOSE)?.takeUnless { it is JsonNull }
+
+    /**
+     * The owner a write leaves: the one it names; else the one the document has (kept as stored, so
+     * an owner a later build wrote survives this one); else, when the write places the document
+     * with a frame, [CanvasGeometryOwner.EXPLICIT], because whoever names a frame means it. With no
+     * owner and no frame the document stays ownerless: a legacy note, laid out as AUTO would be.
+     */
+    private fun ownerField(input: DocumentWriteInput, existing: JsonObject?): JsonElement? =
+        input.owner?.let(::ownerJson)
+            ?: existing?.get(DOC_OWNER)?.takeUnless { it is JsonNull }
+            ?: input.frame?.let { ownerJson(CanvasGeometryOwner.EXPLICIT) }
+
+    private fun ownerJson(owner: CanvasGeometryOwner): JsonElement =
+        json.encodeToJsonElement(CanvasGeometryOwner.serializer(), owner)
 
     private fun upsertDocumentWithLww(sceneJson: String, op: CanvasOp.SetDocumentOp): String =
         writeDocument(
@@ -513,6 +573,8 @@ object CanvasOpProjector {
                 color = op.color,
                 style = op.style,
                 title = op.title,
+                owner = op.owner,
+                compose = op.compose,
             ),
         )
 

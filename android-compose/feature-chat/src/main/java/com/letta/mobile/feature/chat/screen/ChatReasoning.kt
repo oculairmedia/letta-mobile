@@ -7,10 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -29,15 +28,13 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LiveStatusText
 import com.letta.mobile.ui.components.MarkdownText
-import com.letta.mobile.ui.icons.LettaIconSizing
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalChatIsPinching
-import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.theme.LettaDimens
@@ -118,14 +115,13 @@ internal fun MessageReasoning(
         modifier = modifier
             .fillMaxWidth()
             .then(sizeAnimation)
-            // letta-mobile: MessageReasoning renders standalone (bypasses
-            // ChatMessageBubble, which is where every other run-step row gets
-            // its horizontal inset from `chatDimens.bubblePaddingHorizontal`).
-            // Without matching it here, the "Thought" title sits flush
-            // against the run gutter while sibling tool-call rows sit 10dp
-            // further right, so their content doesn't line up under a
-            // shared run's dot/rail — match the same token.
-            .padding(horizontal = MaterialTheme.chatDimens.bubblePaddingHorizontal, vertical = LettaDimens.Space.xs),
+            // MessageReasoning renders standalone (bypasses ChatMessageBubble).
+            // Bubble-less assistant prose adds NO horizontal padding there — the
+            // message list's own contentPadding is the only side gutter — so the
+            // "Thought" row must not add `bubblePaddingHorizontal` either; doing
+            // so inset the disclosure 10dp past the adjacent message text
+            // (product feedback, 2026-09-28: align the thought with the message).
+            .padding(vertical = LettaDimens.Space.xs),
     ) {
         Row(
             modifier = Modifier
@@ -144,7 +140,23 @@ internal fun MessageReasoning(
                         Modifier
                     },
                 )
-                .padding(vertical = LettaDimens.Space.xs),
+                .then(
+                    if (canToggle) {
+                        // Same tap-target floor as RunActivityDisclosure: a collapsed
+                        // "Thought" row and a tool-run disclosure row must measure the same
+                        // header height (letta-mobile-eohab.7, product feedback 2026-09-29).
+                        // heightIn precedes the pad to mirror that row's modifier shape, and
+                        // the xs self-pad collapses to hair so a single-line header never
+                        // exceeds the 44dp floor.
+                        Modifier
+                            .heightIn(min = LettaDimens.Orb.railSlotHeight)
+                            .padding(vertical = LettaDimens.Space.hair)
+                    } else {
+                        // Streaming/active rows stay content-height: no tap target, and a
+                        // floor here would inflate every live reasoning row.
+                        Modifier.padding(vertical = LettaDimens.Space.xs)
+                    },
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
@@ -182,15 +194,9 @@ internal fun MessageReasoning(
                     .testTag(ChatReasoningTestTags.Preview),
             )
 
-            Icon(
-                imageVector = LettaIcons.ExpandMore,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                    alpha = if (canToggle) 0.8f else 0.4f,
-                ),
-                modifier = Modifier
-                    .size(LettaIconSizing.Inline)
-                    .rotate(if (isCollapsed) 0f else 180f),
+            DisclosureChevron(
+                expanded = !isCollapsed,
+                enabled = canToggle,
             )
         }
 
@@ -200,8 +206,11 @@ internal fun MessageReasoning(
             exit = ChatMotion.verticalExit(slideDivisor = 4),
         ) {
             Column(
+                // No `start` indent: the expanded reasoning body aligns flush
+                // with the header and with adjacent message text (product
+                // feedback, 2026-09-28, second pass).
                 modifier = Modifier
-                    .padding(top = LettaDimens.Space.lg, start = LettaDimens.Space.sm, bottom = LettaDimens.Space.xs),
+                    .padding(top = LettaDimens.Space.lg, bottom = LettaDimens.Space.xs),
             ) {
                 if (isActive) {
                     if (message.content.isBlank()) {

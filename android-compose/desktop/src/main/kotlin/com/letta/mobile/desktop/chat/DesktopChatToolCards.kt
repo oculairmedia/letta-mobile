@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import com.letta.mobile.ui.text.LettaSelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CallMade
@@ -283,7 +283,7 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
         provenance?.let { AgentMessageProvenanceMetadata(it, provenanceTint) }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
             val argumentLine = remember(args) { "$ ${primaryToolArgument(ToolArgumentPayload(args))}" }
-            SelectionContainer {
+            LettaSelectionContainer {
                 Text(
                     text = argumentLine,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -763,7 +763,7 @@ internal fun CodeBlock(text: String) {
         shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
     ) {
-        SelectionContainer {
+        LettaSelectionContainer {
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),

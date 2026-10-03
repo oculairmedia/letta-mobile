@@ -17,6 +17,7 @@ object CanvasAssetRefs {
             is CanvasOp.UpdateElementOp -> scan(op.elementJson)
             is CanvasOp.ReplaceSceneOp -> scan(op.sceneJson)
             is CanvasOp.SetDocumentOp -> scan(op.documentJson)
+            is CanvasOp.SetPluginElementOp -> op.snapshot?.let { scan(it.assetRef) }
             is CanvasOp.BatchOp -> op.ops.forEach { collect(it) }
             else -> Unit
         }

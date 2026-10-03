@@ -1,7 +1,10 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
+import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Domain operations for Canvas mutations.
@@ -110,6 +113,9 @@ sealed interface CanvasOp {
      * live on the board beside the drawing, keyed by [documentId]; last writer wins per document.
      * A null [frame] keeps the document where it already is, a null [color] keeps its colour and a
      * null [style] keeps how its text is set and a null [title] keeps its title (an empty one clears it).
+     * A null [owner] keeps the document's geometry owner, except that a [frame] given to a document
+     * with no owner yet makes it [CanvasGeometryOwner.EXPLICIT]; a null [compose] keeps its
+     * canvas_compose provenance.
      */
     @Serializable
     @SerialName("set_document")
@@ -123,6 +129,8 @@ sealed interface CanvasOp {
         val color: String? = null,
         val style: CanvasTextStyle? = null,
         val title: String? = null,
+        val owner: CanvasGeometryOwner? = null,
+        val compose: CanvasComposeProvenance? = null,
     ) : CanvasOp
 
     @Serializable
@@ -132,6 +140,41 @@ sealed interface CanvasOp {
         override val actorId: String,
         override val lamport: Long,
         val documentId: String,
+    ) : CanvasOp
+
+    /**
+     * Upserts a plugin element (`_pluginElements`, canvas plugin platform plan section 4.2). Its
+     * frame (with [owner]) and its state ([elementType] with [v], [ref], [props], [snapshot],
+     * [fallback], [meta]) are settled last-writer-wins separately, so a person's move and a
+     * plugin's state update never overwrite each other; a null field keeps what the element has.
+     * A [frame] without an [owner] is [CanvasGeometryOwner.EXPLICIT]. The first write must carry
+     * [elementType], a [fallback] and a [snapshot] or [CanvasPluginFallback.openUrl].
+     */
+    @Serializable
+    @SerialName("set_plugin_element")
+    data class SetPluginElementOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val elementId: String,
+        val elementType: String? = null,
+        val v: Int? = null,
+        val frame: CanvasDocumentFrame? = null,
+        val owner: CanvasGeometryOwner? = null,
+        val ref: String? = null,
+        val props: JsonObject? = null,
+        val snapshot: CanvasPluginSnapshot? = null,
+        val fallback: CanvasPluginFallback? = null,
+        val meta: JsonObject? = null,
+    ) : CanvasOp
+
+    @Serializable
+    @SerialName("remove_plugin_element")
+    data class RemovePluginElementOp(
+        override val opId: String,
+        override val actorId: String,
+        override val lamport: Long,
+        val elementId: String,
     ) : CanvasOp
 
     @Serializable
@@ -160,6 +203,8 @@ fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
     is CanvasOp.SetLabelOwnerOp -> copy(actorId = actorId)
     is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
     is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
+    is CanvasOp.SetPluginElementOp -> copy(actorId = actorId)
+    is CanvasOp.RemovePluginElementOp -> copy(actorId = actorId)
     is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })
 }
 
@@ -181,11 +226,13 @@ fun CanvasOp.withStamp(opId: String, lamport: Long): CanvasOp = when (this) {
     is CanvasOp.SetLabelOwnerOp -> copy(opId = opId, lamport = lamport)
     is CanvasOp.SetDocumentOp -> copy(opId = opId, lamport = lamport)
     is CanvasOp.RemoveDocumentOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.SetPluginElementOp -> copy(opId = opId, lamport = lamport)
+    is CanvasOp.RemovePluginElementOp -> copy(opId = opId, lamport = lamport)
     is CanvasOp.BatchOp -> copy(opId = opId, lamport = lamport, ops = ops.map { it.withStamp(opId, lamport) })
 }
 
 /**
- * Tool payload DTOs for App Server external tools (canvas.*).
+ * Tool payload DTOs for App Server external tools (canvas_*).
  */
 @Serializable
 data class CanvasCreateArgs(
@@ -219,6 +266,9 @@ data class CanvasGetSceneResult(
     /** The element format in a line ([CanvasSceneSchema.hint]). */
     @SerialName("schema_hint")
     val schemaHint: String? = null,
+    /** The board's plugin elements, compact and outside [sceneJson] ([CanvasSceneRead]). */
+    @SerialName("plugin_elements")
+    val pluginElements: List<JsonObject> = emptyList(),
 )
 
 @Serializable

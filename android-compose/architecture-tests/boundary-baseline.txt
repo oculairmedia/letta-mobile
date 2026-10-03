@@ -1,0 +1,11 @@
+# Module-boundary gate baseline (letta-mobile-o4ygk.1).
+#
+# `./gradlew checkArchitectureBoundaries` reads build/reports/architecture/graph.jsonl
+# (written by exportArchitectureGraph) and fails on any boundary violation that
+# is not listed here. It also fails on a line here whose violation is gone, so
+# delete the line in the same change that removes the edge.
+#
+# Format: <rule> <from> -> <to> <owning-bead>
+# Every line needs an owning bead. Do not add new debt here: fix the edge.
+
+shell-to-shell :cli -> :iroh-wrapper-cli letta-mobile-o4ygk.3

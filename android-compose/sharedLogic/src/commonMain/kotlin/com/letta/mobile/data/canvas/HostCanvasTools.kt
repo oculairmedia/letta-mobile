@@ -1,5 +1,8 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.compose.ComposeErrorCode
+import com.letta.mobile.data.canvas.compose.ComposePublishException
+import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
@@ -14,7 +17,7 @@ private val hostCanvasJson = Json {
 }
 
 /**
- * The `canvas.*` tools run by the host (letta-mobile-aknkw.3), for every agent runtime the host
+ * The `canvas_*` tools run by the host (letta-mobile-aknkw.3), for every agent runtime the host
  * serves: registered through `runtime_start.external_tools` like any tool, answered from the relay's
  * log by [HostCanvasBackend]. Same names, descriptions and inputs as the apps' own
  * [CanvasExternalTools] ([CanvasToolContract]).
@@ -23,10 +26,13 @@ private val hostCanvasJson = Json {
  * refused before anything is read, and nothing in the input can name a different caller.
  */
 object HostCanvasTools {
-    fun all(backend: HostCanvasBackend): List<HostExternalTool> = listOf(
+    fun all(backend: HostCanvasBackend, renderer: CanvasPreviewRenderer? = null): List<HostExternalTool> = listOf(
         HostCanvasTool(CanvasToolContract.create, "Failed to create canvas") { caller, input -> create(backend, caller, input) },
         HostCanvasTool(CanvasToolContract.getScene, "Failed to get scene") { caller, input ->
             withCanvas(backend, caller, input) { entry -> getScene(backend, entry) }
+        },
+        HostCanvasTool(CanvasToolContract.getLayout, "Failed to read layout") { caller, input ->
+            withCanvas(backend, caller, input) { entry -> getLayout(backend, entry, input) }
         },
         HostCanvasTool(CanvasToolContract.replaceScene, "Failed to replace scene") { caller, input ->
             val sceneJson = HostCanvasToolInputs.sceneJson(input) ?: return@HostCanvasTool missing("scene_json")
@@ -45,18 +51,28 @@ object HostCanvasTools {
             }
         },
         HostCanvasTool(CanvasToolContract.list, "Failed to list canvases") { caller, input -> list(backend, caller, input) },
-    )
+        HostCanvasTool(CanvasToolContract.compose, "Failed to compose") { caller, input -> compose(backend, caller, input) },
+        HostCanvasTool(CanvasToolContract.composeGuide, "Failed to describe compose") { _, _ -> CanvasComposeHosting.guide() },
+    ) + listOfNotNull(renderer?.let { previewRenderer ->
+        val preview = HostCanvasPreview(backend, previewRenderer)
+        HostCanvasTool(CanvasToolContract.renderPreview, "Failed to render preview") { caller, input ->
+            withCanvas(backend, caller, input) { entry -> preview.run(caller, entry, input) }
+        }
+    })
 
     private suspend fun getScene(backend: HostCanvasBackend, entry: HostCanvasEntry): ExternalToolResult {
         val scene = backend.scene(entry)
-        return success(
-            CanvasGetSceneResult(
-                sceneJson = scene.sceneJson,
-                revision = scene.revision,
-                canvasId = entry.canvasId,
-                schemaHint = CanvasSceneSchema.hint,
-            ),
-        )
+        return success(CanvasSceneRead.result(scene.sceneJson, scene.revision, entry.canvasId))
+    }
+
+    private suspend fun getLayout(backend: HostCanvasBackend, entry: HostCanvasEntry, input: JsonObject): ExternalToolResult {
+        val scene = backend.scene(entry)
+        return layoutAnswer(CanvasLayoutRead.answer(scene.sceneJson, LayoutRevision(scene.revision), input))
+    }
+
+    private fun layoutAnswer(answer: CanvasLayoutAnswer): ExternalToolResult = when (answer) {
+        is CanvasLayoutAnswer.Page -> ExternalToolResult.Success(answer.json)
+        is CanvasLayoutAnswer.Refused -> ExternalToolResult.Error(answer.message)
     }
 
     private suspend fun create(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
@@ -91,6 +107,48 @@ object HostCanvasTools {
     }
 
     private fun HostCanvasEntry.listed(current: Boolean) = CanvasListEntry(canvasId, title, conversationId, current)
+
+    /**
+     * `canvas_compose` on the host (letta-mobile-bglj6.12): the canvas resolved as every other tool
+     * resolves it ([withCanvas]'s rules), the caller held to its ACL, then [CanvasComposeHosting]
+     * compiles, checks against the log's scene and publishes through [HostCanvasBackend.publish],
+     * which checks again, stamps the ops as the caller's and sends them to the relay as ONE batch
+     * op, so the artifact lands whole or not at all.
+     *
+     * The receipt's revision is the log's head after the batch, the revision `canvas_get_scene`
+     * answers next. A relay that fails before acknowledging is answered BOARD_REFUSED; if the batch
+     * did land, the agent's retry (the same tool call, or the same artifact_id) finds it on the board
+     * and answers its receipt without writing it again.
+     */
+    private suspend fun compose(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
+        val hosting = CanvasComposeHosting(CanvasComposeHosting.IROH_HOST, caller.toolCallId)
+        val canvasId = HostCanvasToolInputs.string(input, "canvas_id")?.takeIf { it.isNotBlank() }
+        val entry = when (val access = if (canvasId != null) backend.open(caller, canvasId) else backend.ownConversation(caller)) {
+            is HostCanvasAccess.Granted -> access.entry
+            is HostCanvasAccess.Denied ->
+                return hosting.refused(CanvasComposeHosting.deniedCode(access.reason), access.reason)
+            null -> return hosting.refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_DEFAULT_CANVAS)
+        }
+        if (!entry.acl.canWrite(caller.agentId)) {
+            val reason = "Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'"
+            return hosting.refused(ComposeErrorCode.UNAUTHORIZED, reason)
+        }
+        val scene = backend.scene(entry)
+        return hosting.compose(input, ComposeTarget(entry.canvasId, scene.sceneJson, scene.revision)) { ops ->
+            when (val published = backend.publish(caller, entry, ops, atomic = true)) {
+                is HostCanvasPublish.Published -> published.revision
+                is HostCanvasPublish.Denied -> throw ComposePublishException(
+                    if (CanvasComposeHosting.deniedCode(published.reason) == ComposeErrorCode.UNAUTHORIZED) {
+                        ComposeErrorCode.UNAUTHORIZED
+                    } else {
+                        ComposeErrorCode.BOARD_REFUSED
+                    },
+                    published.reason,
+                )
+                is HostCanvasPublish.Invalid -> throw ComposePublishException(ComposeErrorCode.BOARD_REFUSED, published.reason)
+            }
+        }
+    }
 
     /**
      * Runs [action] on the canvas the call names, or, naming none, on the canvas of the
@@ -135,7 +193,7 @@ object HostCanvasTools {
     private fun missing(parameter: String) = ExternalToolResult.Error("Missing required parameter: $parameter")
 
     private const val NO_DEFAULT_CANVAS =
-        "Missing required parameter: canvas_id (this call is not in a conversation, so there is no default canvas; use canvas.list or canvas.create)"
+        "Missing required parameter: canvas_id (this call is not in a conversation, so there is no default canvas; use canvas_list or canvas_create)"
 }
 
 /** One host canvas tool: [definition] for the model, [run] for a call with a known caller. */
@@ -158,7 +216,7 @@ private class HostCanvasTool(
             return ExternalToolResult.Error("$failurePrefix: canvas tools require an authenticated agent identity")
         }
         return try {
-            run(HostCanvasCaller(agentId, caller.conversationId), input)
+            run(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId), input)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

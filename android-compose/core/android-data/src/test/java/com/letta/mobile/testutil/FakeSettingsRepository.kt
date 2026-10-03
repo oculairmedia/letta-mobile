@@ -63,6 +63,8 @@ class FakeSettingsRepository(
     private val chatFontScaleState = MutableStateFlow(1f)
     private val enableProjectsState = MutableStateFlow(false)
     private val hapticsEnabledState = MutableStateFlow(true)
+    private val sharedChatPageEnabledState = MutableStateFlow(false)
+    private val openChatsOnCanvasState = MutableStateFlow(true)
 
     override val configs: StateFlow<List<LettaConfig>> = configsState.asStateFlow()
 
@@ -239,6 +241,18 @@ class FakeSettingsRepository(
 
     override suspend fun setHapticsEnabled(enabled: Boolean) {
         hapticsEnabledState.value = enabled
+    }
+
+    override fun getSharedChatPageEnabled(): Flow<Boolean> = sharedChatPageEnabledState
+
+    override suspend fun setSharedChatPageEnabled(enabled: Boolean) {
+        sharedChatPageEnabledState.value = enabled
+    }
+
+    override fun getOpenChatsOnCanvas(): Flow<Boolean> = openChatsOnCanvasState
+
+    override suspend fun setOpenChatsOnCanvas(enabled: Boolean) {
+        openChatsOnCanvasState.value = enabled
     }
 
     override suspend fun setTheme(theme: AppTheme) {

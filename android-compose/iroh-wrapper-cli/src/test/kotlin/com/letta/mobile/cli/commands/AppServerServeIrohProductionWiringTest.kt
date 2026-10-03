@@ -29,6 +29,25 @@ import kotlin.time.Duration.Companion.hours
 
 class AppServerServeIrohProductionWiringTest {
     @Test
+    fun `notebook listener requires a separate explicit peer allowlist`() {
+        val peer = "a".repeat(64)
+        assertEquals(null, parseNotebookPeers(null, null))
+        assertEquals(setOf(peer), parseNotebookPeers("/tmp/notebook", " $peer,$peer "))
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) {
+            parseNotebookPeers("/tmp/notebook", null)
+        }
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) {
+            parseNotebookPeers(null, peer)
+        }
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) {
+            parseNotebookPeers("/tmp/notebook", "")
+        }
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) {
+            parseNotebookPeers("/tmp/notebook", "NOT_A_PEER")
+        }
+    }
+
+    @Test
     fun `lifecycle cleanup cancels scope and runs cleanup upon cancellation`() = runTest {
         val command = AppServerServeIrohCommand()
         val scope = CoroutineScope(Job() + Dispatchers.Default)

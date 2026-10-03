@@ -11,11 +11,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -34,14 +33,15 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaDimens
 
 internal object RunActivityDisclosureTestTags {
     const val Header = "run-activity-disclosure"
     const val WorkingIndicator = "run-activity-working-indicator"
+    const val Chevron = "run-activity-disclosure-chevron"
 }
 
 @Composable
@@ -61,7 +61,6 @@ internal fun RunActivityDisclosure(
     val horizontalPadding = if (isSimpleMode) LettaDimens.Space.hair else LettaDimens.Space.xs
     val verticalPadding = LettaDimens.Space.hair
     val minHeight = if (canToggle) LettaDimens.Orb.railSlotHeight else if (isSimpleMode) LettaDimens.Space.xl else LettaDimens.Space.xxl
-    val iconSize = if (isSimpleMode) LettaDimens.Control.iconSm else LettaDimens.Control.icon
     val textStyle = if (isSimpleMode) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
     val spacing = if (isSimpleMode) LettaDimens.Space.xs else LettaDimens.Space.sm
 
@@ -89,15 +88,6 @@ internal fun RunActivityDisclosure(
     ) {
         if (activity.isActive) {
             WorkingIndicator()
-        } else if (collapsible) {
-            Icon(
-                imageVector = LettaIcons.ExpandMore,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                modifier = Modifier
-                    .size(iconSize)
-                    .rotate(if (collapsed) 0f else 180f),
-            )
         }
         val titleColor = if (activity.isActive) {
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f)
@@ -108,6 +98,19 @@ internal fun RunActivityDisclosure(
             Text(text = title, style = textStyle, color = titleColor)
         }
         ActivityCounts(activity, isSimpleMode = isSimpleMode)
+        if (canToggle) {
+            // Trailing chevron: the same disclosure grammar as every other
+            // expandable timeline row (thought blocks, tool cards, projected
+            // tool rows). The leading position made run disclosures the one
+            // outlier when both row kinds rendered together (product
+            // feedback, 2026-09-28).
+            Spacer(Modifier.weight(1f))
+            DisclosureChevron(
+                expanded = !collapsed,
+                compact = isSimpleMode,
+                modifier = Modifier.testTag(RunActivityDisclosureTestTags.Chevron),
+            )
+        }
     }
 }
 

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -23,11 +24,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,10 +43,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import io.ak1.drawbox.domain.model.ResizeHandle
 import androidx.compose.ui.unit.dp
@@ -54,6 +62,9 @@ import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.compose.CanvasComposePlacement
+import com.letta.mobile.data.canvas.compose.CanvasComposeReserve
+import com.letta.mobile.data.canvas.compose.ComposeBounds
 import io.ak1.drawbox.domain.model.Viewport
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -66,11 +77,20 @@ import com.letta.mobile.ui.theme.LettaDimens
  *
  * Each card is dragged by its handle bar and resized from its corner; the frame is written to the
  * session when the gesture ends, so peers and the agent see the move as one op. A document that
- * was never placed gets a staggered default spot until someone moves it.
+ * was never placed (a legacy frameless note) gets the slot the shared placement engine gives it
+ * ([framelessFrames], from `CanvasComposePlacement.placeFrameless`), so two never overlap.
+ *
+ * How a card is sized follows its geometry owner (canvas_compose, letta-mobile-bglj6.11): an
+ * AUTO-owned or frameless note fits its content within its booked frame (see [NoteSizing]); an
+ * EXPLICIT or USER frame is drawn as stored. Fitting is local: it never writes geometry back.
  *
  * Tapping a card makes it the [activeNoteId]: that one shows the block editor's toolbar and block
  * handles. Its expand button asks the host, through [onExpand], to open it large; while
  * [expandedNoteId] is open elsewhere the card only previews the text.
+ *
+ * A card is board content, so it is laid out in world units ([InWorldUnits], letta-mobile-bglj6.17):
+ * its type is the same proportion of the note on every display and at any system font scale. The
+ * [viewport] is read in layout and draw only: a pan or zoom never recomposes a card.
  */
 @Composable
 fun CanvasNotesLayer(
@@ -101,37 +121,103 @@ fun CanvasNotesLayer(
      * follow the card instead of trailing at the committed position.
      */
     onLiveFrame: (id: String, frame: CanvasDocumentFrame?) -> Unit = { _, _ -> },
+    /**
+     * Where each frameless document sits, by id (`CanvasComposePlacement.placeFrameless` over the
+     * board's content bounds). Null works it out from the notes alone, without the drawing.
+     */
+    framelessFrames: Map<String, CanvasDocumentFrame>? = null,
+    /**
+     * The height an auto-fitted card is shown at, in world units, or null once it is not fitted;
+     * a group move lands each note at the size it was shown at.
+     */
+    onFittedHeight: (id: String, height: Float?) -> Unit = { _, _ -> },
 ) {
+    val frameless = framelessFrames ?: remember(documents) {
+        framelessFramesOf(documents) { CanvasViewportFit.contentBounds(emptyList(), documents) }
+    }
+    // Read by the cards in layout and draw only (Modifier.onBoard), through a function whose
+    // identity never changes, so a pan or zoom recomposes no card.
+    val currentViewport = rememberUpdatedState(viewport)
+    val viewportOf: () -> Viewport = remember { { currentViewport.value } }
+    // The host's callbacks, kept current behind per-card handlers made once per document: the
+    // host's lambdas are new objects on every recomposition (each frame of a zoom), and a card
+    // handed a new one would recompose with it.
+    val handlers = rememberUpdatedState(
+        LayerHandlers(onActivate, onExpand, onToolbar, onPress, onGroupDrag, onGroupDragEnd, onErase, onLiveFrame, onFittedHeight),
+    )
+    // Which optional callbacks the host passes, read here from the parameters (not from [handlers],
+    // whose value is written in this composition and must not be read back in it).
+    val hosted = HostedCallbacks(toolbar = onToolbar != null, groupDrag = onGroupDrag != null, groupDragEnd = onGroupDragEnd != null)
     Box(modifier = modifier.fillMaxSize()) {
-        documents.forEachIndexed { index, document ->
-            val selected = document.id in selectedIds
+        documents.forEach { document ->
+          key(document.id) {
+            val card = remember(document.id) { NoteCardHandlers(document.id, handlers) }
             CanvasNoteCard(
                 session = session,
                 document = document,
-                viewport = viewport,
-                defaultFrame = defaultNoteFrame(index),
+                viewport = viewportOf,
+                defaultFrame = frameless[document.id] ?: FRAMELESS_FALLBACK,
                 active = document.id == activeNoteId,
                 expanded = document.id == expandedNoteId,
-                onActivate = { onActivate(document.id) },
-                onExpand = { onExpand(document.id) },
-                onToolbar = onToolbar,
+                onActivate = card.activate,
+                onExpand = card.expand,
+                onToolbar = card.toolbarIfHosted(hosted),
                 eraseMode = eraseMode,
-                onErase = { onErase(document.id) },
-                onLiveFrame = { frame -> onLiveFrame(document.id, frame) },
-                selection = NoteSelection(
-                    selected = selected,
-                    groupOffset = if (selected) groupOffset else Offset.Zero,
-                    onPress = { shift -> onPress(document.id, shift) },
-                    onGroupDrag = onGroupDrag?.takeIf { selected },
-                    onGroupDragEnd = onGroupDragEnd?.takeIf { selected },
-                ),
+                onErase = card.erase,
+                onLiveFrame = card.liveFrame,
+                selection = card.selection(selected = document.id in selectedIds, groupOffset = groupOffset, hosted = hosted),
+                onFittedHeight = card.fittedHeight,
             )
+          }
         }
     }
 }
 
-/** A card's part in the board's multi-selection. */
-internal class NoteSelection(
+/** The layer's callbacks as the host last passed them. */
+private class LayerHandlers(
+    val onActivate: (String) -> Unit,
+    val onExpand: (String) -> Unit,
+    val onToolbar: ((NoteToolbar?) -> Unit)?,
+    val onPress: (id: String, shift: Boolean) -> Unit,
+    val onGroupDrag: ((Offset) -> Unit)?,
+    val onGroupDragEnd: (() -> Unit)?,
+    val onErase: (String) -> Unit,
+    val onLiveFrame: (id: String, frame: CanvasDocumentFrame?) -> Unit,
+    val onFittedHeight: (id: String, height: Float?) -> Unit,
+)
+
+/** One card's callbacks, made once per document and always calling what the host passed last. */
+private class NoteCardHandlers(id: String, private val latest: State<LayerHandlers>) {
+    val activate: () -> Unit = { latest.value.onActivate(id) }
+    val expand: () -> Unit = { latest.value.onExpand(id) }
+    val toolbar: (NoteToolbar?) -> Unit = { latest.value.onToolbar?.invoke(it) }
+    val press: (Boolean) -> Unit = { shift -> latest.value.onPress(id, shift) }
+    val groupDrag: (Offset) -> Unit = { latest.value.onGroupDrag?.invoke(it) }
+    val groupDragEnd: () -> Unit = { latest.value.onGroupDragEnd?.invoke() }
+    val erase: () -> Unit = { latest.value.onErase(id) }
+    val liveFrame: (CanvasDocumentFrame?) -> Unit = { latest.value.onLiveFrame(id, it) }
+    val fittedHeight: (Float?) -> Unit = { latest.value.onFittedHeight(id, it) }
+
+    /** The toolbar callback, when the host takes the toolbar at all. */
+    fun toolbarIfHosted(hosted: HostedCallbacks): ((NoteToolbar?) -> Unit)? = toolbar.takeIf { hosted.toolbar }
+
+    /** The card's part in the multi-selection: a selected card moves with the group the host drags. */
+    fun selection(selected: Boolean, groupOffset: Offset, hosted: HostedCallbacks): NoteSelection = NoteSelection(
+        selected = selected,
+        groupOffset = if (selected) groupOffset else Offset.Zero,
+        onPress = press,
+        onGroupDrag = groupDrag.takeIf { selected && hosted.groupDrag },
+        onGroupDragEnd = groupDragEnd.takeIf { selected && hosted.groupDragEnd },
+    )
+}
+
+/** Which of the layer's optional callbacks the host passed. */
+@Immutable
+private data class HostedCallbacks(val toolbar: Boolean, val groupDrag: Boolean, val groupDragEnd: Boolean)
+
+/** A card's part in the board's multi-selection; equal when nothing about it changed, so the card is skipped. */
+@Immutable
+internal data class NoteSelection(
     val selected: Boolean,
     val groupOffset: Offset,
     val onPress: (shift: Boolean) -> Unit,
@@ -143,7 +229,8 @@ internal class NoteSelection(
 private fun CanvasNoteCard(
     session: CanvasSession,
     document: CanvasSceneDocument,
-    viewport: Viewport,
+    /** Read in layout and draw only, never in composition. */
+    viewport: () -> Viewport,
     defaultFrame: CanvasDocumentFrame,
     active: Boolean,
     expanded: Boolean,
@@ -154,7 +241,9 @@ private fun CanvasNoteCard(
     eraseMode: Boolean = false,
     onErase: () -> Unit = {},
     onLiveFrame: (CanvasDocumentFrame?) -> Unit = {},
+    onFittedHeight: (Float?) -> Unit = {},
 ) {
+    LocalNoteCompositionProbe.current?.invoke(document.id)
     val scope = rememberCoroutineScope()
     val recorder = LocalCanvasDocumentRecorder.current
     val density = LocalDensity.current
@@ -165,12 +254,13 @@ private fun CanvasNoteCard(
     // which reads as a bug rather than a scale.
     var resizeStartFrame by remember(document.id) { mutableStateOf<CanvasDocumentFrame?>(null) }
     LaunchedEffect(frame, gestureActive) { onLiveFrame(if (gestureActive) frame else null) }
-    LaunchedEffect(document.frame) {
+    // A frameless note's slot moves when the board's content does, so it is a key too.
+    LaunchedEffect(document.frame, defaultFrame) {
         if (!gestureActive) frame = document.frame ?: defaultFrame
     }
 
-    val screenTopLeft = viewport.worldToScreen(Offset(frame.x + selection.groupOffset.x, frame.y + selection.groupOffset.y))
-    val scale = viewport.scale
+    // Where the card sits on the board, in world units; read in layout only (Modifier.onBoard).
+    val topLeft = { Offset(frame.x + selection.groupOffset.x, frame.y + selection.groupOffset.y) }
     val tint = parseHexColor(document.color)
     // A "plain" note (transparent colour) is text sitting on the board, and stays that way even
     // while you work in it: the translucent slab that used to appear on activation read as a
@@ -184,18 +274,40 @@ private fun CanvasNoteCard(
     } else {
         document.style
     }
-    val textModifier = if (isLabel) {
-        Modifier.fillMaxSize().padding(horizontal = LettaDimens.Space.xs)
-    } else {
-        Modifier.fillMaxSize().padding(start = if (plain) LettaDimens.Space.lg else LettaDimens.Space.md, end = LettaDimens.Space.md, top = LettaDimens.Space.xs, bottom = LettaDimens.Space.xs)
-    }
+    // One padding for what is drawn and what auto-fit measures, so the two cannot drift apart.
+    val textModifier = Modifier.fillMaxSize().padding(CanvasNoteChrome.bodyPadding(plain, isLabel))
     val cardColor = when {
         plain -> Color.Transparent
         else -> tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
     }
-    val onCard = if (tint != null && !plain) contrastOn(tint) else MaterialTheme.colorScheme.onSurfaceVariant
+    val onLightSurface = tint != null && !plain
+    val onCard = tint?.takeIf { !plain }?.let(::contrastOn) ?: MaterialTheme.colorScheme.onSurfaceVariant
+
+    // Auto-fit (letta-mobile-bglj6.11): what the card is shown at is measured, remembered per
+    // document, and never written back (NoteFitState).
+    val sizing = noteSizing(document, isLabel)
+    val fitState = remember(document.id) { NoteFitState() }
+    LaunchedEffect(sizing) { fitState.resetFor(sizing) }
+    val shown = fitState.shown(sizing, gestureActive)
+    // Only a fitted card says the scale it is drawn at.
+    val semanticScale = shown.fontScale().takeIf { shown.fits }
+    val shownStyle = shown.style(textStyle)
+    LaunchedEffect(sizing, fitState.measured) { onFittedHeight(shown.reportedHeight()) }
+    // While it is typed into, the card keeps the type size it had and never gets shorter, so a
+    // deleted line or a type-size step never moves the text under the caret.
+    val activeFit = remember(document.id, active) { fitState.measured.takeIf { active } }
+    val storedFrame = document.frame ?: defaultFrame
+
+    // The card's size in the board's own layout, where one world unit is one px before the zoom.
+    val shownHeight = shown.height(frame)
     val widthDp = with(density) { frame.width.toDp() }
-    val heightDp = with(density) { frame.height.toDp() }
+    val heightDp = with(density) { shownHeight.toDp() }
+
+    /** A gesture on a fitted card starts from what is shown, not from the booking under it. */
+    fun beginGesture() {
+        if (!gestureActive) shown.takeOver()?.let { frame = frame.copy(height = it) }
+        gestureActive = true
+    }
 
     // Drag deltas arrive in the card's own (unscaled) space because the scale is a graphics-layer
     // transform, so they are already world units.
@@ -205,14 +317,17 @@ private fun CanvasNoteCard(
         val started = resizeStartFrame
         resizeStartFrame = null
         // Scale the type by however much the box grew, height being what type is measured by.
-        val scaledStyle = computeScaledStyle(plain, started, committed, document.style)
+        // A fitted card set smaller to fit keeps that size once a person takes it over.
+        val fitStyle = shown.takenStyle(document.style)
+        val scaledStyle = computeScaledStyle(plain, started, committed, fitStyle ?: document.style) ?: fitStyle
+        shown.settle(moved = committed != document.frame)
         scope.launch {
             recorder.recordingOrJust("moving a note") {
                 // One commit, not two. A frame op followed by a style op can half-succeed, leaving
                 // a box that grew with type that did not - and the second op runs even when the
                 // first has already failed.
                 runCatching {
-                    session.setDocument(document.id, document.json, frame = committed, style = scaledStyle)
+                    session.moveDocument(document.id, committed, style = scaledStyle)
                 }
             }
         }
@@ -224,157 +339,175 @@ private fun CanvasNoteCard(
         // its text - instead of landing on a card in front of it.
         Box(
             modifier = Modifier
-                .offset { IntOffset(screenTopLeft.x.roundToInt(), screenTopLeft.y.roundToInt()) }
+                .onBoard(viewport, topLeft)
                 .size(width = widthDp, height = heightDp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    transformOrigin = TransformOrigin(0f, 0f)
-                }
                 .semantics { contentDescription = "Note ${document.id}" },
             contentAlignment = Alignment.Center,
         ) {
-            CanvasBlockPreview(
-                json = document.json,
-                style = textStyle,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs),
-            )
+            InWorldUnits {
+                CanvasBlockPreview(
+                    json = document.json,
+                    style = textStyle,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs),
+                )
+            }
         }
         return
+    }
+
+    if (shown.fits) {
+        // Measured at the STORED width and booking, not the live frame, so a drag never remeasures;
+        // and beside the zoomed box rather than in it, so a zoom never does either.
+        NoteFitMeasurer(
+            NoteFitRequest(
+                json = document.json,
+                style = textStyle,
+                onLightSurface = onLightSurface,
+                plain = plain,
+                width = storedFrame.width,
+                reserved = storedFrame.height,
+                fixedScale = activeFit?.fontScale,
+                minHeight = activeFit?.height ?: 0f,
+            ),
+            onFit = fitState::record,
+        )
     }
 
     // The card and its selection chrome share one placed, scaled box, and the box carries the
     // chrome's margin on every side: the chrome sits OUTSIDE the card, and a handle hanging past
     // its parent's bounds is drawn but never hit, which is how the handles came to look draggable
     // without being draggable.
-    // In the card's own (zoomed) units, so the margin is one size on screen like the chrome in it.
-    val chromeInset = canvasSelectionStyle().chromeInset() / (if (scale <= 0f) 1f else scale)
-    val insetPx = with(density) { chromeInset.toPx() } * scale
+    // The margin is one size on screen like the chrome in it, so in the card's own (zoomed) units it
+    // is that divided by the zoom: worked out in layout (chromeMargin), never in composition.
+    val insetPx = with(density) { canvasSelectionStyle().chromeInset().toPx() }
     Box(
         modifier = Modifier
-            .offset {
-                IntOffset(
-                    (screenTopLeft.x - insetPx).roundToInt(),
-                    (screenTopLeft.y - insetPx).roundToInt(),
-                )
-            }
-            .size(width = widthDp + chromeInset * 2, height = heightDp + chromeInset * 2)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin(0f, 0f)
-            },
+            .onBoard(viewport, topLeft, screenInset = insetPx)
+            .chromeMargin(viewport, insetPx, width = frame.width, height = shownHeight),
     ) {
-    Surface(
-        modifier = Modifier
-            .padding(chromeInset)
-            .size(width = widthDp, height = heightDp)
-            .semantics { contentDescription = "Note ${document.id}" }
-            // Taps and drags on the card belong to the note, never to the drawing beneath it; a
-            // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
-            // the active note.
-            // eraseMode is a key, not just a capture: a pointerInput block keeps the values it
-            // was created with, so keying on the id alone left this handler believing the eraser
-            // was never active.
-            .pointerInput(document.id, eraseMode) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    if (eraseMode) onErase() else selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
-                    do {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                    } while (event.changes.any { it.pressed })
-                }
-            }
-            .pointerInput(document.id) { detectTapGestures(onTap = {}) },
-        shape = RoundedCornerShape(NOTE_CORNER),
-        color = cardColor,
-        // Selection is drawn by CanvasSelectionChrome, the same chrome a shape gets. The card's
-        // own border is only the resting outline of a coloured note.
-        border = when {
-            active || selection.selected -> null
-            plain -> null
-            else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-        },
-        // Text on the board is text, not a card, so it never casts one - active or not. A
-        // transparent surface with an elevation does not simply skip the shadow: Compose draws
-        // the shadow body anyway, and a grey slab appeared behind the words the moment they were
-        // edited.
-        shadowElevation = when {
-            plain -> 0.dp
-            active -> LettaDimens.Space.sm
-            else -> LettaDimens.Space.xs
-        },
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // A note has a handle bar; a text element is just text, with a grip to move it by
-            // while active and everything else in the bar at the top of the board.
-            val groupDrag = selection.onGroupDrag
-            val groupDragEnd = selection.onGroupDragEnd
-            val onMove: (Offset) -> Unit = if (groupDrag != null) groupDrag else { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }
-            val onMoveEnd: () -> Unit = if (groupDragEnd != null) groupDragEnd else ::commit
-            if (!plain) NoteHandleBar(
-                title = document.title,
-                cardColor = cardColor,
-                onCard = onCard,
-                onDragStart = { if (groupDrag == null) gestureActive = true },
-                onDrag = onMove,
-                onDragEnd = onMoveEnd,
-                onExpand = onExpand,
-                onRemove = {
-                    scope.launch {
-                        recorder.recordingOrJust("deleting a note") {
-                            runCatching { session.removeDocument(document.id) }
+        Box(
+            modifier = Modifier
+                .insideChromeMargin(viewport, insetPx)
+                // Required, not just a size: the card's own constraints never change with the zoom, so
+                // nothing in it is measured again while the margin around it changes.
+                .requiredSize(width = widthDp, height = heightDp),
+        ) {
+            // Everything in the card is board content, in world units (letta-mobile-bglj6.17): its type,
+            // handle bar, padding, corners and outline are the same proportion of the note on every display.
+            InWorldUnits {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .semantics {
+                            contentDescription = "Note ${document.id}"
+                            semanticScale?.let { noteFontScale = it }
+                        }
+                        // Taps and drags on the card belong to the note, never to the drawing beneath it; a
+                        // tap anywhere on it (the editor's own taps included, in the initial pass) makes it
+                        // the active note.
+                        // eraseMode is a key, not just a capture: a pointerInput block keeps the values it
+                        // was created with, so keying on the id alone left this handler believing the eraser
+                        // was never active.
+                        .pointerInput(document.id, eraseMode) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                if (eraseMode) onErase() else selection.onPress(currentEvent.keyboardModifiers.isShiftPressed)
+                                do {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                } while (event.changes.any { it.pressed })
+                            }
+                        }
+                        .pointerInput(document.id) { detectTapGestures(onTap = {}) },
+                    shape = RoundedCornerShape(NOTE_CORNER),
+                    color = cardColor,
+                    // Selection is drawn by CanvasSelectionChrome, the same chrome a shape gets. The card's
+                    // own border is only the resting outline of a coloured note.
+                    border = when {
+                        active || selection.selected -> null
+                        plain -> null
+                        else -> BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                    },
+                    // Text on the board is text, not a card, so it never casts one - active or not. A
+                    // transparent surface with an elevation does not simply skip the shadow: Compose draws
+                    // the shadow body anyway, and a grey slab appeared behind the words the moment they were
+                    // edited.
+                    shadowElevation = when {
+                        plain -> 0.dp
+                        active -> LettaDimens.Space.sm
+                        else -> LettaDimens.Space.xs
+                    },
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // A note has a handle bar; a text element is just text, with a grip to move it by
+                        // while active and everything else in the bar at the top of the board.
+                        val groupDrag = selection.onGroupDrag
+                        val groupDragEnd = selection.onGroupDragEnd
+                        val onMove: (Offset) -> Unit = if (groupDrag != null) groupDrag else { delta -> frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }
+                        val onMoveEnd: () -> Unit = if (groupDragEnd != null) groupDragEnd else ::commit
+                        if (!plain) NoteHandleBar(
+                            title = document.title,
+                            cardColor = cardColor,
+                            onCard = onCard,
+                            onDragStart = { if (groupDrag == null) beginGesture() },
+                            onDrag = onMove,
+                            onDragEnd = onMoveEnd,
+                            onExpand = onExpand,
+                            onRemove = {
+                                scope.launch {
+                                    recorder.recordingOrJust("deleting a note") {
+                                        runCatching { session.removeDocument(document.id) }
+                                    }
+                                }
+                            },
+                        )
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = if (isLabel) Alignment.Center else Alignment.TopStart,
+                        ) {
+                            if (expanded) {
+                                CanvasBlockPreview(
+                                    json = document.json,
+                                    onLightSurface = onLightSurface,
+                                    style = shownStyle,
+                                    modifier = textModifier,
+                                )
+                            } else {
+                                CanvasBlockEditor(
+                                    session = session,
+                                    documentId = document.id,
+                                    storedJson = document.json,
+                                    active = active,
+                                    onLightSurface = onLightSurface,
+                                    onToolbar = onToolbar,
+                                    style = shownStyle,
+                                    centerVertically = isLabel,
+                                    modifier = textModifier,
+                                )
+                            }
+                            if (plain && active && !isLabel) {
+                                TextMoveGrip(
+                                    modifier = Modifier.align(Alignment.TopStart),
+                                    onDragStart = { if (groupDrag == null) beginGesture() },
+                                    onDrag = onMove,
+                                    onDragEnd = onMoveEnd,
+                                )
+                            }
                         }
                     }
-                },
-            )
-            Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentAlignment = if (isLabel) Alignment.Center else Alignment.TopStart,
-            ) {
-                if (expanded) {
-                    CanvasBlockPreview(
-                        json = document.json,
-                        onLightSurface = tint != null && !plain,
-                        style = textStyle,
-                        modifier = textModifier,
-                    )
-                } else {
-                    CanvasBlockEditor(
-                        session = session,
-                        documentId = document.id,
-                        storedJson = document.json,
-                        active = active,
-                        onLightSurface = tint != null && !plain,
-                        onToolbar = onToolbar,
-                        style = textStyle,
-                        centerVertically = isLabel,
-                        modifier = textModifier,
-                    )
-                }
-                if (plain && active && !isLabel) {
-                    TextMoveGrip(
-                        modifier = Modifier.align(Alignment.TopStart),
-                        onDragStart = { if (groupDrag == null) gestureActive = true },
-                        onDrag = onMove,
-                        onDragEnd = onMoveEnd,
-                    )
                 }
             }
         }
-    }
 
         // The same chrome a selected shape gets — outline, eight handles, and resize — over the
         // card and reaching outside it, so the outer half of each handle can still be grabbed.
+        // Board chrome, so in the display's dp, one size on screen at any zoom.
         if ((active || selection.selected) && !isLabel) {
-            CanvasSelectionChrome(
-                style = canvasSelectionStyle(),
-                scale = scale,
-                contentWidth = widthDp,
-                contentHeight = heightDp,
+            NoteSelectionChrome(
+                viewport = viewport,
+                contentSize = DpSize(widthDp, heightDp),
                 onResize = { handle, delta ->
+                    beginGesture()
                     if (resizeStartFrame == null) resizeStartFrame = frame
-                    gestureActive = true
                     frame = frame.resizedBy(handle, delta)
                 },
                 onResizeEnd = ::commit,
@@ -384,10 +517,31 @@ private fun CanvasNoteCard(
 }
 
 /**
+ * The selection chrome at the board's current zoom. Its own composable so the zoom it reads (it
+ * divides its sizes by it) recomposes the chrome of the one selected card, never the card.
+ */
+@Composable
+private fun NoteSelectionChrome(
+    viewport: () -> Viewport,
+    contentSize: DpSize,
+    onResize: (ResizeHandle, Offset) -> Unit,
+    onResizeEnd: () -> Unit,
+) {
+    CanvasSelectionChrome(
+        style = canvasSelectionStyle(),
+        scale = viewport().scale,
+        contentWidth = contentSize.width,
+        contentHeight = contentSize.height,
+        onResize = onResize,
+        onResizeEnd = onResizeEnd,
+    )
+}
+
+/**
  * A drag that reports its deltas and treats cancel as an end: the one gesture the handle bar,
  * the text grip and the resize corner all share.
  */
-private fun Modifier.dragHandle(onDragStart: () -> Unit, onDrag: (Offset) -> Unit, onDragEnd: () -> Unit): Modifier =
+internal fun Modifier.dragHandle(onDragStart: () -> Unit, onDrag: (Offset) -> Unit, onDragEnd: () -> Unit): Modifier =
     pointerInput(Unit) {
         detectDragGestures(
             onDragStart = { onDragStart() },
@@ -479,12 +633,33 @@ private fun TextMoveGrip(
     }
 }
 
-/** Where the [index]th never-placed document lands: a stagger so several stay visible. */
-internal fun defaultNoteFrame(index: Int): CanvasDocumentFrame = CanvasDocumentFrame(
-    x = NOTE_DEFAULT_ORIGIN + index * NOTE_STAGGER,
-    y = NOTE_DEFAULT_ORIGIN + index * NOTE_STAGGER,
-    width = NOTE_DEFAULT_WIDTH,
-    height = NOTE_DEFAULT_HEIGHT,
+/**
+ * Where each never-placed (frameless) document of [documents] lands, by id: the shared placement
+ * engine's slots (`CanvasComposePlacement.placeFrameless`), laid out against [contentBounds] (the
+ * board's zoom-to-fit bounds, which agree with the engine's JSON reading of the same scene). The
+ * slots are deterministic over the scene, so every peer puts them in the same place, and they never
+ * overlap one another. Replaces the old stagger by list index, which stacked notes on each other.
+ */
+internal fun framelessFramesOf(
+    documents: List<CanvasSceneDocument>,
+    contentBounds: () -> androidx.compose.ui.geometry.Rect?,
+): Map<String, CanvasDocumentFrame> {
+    if (documents.none { it.frame == null }) return emptyMap()
+    val bounds = contentBounds()?.let { ComposeBounds(it.left, it.top, it.width, it.height) }
+    return CanvasComposePlacement.placeFrameless(documents, bounds).mapValues { (_, slot) ->
+        CanvasDocumentFrame(x = slot.x, y = slot.y, width = slot.width, height = slot.height)
+    }
+}
+
+/** A frameless document the placement has no slot for yet: the engine's empty-board origin. */
+internal fun framelessFallbackFrame(): CanvasDocumentFrame = FRAMELESS_FALLBACK
+
+/** One instance, so a card handed it is handed the same frame every time. */
+private val FRAMELESS_FALLBACK: CanvasDocumentFrame = CanvasDocumentFrame(
+    x = CanvasComposePlacement.ORIGIN,
+    y = CanvasComposePlacement.ORIGIN,
+    width = CanvasComposePlacement.FRAMELESS_WIDTH,
+    height = CanvasComposeReserve.MIN_RESERVE,
 )
 
 /**
@@ -533,7 +708,6 @@ internal const val NOTE_DEFAULT_WIDTH = 320f
 internal const val NOTE_DEFAULT_HEIGHT = 240f
 private const val TEXT_DEFAULT_WIDTH = 360f
 private const val TEXT_DEFAULT_HEIGHT = 120f
-private const val NOTE_DEFAULT_ORIGIN = 80f
 // Far enough that the note underneath keeps its first line clear of the new note's corner handle,
 // whose grab area is a shape handle's (see canvasSelectionStyle), not just the handle drawn.
 private const val NOTE_STAGGER = 64f

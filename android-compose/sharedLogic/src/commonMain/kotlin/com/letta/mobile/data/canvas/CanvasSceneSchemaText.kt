@@ -14,7 +14,7 @@ internal object CanvasSceneSchemaText {
         append("Every element needs a unique string id and a type, one of ${schema.allowedTypes.joinToString("|")}. ")
         schema.elementTypes.forEach { append(typeLine(schema, it)).append(' ') }
         append("There are no other element types: a line or arrow is a Shape, and a note or document is not an element ")
-        append("(use canvas.apply_ops set_document). ")
+        append("(use canvas_apply_ops set_document). ")
         append("Example scene: ").append(encode(schema.sceneExample))
     }
 
@@ -22,7 +22,8 @@ internal object CanvasSceneSchemaText {
         append("Elements: ")
         append(schema.elementTypes.joinToString("; ") { "${it.type} {${it.required.joinToString(", ")}}" })
         append(". shapeType ${schema.shapeTypes.joinToString("|")}; points \"x,y\"; colors #rrggbbaa. ")
-        append("Full format and examples in the canvas.replace_scene description.")
+        append("Full format and examples in the canvas_replace_scene description. ")
+        append(PLUGIN_ELEMENTS_HINT)
     }
 
     /**
@@ -33,14 +34,39 @@ internal object CanvasSceneSchemaText {
         append("Nothing was published: the apps cannot draw ")
         append(if (problems.size == 1) "this write." else "${problems.size} parts of this write.")
         problems.forEach { append("\n- ").append(subject(it)).append(' ').append(it.reason) }
-        append("\nAllowed element types: ${CanvasSceneSchema.allowedTypes.joinToString(", ")}. ")
-        append("Lines and arrows are Shapes (shapeType LINE|ARROW); notes/documents are canvas.apply_ops set_document, not elements.")
-        problems.map { it.suggested }.distinct().forEach { append("\n${it.type} example: ${encode(it.example)}") }
-        append("\nScene: {\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}. See canvas.replace_scene's description for every field.")
+        val suggested = problems.mapNotNull { it.suggested }.distinct()
+        if (suggested.isNotEmpty()) drawnHints(suggested)
+        if (problems.any { it.path != null }) append("\n").append(PLUGIN_OPS)
     }
 
-    private fun subject(problem: CanvasElementProblem): String =
-        problem.elementId?.let { "element '$it'" } ?: "the scene (or an element without an id)"
+    private fun StringBuilder.drawnHints(suggested: List<CanvasElementSpec>) {
+        append("\nAllowed element types: ${CanvasSceneSchema.allowedTypes.joinToString(", ")}. ")
+        append("Lines and arrows are Shapes (shapeType LINE|ARROW); notes/documents are canvas_apply_ops set_document, not elements.")
+        suggested.forEach { append("\n${it.type} example: ${encode(it.example)}") }
+        append("\nScene: {\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}. See canvas_replace_scene's description for every field.")
+    }
+
+    private fun subject(problem: CanvasElementProblem): String = when {
+        problem.path != null -> "plugin element '${problem.elementId}' at ${problem.path}"
+        problem.elementId != null -> "element '${problem.elementId}'"
+        else -> "the scene (or an element without an id)"
+    }
+
+    /** Where a scene read puts the plugin elements ([CanvasSceneRead]) and how to write them. */
+    const val PLUGIN_ELEMENTS_HINT: String =
+        "Plugin elements (the scene root's _pluginElements) are not in scene_json: plugin_elements lists each as " +
+            "{id, type \"ext:<pluginId>/<kind>\", v, frame?, owner?, ref?, props, snapshot?, fallback, meta?}; write them " +
+            "with canvas_apply_ops set_plugin_element/remove_plugin_element, never as elements."
+
+    /** The plugin element ops in a paragraph, for canvas_apply_ops' description and a plugin element refusal. */
+    const val PLUGIN_OPS: String =
+        "set_plugin_element {elementId, elementType \"ext:<pluginId>/<kind>\", v, frame?, owner?, ref?, props?, snapshot?, " +
+            "fallback?, meta?} places or updates a plugin's element (frame in world units; props and meta flat scalars, " +
+            "props at most 4 KiB; snapshot {assetRef \"sha256:...\", mediaType?, width?, height?, rev?}; fallback " +
+            "{title, subtitle?, icon?, openUrl? http(s)|meridian:} is the card every app draws without the plugin). " +
+            "Null fields keep what the element has; a move and a state update never overwrite each other. The first " +
+            "write needs elementType, v, fallback.title and a snapshot or fallback.openUrl. " +
+            "remove_plugin_element {elementId} takes it off."
 
     private fun typeLine(schema: CanvasSceneSchema, spec: CanvasElementSpec): String =
         "${spec.type}: requires ${spec.required.joinToString(", ") { field(schema, it) }}; " +

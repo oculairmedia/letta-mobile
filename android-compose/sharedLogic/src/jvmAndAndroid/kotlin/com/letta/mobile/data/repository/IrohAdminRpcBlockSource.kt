@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
+import com.letta.mobile.data.repository.api.AgentBlockTarget
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -280,6 +281,12 @@ class IrohAdminRpcBlockSource private constructor(
         val result = response.result ?: error("Iroh admin_rpc block.update_agent returned no result")
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
+
+    override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =
+        agentDirectory.createAgentBlock(target, value)
+
+    override suspend fun deleteAgentBlock(target: AgentBlockTarget) =
+        agentDirectory.deleteAgentBlock(target)
 
     companion object {
         /**

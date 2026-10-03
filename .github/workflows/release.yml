@@ -106,6 +106,62 @@ jobs:
           fi
           echo "OK: embedded runtime (libnode.so) present in $apk"
 
+      - name: Verify shipped Automerge JNI and 16 KiB ELF LOAD alignment
+        # Inspect the built APK, not Gradle intermediates or the upstream AAR.
+        # This is a packaging/ELF check, not a device-load or license clearance claim.
+        working-directory: android-compose/app/build/outputs/apk/play/release
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import struct
+          import sys
+          import zipfile
+
+          abis = ("armeabi-v7a", "arm64-v8a", "x86_64")
+          jni = "libautomerge_jni_0_2_0.so"  # org.automerge:androidnative:0.0.9
+          apks = glob.glob("*.apk")
+          if len(apks) != 1:
+              sys.exit(f"Expected exactly one release APK, found {len(apks)}: {apks}")
+
+          with zipfile.ZipFile(apks[0]) as apk:
+              names = apk.namelist()
+              if len(names) != len(set(names)):
+                  sys.exit("Duplicate ZIP entries in release APK")
+              for abi in abis:
+                  for lib in (jni, "libnode.so"):
+                      entry = f"lib/{abi}/{lib}"
+                      if entry not in names:
+                          sys.exit(f"Missing shipped native library: {entry}")
+                  entry = f"lib/{abi}/{jni}"
+                  data = apk.read(entry)
+                  if data[:4] != b"\x7fELF" or data[5] != 1 or data[4] not in (1, 2):
+                      sys.exit(f"Invalid little-endian ELF: {entry}")
+                  is64 = data[4] == 2
+                  phoff = struct.unpack_from("<Q" if is64 else "<I", data, 32 if is64 else 28)[0]
+                  phentsize, phnum = struct.unpack_from("<HH", data, 54 if is64 else 42)
+                  min_size = 56 if is64 else 32
+                  if not phnum or phentsize < min_size or phoff + phentsize * phnum > len(data):
+                      sys.exit(f"Invalid ELF program headers: {entry}")
+                  loads = 0
+                  for index in range(phnum):
+                      offset = phoff + index * phentsize
+                      if struct.unpack_from("<I", data, offset)[0] != 1:  # PT_LOAD
+                          continue
+                      loads += 1
+                      if is64:
+                          file_offset, vaddr, align = (struct.unpack_from("<Q", data, offset + n)[0]
+                                                       for n in (8, 16, 48))
+                      else:
+                          file_offset, vaddr, align = (struct.unpack_from("<I", data, offset + n)[0]
+                                                       for n in (4, 8, 28))
+                      if align < 16384 or (file_offset - vaddr) % 16384:
+                          sys.exit(f"16 KiB ELF LOAD alignment failed: {entry} segment {index}")
+                  if not loads:
+                      sys.exit(f"No PT_LOAD segments: {entry}")
+                  print(f"OK: {entry} present with 16 KiB-aligned LOAD segments")
+          PY
+
       - name: Rename APK with tag
         # The play-release build IS the prod artifact (package com.letta.mobile,
         # release keystore, embedded runtime verified above). Name it -prod so

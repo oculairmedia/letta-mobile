@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
@@ -31,23 +30,29 @@ import com.letta.mobile.data.memory.MemoryParityAgentOption
 import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.memory.MemorySummaryMetric
 import com.letta.mobile.data.memory.graph.MemoryPageActions
+import com.letta.mobile.ui.components.ChevronEmphasis
+import com.letta.mobile.ui.components.ChevronIndication
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
+
+/** [showTitle]: the host does not title the screen; [canCreateBlock]: offer "New block". */
+internal data class MemoryChromeOptions(val showTitle: Boolean, val canCreateBlock: Boolean)
 
 /** Title row, agent picker and stats strip above the graph. */
 @Composable
 internal fun MemoryPageChrome(
     parity: MemoryParityControllerState,
     actions: MemoryPageActions,
-    showTitle: Boolean,
+    options: MemoryChromeOptions,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        MemoryHeaderRow(parity, actions, showTitle)
+        MemoryHeaderRow(parity, actions, options)
         parity.errorMessage?.let { MemoryErrorBanner(it) }
         MemorySummaryStrip(parity.memory.summary.metrics)
     }
@@ -57,19 +62,24 @@ internal fun MemoryPageChrome(
 private fun MemoryHeaderRow(
     parity: MemoryParityControllerState,
     actions: MemoryPageActions,
-    showTitle: Boolean,
+    options: MemoryChromeOptions,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        if (showTitle) {
+        if (options.showTitle) {
             Text("Memory", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         }
         Box(Modifier.weight(1f)) {
             if (parity.agents.isNotEmpty()) {
                 MemoryAgentPicker(parity.agents, parity.memory.selectedAgentId, actions::selectAgent)
+            }
+        }
+        if (options.canCreateBlock) {
+            IconButton(onClick = actions::beginCreate) {
+                Icon(LettaIcons.Add, contentDescription = "New block")
             }
         }
         IconButton(onClick = actions::refresh, enabled = !parity.isLoading) {
@@ -89,7 +99,12 @@ private fun MemoryAgentPicker(
     Box {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.widthIn(max = LettaDimens.Pane.sidePanelWidth)) {
             Text(selected.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            Icon(LettaIcons.ExpandMore, contentDescription = "Choose agent", modifier = Modifier.size(LettaDimens.Control.icon))
+            DisclosureChevron(
+                expanded = false,
+                emphasis = ChevronEmphasis.Emphasized,
+                indicates = ChevronIndication.Sheet,
+                contentDescription = "Choose agent",
+            )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             agents.forEach { agent ->

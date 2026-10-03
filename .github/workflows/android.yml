@@ -62,6 +62,10 @@ env:
   # can affect the daemon. CI runs on Java 26, so acknowledge this access at the
   # workflow boundary and keep project-level flags scoped to daemon/test workers.
   GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
+  # Bump to discard the shared Gradle User Home caches. A transient Maven Central
+  # 404 (leakcanary-android .aar, 2026-10-02) was persisted into the main-written
+  # cache as a missing-artifact entry and failed build-apk until it was replaced.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v2
 
 jobs:
   test:
@@ -166,6 +170,10 @@ jobs:
       # Root debug is compiled by testRootDebugUnitTest; Play is compiled by the
       # required play-release APK job. Sideload is the only unique flavor compile.
       # Architecture guardrails stay inside the required `test` job.
+      # checkArchitectureBoundaries reads the exported module graph and fails on
+      # edges into :app, feature->feature, shell->shell, library->feature and
+      # multiplatform->single-platform edges not in architecture-tests/boundary-baseline.txt
+      # (letta-mobile-o4ygk.1). :build-logic:test proves each rule on synthetic graphs.
       - name: Run Android verification task graph
         env:
           ADDITIVE_TASKS: ${{ steps.additive_modules.outputs.tasks }}
@@ -175,6 +183,8 @@ jobs:
             :core:android-data:testDebugUnitTest
             :app:testRootDebugUnitTest
             :app:testScreenshot
+            :build-logic:test
+            checkArchitectureBoundaries
             :architecture-tests:test
             :architecture-tests:architectureTest
             :quality:detekt-rules:check
@@ -184,6 +194,20 @@ jobs:
             tasks+=("${additive_tasks[@]}")
           fi
           ./gradlew "${tasks[@]}"
+
+      # :sharedUI:jvmTest runs here as an additive task. Its Skiko UI tests can
+      # fail on Linux alone (font metrics), and the console log carries neither
+      # assertion messages nor stdout, so keep the reports when this job fails.
+      - name: Upload sharedUI JVM test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sharedui-jvmtest-reports-${{ github.run_id }}
+          path: |
+            android-compose/sharedUI/build/test-results/jvmTest/**
+            android-compose/sharedUI/build/reports/tests/jvmTest/**
+          if-no-files-found: warn
+          retention-days: 7
 
   detekt:
     # Advisory static analysis. Wired with continue-on-error so existing debt
@@ -305,10 +329,14 @@ jobs:
         # on follow-up PRs even when run before Konan). Desktop unit tests
         # still run in the required `test` job when android-compose/desktop
         # changes (additive module tasks). Native compile still catches
-        # JVM-only API leaks in commonMain/commonTest (b97bcf48).
+        # JVM-only API leaks in commonMain/commonTest (b97bcf48). The wasmJs
+        # compiles catch breakage in wasmJsMain/wasmJsTest and dependencies
+        # that ship no wasm artifact, without making web-wasm required
+        # (letta-mobile-o4ygk.2). :sharedUI compiles for wasm too, so JVM-only
+        # calls in the shared Compose UI fail here (letta-mobile-o4ygk.4).
         run: |
           ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
-          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
+          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 
   web-wasm:
@@ -353,7 +381,11 @@ jobs:
           cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
 
       - name: Build and test Compose web client
-        run: ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
+        # The wasm test executable links all of sharedUI; at the repo-wide
+        # 4 GiB Kotlin daemon heap it thrashes GC for ~50 min, then OOMs.
+        run: >-
+          ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
+          "-Pkotlin.daemon.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
 
       - name: Locate WASM distribution
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

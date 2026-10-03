@@ -86,6 +86,8 @@ kotlin {
             dependencies {
                 api(project(":core:ids"))
                 api(project(":core:runtime"))
+                // The canvas plugin SPI and its LCP wire DTOs (letta-mobile-s416w.26): KMP -> KMP.
+                api(project(":plugin-api"))
                 api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api(libs.kotlinx.serialization.json)
@@ -108,6 +110,10 @@ kotlin {
                 // duplicated per platform (letta-mobile-mqzkc).
                 api(libs.ktor.client.core)
                 api(libs.ktor.client.websockets)
+                // letta-mobile-o4ygk.4: the canonical timeline presentation pages its settled rows
+                // in commonMain so :sharedUI can render it on wasm. paging-common is KMP (android,
+                // jvm, wasmJs, linux/mingw/macos-arm64 native).
+                api(libs.androidx.paging.common)
             }
         }
 
@@ -117,16 +123,17 @@ kotlin {
         val jvmAndAndroid by creating {
             dependsOn(commonMain.get())
             dependencies {
-                // Paging-common is Android/JVM only. Former :core:domain contracts
-                // (IMessageRepository, IAllConversationsRepository) live in this
-                // source set because they expose PagingData / java.time.Instant.
-                api(libs.androidx.paging.common)
+                // Former :core:domain contracts (IMessageRepository,
+                // IAllConversationsRepository) live in this source set because they
+                // expose java.time.Instant. paging-common comes from commonMain.
                 // letta-mobile-gw0h1: QR Code encoder for the CLI pair command.
                 // ZXing's `core` jar is pure Java (no Android-only deps).
                 api("com.google.zxing:core:3.5.3")
                 // CIO engine for the admin-proxy PATCH path: HttpURLConnection
                 // cannot send PATCH (JDK ProtocolException).
                 implementation(libs.ktor.client.cio)
+                // Peer-owned notebook documents persist locally on both JVM and Android.
+                implementation(libs.automerge)
             }
         }
 
@@ -140,6 +147,9 @@ kotlin {
                 // Iroh AAR: brings the JVM iroh classes transitively + the
                 // Android-only IrohAndroid class (JNI entry point).
                 implementation(libs.iroh.android)
+                // The Java automerge artifact has no Android .so files; its matching
+                // native libraries ship separately in the upstream Android AAR.
+                implementation("org.automerge:androidnative:0.0.9")
             }
         }
 
@@ -160,12 +170,6 @@ kotlin {
         getByName("jvmTest") {
             dependsOn(jvmAndAndroidTest)
             dependencies {
-                // Architecture characterization for the Meridian federation
-                // decision. Automerge Java 0.0.9 includes the Samod repository
-                // runtime and a generic Transport bridge, letting it run over
-                // the Iroh endpoint we already own instead of adding a second
-                // native mesh endpoint.
-                implementation(libs.automerge)
                 implementation(libs.ktor.client.cio)
                 implementation(libs.zxing.javase)
                 implementation(libs.ktor.server.core)

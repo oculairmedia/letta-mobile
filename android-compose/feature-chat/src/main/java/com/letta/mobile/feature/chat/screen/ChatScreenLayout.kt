@@ -98,12 +98,18 @@ internal fun ChatScreenLayout(
         ChatScreenMainContent(
             params = params,
             contentCallbacks = localState.contentCallbacks,
-            bottomPaddingDp = localState.bottomPaddingDp,
+            insets = ChatScreenContentInsets(
+                bottomPadding = localState.bottomPaddingDp,
+                composerAboveInput = localState.composerAboveInputDp,
+            ),
             openSubagentTarget = localState.openSubagentTarget,
         )
         ChatScreenSubagentRingsOverlay(
             params = ChatScreenSubagentRingsOverlayParams(
-                layoutParams = params,
+                barState = params.subagentBarState,
+                resolvedSubagentSource = params.resolvedSubagentSource,
+                navigation = params.navigation,
+                onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
                 openSubagentTarget = localState.openSubagentTarget,
                 onTargetChange = localState.onTappedSubagentTargetChange,
                 subagentNavigationScope = localState.subagentNavigationScope,
@@ -122,6 +128,7 @@ internal fun ChatScreenLayout(
                 reducedMotion = reducedMotion,
                 bottomInsetDp = params.bottomInsetDp,
                 onComposerHeightChange = localState.onComposerHeightChange,
+                onInputCardHeightChange = localState.onInputCardHeightChange,
                 modifier = Modifier.align(Alignment.BottomCenter),
             ),
         )
@@ -136,33 +143,49 @@ internal fun ChatScreenLayout(
                 onTargetUpdate = localState.onTappedSubagentTargetChange,
             ),
         )
-        localState.toolRunDetails?.let { groups ->
-            ToolRunDetailsSheet(
-                groups = groups,
-                onDismiss = { localState.onToolRunDetailsChange(null) },
-                onAttachmentImageTap = localState.contentCallbacks.onAttachmentImageTap,
-            )
-        }
-        ChatScreenFloatingOverlays(
-            params = ChatScreenFloatingOverlaysParams(
-                floatingBannerMessage = params.floatingBannerMessage,
-                imageViewerState = localState.imageViewerState,
-                onImageViewerDismiss = { localState.onImageViewerStateChange(null) },
-                chatMode = params.chatMode,
-                a2uiDebugFrames = params.state.a2uiDebugFrames,
-                modifier = Modifier.fillMaxSize(),
-            ),
-        )
+        ChatScreenDetailOverlays(params = params, localState = localState)
     }
 }
+
+/** The tool-run details sheet, the floating banner, the image viewer and the A2UI debug frames. */
+@Composable
+private fun ChatScreenDetailOverlays(
+    params: ChatScreenLayoutParams,
+    localState: ChatScreenLayoutLocalState,
+) {
+    localState.toolRunDetails?.let { groups ->
+        ToolRunDetailsSheet(
+            groups = groups,
+            onDismiss = { localState.onToolRunDetailsChange(null) },
+            onAttachmentImageTap = localState.contentCallbacks.onAttachmentImageTap,
+        )
+    }
+    ChatScreenFloatingOverlays(
+        params = ChatScreenFloatingOverlaysParams(
+            floatingBannerMessage = params.floatingBannerMessage,
+            imageViewerState = localState.imageViewerState,
+            onImageViewerDismiss = { localState.onImageViewerStateChange(null) },
+            chatMode = params.chatMode,
+            a2uiDebugFrames = params.state.a2uiDebugFrames,
+            modifier = Modifier.fillMaxSize(),
+        ),
+    )
+}
+
+/** How far the timeline keeps clear of the composer: the whole column, and the band above its input card. */
+private data class ChatScreenContentInsets(
+    val bottomPadding: Dp,
+    val composerAboveInput: Dp,
+)
 
 @Composable
 private fun ChatScreenMainContent(
     params: ChatScreenLayoutParams,
     contentCallbacks: ChatContentCallbacks,
-    bottomPaddingDp: Dp,
+    insets: ChatScreenContentInsets,
     openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
 ) {
+    val bottomPaddingDp = insets.bottomPadding
     val contentPhase = chatScreenContentPhase(params.state)
     val truncatedToolResultResolver = remember(params.viewModel) {
         TruncatedToolResultResolver { messageId ->
@@ -191,6 +214,12 @@ private fun ChatScreenMainContent(
                         chatBackground = params.chatBackground,
                         topPadding = params.contentPadding.calculateTopPadding(),
                         bottomPadding = bottomPaddingDp,
+                        // The FAB anchors above the input CARD, not the whole
+                        // composer column: subtract the transparent band above
+                        // the card (companion row, tool chips, queued sends,
+                        // goal status) so it sits at the same visual height the
+                        // user perceives as "above the composer" (2026-09-28).
+                        scrollFabBottomPadding = bottomPaddingDp - insets.composerAboveInput,
                         activeFontScale = params.activeFontScale,
                         scrollToMessageId = params.viewModel.scrollToMessageId,
                     ),
@@ -260,8 +289,11 @@ private fun ChatScreenErrorPhase(
     )
 }
 
-private data class ChatScreenSubagentRingsOverlayParams(
-    val layoutParams: ChatScreenLayoutParams,
+internal data class ChatScreenSubagentRingsOverlayParams(
+    val barState: ChatScreenSubagentBarState,
+    val resolvedSubagentSource: ActiveSubagentSource,
+    val navigation: ChatScreenNavigationCallbacks,
+    val onFloatingBannerMessageChange: (String) -> Unit,
     val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
     val onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
     val subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
@@ -277,10 +309,11 @@ private data class ChatScreenComposerColumnParams(
     val reducedMotion: Boolean,
     val bottomInsetDp: Dp,
     val onComposerHeightChange: (Dp) -> Unit,
+    val onInputCardHeightChange: (Dp) -> Unit,
     val modifier: Modifier = Modifier,
 )
 
-private data class ChatScreenSubagentTodoSheetParams(
+internal data class ChatScreenSubagentTodoSheetParams(
     val target: SubagentTodoSheetTarget?,
     val resolvedSubagentSource: ActiveSubagentSource,
     val resolvedSelfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource,
@@ -300,11 +333,11 @@ private data class ChatScreenFloatingOverlaysParams(
 )
 
 @Composable
-private fun ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverlayParams) {
+internal fun ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverlayParams) {
     CompositionLocalProvider(LocalSubagentTodoSheetOpener provides params.openSubagentTarget) {
         ActiveSubagentRings(
-            subagents = params.layoutParams.subagentBarState.activeSubagents,
-            now = params.layoutParams.subagentBarState.lingerTick,
+            subagents = params.barState.activeSubagents,
+            now = params.barState.lingerTick,
             onRingClick = { subagent ->
                 params.onTargetChange(
                     SubagentTodoSheetTarget(
@@ -319,12 +352,12 @@ private fun ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverla
                 handleSubagentViewConversation(
                     SubagentViewConversationParams(
                         subagent = subagent,
-                        resolvedSubagentSource = params.layoutParams.resolvedSubagentSource,
-                        navigation = params.layoutParams.navigation,
+                        resolvedSubagentSource = params.resolvedSubagentSource,
+                        navigation = params.navigation,
                         subagentNavigationScope = params.subagentNavigationScope,
                         haptic = params.haptic,
                         onTargetChange = params.onTargetChange,
-                        onFloatingBannerMessageChange = params.layoutParams.onFloatingBannerMessageChange,
+                        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
                     ),
                 )
             },
@@ -436,12 +469,7 @@ private fun ChatScreenComposerColumn(params: ChatScreenComposerColumnParams) {
             },
     ) {
         ChatScreenGoalStatusSection(params.state, params.viewModel)
-        ChatScreenComposerInputSection(
-            state = params.state,
-            composerState = params.composerState,
-            viewModel = params.viewModel,
-            navigation = params.navigation,
-        )
+        ChatScreenComposerInputSection(params)
     }
 }
 
@@ -513,12 +541,11 @@ internal fun activeRunActivity(messages: List<com.letta.mobile.data.model.UiMess
 }
 
 @Composable
-private fun ChatScreenComposerInputSection(
-    state: ChatUiState,
-    composerState: ChatComposerState,
-    viewModel: AdminChatViewModel,
-    navigation: ChatScreenNavigationCallbacks,
-) {
+private fun ChatScreenComposerInputSection(params: ChatScreenComposerColumnParams) {
+    val state = params.state
+    val composerState = params.composerState
+    val viewModel = params.viewModel
+    val navigation = params.navigation
     val reducedMotion = rememberReducedMotionEnabled()
     val launchPicker = rememberImageAttachmentPicker(
         onPicked = { viewModel.addAttachment(it) },
@@ -567,12 +594,13 @@ private fun ChatScreenComposerInputSection(
                 emptyList()
             },
             onOpenCanvas = navigation.onOpenCanvas,
+            onInputCardHeightChange = params.onInputCardHeightChange,
         )
     }
 }
 
 @Composable
-private fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParams) {
+internal fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParams) {
     params.target?.let { sheetTarget ->
         var todoState by remember(sheetTarget.toolCallId) {
             mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)
@@ -609,7 +637,7 @@ private fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParam
 }
 
 @Composable
-private fun ChatScreenVoiceOverlay(modifier: Modifier = Modifier) {
+internal fun ChatScreenVoiceOverlay(modifier: Modifier = Modifier) {
     val voiceActivity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
     val voiceIsHiltHost = voiceActivity is dagger.hilt.internal.GeneratedComponentManager<*>
     if (voiceIsHiltHost) {

@@ -1,0 +1,11 @@
+{"dir":"plugin->host","raw":"not json","code":-32700,"answered":true}
+{"dir":"plugin->host","raw":"[{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"plugin.health\"}]","code":-32600,"answered":true}
+{"dir":"plugin->host","raw":"{\"id\":2,\"method\":\"host.emit\",\"params\":{}}","code":-32600,"answered":true}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"id\":{\"n\":3},\"method\":\"host.emit\"}","code":-32600,"answered":true}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"host.emit\",\"params\":[1]}","code":-32602,"answered":true}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"method\":\"host.log\",\"params\":\"x\"}","code":-32602,"answered":false}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"id\":5,\"result\":{},\"error\":{\"code\":1,\"message\":\"x\"}}","code":-32600,"answered":false}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"plugin.unknown\",\"params\":{}}","code":-32601,"answered":true}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"action.invoke\",\"params\":{}}","code":-32601,"answered":true}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"host.log\",\"params\":{}}","code":-32600,"answered":true}
+{"dir":"plugin->host","raw":"{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"host.emit\",\"params\":{\"place\":\"x\"}}","code":-32602,"answered":true}

@@ -162,6 +162,8 @@ val buildDesktopTabletNative = tasks.register<Exec>("buildDesktopTabletNative") 
         manifest,
         tabletInputDir.file("Cargo.lock"),
         fileTree(tabletInputDir.dir("src")),
+        tabletInputDir.file("build.rs"),
+        fileTree(rootProject.layout.projectDirectory.dir("native/octotablet")),
     )
     outputs.file(tabletInputDir.file("target/release/$tabletNativeLibraryName"))
     commandLine(
@@ -300,6 +302,11 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // letta-mobile-s416w.14: the live JCEF plugin-view tests need a display and the JCEF native
+    // bundle, so they run only on request: -PrunJcefUiTest=true (or -DrunJcefUiTest=true).
+    providers.gradleProperty("runJcefUiTest").orElse(providers.systemProperty("runJcefUiTest")).orNull
+        ?.let { systemProperty("runJcefUiTest", it) }
+    providers.gradleProperty("jcefDir").orNull?.let { systemProperty("letta.pluginViews.jcefDir", it) }
 }
 
 // letta-mobile-0s5bi spike: native Rive (rive-runtime + D3D11 Rive Renderer) as a Compose node.
@@ -459,14 +466,12 @@ nucleus.application {
     // text components, so the touch keyboard never pops).
     javaHome = packagingJavaHome
 
-    // Windows touch input (see desktop/.../touch/DesktopWindowsTouchInput.kt).
-    // AWT translates WM_TOUCH into ordinary MouseEvents and keeps the only
-    // "this came from a finger" flag behind sun.awt.AWTAccessor, which is not
-    // an exported package. Without this the shim degrades to a no-op (logged
-    // once) and touch drag-to-scroll plus the touch keyboard stay dead.
+    // Windows touch: AWT still turns each finger into touch-caused mouse events,
+    // and the only flag that says so sits behind sun.awt.AWTAccessor.
+    // DesktopTouchEchoFilter reads it to drop that copy, since fingers reach
+    // Compose as real touch (ComposeTouchInjector).
     //
-    // sun.awt.windows is a second, separate package (not covered by the
-    // sun.awt open above): DesktopWindowsTouchKeyboard reflects onto
+    // The Windows touch keyboard: DesktopWindowsTouchKeyboard reflects onto
     // WToolkit.showTouchKeyboard/hideTouchKeyboard to raise the touch
     // keyboard, since the COM ITipInvocation route is dead on Windows 11
     // (see that file's KDoc for the measured facts). Without this open,
@@ -482,6 +487,13 @@ nucleus.application {
         "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
     )
+
+    // Skiko's FrameWatcher calls System.gc() every 30s once 1,000 frames have rendered, to
+    // reclaim native Skia peers. It assumes a concurrent collector; under G1's default that
+    // is a stop-the-world FULL collection (~80ms here), felt as a periodic halt while drawing
+    // on the canvas. This makes those calls start a concurrent cycle instead, which still
+    // reclaims the peers without freezing the UI.
+    jvmArgs("-XX:+ExplicitGCInvokesConcurrent")
 
     // How Compose renders popups, menus and tooltips: drawn into the window's own canvas as
     // scene "layers" (the default), or as separate heavyweight components. Overridable for
@@ -867,3 +879,119 @@ afterEvaluate {
 // configureEach block above (the doLast needs the directory to exist on
 // disk to read its release file). All packaging entry points are covered
 // by that match â€” no separate dependency wiring here.
+
+/*
+ * Phone preview (docs/development/phone-preview.md): the desktop app as a phone, and a gallery of the
+ * shared chat page's phone fixtures. Dev-only - nothing here is packaged, and the normal `run` and
+ * the installers are untouched.
+ *
+ *   ./gradlew :desktop:runPhone             the real app in a Pixel-sized window (LETTA_DESKTOP_PHONE=1)
+ *   ./gradlew :desktop:runPhonePlayground   the fixture gallery (no server)
+ *   ./gradlew :desktop:runPhoneHot / :desktop:runPhonePlaygroundHot   the same under Compose Hot Reload
+ */
+
+// The playground lives in its own source set, so the fixtures (sharedUI-devfixtures) never reach the
+// production classpath. It sees desktop's internals (the phone screen, the theme) as a test would.
+val phonePlayground: SourceSet = sourceSets.create("phonePlayground") {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += sourceSets.main.get().output
+}
+configurations.named("phonePlaygroundImplementation") { extendsFrom(configurations.implementation.get()) }
+configurations.named("phonePlaygroundRuntimeOnly") { extendsFrom(configurations.runtimeOnly.get()) }
+configurations.named("phonePlaygroundCompileClasspath") {
+    shouldResolveConsistentlyWith(configurations.getByName("phonePlaygroundRuntimeClasspath"))
+}
+dependencies {
+    "phonePlaygroundImplementation"(project(":sharedUI-devfixtures"))
+    // The phone shell's tests render the same fixture screens.
+    testImplementation(project(":sharedUI-devfixtures"))
+}
+kotlin.target.compilations.named("phonePlayground") {
+    associateWith(kotlin.target.compilations.getByName("main"))
+}
+
+/** The extracted JBR as a launcher, as the `run` task uses it (Jewel needs a 25+ runtime; JBR has the AWT input bridge). */
+val desktopJbrLauncher: Provider<JavaLauncher> = provider {
+    val executable = desktopJbrHome.get().file("bin/java.exe")
+    object : JavaLauncher {
+        override fun getExecutablePath() = executable
+        override fun getMetadata() = object : JavaInstallationMetadata {
+            override fun getLanguageVersion() = JavaLanguageVersion.of(minimumRuntimeJdk)
+            override fun getJavaRuntimeVersion() = jbrVersion
+            override fun getJvmVersion() = jbrVersion
+            override fun getVendor() = "JetBrains"
+            override fun getInstallationPath() = desktopJbrHome.get()
+            override fun isCurrentJvm() = false
+        }
+    }
+}
+
+/** The git-ignored native Rive bridge, when one was copied into the module (see avatar/renderer-rive/native/desktop). */
+val phoneRiveBridge = layout.projectDirectory.file("rive_desktop_bridge.dll").asFile
+
+/** What both phone launchers share: the JBR, the app's JVM flags, the Rive bridge and its warning. */
+fun JavaExec.configurePhoneLaunch() {
+    group = "application"
+    workingDir = projectDir
+    jvmArgs(
+        "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
+        "-XX:+ExplicitGCInvokesConcurrent",
+    )
+    if (isWindowsHost) {
+        dependsOn(extractDesktopJbr)
+        javaLauncher.set(desktopJbrLauncher)
+    }
+    val bridge = riveBridgeSource?.let(::File)?.takeIf { it.isFile } ?: phoneRiveBridge.takeIf { it.isFile }
+    if (bridge != null) {
+        systemProperty("rive.bridge.path", bridge.absolutePath)
+    } else {
+        doFirst {
+            logger.warn(
+                "WARNING: no rive_desktop_bridge.dll (copy it to ${phoneRiveBridge.path}, or pass -PriveBridge=<dll>); " +
+                    "mascots fall back to orbs in the phone preview.",
+            )
+        }
+    }
+}
+
+fun JavaExec.configurePhoneApp() {
+    description = "Runs the desktop app as a phone: Pixel 9 Pro window, Touch chat, simulated insets and keyboard."
+    mainClass.set("com.letta.mobile.desktop.MainKt")
+    environment("LETTA_DESKTOP_PHONE", "1")
+    configurePhoneLaunch()
+}
+
+fun JavaExec.configurePhonePlayground() {
+    description = "Runs the phone playground: the shared chat page's phone fixtures, live, without a server."
+    mainClass.set("com.letta.mobile.desktop.phone.playground.PhonePlaygroundKt")
+    configurePhoneLaunch()
+}
+
+tasks.register<JavaExec>("runPhone") {
+    classpath = sourceSets.main.get().runtimeClasspath
+    configurePhoneApp()
+}
+
+tasks.register<JavaExec>("runPhonePlayground") {
+    classpath = phonePlayground.runtimeClasspath
+    configurePhonePlayground()
+}
+
+// Compose Hot Reload (JetBrains Runtime + its agent; the JBR above supports enhanced class
+// redefinition). Applied only when a hot task is on the command line, because the plugin also adds
+// compiler flags and runtime artifacts that ordinary builds should not carry.
+val hotReloadRequested = gradle.startParameter.taskNames.any { name ->
+    name.substringAfterLast(':').let { it.startsWith("hot") || it.endsWith("Hot") }
+}
+if (hotReloadRequested) {
+    apply(plugin = "org.jetbrains.compose.hot-reload")
+    tasks.register<org.jetbrains.compose.reload.gradle.ComposeHotRun>("runPhoneHot") {
+        compilation.set(kotlin.target.compilations.getByName("main"))
+        configurePhoneApp()
+    }
+    tasks.register<org.jetbrains.compose.reload.gradle.ComposeHotRun>("runPhonePlaygroundHot") {
+        compilation.set(kotlin.target.compilations.getByName("phonePlayground"))
+        configurePhonePlayground()
+    }
+}

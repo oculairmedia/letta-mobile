@@ -139,7 +139,13 @@ class CanvasRelayClient(
 
         /** Assets sent to (or already held by) the host on this connection. */
         val assetsUp = mutableSetOf<String>()
+
+        /** What the host said it reads, by topic, from its [CanvasRelayMessage.Joined]. */
+        val hostReads = mutableMapOf<String, Set<String>>()
     }
+
+    /** What to do with one of this app's ops on a connection ([claimSend]). */
+    private enum class SendClaim { SEND, HELD, SUPERSEDED }
 
     /** What this app knows of a canvas on its host, for settle comparisons and diagnostics. */
     data class RelayView(val hostId: String?, val topic: String, val canonicalId: CanvasId?, val hostCursor: Long, val queued: Int)
@@ -162,7 +168,9 @@ class CanvasRelayClient(
         // Durable before the network: a publish that fails leaves the op queued, not lost (I3).
         delivery.enqueue(canvas.topic, listOf(op.opId))
         lock.withLock { canvasesOf(canvas.topic) }.forEach { it.local.tryEmit(op) }
-        val live = lock.withLock { current?.takeIf { canvas.topic in it.joinSent }?.also { it.inFlight += op.opId } }
+        val live = lock.withLock {
+            current?.takeIf { canvas.topic in it.joinSent && claimSend(it, canvas.topic, op) == SendClaim.SEND }
+        }
         if (live != null) {
             try {
                 sendAssetsFor(live, canvas.topic, op)
@@ -344,7 +352,7 @@ class CanvasRelayClient(
         val canvas = lock.withLock { canvases.values.first { it.topic == topic } }
         val after = delivery.cursor(live.connection.hostId, topic) ?: 0L
         gate.joining(CanvasRelayTopic(topic))
-        live.connection.send(CanvasRelayMessage.Join(topic, canvas.id.value, after))
+        live.connection.send(CanvasRelayMessage.Join(topic, canvas.id.value, after, CanvasRelayFeatures.SUPPORTED))
     }
 
     /**
@@ -445,6 +453,7 @@ class CanvasRelayClient(
         val firstTimeHere = delivery.cursor(live.connection.hostId, message.topic) == null
         val locals = lock.withLock {
             refusal = null
+            live.hostReads[message.topic] = message.features.toSet()
             canvasesOf(message.topic).onEach { it.canonicalId = CanvasId(message.canvasId) }.map { it.id }
         }
         val localOps = locals.flatMap { opLog.getOps(it, 0L) }.associateBy { it.opId }
@@ -466,12 +475,39 @@ class CanvasRelayClient(
                 delivery.reject(topic, opId, "not in the local op log")
                 continue
             }
-            val send = lock.withLock { (current === live).also { if (it) live.inFlight += opId } }
-            if (!send) return false
-            sendAssetsFor(live, topic, op)
-            live.connection.send(CanvasRelayMessage.Publish(topic, op))
+            when (lock.withLock { claimSend(live, topic, op) }) {
+                SendClaim.SUPERSEDED -> return false
+                SendClaim.HELD -> held(topic, op)
+                SendClaim.SEND -> {
+                    sendAssetsFor(live, topic, op)
+                    live.connection.send(CanvasRelayMessage.Publish(topic, op))
+                }
+            }
         }
         return true
+    }
+
+    /**
+     * Whether [op] goes up on [live] now (under [lock]): not on a superseded connection, and not to a
+     * host that did not say it reads it ([CanvasRelayFeatures]), which would refuse the whole connection
+     * over it. Claimed, it is in flight.
+     */
+    private fun claimSend(live: Live, topic: String, op: CanvasOp): SendClaim = when {
+        current !== live -> SendClaim.SUPERSEDED
+        !CanvasRelayFeatures.readableBy(op, live.hostReads[topic].orEmpty()) -> SendClaim.HELD
+        else -> {
+            live.inFlight += op.opId
+            SendClaim.SEND
+        }
+    }
+
+    /** [op] stays queued: this host cannot read it, and a host redeployed with a build that can will take it. */
+    private fun held(topic: String, op: CanvasOp) {
+        com.letta.mobile.util.Telemetry.event(
+            "CanvasRelayClient", "op.held",
+            "topic" to topic, "opId" to op.opId, "needs" to CanvasRelayFeatures.required(op).joinToString(","),
+            level = com.letta.mobile.util.Telemetry.Level.WARN,
+        )
     }
 
     // ---- Local ----

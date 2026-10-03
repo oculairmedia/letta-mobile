@@ -4,8 +4,13 @@ import com.letta.mobile.data.repository.modelcontrol.ConversationModelRepository
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.repository.modelcontrol.ProviderConnectionRepository
+import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * letta-mobile-w4q4p: the chat picker's view of the host model catalog
@@ -15,12 +20,24 @@ import javax.inject.Inject
 class ChatModelControl @Inject constructor(
     private val catalog: ModelCatalogRepository,
     private val conversationModels: ConversationModelRepository,
+    private val providers: ProviderConnectionRepository,
 ) {
     suspend fun refreshCatalog() {
         catalog.refresh()
     }
 
+    /** letta-mobile-w4q4p.6.1: the shared picker's view of the host catalog (the Hilt singletons, so edits show at once). */
+    fun pickerSource(): ModelPickerSource = ModelPickerSource.catalog(providers, catalog)
+
+    /** The Models sheet's presenter over the same repositories. */
+    fun managementController(scope: CoroutineScope): ProviderManagementController =
+        ProviderManagementController(scope, providers, catalog)
+
     fun reasoningEffortsFor(handle: ModelHandle?): List<String> = catalog.reasoningEffortsFor(handle)
+
+    /** letta-mobile-okvyf: conversation id -> model applied by a per-conversation switch. */
+    val conversationSelections: StateFlow<Map<String, String>>
+        get() = conversationModels.selections.byConversation
 
     suspend fun switchConversationModel(target: ConversationModelTarget, pick: ModelPick) {
         conversationModels.updateModel(target, pick.handle, pick.effort.toChoice())

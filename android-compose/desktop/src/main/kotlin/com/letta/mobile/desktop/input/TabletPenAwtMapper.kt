@@ -13,6 +13,13 @@ internal class TabletPenAwtMapper {
     private var lastPoint: Point = Point(0, 0)
     private var reportedGeometry: Boolean = false
 
+    /** Ends a synthetic press without posting a new one. A no-op when the pen is already up. */
+    fun releaseIfDown(target: Component) {
+        if (!down) return
+        down = false
+        post(target, lastPoint, MouseEvent.MOUSE_RELEASED)
+    }
+
     fun dispatch(target: Component, sample: TabletPenDecoder.DecodedSample, scale: Double) {
         val point = Point(sample.x.toInt(), sample.y.toInt())
         reportGeometryOnce(target, sample, scale)

@@ -436,19 +436,30 @@ class ConfigViewModelTest {
         assertEquals(false, fakeRepository.getDynamicColor().first())
     }
 
-    @Test
-    fun updateMode_updatesStateCorrectly() = runTest {
+    /**
+     * Loads the empty form (no active config), applies [edit] to the view model, and returns the
+     * form the view model then emits, asserting it is a loaded one.
+     */
+    private suspend fun loadedFormAfter(edit: ConfigViewModel.() -> Unit): ConfigUiState {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
 
-        viewModel.updateMode(ServerMode.SELF_HOSTED)
+        viewModel.edit()
 
+        lateinit var form: ConfigUiState
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals(ServerMode.SELF_HOSTED, successState.mode)
+            form = (state as UiState.Success).data
         }
+        return form
+    }
+
+    @Test
+    fun updateMode_updatesStateCorrectly() = runTest {
+        val successState = loadedFormAfter { updateMode(ServerMode.SELF_HOSTED) }
+
+        assertEquals(ServerMode.SELF_HOSTED, successState.mode)
     }
 
     @Test
@@ -484,98 +495,79 @@ class ConfigViewModelTest {
 
     @Test
     fun updateServerUrl_updatesStateCorrectly() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
+        val successState = loadedFormAfter { updateServerUrl("http://test.server") }
 
-        viewModel.updateServerUrl("http://test.server")
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals("http://test.server", successState.serverUrl)
-        }
+        assertEquals("http://test.server", successState.serverUrl)
     }
 
     @Test
     fun updateApiToken_updatesStateCorrectly() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
+        val successState = loadedFormAfter { updateApiToken("test-token") }
 
-        viewModel.updateApiToken("test-token")
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals("test-token", successState.apiToken)
-        }
+        assertEquals("test-token", successState.apiToken)
     }
 
     @Test
     fun updateTheme_updatesStateCorrectly() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
+        val successState = loadedFormAfter { updateTheme(AppTheme.DARK) }
 
-        viewModel.updateTheme(AppTheme.DARK)
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals(AppTheme.DARK, successState.theme)
-        }
+        assertEquals(AppTheme.DARK, successState.theme)
         assertEquals(AppTheme.DARK, fakeRepository.getTheme().first())
     }
 
     @Test
     fun updateThemePreset_updatesStateCorrectly() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
+        val successState = loadedFormAfter { updateThemePreset(ThemePreset.SAKURA) }
 
-        viewModel.updateThemePreset(ThemePreset.SAKURA)
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals(ThemePreset.SAKURA, successState.themePreset)
-            assertEquals(false, successState.dynamicColor)
-        }
+        assertEquals(ThemePreset.SAKURA, successState.themePreset)
+        assertEquals(false, successState.dynamicColor)
         assertEquals(ThemePreset.SAKURA, fakeRepository.getThemePreset().first())
         assertEquals(false, fakeRepository.getDynamicColor().first())
     }
 
     @Test
     fun updateDynamicColor_updatesStateCorrectly() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
+        val successState = loadedFormAfter { updateDynamicColor(false) }
 
-        viewModel.updateDynamicColor(false)
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals(false, successState.dynamicColor)
-        }
+        assertEquals(false, successState.dynamicColor)
         assertEquals(false, fakeRepository.getDynamicColor().first())
     }
 
     @Test
     fun updateEnableProjects_updatesStateCorrectly() = runTest {
+        val successState = loadedFormAfter { updateEnableProjects(false) }
+
+        assertEquals(false, successState.enableProjects)
+        assertEquals(false, fakeRepository.getEnableProjects().first())
+    }
+
+    @Test
+    fun updateSharedChatPageEnabled_updatesStateAndPersists() = runTest {
+        val successState = loadedFormAfter { updateSharedChatPageEnabled(true) }
+
+        assertEquals(true, successState.sharedChatPageEnabled)
+        assertEquals(true, fakeRepository.getSharedChatPageEnabled().first())
+    }
+
+    @Test
+    fun openChatsOnCanvas_defaultsOn_andUpdatePersists() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
-
-        viewModel.updateEnableProjects(false)
 
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals(false, successState.enableProjects)
+            assertEquals(true, (state as UiState.Success).data.openChatsOnCanvas)
         }
-        assertEquals(false, fakeRepository.getEnableProjects().first())
+
+        viewModel.updateOpenChatsOnCanvas(false)
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(state is UiState.Success)
+            assertEquals(false, (state as UiState.Success).data.openChatsOnCanvas)
+        }
+        assertEquals(false, fakeRepository.getOpenChatsOnCanvas().first())
     }
 
     @Test

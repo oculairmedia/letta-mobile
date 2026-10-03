@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
@@ -69,8 +68,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.LettaCardDefaults
@@ -732,176 +729,8 @@ internal fun ModelInfoCard(
     }
 }
 
-/**
- * Bottom-sheet quick picker for swapping the active agent's model.
- * Lists available LLM models grouped by provider type, with one-tap
- * apply. Capability hints (context window size, tier) are included
- * when the model-list API provides them.
- *
- * letta-mobile-g5hyz: tap → bottom-sheet quick picker.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun ModelPickerSheet(
-    models: List<LlmModel>,
-    currentModel: String?,
-    onDismiss: () -> Unit,
-    onModelSelected: (String) -> Unit,
-    onRefresh: () -> Unit,
-) {
-    val reasoning = LocalModelPickerReasoning.current
-    var isDismissingForAction by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
-
-    fun selectThenDismiss(action: () -> Unit) {
-        if (isDismissingForAction) return
-        isDismissingForAction = true
-        action()
-        onDismiss()
-        scope.launch { runCatching { sheetState.hide() } }
-    }
-
-    LaunchedEffect(Unit) {
-        if (models.isEmpty()) onRefresh()
-    }
-
-    var modelQuery by rememberSaveable { mutableStateOf("") }
-
-    val grouped = remember(models, modelQuery) {
-        val q = modelQuery.trim().lowercase()
-        val filtered = if (q.isEmpty()) {
-            models
-        } else {
-            models.filter { model ->
-                model.displayName.lowercase().contains(q) ||
-                    model.providerType.lowercase().contains(q) ||
-                    (model.providerName?.lowercase()?.contains(q) == true) ||
-                    (model.handle?.lowercase()?.contains(q) == true) ||
-                    model.name.lowercase().contains(q) ||
-                    model.id.lowercase().contains(q)
-            }
-        }
-        val sorted = filtered.sortedWith(compareBy({ it.providerType }, { it.displayName.lowercase() }))
-        sorted.groupBy { it.providerType.ifBlank { "Other" } }
-    }
-
-    val activeModel = remember(models, currentModel) {
-        ModelCatalog.selectedModel(models, currentModel)
-    }
-
-    ModalBottomSheet(
-        sheetState = sheetState,
-        onDismissRequest = onDismiss,
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(LettaDimens.Space.lg)
-                .testTag(AgentScaffoldTestTags.MODEL_PICKER_SHEET),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.screen_drawer_model_picker_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onRefresh) {
-                    Icon(
-                        LettaIcons.Refresh,
-                        contentDescription = stringResource(R.string.action_refresh),
-                        modifier = Modifier.size(LettaDimens.Control.iconButtonSm),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
-
-            if (models.isNotEmpty()) {
-                LettaSearchBar(
-                    query = modelQuery,
-                    onQueryChange = { modelQuery = it },
-                    onClear = { modelQuery = "" },
-                    placeholder = stringResource(R.string.screen_drawer_model_picker_search_hint),
-                    compact = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
-            }
-
-            if (grouped.isEmpty()) {
-                Text(
-                    text = if (modelQuery.isBlank()) {
-                        stringResource(R.string.screen_drawer_model_picker_empty)
-                    } else {
-                        stringResource(R.string.screen_drawer_model_picker_no_match, modelQuery)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = LettaDimens.Space.lg),
-                )
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-                    modifier = Modifier.heightIn(max = PickerListMaxHeight),
-                ) {
-                    grouped.forEach { (provider, providerModels) ->
-                        item(key = "provider-$provider") {
-                            Text(
-                                text = provider.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
-                            )
-                        }
-                        itemsIndexed(
-                            providerModels,
-                            key = { index, model ->
-                                // Catalogs can emit duplicate handles (same model
-                                // listed under more than one provider entry). Index
-                                // keeps LazyColumn keys unique without remounting
-                                // rows that already have a distinct id.
-                                listOfNotNull(model.id, model.handle, model.name, index.toString())
-                                    .joinToString("|")
-                            },
-                        ) { _, model ->
-                            val handle = model.handle ?: model.name
-                            ModelPickerRow(
-                                model = model,
-                                spec = ModelPickerRowSpec(
-                                    handle = handle,
-                                    isActive = model == activeModel,
-                                    enabled = !isDismissingForAction,
-                                    efforts = reasoning.effortsFor(handle),
-                                    subtitle = buildModelSubtitle(model),
-                                ),
-                                onSelect = { selectThenDismiss { onModelSelected(handle) } },
-                                onEffortSelected = { effort -> selectThenDismiss { reasoning.onEffortSelected(handle, effort) } },
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(LettaDimens.Space.lg))
-        }
-    }
-}
-
-/**
- * Builds the subtitle line for a model picker item: context window
- * size and provider name when available.
- */
-private fun buildModelSubtitle(model: LlmModel): String {
-    val parts = mutableListOf<String>()
-    model.contextWindow?.takeIf { it > 0 }?.let {
-        parts.add("${it / 1000}K context")
-    }
-    model.providerName?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
-    return parts.joinToString(" · ")
-}
+/** Who the drawer is about: the agent and the backend it runs on. */
+private data class DrawerAgentIdentity(val name: String, val id: String, val backendLabel: String?)
 
 internal data class DrawerNavigationCallbacks(
     val onNavigateToAdmin: () -> Unit = {},
@@ -948,9 +777,7 @@ internal fun DrawerContent(
             .navigationBarsPadding(),
     ) {
         DrawerAgentHeader(
-            agentName = agentName,
-            agentId = agentId,
-            activeBackendLabel = activeBackendLabel,
+            identity = DrawerAgentIdentity(name = agentName, id = agentId, backendLabel = activeBackendLabel),
             onSearchMessages = {
                 HapticEffects.segmentTick(haptic, view)
                 onSearchMessages()
@@ -1021,13 +848,11 @@ private val DrawerInset = LettaDimens.Space.md
 /** Who: the agent's avatar (the shared one), its name, the backend it talks to, and its actions. */
 @Composable
 private fun DrawerAgentHeader(
-    agentName: String,
-    agentId: String,
-    activeBackendLabel: String?,
+    identity: DrawerAgentIdentity,
     onSearchMessages: () -> Unit,
     onEditAgent: () -> Unit,
 ) {
-    val displayName = agentName.ifBlank { stringResource(R.string.screen_drawer_default_agent_name) }
+    val displayName = identity.name.ifBlank { stringResource(R.string.screen_drawer_default_agent_name) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1036,7 +861,7 @@ private fun DrawerAgentHeader(
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
         // A still: on this screen the composer companion is the live one.
-        AgentAvatar(agentId = agentId, name = displayName, size = LettaDimens.Orb.railSlotWidth, live = false)
+        AgentAvatar(agentId = identity.id, name = displayName, size = LettaDimens.Orb.railSlotWidth, live = false)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = displayName,
@@ -1052,7 +877,7 @@ private fun DrawerAgentHeader(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = activeBackendLabel ?: stringResource(R.string.screen_drawer_backend_unknown),
+                    text = identity.backendLabel ?: stringResource(R.string.screen_drawer_backend_unknown),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

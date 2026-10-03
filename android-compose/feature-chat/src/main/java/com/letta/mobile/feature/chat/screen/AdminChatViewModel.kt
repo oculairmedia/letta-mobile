@@ -273,8 +273,12 @@ internal class AdminChatViewModel @Inject constructor(
         backgroundRefreshScope = viewModelScope,
     )
     private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository)
+    // The route's agent is this screen's for its whole life. The shared chat page reads it from
+    // here to draw the agent's mascot (the Touch chat head, the composer companion) and to scope
+    // foreign-agent rows out of the timeline (c4igq.4); without it every mascot site fell back
+    // to its stand-in (letta-mobile-bglj6.1).
     private val _uiState: MutableStateFlow<ChatUiState> = MutableStateFlow(
-        ChatUiState(agentName = initialAgentName.orEmpty())
+        ChatUiState(agentName = initialAgentName.orEmpty(), agentId = agentId.value.takeIf { it.isNotBlank() })
     )
 
     private val _sessionState = MutableStateFlow(ChatSessionState())
@@ -554,6 +558,19 @@ internal class AdminChatViewModel @Inject constructor(
     val hapticsEnabled: StateFlow<Boolean> = settingsRepository.getHapticsEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    /**
+     * letta-mobile-bglj6.1: render the shared KMP chat page instead of the legacy layout (preview).
+     * Starts false (the setting's default) so the legacy layout draws on the first frame; with the
+     * preview on, the shared page replaces it once the setting is read (a one-frame legacy flash,
+     * accepted: the settings store has no synchronous read).
+     */
+    val sharedChatPageEnabled: StateFlow<Boolean> = settingsRepository.getSharedChatPageEnabled()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** letta-mobile-bglj6.1: open conversations canvas-first on the shared chat page (default on). */
+    val openChatsOnCanvas: StateFlow<Boolean> = settingsRepository.getOpenChatsOnCanvas()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -573,6 +590,11 @@ internal class AdminChatViewModel @Inject constructor(
             .filter { agents -> agents.isNotEmpty() }
             .map { agents -> agents.find { it.id == agentId } },
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** Per-conversation switches leave the agent model unchanged. */
+    val conversationModelSelections: StateFlow<Map<String, String>> by lazy {
+        modelCoordinator.conversationSelections
+    }
 
     val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)
@@ -599,6 +621,12 @@ internal class AdminChatViewModel @Inject constructor(
             effort,
         ),
     )
+
+    fun modelPickerSource(): com.letta.mobile.data.repository.modelcontrol.ModelPickerSource? = modelCoordinator.pickerSource()
+
+    fun modelsEditController(
+        scope: kotlinx.coroutines.CoroutineScope,
+    ): com.letta.mobile.data.repository.modelcontrol.ProviderManagementController? = modelCoordinator.modelsEditController(scope)
 
     fun reasoningEffortsFor(handle: String?): List<String> =
         modelCoordinator.reasoningEffortsFor(handle?.let { com.letta.mobile.data.repository.modelcontrol.ModelHandle(it) })

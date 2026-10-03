@@ -66,16 +66,19 @@ class CanonicalTimelineEngine(
     private var liveReturns = emptySet<String>()
     private val mutableLive = MutableStateFlow<TimelineLivePublication?>(null)
     val live = mutableLive.asStateFlow()
+    private val mutableSettling = MutableStateFlow<List<TimelineLivePublication>>(emptyList())
+    val settling = mutableSettling.asStateFlow()
 
     suspend fun beginLive(selection: TimelineEngineSelection): TimelineLiveFence = mutex.withLock {
         check(selection === mutablePublication.value.selection) { "Stale selection" }
-        // A committed settlement already belongs to the durable ledger. Starting another turn
-        // drops only its resident overlay; Paging observes durableRevision and canonical identities.
-        // Old acknowledgments remain fenced by the publication's fence, not a growing body queue.
+        // Keep the prior reply visible while its durable row is still waiting to become resident.
         check(sequence < Long.MAX_VALUE)
         TimelineLiveFence(selection, TimelineRequestId((++sequence).toString())).also {
             // A response fetched before this run cannot repair the post-run timeline.
             pendingReconcile = null
+            mutableLive.value?.takeIf { previous -> previous.settlementRevision != null }?.let { previous ->
+                mutableSettling.value = (mutableSettling.value + previous).takeLast(8)
+            }
             liveFence = it
             liveReduction = TimelineReducerState(Timeline(conversationId = selection.scope.conversationId))
             liveReturns = emptySet()
@@ -204,6 +207,15 @@ class CanonicalTimelineEngine(
         fence: TimelineLiveFence,
         presented: Map<TimelineMessageId, Long>,
     ): Boolean = mutex.withLock {
+        val previous = mutableSettling.value.firstOrNull { it.fence === fence }
+        if (previous != null) {
+            val aliases = resolveAliases(fence.selection.scope, previous, presented)
+            val updated = previous.copy(aliases = previous.aliases + aliases)
+            mutableSettling.value = mutableSettling.value.mapNotNull {
+                if (it.fence !== fence) it else updated.takeUnless { publication -> publication.isSettled(presented) }
+            }
+            return@withLock updated.isSettled(presented)
+        }
         val current = mutableLive.value ?: return@withLock false
         if (current.fence !== fence) return@withLock false
         val nextAliases = resolveAliases(fence.selection.scope, current, presented)
@@ -244,9 +256,12 @@ class CanonicalTimelineEngine(
     )
 
     private fun adoptCommittedIdentities(committed: List<CommittedRow>) {
+        val ordered = committed.sortedWith(compareBy({ it.orderDate }, { it.orderOtid }))
+        mutableSettling.value = mutableSettling.value.map { publication ->
+            publication.copy(aliases = publication.aliases + publication.adoptionsFrom(ordered))
+        }
         val live = mutableLive.value ?: return
         if (live.settlementRevision == null) return
-        val ordered = committed.sortedWith(compareBy({ it.orderDate }, { it.orderOtid }))
         val adopted = live.adoptionsFrom(ordered)
         if (adopted.isEmpty()) return
         mutableLive.value = live.copy(aliases = live.aliases + adopted)
@@ -365,6 +380,9 @@ class CanonicalTimelineEngine(
      * and there is nothing yet to resolve against.
      */
     private suspend fun attachResolvedAliases(scope: TimelineScope) {
+        mutableSettling.value = mutableSettling.value.map { publication ->
+            publication.copy(aliases = publication.aliases + resolveAliases(scope, publication, emptyMap()))
+        }
         val live = mutableLive.value ?: return
         if (live.settlementRevision == null) return
         val aliases = resolveAliases(scope, live, emptyMap())
@@ -408,6 +426,7 @@ class CanonicalTimelineEngine(
         liveFence = null
         liveReduction = null
         mutableLive.value = null
+        mutableSettling.value = emptyList()
         mutablePublication.value = TimelineEnginePublication(selection, checkpoint.revision)
         TimelineEngineOpen.Opened(selection)
     }
@@ -479,11 +498,14 @@ class CanonicalTimelineEngine(
         request: TimelineEngineRequest,
         page: TimelineRemotePageResult.Page,
     ): TimelineEngineReconcileResult = mutex.withLock {
-        if (pendingReconcile !== request || request.selection !== mutablePublication.value.selection ||
-            page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
-        ) return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
-        // A settled turn now depends on this path for its durable rows, so only refuse mid-stream.
-        if (liveFence != null && mutableLive.value?.settlementRevision == null) {
+        val requestMismatch = pendingReconcile !== request || request.selection !== mutablePublication.value.selection
+        val generationMismatch = page.requestId != request.remote.requestId || page.selectionGeneration != request.selection.generation
+        if (requestMismatch || generationMismatch) {
+            return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.Stale)
+        }
+        val turnInFlight = liveFence != null && mutableLive.value?.settlementRevision == null
+        val nothingSettling = mutableSettling.value.isEmpty()
+        if (turnInFlight && nothingSettling) {
             return@withLock TimelineEngineReconcileResult(TimelineEnginePageOutcome.NoProgress)
         }
         validate(page)
@@ -494,18 +516,22 @@ class CanonicalTimelineEngine(
             for (record in page.records) {
                 currentCoroutineContext().ensureActive()
                 val event = record.message.toTimelineEvent(0.0)
-                val identity = if (writer is TimelineExactCanonicalWriter && event != null)
-                    writer.canonicalIdentity(this, event.serverId, event.otid) else record.identity
+                val exact = (writer as? TimelineExactCanonicalWriter)?.takeIf { event != null }
+                val identity = if (exact != null) {
+                    exact.canonicalIdentity(this, event!!.serverId, event.otid)
+                } else {
+                    record.identity
+                }
                 val existed = locate(identity) != null
                 val merged = writer.merge(this, record)
                 if (merged && !existed) appended++
                 changed = merged || changed
                 // After the merge: a tool call's stored key is its group owner, which the tool
                 // index only knows once this record has been written.
-                if (writer is TimelineExactCanonicalWriter && event != null) {
+                if (exact != null) {
                     committed += CommittedRow(
-                        event = event,
-                        identity = writer.canonicalEventIdentity(this, event),
+                        event = event!!,
+                        identity = exact.canonicalEventIdentity(this, event),
                         isNew = !existed,
                         orderDate = record.message.date.orEmpty(),
                         orderOtid = record.message.otid ?: record.message.id,

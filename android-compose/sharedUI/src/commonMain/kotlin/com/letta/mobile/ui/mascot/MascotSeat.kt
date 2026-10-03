@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,10 @@ fun MascotSeat(
     identity: MascotIdentity? = null,
     onClick: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
+    /** A drag on the character, in dp (see [SeatHandlers.onDrag]). */
+    onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null,
+    /** Whether a drag starting now goes to [onDrag]; one it turns down is left to what is under it. */
+    dragEnabled: () -> Boolean = { true },
     empty: @Composable (MascotSeatVacancy) -> Unit,
 ) {
     val transport = LocalMascotTransport.current
@@ -96,18 +101,25 @@ fun MascotSeat(
     val handlers = remember { SeatHandlers() }
     handlers.onClick = onClick
     handlers.onEdit = onEdit
+    handlers.onDrag = onDrag
+    handlers.dragEnabled = dragEnabled
     DisposableEffect(transport, key) {
         onDispose { key?.let { transport.seats.remove(it) } }
     }
     // The seat is published from composition, not only from layout: a new identity or overscale
     // with the same bounds must reach the layer too, and layout alone would never report it.
     var bounds by remember { mutableStateOf<Rect?>(null) }
+    // The box's own width: a layer scale outside it shows in [bounds] but not here.
+    var layoutWidth by remember { mutableFloatStateOf(0f) }
     val seatKey = key?.takeIf { occupancy.available }
-    LaunchedEffect(transport, seatKey, bounds, overscale, identity) {
-        transport.publishSeat(seatKey, bounds) { MascotSeatInfo(it, overscale, identity, handlers) }
+    LaunchedEffect(transport, seatKey, bounds, layoutWidth, overscale, identity) {
+        transport.publishSeat(seatKey, bounds) { MascotSeatInfo(it, overscale, identity, handlers, layoutWidth) }
     }
     Box(
-        modifier = modifier.requiredSize(size).onGloballyPositioned { bounds = it.boundsInWindow() },
+        modifier = modifier.requiredSize(size).onGloballyPositioned {
+            bounds = it.boundsInWindow()
+            layoutWidth = it.size.width.toFloat()
+        },
         contentAlignment = Alignment.Center,
     ) {
         when {

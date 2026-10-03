@@ -6,7 +6,7 @@ import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore
+import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnContextPreflight
@@ -218,14 +218,14 @@ internal data class DesktopAppServerEngineConfig(
 )
 
 /**
- * The desktop's own canvas.* tools, for an App Server it reaches directly. On Iroh the host answers
- * canvas.* for every runtime it serves (letta-mobile-aknkw), so the desktop offers none there.
+ * The desktop's own canvas_* tools, for an App Server it reaches directly. On Iroh the host answers
+ * canvas_* for every runtime it serves (letta-mobile-aknkw), so the desktop offers none there.
  */
 internal fun desktopCanvasToolRegistry(
     isIroh: Boolean,
     canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
 ): ExternalToolRegistry = ExternalToolRegistry.hostTools(
-    if (isIroh) emptyList() else CanvasExternalTools.all(DesktopCanvasDocumentStore(), canvasSessions),
+    if (isIroh) emptyList() else CanvasExternalTools.all(DesktopNotebookCanvasStore.documents, canvasSessions),
 )
 
 internal fun buildDesktopAppServerTurnEngine(

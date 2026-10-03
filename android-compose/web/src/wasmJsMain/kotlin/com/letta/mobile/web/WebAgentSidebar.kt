@@ -1,5 +1,6 @@
 package com.letta.mobile.web
 
+import com.letta.mobile.ui.chat.AgentOrb
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -71,7 +72,7 @@ internal fun WebAgentSidebar(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            WebAgentAvatar(agents.indexOf(selectedAgent).coerceAtLeast(0), 30.dp)
+            AgentOrb(agents.indexOf(selectedAgent).coerceAtLeast(0), 30.dp, agentId = selectedAgent?.id)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(selectedAgent?.name ?: "Letta", style = MaterialTheme.typography.titleSmall, maxLines = 1)
@@ -154,7 +155,7 @@ internal fun WebAgentSidebar(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onAgentSelected(agent) },
                     ) {
                         Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            WebAgentAvatar(agents.indexOf(agent), 28.dp)
+                            AgentOrb(agents.indexOf(agent), 28.dp, agentId = agent.id)
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis)

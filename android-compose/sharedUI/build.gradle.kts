@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
@@ -21,31 +23,46 @@ detekt {
     parallel = true
 }
 
+compose.resources {
+    // letta-mobile-bglj6.1: one generated Res for the shared chat page's strings.
+    packageOfResClass = "com.letta.mobile.sharedui.resources"
+    publicResClass = false
+    generateResClass = always
+}
+
 kotlin {
+    // Every target, wasm included (letta-mobile-o4ygk.4).
+    compilerOptions {
+        optIn.add("androidx.compose.material3.ExperimentalMaterial3Api")
+    }
+
     android {
         namespace = "com.letta.mobile.sharedui"
         compileSdk = libs.versions.compileSdk.get().toInt()
         minSdk = libs.versions.minSdk.get().toInt()
 
+        // letta-mobile-bglj6.1: package the Compose Multiplatform strings into the APK.
+        androidResources {
+            enable = true
+        }
+
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            freeCompilerArgs.addAll(
-                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            )
         }
     }
 
     jvm {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            freeCompilerArgs.addAll(
-                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            )
         }
     }
 
-    // Phase 3b: android + jvm hosts for shared Compose UI. wasmJs remains a
-    // follow-on (web keeps its local theme duplicates until then).
+    // letta-mobile-o4ygk.4: the web client compiles the same shared UI. The required
+    // shared-multiplatform job compiles main and test for wasm; the browser tests are not run yet.
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
 
     sourceSets {
         commonMain {
@@ -92,6 +109,12 @@ kotlin {
                 // Android, a file dialog on desktop. The same library the hosts already use.
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)
+                // letta-mobile-bglj6.1: the shared chat page's strings (Compose Multiplatform resources,
+                // so Android and desktop read one copy instead of R.string and literals).
+                implementation("org.jetbrains.compose.components:components-resources:1.10.0")
+                // The shared chat page's paged canonical timeline (LazyPagingItems over
+                // CanonicalTimelinePresentation.settled). KMP: android, jvm and wasm.
+                implementation(libs.androidx.paging.compose)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
             }
@@ -103,19 +126,41 @@ kotlin {
             }
         }
 
+        // Skia-backed actuals shared by desktop and web (letta-mobile-o4ygk.4): both render with
+        // Skiko, so the SkSL glow shader and the Skia image decode compile once for both.
+        val skikoMain by creating {
+            dependsOn(commonMain.get())
+        }
+
+        jvmMain {
+            dependsOn(skikoMain)
+        }
+
+        wasmJsMain {
+            dependsOn(skikoMain)
+        }
+
         androidMain {
             dependencies {
                 // Turning picked photos upright before they go on a canvas.
                 implementation(libs.androidx.exifinterface)
+                // letta-mobile-bglj6.1: the shared chat page collects its port with the Android lifecycle.
+                implementation(libs.androidx.lifecycle.runtime.compose)
             }
         }
 
         jvmTest {
             dependencies {
+                // Model-control UI tests and their light/dark render snapshots (letta-mobile-w4q4p.6.1).
+                implementation(libs.compose.desktop.ui.test)
                 implementation(libs.junit4)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(compose.desktop.currentOs)
+                // letta-mobile-bglj6.1: Compose UI tests for the shared chat page (runComposeUiTest).
+                implementation(libs.compose.desktop.ui.test)
                 implementation(kotlin("test"))
+                // The phone fixtures (conversation, ports, stand-in mascot) the desktop phone playground shows too.
+                implementation(project(":sharedUI-devfixtures"))
             }
         }
     }

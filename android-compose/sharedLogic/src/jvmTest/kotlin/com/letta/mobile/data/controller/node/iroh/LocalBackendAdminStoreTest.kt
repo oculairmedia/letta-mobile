@@ -230,21 +230,21 @@ class LocalBackendAdminStoreTest {
         assertEquals("ui-1", u["id"]!!.jsonPrimitive.content)
         assertEquals("2025-06-01T12:00:00.000Z", u["date"]!!.jsonPrimitive.content)
 
-        // [1] assistant_message: otid = source id, assistant offset +40ms.
+        // [1] assistant_message: otid = source id; part 0, assistant rank +4ms (iyj4s part-ordered dates).
         val a = msgs[1].jsonObject
         assertEquals("assistant_message", a["message_type"]!!.jsonPrimitive.content)
         assertEquals("working", a["content"]!!.jsonPrimitive.content)
         assertEquals("ui-2", a["otid"]!!.jsonPrimitive.content)
         assertEquals("ui-2", a["id"]!!.jsonPrimitive.content)
-        assertEquals("2025-06-01T12:00:00.040Z", a["date"]!!.jsonPrimitive.content)
+        assertEquals("2025-06-01T12:00:00.004Z", a["date"]!!.jsonPrimitive.content)
 
-        // [2] tool_call_message: toolcall-<id>, tool_call offset +20ms.
+        // [2] tool_call_message: toolcall-<id>; part 1 (+10ms), tool_call rank +2ms, after the reply it follows.
         val tc = msgs[2].jsonObject
         assertEquals("tool_call_message", tc["message_type"]!!.jsonPrimitive.content)
         assertEquals("toolcall-call-1", tc["id"]!!.jsonPrimitive.content)
         assertEquals("Bash", tc["name"]!!.jsonPrimitive.content)
         assertEquals("toolcall-call-1", tc["otid"]!!.jsonPrimitive.content)
-        assertEquals("2025-06-01T12:00:00.020Z", tc["date"]!!.jsonPrimitive.content)
+        assertEquals("2025-06-01T12:00:00.012Z", tc["date"]!!.jsonPrimitive.content)
         val call = tc["tool_call"]!!.jsonObject
         assertEquals("Bash", call["name"]!!.jsonPrimitive.content)
         assertEquals("call-1", call["tool_call_id"]!!.jsonPrimitive.content)

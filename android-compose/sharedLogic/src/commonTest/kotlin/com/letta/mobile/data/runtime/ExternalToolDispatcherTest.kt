@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.extras.ExternalTool
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.controller.extras.ToolSource
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -15,7 +16,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -66,7 +69,8 @@ class ExternalToolDispatcherTest {
             }
         }
         dispatcher(RecordingClient(), registry = registryOf(tool)).answerRequest()
-        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller("agent-1", "conv-1"), seen)
+        // letta-mobile-bglj6.12: and the request's tool_call_id, which the timeline keys the call on.
+        assertEquals(com.letta.mobile.data.controller.extras.ExternalToolCaller("agent-1", "conv-1", TOOL_CALL_ID), seen)
     }
 
     @Test
@@ -195,6 +199,62 @@ class ExternalToolDispatcherTest {
         assertTrue(client.responses.isEmpty())
     }
 
+    /**
+     * letta-mobile-s416w.27: an agent's in-flight turn still lists a tool whose source was removed
+     * (letta-code snapshots the tools per turn), so its call must get a clean error, never a hang.
+     */
+    @Test
+    fun aCallForAToolRemovedBeforeItArrivesIsAnsweredAsNoLongerAvailable() = runTest {
+        val client = RecordingClient()
+        val registry = liveRegistryOf(EchoTool { ExternalToolResult.Success("never") })
+        registry.advertisedToolsCommandGroups()
+        registry.removeSource(PLUGIN)
+
+        dispatcher(client, registry).answerRequest()
+
+        val sent = client.responses.single()
+        assertEquals(REQUEST_ID, sent.requestId)
+        sent.assertIsErrorContaining("tool 'echo' is no longer available")
+    }
+
+    @Test
+    fun aToolRemovedWhileItRunsStillAnswersWithItsResult() = runTest {
+        val client = RecordingClient()
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val registry = liveRegistryOf(
+            EchoTool {
+                started.complete(Unit)
+                release.await()
+                ExternalToolResult.Success("finished")
+            },
+        )
+        registry.advertisedToolsCommandGroups()
+
+        val answering = async { dispatcher(client, registry).answerRequest() }
+        started.await()
+        registry.removeSource(PLUGIN)
+        release.complete(Unit)
+        answering.await()
+
+        assertEquals("finished", client.responses.single().result?.content?.single()?.text)
+    }
+
+    @Test
+    fun aReplayAfterTheToolWasRemovedReusesTheCachedResult() = runTest {
+        val client = RecordingClient()
+        var invocations = 0
+        val registry = liveRegistryOf(EchoTool { invocations += 1; ExternalToolResult.Success("once") })
+        registry.advertisedToolsCommandGroups()
+
+        dispatcher(client, registry).answerRequest()
+        registry.removeSource(PLUGIN)
+        dispatcher(client, registry).answerRequest(leaseToken = 2L)
+
+        assertEquals(1, invocations)
+        assertTrue(client.responses.all { it.result?.content?.single()?.text == "once" })
+    }
+
     // ---------------------------------------------------------------- helpers
 
     /** The one request identity every case here dispatches. */
@@ -227,6 +287,11 @@ class ExternalToolDispatcherTest {
     private fun registryOf(tool: ExternalTool) =
         ExternalToolRegistry(tools = listOf(tool), capabilities = RemoteCapabilities(slimAgents = true))
 
+    /** [tool] offered by a live source with id [PLUGIN] instead of the fixed list. */
+    private fun liveRegistryOf(tool: ExternalTool) =
+        ExternalToolRegistry(tools = emptyList(), capabilities = RemoteCapabilities(slimAgents = true))
+            .apply { addSource(ToolSource.static(PLUGIN, listOf(tool))) }
+
     private fun request(requestId: String, toolCallId: String) =
         AppServerInboundFrame.ExternalToolCallRequest(
             requestId = requestId,
@@ -250,6 +315,7 @@ class ExternalToolDispatcherTest {
         const val REQUEST_ID = "req-1"
         const val TOOL_CALL_ID = "call_1"
         const val CLAIM_GENERATION = 0L
+        const val PLUGIN = "plugin.echo"
     }
 
     private class RecordingClient : AppServerClient {

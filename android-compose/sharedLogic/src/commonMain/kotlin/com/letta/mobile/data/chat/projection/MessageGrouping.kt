@@ -522,9 +522,7 @@ internal fun String.normalizeRunPanelEchoText(): String {
 private fun UiMessage.runPanelEchoKey(): String? {
     if (role != "assistant") return null
     if (isReasoning || isError) return null
-    if (!toolCalls.isNullOrEmpty()) return null
-    if (generatedUi != null || approvalRequest != null || approvalResponse != null) return null
-    if (attachments.isNotEmpty()) return null
+    if (!carriesOnlyText()) return null
     EchoCompactionInstrumentation.recordNormalization()
     val normalized = content.normalizeRunPanelEchoText()
     return normalized.takeIf { it.length >= MinRunPanelEchoLength }

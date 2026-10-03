@@ -2,7 +2,6 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,17 +15,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -39,12 +34,6 @@ fun Accordions(
     subtitle: String = "",
     content: @Composable () -> Unit,
 ) {
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-        label = "chevron",
-    )
-
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -75,11 +64,9 @@ fun Accordions(
                 }
             }
             Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
-            Icon(
-                imageVector = LettaIcons.ExpandMore,
+            DisclosureChevron(
+                expanded = expanded,
                 contentDescription = if (expanded) "Collapse" else "Expand",
-                modifier = Modifier.rotate(chevronRotation),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 

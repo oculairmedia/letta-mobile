@@ -228,6 +228,35 @@ class HostCanvasSceneSchemaTest {
         assertTrue("\"strokeWidth\"" in logged.elementJson, "filled to what DrawBox requires: ${logged.elementJson}")
     }
 
+    /** letta-mobile-bglj6.7: set_document's owner decodes on the host, is inferred from a frame, and only the enum is taken. */
+    @Test
+    fun setDocumentOwnerIsDecodedInferredAndHeldToItsValues() = runTest {
+        val host = Host()
+        fun note(id: String, owner: String?) = buildJsonObject {
+            put("type", "set_document")
+            put("documentId", id)
+            put("documentJson", """{"version":2,"blocks":[]}""")
+            put("frame", buildJsonObject { put("x", 0); put("y", 0); put("width", 320); put("height", 200) })
+            owner?.let { put("owner", it) }
+        }
+
+        host.call(CanvasToolContract.APPLY_OPS, buildJsonObject { put("ops", JsonArray(listOf(note("mine", "user"), note("placed", null)))) })
+            .content()
+
+        val logged = host.logged(conversationTopic).map { assertIs<CanvasOp.SetDocumentOp>(it.op) }
+        assertEquals(listOf(CanvasGeometryOwner.USER, null), logged.map { it.owner })
+        val scene = json.decodeFromString<CanvasGetSceneResult>(host.call(CanvasToolContract.GET_SCENE, buildJsonObject { }).content())
+        assertEquals(
+            mapOf("mine" to CanvasGeometryOwner.USER, "placed" to CanvasGeometryOwner.EXPLICIT),
+            CanvasOpProjector.documentsOf(scene.sceneJson).associate { it.id to it.owner },
+        )
+
+        val refusal = host.call(CanvasToolContract.APPLY_OPS, buildJsonObject { put("ops", JsonArray(listOf(note("odd", "sideways")))) })
+            .error()
+        assertTrue("sideways" in refusal, refusal)
+        assertEquals(2, host.logged(conversationTopic).size, "nothing of a refused batch is logged")
+    }
+
     private companion object {
         const val AGENT = "agent-1"
         const val CONVERSATION = "conv-1"

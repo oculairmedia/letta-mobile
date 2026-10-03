@@ -10,7 +10,16 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
-        google()
+        // google() only serves Google/AndroidX/AGP coordinates. Filtering it keeps
+        // third-party artifacts (leakcanary, ...) from being probed there, so a
+        // negative-cache entry from Google's mirror cannot shadow Maven Central.
+        google {
+            content {
+                includeGroupByRegex("com[.]android.*")
+                includeGroupByRegex("com[.]google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
         mavenCentral()
         // Kotzilla SDK artifacts (e.g. kotzilla-sdk-compose-jvm) are published
         // to the Gradle Plugin Portal, not Maven Central. The plugin itself
@@ -56,9 +65,16 @@ include(":core:testutil")
 include(":avatar:core")
 include(":avatar:renderer-rive")
 include(":sharedLogic")
+// The Kotlin SPI jvm canvas plugins compile against, and its conformance kit (letta-mobile-s416w.26).
+include(":plugin-api")
+include(":plugin-api-testkit")
 include(":sharedUI")
+// Phone fixtures for the shared chat page: sharedUI's snapshot tests and desktop's phone playground.
+include(":sharedUI-devfixtures")
 // DrawBox, vendored from upstream v2.1.0 so the canvas can be fixed at the source (drawbox/VENDORED.md).
 include(":drawbox")
+// Live plugin pages on the canvas (letta-mobile-s416w.13): the platform hosts (Android WebView; desktop JCEF).
+include(":plugin-view")
 include(":designsystem")
 include(":feature-chat")
 include(":feature-editagent")

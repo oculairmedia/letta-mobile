@@ -4,6 +4,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineImageBodies
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan
@@ -15,6 +16,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotMutationCharacterizer
 import com.letta.mobile.data.timeline.snapshot.TimelineIncrementalSnapshotPlanner
 import com.letta.mobile.data.timeline.snapshot.SnapshotStructuralSummary
+import com.letta.mobile.data.timeline.snapshot.withImageBodies
 import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.atomic
@@ -164,6 +166,15 @@ class TimelineSyncLoop(
         )
     }
 
+    private val imageRecovery by lazy {
+        TimelineImageRecovery(
+            conversationId = conversationId,
+            transport = messageApi,
+            timeline = { timelineProcessor.state.value.timeline },
+            restore = ::restoreImagePlaceholders,
+        )
+    }
+
     private val hydrator by lazy {
         TimelineHydrator(
             conversationId = conversationId,
@@ -285,7 +296,7 @@ class TimelineSyncLoop(
                 scope = snapshotScope,
                 revision = snapshotRevision,
                 writtenAtMillis = timelineCurrentTimeMillis(),
-            )
+            ).withStoredImageBodies(committedState.timeline)
             envelope to TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
         }
 
@@ -344,6 +355,13 @@ class TimelineSyncLoop(
             )
         }
     }
+
+    // Stores that keep image bodies get them written before the envelope that names them;
+    // otherwise an image over the inline budget is persisted as size-only metadata.
+    private suspend fun StoredTimelineEnvelope.withStoredImageBodies(timeline: Timeline): StoredTimelineEnvelope =
+        (confirmedTimelineStore as? ConfirmedTimelineImageBodies)?.let {
+            withImageBodies(timeline, it, previous = lastPersistedEnvelope)
+        } ?: this
 
     internal data class IncrementalPlanningDecision(
         val result: TimelineIncrementalSnapshotPlanner.Result,
@@ -457,7 +475,7 @@ class TimelineSyncLoop(
             scope = snapshotScope,
             revision = revision,
             writtenAtMillis = startedAtMs,
-        )
+        ).withStoredImageBodies(timeline)
         val fingerprint = TimelineSnapshotCodec.computeStoredEnvelopeFingerprint(envelope)
         try {
             withContext(ioDispatcher + NonCancellable) {
@@ -831,17 +849,23 @@ class TimelineSyncLoop(
     }
 
     suspend fun closeAndJoin() {
-        persistRequests.close()
-        eventQueue.close()
-        streamSubscriberJob?.cancel(CancellationException("TimelineSyncLoop draining"))
         withContext(NonCancellable) {
-            streamSubscriberJob?.join()
-            eventProcessorJob.join()
-            timelineProcessor.closeAndJoin()
-            persistJob.join()
-            flushSnapshotNow(prune = true)
+            try {
+                persistRequests.close()
+                // Late producers must observe cancellation, not report a send failure back to
+                // this same closed queue. Buffered events still drain before the receiver ends.
+                eventQueue.close(CancellationException("TimelineSyncLoop draining"))
+                streamSubscriberJob?.cancel(CancellationException("TimelineSyncLoop draining"))
+                streamSubscriberJob?.join()
+                eventProcessorJob.join()
+                outboundSendProcessor.stopAndJoin()
+                timelineProcessor.closeAndJoin()
+                persistJob.join()
+                flushSnapshotNow(prune = true)
+            } finally {
+                close()
+            }
         }
-        close()
     }
 
     @Volatile
@@ -860,8 +884,30 @@ class TimelineSyncLoop(
                 // backoff sweep as turnEnded if the immediate reconcile alone
                 // doesn't resolve everything, so there's always a terminal outcome.
                 danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
+                launchImageRecoveryIfNeeded()
             }
         }
+    }
+
+    /**
+     * letta-mobile-a02be: rows restored from a snapshot that kept an image only as its size get
+     * the bytes back from the server, in the background so the timeline never waits on it.
+     */
+    private fun launchImageRecoveryIfNeeded() {
+        val hasPlaceholder = timelineProcessor.state.value.timeline.events.any { event ->
+            event is TimelineEvent.Confirmed && event.attachments.any { it.isSizeOnlyPlaceholder }
+        }
+        if (hasPlaceholder) loopScope.launch(ioDispatcher) { recoverImagePlaceholders() }
+    }
+
+    /** Fetches the images of size-only placeholder rows from the server. Returns rows restored. */
+    suspend fun recoverImagePlaceholders(): Int = imageRecovery.recover()
+
+    private suspend fun restoreImagePlaceholders(serverId: String, images: List<MessageContentPart.Image>): Boolean {
+        val applied = timelineProcessor.submitMaintenanceMutation(TimelineMutation.RestoreImagePlaceholders(serverId, images))
+        val changed = (applied as? TimelineProcessorAck.Applied)?.result?.changed == true
+        if (changed) scheduleSnapshotPersist(SnapshotPersistReason.LOCAL_MUTATION)
+        return changed
     }
 
     /**
@@ -945,6 +991,10 @@ class TimelineSyncLoop(
      */
     suspend fun turnEnded(clean: Boolean) {
         turnActive = false
+        if (clean) {
+            // Successful terminal evidence supersedes live connection-loss notices for this conversation.
+            timelineProcessor.submit(TimelineMutation.RetireTurnFailureNotices)
+        }
         // Bump the generation so a timer already past its delay cannot enqueue a
         // post-terminal write, then cancel the current one.
         turnSafetyFlushGeneration++

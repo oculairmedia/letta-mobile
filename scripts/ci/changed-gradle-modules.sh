@@ -50,11 +50,16 @@ while IFS= read -r file; do
     android-compose/feature-chat/*) TASKS[":feature-chat:testDebugUnitTest"]=1 ;;
     android-compose/feature-editagent/*) TASKS[":feature-editagent:testDebugUnitTest"]=1 ;;
     android-compose/designsystem/*) TASKS[":designsystem:testDebugUnitTest"]=1 ;;
+    android-compose/sharedUI/*) TASKS[":sharedUI:jvmTest"]=1 ;;
+    android-compose/plugin-view/*) TASKS[":plugin-view:jvmTest"]=1; TASKS[":plugin-view:testAndroidHostTest"]=1 ;;
     android-compose/core/android-data/*) TASKS[":core:android-data:testDebugUnitTest"]=1 ;;
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
     android-compose/cli/*) TASKS[":cli:testDebugUnitTest"]=1 ;;
     android-compose/appserver-cli/*) TASKS[":appserver-cli:test"]=1 ;;
     android-compose/iroh-wrapper-cli/*) TASKS[":iroh-wrapper-cli:test"]=1 ;;
+    # The conformance kit is the SPI's executable contract: an SPI change re-runs it too.
+    android-compose/plugin-api/*) TASKS[":plugin-api:jvmTest"]=1; TASKS[":plugin-api-testkit:jvmTest"]=1 ;;
+    android-compose/plugin-api-testkit/*) TASKS[":plugin-api-testkit:jvmTest"]=1 ;;
   esac
 done <<<"$DIFF_FILES"
 
@@ -62,11 +67,16 @@ ORDERED=(
   ":feature-chat:testDebugUnitTest"
   ":feature-editagent:testDebugUnitTest"
   ":designsystem:testDebugUnitTest"
+  ":sharedUI:jvmTest"
+  ":plugin-view:jvmTest"
+  ":plugin-view:testAndroidHostTest"
   ":core:android-data:testDebugUnitTest"
   ":desktop:test"
   ":cli:testDebugUnitTest"
   ":appserver-cli:test"
   ":iroh-wrapper-cli:test"
+  ":plugin-api:jvmTest"
+  ":plugin-api-testkit:jvmTest"
 )
 OUT=()
 for task in "${ORDERED[@]}"; do

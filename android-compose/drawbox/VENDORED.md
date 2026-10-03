@@ -24,8 +24,14 @@ those are fixed where they live, and each fix is a candidate to contribute upstr
   Letta draws its own controls (the published `drawbox-ui` Android artifact ships without its
   resources; see letta-mobile-r5f3r), so nothing else from that module is used.
 
-Not taken: the iOS, JS, wasm and web source sets (Letta builds Android and JVM only), the sample
-apps, docs, and upstream's publishing, Dokka, Spotless and lint setup.
+- From `DrawBox/src/wasmJsMain` and `DrawBox/src/webMain` (letta-mobile-o4ygk.4, same commit):
+  `ClipboardImage.wasmJs.kt`, `DragDropImage.wasmJs.kt`, `ImageDecoder.web.kt` and
+  `Platform.web.kt`, copied unchanged into `src/wasmJsMain`. Letta has no JS target, so upstream's
+  `webMain` (shared by JS and wasm) is folded into `wasmJsMain`; the file names keep their upstream
+  suffixes so they diff cleanly.
+
+Not taken: the iOS and JS source sets (Letta builds Android, JVM and wasm), the sample apps, docs,
+and upstream's publishing, Dokka, Spotless and lint setup.
 
 ## Letta changes
 
@@ -143,3 +149,9 @@ Tests: `SvgExporterTest`, `SerializationTest`, `GeometryTest`, `DrawBoxControlle
 Letta's first-party checks do not apply here, so the code stays diffable against upstream: the
 architecture test's package and `commonMain` import rules skip this module, and the detekt
 guardrail skips its files. Build, tests and compiler warnings still apply.
+
+### 11. The host can widen the pick tolerance (letta-mobile-4i2z9.24)
+
+Pressing or tapping picked an element within a fixed 12dp, which a fingertip on a thin line misses.
+`DrawBox(pickTolerance = ...)` is read at the moment of each press, so a host that knows the press
+came from a finger can widen it without changing mouse or pen precision. Null keeps 12dp.

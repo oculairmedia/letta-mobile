@@ -248,6 +248,7 @@ class CanonicalTimelineSession(
     )
     val publication = engine.publication
     val live = engine.live
+    val settling = engine.settling
     private val pendingStore = CanonicalPendingLocalStore(store)
     private val pendingMutex = kotlinx.coroutines.sync.Mutex()
     private val mutablePending = kotlinx.coroutines.flow.MutableStateFlow<List<CanonicalPendingLocalStore.Record>>(emptyList())

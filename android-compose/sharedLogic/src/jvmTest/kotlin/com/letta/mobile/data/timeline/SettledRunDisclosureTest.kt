@@ -15,15 +15,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -37,7 +30,7 @@ import kotlin.test.assertTrue
  */
 class SettledRunDisclosureTest {
     @Test fun settledToolTurnRendersExactlyAsItsFinalLiveRender() = runBlocking {
-        val harness = Harness.open(durableToolTurn)
+        val harness = CanonicalTurnHarness.open(scope, durableToolTurn)
         try {
             val live = harness.streamTurn(liveToolTurn)
             harness.settle()
@@ -53,7 +46,7 @@ class SettledRunDisclosureTest {
     }
 
     @Test fun settledReplyKeepsItsDisclosureUnderTheLiveRowsKey() = runBlocking {
-        val harness = Harness.open(durableReplyTurn)
+        val harness = CanonicalTurnHarness.open(scope, durableReplyTurn)
         try {
             val live = harness.streamTurn(liveReplyTurn)
             harness.settle()
@@ -65,7 +58,7 @@ class SettledRunDisclosureTest {
     }
 
     @Test fun relaunchRebuildsTheDisclosureFromDurableRowsAlone() = runBlocking {
-        val harness = Harness.open(durableReplyTurn)
+        val harness = CanonicalTurnHarness.open(scope, durableReplyTurn)
         try {
             harness.settle()
             val (run, prompt) = harness.rows()
@@ -107,73 +100,9 @@ class SettledRunDisclosureTest {
         is ChatRenderItem.Single -> listOf(item.message)
     }
 
-    /** One conversation's coordinator, presentation and a presenter recording its settled rows. */
-    private class Harness private constructor(
-        private val coordinator: CanonicalTimelineCoordinator,
-        private val owner: CanonicalTimelineCoordinator.Owner,
-        private val ui: CoroutineScope,
-        private val presentation: CanonicalTimelinePresentation,
-    ) {
-        companion object {
-            suspend fun open(durable: List<LettaMessage>): Harness {
-                val coordinator = CanonicalTimelineCoordinator(InMemoryTimelineStore(), DurableTransport(durable))
-                val owner = coordinator.acquire(scope)
-                val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-                return Harness(coordinator, owner, ui, CanonicalTimelinePresentation.open(coordinator, owner, ui))
-            }
-        }
-
-        private val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
-        private val generations = AtomicInteger()
-
-        /** Streams [frames] as the device saw them and returns the final live render. */
-        suspend fun streamTurn(frames: List<LettaMessage>): List<ChatRenderItem> {
-            val fence = coordinator.beginLive(owner)
-            frames.forEach { assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(it))) }
-            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
-            // The presentation projects on its own dispatcher: wait for the final frame, not the first.
-            awaitCondition({ "live turn never projected: ${presentation.live.value}" }) {
-                presentation.live.value.size == 2 && presentation.live.value.first().containsMessageId(reply.id)
-            }
-            return presentation.live.value
-        }
-
-        suspend fun settle() {
-            assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
-            ui.launch {
-                presentation.settled.collectLatest { generations.incrementAndGet(); presenter.collectFrom(it) }
-            }
-            presenter.awaitRows(2) { "settled turn never arrived" }
-            presenter.awaitIdle()
-        }
-
-        suspend fun drainAndRepage() {
-            presentation.onResidentRows(presenter.snapshot().items)
-            awaitCondition({ "live overlay did not drain" }) { owner.session.live.value == null }
-            val before = generations.get()
-            owner.session.engine.advanceToolSweep(owner.selection)
-            awaitCondition({ "no paging generation after the revision" }) { generations.get() > before }
-            presenter.awaitIdle()
-        }
-
-        fun rows(): List<ChatRenderItem> = presenter.snapshot().items.map { it.item }
-
-        suspend fun close() {
-            presentation.close()
-            ui.cancel()
-        }
-    }
-
-    /** The recent page App Server `message.list` returns for the turn. */
-    private class DurableTransport(private val durable: List<LettaMessage>) :
-        TimelineTransport by unexpectedTimelineTransport() {
-        override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
-            TimelineRemotePageResult.Page(
-                request.requestId, request.selectionGeneration,
-                durable.map { TimelineRemoteRecord(TimelineMessageId(it.id), it, 0) },
-                null, false, 0,
-            )
-    }
+    /** Streams the finished [frames] and returns the final live render (the reply and the prompt). */
+    private suspend fun CanonicalTurnHarness.streamTurn(frames: List<LettaMessage>): List<ChatRenderItem> =
+        stream(frames, finished = true) { live -> live.size == 2 && live.first().containsMessageId(reply.id) }
 
     private companion object {
         const val PROMPT_ID = "ui-msg-9173297"

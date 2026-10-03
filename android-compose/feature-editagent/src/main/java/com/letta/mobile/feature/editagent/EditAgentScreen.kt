@@ -37,6 +37,8 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ChevronIndication
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
@@ -193,8 +195,9 @@ private fun EditAgentTitleJumpControl(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Icon(
-            LettaIcons.ExpandMore,
+        DisclosureChevron(
+            expanded = false,
+            indicates = ChevronIndication.Sheet,
             contentDescription = stringResource(R.string.screen_agent_edit_jump_to_section),
         )
     }

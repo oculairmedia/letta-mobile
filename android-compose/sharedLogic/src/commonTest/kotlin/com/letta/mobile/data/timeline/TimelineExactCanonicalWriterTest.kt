@@ -411,8 +411,10 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(firstMessage)))
         val firstBody = store.rows.values.single().body.copyOf()
         val second = engine.beginLive(selection)
-        // Starting the next turn drops the finished overlay; its acknowledgment can never land.
-        assertFalse(engine.acknowledgeSettlement(first, mapOf(TimelineMessageId("id") to 1L)))
+        // The previous turn stays visible until its canonical row is resident.
+        assertEquals(first, engine.settling.value.single().fence)
+        assertTrue(engine.acknowledgeSettlement(first, mapOf(TimelineMessageId("id") to 1L)))
+        assertTrue(engine.settling.value.isEmpty())
         val secondMessage = message("second").copy(id = "second", otid = "second")
         assertTrue(engine.ingest(second, TimelineStreamFrame.Message(secondMessage)))
         kotlin.test.assertContentEquals(firstBody, store.rows.values.single().body)

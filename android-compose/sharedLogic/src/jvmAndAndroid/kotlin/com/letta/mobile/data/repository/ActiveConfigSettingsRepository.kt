@@ -81,4 +81,8 @@ class ActiveConfigSettingsRepository(
     override suspend fun setDynamicColor(enabled: Boolean) = Unit
     override suspend fun setEnableProjects(enabled: Boolean) = Unit
     override suspend fun setHapticsEnabled(enabled: Boolean) = Unit
+    override fun getSharedChatPageEnabled(): Flow<Boolean> = flowOf(false)
+    override suspend fun setSharedChatPageEnabled(enabled: Boolean) = Unit
+    override fun getOpenChatsOnCanvas(): Flow<Boolean> = flowOf(true)
+    override suspend fun setOpenChatsOnCanvas(enabled: Boolean) = Unit
 }

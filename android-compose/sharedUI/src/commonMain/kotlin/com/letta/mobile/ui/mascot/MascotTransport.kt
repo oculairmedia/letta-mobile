@@ -5,6 +5,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -34,7 +38,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -75,17 +82,73 @@ internal data class MascotSeatInfo(
     val overscale: Float,
     val identity: MascotIdentity?,
     val handlers: SeatHandlers,
+    /**
+     * The seat box's own width in px, before any layer scale. A seat that scales itself (the chat
+     * page's companion shrinking into the docked panel's badge) reports scaled [bounds]; the layer
+     * keeps drawing the character at this size and scales it, so the renderer is never resized
+     * per frame. Zero means the same as [bounds].
+     */
+    val layoutWidth: Float = 0f,
 ) {
     val onClick: (() -> Unit)? get() = handlers.onClick
     val onEdit: (() -> Unit)? get() = handlers.onEdit
+
+    /** The box the character is drawn in, before the seat's own scale. */
+    val drawWidth: Float get() = seatDrawWidth()
+
+    /** [layoutWidth] when the seat reports one, else the width of its [bounds]. */
+    private fun seatDrawWidth(): Float {
+        return if (layoutWidth > 0f) layoutWidth else bounds.width
+    }
 }
 
-/** The latest click / edit handlers of one seat; updated in place, never compared. */
+/**
+ * The latest click / edit handlers of one seat; updated in place, never compared. Only whether a
+ * seat has an edit or a drag handler at all is snapshot state: the layer installs its hover and
+ * drag input for those alone, so a seat with neither leaves every touch to what is under it.
+ */
 internal class SeatHandlers {
     var onClick: (() -> Unit)? = null
 
     /** Opens the agent's editor; every drawn mascot offers it as a pencil badge on hover. */
     var onEdit: (() -> Unit)? = null
+        set(value) {
+            field = value
+            syncEditable()
+        }
+
+    /**
+     * A drag on the character, in dp; null leaves drags to whatever is under it. The layer draws
+     * above every seat, so a seat that moves its surface (the chat dock) can only be grabbed here.
+     */
+    var onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null
+        set(value) {
+            field = value
+            syncDraggable()
+        }
+
+    /**
+     * Whether a drag starting now moves anything (the dock's companion only while it sits on the
+     * dock). Read as each gesture starts: a gesture it turns down is never consumed.
+     */
+    var dragEnabled: () -> Boolean = { true }
+
+    var editable: Boolean by mutableStateOf(false)
+        private set
+    var draggable: Boolean by mutableStateOf(false)
+        private set
+
+    /** Writes [editable] only when it changes, so an unchanged handler swap records no state write. */
+    private fun syncEditable() {
+        val hasHandler = onEdit != null
+        if (editable != hasHandler) editable = hasHandler
+    }
+
+    /** Writes [draggable] only when it changes, so an unchanged handler swap records no state write. */
+    private fun syncDraggable() {
+        val hasHandler = onDrag != null
+        if (draggable != hasHandler) draggable = hasHandler
+    }
 }
 
 /**
@@ -203,40 +266,24 @@ private fun TransportedMascot(
         snapshotFlow { transport.activeStage(currentAgent) }
             .distinctUntilChanged()
             .conflate()
-            .collect { next ->
-                if (next == null || next == flight.shownStage) return@collect
-                val shownSeat = MascotTransport.SeatKey(flight.shownAgent ?: currentAgent, flight.shownStage ?: next)
-                flight.from = shownRect(flight, transport.seat(shownSeat)?.bounds ?: flight.from)
-                flight.shownStage = next
-                flight.shownAgent = currentAgent
-                if (reducedMotion) {
-                    flight.progress.snapTo(1f)
-                    flight.presence.snapTo(1f)
-                    return@collect
-                }
-                flight.progress.snapTo(0f)
-                coroutineScope {
-                    launch { flight.progress.animateTo(1f, tween(TRANSPORT_MILLIS, easing = FastOutSlowInEasing)) }
-                    flight.presence.animateTo(0f, tween(TRANSPORT_LEAVE_MILLIS))
-                    flight.presence.animateTo(1f, tween(TRANSPORT_MILLIS - TRANSPORT_LEAVE_MILLIS, easing = FastOutSlowInEasing))
-                }
-            }
+            .collect { next -> transport.hop(flight, currentAgent, next, reducedMotion) }
     }
     // The renderer's node keeps the DESTINATION size for the whole flight and the change of size
     // is a layer scale: a Rive surface re-allocates its readback buffer and restarts its frame
     // loop on every size change, so resizing it per frame is what made a hop stutter.
     val rect = shownRect(flight, seat.bounds)
     val density = LocalDensity.current
-    val boxSize = with(density) { seat.bounds.width.toDp() }
-    val flightScale = if (seat.bounds.width > 0f) rect.width / seat.bounds.width else 1f
+    val drawWidth = seat.drawWidth
+    val boxSize = with(density) { drawWidth.toDp() }
+    val flightScale = flightScaleOf(rect, drawWidth)
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
     Box(
         modifier = Modifier
             .offset {
                 IntOffset(
-                    (rect.center.x - seat.bounds.width / 2f - origin.x).roundToInt(),
-                    (rect.center.y - seat.bounds.height / 2f - origin.y).roundToInt(),
+                    (rect.center.x - drawWidth / 2f - origin.x).roundToInt(),
+                    (rect.center.y - drawWidth / 2f - origin.y).roundToInt(),
                 )
             }
             .requiredSize(boxSize)
@@ -247,7 +294,9 @@ private fun TransportedMascot(
                 scaleX = scale
                 scaleY = scale
             }
-            .hoverable(hover),
+            // Hover (for the pencil) and drag only where the seat has them: a seat with neither
+            // takes no input at all, and what it stands over (the Touch chat head) keeps its own.
+            .seatInput(seat.handlers, hover),
         contentAlignment = Alignment.Center,
     ) {
         MascotLive(agentId, identity, size = boxSize * seat.overscale, onClick = seat.onClick, sceneKey = sceneKey)
@@ -255,6 +304,67 @@ private fun TransportedMascot(
         // one way to edit the agent from any mascot, so no seat needs to travel to the editor.
         seat.onEdit?.let { onEdit ->
             if (hovered) MascotEditBadge(onEdit, Modifier.align(Alignment.BottomEnd))
+        }
+    }
+}
+
+/**
+ * One hop of [flight] (the slot [agentId] stands in now) to the stage [next], from wherever it
+ * is drawn this frame; nothing when [next] is no stage or the one already shown.
+ */
+private suspend fun MascotTransport.hop(flight: MascotTransport.Flight, agentId: String, next: MascotStage?, reducedMotion: Boolean) {
+    if (next == null || next == flight.shownStage) return
+    val shownSeat = MascotTransport.SeatKey(flight.shownAgent ?: agentId, flight.shownStage ?: next)
+    flight.from = shownRect(flight, seat(shownSeat)?.bounds ?: flight.from)
+    flight.shownStage = next
+    flight.shownAgent = agentId
+    if (reducedMotion) {
+        flight.progress.snapTo(1f)
+        flight.presence.snapTo(1f)
+        return
+    }
+    flight.progress.snapTo(0f)
+    coroutineScope {
+        launch { flight.progress.animateTo(1f, tween(TRANSPORT_MILLIS, easing = FastOutSlowInEasing)) }
+        flight.presence.animateTo(0f, tween(TRANSPORT_LEAVE_MILLIS))
+        flight.presence.animateTo(1f, tween(TRANSPORT_MILLIS - TRANSPORT_LEAVE_MILLIS, easing = FastOutSlowInEasing))
+    }
+}
+
+/** The layer scale that draws a [drawWidth] box at [rect]'s width; 1 for an empty box. */
+private fun flightScaleOf(rect: Rect, drawWidth: Float): Float {
+    return if (drawWidth > 0f) rect.width / drawWidth else 1f
+}
+
+/** Hover for the pencil when the seat is [SeatHandlers.editable], drag when it is [SeatHandlers.draggable]. */
+private fun Modifier.seatInput(handlers: SeatHandlers, hover: MutableInteractionSource): Modifier {
+    val hoverInput = if (handlers.editable) Modifier.hoverable(hover) else Modifier
+    val dragInput = if (handlers.draggable) Modifier.seatDrag(handlers) else Modifier
+    return then(hoverInput).then(dragInput)
+}
+
+/**
+ * Drags the character for [handlers]. A gesture is taken (its slop consumed) only when the seat's
+ * gate is open as it starts; otherwise it is left alone for whatever is under the layer.
+ */
+private fun Modifier.seatDrag(handlers: SeatHandlers): Modifier {
+    return pointerInput(handlers) { seatDragGestures(handlers) }
+}
+
+/** The gesture loop behind [seatDrag]: gate, slop, then every drag delta to the seat's handler in dp. */
+private suspend fun PointerInputScope.seatDragGestures(handlers: SeatHandlers) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        if (!handlers.dragEnabled()) return@awaitEachGesture
+        val start = awaitTouchSlopOrCancellation(down.id) { change, overSlop ->
+            change.consume()
+            handlers.onDrag?.invoke(overSlop.x.toDp().value, overSlop.y.toDp().value)
+        } ?: return@awaitEachGesture
+        drag(start.id) { change ->
+            // Read per event: the seat's handler changes in place.
+            val amount = change.positionChange()
+            change.consume()
+            handlers.onDrag?.invoke(amount.x.toDp().value, amount.y.toDp().value)
         }
     }
 }

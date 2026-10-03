@@ -33,7 +33,9 @@ import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
+import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.CollapsibleStatusRow
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LiveStatusText
 import com.letta.mobile.ui.components.StatusTimeline
 import com.letta.mobile.ui.components.StatusTimelineItem
@@ -280,7 +282,10 @@ private fun ToolRunSummaryRow(
                     }
             }
             .clickable(onClick = onClick)
-            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.md),
+            // Align with the Thought (MessageReasoning) rows: no horizontal inset, so the
+            // summary label shares their leading edge, and the same xs vertical self-pad,
+            // so the step beat comes solely from the group card's groupedMessageSpacing.
+            .padding(vertical = LettaDimens.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
@@ -290,11 +295,10 @@ private fun ToolRunSummaryRow(
             color = color,
             modifier = Modifier.weight(1f),
         )
-        Icon(
-            imageVector = LettaIcons.ExpandMore,
+        DisclosureChevron(
+            expanded = false,
+            indicates = ChevronIndication.Sheet,
             contentDescription = "Open command details",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }

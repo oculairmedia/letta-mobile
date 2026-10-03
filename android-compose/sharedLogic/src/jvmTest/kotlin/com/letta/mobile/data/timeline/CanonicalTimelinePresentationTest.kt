@@ -205,7 +205,29 @@ class CanonicalTimelinePresentationTest {
         runCurrent()
 
         assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
-        assertEquals(listOf("again", "question"), contents(presentation.live.value))
+        assertEquals(listOf("again", "hello", "question"), contents(presentation.live.value))
+        presentation.close()
+    }
+
+    @Test fun firstReplyRemainsVisibleUntilItsCanonicalRowIsResidentDuringNextTurn() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        val first = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(assistant("first", "reply-1"))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Done))
+        runCurrent()
+        assertEquals(listOf("first"), contents(presentation.live.value))
+
+        val second = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, second, TimelineStreamFrame.Message(assistant("second", "reply-2"))))
+        runCurrent()
+        assertEquals(listOf("second", "first"), contents(presentation.live.value))
+
+        presentation.onResidentRows(listOf(row("reply-1", 1)))
+        runCurrent()
+        assertEquals(listOf("second"), contents(presentation.live.value))
+        assertEquals(second, owner.session.live.value?.fence)
         presentation.close()
     }
 

@@ -80,5 +80,6 @@ internal suspend fun createCanonicalChatPagingPresentation(
             // Cleanup must survive UI scope cancellation; canonical.close only detaches the viewport.
             (uiScope + kotlinx.coroutines.NonCancellable).launch { canonical.close() }
         },
+        canonical = canonical,
     )
 }

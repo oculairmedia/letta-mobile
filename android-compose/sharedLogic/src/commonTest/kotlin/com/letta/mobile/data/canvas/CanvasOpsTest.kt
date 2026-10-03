@@ -1,9 +1,13 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.SerializationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CanvasOpsTest {
@@ -136,5 +140,79 @@ class CanvasOpsTest {
         val listResult = CanvasListResult(ids = listOf("canvas-1", "canvas-2"))
         assertEquals(listArgs, json.decodeFromString<CanvasListArgs>(json.encodeToString(listArgs)))
         assertEquals(listResult, json.decodeFromString<CanvasListResult>(json.encodeToString(listResult)))
+    }
+
+    /** letta-mobile-bglj6.7: owner and compose provenance on set_document, and logs written before them. */
+    @Test
+    fun setDocumentOwnerAndProvenanceRoundTripAndOldOpsStillDecode() {
+        val op = CanvasOp.SetDocumentOp(
+            opId = "op-1",
+            actorId = "agent-1",
+            lamport = 3L,
+            documentId = "cmp-weekend-plan-meals",
+            documentJson = """{"version":2,"blocks":[]}""",
+            frame = CanvasDocumentFrame(424f, 152f, 320f, 318f),
+            owner = CanvasGeometryOwner.AUTO,
+            compose = CanvasComposeProvenance("weekend-plan", "meals", "NOTE", "letta.canvas.compose", 1),
+        )
+        val serialized = json.encodeToString<CanvasOp>(op)
+        assertTrue("\"owner\":\"auto\"" in serialized, serialized)
+        assertTrue("\"compose\":{\"artifactId\":\"weekend-plan\"" in serialized, serialized)
+        assertEquals(op, json.decodeFromString<CanvasOp>(serialized))
+
+        val old = """{"type":"set_document","opId":"o","actorId":"a","lamport":1,"documentId":"n","documentJson":"{}"}"""
+        val decoded = json.decodeFromString<CanvasOp>(old) as CanvasOp.SetDocumentOp
+        assertNull(decoded.owner)
+        assertNull(decoded.compose)
+
+        assertEquals(
+            CanvasGeometryOwner.USER,
+            (json.decodeFromString<CanvasOp>(old.dropLast(1) + ",\"owner\":\"user\"}") as CanvasOp.SetDocumentOp).owner,
+        )
+        val refused = assertFailsWith<SerializationException> {
+            json.decodeFromString<CanvasOp>(old.dropLast(1) + ",\"owner\":\"sideways\"}")
+        }
+        assertTrue("sideways" in refused.message.orEmpty(), refused.message)
+    }
+
+    /** letta-mobile-s416w.1: the plugin element ops on the wire, rebound and restamped, nested in a batch. */
+    @Test
+    fun pluginElementOpsRoundTripRebindRestampAndNest() {
+        val place = CanvasPluginElementFixtures.place(4)
+        val remove = CanvasPluginElementFixtures.remove(5)
+        val placed = json.encodeToString<CanvasOp>(place)
+        assertTrue("\"type\":\"set_plugin_element\"" in placed, placed)
+        assertTrue("\"elementType\":\"ext:letta.example/widget\"" in placed, placed)
+        assertTrue("\"type\":\"remove_plugin_element\"" in json.encodeToString<CanvasOp>(remove))
+
+        val batch = CanvasOp.BatchOp("b", "agent-1", 6, listOf(place, CanvasOp.BatchOp("inner", "agent-1", 6, listOf(remove))))
+        assertEquals(batch, json.decodeFromString<CanvasOp>(json.encodeToString<CanvasOp>(batch)))
+
+        val rebound = batch.withActor("caller") as CanvasOp.BatchOp
+        assertEquals("caller", (rebound.ops[0] as CanvasOp.SetPluginElementOp).actorId)
+        assertEquals("caller", ((rebound.ops[1] as CanvasOp.BatchOp).ops[0] as CanvasOp.RemovePluginElementOp).actorId)
+        val stamped = batch.withStamp("undo-1", 99) as CanvasOp.BatchOp
+        assertEquals(99, (stamped.ops[0] as CanvasOp.SetPluginElementOp).lamport)
+        assertEquals("undo-1", ((stamped.ops[1] as CanvasOp.BatchOp).ops[0] as CanvasOp.RemovePluginElementOp).opId)
+        assertEquals(place.copy(opId = "undo-1", lamport = 99), stamped.ops[0])
+
+        // A move or a state update names only what it sets: an op written before any field existed still decodes.
+        val minimal = """{"type":"set_plugin_element","opId":"o","actorId":"a","lamport":1,"elementId":"pe"}"""
+        assertEquals(CanvasOp.SetPluginElementOp("o", "a", 1, "pe"), json.decodeFromString<CanvasOp>(minimal))
+    }
+
+    @Test
+    fun theSnapshotOfAPluginElementIsAnAssetTheRelaySends() {
+        val place = CanvasPluginElementFixtures.place(1)
+        assertEquals(setOf(place.snapshot!!.assetRef), CanvasAssetRefs.of(place))
+        assertEquals(setOf(place.snapshot!!.assetRef), CanvasAssetRefs.of(CanvasOp.BatchOp("b", "a", 1, listOf(place))))
+        assertEquals(emptySet(), CanvasAssetRefs.of(CanvasPluginElementFixtures.progress(2, 0.5)))
+    }
+
+    @Test
+    fun aPluginElementOpCrossesTheRelayUnchanged() {
+        val publish = CanvasRelayMessage.Publish("canvas:c", CanvasPluginElementFixtures.place(3))
+        val decoded = CanvasRelayProtocol.decode(CanvasRelayProtocol.encode(publish))
+        assertEquals(CanvasRelayDecoded.Message(publish), decoded)
     }
 }

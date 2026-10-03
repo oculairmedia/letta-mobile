@@ -6,8 +6,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -18,6 +21,10 @@ import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
+import com.letta.mobile.data.plugin.view.ViewPlatform
+import com.letta.mobile.pluginview.PluginViewEnvironment
+import com.letta.mobile.pluginview.ProvidePluginViews
+import com.letta.mobile.pluginview.WebViewPluginViewHost
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,9 +81,15 @@ fun CanvasScreen(
     canvasId: String,
     conversationId: String? = null,
     agentId: String? = null,
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)?,
     onShareToChat: ((ByteArray, String) -> Unit)? = null,
     viewModel: CanvasViewModel = hiltViewModel(),
+    /** False when the canvas is the page itself (under the shared chat): no title bar or back. */
+    showTitle: Boolean = true,
+    /** Host chrome floating over the board's top edge; see [CanvasWorkspace]. */
+    chromeTopInset: Dp = 0.dp,
+    /** The shared chat's "Show on canvas" camera requests (letta-mobile-bglj6.13); null elsewhere. */
+    cameraRequest: com.letta.mobile.ui.canvas.CanvasCameraRequest? = null,
 ) {
     LaunchedEffect(canvasId, conversationId, agentId) {
         viewModel.initSession(canvasId, conversationId, agentId)
@@ -85,13 +98,26 @@ fun CanvasScreen(
     val session by viewModel.session.collectAsStateWithLifecycle()
     val activeSession = session
     if (activeSession != null) {
-        CanvasWorkspace(
-            session = activeSession,
-            presenceTransport = viewModel.presenceTransport,
-            assets = viewModel.assets,
-            onNavigateBack = onNavigateBack,
-            onShareToChat = onShareToChat,
-        )
+        // Live plugin pages (letta-mobile-s416w.13): the WebView host. The plugin catalog and the
+        // page transport arrive with the live-view integration (s416w.15/.32); until then the
+        // transport is offline and every plugin element keeps its fallback card.
+        val pluginViews = remember(activeSession.canvasId) {
+            PluginViewEnvironment(canvasId = activeSession.canvasId.value, platform = ViewPlatform.ANDROID)
+        }
+        // The view model's scope outlives a removed element, so a page's teardown can finish.
+        val pluginHost = remember(viewModel) { WebViewPluginViewHost(viewModel.viewModelScope) }
+        ProvidePluginViews(host = pluginHost, environment = pluginViews, plugins = emptyList()) {
+            CanvasWorkspace(
+                session = activeSession,
+                presenceTransport = viewModel.presenceTransport,
+                assets = viewModel.assets,
+                onNavigateBack = onNavigateBack,
+                onShareToChat = onShareToChat,
+                showTitle = showTitle,
+                chromeTopInset = chromeTopInset,
+                cameraRequest = cameraRequest,
+            )
+        }
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()

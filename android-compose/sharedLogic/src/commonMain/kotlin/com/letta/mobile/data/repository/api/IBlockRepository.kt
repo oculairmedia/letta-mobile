@@ -22,6 +22,16 @@ data class AgentBlockTarget(val agentId: String, val label: String)
  */
 interface IAgentBlockWriteRepository : IAgentBlockRepository {
     suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block
+
+    /**
+     * bfooy.5: create a new block under the agent (`block.create_agent` on the
+     * local backend: a new committed `memory/system/<label>.md`). Fails when the
+     * label already exists rather than overwriting it.
+     */
+    suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block
+
+    /** bfooy.5: delete the agent's block (`block.delete_agent`: a committed file delete). */
+    suspend fun deleteAgentBlock(target: AgentBlockTarget)
 }
 
 interface IBlockRepository : IAgentBlockRepository {

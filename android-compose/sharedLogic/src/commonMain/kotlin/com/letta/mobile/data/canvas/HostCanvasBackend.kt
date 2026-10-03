@@ -1,13 +1,18 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import kotlinx.coroutines.channels.Channel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-/** Who is calling a host canvas tool: the runtime scope the App Server stamped, never the input. */
-data class HostCanvasCaller(val agentId: String, val conversationId: String? = null)
+/**
+ * Who is calling a host canvas tool: the runtime scope the App Server stamped, never the input.
+ * [toolCallId] is the call's own id in the run (letta-mobile-bglj6.12), for a tool that must answer
+ * a retried call the same way.
+ */
+data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null)
 
 /** A canvas's scene as the host's log has it: [revision] is the log's head cursor. */
 data class HostCanvasScene(val sceneJson: String, val revision: Long, val lamport: Long)
@@ -20,7 +25,7 @@ sealed interface HostCanvasAccess {
 }
 
 /**
- * The host's side of the `canvas.*` tools (letta-mobile-aknkw.1): canvases read from and written to
+ * The host's side of the `canvas_*` tools (letta-mobile-aknkw.1): canvases read from and written to
  * the relay's durable op log, so an agent running on the host draws on the same boards the apps
  * share, whether or not any app is connected.
  *
@@ -31,6 +36,7 @@ sealed interface HostCanvasAccess {
  * - Who may read and write each canvas is in [directory] (letta-mobile-aknkw.2). An agent may claim
  *   the canvas of the conversation its runtime is in, and no other: the App Server's runtime scope
  *   is the proof that the conversation is its own.
+ * - A plugin element's props are held to [kinds], the plugin kinds this host has installed.
  */
 @OptIn(ExperimentalUuidApi::class)
 class HostCanvasBackend(
@@ -39,6 +45,7 @@ class HostCanvasBackend(
     private val directory: HostCanvasDirectory,
     private val newOpId: () -> String = { "agent-op-${Uuid.random()}" },
     private val ackTimeout: Duration = DEFAULT_ACK_TIMEOUT,
+    private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) {
     /** The canvas [canvasId] for [caller]: known to the directory, or its own conversation's. */
     suspend fun open(caller: HostCanvasCaller, canvasId: String): HostCanvasAccess {
@@ -106,13 +113,23 @@ class HostCanvasBackend(
      * The batch is all or nothing ([check]): elements the apps cannot draw (letta-mobile-qygvv.21)
      * and a board state they cannot draw as meant (letta-mobile-qygvv.30) refuse the whole of it
      * before anything is sent. Published, a bad op would be acknowledged, logged and fanned out.
+     *
+     * [atomic] also makes the write itself all or nothing (letta-mobile-bglj6.12): the ops go to the
+     * relay as one [CanvasOp.BatchOp] ([CanvasStampedBatch]), appended, acknowledged and fanned out
+     * as one log entry, so a relay that fails mid-write leaves none of them. Sent op by op, a
+     * failure after the first ack leaves the ones before it on the board.
      */
-    suspend fun publish(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasPublish =
+    suspend fun publish(
+        caller: HostCanvasCaller,
+        entry: HostCanvasEntry,
+        ops: List<CanvasOp>,
+        atomic: Boolean = false,
+    ): HostCanvasPublish =
         when (val checked = check(caller, entry, ops)) {
             is HostCanvasCheck.Denied -> HostCanvasPublish.Denied(checked.reason)
             is HostCanvasCheck.Checked -> when (val result = checked.result) {
                 is CanvasBatchCheck.Invalid -> HostCanvasPublish.Invalid(result.message)
-                is CanvasBatchCheck.Valid -> send(caller, entry, result.ops)
+                is CanvasBatchCheck.Valid -> send(caller, entry, result.ops, atomic)
             }
         }
 
@@ -126,16 +143,22 @@ class HostCanvasBackend(
             return HostCanvasCheck.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
         val scene = scene(entry)
-        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.agentId) }))
+        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.agentId) }, kinds))
     }
 
-    private suspend fun send(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>): HostCanvasPublish {
+    private suspend fun send(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>, atomic: Boolean): HostCanvasPublish {
         val replies = Channel<CanvasRelayMessage>(Channel.UNLIMITED)
         val link = relay.connect(CanvasRelayProtocol.AGENT_ORIGIN_PREFIX + caller.agentId) { replies.send(it) }
         try {
-            link.receive(CanvasRelayMessage.Join(entry.topic, entry.canvasId, afterCursor = store.head(entry.topic)))
-            var lamport = scene(entry).lamport
-            val stamped = ops.map { it.withActor(caller.agentId).withStamp(newOpId(), ++lamport) }
+            link.receive(
+                CanvasRelayMessage.Join(entry.topic, entry.canvasId, store.head(entry.topic), CanvasRelayFeatures.SUPPORTED),
+            )
+            val lamport = scene(entry).lamport
+            val stamped = if (atomic) {
+                listOf(CanvasStampedBatch.of(ops, caller.agentId, lamport, newOpId))
+            } else {
+                CanvasStampedBatch.separately(ops, caller.agentId, lamport, newOpId)
+            }
             stamped.forEach { link.receive(CanvasRelayMessage.Publish(entry.topic, it)) }
             return HostCanvasAcks(stamped).await(replies, ackTimeout)
         } finally {

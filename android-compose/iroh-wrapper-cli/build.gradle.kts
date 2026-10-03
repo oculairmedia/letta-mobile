@@ -70,6 +70,7 @@ application {
 
 dependencies {
     api(project(":sharedLogic"))
+    implementation(libs.automerge)
 
     api(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)

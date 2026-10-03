@@ -61,7 +61,7 @@ class ProductionIrohToolRegistryWiringTest {
     }
 
     /**
-     * letta-mobile-aknkw: every runtime the host starts gets the host's canvas.* tools, whether or
+     * letta-mobile-aknkw: every runtime the host starts gets the host's canvas_* tools, whether or
      * not --meridian-binary is set, since they need only the canvas relay the host runs.
      */
     @Test
@@ -84,6 +84,36 @@ class ProductionIrohToolRegistryWiringTest {
             )
             val advertised = registry.advertisedToolsCommandGroups()!!.flatMap { group -> group.tools.map { it.name } }.toSet()
             assertTrue(advertised.containsAll(canvasNames), "binary '$binary' advertised $advertised")
+        }
+    }
+
+    /**
+     * letta-mobile-bglj6.12: runtime_start.external_tools carries canvas_compose and its guide whole,
+     * so a rebuilt wrapper offers them to every agent it runs.
+     */
+    @Test
+    fun runtimeStartCarriesComposeAndItsGuide() {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasRelayStore()
+        val registry = buildProductionExternalToolRegistryForTesting(
+            binary = "",
+            identityDir = null,
+            addressStore = null,
+            hostTools = com.letta.mobile.data.canvas.HostCanvasTools.all(
+                com.letta.mobile.data.canvas.HostCanvasBackend(
+                    relay = com.letta.mobile.data.canvas.CanvasRelayHost(store, hostId = { "host" }),
+                    store = store,
+                    directory = com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory(),
+                ),
+            ),
+        )
+        val sent = registry.advertisedToolsCommandGroups()!!.flatMap { it.tools }
+        listOf(
+            com.letta.mobile.data.canvas.CanvasToolContract.compose,
+            com.letta.mobile.data.canvas.CanvasToolContract.composeGuide,
+        ).forEach { definition ->
+            val tool = sent.single { it.name == definition.name }
+            assertEquals(definition.description, tool.description)
+            assertEquals(definition.inputSchema, tool.parameters)
         }
     }
 

@@ -1,0 +1,584 @@
+public final com.letta.mobile.plugin.api.ActionCall : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.ActionCall.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ActionCall(java.lang.String,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.ActionContext)
+    public final com.letta.mobile.plugin.api.ActionCall com.letta.mobile.plugin.api.ActionCall.copy(java.lang.String,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.ActionContext)
+    public final com.letta.mobile.plugin.api.ActionContext com.letta.mobile.plugin.api.ActionCall.component3()
+    public final com.letta.mobile.plugin.api.ActionContext com.letta.mobile.plugin.api.ActionCall.getContext()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionCall.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionCall.getAction()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.ActionCall.component2()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.ActionCall.getInput()
+    public int com.letta.mobile.plugin.api.ActionCall.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ActionCall.toString()
+    public static final com.letta.mobile.plugin.api.ActionCall$Companion com.letta.mobile.plugin.api.ActionCall.Companion
+
+public static final com.letta.mobile.plugin.api.ActionCall$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionCall> com.letta.mobile.plugin.api.ActionCall$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.ActionContext : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.ActionContext.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ActionContext(com.letta.mobile.plugin.api.ActionOrigin,java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.ActionContext com.letta.mobile.plugin.api.ActionContext.copy(com.letta.mobile.plugin.api.ActionOrigin,java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.ActionOrigin com.letta.mobile.plugin.api.ActionContext.component1()
+    public final com.letta.mobile.plugin.api.ActionOrigin com.letta.mobile.plugin.api.ActionContext.getOrigin()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionContext.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionContext.component3()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionContext.getCanvasId()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionContext.getElementId()
+    public int com.letta.mobile.plugin.api.ActionContext.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ActionContext.toString()
+    public static final com.letta.mobile.plugin.api.ActionContext$Companion com.letta.mobile.plugin.api.ActionContext.Companion
+
+public static final com.letta.mobile.plugin.api.ActionContext$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionContext> com.letta.mobile.plugin.api.ActionContext$Companion.serializer()
+
+public abstract interface com.letta.mobile.plugin.api.ActionOrigin : 
+    public static final com.letta.mobile.plugin.api.ActionOrigin$Companion com.letta.mobile.plugin.api.ActionOrigin.Companion
+
+public static final com.letta.mobile.plugin.api.ActionOrigin$Agent : java.lang.Object, com.letta.mobile.plugin.api.ActionOrigin
+    public boolean com.letta.mobile.plugin.api.ActionOrigin$Agent.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ActionOrigin$Agent(java.lang.String,java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.ActionOrigin$Agent com.letta.mobile.plugin.api.ActionOrigin$Agent.copy(java.lang.String,java.lang.String,java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Agent.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Agent.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Agent.component3()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Agent.getAgentId()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Agent.getConversationId()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Agent.getToolCallId()
+    public int com.letta.mobile.plugin.api.ActionOrigin$Agent.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Agent.toString()
+    public static final com.letta.mobile.plugin.api.ActionOrigin$Agent$Companion com.letta.mobile.plugin.api.ActionOrigin$Agent.Companion
+
+public static final com.letta.mobile.plugin.api.ActionOrigin$Agent$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionOrigin$Agent> com.letta.mobile.plugin.api.ActionOrigin$Agent$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.ActionOrigin$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionOrigin> com.letta.mobile.plugin.api.ActionOrigin$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.ActionOrigin$Host : java.lang.Object, com.letta.mobile.plugin.api.ActionOrigin
+    public boolean com.letta.mobile.plugin.api.ActionOrigin$Host.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ActionOrigin$Host(java.lang.String)
+    public final com.letta.mobile.plugin.api.ActionOrigin$Host com.letta.mobile.plugin.api.ActionOrigin$Host.copy(java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Host.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Host.getReason()
+    public int com.letta.mobile.plugin.api.ActionOrigin$Host.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ActionOrigin$Host.toString()
+    public static final com.letta.mobile.plugin.api.ActionOrigin$Host$Companion com.letta.mobile.plugin.api.ActionOrigin$Host.Companion
+
+public static final com.letta.mobile.plugin.api.ActionOrigin$Host$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionOrigin$Host> com.letta.mobile.plugin.api.ActionOrigin$Host$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.ActionOrigin$View : java.lang.Object, com.letta.mobile.plugin.api.ActionOrigin
+    public boolean com.letta.mobile.plugin.api.ActionOrigin$View.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ActionOrigin$View(java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.ActionOrigin$View com.letta.mobile.plugin.api.ActionOrigin$View.copy(java.lang.String,java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$View.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$View.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$View.getElementId()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionOrigin$View.getPeerId()
+    public int com.letta.mobile.plugin.api.ActionOrigin$View.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ActionOrigin$View.toString()
+    public static final com.letta.mobile.plugin.api.ActionOrigin$View$Companion com.letta.mobile.plugin.api.ActionOrigin$View.Companion
+
+public static final com.letta.mobile.plugin.api.ActionOrigin$View$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionOrigin$View> com.letta.mobile.plugin.api.ActionOrigin$View$Companion.serializer()
+
+public abstract interface com.letta.mobile.plugin.api.ActionResult : 
+    public static final com.letta.mobile.plugin.api.ActionResult$Companion com.letta.mobile.plugin.api.ActionResult.Companion
+
+public static final com.letta.mobile.plugin.api.ActionResult$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionResult> com.letta.mobile.plugin.api.ActionResult$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.ActionResult$Error : java.lang.Object, com.letta.mobile.plugin.api.ActionResult
+    public boolean com.letta.mobile.plugin.api.ActionResult$Error.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ActionResult$Error(java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.ActionResult$Error com.letta.mobile.plugin.api.ActionResult$Error.copy(java.lang.String,java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.getCode()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.getMessage()
+    public int com.letta.mobile.plugin.api.ActionResult$Error.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.toString()
+    public static final com.letta.mobile.plugin.api.ActionResult$Error$Companion com.letta.mobile.plugin.api.ActionResult$Error.Companion
+    public static final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.INTERNAL
+    public static final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.INVALID_INPUT
+    public static final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.UNAVAILABLE
+    public static final java.lang.String com.letta.mobile.plugin.api.ActionResult$Error.UNKNOWN_ACTION
+
+public static final com.letta.mobile.plugin.api.ActionResult$Error$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionResult$Error> com.letta.mobile.plugin.api.ActionResult$Error$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.ActionResult$Ok : java.lang.Object, com.letta.mobile.plugin.api.ActionResult
+    public boolean com.letta.mobile.plugin.api.ActionResult$Ok.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ActionResult$Ok(java.lang.String,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.PluginEmit)
+    public final com.letta.mobile.plugin.api.ActionResult$Ok com.letta.mobile.plugin.api.ActionResult$Ok.copy(java.lang.String,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.PluginEmit)
+    public final com.letta.mobile.plugin.api.PluginEmit com.letta.mobile.plugin.api.ActionResult$Ok.component3()
+    public final com.letta.mobile.plugin.api.PluginEmit com.letta.mobile.plugin.api.ActionResult$Ok.getEmit()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionResult$Ok.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ActionResult$Ok.getText()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.ActionResult$Ok.component2()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.ActionResult$Ok.getStructured()
+    public int com.letta.mobile.plugin.api.ActionResult$Ok.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ActionResult$Ok.toString()
+    public static final com.letta.mobile.plugin.api.ActionResult$Ok$Companion com.letta.mobile.plugin.api.ActionResult$Ok.Companion
+
+public static final com.letta.mobile.plugin.api.ActionResult$Ok$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ActionResult$Ok> com.letta.mobile.plugin.api.ActionResult$Ok$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.Base64ByteArraySerializer : java.lang.Object, kotlinx.serialization.KSerializer<byte[]>
+    public byte[] com.letta.mobile.plugin.api.Base64ByteArraySerializer.deserialize(kotlinx.serialization.encoding.Decoder)
+    public kotlinx.serialization.descriptors.SerialDescriptor com.letta.mobile.plugin.api.Base64ByteArraySerializer.getDescriptor()
+    public static final com.letta.mobile.plugin.api.Base64ByteArraySerializer com.letta.mobile.plugin.api.Base64ByteArraySerializer.INSTANCE
+    public void com.letta.mobile.plugin.api.Base64ByteArraySerializer.serialize(kotlinx.serialization.encoding.Encoder,byte[])
+
+public abstract interface com.letta.mobile.plugin.api.CanvasPlugin : 
+    public abstract com.letta.mobile.plugin.api.PluginHealth com.letta.mobile.plugin.api.CanvasPlugin.health()
+    public abstract java.lang.Object com.letta.mobile.plugin.api.CanvasPlugin.invoke(com.letta.mobile.plugin.api.ActionCall,kotlin.coroutines.Continuation<? super com.letta.mobile.plugin.api.ActionResult>)
+    public abstract void com.letta.mobile.plugin.api.CanvasPlugin.activate()
+    public abstract void com.letta.mobile.plugin.api.CanvasPlugin.deactivate()
+    public default com.letta.mobile.plugin.api.PluginInfo com.letta.mobile.plugin.api.CanvasPlugin.initialize(com.letta.mobile.plugin.api.PluginHost)
+    public default java.lang.Object com.letta.mobile.plugin.api.CanvasPlugin.onElementEvent(com.letta.mobile.plugin.api.ElementEvent,kotlin.coroutines.Continuation<? super kotlin.Unit>)
+    public default void com.letta.mobile.plugin.api.CanvasPlugin.onSettingsChanged(kotlinx.serialization.json.JsonObject)
+
+public static final com.letta.mobile.plugin.api.CanvasPlugin$DefaultImpls : java.lang.Object
+    public static com.letta.mobile.plugin.api.PluginInfo com.letta.mobile.plugin.api.CanvasPlugin$DefaultImpls.initialize(com.letta.mobile.plugin.api.CanvasPlugin,com.letta.mobile.plugin.api.PluginHost)
+    public static java.lang.Object com.letta.mobile.plugin.api.CanvasPlugin$DefaultImpls.onElementEvent(com.letta.mobile.plugin.api.CanvasPlugin,com.letta.mobile.plugin.api.ElementEvent,kotlin.coroutines.Continuation<? super kotlin.Unit>)
+    public static void com.letta.mobile.plugin.api.CanvasPlugin$DefaultImpls.onSettingsChanged(com.letta.mobile.plugin.api.CanvasPlugin,kotlinx.serialization.json.JsonObject)
+
+public final com.letta.mobile.plugin.api.ElementEvent : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.ElementEvent.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ElementEvent(java.lang.String,java.lang.String,com.letta.mobile.plugin.api.ElementEventType,com.letta.mobile.plugin.api.ElementFrame,java.lang.String)
+    public final com.letta.mobile.plugin.api.ElementEvent com.letta.mobile.plugin.api.ElementEvent.copy(java.lang.String,java.lang.String,com.letta.mobile.plugin.api.ElementEventType,com.letta.mobile.plugin.api.ElementFrame,java.lang.String)
+    public final com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEvent.component3()
+    public final com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEvent.getEvent()
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.ElementEvent.component4()
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.ElementEvent.getFrame()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementEvent.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementEvent.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementEvent.component5()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementEvent.getCanvasId()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementEvent.getElementId()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementEvent.getKind()
+    public int com.letta.mobile.plugin.api.ElementEvent.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ElementEvent.toString()
+    public static final com.letta.mobile.plugin.api.ElementEvent$Companion com.letta.mobile.plugin.api.ElementEvent.Companion
+
+public static final com.letta.mobile.plugin.api.ElementEvent$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ElementEvent> com.letta.mobile.plugin.api.ElementEvent$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.ElementEventType : java.lang.Enum<com.letta.mobile.plugin.api.ElementEventType>
+    public static com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEventType.valueOf(java.lang.String)
+    public static com.letta.mobile.plugin.api.ElementEventType[] com.letta.mobile.plugin.api.ElementEventType.values()
+    public static final com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEventType.FOCUSED
+    public static final com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEventType.MOVED
+    public static final com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEventType.REMOVED
+    public static final com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEventType.VIEW_CLOSED
+    public static final com.letta.mobile.plugin.api.ElementEventType com.letta.mobile.plugin.api.ElementEventType.VIEW_OPENED
+    public static final com.letta.mobile.plugin.api.ElementEventType$Companion com.letta.mobile.plugin.api.ElementEventType.Companion
+    public static kotlin.enums.EnumEntries<com.letta.mobile.plugin.api.ElementEventType> com.letta.mobile.plugin.api.ElementEventType.getEntries()
+
+public static final com.letta.mobile.plugin.api.ElementEventType$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ElementEventType> com.letta.mobile.plugin.api.ElementEventType$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.ElementFallback : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.ElementFallback.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ElementFallback(java.lang.String,java.lang.String,java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.ElementFallback com.letta.mobile.plugin.api.ElementFallback.copy(java.lang.String,java.lang.String,java.lang.String,java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.component3()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.component4()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.getIcon()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.getOpenUrl()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.getSubtitle()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementFallback.getTitle()
+    public int com.letta.mobile.plugin.api.ElementFallback.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ElementFallback.toString()
+    public static final com.letta.mobile.plugin.api.ElementFallback$Companion com.letta.mobile.plugin.api.ElementFallback.Companion
+
+public static final com.letta.mobile.plugin.api.ElementFallback$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ElementFallback> com.letta.mobile.plugin.api.ElementFallback$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.ElementFrame : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.ElementFrame.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ElementFrame(float,float,float,float)
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.ElementFrame.copy(float,float,float,float)
+    public final float com.letta.mobile.plugin.api.ElementFrame.component1()
+    public final float com.letta.mobile.plugin.api.ElementFrame.component2()
+    public final float com.letta.mobile.plugin.api.ElementFrame.component3()
+    public final float com.letta.mobile.plugin.api.ElementFrame.component4()
+    public final float com.letta.mobile.plugin.api.ElementFrame.getHeight()
+    public final float com.letta.mobile.plugin.api.ElementFrame.getWidth()
+    public final float com.letta.mobile.plugin.api.ElementFrame.getX()
+    public final float com.letta.mobile.plugin.api.ElementFrame.getY()
+    public int com.letta.mobile.plugin.api.ElementFrame.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ElementFrame.toString()
+    public static final com.letta.mobile.plugin.api.ElementFrame$Companion com.letta.mobile.plugin.api.ElementFrame.Companion
+
+public static final com.letta.mobile.plugin.api.ElementFrame$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ElementFrame> com.letta.mobile.plugin.api.ElementFrame$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.ElementQuery : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.ElementQuery.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.ElementQuery()
+    public com.letta.mobile.plugin.api.ElementQuery(java.lang.String,java.util.List<java.lang.String>,java.util.List<java.lang.String>,boolean)
+    public final boolean com.letta.mobile.plugin.api.ElementQuery.component4()
+    public final boolean com.letta.mobile.plugin.api.ElementQuery.getOwnOnly()
+    public final com.letta.mobile.plugin.api.ElementQuery com.letta.mobile.plugin.api.ElementQuery.copy(java.lang.String,java.util.List<java.lang.String>,java.util.List<java.lang.String>,boolean)
+    public final java.lang.String com.letta.mobile.plugin.api.ElementQuery.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.ElementQuery.getCanvasId()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.ElementQuery.component2()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.ElementQuery.component3()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.ElementQuery.getElementIds()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.ElementQuery.getKinds()
+    public int com.letta.mobile.plugin.api.ElementQuery.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.ElementQuery.toString()
+    public static final com.letta.mobile.plugin.api.ElementQuery$Companion com.letta.mobile.plugin.api.ElementQuery.Companion
+
+public static final com.letta.mobile.plugin.api.ElementQuery$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.ElementQuery> com.letta.mobile.plugin.api.ElementQuery$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.EmitReceipt : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.EmitReceipt.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.EmitReceipt()
+    public com.letta.mobile.plugin.api.EmitReceipt(java.util.List<java.lang.String>,java.util.List<com.letta.mobile.plugin.api.EmitRefusal>)
+    public final com.letta.mobile.plugin.api.EmitReceipt com.letta.mobile.plugin.api.EmitReceipt.copy(java.util.List<java.lang.String>,java.util.List<com.letta.mobile.plugin.api.EmitRefusal>)
+    public final java.util.List<com.letta.mobile.plugin.api.EmitRefusal> com.letta.mobile.plugin.api.EmitReceipt.component2()
+    public final java.util.List<com.letta.mobile.plugin.api.EmitRefusal> com.letta.mobile.plugin.api.EmitReceipt.getRefused()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.EmitReceipt.component1()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.EmitReceipt.getPlaced()
+    public int com.letta.mobile.plugin.api.EmitReceipt.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.EmitReceipt.toString()
+    public static final com.letta.mobile.plugin.api.EmitReceipt$Companion com.letta.mobile.plugin.api.EmitReceipt.Companion
+
+public static final com.letta.mobile.plugin.api.EmitReceipt$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.EmitReceipt> com.letta.mobile.plugin.api.EmitReceipt$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.EmitRefusal : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.EmitRefusal.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.EmitRefusal(int,java.lang.String)
+    public final com.letta.mobile.plugin.api.EmitRefusal com.letta.mobile.plugin.api.EmitRefusal.copy(int,java.lang.String)
+    public final int com.letta.mobile.plugin.api.EmitRefusal.component1()
+    public final int com.letta.mobile.plugin.api.EmitRefusal.getIndex()
+    public final java.lang.String com.letta.mobile.plugin.api.EmitRefusal.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.EmitRefusal.getReason()
+    public int com.letta.mobile.plugin.api.EmitRefusal.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.EmitRefusal.toString()
+    public static final com.letta.mobile.plugin.api.EmitRefusal$Companion com.letta.mobile.plugin.api.EmitRefusal.Companion
+
+public static final com.letta.mobile.plugin.api.EmitRefusal$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.EmitRefusal> com.letta.mobile.plugin.api.EmitRefusal$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.HostInfo : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.HostInfo.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.HostInfo(java.lang.String,java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.HostInfo com.letta.mobile.plugin.api.HostInfo.copy(java.lang.String,java.lang.String,java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.HostInfo.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.HostInfo.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.HostInfo.component3()
+    public final java.lang.String com.letta.mobile.plugin.api.HostInfo.getName()
+    public final java.lang.String com.letta.mobile.plugin.api.HostInfo.getPlatform()
+    public final java.lang.String com.letta.mobile.plugin.api.HostInfo.getVersion()
+    public int com.letta.mobile.plugin.api.HostInfo.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.HostInfo.toString()
+    public static final com.letta.mobile.plugin.api.HostInfo$Companion com.letta.mobile.plugin.api.HostInfo.Companion
+
+public static final com.letta.mobile.plugin.api.HostInfo$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.HostInfo> com.letta.mobile.plugin.api.HostInfo$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.LcpDirection : java.lang.Enum<com.letta.mobile.plugin.api.LcpDirection>
+    public static com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.valueOf(java.lang.String)
+    public static com.letta.mobile.plugin.api.LcpDirection[] com.letta.mobile.plugin.api.LcpDirection.values()
+    public static final com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.EITHER
+    public static final com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.HOST_TO_PLUGIN
+    public static final com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.PLUGIN_TO_HOST
+    public static kotlin.enums.EnumEntries<com.letta.mobile.plugin.api.LcpDirection> com.letta.mobile.plugin.api.LcpDirection.getEntries()
+
+public final com.letta.mobile.plugin.api.LcpMethod : java.lang.Enum<com.letta.mobile.plugin.api.LcpMethod>
+    public final boolean com.letta.mobile.plugin.api.LcpMethod.getNotification()
+    public final com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpMethod.getDirection()
+    public final java.lang.Long com.letta.mobile.plugin.api.LcpMethod.getDeadlineMillis()
+    public final java.lang.String com.letta.mobile.plugin.api.LcpMethod.getSpiMember()
+    public final java.lang.String com.letta.mobile.plugin.api.LcpMethod.getWire()
+    public static com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.valueOf(java.lang.String)
+    public static com.letta.mobile.plugin.api.LcpMethod[] com.letta.mobile.plugin.api.LcpMethod.values()
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.ACTIVATE
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.CANCEL
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.DEACTIVATE
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.ELEMENT_EVENT
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.EMIT
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.HEALTH
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.INITIALIZE
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.INVOKE
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.LOG
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.PUT_ASSET_BEGIN
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.PUT_ASSET_CHUNK
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.PUT_ASSET_END
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.READ_ELEMENTS
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.SETTINGS_CHANGED
+    public static final com.letta.mobile.plugin.api.LcpMethod$Companion com.letta.mobile.plugin.api.LcpMethod.Companion
+    public static final int com.letta.mobile.plugin.api.LcpMethod.MAX_ASSET_CHUNK_BYTES
+    public static final int com.letta.mobile.plugin.api.LcpMethod.MAX_MESSAGE_BYTES
+    public static kotlin.enums.EnumEntries<com.letta.mobile.plugin.api.LcpMethod> com.letta.mobile.plugin.api.LcpMethod.getEntries()
+
+public static final com.letta.mobile.plugin.api.LcpMethod$Companion : java.lang.Object
+    public final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod$Companion.byWire(java.lang.String)
+    public final java.util.Set<java.lang.String> com.letta.mobile.plugin.api.LcpMethod$Companion.getINITIALIZE_PARAMS()
+    public final java.util.Set<java.lang.String> com.letta.mobile.plugin.api.LcpMethod$Companion.getJVM_ONLY_HOST_MEMBERS()
+
+public final com.letta.mobile.plugin.api.LogLevel : java.lang.Enum<com.letta.mobile.plugin.api.LogLevel>
+    public static com.letta.mobile.plugin.api.LogLevel com.letta.mobile.plugin.api.LogLevel.valueOf(java.lang.String)
+    public static com.letta.mobile.plugin.api.LogLevel[] com.letta.mobile.plugin.api.LogLevel.values()
+    public static final com.letta.mobile.plugin.api.LogLevel com.letta.mobile.plugin.api.LogLevel.DEBUG
+    public static final com.letta.mobile.plugin.api.LogLevel com.letta.mobile.plugin.api.LogLevel.ERROR
+    public static final com.letta.mobile.plugin.api.LogLevel com.letta.mobile.plugin.api.LogLevel.INFO
+    public static final com.letta.mobile.plugin.api.LogLevel com.letta.mobile.plugin.api.LogLevel.WARN
+    public static final com.letta.mobile.plugin.api.LogLevel$Companion com.letta.mobile.plugin.api.LogLevel.Companion
+    public static kotlin.enums.EnumEntries<com.letta.mobile.plugin.api.LogLevel> com.letta.mobile.plugin.api.LogLevel.getEntries()
+
+public static final com.letta.mobile.plugin.api.LogLevel$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.LogLevel> com.letta.mobile.plugin.api.LogLevel$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.PlaceElement : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.PlaceElement.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.PlaceElement(java.lang.String,int,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.ElementFallback,java.lang.String,com.letta.mobile.plugin.api.ElementFrame,com.letta.mobile.plugin.api.SnapshotSource,java.lang.String)
+    public final com.letta.mobile.plugin.api.ElementFallback com.letta.mobile.plugin.api.PlaceElement.component4()
+    public final com.letta.mobile.plugin.api.ElementFallback com.letta.mobile.plugin.api.PlaceElement.getFallback()
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.PlaceElement.component6()
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.PlaceElement.getFrame()
+    public final com.letta.mobile.plugin.api.PlaceElement com.letta.mobile.plugin.api.PlaceElement.copy(java.lang.String,int,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.ElementFallback,java.lang.String,com.letta.mobile.plugin.api.ElementFrame,com.letta.mobile.plugin.api.SnapshotSource,java.lang.String)
+    public final com.letta.mobile.plugin.api.SnapshotSource com.letta.mobile.plugin.api.PlaceElement.component7()
+    public final com.letta.mobile.plugin.api.SnapshotSource com.letta.mobile.plugin.api.PlaceElement.getSnapshot()
+    public final int com.letta.mobile.plugin.api.PlaceElement.component2()
+    public final int com.letta.mobile.plugin.api.PlaceElement.getV()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceElement.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceElement.component5()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceElement.component8()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceElement.getCanvasId()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceElement.getKind()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceElement.getRef()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.PlaceElement.component3()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.PlaceElement.getProps()
+    public int com.letta.mobile.plugin.api.PlaceElement.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PlaceElement.toString()
+    public static final com.letta.mobile.plugin.api.PlaceElement$Companion com.letta.mobile.plugin.api.PlaceElement.Companion
+
+public static final com.letta.mobile.plugin.api.PlaceElement$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PlaceElement> com.letta.mobile.plugin.api.PlaceElement$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.PlaceImage : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.PlaceImage.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.PlaceImage(com.letta.mobile.plugin.api.SnapshotSource,com.letta.mobile.plugin.api.ElementFrame,java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.PlaceImage.component2()
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.PlaceImage.getFrame()
+    public final com.letta.mobile.plugin.api.PlaceImage com.letta.mobile.plugin.api.PlaceImage.copy(com.letta.mobile.plugin.api.SnapshotSource,com.letta.mobile.plugin.api.ElementFrame,java.lang.String,java.lang.String)
+    public final com.letta.mobile.plugin.api.SnapshotSource com.letta.mobile.plugin.api.PlaceImage.component1()
+    public final com.letta.mobile.plugin.api.SnapshotSource com.letta.mobile.plugin.api.PlaceImage.getImage()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceImage.component3()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceImage.component4()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceImage.getAlt()
+    public final java.lang.String com.letta.mobile.plugin.api.PlaceImage.getCanvasId()
+    public int com.letta.mobile.plugin.api.PlaceImage.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PlaceImage.toString()
+    public static final com.letta.mobile.plugin.api.PlaceImage$Companion com.letta.mobile.plugin.api.PlaceImage.Companion
+
+public static final com.letta.mobile.plugin.api.PlaceImage$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PlaceImage> com.letta.mobile.plugin.api.PlaceImage$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.PluginApi : java.lang.Object
+    public static final com.letta.mobile.plugin.api.PluginApi com.letta.mobile.plugin.api.PluginApi.INSTANCE
+    public static final int com.letta.mobile.plugin.api.PluginApi.CONTRACT_VERSION
+    public static final java.lang.String com.letta.mobile.plugin.api.PluginApi.VERSION
+
+public final com.letta.mobile.plugin.api.PluginElementView : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.PluginElementView.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.PluginElementView(java.lang.String,java.lang.String,java.lang.String,java.lang.Integer,com.letta.mobile.plugin.api.ElementFrame,kotlinx.serialization.json.JsonObject,java.lang.String,com.letta.mobile.plugin.api.ElementFallback)
+    public final com.letta.mobile.plugin.api.ElementFallback com.letta.mobile.plugin.api.PluginElementView.component8()
+    public final com.letta.mobile.plugin.api.ElementFallback com.letta.mobile.plugin.api.PluginElementView.getFallback()
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.PluginElementView.component5()
+    public final com.letta.mobile.plugin.api.ElementFrame com.letta.mobile.plugin.api.PluginElementView.getFrame()
+    public final com.letta.mobile.plugin.api.PluginElementView com.letta.mobile.plugin.api.PluginElementView.copy(java.lang.String,java.lang.String,java.lang.String,java.lang.Integer,com.letta.mobile.plugin.api.ElementFrame,kotlinx.serialization.json.JsonObject,java.lang.String,com.letta.mobile.plugin.api.ElementFallback)
+    public final java.lang.Integer com.letta.mobile.plugin.api.PluginElementView.component4()
+    public final java.lang.Integer com.letta.mobile.plugin.api.PluginElementView.getV()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.component2()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.component3()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.component7()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.getCanvasId()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.getId()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.getRef()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginElementView.getType()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.PluginElementView.component6()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.PluginElementView.getProps()
+    public int com.letta.mobile.plugin.api.PluginElementView.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PluginElementView.toString()
+    public static final com.letta.mobile.plugin.api.PluginElementView$Companion com.letta.mobile.plugin.api.PluginElementView.Companion
+
+public static final com.letta.mobile.plugin.api.PluginElementView$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PluginElementView> com.letta.mobile.plugin.api.PluginElementView$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.PluginEmit : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.PluginEmit.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.PluginEmit()
+    public com.letta.mobile.plugin.api.PluginEmit(java.util.List<com.letta.mobile.plugin.api.PlaceElement>,java.util.List<com.letta.mobile.plugin.api.UpdateElement>,java.util.List<java.lang.String>,java.util.List<com.letta.mobile.plugin.api.PlaceImage>)
+    public final boolean com.letta.mobile.plugin.api.PluginEmit.isEmpty()
+    public final com.letta.mobile.plugin.api.PluginEmit com.letta.mobile.plugin.api.PluginEmit.copy(java.util.List<com.letta.mobile.plugin.api.PlaceElement>,java.util.List<com.letta.mobile.plugin.api.UpdateElement>,java.util.List<java.lang.String>,java.util.List<com.letta.mobile.plugin.api.PlaceImage>)
+    public final java.util.List<com.letta.mobile.plugin.api.PlaceElement> com.letta.mobile.plugin.api.PluginEmit.component1()
+    public final java.util.List<com.letta.mobile.plugin.api.PlaceElement> com.letta.mobile.plugin.api.PluginEmit.getPlace()
+    public final java.util.List<com.letta.mobile.plugin.api.PlaceImage> com.letta.mobile.plugin.api.PluginEmit.component4()
+    public final java.util.List<com.letta.mobile.plugin.api.PlaceImage> com.letta.mobile.plugin.api.PluginEmit.getPlaceImages()
+    public final java.util.List<com.letta.mobile.plugin.api.UpdateElement> com.letta.mobile.plugin.api.PluginEmit.component2()
+    public final java.util.List<com.letta.mobile.plugin.api.UpdateElement> com.letta.mobile.plugin.api.PluginEmit.getUpdate()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.PluginEmit.component3()
+    public final java.util.List<java.lang.String> com.letta.mobile.plugin.api.PluginEmit.getRemove()
+    public int com.letta.mobile.plugin.api.PluginEmit.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PluginEmit.toString()
+    public static final com.letta.mobile.plugin.api.PluginEmit$Companion com.letta.mobile.plugin.api.PluginEmit.Companion
+
+public static final com.letta.mobile.plugin.api.PluginEmit$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PluginEmit> com.letta.mobile.plugin.api.PluginEmit$Companion.serializer()
+
+public abstract interface com.letta.mobile.plugin.api.PluginHealth : 
+    public static final com.letta.mobile.plugin.api.PluginHealth$Companion com.letta.mobile.plugin.api.PluginHealth.Companion
+
+public static final com.letta.mobile.plugin.api.PluginHealth$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PluginHealth> com.letta.mobile.plugin.api.PluginHealth$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.PluginHealth$Degraded : java.lang.Object, com.letta.mobile.plugin.api.PluginHealth
+    public boolean com.letta.mobile.plugin.api.PluginHealth$Degraded.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.PluginHealth$Degraded(java.lang.String)
+    public final com.letta.mobile.plugin.api.PluginHealth$Degraded com.letta.mobile.plugin.api.PluginHealth$Degraded.copy(java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.PluginHealth$Degraded.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginHealth$Degraded.getReason()
+    public int com.letta.mobile.plugin.api.PluginHealth$Degraded.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PluginHealth$Degraded.toString()
+    public static final com.letta.mobile.plugin.api.PluginHealth$Degraded$Companion com.letta.mobile.plugin.api.PluginHealth$Degraded.Companion
+
+public static final com.letta.mobile.plugin.api.PluginHealth$Degraded$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PluginHealth$Degraded> com.letta.mobile.plugin.api.PluginHealth$Degraded$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.PluginHealth$Failed : java.lang.Object, com.letta.mobile.plugin.api.PluginHealth
+    public boolean com.letta.mobile.plugin.api.PluginHealth$Failed.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.PluginHealth$Failed(java.lang.String)
+    public final com.letta.mobile.plugin.api.PluginHealth$Failed com.letta.mobile.plugin.api.PluginHealth$Failed.copy(java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.PluginHealth$Failed.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginHealth$Failed.getReason()
+    public int com.letta.mobile.plugin.api.PluginHealth$Failed.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PluginHealth$Failed.toString()
+    public static final com.letta.mobile.plugin.api.PluginHealth$Failed$Companion com.letta.mobile.plugin.api.PluginHealth$Failed.Companion
+
+public static final com.letta.mobile.plugin.api.PluginHealth$Failed$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PluginHealth$Failed> com.letta.mobile.plugin.api.PluginHealth$Failed$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.PluginHealth$Ok : java.lang.Object, com.letta.mobile.plugin.api.PluginHealth
+    public boolean com.letta.mobile.plugin.api.PluginHealth$Ok.equals(java.lang.Object)
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PluginHealth$Ok> com.letta.mobile.plugin.api.PluginHealth$Ok.serializer()
+    public int com.letta.mobile.plugin.api.PluginHealth$Ok.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PluginHealth$Ok.toString()
+    public static final com.letta.mobile.plugin.api.PluginHealth$Ok com.letta.mobile.plugin.api.PluginHealth$Ok.INSTANCE
+
+public abstract interface com.letta.mobile.plugin.api.PluginHost : 
+    public abstract com.letta.mobile.plugin.api.HostInfo com.letta.mobile.plugin.api.PluginHost.getHostInfo()
+    public abstract com.letta.mobile.plugin.api.PluginHttpClient com.letta.mobile.plugin.api.PluginHost.getHttpClient()
+    public abstract int com.letta.mobile.plugin.api.PluginHost.getContractVersion()
+    public abstract java.lang.Object com.letta.mobile.plugin.api.PluginHost.emit(com.letta.mobile.plugin.api.PluginEmit,kotlin.coroutines.Continuation<? super com.letta.mobile.plugin.api.EmitReceipt>)
+    public abstract java.lang.Object com.letta.mobile.plugin.api.PluginHost.putAsset(java.lang.String,byte[],kotlin.coroutines.Continuation<? super java.lang.String>)
+    public abstract java.lang.Object com.letta.mobile.plugin.api.PluginHost.readElements(com.letta.mobile.plugin.api.ElementQuery,kotlin.coroutines.Continuation<? super java.util.List<com.letta.mobile.plugin.api.PluginElementView>>)
+    public abstract java.lang.String com.letta.mobile.plugin.api.PluginHost.getPluginId()
+    public abstract java.lang.String com.letta.mobile.plugin.api.PluginHost.secret(java.lang.String)
+    public abstract kotlinx.coroutines.CoroutineScope com.letta.mobile.plugin.api.PluginHost.getScope()
+    public abstract kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.PluginHost.getSettings()
+    public abstract void com.letta.mobile.plugin.api.PluginHost.log(com.letta.mobile.plugin.api.LogLevel,java.lang.String,java.util.Map<java.lang.String, java.lang.String>)
+
+public static final com.letta.mobile.plugin.api.PluginHost$DefaultImpls : java.lang.Object
+
+public final com.letta.mobile.plugin.api.PluginHostException : java.lang.RuntimeException
+    public com.letta.mobile.plugin.api.PluginHostException(java.lang.String,java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.PluginHostException.getCode()
+    public static final com.letta.mobile.plugin.api.PluginHostException$Companion com.letta.mobile.plugin.api.PluginHostException.Companion
+    public static final java.lang.String com.letta.mobile.plugin.api.PluginHostException.CAPABILITY_DENIED
+    public static final java.lang.String com.letta.mobile.plugin.api.PluginHostException.DEACTIVATED
+    public static final java.lang.String com.letta.mobile.plugin.api.PluginHostException.LIMIT
+    public static final java.lang.String com.letta.mobile.plugin.api.PluginHostException.NOT_ACTIVE
+    public static final java.lang.String com.letta.mobile.plugin.api.PluginHostException.ORIGIN_DENIED
+
+public static final com.letta.mobile.plugin.api.PluginHostException$Companion : java.lang.Object
+
+public abstract interface com.letta.mobile.plugin.api.PluginHttpClient : 
+    public abstract java.lang.Object com.letta.mobile.plugin.api.PluginHttpClient.get(java.lang.String,java.util.Map<java.lang.String, java.lang.String>,kotlin.coroutines.Continuation<? super com.letta.mobile.plugin.api.PluginHttpResponse>)
+    public abstract java.lang.Object com.letta.mobile.plugin.api.PluginHttpClient.post(java.lang.String,byte[],java.lang.String,java.util.Map<java.lang.String, java.lang.String>,kotlin.coroutines.Continuation<? super com.letta.mobile.plugin.api.PluginHttpResponse>)
+
+public static final com.letta.mobile.plugin.api.PluginHttpClient$DefaultImpls : java.lang.Object
+
+public final com.letta.mobile.plugin.api.PluginHttpResponse : java.lang.Object
+    public com.letta.mobile.plugin.api.PluginHttpResponse(int,java.util.Map<java.lang.String, java.lang.String>,byte[])
+    public final byte[] com.letta.mobile.plugin.api.PluginHttpResponse.getBody()
+    public final int com.letta.mobile.plugin.api.PluginHttpResponse.getStatus()
+    public final java.util.Map<java.lang.String, java.lang.String> com.letta.mobile.plugin.api.PluginHttpResponse.getHeaders()
+
+public final com.letta.mobile.plugin.api.PluginInfo : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.PluginInfo.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.PluginInfo()
+    public com.letta.mobile.plugin.api.PluginInfo(java.lang.String,java.util.Map<java.lang.String, java.lang.String>)
+    public final com.letta.mobile.plugin.api.PluginInfo com.letta.mobile.plugin.api.PluginInfo.copy(java.lang.String,java.util.Map<java.lang.String, java.lang.String>)
+    public final java.lang.String com.letta.mobile.plugin.api.PluginInfo.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.PluginInfo.getBuild()
+    public final java.util.Map<java.lang.String, java.lang.String> com.letta.mobile.plugin.api.PluginInfo.component2()
+    public final java.util.Map<java.lang.String, java.lang.String> com.letta.mobile.plugin.api.PluginInfo.getDetails()
+    public int com.letta.mobile.plugin.api.PluginInfo.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.PluginInfo.toString()
+    public static final com.letta.mobile.plugin.api.PluginInfo$Companion com.letta.mobile.plugin.api.PluginInfo.Companion
+
+public static final com.letta.mobile.plugin.api.PluginInfo$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.PluginInfo> com.letta.mobile.plugin.api.PluginInfo$Companion.serializer()
+
+public abstract interface com.letta.mobile.plugin.api.SnapshotSource : 
+    public static final com.letta.mobile.plugin.api.SnapshotSource$Companion com.letta.mobile.plugin.api.SnapshotSource.Companion
+
+public static final com.letta.mobile.plugin.api.SnapshotSource$Asset : java.lang.Object, com.letta.mobile.plugin.api.SnapshotSource
+    public boolean com.letta.mobile.plugin.api.SnapshotSource$Asset.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.SnapshotSource$Asset(java.lang.String)
+    public final com.letta.mobile.plugin.api.SnapshotSource$Asset com.letta.mobile.plugin.api.SnapshotSource$Asset.copy(java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.SnapshotSource$Asset.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.SnapshotSource$Asset.getRef()
+    public int com.letta.mobile.plugin.api.SnapshotSource$Asset.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.SnapshotSource$Asset.toString()
+    public static final com.letta.mobile.plugin.api.SnapshotSource$Asset$Companion com.letta.mobile.plugin.api.SnapshotSource$Asset.Companion
+
+public static final com.letta.mobile.plugin.api.SnapshotSource$Asset$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.SnapshotSource$Asset> com.letta.mobile.plugin.api.SnapshotSource$Asset$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.SnapshotSource$Bytes : java.lang.Object, com.letta.mobile.plugin.api.SnapshotSource
+    public com.letta.mobile.plugin.api.SnapshotSource$Bytes(java.lang.String,byte[])
+    public final byte[] com.letta.mobile.plugin.api.SnapshotSource$Bytes.getBytes()
+    public final java.lang.String com.letta.mobile.plugin.api.SnapshotSource$Bytes.getMediaType()
+    public java.lang.String com.letta.mobile.plugin.api.SnapshotSource$Bytes.toString()
+    public static final com.letta.mobile.plugin.api.SnapshotSource$Bytes$Companion com.letta.mobile.plugin.api.SnapshotSource$Bytes.Companion
+
+public static final com.letta.mobile.plugin.api.SnapshotSource$Bytes$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.SnapshotSource$Bytes> com.letta.mobile.plugin.api.SnapshotSource$Bytes$Companion.serializer()
+
+public static final com.letta.mobile.plugin.api.SnapshotSource$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.SnapshotSource> com.letta.mobile.plugin.api.SnapshotSource$Companion.serializer()
+
+public final com.letta.mobile.plugin.api.UpdateElement : java.lang.Object
+    public boolean com.letta.mobile.plugin.api.UpdateElement.equals(java.lang.Object)
+    public com.letta.mobile.plugin.api.UpdateElement(java.lang.String,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.ElementFallback,com.letta.mobile.plugin.api.SnapshotSource,java.lang.String)
+    public final com.letta.mobile.plugin.api.ElementFallback com.letta.mobile.plugin.api.UpdateElement.component3()
+    public final com.letta.mobile.plugin.api.ElementFallback com.letta.mobile.plugin.api.UpdateElement.getFallback()
+    public final com.letta.mobile.plugin.api.SnapshotSource com.letta.mobile.plugin.api.UpdateElement.component4()
+    public final com.letta.mobile.plugin.api.SnapshotSource com.letta.mobile.plugin.api.UpdateElement.getSnapshot()
+    public final com.letta.mobile.plugin.api.UpdateElement com.letta.mobile.plugin.api.UpdateElement.copy(java.lang.String,kotlinx.serialization.json.JsonObject,com.letta.mobile.plugin.api.ElementFallback,com.letta.mobile.plugin.api.SnapshotSource,java.lang.String)
+    public final java.lang.String com.letta.mobile.plugin.api.UpdateElement.component1()
+    public final java.lang.String com.letta.mobile.plugin.api.UpdateElement.component5()
+    public final java.lang.String com.letta.mobile.plugin.api.UpdateElement.getElementId()
+    public final java.lang.String com.letta.mobile.plugin.api.UpdateElement.getRef()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.UpdateElement.component2()
+    public final kotlinx.serialization.json.JsonObject com.letta.mobile.plugin.api.UpdateElement.getProps()
+    public int com.letta.mobile.plugin.api.UpdateElement.hashCode()
+    public java.lang.String com.letta.mobile.plugin.api.UpdateElement.toString()
+    public static final com.letta.mobile.plugin.api.UpdateElement$Companion com.letta.mobile.plugin.api.UpdateElement.Companion
+
+public static final com.letta.mobile.plugin.api.UpdateElement$Companion : java.lang.Object
+    public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.UpdateElement> com.letta.mobile.plugin.api.UpdateElement$Companion.serializer()
+

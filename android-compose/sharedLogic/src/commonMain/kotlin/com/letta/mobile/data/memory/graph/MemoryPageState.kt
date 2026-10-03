@@ -11,6 +11,12 @@ data class MemoryPageState(
     val view: MemoryGraphView = MemoryGraphView(),
     val layout: MemoryGraphLayout = MemoryGraphLayout(),
     val selection: MemoryNodeSelection? = null,
+    /** An agent is selected and the backend exposes committed block writes. */
+    val canCreateBlock: Boolean = false,
+    /** The open "New block" sheet, if any. */
+    val creation: MemoryBlockDraft? = null,
+    /** The pending delete confirmation, if any. */
+    val deletion: MemoryBlockDeletion? = null,
 ) {
     val selectedNodeId: String? get() = selection?.detail?.nodeId
 }
@@ -51,15 +57,33 @@ data class MemoryNodeSelection(
     val displayText: String
         get() = (content as? MemoryNodeContent.Loaded)?.value ?: detail.body
 
-    val canEdit: Boolean
-        get() = writable && !detail.readOnly && detail.blockRef != null && content is MemoryNodeContent.Loaded
+    val canEdit: Boolean get() = MemorySelectionRules.canEdit(this)
 
-    val canSave: Boolean
-        get() = editor != null && !editor.isSaving && editor.isDirty && !editor.exceeds(detail.limit)
+    /** A writable, non-read-only block that is not mid-save. */
+    val canDelete: Boolean get() = MemorySelectionRules.canDelete(this)
+
+    val canSave: Boolean get() = MemorySelectionRules.canSave(this)
+}
+
+/** The selection's capability rules, kept in named functions rather than property initializers. */
+internal object MemorySelectionRules {
+    private fun isWritableBlock(selection: MemoryNodeSelection): Boolean =
+        selection.writable && !selection.detail.readOnly && selection.detail.blockRef != null
+
+    fun canEdit(selection: MemoryNodeSelection): Boolean =
+        isWritableBlock(selection) && selection.content is MemoryNodeContent.Loaded
+
+    fun canDelete(selection: MemoryNodeSelection): Boolean =
+        isWritableBlock(selection) && selection.editor?.isSaving != true
+
+    fun canSave(selection: MemoryNodeSelection): Boolean {
+        val editor = selection.editor ?: return false
+        return !editor.isSaving && editor.isDirty && !editor.exceeds(selection.detail.limit)
+    }
 }
 
 /** Everything the page can ask for. The controller implements it; UI calls it. */
-interface MemoryPageActions {
+interface MemoryPageActions : MemoryBlockLifecycleActions {
     fun refresh()
     fun selectAgent(agentId: String)
     fun toggleKind(kind: MemoryGraphNodeKind)

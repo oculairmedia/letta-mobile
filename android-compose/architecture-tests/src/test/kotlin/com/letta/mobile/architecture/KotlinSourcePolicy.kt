@@ -50,6 +50,8 @@ internal object KotlinSourcePolicy {
                 file.imports
                     .filter { import -> forbiddenCommonMainImports.any(import.name::startsWith) }
                     .forEach { import -> add("${file.path}: commonMain imports ${import.name}") }
+                ImplicitJvmApiScan.hits(file.text)
+                    .forEach { hit -> add("${file.path}: commonMain uses JVM-only $hit") }
             }
         }
     }

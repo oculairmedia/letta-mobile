@@ -12,16 +12,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
@@ -91,9 +94,8 @@ private enum class NoteFoot { ICONS, COLOURS, FORMAT }
  * they name in its place — add a checklist, the colours, the text formatting — beside undo, redo
  * and the note's menu.
  *
- * It is a panel inside the board's own box rather than a platform dialog, so it behaves the same
- * on desktop and Android. On a phone it takes the whole board; on a wide board it floats as a
- * card. The card underneath shows a read-only preview while this is open, so only one editor
+ * The shared editor opens as a bottom sheet on narrow boards and floats over wide boards.
+ * The card underneath shows a read-only preview while this is open, so only one editor
  * writes the document.
  */
 @Composable
@@ -105,14 +107,54 @@ fun CanvasNoteEditorPanel(
     onToolbar: ((NoteToolbar?) -> Unit)? = null,
     /** The whole overlay, scrim included, is chrome: nothing behind it is drawable. */
     chromeRegions: CanvasChromeRegions? = null,
-    /** A phone: the note takes the whole board instead of floating as a card. */
+    /** Narrow boards use the same editor inside a bottom sheet. */
     compact: Boolean = false,
     actions: NoteEditorActions? = null,
+    /** What the editor keeps clear of: the system bars and keyboard, and any host chrome over the board. */
+    insets: WindowInsets = WindowInsets.safeDrawing,
 ) {
     val tint = parseHexColor(document.color)?.takeIf { it.alpha > 0f }
     val background = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh
     val onCard = if (tint != null) contrastOn(tint) else MaterialTheme.colorScheme.onSurface
     var toolbar by remember(document.id) { mutableStateOf<NoteToolbar?>(null) }
+    val editor: @Composable () -> Unit = {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NoteIcon(NoteButton(Lucide.ArrowLeft, "Close note editor"), onCard, onClick = onClose)
+            }
+            NoteTitleField(session, document, onCard, compact)
+            CanvasBlockEditor(
+                session = session,
+                documentId = document.id,
+                storedJson = document.json,
+                active = true,
+                onLightSurface = tint != null,
+                onToolbar = { handed ->
+                    toolbar = handed
+                    onToolbar?.invoke(handed)
+                },
+                style = document.style,
+                modifier = Modifier.weight(1f).fillMaxWidth()
+                    .padding(horizontal = if (compact) LettaDimens.Space.md else LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
+            )
+            NoteFootBar(OpenNote(session, document, onCard, background), toolbar, actions)
+        }
+    }
+    if (compact) {
+        ModalBottomSheet(onDismissRequest = onClose, modifier = modifier.canvasChrome(chromeRegions)) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).heightIn(min = 280.dp)
+                    .semantics { contentDescription = "Note editor" },
+                color = background,
+            ) {
+                editor()
+            }
+        }
+        return
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -126,7 +168,7 @@ fun CanvasNoteEditorPanel(
             modifier = Modifier
                 .fillMaxSize()
                 // Clear of the system bars, and of the keyboard, which the foot bar rides on.
-                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .windowInsetsPadding(insets)
                 .then(if (compact) Modifier else Modifier.padding(horizontal = LettaDimens.Space.xl, vertical = 56.dp).widthIn(max = 880.dp))
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .semantics { contentDescription = "Note editor" },
@@ -135,30 +177,7 @@ fun CanvasNoteEditorPanel(
             tonalElevation = if (compact) 0.dp else LettaDimens.Space.xs,
             shadowElevation = if (compact) 0.dp else LettaDimens.Space.md,
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    NoteIcon(NoteButton(Lucide.ArrowLeft, "Close note editor"), onCard, onClick = onClose)
-                }
-                NoteTitleField(session, document, onCard, compact)
-                CanvasBlockEditor(
-                    session = session,
-                    documentId = document.id,
-                    storedJson = document.json,
-                    active = true,
-                    onLightSurface = tint != null,
-                    onToolbar = { handed ->
-                        toolbar = handed
-                        onToolbar?.invoke(handed)
-                    },
-                    style = document.style,
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                        .padding(horizontal = if (compact) LettaDimens.Space.md else LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
-                )
-                NoteFootBar(OpenNote(session, document, onCard, background), toolbar, actions)
-            }
+            editor()
         }
     }
 }

@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.CanvasArchiveStore
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasDocument
+import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasArchiveStore
@@ -25,7 +26,7 @@ import kotlinx.coroutines.launch
  * the behaviour is testable without composing anything.
  */
 internal class DesktopCanvasLibrary(
-    private val store: DesktopCanvasDocumentStore,
+    private val store: CanvasDocumentStore,
     private val scope: CoroutineScope,
     private val archive: CanvasArchiveStore = InMemoryCanvasArchiveStore(),
 ) {
@@ -95,7 +96,7 @@ internal class DesktopCanvasLibrary(
 
 @Composable
 internal fun rememberDesktopCanvasLibrary(
-    store: DesktopCanvasDocumentStore,
+    store: CanvasDocumentStore,
     scope: CoroutineScope,
 ): DesktopCanvasLibrary = remember(store, scope) { DesktopCanvasLibrary(store, scope, DesktopCanvasArchiveStore()) }
 

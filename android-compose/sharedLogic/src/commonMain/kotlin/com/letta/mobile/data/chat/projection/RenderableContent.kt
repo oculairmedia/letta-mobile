@@ -30,7 +30,8 @@ private fun UiMessage.hasNoStructuredPayload(): Boolean =
         approvalResponse == null &&
         subagentNotification == null &&
         attachments.isEmpty() &&
-        agentMessageProvenance == null
+        agentMessageProvenance == null &&
+        artifacts.isEmpty()
 
 /** Drops [hasNoRenderableContent] segments; returns the same list when there are none. */
 fun List<UiMessage>.withoutContentlessSegments(): List<UiMessage> =

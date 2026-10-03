@@ -1248,6 +1248,46 @@
       ]
     },
     {
+      "method": "block.create_agent",
+      "handler": "AgentBlockWriteHandlers.kt",
+      "current_backend": "app_server_v2 write_memory_file on a NEW memory/system/<label>.md (App Server performs the write and commits)",
+      "owner": "app_server_v2",
+      "public_contract": "write_memory_file",
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "lgns8.9",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none",
+      "phase3_decision": "adopt_v2",
+      "notes": "bfooy.5 agent-scoped CREATE: the agent-scoped replacement for the denied global block.create. Refuses a label that already exists for the agent (read from the store) so a create never clobbers, then writes memory/system/<label>.md through write_memory_file, which commits so MemFS HEAD moves and the compiled system prompt sees the new block.",
+      "native_contract": [
+        "write_memory_file",
+        "write_memory_file_response"
+      ]
+    },
+    {
+      "method": "block.delete_agent",
+      "handler": "AgentBlockWriteHandlers.kt",
+      "current_backend": "app_server_v2 delete_memory_file on memory/system/<label>.md (App Server performs the delete and commits)",
+      "owner": "app_server_v2",
+      "public_contract": "delete_memory_file",
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "lgns8.9",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none",
+      "phase3_decision": "adopt_v2",
+      "notes": "bfooy.5 agent-scoped DELETE: the agent-scoped replacement for the denied global block.delete. Maps 1:1 onto the pinned delete_memory_file command, which removes the file and commits the deletion (idempotent upstream: an absent file succeeds without a commit).",
+      "native_contract": [
+        "delete_memory_file",
+        "delete_memory_file_response"
+      ]
+    },
+    {
       "method": "mcp.list",
       "handler": "McpAdminHandlers.kt",
       "current_backend": "controller_native empty-by-contract (admin-shim has no /v1/mcp/servers route; it stubs /v1/mcp-servers with [])",

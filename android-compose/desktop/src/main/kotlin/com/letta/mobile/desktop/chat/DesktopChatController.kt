@@ -21,6 +21,7 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.data.repository.observeConversationUpdates
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -58,7 +59,8 @@ import kotlin.time.Duration.Companion.milliseconds
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
-    private val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
+    /** Read by the shared page's port, so its picker encodes to the limits this controller enforces. */
+    internal val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     private val gatewayFactory: suspend () -> DesktopChatGateway = {
         createDefaultDesktopChatGateway(bootstrapState.config)
     },
@@ -433,7 +435,7 @@ class DesktopChatController(
 
     // Per-conversation model overrides set this session (the picker). The
     // effective composer model otherwise comes from the conversation's agent.
-    private var conversationModelById: Map<String, String> = emptyMap()
+    private val conversationModels = ConversationModelSelections()
 
     private val gatewayExtras: ChatGatewayExtras?
         get() = gateway as? ChatGatewayExtras
@@ -677,20 +679,44 @@ class DesktopChatController(
         }
     }
 
+    /** Re-reads the chat's model list after the host catalog changed (letta-mobile-w4q4p.6.1). */
+    suspend fun reloadModelCatalog() {
+        if (closed) return
+        val extras = gatewayExtras ?: return
+        modelCatalogHelper.startModelCatalogLoad(extras, replaceCurrent = true).await().getOrThrow()
+    }
+
     /** Apply a model override to the active conversation. */
     fun setConversationModel(model: String) {
         if (closed) return
         val conversationId = _state.value.selectedConversationId ?: return
-        conversationModelById = conversationModelById + (conversationId to model)
+        val previousOverride = conversationModels[conversationId]
+        val previousLabel = _state.value.composerModelLabel
+        conversationModels.record(conversationId, model)
         _state.update { it.copy(composerModelLabel = model) }
-        val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
         scope.launch {
-            runCatching { gatewayExtras?.setConversationModel(conversationId, transportModel) }
-                .onFailure { t ->
-                    _state.update {
-                        it.copy(errorMessage = t.message ?: "Could not change model")
-                    }
-                }
+            applyConversationModel(conversationId, model, previousOverride, previousLabel)
+        }
+    }
+
+    private suspend fun applyConversationModel(
+        conversationId: String,
+        model: String,
+        previousOverride: String?,
+        previousLabel: String,
+    ) {
+        try {
+            val extras = gatewayExtras ?: error("This backend cannot change a conversation's model")
+            val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
+            extras.setConversationModel(conversationId, transportModel)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            val restored = conversationModels.rollback(conversationId, model, previousOverride)
+            if (restored && _state.value.selectedConversationId == conversationId) {
+                _state.update { it.copy(composerModelLabel = previousLabel) }
+            }
+            _state.update { it.copy(errorMessage = t.message ?: "Could not change model") }
         }
     }
 
@@ -726,14 +752,14 @@ class DesktopChatController(
 
     private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
         scope.launch {
-            val override = conversationModelById[conversationId]
-            val label = when {
-                !override.isNullOrBlank() -> override
-                !agentId.isNullOrBlank() ->
-                    runCatching { agentByIdProvider(setOf(agentId)) }
-                        .getOrNull()?.get(agentId)?.model?.takeIf { it.isNotBlank() } ?: "Auto"
-                else -> "Auto"
+            val agentModel = if (conversationModels[conversationId] == null && !agentId.isNullOrBlank()) {
+                runCatching { agentByIdProvider(setOf(agentId)) }.getOrNull()?.get(agentId)?.model
+            } else {
+                null
             }
+            // letta-mobile-okvyf: read the override AFTER the agent lookup, so a pick
+            // made while the lookup was in flight is not overwritten by the agent model.
+            val label = conversationModels.effectiveModel(conversationId, agentModel) ?: "Auto"
             if (!closed && _state.value.selectedConversationId == conversationId) {
                 _state.update { it.copy(composerModelLabel = label) }
             }
@@ -772,21 +798,41 @@ class DesktopChatController(
         if (closed) return
         _state.update { current ->
             val next = ChatSessionReducer.attachImage(current.runtimeState, image, attachmentLimits)
-            current.withRuntimeState(next).copy(errorMessage = next.composer.error?.toDesktopMessage(attachmentLimits))
+            val error = next.composer.error?.toDesktopMessage(attachmentLimits)
+            val attached = current.withRuntimeState(next).withoutComposerError()
+            if (error != null) attached.withComposerError(error) else attached
         }
     }
 
     fun removeImageAttachment(index: Int) {
         if (closed) return
         _state.update {
-            it.withRuntimeState(ChatSessionReducer.removeImageAttachment(it.runtimeState, index))
-                .copy(errorMessage = null)
+            it.withRuntimeState(ChatSessionReducer.removeImageAttachment(it.runtimeState, index)).withoutComposerError()
         }
     }
 
+    /** A composer error: the shared page shows it in the composer, not the page snackbar. */
     fun showComposerError(message: String) {
         if (closed) return
+        _state.update { it.withComposerError(message) }
+    }
+
+    /** The composer's error was dismissed; a page error that differs from it stays. */
+    fun clearComposerError() {
+        if (closed) return
+        _state.update { it.withoutComposerError() }
+    }
+
+    /** An error about the page (not the draft), such as a starter prompt that could not send. */
+    private fun showPageError(message: String) {
+        if (closed) return
         _state.update { it.copy(errorMessage = message) }
+    }
+
+    /** The shared page acknowledged (showed or dismissed) the surface error. */
+    fun clearErrorMessage() {
+        if (closed) return
+        _state.update { it.copy(errorMessage = null) }
     }
 
     /**
@@ -889,28 +935,50 @@ class DesktopChatController(
 
     fun send() {
         if (closed) return
-        cancellingConversationId.value?.let { cancelling ->
-            if (cancelling == _state.value.selectedConversationId) {
-                showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
-                return
-            }
+        _state.update { it.withoutComposerError() }
+        if (stopBlocksSend()) {
+            showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
+            return
         }
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
+        // As before, a draft send with no connection is a no-op: the composer cannot send then.
+        dispatchSend(draft, onRefused = ::showComposerError, onNotConnected = {})
+    }
+
+    /**
+     * Sends [text] without touching the draft or its staged images (a starter prompt, "send
+     * again"), through the same route as [send]. A send that cannot start says so on the page.
+     */
+    fun sendText(text: String) {
+        if (closed || text.isBlank()) return
+        if (stopBlocksSend()) {
+            showPageError(STOPPING_SEND_BLOCKED_MESSAGE)
+            return
+        }
+        val draft = ChatComposerSendDraft(text = text.trim(), attachments = emptyList(), nextState = _state.value.composer)
+        dispatchSend(draft, onRefused = ::showPageError, onNotConnected = { showPageError(SEND_NOT_CONNECTED_MESSAGE) })
+    }
+
+    private fun stopBlocksSend(): Boolean {
+        val cancelling = cancellingConversationId.value ?: return false
+        return cancelling == _state.value.selectedConversationId
+    }
+
+    /** [draft]'s nextState is the composer after the send: emptied by [send], untouched by [sendText]. */
+    private fun dispatchSend(draft: ChatComposerSendDraft, onRefused: (String) -> Unit, onNotConnected: () -> Unit) {
         _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
         // The canonical route owns its own send. It deliberately runs no legacy loop, so falling
         // through to the loop check below would drop the message on the floor.
         if (_canonicalPresentation.value != null) {
-            launchCanonicalSend(draft)
+            launchCanonicalSend(draft, onRefused)
             return
         }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
-            _state.update {
-                if (it.connectionState == DesktopChatConnectionState.Demo) {
-                    it.sendLocalMessage()
-                } else {
-                    it
-                }
+            if (_state.value.connectionState == DesktopChatConnectionState.Demo) {
+                _state.update { it.sendLocalMessage(draft) }
+            } else {
+                onNotConnected()
             }
             return
         }
@@ -940,11 +1008,11 @@ class DesktopChatController(
     fun canonicalSendQueue(): com.letta.mobile.data.chat.send.ChatSendQueueControls? =
         selectedCanonicalCoordinator()?.sendQueue
 
-    private fun launchCanonicalSend(draft: ChatComposerSendDraft) {
+    private fun launchCanonicalSend(draft: ChatComposerSendDraft, onRefused: (String) -> Unit) {
         val conversationId = _state.value.selectedConversationId
         val coordinator = selectedCanonicalCoordinator()
         if (coordinator == null) {
-            showComposerError("This conversation cannot send on the canonical timeline route.")
+            onRefused(CANONICAL_SEND_UNAVAILABLE_MESSAGE)
             return
         }
         titleCandidateForSend(conversationId, draft.text)?.let { title ->
@@ -1364,6 +1432,12 @@ private val ROSTER_REFRESHABLE_STATES = setOf(
     ChatConnectionState.Sending,
     ChatConnectionState.SendFailed,
 )
+
+/** Shown when a send finds no live connection to send on (outside the demo backend). */
+internal const val SEND_NOT_CONNECTED_MESSAGE = "Not connected: the message was not sent."
+
+/** Shown when a conversation cannot send on the canonical timeline route. */
+internal const val CANONICAL_SEND_UNAVAILABLE_MESSAGE = "This conversation cannot send on the canonical timeline route."
 
 /** letta-mobile-lgns8.19: shown when a send is attempted while a stop is pending. */
 internal const val STOPPING_SEND_BLOCKED_MESSAGE =

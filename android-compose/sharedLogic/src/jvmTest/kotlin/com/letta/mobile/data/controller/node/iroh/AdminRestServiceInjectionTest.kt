@@ -53,11 +53,26 @@ class AdminRestServiceInjectionTest {
     private val formerAdminRestMethods: Set<String> =
         RunAdminHandlers.METHODS + ArchiveAdminHandlers.METHODS + IdentityAdminHandlers.METHODS +
             ModelAdminHandlers.FORMER_ADMIN_REST_METHODS + ScheduleAdminHandlers.METHODS +
-            ToolAdminHandlers.METHODS + McpAdminHandlers.METHODS + setOf("agent.context")
+            ToolAdminHandlers.FORMER_ADMIN_REST_METHODS + McpAdminHandlers.METHODS + setOf("agent.context")
 
     @Test
     fun theRetiredAdminRestSurfaceIsStillFullyEnumerated() {
         assertEquals(37, formerAdminRestMethods.size, "expected the 37 former admin_rest methods")
+    }
+
+    /**
+     * bfooy.5 added agent-scoped block create/delete to the tool/block handler
+     * AFTER the retirement. They are outside the former surface and must be
+     * owned natively by the App Server, never by a REST adapter.
+     */
+    @Test
+    fun postRetirementBlockMethodsAreAppServerOwned() {
+        assertEquals(setOf("block.create_agent", "block.delete_agent"), ToolAdminHandlers.POST_RETIREMENT_METHODS)
+        assertTrue(ToolAdminHandlers.POST_RETIREMENT_METHODS.none { it in formerAdminRestMethods })
+        val byMethod = IrohAdminOwnershipMatrix.operations.associateBy { it.requiredString("method") }
+        ToolAdminHandlers.POST_RETIREMENT_METHODS.forEach { method ->
+            assertEquals("app_server_v2", byMethod.getValue(method).requiredString("post_shim_owner"), method)
+        }
     }
 
     @Test

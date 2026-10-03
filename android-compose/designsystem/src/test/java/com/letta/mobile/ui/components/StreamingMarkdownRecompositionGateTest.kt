@@ -11,7 +11,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import com.letta.mobile.ui.theme.LettaTheme
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail

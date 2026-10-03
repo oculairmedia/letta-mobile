@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.chat.projection.ToolTimelineGroup
+import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -26,7 +27,9 @@ internal data class ChatScreenLayoutLocalState(
     val imageViewerState: Pair<ImmutableList<UiImageAttachment>, Int>?,
     val onImageViewerStateChange: (Pair<ImmutableList<UiImageAttachment>, Int>?) -> Unit,
     val bottomPaddingDp: Dp,
+    val composerAboveInputDp: Dp,
     val onComposerHeightChange: (Dp) -> Unit,
+    val onInputCardHeightChange: (Dp) -> Unit,
     val contentCallbacks: ChatContentCallbacks,
     val toolRunDetails: List<ToolTimelineGroup>?,
     val onToolRunDetailsChange: (List<ToolTimelineGroup>?) -> Unit,
@@ -42,7 +45,13 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
     }
     var toolRunDetails by remember { mutableStateOf<List<ToolTimelineGroup>?>(null) }
     var composerHeightDp by remember { mutableStateOf(0.dp) }
+    var inputCardHeightDp by remember { mutableStateOf(0.dp) }
     val bottomPaddingDp = composerHeightDp + params.bottomInsetDp
+    // The visually transparent band inside the composer column above the
+    // input card (goal status, queued sends, mascot companion/thinking row,
+    // tool chips). Zero until the card reports its first measurement, so
+    // consumers fall back to the full composer clearance on frame one.
+    val composerAboveInputDp = composerBandAboveInput(composerHeightDp, inputCardHeightDp)
 
     val openImageViewer: (List<UiImageAttachment>, Int) -> Unit = remember {
         { attachments, index ->
@@ -59,21 +68,8 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         subagentNavigationScope,
     ) {
         { target ->
-            tappedSubagentTarget = target
-            if (target.subagentConversationId == null) {
-                subagentNavigationScope.launch {
-                    val subagent = params.resolvedSubagentSource.resolveSubagent(target.toolCallId).getOrNull()
-                    val agentId = target.subagentAgentId ?: subagent?.subagentAgentId
-                    val conversationId = subagent?.let {
-                        params.resolvedSubagentSource.resolveConversationId(it).getOrNull()
-                    }
-                    if (agentId != null && conversationId != null) {
-                        tappedSubagentTarget = target.copy(
-                            subagentAgentId = agentId,
-                            subagentConversationId = conversationId,
-                        )
-                    }
-                }
+            openSubagentTodoSheet(target, params.resolvedSubagentSource, subagentNavigationScope) {
+                tappedSubagentTarget = it
             }
         }
     }
@@ -87,14 +83,39 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
         imageViewerState = imageViewerState,
         onImageViewerStateChange = { imageViewerState = it },
         bottomPaddingDp = bottomPaddingDp,
+        composerAboveInputDp = composerAboveInputDp,
         onComposerHeightChange = {
             composerHeightDp = it
             params.onComposerMeasured(it)
         },
+        onInputCardHeightChange = { inputCardHeightDp = it },
         contentCallbacks = contentCallbacks,
         toolRunDetails = toolRunDetails,
         onToolRunDetailsChange = { toolRunDetails = it },
     )
+}
+
+/**
+ * Opens [target]'s todo sheet at once, then (when the dispatch has no conversation yet) resolves
+ * the subagent's agent and conversation in [scope] and re-targets the sheet so it can offer
+ * "view conversation". Shared by the legacy layout and the shared chat page.
+ */
+internal fun openSubagentTodoSheet(
+    target: SubagentTodoSheetTarget,
+    source: ActiveSubagentSource,
+    scope: CoroutineScope,
+    onTarget: (SubagentTodoSheetTarget) -> Unit,
+) {
+    onTarget(target)
+    if (target.subagentConversationId != null) return
+    scope.launch {
+        val subagent = source.resolveSubagent(target.toolCallId).getOrNull()
+        val agentId = target.subagentAgentId ?: subagent?.subagentAgentId
+        val conversationId = subagent?.let { source.resolveConversationId(it).getOrNull() }
+        if (agentId != null && conversationId != null) {
+            onTarget(target.copy(subagentAgentId = agentId, subagentConversationId = conversationId))
+        }
+    }
 }
 
 @Composable
@@ -125,3 +146,18 @@ private fun rememberChatContentCallbacks(
         )
     }
 }
+
+/**
+ * Height of the visually transparent band inside the composer column: the
+ * measured column height minus the measured input card height. Returns zero
+ * until the card reports its first measurement, and zero when the column IS
+ * the card (no attachments/controls band above it). Never negative — a
+ * transient frame where the card measures taller than the column falls back
+ * to full-column clearance rather than pulling the FAB below the card.
+ */
+internal fun composerBandAboveInput(composerHeight: Dp, inputCardHeight: Dp): Dp =
+    if (inputCardHeight > 0.dp) {
+        (composerHeight - inputCardHeight).coerceAtLeast(0.dp)
+    } else {
+        0.dp
+    }

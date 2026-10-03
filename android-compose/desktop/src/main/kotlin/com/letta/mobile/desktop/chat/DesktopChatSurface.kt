@@ -121,27 +121,19 @@ internal data class ChatDetailPaneActions(
     val queueControls: () -> com.letta.mobile.data.chat.send.ChatSendQueueControls? = { null },
 )
 
+/**
+ * Drives the ambient glow off the thinking state: a teal breath while the agent works, a brief
+ * "completed" settle afterward, error tint on failure. Shared by [ChatDetailPane] and the shared
+ * chat page host so both pages glow the same.
+ */
 @Composable
-internal fun ChatDetailPane(
-    state: ChatDetailPaneState,
-    actions: ChatDetailPaneActions,
-    modifier: Modifier = Modifier,
-) {
-    val surface = state.surface
-    val approvalHandler = actions.onSubmitApproval?.let { onDecision ->
-        DesktopApprovalDecisionHandler(
-            onDecision = onDecision,
-            submittingRequestIds = state.submittingApprovalRequestIds,
-        )
-    }
-    // Drive the ambient glow off the thinking state: a teal breath while the
-    // agent works, a brief "completed" settle afterward, error tint on failure.
+internal fun rememberDesktopAmbientStatus(isThinking: Boolean, errorMessage: String?): DesktopAmbientStatus {
     var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
     var hadActiveRun by remember { mutableStateOf(false) }
-    LaunchedEffect(state.isThinking, surface.errorMessage) {
+    LaunchedEffect(isThinking, errorMessage) {
         when {
-            surface.errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
-            state.isThinking -> {
+            errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
+            isThinking -> {
                 hadActiveRun = true
                 ambientStatus = DesktopAmbientStatus.Running
             }
@@ -158,6 +150,24 @@ internal fun ChatDetailPane(
             else -> ambientStatus = DesktopAmbientStatus.Idle
         }
     }
+    return ambientStatus
+}
+
+@Composable
+internal fun ChatDetailPane(
+    state: ChatDetailPaneState,
+    actions: ChatDetailPaneActions,
+    modifier: Modifier = Modifier,
+) {
+    val surface = state.surface
+    val approvalHandler = actions.onSubmitApproval?.let { onDecision ->
+        DesktopApprovalDecisionHandler(
+            onDecision = onDecision,
+            submittingRequestIds = state.submittingApprovalRequestIds,
+        )
+    }
+    // Thinking clears at the first reply; the reply stream runs on to the turn's terminal.
+    val ambientStatus = rememberDesktopAmbientStatus(state.isThinking || state.isStreamingReply, surface.errorMessage)
     // No pane edge drawn here. The boundary between this pane and whatever sits
     // to its left (rail, or sidebar when open) is already drawn by RailDivider,
     // and this stroke landed immediately beside it — two 1px lines a pixel
@@ -216,6 +226,17 @@ private fun ChatDetailBody(
             actions = actions.queue,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.xxl),
         )
+        // "Quote" on text selected by touch drops it into this prompt while it is on screen.
+        val quoteSink = com.letta.mobile.ui.text.LocalQuoteSink.current
+        val promptText by androidx.compose.runtime.rememberUpdatedState(surface.composerText)
+        val onPromptChanged by androidx.compose.runtime.rememberUpdatedState(actions.onComposerTextChanged)
+        androidx.compose.runtime.DisposableEffect(quoteSink) {
+            val quoteHere: (String) -> Unit = { quoted ->
+                onPromptChanged(com.letta.mobile.ui.text.quoteIntoPrompt(promptText, quoted))
+            }
+            quoteSink?.target = quoteHere
+            onDispose { if (quoteSink?.target === quoteHere) quoteSink.target = null }
+        }
         ComposerBar(
             companion = companion,
             companionPresent = companionPresent,

@@ -60,11 +60,10 @@ kotlin {
             resources.srcDir(generatedIrohResources)
             dependencies {
                 implementation(project(":sharedLogic"))
-                implementation(libs.compose.web.runtime)
-                implementation(libs.compose.web.foundation)
-                implementation(libs.compose.web.material3)
-                implementation(libs.compose.web.ui)
-                implementation(libs.compose.web.material.icons)
+                // letta-mobile-o4ygk.4.5: the shared Compose UI (the chat page, the canvas, the
+                // theme). Its Compose Multiplatform runtime, foundation, material3, ui and icons
+                // are api, so the web app compiles against exactly the versions it renders with.
+                implementation(project(":sharedUI"))
                 implementation(libs.ktor.client.js)
                 implementation(libs.ktor.client.websockets)
                 implementation(libs.ktor.client.content.negotiation)
@@ -77,6 +76,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                // Browser smoke tests of the shell around the shared chat page.
+                implementation(libs.compose.desktop.ui.test)
             }
         }
     }
@@ -84,4 +85,15 @@ kotlin {
 
 tasks.named("wasmJsProcessResources") {
     dependsOn(generateIrohWasmBindings)
+}
+
+// letta-mobile-o4ygk.4.5: the Compose Gradle plugin (1.10) ships the browser its own Skiko runtime
+// (skiko.mjs + skiko.wasm), older than the Skiko the shared UI links against: :sharedUI resolves
+// Compose UI 1.12 (through :drawbox and coil), whose Skia bindings import functions the old
+// runtime lacks, so the page fails to instantiate. Serve the runtime that matches the classpath.
+// Keep this in step with the org.jetbrains.skiko:skiko version on wasmJsRuntimeClasspath; it goes
+// once the Compose plugin matches the resolved Compose (letta-mobile-o4ygk.4.10).
+val webSkikoRuntimeVersion = "0.150.1"
+configurations.matching { it.name == "COMPOSE_SKIKO_JS_WASM_RUNTIME" }.configureEach {
+    resolutionStrategy.force("org.jetbrains.skiko:skiko-js-wasm-runtime:$webSkikoRuntimeVersion")
 }

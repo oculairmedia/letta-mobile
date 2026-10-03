@@ -7,7 +7,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import com.letta.mobile.data.canvas.CanvasHistory
 
 /**
  * The board's own controls, by where they are on screen.
@@ -27,6 +31,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
  * that appears with a selection, a panel that grows - stays accurate without re-registering.
  */
 class CanvasChromeRegions {
+    /**
+     * Where the board's scene root sits in the window.
+     *
+     * Controls drawn in the board use [androidx.compose.ui.layout.LayoutCoordinates.boundsInRoot],
+     * which is already the space the pen checks. A popup is its own layer: its root bounds are
+     * local to that layer, so they have to be shifted back into the scene by this origin.
+     */
+    var sceneRootInWindow: Offset = Offset.Zero
+
     private val regions = mutableListOf<() -> Rect?>()
 
     /** Registers [bounds]; call the returned function to remove it again. */
@@ -56,8 +69,27 @@ internal fun Modifier.canvasChrome(regions: CanvasChromeRegions?): Modifier {
         val unregister = regions.register { holder.bounds }
         onDispose { unregister() }
     }
-    return onGloballyPositioned { holder.bounds = it.boundsInRoot() }
+    return onGloballyPositioned { coordinates ->
+        val layerRoot = coordinates.findRootCoordinates().positionInWindow()
+        val sceneRoot = regions.sceneRootInWindow
+        val sameScene = (layerRoot - sceneRoot).getDistance() < 1f
+        holder.bounds = if (sameScene) {
+            coordinates.boundsInRoot()
+        } else {
+            val inWindow = coordinates.boundsInWindow()
+            Rect(
+                left = inWindow.left - sceneRoot.x,
+                top = inWindow.top - sceneRoot.y,
+                right = inWindow.right - sceneRoot.x,
+                bottom = inWindow.bottom - sceneRoot.y,
+            )
+        }
+    }
 }
+
+/** The board the control is drawn on, so a popup can register itself as chrome. */
+val LocalCanvasChromeRegions = androidx.compose.runtime.compositionLocalOf<CanvasChromeRegions?> { null }
+
 
 /** Where one control currently is. Plain, so moving a control does not recompose anything. */
 private class ChromeBounds {
@@ -76,6 +108,12 @@ private class ChromeBounds {
 fun interface CanvasDocumentRecorder {
     /** Runs [block] and records whatever it changed as one step called [label]. */
     suspend fun recording(label: String, block: suspend () -> Unit)
+
+    /**
+     * Records [step], a change already made that worked out its own undo (a plugin element's move
+     * or removal, letta-mobile-s416w.3/.4). A recorder with no history ignores it.
+     */
+    fun record(step: CanvasHistory.Step.Documents) = Unit
 }
 
 /** The board's recorder, for editors composed inside it. */
@@ -90,4 +128,10 @@ val LocalCanvasDocumentRecorder = androidx.compose.runtime.compositionLocalOf<Ca
  */
 suspend fun CanvasDocumentRecorder?.recordingOrJust(label: String, block: suspend () -> Unit) {
     if (this == null) block() else recording(label, block)
+}
+
+/** Runs [change] and records the step it returns, when there is a board listening and it changed something. */
+suspend fun CanvasDocumentRecorder?.recordingStep(change: suspend () -> CanvasHistory.Step.Documents?) {
+    val step = change() ?: return
+    this?.record(step)
 }

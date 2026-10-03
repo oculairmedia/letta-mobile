@@ -1,5 +1,11 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.IrohRelayConfig
+import computer.iroh.Connection
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -7,9 +13,41 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class IrohNodeConnectionSupportTest {
+    @Test
+    fun endpointRejectsDuplicateProtocolAlpnsBeforeBinding() {
+        assertFailsWith<IllegalArgumentException> {
+            IrohNodeEndpoint(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+                relayConfig = IrohRelayConfig.Default,
+                authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+                protocolHandlers = listOf(object : IrohNodeProtocolHandler {
+                    override val alpn = IrohNodeEndpoint.DEFAULT_ALPN.copyOf()
+                    override fun authorize(remoteEndpointId: String) = false
+                    override suspend fun accept(connection: Connection, remoteEndpointId: String) = Unit
+                }),
+            )
+        }
+    }
+
+
+    @Test
+    fun endpointRefusesUnregisteredOutboundProtocol() = runBlocking {
+        val endpoint = IrohNodeEndpoint(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
+        val remote = computer.iroh.EndpointAddr(
+            computer.iroh.EndpointId.fromBytes(ByteArray(32)), null, emptyList(),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            endpoint.connect(remote, "/letta/notebook/0".encodeToByteArray())
+        }
+        Unit
+    }
 
     // ---- ProcessScopedClientMessageDedupe (P3-4, 3wq5g) --------------------
 

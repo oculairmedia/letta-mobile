@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.haptics.HapticEffects
@@ -430,11 +431,9 @@ internal fun CollapsibleSectionHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.weight(1f))
-        Icon(
-            imageVector = if (state.expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
+        DisclosureChevron(
+            expanded = state.expanded,
             contentDescription = if (state.expanded) "Collapse" else "Expand",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon),
         )
     }
 }

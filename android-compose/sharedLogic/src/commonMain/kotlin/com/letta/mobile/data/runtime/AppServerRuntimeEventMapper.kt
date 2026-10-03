@@ -63,6 +63,7 @@ open class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.CronDeleteResponse,
             is AppServerInboundFrame.CronDeleteAllResponse,
             is AppServerInboundFrame.WriteMemoryFileResponse,
+            is AppServerInboundFrame.DeleteMemoryFileResponse,
             is AppServerInboundFrame.GetReflectionSettingsResponse,
             is AppServerInboundFrame.SetReflectionSettingsResponse,
             is AppServerInboundFrame.GetCwdMapResponse,

@@ -48,7 +48,7 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MarkdownText
-import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.util.formatRelativeTime
@@ -705,11 +705,7 @@ internal fun ProjectContextCard(
             FilledTonalButton(
                 onClick = { onExpandedChange(!expanded) },
             ) {
-                Icon(
-                    imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                )
+                DisclosureChevron(expanded = expanded)
                 Spacer(modifier = Modifier.width(LettaDimens.Space.sm))
                 Text(
                     text = if (expanded) stringResource(R.string.common_hide) else stringResource(R.string.common_details),

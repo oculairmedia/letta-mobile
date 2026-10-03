@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,6 +9,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Runtime session managing a [CanvasDocument] with multi-writer op-log support.
@@ -25,6 +30,10 @@ class CanvasSession(
     private val mutex = Mutex()
     private val _document = MutableStateFlow<CanvasDocument?>(null)
     val document: StateFlow<CanvasDocument?> = _document.asStateFlow()
+
+    /** Storage faults of the store behind this board; empty for a store that reports none. */
+    val storageFaults: StateFlow<List<CanvasStorageFault>> =
+        (store as? CanvasStorageHealth)?.storageFaults ?: MutableStateFlow(emptyList<CanvasStorageFault>()).asStateFlow()
 
     private val _checkpoints = MutableStateFlow<List<CanvasCheckpoint>>(emptyList())
     val checkpoints: StateFlow<List<CanvasCheckpoint>> = _checkpoints.asStateFlow()
@@ -270,6 +279,10 @@ class CanvasSession(
      * Applies a sequence of operations as a single revision bump.
      */
     suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
+        applyOpsLocked(ops, isRemote)
+    }
+
+    private suspend fun applyOpsLocked(ops: List<CanvasOp>, isRemote: Boolean): CanvasDocument {
         val current = currentDoc()
         val opsToApply = filterAndRecordOps(ops, isRemote, current.acl)
         if (opsToApply.isEmpty()) return current
@@ -279,7 +292,17 @@ class CanvasSession(
         if (!isRemote) {
             broadcastOps(opsToApply)
         }
-        updated
+        return updated
+    }
+
+    /**
+     * An agent's checked ops (canvas_apply_ops on an app's own App Server, letta-mobile-s416w.5),
+     * each rebound to [actorId] and stamped after this session's clock as the Iroh host stamps them
+     * after its log's ([CanvasStampedBatch.separately]), then committed as one revision and published
+     * op by op. An update the agent sends is newer than the board it read, whatever clock it wrote.
+     */
+    suspend fun applyAgentOps(ops: List<CanvasOp>, actorId: String): CanvasDocument = mutex.withLock {
+        applyOpsLocked(CanvasStampedBatch.separately(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") }, isRemote = false)
     }
 
     /**
@@ -300,26 +323,34 @@ class CanvasSession(
         color: String? = null,
         style: CanvasTextStyle? = null,
         title: String? = null,
-    ): CanvasDocument? {
+    ): CanvasDocument? = writeDocument(CanvasDocumentWrite(documentId, documentJson, frame, color, style, title, actorId = actorId))
+
+    /**
+     * Writes a block document (Cascade JSON) as a local op, as [write] says (its frame, owner and
+     * compose provenance among the rest, letta-mobile-bglj6.7); a no-op when nothing would change.
+     */
+    suspend fun writeDocument(write: CanvasDocumentWrite): CanvasDocument? {
         val op = CanvasOp.SetDocumentOp(
             opId = CanvasOpDiffer.generateOpId("doc"),
-            actorId = actorId,
+            actorId = write.actorId,
             lamport = lamportClock + 1,
-            documentId = documentId,
-            documentJson = documentJson,
-            frame = frame,
-            color = color,
-            style = style,
-            title = title,
+            documentId = write.documentId,
+            documentJson = write.documentJson,
+            frame = write.frame,
+            color = write.color,
+            style = write.style,
+            title = write.title,
+            owner = write.owner,
+            compose = write.compose,
         )
-        val existing = documents().firstOrNull { it.id == documentId }
+        val existing = documents().firstOrNull { it.id == write.documentId }
         return if (existing != null && existing.alreadyHas(op)) null else applyLocal(op)
     }
 
     /** Whether writing [op] would leave this document as it is: the same text, and nothing [op] sets differs. */
     private fun CanvasSceneDocument.alreadyHas(op: CanvasOp.SetDocumentOp): Boolean =
         json == op.documentJson && keeps(op.frame, frame) && keeps(op.color, color) && keeps(op.style, style) &&
-            (op.title == null || op.title.ifBlank { null } == title)
+            (op.title == null || op.title.ifBlank { null } == title) && keeps(op.owner, owner) && keeps(op.compose, compose)
 
     /** A field [op] leaves out ([wanted] null) keeps what the document has. */
     private fun <T> keeps(wanted: T?, current: T?): Boolean = wanted == null || wanted == current
@@ -354,14 +385,36 @@ class CanvasSession(
         return setDocument(documentId, existing.json, actorId, color = colorHex)
     }
 
-    /** Moves or resizes a block document on the board; a no-op for a document that is not there. */
+    /**
+     * Moves or resizes a block document without replacing text edited since the drag began. A
+     * person's move: the document becomes [CanvasGeometryOwner.USER]-owned and is never auto-fitted again.
+     */
     suspend fun moveDocument(
         documentId: String,
         frame: CanvasDocumentFrame,
         actorId: String = LOCAL_USER_ACTOR_ID,
-    ): CanvasDocument? {
-        val existing = documents().firstOrNull { it.id == documentId } ?: return null
-        return setDocument(documentId, existing.json, actorId, frame)
+        style: CanvasTextStyle? = null,
+    ): CanvasDocument? = mutex.withLock {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return@withLock null
+        if (isMoveRedundant(existing, frame, style)) return@withLock null
+        applyLocalLocked(
+            CanvasOp.SetDocumentOp(
+                opId = CanvasOpDiffer.generateOpId("doc"),
+                actorId = actorId,
+                lamport = lamportClock + 1,
+                documentId = documentId,
+                documentJson = existing.json,
+                frame = frame,
+                style = style,
+                owner = CanvasGeometryOwner.USER,
+            ),
+        )
+    }
+
+    private fun isMoveRedundant(existing: CanvasSceneDocument, frame: CanvasDocumentFrame, style: CanvasTextStyle?): Boolean {
+        if (existing.frame != frame) return false
+        if (style == null) return true
+        return existing.style == style
     }
 
     /** Connector ends bound to block documents, by connector element id. */
@@ -383,6 +436,43 @@ class CanvasSession(
             last = applyLocalLocked(stamped)
         }
         last
+    }
+
+    /**
+     * An agent's checked batch applied as one op (letta-mobile-bglj6.12, canvas_compose): stamped
+     * after this session's clock ([CanvasStampedBatch]), held to the ACL as [actorId], logged,
+     * committed as a single revision and published to peers as one message, so a peer never holds
+     * half of it.
+     */
+    suspend fun applyAgentBatch(ops: List<CanvasOp>, actorId: String): CanvasDocument = mutex.withLock {
+        applyLocalLocked(CanvasStampedBatch.of(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") })
+    }
+
+    /** Shared notebook history, independent of this person's undo stack. */
+    suspend fun deletedElements(): List<CanvasDeletedElement> =
+        (store as? CanvasDeletedElementStore)?.deletedElements(canvasId).orEmpty()
+
+    /** Restore just one deleted drawing item, using a fresh LWW stamp and a normal synced op. */
+    suspend fun restoreDeletedElement(
+        target: CanvasDeletedElement,
+    ): CanvasDocument? = mutex.withLock {
+        val snapshot = (store as? CanvasDeletedElementStore)?.deletedElements(canvasId)
+            ?.firstOrNull { it.elementId == target.elementId } ?: return@withLock null
+        val stored = store.get(canvasId) ?: return@withLock null
+        // A snapshot can outlive a peer's re-add; never replace an already live same-ID item.
+        val live = Json.parseToJsonElement(stored.sceneJson).jsonObject["elements"]?.jsonArray.orEmpty()
+        if (live.any { it.jsonObject["id"]?.jsonPrimitive?.content == target.elementId }) return@withLock null
+        _document.value = stored
+        adoptLamportOf(stored)
+        applyLocalLocked(
+            CanvasOp.AddElementOp(
+                opId = CanvasOpDiffer.generateOpId("restore"),
+                actorId = LOCAL_USER_ACTOR_ID,
+                lamport = ++lamportClock,
+                elementId = target.elementId,
+                elementJson = snapshot.elementJson,
+            ),
+        )
     }
 
     /** Which shape owns which label document; see [CanvasOp.SetLabelOwnerOp]. */
@@ -451,12 +541,13 @@ class CanvasSession(
     /**
      * Moves several block documents at once, as one batch with one set_document op per document,
      * so a group drag lands as a single revision and peers see the notes move together. Documents
-     * that are not there, or already at their frame, are skipped; nothing to do returns null.
+     * that are not there, or already at their frame, are skipped; nothing to do returns null. Each
+     * moved document becomes [CanvasGeometryOwner.USER]-owned, as with [moveDocument].
      */
     suspend fun moveDocuments(
         frames: Map<String, CanvasDocumentFrame>,
         actorId: String = LOCAL_USER_ACTOR_ID,
-    ): CanvasDocument? {
+    ): CanvasDocument? = mutex.withLock {
         val existing = documents().associateBy { it.id }
         val ops = frames.mapNotNull { (id, frame) ->
             val doc = existing[id] ?: return@mapNotNull null
@@ -468,10 +559,11 @@ class CanvasSession(
                 documentId = id,
                 documentJson = doc.json,
                 frame = frame,
+                owner = CanvasGeometryOwner.USER,
             )
         }
-        if (ops.isEmpty()) return null
-        return applyLocal(
+        if (ops.isEmpty()) return@withLock null
+        applyLocalLocked(
             CanvasOp.BatchOp(
                 opId = CanvasOpDiffer.generateOpId("batch"),
                 actorId = actorId,
@@ -500,6 +592,19 @@ class CanvasSession(
                     documentId = documentId,
                 ),
             )
+        }
+
+    /** The plugin elements on the board as of the current scene; a person moves them with [movePluginElement]. */
+    fun pluginElements(): List<CanvasPluginElement> = CanvasOpProjector.pluginElementsOf(sceneJsonOrEmpty())
+
+    /**
+     * Applies the local op [build] makes of the current scene and the next lamport, testing the
+     * scene and writing under one lock; nothing when [build] makes nothing.
+     */
+    internal suspend fun applyLocalBuilt(build: (sceneJson: String, lamport: Long) -> CanvasOp?): CanvasDocument? =
+        mutex.withLock {
+            val op = build(sceneJsonOrEmpty(), lamportClock + 1) ?: return@withLock null
+            applyLocalLocked(op)
         }
 
     suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
@@ -707,4 +812,20 @@ data class CanvasConversationOptions(
     val opLog: CanvasOpLog = InMemoryCanvasOpLog(),
     val syncTransport: CanvasSyncTransport? = null,
     val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+)
+
+/**
+ * A write of block document [documentId] ([CanvasSession.writeDocument]): its text, and what else
+ * it sets; a field left null keeps what the document has. [actorId] is who writes it.
+ */
+data class CanvasDocumentWrite(
+    val documentId: String,
+    val documentJson: String,
+    val frame: CanvasDocumentFrame? = null,
+    val color: String? = null,
+    val style: CanvasTextStyle? = null,
+    val title: String? = null,
+    val owner: CanvasGeometryOwner? = null,
+    val compose: CanvasComposeProvenance? = null,
+    val actorId: String = CanvasSession.LOCAL_USER_ACTOR_ID,
 )

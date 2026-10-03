@@ -12,7 +12,7 @@ internal object CanvasSceneStateChecks {
 
     fun all(index: CanvasSceneIndex, sceneChars: Int): List<CanvasStateViolation> =
         size(index, sceneChars) + elements(index) + duplicates(index) + elementBindings(index) +
-            documents(index) + labelOwners(index) + arrowBindings(index)
+            documents(index) + labelOwners(index) + arrowBindings(index) + CanvasPluginElementChecks.all(index)
 
     private fun size(index: CanvasSceneIndex, sceneChars: Int): List<CanvasStateViolation> = listOfNotNull(
         violation(CanvasStateInvariant.SCENE_SIZE, CanvasSceneState.SCENE, "is $sceneChars chars, over ${CanvasSceneLimits.MAX_SCENE_CHARS}")

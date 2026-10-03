@@ -74,6 +74,8 @@ class AdminRpcP1HandlersTest {
             "block.list" to params(),
             "block.get" to params("block_id" to "block-1"),
             "block.update_agent" to params("agent_id" to "agent-1", "label" to "persona", "value" to "updated"),
+            "block.create_agent" to params("agent_id" to "agent-1", "label" to "notes", "value" to "new"),
+            "block.delete_agent" to params("agent_id" to "agent-1", "label" to "notes"),
             "agent.context" to params("agent_id" to "agent-1", "conversation_id" to "conversation-1"),
         ).forEach { (method, p) ->
             val response = router.dispatch("test-request", method, p)
