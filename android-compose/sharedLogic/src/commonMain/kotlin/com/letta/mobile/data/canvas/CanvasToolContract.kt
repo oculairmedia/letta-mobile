@@ -35,6 +35,7 @@ data class CanvasToolDefinition(val name: String, val description: String, val i
 object CanvasToolContract {
     const val CREATE = "canvas_create"
     const val GET_SCENE = "canvas_get_scene"
+    const val GET_LAYOUT = "canvas_get_layout"
     const val REPLACE_SCENE = "canvas_replace_scene"
     const val APPLY_OPS = "canvas_apply_ops"
     const val EXPORT_SVG = "canvas_export_svg"
@@ -85,6 +86,22 @@ object CanvasToolContract {
             "conversation you are in. The result's schema_hint summarises the element format; plugin_elements " +
             "lists the plugin elements on it (change them with $APPLY_OPS set_plugin_element).",
         objectSchema(canvasIdParam),
+    )
+
+    val getLayout = CanvasToolDefinition(
+        GET_LAYOUT,
+        "Read a canvas's geometry without its full payloads (with no canvas_id, the conversation's canvas). " +
+            "Each row is {id, kind, frame:[x,y,w,h]}. kind is shape (plus shape, such as RECTANGLE or ARROW), " +
+            "text, path, image, note or plugin (plus pluginKind). label is at most 60 characters. An ARROW's " +
+            "bindings are {from, to}, each a note id, an element id, or null. Rows are ordered by id. limit " +
+            "defaults to 200 and is at most 500; a page also ends at 16 KiB and returns nextCursor for the rest. " +
+            "A cursor from another revision is refused as {\"error\":\"stale_cursor\",\"revision\":<current>}; " +
+            "call again with no cursor.",
+        objectSchema(
+            canvasIdParam,
+            ToolParam("cursor", description = "The nextCursor from the previous page. Omit it to start from the first row."),
+            ToolParam("limit", type = "integer", description = "How many rows to return, from 1 to 500. Defaults to 200."),
+        ),
     )
 
     val replaceScene = CanvasToolDefinition(
@@ -215,7 +232,7 @@ object CanvasToolContract {
      * tool that always fails only costs an agent turns (see ExternalToolRegistry.factoryDefault).
      */
     // Only advertise preview when a mobile renderer bridge is actually connected.
-    val all: List<CanvasToolDefinition> = listOf(create, getScene, replaceScene, applyOps, list) + composeTools
+    val all: List<CanvasToolDefinition> = listOf(create, getScene, getLayout, replaceScene, applyOps, list) + composeTools
     val withPreview: List<CanvasToolDefinition> = all + renderPreview
 
     /** An object of [params]; the [ToolParam.required] ones are listed as required. */
