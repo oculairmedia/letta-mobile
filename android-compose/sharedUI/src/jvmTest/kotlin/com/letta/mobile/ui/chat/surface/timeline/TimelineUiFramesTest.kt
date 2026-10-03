@@ -56,7 +56,8 @@ class TimelineUiFramesTest {
 
     @Test
     fun settleDoesNotFlashTheSpinner() = replyTurn { frames ->
-        val flashes = spinnerFlashes(frames)
+        // Opening the history is allowed its loading state; everything after is not.
+        val flashes = spinnerFlashes(frames.filter { it.step != "open" })
         assertTrue(flashes.isEmpty(), "spinner over rows:\n" + flashes.joinToString("\n"))
     }
 
@@ -97,6 +98,7 @@ class TimelineUiFramesTest {
                 runBlocking { rig.settle(listOf(usage, stop, reply(tokens.last()), prompt) + history) }
                 recorder.advance("settle", SETTLE_FRAMES)
                 recorder.writeFrameImage("reply-last")
+                recorder.writeFrameLog("reply-frames")
                 assertTrue(rig.drained, "the overlay never handed over to the settled ledger")
                 assertTrue(recorder.frames.first { it.step == "open" && it.rows.isNotEmpty() }.rows.size > 3, "history never drew")
                 assertFrames(recorder.frames)
@@ -110,12 +112,14 @@ class TimelineUiFramesTest {
         const val PROMPT_OTID = "cm-android-5d1e"
         const val MAX_HEIGHT_JUMP_DP = 2f
         const val MAX_ROW_COMPOSITIONS_PER_FRAME = 2
-        const val OPEN_FRAMES = 20
+        /** Few enough that the oldest edge, and so the older-history footer, is on screen. */
+        const val HISTORY_EXCHANGES = 3
+        const val OPEN_FRAMES = 30
         const val TOKEN_FRAMES = 2
         const val SETTLE_FRAMES = 20
         val scope = TimelineScope("backend", "conv-frames", "agent")
 
-        val history: List<LettaMessage> = (0 until 12).flatMap { i ->
+        val history: List<LettaMessage> = (0 until HISTORY_EXCHANGES).flatMap { i ->
             listOf(
                 AssistantMessage(id = "old-reply-$i", contentRaw = JsonPrimitive("Earlier answer $i."), date = "2026-09-25T03:%02d:01.000Z".format(i)),
                 UserMessage(id = "old-prompt-$i", contentRaw = JsonPrimitive("Earlier question $i"), date = "2026-09-25T03:%02d:00.000Z".format(i), otid = "cm-old-$i"),

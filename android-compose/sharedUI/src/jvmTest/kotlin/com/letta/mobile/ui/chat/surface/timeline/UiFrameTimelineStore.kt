@@ -16,10 +16,11 @@ import com.letta.mobile.data.timeline.TimelineStoredRecord
 import com.letta.mobile.data.timeline.TimelineToolIndexEntry
 
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import kotlinx.coroutines.delay
 
 /**
  * letta-mobile-29sxj: a copy of sharedLogic's test-only InMemoryTimelineStore (internal to that
- * module's tests, so unreachable from here), kept identical in behaviour.
+ * module's tests, so unreachable from here), kept identical in behaviour except for [readLatencyMillis].
  *
  * The in-memory ledger the store-backed timeline tests run against.
  *
@@ -33,6 +34,8 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
  */
 internal class UiFrameTimelineStore(
     initial: TimelineDurableCheckpoint = TimelineDurableCheckpoint(0, TimelineContinuation.Initial, true),
+    /** Real time every read takes, as a device database does; keeps Paging's refresh Loading up across frames. */
+    private val readLatencyMillis: Long = 0,
 ) : TimelineBoundedStore {
     var current: TimelineDurableCheckpoint = initial
     var bodyReads = 0
@@ -48,6 +51,7 @@ internal class UiFrameTimelineStore(
     }
 
     override suspend fun <T> read(scope: TimelineScope, block: suspend TimelineStoreReader.() -> T): T {
+        if (readLatencyMillis > 0) delay(readLatencyMillis)
         reads++
         return block(Tx(tools[scope]?.snapshot() ?: UiFrameToolIndexState()))
     }

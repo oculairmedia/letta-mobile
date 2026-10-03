@@ -118,6 +118,12 @@ internal class TimelineUiFrameRecorder(
         ImageIO.write(test.onRoot().captureToImage().toAwtImage(), "png", dir.resolve("$label.png"))
     }
 
+    /** Writes every recorded frame, one line each, to build/chat-surface-frames/<label>.txt. */
+    fun writeFrameLog(label: String) {
+        val dir = File("build/chat-surface-frames").apply { mkdirs() }
+        dir.resolve("$label.txt").writeText(recorded.joinToString(System.lineSeparator()))
+    }
+
     override fun close() {
         scrollProbe?.close()
         compositions.close()

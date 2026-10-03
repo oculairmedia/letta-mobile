@@ -103,9 +103,11 @@ internal class TimelineDomainRig private constructor(
     }
 
     companion object {
+        private const val READ_LATENCY_MILLIS = 25L
+
         suspend fun open(scope: TimelineScope): TimelineDomainRig {
             val transport = MutableDurableTransport()
-            val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(), transport)
+            val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(readLatencyMillis = READ_LATENCY_MILLIS), transport)
             val owner = coordinator.acquire(scope)
             val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
