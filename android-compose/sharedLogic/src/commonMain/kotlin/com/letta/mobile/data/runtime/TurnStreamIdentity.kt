@@ -68,16 +68,36 @@ internal class TurnStreamIdentity(
         return frame.restamped(FrameIdentity(logicalId, turnId), text)
     }
 
-    private fun stampRow(frame: DeltaFrame): String {
-        val type = frame.type.orEmpty()
-        boundaries.noteNonTextFrame(type)
-        return frame.restamped(rowIdentity(type, frame.delta), text = null)
+    private fun stampRow(frame: DeltaFrame): String =
+        frame.restamped(noteRowFrame(frame).let(::rowIdentity), text = null)
+
+    private fun noteRowFrame(frame: DeltaFrame): DeltaFrame {
+        boundaries.noteNonTextFrame()
+        return frame
     }
 
-    private fun rowIdentity(type: String, delta: JsonObject): FrameIdentity = when (type) {
-        "user_message" -> (delta.stampString("otid") ?: turnId).let { FrameIdentity(LogicalMessageId(it), it) }
-        "tool_call_message" -> FrameIdentity(toolCallRowId(delta), turnId)
-        "tool_return_message" -> FrameIdentity(toolReturnRowId(delta), turnId)
+    /**
+     * Stamps a delta the host synthesized itself (tool projection, user echo, dangling-call
+     * settlement) so it carries the same ids a stream frame would: `tc-` / `tr-<tool_call_id>`,
+     * the client message id for a user echo. Deltas that are already stamped, text, or not rows
+     * pass through unchanged.
+     */
+    fun stampDelta(delta: JsonObject): JsonObject {
+        val frame = DeltaFrame(JsonObject(emptyMap()), delta)
+        val stampable = frame.type != null && frame.type !in TEXT_TYPES && frame.type !in UNSTAMPED_TYPES
+        if (!stampable || delta.containsKey("logical_message_id")) return delta
+        return frame.stampedDelta(rowIdentity(noteRowFrame(frame)), text = null)
+    }
+
+    /** A projected tool call or return the processor never sees as a stream frame still ends a text run. */
+    fun noteNonStreamRow() {
+        boundaries.noteNonTextFrame()
+    }
+
+    private fun rowIdentity(frame: DeltaFrame): FrameIdentity = when (frame.type) {
+        "user_message" -> (frame.delta.stampString("otid") ?: turnId).let { FrameIdentity(LogicalMessageId(it), it) }
+        "tool_call_message" -> FrameIdentity(toolCallRowId(frame.delta), turnId)
+        "tool_return_message" -> FrameIdentity(toolReturnRowId(frame.delta), turnId)
         else -> FrameIdentity(mint(), turnId)
     }
 
@@ -113,6 +133,8 @@ internal fun TurnStreamIdentity.stampPayload(payload: RuntimeEventPayload): Runt
             stamp(payload.body, StreamTextFrameSource.AppServerDelta)?.let { payload.copy(body = it) }
         is RuntimeEventPayload.ExternalTransportFrame ->
             stamp(payload.body, StreamTextFrameSource.CumulativeSnapshot)?.let { payload.copy(body = it) }
+        is RuntimeEventPayload.ToolCallObserved -> payload.also { noteNonStreamRow() }
+        is RuntimeEventPayload.ToolReturnObserved -> payload.also { noteNonStreamRow() }
         else -> payload
     }
 
@@ -165,8 +187,9 @@ private class TextMessageBoundaries(private val mintId: () -> LogicalMessageId) 
         return LogicalMessageId(rowId)
     }
 
-    fun noteNonTextFrame(type: String) {
-        lastStampedType = type
+    /** A non-text row (tool call, tool return, user echo...) ends the current text run of every type. */
+    fun noteNonTextFrame() {
+        lastStampedType = null
     }
 
     private fun segmentedId(type: String): LogicalMessageId {
@@ -208,7 +231,15 @@ private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject) {
         textFrom(delta[textField]) ?: textFrom(delta["content"]) ?: textFrom(delta["text"])
 
     fun restamped(identity: FrameIdentity, text: StampedText?): String {
-        val rewritten = buildJsonObject {
+        val rewritten = stampedDelta(identity, text)
+        return buildJsonObject {
+            envelope.forEach { (key, value) -> if (key != "delta") put(key, value) }
+            put("delta", rewritten)
+        }.toString()
+    }
+
+    fun stampedDelta(identity: FrameIdentity, text: StampedText?): JsonObject =
+        buildJsonObject {
             delta.forEach { (key, value) -> if (key !in rewrittenKeys(text)) put(key, value) }
             text?.let {
                 put(textField, it.text)
@@ -217,11 +248,6 @@ private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject) {
             put("logical_message_id", identity.logicalId.value)
             put("turn_id", identity.turnId)
         }
-        return buildJsonObject {
-            envelope.forEach { (key, value) -> if (key != "delta") put(key, value) }
-            put("delta", rewritten)
-        }.toString()
-    }
 
     private fun rewrittenKeys(text: StampedText?): Set<String> =
         setOf("logical_message_id", "turn_id", "text_seq") + listOfNotNull(textField.takeIf { text != null })

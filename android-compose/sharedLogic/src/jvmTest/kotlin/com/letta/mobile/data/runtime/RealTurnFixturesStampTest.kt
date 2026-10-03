@@ -3,6 +3,7 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -12,6 +13,7 @@ import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-jdcoj: replays the REAL turns captured for letta-mobile-bglj6.1.15 (4 models x 2
@@ -67,6 +69,35 @@ class RealTurnFixturesStampTest {
         }
     }
 
+    @Test
+    fun everyToolAndUserFrameInTheRealTurnsIsStampedAndDuplicatesShareIds() {
+        ALL_MODELS.forEach { model ->
+            listOf(1, 2).forEach { turn ->
+                val deltas = wireFrames(model, turn).map { it.getValue("delta").jsonObject }
+                    .filter { it.str("message_type") in ROW_TYPES }
+                assertTrue(deltas.isNotEmpty(), "$model turn$turn")
+                // The stream-frame path and the host's synthesized-delta path agree.
+                val viaStream = TurnStreamIdentity("cm-turn") { "lm-x" }
+                    .let { id -> deltas.map { deltaOfBody(id.stamp(wrap(it), StreamTextFrameSource.AppServerDelta)!!) } }
+                val viaSynth = TurnStreamIdentity("cm-turn") { "lm-x" }.let { id -> deltas.map { id.stampDelta(it) } }
+                listOf(viaStream, viaSynth).forEach { stamped ->
+                    stamped.forEach { assertTrue(it.str("logical_message_id").isNotEmpty() && it.str("turn_id").isNotEmpty(), "$model turn$turn") }
+                    val byCall = stamped.filter { it.str("message_type") != "user_message" }.groupBy { it.str("message_type") + ":" + callIdOf(it) }
+                    byCall.forEach { (callId, frames) ->
+                        assertEquals(1, frames.map { it.str("logical_message_id") }.toSet().size, "$model $callId")
+                    }
+                }
+                assertEquals(viaStream.map { it.str("logical_message_id") }, viaSynth.map { it.str("logical_message_id") })
+            }
+        }
+    }
+
+    private fun wrap(delta: JsonObject): String =
+        JsonObject(mapOf("type" to JsonPrimitive("stream_delta"), "delta" to delta)).toString()
+
+    private fun callIdOf(delta: JsonObject): String =
+        delta["tool_call"]?.jsonObject?.str("tool_call_id") ?: delta.str("tool_call_id")
+
     private fun forEachTurn(block: (String, List<JsonObject>, Map<String, String>) -> Unit) {
         MODELS.forEach { model ->
             listOf(1, 2).forEach { turn ->
@@ -100,6 +131,13 @@ class RealTurnFixturesStampTest {
     private fun JsonArray?.orEmpty(): List<kotlinx.serialization.json.JsonElement> = this?.toList() ?: emptyList()
 
     private companion object {
+        val ROW_TYPES = setOf("tool_call_message", "tool_return_message", "user_message")
+        val ALL_MODELS = listOf(
+            "minimax-m3", "qwen3.8-max", "claude-sonnet-5-5", "kat-coder-pro-v2.5",
+            "minimax-m3-fallback-from-kat-coder", "minimax-m3-fallback-from-qwen3.8-max",
+            "openrouter-deepseek-v4.1-flash", "openrouter-gemini-3.8-flash", "openrouter-glm-5.3-flash",
+            "openrouter-gpt-6.1-sol", "openrouter-grok-4.7", "openrouter-qwen3.8-flash",
+        )
         val MODELS = listOf("minimax-m3", "qwen3.8-max", "claude-sonnet-5-5", "kat-coder-pro-v2.5")
     }
 }
