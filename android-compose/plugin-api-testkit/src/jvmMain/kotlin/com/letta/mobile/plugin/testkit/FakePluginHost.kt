@@ -14,9 +14,7 @@ import com.letta.mobile.plugin.api.PluginHostException
 import com.letta.mobile.plugin.api.PluginHttpClient
 import com.letta.mobile.plugin.api.PluginHttpResponse
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.serialization.json.JsonObject
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
@@ -43,10 +41,12 @@ public data class PluginHttpRequest(
  * call refused, as the host would); [PluginConformance] reports them.
  *
  * Usable on its own in a plugin's unit tests: it starts active, and [httpHandler] answers the
- * plugin's allowed requests (an empty 200 by default).
+ * plugin's allowed requests (an empty 200 by default). [scope] is the caller's, the lifecycle owner
+ * of the plugin's background work (a test's `backgroundScope`, say): [close] cancels its children.
  */
 public class FakePluginHost(
     public val manifest: ConformanceManifest,
+    override val scope: CoroutineScope,
     override val settings: JsonObject = manifest.defaultSettings(),
     private val secrets: Map<String, String> = emptyMap(),
     override val hostInfo: HostInfo = HostInfo(name = "letta-conformance-kit", version = PluginApi.VERSION),
@@ -54,7 +54,6 @@ public class FakePluginHost(
 ) : PluginHost {
     override val pluginId: String get() = manifest.id
     override val contractVersion: Int = PluginApi.CONTRACT_VERSION
-    override val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(SCOPE_THREADS))
 
     private val recordedEmits = CopyOnWriteArrayList<PluginEmit>()
     private val recordedLogs = CopyOnWriteArrayList<LogLine>()
@@ -154,10 +153,10 @@ public class FakePluginHost(
         recordedLogs += LogLine(level, message, fields)
     }
 
-    /** Ends the plugin's lifetime here: its scope is cancelled and any later use is a violation. */
+    /** Ends the plugin's lifetime here: its background work is cancelled and any later use is a violation. */
     public fun close() {
         phase = HostPhase.DEACTIVATED
-        scope.cancel()
+        scope.coroutineContext.cancelChildren()
     }
 
     private fun requireCapability(capability: ConformanceCapability, call: HostCall) {
@@ -189,7 +188,6 @@ public class FakePluginHost(
 
     internal companion object {
         const val CANVAS_ID: String = "conformance-canvas"
-        private const val SCOPE_THREADS = 4
     }
 }
 

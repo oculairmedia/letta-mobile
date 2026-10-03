@@ -4,6 +4,7 @@ import com.letta.mobile.plugin.api.CanvasPlugin
 import com.letta.mobile.plugin.api.LcpMethod
 import com.letta.mobile.plugin.api.PluginHttpResponse
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -59,5 +60,8 @@ public object PluginConformance {
         plugin: CanvasPlugin,
         manifest: ConformanceManifest,
         options: ConformanceOptions = ConformanceOptions(),
-    ): ConformanceReport = runBlocking { ConformanceRun(plugin, manifest, options).execute() }
+    ): ConformanceReport = runBlocking {
+        // The run owns the plugin's scope: its children are the plugin's background work, cancelled at deactivate.
+        supervisorScope { ConformanceRun(plugin, manifest, options, scope = this).execute() }
+    }
 }

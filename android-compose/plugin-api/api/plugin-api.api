@@ -547,11 +547,9 @@ public static final com.letta.mobile.plugin.api.SnapshotSource$Asset$Companion :
     public final kotlinx.serialization.KSerializer<com.letta.mobile.plugin.api.SnapshotSource$Asset> com.letta.mobile.plugin.api.SnapshotSource$Asset$Companion.serializer()
 
 public static final com.letta.mobile.plugin.api.SnapshotSource$Bytes : java.lang.Object, com.letta.mobile.plugin.api.SnapshotSource
-    public boolean com.letta.mobile.plugin.api.SnapshotSource$Bytes.equals(java.lang.Object)
     public com.letta.mobile.plugin.api.SnapshotSource$Bytes(java.lang.String,byte[])
     public final byte[] com.letta.mobile.plugin.api.SnapshotSource$Bytes.getBytes()
     public final java.lang.String com.letta.mobile.plugin.api.SnapshotSource$Bytes.getMediaType()
-    public int com.letta.mobile.plugin.api.SnapshotSource$Bytes.hashCode()
     public java.lang.String com.letta.mobile.plugin.api.SnapshotSource$Bytes.toString()
     public static final com.letta.mobile.plugin.api.SnapshotSource$Bytes$Companion com.letta.mobile.plugin.api.SnapshotSource$Bytes.Companion
 
