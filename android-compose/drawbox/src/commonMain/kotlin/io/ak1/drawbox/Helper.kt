@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.TextAlignment
 import io.ak1.drawbox.text.FontRegistry
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
