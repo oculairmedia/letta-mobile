@@ -100,6 +100,10 @@ import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBoundsForElement
 import io.ak1.drawbox.domain.model.rotateAround
 import io.ak1.drawbox.domain.model.topmostHit
+import io.ak1.drawbox.domain.model.textTopLeft
+import io.ak1.drawbox.domain.model.textBox
+import io.ak1.drawbox.domain.model.resolvedTextColor
+import io.ak1.drawbox.domain.model.canHoldText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -1688,6 +1692,35 @@ private fun DrawScope.renderElementContent(
 }
 
 /**
+ * A shape's text, wrapped to [textBox] and centred in it. Laid out through the same
+ * [TextLayoutCache] as text elements, under the shape's id plus [SHAPE_TEXT_KEY]. Skipped on
+ * the read-only preview path, which has no measurer.
+ */
+private fun DrawScope.drawShapeText(
+    shape: Element.Shape,
+    textCache: TextLayoutCache?,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer?,
+) {
+    if (shape.text.isEmpty() || !shape.canHoldText) return
+    if (textCache == null || textMeasurer == null) return
+    val box = shape.textBox()
+    val layout = textCache.layoutFor(
+        id = shape.id + SHAPE_TEXT_KEY,
+        text = shape.text,
+        fontFamilyKey = shape.fontFamilyKey,
+        fontSize = shape.fontSize,
+        alignment = shape.textAlignment,
+        wrapWidth = box.width.coerceAtLeast(1f),
+        measurer = textMeasurer,
+    )
+    drawText(
+        textLayoutResult = layout,
+        color = shape.resolvedTextColor,
+        topLeft = shape.textTopLeft(layout.size.height.toFloat()),
+    )
+}
+
+/**
  * Render an [Element.Text] inside its wrap box. Layout is delegated to
  * [TextLayoutCache] so re-rendering an unchanged block is allocation-free.
  *
@@ -2005,6 +2038,8 @@ private fun StrokeStyle.offLength(width: Float): Float = when (this) {
 
 private fun lerp(a: Offset, b: Offset, t: Float): Offset =
     Offset(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+
+private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
 /**
  * Render a variable-width pen-pressure stroke that also respects [style].
