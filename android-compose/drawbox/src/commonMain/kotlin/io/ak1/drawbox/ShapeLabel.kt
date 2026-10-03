@@ -84,7 +84,8 @@ private fun DrawScope.drawConnectorLabel(
     drawText(textLayoutResult = layout, color = shape.resolvedTextColor, topLeft = topLeft)
 }
 
-/** The chip is the board behind the arrow, so a dark board does not get a white sticker. */
+/** Whether a shape's text is hidden, and the board colour a connector's chip is painted with. */
+internal data class ShapeTextPaint(val hidden: Boolean, val chip: Color)
 internal fun connectorChip(board: Color): Color = board
 
 /** Wide enough for the glyphs, tight enough that the chip stays off the cards it joins. */

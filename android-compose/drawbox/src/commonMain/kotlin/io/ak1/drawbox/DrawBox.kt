@@ -940,7 +940,7 @@ fun DrawBox(
                     }) {
                         orderedElements.forEach { el ->
                             if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds, state.bgColor)
+                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, ShapeTextPaint(el.id in hiddenTextElementIds, state.bgColor))
                             }
                         }
                     }
@@ -962,7 +962,7 @@ fun DrawBox(
             }) {
                 if (activeIds.isNotEmpty()) {
                     orderedElements.forEach { el ->
-                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, el.id in hiddenTextElementIds, state.bgColor)
+                        if (el.id in activeIds && el.id !in hiddenElementIds) renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, ShapeTextPaint(el.id in hiddenTextElementIds, state.bgColor))
                     }
                 }
                 drawSelectionChrome(
@@ -1006,7 +1006,7 @@ fun DrawBox(
                         translate(vp.offset.x, vp.offset.y)
                         scale(vp.scale, vp.scale, pivot = Offset.Zero)
                     }) {
-                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale, chip = state.bgColor) }
+                        orderedElements.forEach { renderElement(it, pathCache, imageCache, textCache, textMeasurer, vp.scale, ShapeTextPaint(hidden = false, chip = state.bgColor)) }
                     }
                 }
                 capturePending = false
@@ -1074,7 +1074,7 @@ fun DrawingPreview(
                         textCache = textCache,
                         textMeasurer = textMeasurer,
                         viewportScale = viewport.scale,
-                        chip = bgColor,
+                        shapeText = ShapeTextPaint(hidden = false, chip = bgColor),
                     )
                 }
         }
@@ -1613,14 +1613,13 @@ private fun DrawScope.renderElement(
     textCache: TextLayoutCache? = null,
     textMeasurer: androidx.compose.ui.text.TextMeasurer? = null,
     viewportScale: Float = 1f,
-    hideShapeText: Boolean = false,
-    chip: Color,
+    shapeText: ShapeTextPaint,
 ) {
     if (element.rotation == 0f) {
-        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText, chip)
+        renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, shapeText)
     } else {
         withTransform({ rotate(element.rotation, pivot = element.bounds().center) }) {
-            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, hideShapeText, chip)
+            renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, shapeText)
         }
     }
 }
@@ -1632,8 +1631,7 @@ private fun DrawScope.renderElementContent(
     textCache: TextLayoutCache?,
     textMeasurer: androidx.compose.ui.text.TextMeasurer?,
     viewportScale: Float,
-    hideShapeText: Boolean = false,
-    chip: Color,
+    shapeText: ShapeTextPaint,
 ) {
     when (element) {
         is Element.Path -> {
@@ -1679,7 +1677,7 @@ private fun DrawScope.renderElementContent(
         }
         is Element.Shape -> {
             drawShape(element)
-            if (!hideShapeText) drawShapeText(element, textCache, textMeasurer, chip)
+            if (!shapeText.hidden) drawShapeText(element, textCache, textMeasurer, shapeText.chip)
         }
         is Element.Image -> {
             drawImageElement(element, imageCache, viewportScale)
