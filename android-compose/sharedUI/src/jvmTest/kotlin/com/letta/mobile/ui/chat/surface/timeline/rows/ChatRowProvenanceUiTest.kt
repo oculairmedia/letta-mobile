@@ -73,11 +73,7 @@ class ChatRowProvenanceUiTest {
         val bubble = onNodeWithTag(ChatRowTestTags.USER_PROMPT, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val label = onNodeWithTag(ChatRowTestTags.PROMPT_PROVENANCE, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val body = onNodeWithText("Inter-agent status line.", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue(
-            label.left >= bubble.left && label.right <= bubble.right &&
-                label.top >= bubble.top && label.bottom <= bubble.bottom,
-            "the indicator $label sits inside the bubble $bubble",
-        )
+        assertTrue(bubble.intersect(label) == label, "the indicator $label sits inside the bubble $bubble")
         assertTrue(label.bottom <= body.top, "the indicator $label heads the body $body")
         onNodeWithContentDescription("Expand agent message details", useUnmergedTree = true).assertExists()
     }

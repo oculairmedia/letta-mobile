@@ -84,7 +84,10 @@ internal object ChatTimelineTags {
  * runs the content out under a sticky pinned prompt (TimelineListFrame).
  */
 @Immutable
-internal data class TimelineFadeAlphas(val top: Float, val bottom: Float, val pinned: Float = 0f)
+internal data class TimelineFadeAlphas(val top: Float, val bottom: Float, val pinned: Float = 0f) {
+    /** Some band draws: the mask is skipped altogether when none does. */
+    val anyShown: Boolean get() = maxOf(top, bottom, pinned) > 0f
+}
 
 /**
  * Edge fades for a REVERSED list: "can scroll forward" is toward older rows (the top) and "can
@@ -134,7 +137,7 @@ internal fun Modifier.timelineFadingEdges(
     bottomLength: Dp = ChatTimelineDimens.bottomFadeLength,
     pinnedEdgePx: () -> Float = { 0f },
 ): Modifier {
-    if (alphas.top <= 0f && alphas.bottom <= 0f && alphas.pinned <= 0f) return this
+    if (!alphas.anyShown) return this
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
@@ -147,8 +150,9 @@ internal fun Modifier.timelineFadingEdges(
 
 /** Clears the content down to [edgePx] at [alpha]'s strength, then grades it back in over [lengthPx]. */
 private fun DrawScope.drawPinnedBand(edgePx: Float, lengthPx: Float, alpha: Float) {
+    if (alpha <= 0f || edgePx <= 0f) return
     val end = (edgePx + lengthPx).coerceAtMost(size.height)
-    if (alpha <= 0f || edgePx <= 0f || end <= 0f) return
+    if (end <= 0f) return
     val faded = Color.Black.copy(alpha = 1f - alpha)
     val solidUntil = (edgePx / end).coerceIn(0f, 1f)
     drawRect(
