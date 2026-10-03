@@ -1,7 +1,21 @@
 package com.letta.mobile.desktop.canvas
 
+import com.letta.mobile.data.canvas.CanvasAcl
+import com.letta.mobile.data.canvas.CanvasCreateOptions
+import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocument
+import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasGeometryOwner
 import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.canvas.CanvasOpProjector
+import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.FileCanvasOpLog
+import com.letta.mobile.data.canvas.movePluginElement
+import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
+import com.letta.mobile.data.canvas.removePluginElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.async
@@ -154,5 +168,58 @@ class DesktopCanvasDocumentStoreTest {
         val stale = v1.copy(revision = 2L, sceneJson = """{"stale":true}""", updatedAtEpochMs = 3000L)
         assertFalse(store.upsertIfRevision(stale, expectedRevision = 1L))
         assertEquals(v2, DesktopCanvasDocumentStore(rootDirectory = tempDir).get(docId))
+    }
+
+    /**
+     * letta-mobile-s416w.3: plugin elements on the desktop, store and op log both. After a restart
+     * the board holds the same elements, the log replays to them, and a person's move still lands.
+     */
+    @Test
+    fun pluginElementsSurviveARestartOfTheDesktopStoreAndOpLog() = runTest {
+        val canvasId = CanvasId("canvas-plugin-desktop")
+        val agent = "agent:desk"
+        val frame = CanvasDocumentFrame(100f, 100f, 320f, 240f)
+        val moved = CanvasDocumentFrame(500f, 40f, 320f, 240f)
+        fun place(id: String) = CanvasOp.SetPluginElementOp(
+            opId = "place-$id", actorId = agent, lamport = 0L, elementId = id,
+            elementType = "ext:letta.example/widget", frame = frame, ref = "w:$id",
+            props = JsonObject(mapOf("status" to JsonPrimitive("queued"))),
+            fallback = CanvasPluginFallback("Widget $id", openUrl = "https://example.test/$id"),
+        )
+        val stateUpdate = CanvasOp.SetPluginElementOp(
+            opId = "progress-1", actorId = agent, lamport = 0L, elementId = "pe-a",
+            props = JsonObject(mapOf("status" to JsonPrimitive("done"))),
+        )
+        val session = CanvasSession.create(
+            DesktopCanvasDocumentStore(rootDirectory = tempDir),
+            CanvasCreateOptions(
+                canvasId = canvasId,
+                acl = CanvasAcl(CanvasSession.LOCAL_USER_ACTOR_ID, writerAgentIds = setOf(agent)),
+                opLog = FileCanvasOpLog(rootDirectory = tempDir.resolve("ops")),
+            ),
+        )
+        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), agent)
+        assertNotNull(session.movePluginElement("pe-a", moved))
+        session.applyAgentBatch(listOf(stateUpdate), agent)
+        assertNotNull(session.removePluginElement("pe-b"))
+        val before = session.pluginElements()
+
+        val reopened = assertNotNull(
+            CanvasSession.open(
+                DesktopCanvasDocumentStore(rootDirectory = tempDir),
+                canvasId,
+                CanvasConversationOptions(opLog = FileCanvasOpLog(rootDirectory = tempDir.resolve("ops"))),
+            ),
+        )
+        assertEquals(before, reopened.pluginElements())
+        val element = reopened.pluginElements().single()
+        assertEquals(moved, element.frame)
+        assertEquals(CanvasGeometryOwner.USER, element.owner)
+        assertEquals(JsonPrimitive("done"), element.props["status"])
+        val replayed = CanvasOpProjector.project(CanvasOpProjector.emptySceneJson(), reopened.opLog.getOps(canvasId, 0L))
+        assertEquals(before, CanvasOpProjector.pluginElementsOf(replayed))
+
+        assertNotNull(reopened.movePluginElement("pe-a", frame))
+        assertEquals(frame, DesktopCanvasDocumentStore(rootDirectory = tempDir).get(canvasId)?.let { CanvasOpProjector.pluginElementsOf(it.sceneJson).single().frame })
     }
 }
