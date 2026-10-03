@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.schema.SchemaProblem
+import com.letta.mobile.plugin.api.PluginApi
 import kotlinx.serialization.json.JsonPrimitive
 
 /** What a [PluginManifestRules] problem is: the rules a schema cannot say (plan section 3.1). */
@@ -60,8 +61,8 @@ internal fun <T> duplicates(values: List<T>, at: ManifestPointer): List<SchemaPr
  * element kinds and pages are [PluginContentRules]. Each problem is at its JSON pointer.
  */
 object PluginManifestRules {
-    /** The `contract.version`s this host speaks; a package outside them is refused at install. */
-    val SUPPORTED_CONTRACT_VERSIONS: Set<Int> = setOf(1)
+    /** The `contract.version`s this host speaks (the `:plugin-api` major it ships); a package outside them is refused at install. */
+    val SUPPORTED_CONTRACT_VERSIONS: Set<Int> = setOf(PluginApi.CONTRACT_VERSION)
 
     /** Agent tool names: what the App Server and the models accept. */
     const val MAX_TOOL_NAME_LENGTH: Int = 64
