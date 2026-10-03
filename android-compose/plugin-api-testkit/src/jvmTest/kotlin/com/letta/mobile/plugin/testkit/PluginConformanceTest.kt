@@ -21,9 +21,6 @@ class PluginConformanceTest {
         assertEquals(setOf(rule), report.brokenRules, report.toString())
     }
 
-    private fun manifestWithout(capability: String): ConformanceManifest =
-        SamplePlugin.manifest.copy(capabilities = SamplePlugin.manifest.capabilities - capability)
-
     @Test
     fun `the sample plugin keeps the contract`() {
         val report = PluginConformance.run(SamplePlugin(), SamplePlugin.manifest)
@@ -86,11 +83,11 @@ class PluginConformanceTest {
 
     @Test
     fun `capabilities - reading elements needs canvas read`() =
-        assertBreaks(ConformanceRule.CAPABILITY, ReadsElements(), manifestWithout(ConformanceManifest.CANVAS_READ))
+        assertBreaks(ConformanceRule.CAPABILITY, ReadsElements(), SamplePlugin.manifest.without(ConformanceCapability.CANVAS_READ))
 
     @Test
     fun `capabilities - emitting needs canvas place`() =
-        assertBreaks(ConformanceRule.CAPABILITY, SamplePlugin(), manifestWithout(ConformanceManifest.CANVAS_PLACE))
+        assertBreaks(ConformanceRule.CAPABILITY, SamplePlugin(), SamplePlugin.manifest.without(ConformanceCapability.CANVAS_PLACE))
 
     @Test
     fun `deadlines - an action answers in time`() = assertBreaks(

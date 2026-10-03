@@ -13,7 +13,6 @@ import com.letta.mobile.plugin.api.PluginHealth
 import com.letta.mobile.plugin.api.PluginHost
 import com.letta.mobile.plugin.api.PluginInfo
 import com.letta.mobile.plugin.api.SnapshotSource
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -37,33 +36,36 @@ open class SamplePlugin : CanvasPlugin {
     }
 
     override suspend fun invoke(call: ActionCall): ActionResult = when (call.action) {
-        "place" -> place(call.input.getValue("label").jsonPrimitive.content)
-        "echo" -> echo(call.input)
-        else -> unknown(call.action)
+        "place" -> place(call)
+        "echo" -> echo(call)
+        else -> unknown(call)
     }
 
-    protected open suspend fun place(label: String): ActionResult {
+    protected open suspend fun place(call: ActionCall): ActionResult {
         host.httpClient.get("$SERVICE/status", mapOf("Authorization" to "Bearer ${host.secret("apiToken")}"))
-        val ref = host.putAsset("image/png", byteArrayOf(1, 2, 3))
-        return ActionResult.Ok("Placed $label", emit = PluginEmit(place = listOf(card(label, ref))))
+        val card = Card(label = call.input.getValue("label").jsonPrimitive.content, snapshotRef = host.putAsset("image/png", byteArrayOf(1, 2, 3)))
+        return ActionResult.Ok("Placed ${card.label}", emit = PluginEmit(place = listOf(card(card))))
     }
 
-    protected open fun card(label: String, snapshotRef: String): PlaceElement = PlaceElement(
+    /** What `place` puts on the board. */
+    data class Card(val label: String, val snapshotRef: String)
+
+    protected open fun card(card: Card): PlaceElement = PlaceElement(
         kind = "card",
         v = 2,
         props = buildJsonObject {
-            put("label", JsonPrimitive(label))
+            put("label", JsonPrimitive(card.label))
             put("status", JsonPrimitive("idle"))
         },
-        fallback = ElementFallback(title = label),
-        snapshot = SnapshotSource.Asset(snapshotRef),
+        fallback = ElementFallback(title = card.label),
+        snapshot = SnapshotSource.Asset(card.snapshotRef),
     )
 
-    protected open suspend fun echo(input: JsonObject): ActionResult =
-        ActionResult.Ok(input["text"]?.jsonPrimitive?.content ?: greeting())
+    protected open suspend fun echo(call: ActionCall): ActionResult =
+        ActionResult.Ok(call.input["text"]?.jsonPrimitive?.content ?: greeting())
 
-    protected open fun unknown(action: String): ActionResult =
-        ActionResult.Error(ActionResult.Error.UNKNOWN_ACTION, "Sample has no action '$action'")
+    protected open fun unknown(call: ActionCall): ActionResult =
+        ActionResult.Error(ActionResult.Error.UNKNOWN_ACTION, "Sample has no action '${call.action}'")
 
     override suspend fun onElementEvent(event: ElementEvent) {
         if (event.event == ElementEventType.REMOVED) host.log(LogLevel.INFO, "card removed", mapOf("elementId" to event.elementId))

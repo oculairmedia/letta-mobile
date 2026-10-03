@@ -5,8 +5,8 @@ import com.letta.mobile.plugin.api.PlaceImage
 import com.letta.mobile.plugin.api.PluginEmit
 import com.letta.mobile.plugin.api.SnapshotSource
 import com.letta.mobile.plugin.api.UpdateElement
-import com.letta.mobile.plugin.testkit.ConformanceManifest.Companion.ASSETS_WRITE
-import com.letta.mobile.plugin.testkit.ConformanceManifest.Companion.CANVAS_PLACE
+import com.letta.mobile.plugin.testkit.ConformanceCapability.ASSETS_WRITE
+import com.letta.mobile.plugin.testkit.ConformanceCapability.CANVAS_PLACE
 import kotlinx.serialization.json.JsonObject
 
 /** One refused entry of an emit: its [index] in the flattened order (place, update, remove, placeImages). */
@@ -58,7 +58,7 @@ internal class EmitRules(private val manifest: ConformanceManifest, private val 
 
     private fun propsProblems(kind: String, props: JsonObject): List<Pair<ConformanceRule, String>> {
         val schema = manifest.elements[kind]?.props ?: return emptyList()
-        return JsonSchemaSubset.problems(schema, props, "/props").map { ConformanceRule.EMIT to "kind '$kind': $it" }
+        return JsonSchemaSubset.problems(schema, props, JsonPointer.ROOT.child("props")).map { ConformanceRule.EMIT to "kind '$kind': $it" }
     }
 
     private fun snapshotProblems(snapshot: SnapshotSource?): List<Pair<ConformanceRule, String>> = listOfNotNull(

@@ -37,8 +37,11 @@ public data class ConformanceManifest(
     @Serializable
     public data class Action(public val input: JsonObject)
 
-    /** Whether the manifest asks for [capability] (its wire spelling, `canvas:place`). */
-    public fun has(capability: String): Boolean = capability in capabilities
+    /** Whether the manifest asks for [capability]. */
+    public fun has(capability: ConformanceCapability): Boolean = capability.wire in capabilities
+
+    /** This manifest without [capability], for testing that a plugin copes with its absence. */
+    public fun without(capability: ConformanceCapability): ConformanceManifest = copy(capabilities = capabilities - capability.wire)
 
     /** The settings a host resolves with no owner input: every declared `default`. */
     public fun defaultSettings(): JsonObject = JsonObject(
@@ -50,11 +53,16 @@ public data class ConformanceManifest(
 
         /** The manifest in [text] (the content of `letta-plugin.json`). */
         public fun parse(text: String): ConformanceManifest = json.decodeFromString(serializer(), text)
-
-        /** Capability wire names. */
-        public const val CANVAS_PLACE: String = "canvas:place"
-        public const val CANVAS_READ: String = "canvas:read"
-        public const val ASSETS_WRITE: String = "assets:write"
-        public const val NET_CONNECT: String = "net:connect"
     }
+}
+
+/** The install-time capabilities the kit checks (plan section 3.3), by their manifest spelling [wire]. */
+public enum class ConformanceCapability(public val wire: String) {
+    CANVAS_PLACE("canvas:place"),
+    CANVAS_READ("canvas:read"),
+    ASSETS_WRITE("assets:write"),
+    NET_CONNECT("net:connect"),
+    ;
+
+    override fun toString(): String = wire
 }

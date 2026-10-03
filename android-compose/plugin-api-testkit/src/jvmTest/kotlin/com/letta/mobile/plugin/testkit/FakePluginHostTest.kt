@@ -59,6 +59,19 @@ class FakePluginHostTest {
     }
 
     @Test
+    fun `the allowlist matches exact origins and wildcard subdomains`() {
+        val allowlist = OriginAllowlist(listOf("https://api.example.test", "wss://*.example.test", "http://127.0.0.1:8188"))
+        fun admits(url: String) = HttpOrigin.of(url)?.let(allowlist::admits) == true
+        assertTrue(admits("https://api.example.test/v1"))
+        assertTrue(admits("wss://live.example.test/socket"))
+        assertTrue(admits("http://127.0.0.1:8188/prompt"))
+        assertTrue(!admits("https://other.example.test"))
+        assertTrue(!admits("wss://example.test"))
+        assertTrue(!admits("http://127.0.0.1:9000"))
+        assertTrue(!admits("not a url"))
+    }
+
+    @Test
     fun `a closed host refuses every use`() {
         host.close()
         val refused = assertFailsWith<PluginHostException> { host.secret("apiToken") }

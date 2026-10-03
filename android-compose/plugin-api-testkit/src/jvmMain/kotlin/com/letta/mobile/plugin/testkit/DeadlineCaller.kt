@@ -24,7 +24,7 @@ internal sealed interface CallOutcome<out T> {
  */
 internal class DeadlineCaller(
     private val options: ConformanceOptions,
-    private val finding: (ConformanceRule, String) -> Unit,
+    private val finding: (ConformanceFinding) -> Unit,
 ) {
     private val calls = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -34,7 +34,7 @@ internal class DeadlineCaller(
         val result = withTimeoutOrNull(deadline) { running.await() }
         if (result == null) {
             running.cancel()
-            finding(ConformanceRule.DEADLINE, "${method.spiMember} did not answer within $deadline ms (${method.wire})")
+            finding(ConformanceFinding(ConformanceRule.DEADLINE, "${method.spiMember} did not answer within $deadline ms (${method.wire})"))
             return CallOutcome.Late
         }
         return result.fold({ CallOutcome.Answered(it) }, { CallOutcome.Threw(it) })

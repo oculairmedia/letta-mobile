@@ -13,8 +13,6 @@ import com.letta.mobile.plugin.api.PluginHost
 import com.letta.mobile.plugin.api.PluginHostException
 import com.letta.mobile.plugin.api.PluginHttpClient
 import com.letta.mobile.plugin.api.PluginHttpResponse
-import com.letta.mobile.plugin.testkit.ConformanceManifest.Companion.ASSETS_WRITE
-import com.letta.mobile.plugin.testkit.ConformanceManifest.Companion.CANVAS_READ
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,9 +25,12 @@ import java.util.concurrent.CopyOnWriteArrayList
 /** One [PluginHost.log] line as the host recorded it. */
 public data class LogLine(public val level: LogLevel, public val message: String, public val fields: Map<String, String>)
 
+/** The HTTP methods [PluginHost.httpClient] offers. */
+public enum class HttpMethod { GET, POST }
+
 /** One request a plugin sent through [PluginHost.httpClient]. */
 public data class PluginHttpRequest(
-    public val method: String,
+    public val method: HttpMethod,
     public val url: String,
     public val headers: Map<String, String>,
     public val contentType: String? = null,
@@ -65,7 +66,15 @@ public class FakePluginHost(
     @Volatile
     internal var phase: HostPhase = HostPhase.ACTIVE
 
-    override val httpClient: PluginHttpClient = AllowlistHttpClient(manifest, ::guardWork, ::violation, recordedRequests, httpHandler)
+    override val httpClient: PluginHttpClient = AllowlistHttpClient(
+        manifest = manifest,
+        admit = { request ->
+            guardWork(HostCall.HTTP)
+            recordedRequests += request
+        },
+        refuse = { recordedViolations += it },
+        handler = httpHandler,
+    )
 
     /** Every emit, from [emit] and from action results, in order. */
     public val emits: List<PluginEmit> get() = recordedEmits.toList()
@@ -86,12 +95,12 @@ public class FakePluginHost(
     public val violations: List<ConformanceFinding> get() = recordedViolations.toList()
 
     override fun secret(name: String): String? {
-        guardUse("secret")
+        guardUse(HostCall.SECRET)
         return secrets[name]
     }
 
     override suspend fun emit(emit: PluginEmit): EmitReceipt {
-        guardWork("emit")
+        guardWork(HostCall.EMIT)
         return apply(emit)
     }
 
@@ -99,7 +108,7 @@ public class FakePluginHost(
     internal fun apply(emit: PluginEmit): EmitReceipt {
         recordedEmits += emit
         val problems = EmitRules(manifest, placed.associate { it.id to it.type.substringAfter('/') }).problems(emit)
-        problems.forEach { violation(it.rule, "emit entry ${it.index}: ${it.reason}") }
+        problems.forEach { violation(ConformanceFinding(it.rule, "emit entry ${it.index}: ${it.reason}")) }
         val refusedIndexes = problems.map { it.index }.toSet()
         val placedIds = emit.place.withIndex().filter { it.index !in refusedIndexes }.map { place(it.value) }
         placed.removeAll { it.id in emit.remove }
@@ -122,16 +131,16 @@ public class FakePluginHost(
     }
 
     override suspend fun putAsset(mediaType: String, bytes: ByteArray): String {
-        guardWork("putAsset")
-        requireCapability(ASSETS_WRITE, "putAsset")
+        guardWork(HostCall.PUT_ASSET)
+        requireCapability(ConformanceCapability.ASSETS_WRITE, HostCall.PUT_ASSET)
         val ref = "sha256:" + MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
         storedAssets[ref] = bytes
         return ref
     }
 
     override suspend fun readElements(query: ElementQuery): List<PluginElementView> {
-        guardWork("readElements")
-        requireCapability(CANVAS_READ, "readElements")
+        guardWork(HostCall.READ_ELEMENTS)
+        requireCapability(ConformanceCapability.CANVAS_READ, HostCall.READ_ELEMENTS)
         return placed.filter { element -> query.matches(element) }
     }
 
@@ -141,7 +150,7 @@ public class FakePluginHost(
             (kinds.isEmpty() || element.type.substringAfter('/') in kinds)
 
     override fun log(level: LogLevel, message: String, fields: Map<String, String>) {
-        guardUse("log")
+        guardUse(HostCall.LOG)
         recordedLogs += LogLine(level, message, fields)
     }
 
@@ -151,33 +160,50 @@ public class FakePluginHost(
         scope.cancel()
     }
 
-    private fun requireCapability(capability: String, call: String) {
+    private fun requireCapability(capability: ConformanceCapability, call: HostCall) {
         if (manifest.has(capability)) return
-        violation(ConformanceRule.CAPABILITY, "host.$call needs the $capability capability")
-        throw PluginHostException(PluginHostException.CAPABILITY_DENIED, "host.$call needs the $capability capability")
+        refuse(ConformanceRule.CAPABILITY, PluginHostException(PluginHostException.CAPABILITY_DENIED, "$call needs the $capability capability"))
     }
 
-    private fun guardUse(call: String) {
+    /** Any use of the host after deactivate is refused. */
+    private fun guardUse(call: HostCall) {
         if (phase != HostPhase.DEACTIVATED) return
-        violation(ConformanceRule.LIFECYCLE, "used host.$call after deactivate")
-        throw PluginHostException(PluginHostException.DEACTIVATED, "host.$call after deactivate")
+        refuse(ConformanceRule.LIFECYCLE, PluginHostException(PluginHostException.DEACTIVATED, "used $call after deactivate"))
     }
 
-    private fun guardWork(call: String) {
+    /** Work (emits, assets, reads, the network) is refused outside the active phase. */
+    private fun guardWork(call: HostCall) {
         guardUse(call)
         if (phase == HostPhase.ACTIVE) return
-        violation(ConformanceRule.LIFECYCLE, "used host.$call before activate")
-        throw PluginHostException(PluginHostException.NOT_ACTIVE, "host.$call before activate")
+        refuse(ConformanceRule.LIFECYCLE, PluginHostException(PluginHostException.NOT_ACTIVE, "used $call before activate"))
     }
 
-    private fun violation(rule: ConformanceRule, message: String) {
-        recordedViolations += ConformanceFinding(rule, message)
+    private fun refuse(rule: ConformanceRule, refusal: PluginHostException): Nothing {
+        violation(ConformanceFinding(rule, refusal.message.orEmpty()))
+        throw refusal
+    }
+
+    private fun violation(finding: ConformanceFinding) {
+        recordedViolations += finding
     }
 
     internal companion object {
         const val CANVAS_ID: String = "conformance-canvas"
         private const val SCOPE_THREADS = 4
     }
+}
+
+/** The host members a plugin calls, as findings name them. */
+internal enum class HostCall(private val label: String) {
+    SECRET("host.secret"),
+    EMIT("host.emit"),
+    PUT_ASSET("host.putAsset"),
+    READ_ELEMENTS("host.readElements"),
+    LOG("host.log"),
+    HTTP("host.httpClient"),
+    ;
+
+    override fun toString(): String = label
 }
 
 /** Where a plugin is in its lifetime, as the host sees it. */
