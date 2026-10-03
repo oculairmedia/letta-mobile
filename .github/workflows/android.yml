@@ -377,7 +377,11 @@ jobs:
           cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
 
       - name: Build and test Compose web client
-        run: ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
+        # The wasm test executable links all of sharedUI; at the repo-wide
+        # 4 GiB Kotlin daemon heap it thrashes GC for ~50 min, then OOMs.
+        run: >-
+          ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
+          "-Pkotlin.daemon.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
 
       - name: Locate WASM distribution
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
