@@ -72,6 +72,14 @@ internal value class LayoutRevision(val raw: Long)
 @JvmInline
 internal value class PageLimit(val raw: Int)
 
+/** The index of a row in the layout order. The cursor stores this, and the next page starts one past it. */
+@JvmInline
+internal value class RowIndex(val raw: Int)
+
+/** Bytes already packed into a page, so the cap check does not re-encode every row. */
+@JvmInline
+internal value class PageBytes(val raw: Int)
+
 /**
  * Builds a `canvas_get_layout` page from the scene `canvas_get_scene` would read at [revision].
  */
@@ -153,28 +161,28 @@ internal object CanvasLayoutRead {
 internal object CanvasLayoutCursor {
     private val CURSOR = Regex("""r(\d+):(\d+)""")
 
-    fun encode(revision: LayoutRevision, index: Int): String = "r${revision.raw}:$index"
+    fun encode(revision: LayoutRevision, index: RowIndex): String = "r${revision.raw}:${index.raw}"
 
     fun decode(cursor: String): Decoded? {
         val match = CURSOR.matchEntire(cursor) ?: return null
         val revision = match.groupValues[1].toLongOrNull()?.let(::LayoutRevision) ?: return null
-        val index = match.groupValues[2].toIntOrNull() ?: return null
+        val index = match.groupValues[2].toIntOrNull()?.let(::RowIndex) ?: return null
         return Decoded(revision, index)
     }
 
     /** Where the next page starts. A cursor that does not decode is [Start.Bad], not a stale revision. */
     fun start(rows: List<CanvasLayoutRow>, revision: LayoutRevision, cursor: String?): Start {
-        if (cursor == null) return Start.At(0)
+        if (cursor == null) return Start.At(RowIndex(0))
         val decoded = decode(cursor) ?: return Start.Bad
         if (decoded.revision != revision) return Start.Stale
-        if (decoded.index !in rows.indices) return Start.Bad
-        return Start.At(decoded.index + 1)
+        if (decoded.index.raw !in rows.indices) return Start.Bad
+        return Start.At(RowIndex(decoded.index.raw + 1))
     }
 
-    data class Decoded(val revision: LayoutRevision, val index: Int)
+    data class Decoded(val revision: LayoutRevision, val index: RowIndex)
 
     sealed interface Start {
-        data class At(val index: Int) : Start
+        data class At(val index: RowIndex) : Start
         data object Bad : Start
         data object Stale : Start
     }
@@ -182,27 +190,41 @@ internal object CanvasLayoutCursor {
 
 /** The rows of one page, in id order, stopping at the limit or the byte cap. */
 internal object CanvasLayoutPage {
-    fun of(revision: LayoutRevision, rows: List<CanvasLayoutRow>, start: Int, limit: PageLimit): CanvasLayoutResult {
+    fun of(revision: LayoutRevision, rows: List<CanvasLayoutRow>, start: RowIndex, limit: PageLimit): CanvasLayoutResult {
         val chosen = ArrayList<CanvasLayoutRow>()
         var index = start
-        var packed = 0
-        while (index < rows.size && chosen.size < limit.raw) {
-            val rowSize = CanvasLayoutJson.rowBytes(rows[index])
-            val comma = if (chosen.isEmpty()) 0 else 1
-            val cursor = if (index + 1 < rows.size) CanvasLayoutCursor.encode(revision, index) else null
-            val total = CanvasLayoutJson.shellBytes(revision, cursor) + packed + comma + rowSize
-            if (chosen.isNotEmpty() && total > CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES) break
-            chosen.add(rows[index])
-            packed += comma + rowSize
-            index += 1
+        var packed = PageBytes(0)
+        while (chosen.size < limit.raw) {
+            val step = admit(revision, rows, index, chosen, packed) ?: break
+            chosen.add(rows[index.raw])
+            packed = step.packed
+            index = step.next
         }
-        val cursor = if (index < rows.size && chosen.isNotEmpty()) {
-            CanvasLayoutCursor.encode(revision, index - 1)
-        } else {
-            null
-        }
-        return CanvasLayoutResult(revision.raw, chosen, cursor)
+        return CanvasLayoutResult(revision.raw, chosen, trailing(revision, rows, index, chosen))
     }
+
+    /** The next row, or null when it does not fit or the rows have run out. */
+    private fun admit(
+        revision: LayoutRevision,
+        rows: List<CanvasLayoutRow>,
+        index: RowIndex,
+        chosen: List<CanvasLayoutRow>,
+        packed: PageBytes,
+    ): Step? {
+        val row = rows.getOrNull(index.raw) ?: return null
+        val comma = if (chosen.isEmpty()) PageBytes(0) else PageBytes(1)
+        val total = CanvasLayoutJson.shellBytes(revision, cursorOf(revision, rows, index)) + packed.raw + comma.raw + CanvasLayoutJson.rowBytes(row)
+        if (chosen.isNotEmpty() && total > CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES) return null
+        return Step(PageBytes(packed.raw + comma.raw + CanvasLayoutJson.rowBytes(row)), RowIndex(index.raw + 1))
+    }
+
+    private fun cursorOf(revision: LayoutRevision, rows: List<CanvasLayoutRow>, index: RowIndex): String? =
+        if (index.raw + 1 < rows.size) CanvasLayoutCursor.encode(revision, index) else null
+
+    private fun trailing(revision: LayoutRevision, rows: List<CanvasLayoutRow>, index: RowIndex, chosen: List<CanvasLayoutRow>): String? =
+        if (index.raw < rows.size && chosen.isNotEmpty()) CanvasLayoutCursor.encode(revision, RowIndex(index.raw - 1)) else null
+
+    private data class Step(val packed: PageBytes, val next: RowIndex)
 }
 
 /** Compact JSON for a page. Null fields are left out; an ARROW's binding ends are present even when null. */
