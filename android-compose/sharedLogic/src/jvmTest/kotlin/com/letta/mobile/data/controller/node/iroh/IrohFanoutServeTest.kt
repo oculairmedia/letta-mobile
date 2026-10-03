@@ -124,7 +124,7 @@ class IrohFanoutServeTest {
      * Scripted controller-style flow for [conversationId]: tool_call, assistant
      * multi-delta (incremental), tool_return, terminal stop_reason — the shape
      * handleInput's collect-loop delivers. [otid] scopes the assistant stream so
-     * concurrent conversations produce distinct cm-stream ids.
+     * concurrent conversations stay distinct.
      */
     private fun scriptedDrafts(
         runtime: AppServerRuntimeScope,
@@ -169,7 +169,7 @@ class IrohFanoutServeTest {
         for (payload in drafts) {
             if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) continue
             if (fanout.isFailureOrCancelLifecycle(payload)) fanout.flushOpenToolCalls()
-            fanout.onDraft(payload)
+            fanout.onStampedDraft(payload)
         }
     }
 
@@ -190,7 +190,7 @@ class IrohFanoutServeTest {
             turns.forEach { (fanout, drafts) ->
                 if (i < drafts.size) {
                     val p = drafts[i]
-                    if (!(fanout.anyTerminalWritten && fanout.isTerminalLifecycle(p))) fanout.onDraft(p)
+                    if (!(fanout.anyTerminalWritten && fanout.isTerminalLifecycle(p))) fanout.onStampedDraft(p)
                 }
             }
         }
@@ -199,9 +199,8 @@ class IrohFanoutServeTest {
     /** case4 helper: a viewer received the full cumulative sequence for exactly ONE otid, one terminal, monotonic seq. */
     private fun assertViewerSawOnlyConversation(sink: CapturingSink, who: String, otid: String) {
         assertEquals(listOf("Hel", "Hello world"), assistantContents(sink), "$who cumulative text")
-        val ids = parsed(sink).mapNotNull { deltaOf(it)?.get("id")?.jsonPrimitive?.content }
-            .filter { it.startsWith("cm-stream-") }
-        assertTrue(ids.all { it == "cm-stream-$otid" }, "$who only $otid assistant ids")
+        val otids = parsed(sink).mapNotNull { deltaOf(it)?.get("otid")?.jsonPrimitive?.content }
+        assertEquals(listOf(otid, otid), otids, "$who only $otid assistant frames")
         assertEquals(1, terminalCount(sink), "$who one terminal")
         val seqs = parsed(sink).map { seqOf(it) }
         assertEquals(seqs.sorted(), seqs, "$who seq monotonic under interleave")
@@ -251,11 +250,12 @@ class IrohFanoutServeTest {
             val seqs = frames.map { seqOf(it) }
             assertEquals(seqs.sorted(), seqs, "$who event_seq monotonic")
             assertEquals(seqs.toSet().size, seqs.size, "$who event_seq unique")
-            // cm-stream tag on the assistant deltas.
-            val assistantIds = frames.mapNotNull { deltaOf(it)?.get("id")?.jsonPrimitive?.content }
-                .filter { it.startsWith("cm-stream-") }
-            assertEquals(2, assistantIds.size, "$who cm-stream tagged assistant deltas")
-            assertTrue(assistantIds.all { it == "cm-stream-otid-C" }, "$who cm-stream id")
+            // One logical id and a growing text_seq stamped on the assistant deltas; delta.id untouched.
+            val assistantDeltas = frames.mapNotNull { deltaOf(it) }
+                .filter { it["message_type"]?.jsonPrimitive?.content == "assistant_message" }
+            assertEquals(1, assistantDeltas.map { it["logical_message_id"]?.jsonPrimitive?.content }.toSet().size, "$who one logical id")
+            assertEquals(listOf("1", "2"), assistantDeltas.map { it["text_seq"]?.jsonPrimitive?.content }, "$who text_seq")
+            assertTrue(assistantDeltas.all { it["id"]?.jsonPrimitive?.content == "letta-msg-1" }, "$who id untouched")
             // Cumulative accumulation carries full text in the last delta.
             assertEquals(listOf("Hel", "Hello world"), assistantContents(sink), "$who cumulative text")
             // EXACTLY ONE terminal.
@@ -461,7 +461,7 @@ class IrohFanoutServeTest {
         val leaverSink = CapturingSink()
         val leaver = viewer("conn-leaver", leaverSink)
         val leaverRegistration = registry.register("conv-C", leaver)
-        fanout.onDraft(assistant("Hel"))
+        fanout.onStampedDraft(assistant("Hel"))
 
         // Leaver disconnects mid-turn and releases its exact generation.
         registry.release(leaverRegistration)
@@ -471,7 +471,7 @@ class IrohFanoutServeTest {
         )
         val leaverFramesAtDisconnect = leaverSink.frames().size
 
-        fanout.onDraft(assistant("lo wor"))
+        fanout.onStampedDraft(assistant("lo wor"))
 
         // Joiner registers mid-turn (its own message.list subscribe would do this).
         val joinerSink = CapturingSink()
@@ -479,8 +479,8 @@ class IrohFanoutServeTest {
         registry.register("conv-C", joiner)
 
         // Final incremental delta is emitted cumulatively, followed by terminal.
-        fanout.onDraft(assistant("ld"))
-        fanout.onDraft(RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed, reason = "end_turn"))
+        fanout.onStampedDraft(assistant("ld"))
+        fanout.onStampedDraft(RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed, reason = "end_turn"))
 
         // JOINER converged to the FINAL text + one terminal.
         assertEquals("Hello world", assistantContents(joinerSink).last(), "joiner converges to final text")
@@ -548,10 +548,10 @@ class IrohFanoutServeTest {
         // robust to key-ordering, while still asserting exact key/value content.
         val goldenBodies = frames.map { deltaOf(it)!! }
         val expectedBodies = listOf(
-            """{"message_type":"tool_call_message","tool_call":{"tool_call_id":"tc-C","name":"stub_tool","arguments":"{}"}}""",
-            """{"message_type":"assistant_message","otid":"otid-C","content":"Hel","id":"cm-stream-otid-C"}""",
-            """{"message_type":"assistant_message","otid":"otid-C","content":"Hello world","id":"cm-stream-otid-C"}""",
-            """{"message_type":"tool_return_message","tool_call_id":"tc-C","status":"success","tool_return":"ok"}""",
+            """{"message_type":"tool_call_message","tool_call":{"tool_call_id":"tc-C","name":"stub_tool","arguments":"{}"},"logical_message_id":"tc-tc-C","turn_id":"turn-1"}""",
+            """{"message_type":"assistant_message","otid":"otid-C","content":"Hel","id":"letta-msg-1","text_seq":1,"logical_message_id":"lm-1","turn_id":"turn-1"}""",
+            """{"message_type":"assistant_message","otid":"otid-C","content":"Hello world","id":"letta-msg-1","text_seq":2,"logical_message_id":"lm-1","turn_id":"turn-1"}""",
+            """{"message_type":"tool_return_message","tool_call_id":"tc-C","status":"success","tool_return":"ok","logical_message_id":"tr-tc-C","turn_id":"turn-1"}""",
             """{"message_type":"stop_reason","stop_reason":"end_turn"}""",
         ).map { json.parseToJsonElement(it).jsonObject }
         assertEquals(

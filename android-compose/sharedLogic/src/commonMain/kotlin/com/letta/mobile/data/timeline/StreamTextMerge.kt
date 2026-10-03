@@ -15,6 +15,10 @@ enum class StreamTextMergeBranch {
     // prefix/suffix relationship. Appending them would duplicate/garble the
     // text, so we keep the longer (more complete) snapshot instead.
     SNAPSHOT_CONFLICT,
+    // letta-mobile-bglj6.1.12: a newer snapshot of a cumulative stream that shares
+    // a long opening with the text held, then says something else. The reply was
+    // rewritten upstream; the newer body replaces the old one.
+    SNAPSHOT_REWRITE,
     APPEND,
 }
 
@@ -116,84 +120,126 @@ fun mergeStreamText(
     incrementalForwardAppend: Boolean = false,
     isCumulativeStream: Boolean = false,
 ): StreamTextMergeResult {
-    // A forward delta in an incremental stream is always new text to append: a
-    // prefix/suffix coincidence must NOT drop it (STALE/SUFFIX_DUPLICATE).
-    val forwardIncrement = incrementalForwardAppend && incomingIsForwardDelta
-    // letta-mobile-mvcr4: a forward (higher-seq) snapshot whose body
-    // overlaps the existing text by NEARLY all of one side (only differs
-    // by the leading or trailing few chars) is a re-tokenized snapshot,
-    // not a forward delta. Without this branch we APPEND and duplicate
-    // the partial body, and the downstream reveal then visibly
-    // truncates the duplicate. We require a substantial overlap
-    // (>= 4 chars in common AND overlap covers all but a few chars of
-    // the shorter side) so genuine tiny forward deltas like "Y" + "es ..."
-    // still APPEND.
-    val shortLen = minOf(existing.length, incoming.length)
-    val maxMatch = maxOf(existing.length, incoming.length)
-    val overlapLen = if (shortLen >= 4) {
-        // best suffix-of-incoming equal to prefix-of-existing length
-        val k = longestCommonPrefixLength(existing, incoming)
-        maxOf(k, longestCommonSuffixLength(existing, incoming))
-    } else 0
-    val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
-        (overlapLen.toDouble() / maxMatch.toDouble() >= 0.75)
-    // letta-mobile-bn008 + letta-mobile-wucn: an identical frame is only dropped
-    // when the stream is known to be cumulative. Ungating EQUAL broke wucn: an
-    // incremental token can be byte-identical to the accumulator and must APPEND.
-    // A strictly longer frame that already starts with the accumulator is not
-    // that token — it is a snapshot, and appending it is the staircase. That
-    // replace is not gated. The EQUAL gates are OR'd:
-    //   canUseSnapshotMerge  -> the existing seq-id ordering signal (drop-text
-    //                           branches stay gated on this alone below)
-    //   isCumulativeStream   -> the upstream-derived stable-otid stream-shape
-    //                           signal (replaces the dropped-by-A-single-frame
-    //                           seq-id check from the bn008 cascade)
-    // STALE / SUFFIX_DUPLICATE / SNAPSHOT_CONFLICT remain gated on
-    // canUseSnapshotMerge because they DROP text and need the full ordering
-    // signal; isCumulativeStream alone is not sufficient for them.
-    val cumulativeShapeAccepted = isCumulativeStream || canUseSnapshotMerge
-    val branch = when {
-        incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
-        incoming == existing && cumulativeShapeAccepted -> StreamTextMergeBranch.EQUAL
-        // Longer text that already contains the reply so far is a snapshot.
-        // This does not require the cumulative-stream flag: App Server frames
-        // often arrive without one, and appending them is the staircase
-        // ("…555" + "…5555 returned"). Identical text stays APPEND unless a
-        // cumulative signal is present, so a repeated incremental token is kept.
-        existing.isNotEmpty() &&
-            incoming.length > existing.length &&
-            incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
-        canUseSnapshotMerge && !forwardIncrement && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
-        canUseSnapshotMerge && !forwardIncrement && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
-        // letta-mobile-mvcr4: near-overlap forward snapshot -> coalesce
-        // to the longer complete text instead of duplicating.
-        nearOverlaps -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
-        // letta-mobile-k9y5d: both frames carry a seq id but neither is a clean
-        // prefix/suffix of the other. If the incoming is NOT a forward delta it
-        // is a replayed/out-of-order snapshot, not a new continuation — appending
-        // would duplicate the body and could drop a prefix, so keep the longer
-        // (complete) snapshot. A forward delta still appends (incremental stream).
-        canUseSnapshotMerge && !incomingIsForwardDelta -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
-        else -> StreamTextMergeBranch.APPEND
+    val frames = MergeFrames(existing = existing, incoming = incoming)
+    val signals = MergeSignals(
+        canUseSnapshotMerge = canUseSnapshotMerge,
+        incomingIsForwardDelta = incomingIsForwardDelta,
+        incrementalForwardAppend = incrementalForwardAppend,
+        isCumulativeStream = isCumulativeStream,
+    )
+    val branch = classifyMerge(frames, signals)
+    return StreamTextMergeResult(
+        text = frames.mergedText(branch),
+        branch = branch,
+        garbleRisk = branch == StreamTextMergeBranch.APPEND && frames.isShortAppend(),
+    )
+}
+
+/** The stream-shape and ordering signals the caller derives once per frame. */
+private data class MergeSignals(
+    val canUseSnapshotMerge: Boolean,
+    val incomingIsForwardDelta: Boolean,
+    val incrementalForwardAppend: Boolean,
+    val isCumulativeStream: Boolean,
+) {
+    /** A forward delta in an incremental stream is always new text: a prefix/suffix coincidence must not drop it. */
+    val forwardIncrement: Boolean get() = incrementalForwardAppend && incomingIsForwardDelta
+
+    /**
+     * letta-mobile-bn008 + letta-mobile-wucn: an identical frame is only dropped when the stream is
+     * known to be cumulative (seq-id ordering OR stable-otid stream shape). Ungating EQUAL broke
+     * wucn: an incremental token can be byte-identical to the accumulator and must APPEND.
+     */
+    val cumulativeShapeAccepted: Boolean get() = isCumulativeStream || canUseSnapshotMerge
+
+    /** STALE / SUFFIX_DUPLICATE drop text, so they need the full ordering signal and no forced append. */
+    val mayDropRedelivery: Boolean get() = canUseSnapshotMerge && !forwardIncrement
+}
+
+/** The text held and the text arriving, with every comparison between them. */
+private class MergeFrames(val existing: String, val incoming: String) {
+    fun isEqual(): Boolean = incoming == existing
+
+    /**
+     * Longer text that already contains the reply so far is a snapshot. Appending it is the
+     * staircase ("...555" + "...5555 returned").
+     */
+    fun isGrowth(): Boolean =
+        existing.isNotEmpty() && incoming.length > existing.length && incoming.startsWith(existing)
+
+    fun isPrefixOfExisting(): Boolean = existing.startsWith(incoming)
+
+    fun isSuffixOfExisting(): Boolean = existing.endsWith(incoming)
+
+    /**
+     * letta-mobile-mvcr4: the two texts share all but a few characters at one end: at least 4 in
+     * common, covering three quarters of the longer side.
+     */
+    fun nearlyOverlaps(): Boolean {
+        if (minOf(existing.length, incoming.length) < 4) return false
+        val overlapLen = maxOf(
+            longestCommonPrefixLength(existing, incoming),
+            longestCommonSuffixLength(existing, incoming),
+        )
+        return overlapLen >= 4 &&
+            overlapLen.toDouble() / maxOf(existing.length, incoming.length).toDouble() >= 0.75
     }
-    val text = when (branch) {
+
+    /**
+     * True when [incoming] is a whole snapshot of the reply [existing] holds, rewritten past a
+     * shared opening: both run on after [REWRITE_MIN_SHARED_OPENING] or more characters in common,
+     * each in its own direction. Appending such a snapshot to a cumulative stream stacks a
+     * near-copy of the reply under itself on every frame (the owner's desktop panel, 2026-10-03).
+     * An incremental token never opens with that much of the reply and then diverges; a repeat of
+     * the reply is EQUAL, a growth CUMULATIVE, and both are decided before this.
+     */
+    fun isRewrittenSnapshot(): Boolean {
+        val shared = longestCommonPrefixLength(existing, incoming)
+        return shared >= REWRITE_MIN_SHARED_OPENING && shared < existing.length && shared < incoming.length
+    }
+
+    /** An append of a chunk under half the held text: where a garbled merge would show. */
+    fun isShortAppend(): Boolean =
+        existing.isNotEmpty() && incoming.isNotEmpty() && incoming.length < existing.length / 2
+
+    fun mergedText(branch: StreamTextMergeBranch): String = when (branch) {
         StreamTextMergeBranch.EMPTY_INCOMING,
         StreamTextMergeBranch.EQUAL,
         StreamTextMergeBranch.STALE,
         StreamTextMergeBranch.SUFFIX_DUPLICATE -> existing
-        StreamTextMergeBranch.CUMULATIVE -> incoming
+        StreamTextMergeBranch.CUMULATIVE,
+        StreamTextMergeBranch.SNAPSHOT_REWRITE -> incoming
         StreamTextMergeBranch.SNAPSHOT_CONFLICT -> if (incoming.length > existing.length) incoming else existing
         StreamTextMergeBranch.APPEND -> existing + incoming
     }
-    return StreamTextMergeResult(
-        text = text,
-        branch = branch,
-        garbleRisk = branch == StreamTextMergeBranch.APPEND &&
-            existing.isNotEmpty() &&
-            incoming.isNotEmpty() &&
-            incoming.length < existing.length / 2,
-    )
 }
+
+private fun classifyMerge(frames: MergeFrames, signals: MergeSignals): StreamTextMergeBranch =
+    classifyWholeSnapshot(frames, signals) ?: classifyDivergent(frames, signals)
+
+/** Branches decided by one text containing the other (or an empty frame). */
+private fun classifyWholeSnapshot(frames: MergeFrames, signals: MergeSignals): StreamTextMergeBranch? = when {
+    frames.incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
+    frames.isEqual() && signals.cumulativeShapeAccepted -> StreamTextMergeBranch.EQUAL
+    // Not gated on the cumulative flag: App Server frames often arrive without one.
+    frames.isGrowth() -> StreamTextMergeBranch.CUMULATIVE
+    signals.mayDropRedelivery && frames.isPrefixOfExisting() -> StreamTextMergeBranch.STALE
+    signals.mayDropRedelivery && frames.isSuffixOfExisting() -> StreamTextMergeBranch.SUFFIX_DUPLICATE
+    else -> null
+}
+
+/** Branches for frames that neither contain nor repeat the held text. */
+private fun classifyDivergent(frames: MergeFrames, signals: MergeSignals): StreamTextMergeBranch = when {
+    signals.isCumulativeStream && signals.incomingIsForwardDelta && frames.isRewrittenSnapshot() ->
+        StreamTextMergeBranch.SNAPSHOT_REWRITE
+    // letta-mobile-mvcr4: near-overlap forward snapshot -> coalesce to the longer complete text.
+    signals.canUseSnapshotMerge && frames.nearlyOverlaps() -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
+    // letta-mobile-k9y5d: a replayed/out-of-order snapshot keeps the longer text; a forward delta appends.
+    signals.canUseSnapshotMerge && !signals.incomingIsForwardDelta -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
+    else -> StreamTextMergeBranch.APPEND
+}
+
+private const val REWRITE_MIN_SHARED_OPENING = 24
 
 private fun longestCommonPrefixLength(a: String, b: String): Int {
     val n = minOf(a.length, b.length)

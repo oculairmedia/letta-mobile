@@ -217,7 +217,7 @@ class IrohFanoutFrameShapeParityTest {
         registry.register(conversationId, observer)
 
         val fanout = fanoutFor(registry, initiator)
-        for (payload in fixtureDrafts(fixture)) fanout.onDraft(payload)
+        for (payload in fixtureDrafts(fixture)) fanout.onStampedDraft(payload)
 
         // Replay the OBSERVER's fanned-out assistant deltas through the real reducer.
         val obsTimeline = replayThroughReducer(deltaBodiesOf(sinkObs), source = "iroh-observer")
@@ -266,7 +266,7 @@ class IrohFanoutFrameShapeParityTest {
         registry.register(conversationId, observer)
 
         val fanout = fanoutFor(registry, initiator)
-        for (payload in fixtureDrafts(fixture)) fanout.onDraft(payload)
+        for (payload in fixtureDrafts(fixture)) fanout.onStampedDraft(payload)
 
         val initFrames = sinkInit.frames().map { json.parseToJsonElement(it).jsonObject }
         val obsFrames = sinkObs.frames().map { json.parseToJsonElement(it).jsonObject }
@@ -319,7 +319,7 @@ class IrohFanoutFrameShapeParityTest {
         registry.register(conversationId, observer)
 
         val fanout = fanoutFor(registry, initiator)
-        for (payload in fixtureDrafts(fixture)) fanout.onDraft(payload)
+        for (payload in fixtureDrafts(fixture)) fanout.onStampedDraft(payload)
 
         // Enable the h30cy frame-flow diagnostics and clear the ring so only our
         // emit/ingest gate events are counted.
