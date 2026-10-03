@@ -44,6 +44,7 @@ class CanvasExternalToolsTest {
             listOf(
                 "canvas_create",
                 "canvas_get_scene",
+                "canvas_get_layout",
                 "canvas_replace_scene",
                 "canvas_apply_ops",
                 "canvas_list",
@@ -342,6 +343,7 @@ class CanvasExternalToolsTest {
         val inputs = mapOf(
             "canvas_create" to buildJsonObject { put("title", "x") },
             "canvas_get_scene" to buildJsonObject { put("canvas_id", "canvas-open") },
+            "canvas_get_layout" to buildJsonObject { put("canvas_id", "canvas-open") },
             "canvas_replace_scene" to buildJsonObject { put("canvas_id", "canvas-open"); put("scene_json", "{}") },
             "canvas_apply_ops" to buildJsonObject { put("canvas_id", "canvas-open"); put("ops", buildJsonArray { }) },
             "canvas_export_svg" to buildJsonObject { put("canvas_id", "canvas-open") },

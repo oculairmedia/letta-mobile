@@ -31,6 +31,9 @@ object HostCanvasTools {
         HostCanvasTool(CanvasToolContract.getScene, "Failed to get scene") { caller, input ->
             withCanvas(backend, caller, input) { entry -> getScene(backend, entry) }
         },
+        HostCanvasTool(CanvasToolContract.getLayout, "Failed to read layout") { caller, input ->
+            withCanvas(backend, caller, input) { entry -> getLayout(backend, entry, input) }
+        },
         HostCanvasTool(CanvasToolContract.replaceScene, "Failed to replace scene") { caller, input ->
             val sceneJson = HostCanvasToolInputs.sceneJson(input) ?: return@HostCanvasTool missing("scene_json")
             withCanvas(backend, caller, input) { entry ->
@@ -60,6 +63,16 @@ object HostCanvasTools {
     private suspend fun getScene(backend: HostCanvasBackend, entry: HostCanvasEntry): ExternalToolResult {
         val scene = backend.scene(entry)
         return success(CanvasSceneRead.result(scene.sceneJson, scene.revision, entry.canvasId))
+    }
+
+    private suspend fun getLayout(backend: HostCanvasBackend, entry: HostCanvasEntry, input: JsonObject): ExternalToolResult {
+        val scene = backend.scene(entry)
+        return layoutAnswer(CanvasLayoutRead.answer(scene.sceneJson, LayoutRevision(scene.revision), input))
+    }
+
+    private fun layoutAnswer(answer: CanvasLayoutAnswer): ExternalToolResult = when (answer) {
+        is CanvasLayoutAnswer.Page -> ExternalToolResult.Success(answer.json)
+        is CanvasLayoutAnswer.Refused -> ExternalToolResult.Error(answer.message)
     }
 
     private suspend fun create(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
