@@ -28,7 +28,7 @@ class TurnStreamIdentityTest {
     @Test
     fun appServerDeltasAccumulateInOrderWithGrowingTextSeq() = runTest {
         val turn = StampedTurn(this)
-        turn.feed(assistant("Hel", messageId = "m1"), assistant("lo", messageId = "m1"), assistant(" world", messageId = "m1"))
+        turn.feed(assistant("Hel", ids("m1")), assistant("lo", ids("m1")), assistant(" world", ids("m1")))
         val deltas = turn.emittedDeltas()
         assertEquals(listOf("Hel", "Hello", "Hello world"), deltas.map { it.field("content") })
         assertEquals(listOf(1, 2, 3), deltas.map { it["text_seq"]?.jsonPrimitive?.intOrNull })
@@ -40,9 +40,9 @@ class TurnStreamIdentityTest {
     fun twoAssistantMessagesInOneRunGetTwoLogicalIds() = runTest {
         val turn = StampedTurn(this)
         turn.feed(
-            assistant("First", frameId = "letta-msg-1"),
+            assistant("First", FrameIds(frameId = "letta-msg-1")),
             toolCall("call-1"),
-            assistant("Second", frameId = "letta-msg-2"),
+            assistant("Second", FrameIds(frameId = "letta-msg-2")),
         )
         val assistants = turn.emittedDeltas().filter { it.field("message_type") == "assistant_message" }
         assertEquals(listOf("First", "Second"), assistants.map { it.field("content") })
@@ -55,10 +55,10 @@ class TurnStreamIdentityTest {
     fun messageIdWinsOverSegmentationRule() = runTest {
         val turn = StampedTurn(this)
         turn.feed(
-            assistant("Part one", messageId = "m1"),
+            assistant("Part one", ids("m1")),
             toolCall("call-1"),
-            assistant(" and two", messageId = "m1"),
-            assistant("Other", messageId = "m2"),
+            assistant(" and two", ids("m1")),
+            assistant("Other", ids("m2")),
         )
         val assistants = turn.emittedDeltas().filter { it.field("message_type") == "assistant_message" }
         assertEquals(listOf("Part one", "Part one and two", "Other"), assistants.map { it.field("content") })
@@ -88,7 +88,7 @@ class TurnStreamIdentityTest {
     @Test
     fun replayedFrameIsDropped() = runTest {
         val turn = StampedTurn(this)
-        val first = assistant("same", messageId = "m1", key = "replay-key")
+        val first = assistant("same", FrameIds(messageId = "m1", key = FrameKey("replay-key")))
         turn.feed(first, first)
         assertEquals(listOf("same"), turn.emittedDeltas().map { it.field("content") })
     }
@@ -127,20 +127,17 @@ class TurnStreamIdentityTest {
         assertNull(stop["turn_id"])
     }
 
-    private fun assistant(
-        text: String,
-        messageId: String? = null,
-        frameId: String? = null,
-        key: String? = null,
-    ): RuntimeEventDraft {
+    private fun ids(messageId: String) = FrameIds(messageId = messageId)
+
+    private fun assistant(text: String, ids: FrameIds = FrameIds()): RuntimeEventDraft {
         val fields = listOfNotNull(
             """"message_type":"assistant_message"""",
             """"run_id":"run-1"""",
-            messageId?.let { """"message_id":"$it"""" },
-            frameId?.let { """"id":"$it"""" },
+            ids.messageId?.let { """"message_id":"$it"""" },
+            ids.frameId?.let { """"id":"$it"""" },
             """"content":"$text"""",
         ).joinToString(",")
-        return frame("{$fields}", key = key)
+        return frame("{$fields}", ids.key)
     }
 
     private fun toolCall(callId: String) = frame(
@@ -151,10 +148,13 @@ class TurnStreamIdentityTest {
         """{"message_type":"tool_return_message","tool_call_id":"$callId","tool_return":"ok","status":"success"}""",
     )
 
-    private fun frame(delta: String, key: String? = null): RuntimeEventDraft {
-        val keyField = key?.let { """"idempotency_key":"$it",""" }.orEmpty()
+    private fun frame(delta: String, key: FrameKey? = null): RuntimeEventDraft {
+        val keyField = key?.let { """"idempotency_key":"${it.value}",""" }.orEmpty()
         return streamDraft(
-            RuntimeEventPayload.RemoteStreamFrame(frameId = key ?: "f", body = """{"type":"stream_delta",$keyField"delta":$delta}"""),
+            RuntimeEventPayload.RemoteStreamFrame(
+                frameId = key?.value ?: "f",
+                body = """{"type":"stream_delta",$keyField"delta":$delta}""",
+            ),
         )
     }
 
@@ -163,7 +163,13 @@ class TurnStreamIdentityTest {
     )
 }
 
-internal fun streamDraft(payload: RuntimeEventPayload) = RuntimeEventDraft(
+@JvmInline
+private value class FrameKey(val value: String)
+
+/** The optional upstream identifiers an assistant test frame carries. */
+private data class FrameIds(val messageId: String? = null, val frameId: String? = null, val key: FrameKey? = null)
+
+private fun streamDraft(payload: RuntimeEventPayload) = RuntimeEventDraft(
     backendId = BackendId("backend-1"),
     runtimeId = RuntimeId("runtime-1"),
     runId = RunId("run-1"),

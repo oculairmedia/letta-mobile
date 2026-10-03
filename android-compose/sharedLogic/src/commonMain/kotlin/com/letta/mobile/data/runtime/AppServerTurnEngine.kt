@@ -980,6 +980,44 @@ class AppServerTurnEngine(
         }
     }
 
+    private class TurnDraftWiring(
+        val scope: AppServerRuntimeScope,
+        val command: TurnCommand,
+        val permissionMode: AppServerPermissionMode,
+        val lease: LeaseRef,
+    )
+
+    /** The turn's one [TurnDraftProcessor], wired to this engine's approval, settle and terminal handling. */
+    private fun newTurnDraftProcessor(
+        wiring: TurnDraftWiring,
+        emitDraft: suspend (RuntimeEventDraft) -> Unit,
+        coroutineScope: CoroutineScope,
+    ): TurnDraftProcessor =
+        TurnDraftProcessor(
+            callbacks = TurnDraftCallbacks(
+                autoApprovedDraft = { draft ->
+                    autoApprovedToolCallDraft(wiring.scope, wiring.permissionMode, wiring.command, draft)?.let { approved ->
+                        wiring.command.draftFor(runId = draft.runId, payload = approved)
+                    }
+                },
+                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, wiring.lease.slot.key, ledger) },
+                clearApprovals = { approvals.clearKey(wiring.lease.slot.key) },
+                emit = emitDraft,
+                settle = { ledger, reason ->
+                    settleDanglingToolCalls(wiring.command, ledger.emitted, ledger.returned, emitDraft, reason)
+                },
+                completedDraft = { runId -> wiring.command.completedDraft(runId) },
+                recordTerminal = { draft, frameSeq ->
+                    recordTerminalLifecycle(draft, wiring.command, frameSeq, wiring.lease)
+                },
+                noteCompleted = { frameSeq -> noteCompletedSettle(frameSeq, wiring.lease) },
+                complete = { throw TurnCompleted },
+                settleDelayMs = terminalSettleQuietMs,
+            ),
+            coroutineScope = coroutineScope,
+            identity = turnStreamIdentityFor(wiring.lease.queuedInput.clientMessageId),
+        )
+
     private data class TurnFrameContext(
         val runtimeScope: AppServerRuntimeScope,
         val command: TurnCommand,
@@ -1201,29 +1239,10 @@ class AppServerTurnEngine(
         val slot = lease.slot
         val idleWatchdog = TurnIdleWatchdog(slot.key) { lease.queuedInput.isWatchdogPaused(isConnectionGenerationSuperseded(lease)) }
         val watchdog = idleWatchdog.launchIn(this)
-        val draftProcessor = TurnDraftProcessor(
-            callbacks = TurnDraftCallbacks(
-                autoApprovedDraft = { draft ->
-                    autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)?.let { approved ->
-                        command.draftFor(runId = draft.runId, payload = approved)
-                    }
-                },
-                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, slot.key, ledger) },
-                clearApprovals = { approvals.clearKey(slot.key) },
-                emit = emitDraft,
-                settle = { ledger, reason ->
-                    settleDanglingToolCalls(command, ledger.emitted, ledger.returned, emitDraft, reason)
-                },
-                completedDraft = { runId -> command.completedDraft(runId) },
-                recordTerminal = { draft, frameSeq ->
-                    recordTerminalLifecycle(draft, command, frameSeq, lease)
-                },
-                noteCompleted = { frameSeq -> noteCompletedSettle(frameSeq, lease) },
-                complete = { throw TurnCompleted },
-                settleDelayMs = terminalSettleQuietMs,
-            ),
+        val draftProcessor = newTurnDraftProcessor(
+            TurnDraftWiring(scope, command, turnPermissionMode, lease),
+            emitDraft,
             coroutineScope = this,
-            identity = turnStreamIdentityFor(lease.queuedInput.clientMessageId),
         )
         val emittedToolCallIds = draftProcessor.ledger.emitted
         val returnedToolCallIds = draftProcessor.ledger.returned

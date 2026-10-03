@@ -42,9 +42,10 @@ internal enum class StreamTextFrameSource {
  */
 internal class TurnStreamIdentity(
     private val turnId: String,
-    private val mintId: () -> String,
+    mintId: () -> String,
 ) {
-    private val boundaries = TextMessageBoundaries(mintId)
+    private val mint = { LogicalMessageId(mintId()) }
+    private val boundaries = TextMessageBoundaries(mint)
     private val texts = CumulativeTexts()
     private val seenTextFrameKeys = HashSet<String>()
 
@@ -61,8 +62,7 @@ internal class TurnStreamIdentity(
     private fun stampText(frame: DeltaFrame, source: StreamTextFrameSource): String? {
         val frameKey = frame.idempotencyKey
         if (frameKey != null && !seenTextFrameKeys.add(frameKey)) return null
-        val type = frame.type.orEmpty()
-        val logicalId = boundaries.textMessageId(type, frame.delta.stampString("message_id"), frame.delta.stampString("otid"))
+        val logicalId = boundaries.textMessageId(frame.boundaryKey())
         val text = frame.textChunk()?.let { texts.next(logicalId, it, source) }
         return frame.restamped(FrameIdentity(logicalId, turnId), text)
     }
@@ -74,18 +74,19 @@ internal class TurnStreamIdentity(
     }
 
     private fun rowIdentity(type: String, delta: JsonObject): FrameIdentity = when (type) {
-        "user_message" -> delta.stampString("otid")?.let { FrameIdentity(it, it) } ?: FrameIdentity(turnId, turnId)
-        "tool_call_message" -> FrameIdentity(
-            canonicalToolCalls(delta).firstOrNull()?.toolCallId?.takeIf { it.isNotBlank() }
-                ?.let { "tc-$it" } ?: mintId(),
-            turnId,
-        )
-        "tool_return_message" -> FrameIdentity(
-            canonicalToolReturn(delta).toolCallId.takeIf { it.isNotBlank() }?.let { "tr-$it" } ?: mintId(),
-            turnId,
-        )
-        else -> FrameIdentity(mintId(), turnId)
+        "user_message" -> (delta.stampString("otid") ?: turnId).let { FrameIdentity(LogicalMessageId(it), it) }
+        "tool_call_message" -> FrameIdentity(toolCallRowId(delta), turnId)
+        "tool_return_message" -> FrameIdentity(toolReturnRowId(delta), turnId)
+        else -> FrameIdentity(mint(), turnId)
     }
+
+    private fun toolCallRowId(delta: JsonObject): LogicalMessageId =
+        canonicalToolCalls(delta).firstOrNull()?.toolCallId?.takeIf { it.isNotBlank() }
+            ?.let { LogicalMessageId("tc-$it") } ?: mint()
+
+    private fun toolReturnRowId(delta: JsonObject): LogicalMessageId =
+        canonicalToolReturn(delta).toolCallId.takeIf { it.isNotBlank() }
+            ?.let { LogicalMessageId("tr-$it") } ?: mint()
 
     private companion object {
         val TEXT_TYPES = setOf("assistant_message", "reasoning_message", "hidden_reasoning_message")
@@ -122,7 +123,13 @@ internal fun turnStreamIdentityFor(clientMessageId: String?): TurnStreamIdentity
         mintId = { "lm-${Uuid.random()}" },
     )
 
-private data class FrameIdentity(val logicalId: String, val turnId: String)
+@JvmInline
+private value class LogicalMessageId(val value: String)
+
+private data class FrameIdentity(val logicalId: LogicalMessageId, val turnId: String)
+
+/** What decides which logical message a text frame belongs to: its type, then `message_id`, then `otid`. */
+private data class TextFrameKey(val type: String, val messageId: String?, val otid: String?)
 
 private data class StampedText(val text: String, val seq: Int)
 
@@ -131,15 +138,15 @@ private data class StampedText(val text: String, val seq: Int)
  * order: the upstream `message_id`, else its `otid`, else "a frame of a different message_type was
  * seen since the last text frame of this type". `run_id` and the rotating delta `id` never count.
  */
-internal class TextMessageBoundaries(private val mintId: () -> String) {
-    private val explicit = HashMap<String, String>()
-    private val currentByType = HashMap<String, String>()
+private class TextMessageBoundaries(private val mintId: () -> LogicalMessageId) {
+    private val explicit = HashMap<String, LogicalMessageId>()
+    private val currentByType = HashMap<String, LogicalMessageId>()
     private var lastStampedType: String? = null
 
-    fun textMessageId(type: String, messageId: String?, otid: String?): String {
-        val explicitKey = listOfNotNull(messageId?.let { "m:$it" }, otid?.let { "o:$it" }).firstOrNull()
-        val id = explicitKey?.let { explicit.getOrPut("$type|$it", mintId) } ?: segmentedId(type)
-        lastStampedType = type
+    fun textMessageId(key: TextFrameKey): LogicalMessageId {
+        val explicitKey = listOfNotNull(key.messageId?.let { "m:$it" }, key.otid?.let { "o:$it" }).firstOrNull()
+        val id = explicitKey?.let { explicit.getOrPut("${key.type}|$it", mintId) } ?: segmentedId(key.type)
+        lastStampedType = key.type
         return id
     }
 
@@ -147,17 +154,17 @@ internal class TextMessageBoundaries(private val mintId: () -> String) {
         lastStampedType = type
     }
 
-    private fun segmentedId(type: String): String {
+    private fun segmentedId(type: String): LogicalMessageId {
         val continued = lastStampedType == type
         return currentByType[type].takeIf { continued } ?: mintId().also { currentByType[type] = it }
     }
 }
 
 private class CumulativeTexts {
-    private val textById = HashMap<String, String>()
-    private val seqById = HashMap<String, Int>()
+    private val textById = HashMap<LogicalMessageId, String>()
+    private val seqById = HashMap<LogicalMessageId, Int>()
 
-    fun next(logicalId: String, chunk: String, source: StreamTextFrameSource): StampedText {
+    fun next(logicalId: LogicalMessageId, chunk: String, source: StreamTextFrameSource): StampedText {
         val text = when (source) {
             StreamTextFrameSource.AppServerDelta -> textById[logicalId].orEmpty() + chunk
             StreamTextFrameSource.CumulativeSnapshot -> chunk
@@ -175,6 +182,8 @@ private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject) {
 
     private val textField: String get() = if (type == "assistant_message") "content" else "reasoning"
 
+    fun boundaryKey() = TextFrameKey(type.orEmpty(), delta.stampString("message_id"), delta.stampString("otid"))
+
     fun textChunk(): String? =
         textFrom(delta[textField]) ?: textFrom(delta["content"]) ?: textFrom(delta["text"])
 
@@ -185,7 +194,7 @@ private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject) {
                 put(textField, it.text)
                 put("text_seq", it.seq)
             }
-            put("logical_message_id", identity.logicalId)
+            put("logical_message_id", identity.logicalId.value)
             put("turn_id", identity.turnId)
         }
         return buildJsonObject {
