@@ -75,12 +75,13 @@ class StreamRewriteFramesTest {
 
     private var sequence = 0
 
-    /** One App Server assistant frame: a fresh backend id per chunk, the reply's stable otid. */
+    /** One App Server assistant frame: a fresh backend id per chunk, the reply's stamped logical id. */
     private fun chunk(index: Int, text: String) = AssistantMessage(
         id = "letta-msg-${1_300 + index}",
         contentRaw = JsonPrimitive(text),
         date = "2026-10-03T12:00:${(10 + index % 50).toString().padStart(2, '0')}.000Z",
-        otid = REPLY_OTID,
+        logicalMessageId = REPLY_OTID,
+        textSeq = index + 1,
         runId = RUN,
     )
 
