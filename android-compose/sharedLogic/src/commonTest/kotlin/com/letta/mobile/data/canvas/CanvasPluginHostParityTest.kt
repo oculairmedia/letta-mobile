@@ -64,6 +64,8 @@ class CanvasPluginHostParityTest {
         assertEquals(scenes[0], scenes[1])
         assertEquals(scenes[0], scenes[2])
         assertEquals(CanvasEndBinding("n-a", "right"), CanvasOpProjector.arrowBindingsOf(raw[0]).getValue("a-sort").start)
+        assertEquals(unstamped(hosts[0].logged()), unstamped(hosts[1].logged()), "the same expansion, in the same order, with the same clocks")
+        assertIs<CanvasOp.BatchOp>(hosts[0].logged()?.last(), "the arrow and its binding are one entry")
     }
 
     /** A result without what each host counts or mints for itself: its revision. */

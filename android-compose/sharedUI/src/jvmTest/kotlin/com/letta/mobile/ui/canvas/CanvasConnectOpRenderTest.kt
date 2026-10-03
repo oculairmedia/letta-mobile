@@ -78,8 +78,11 @@ import kotlin.test.assertTrue
  * connect-phone-moved.png, connect-desktop-moved.png.
  *
  * Headless DrawingPreview does not run the live follow effect, so the "after" snapshot persists
- * [CanvasSnapping.follow] through update_element. The open board re-aims the same way from
- * followNoteConnectors.
+ * [CanvasSnapping.follow] through update_element. The open board's own re-aim
+ * ([CanvasWorkspaceSupport.followConnectors]) is tested in [CanvasConnectFollowTest].
+ *
+ * Connector labels are the arrow's text; whether DrawBox draws them is drawbox's business
+ * (letta-mobile #1757), so this test asserts the text, never label pixels.
  */
 class CanvasConnectOpRenderTest {
     private val json = Json { ignoreUnknownKeys = true }

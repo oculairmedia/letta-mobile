@@ -117,7 +117,9 @@ object CanvasToolContract {
             "style = {fontScale?, fontFamily? sans|serif|mono, textColor?, align? start|center|end}, " +
             "owner: explicit (default when a frame is given) | user | auto) and " +
             "remove_document {documentId} takes it off. " +
-            "connect {id, from, to, label?, style?} draws an arrow between two notes or shapes (the sides face each other); " +
+            "connect {id, from, to, label?, style?: {strokeColor? #rrggbb or #rrggbbaa, strokeWidth?, dashed?}} draws an arrow " +
+            "between two framed notes or boxed shapes (not lines or arrows), from the midpoint of the side that faces the other " +
+            "to the midpoint of its facing side; the two must not overlap or touch, and a rotated shape is joined at its unrotated box; " +
             "set_arrow_binding {elementId, binding: {start?: {documentId, side}, end?}} attaches an existing arrow to notes " +
             "(side is left, top, right or bottom; a null end stays free). " +
             CanvasSceneSchemaText.PLUGIN_OPS +
