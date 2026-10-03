@@ -336,6 +336,8 @@ data class ComposeReceiptItem(
     val kind: ComposeKind,
     val id: String? = null,
     val count: Int? = null,
+    /** `[x, y, w, h]` in world units, integers, half-up. Absent when the receipt had to drop it. */
+    val frame: List<Int>? = null,
     val children: List<ComposeReceiptItem>? = null,
 ) {
     /** The board id of this piece of [artifactId]: the one the receipt names, else the derived one. */
@@ -362,6 +364,10 @@ data class ComposeReceipt(
     val bounds: ComposeBounds? = null,
     val items: List<ComposeReceiptItem>,
     val warnings: List<String> = emptyList(),
+    /** True when any item's frame was left off so the receipt stayed within [MAX_RECEIPT_BYTES]. */
+    val framesOmitted: Boolean? = null,
+    /** Set with [framesOmitted]: where to read the geometry that did not fit. */
+    val framesHint: String? = null,
 )
 
 @Serializable

@@ -148,7 +148,7 @@ class CanvasComposeCompilerTest {
                     ),
                 ),
             ),
-            receipt.items,
+            receipt.items.map { it.withoutFrames() },
         )
         // Every derived board id is an op the batch makes (letta-mobile-bglj6.14).
         val made = ready.ops.map { (it as? CanvasOp.SetDocumentOp)?.documentId ?: (it as CanvasOp.AddElementOp).elementId }.toSet()
@@ -527,4 +527,7 @@ class CanvasComposeCompilerTest {
     private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.content
 
     private fun hex(bytes: ByteArray): String = bytes.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+
+    private fun ComposeReceiptItem.withoutFrames(): ComposeReceiptItem =
+        copy(frame = null, children = children?.map { it.withoutFrames() })
 }
