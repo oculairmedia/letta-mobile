@@ -77,17 +77,20 @@ internal fun TimelineListFrame(
     modifier: Modifier = Modifier,
     content: LazyListScope.() -> Unit,
 ) {
+    val pinned = overlays.pinnedPrompt
     val fades = rememberTimelineFadeAlphas(
         canScrollTowardOlder = listState.canScrollForward,
         canScrollTowardNewer = listState.canScrollBackward,
-        promptPinned = overlays.pinnedPrompt.item != null,
+        // The desktop's pinned card stands the top fade down; a sticky copy keeps it on.
+        promptPinned = pinned.item != null && !pinned.sticky,
+        stickyPromptPinned = pinned.item != null && pinned.sticky,
     )
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
         backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = ChatTimelineDimens.Alpha.selection),
     )
     // Under floating chrome the prompt's sticky copy stands in for its row, which hides meanwhile.
-    val sticky = overlays.pinnedPrompt.takeIf { it.sticky }
+    val sticky = pinned.takeIf { it.sticky }
     Box(modifier = modifier.fillMaxWidth()) {
         CompositionLocalProvider(LocalTextSelectionColors provides selectionColors, LocalStickyPrompt provides sticky) {
             LazyColumn(
@@ -99,7 +102,13 @@ internal fun TimelineListFrame(
                     .clipToBounds()
                     // Under floating chrome the dissolve runs from the top edge through it (Android's
                     // chat list fades over its top padding, ChatMessageListBody).
-                    .timelineFadingEdges(fades, topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve)
+                    // A sticky prompt runs the rows out above its bottom edge, so they never pass
+                    // hard under it or the chrome.
+                    .timelineFadingEdges(
+                        fades,
+                        topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve,
+                        pinnedEdgePx = { pinned.copyBottomPx.toFloat() },
+                    )
                     .graphicsLayer {
                         translationY = overlays.glide.overshootPx
                         // A pinch in progress, read here only: it redraws the rows, never re-lays them out.
@@ -152,9 +161,9 @@ internal fun TimelineListFrame(
 
 /**
  * The pinned prompt's copy over the list. On the desktop it rests in a card's inset below the top
- * edge. Under floating chrome ([PinnedPrompt.sticky]) it is the prompt's row exactly (the list's
- * gutter, its leading space), placed by [PinnedPrompt.copyTop]: on its row, then held at the
- * visible top, so it never travels up under the chrome and never jumps.
+ * edge. Under floating chrome ([PinnedPrompt.sticky]) it is the prompt's bubble exactly (the list's
+ * gutter, no leading space), placed by [PinnedPrompt.copyTop]: on its row, then held right at the
+ * visible top, so it never travels up under the chrome, never jumps, and leaves no gap below it.
  */
 @Composable
 private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindings: TimelineRowBindings, modifier: Modifier) {
@@ -174,7 +183,9 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
     ) {
         // A copy, never a send flight's landing spot: only the prompt's own row can be.
         CompositionLocalProvider(LocalSendFlight provides null) {
-            TimelineItemRow(prompt, bindings, leadingSpace = pinned.sticky)
+            // The bubble alone: without the row's leading space it holds snug under the chrome,
+            // and bottom-aligned with its row it still rides the row seamlessly.
+            TimelineItemRow(prompt, bindings, leadingSpace = false)
         }
     }
 }

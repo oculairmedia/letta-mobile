@@ -58,13 +58,24 @@ fun AgentMessageProvenanceLabel(
     onToggleExpand: () -> Unit,
     resolveName: ((agentId: String) -> String?)? = null,
     onAgentClick: ((agentId: String) -> Unit)? = null,
+    /**
+     * Set when the label is drawn inside a tinted bubble (the shared timeline's inter-agent prompt):
+     * the bubble's content colour then carries the names and the quiet text, so they read on its
+     * container. Null keeps the page tints (tertiary names, onSurfaceVariant text).
+     */
+    contentColor: Color? = null,
 ) {
     val spec = provenance.toLabelSpec(resolveName ?: { null })
     // Semantic identity tint — restrained (tertiary is the M3 "accent
     // distinct from primary" role), not a loud banner color. Failures use
     // the standard destructive (error) role regardless of direction, since a
     // failed send/receipt needs to be noticed.
-    val tint = if (spec.isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+    val tint = when {
+        spec.isFailed -> MaterialTheme.colorScheme.error
+        contentColor != null -> contentColor
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    val muted = contentColor?.copy(alpha = IN_BUBBLE_MUTED_ALPHA) ?: MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = Modifier
@@ -74,7 +85,7 @@ fun AgentMessageProvenanceLabel(
         AgentMessageProvenanceHeader(
             provenance = provenance,
             spec = spec,
-            tint = tint,
+            colors = ProvenanceHeaderColors(tint, muted),
             expanded = expanded,
             onToggleExpand = onToggleExpand,
             onAgentClick = onAgentClick ?: {},
@@ -113,6 +124,12 @@ fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: Col
     }
 }
 
+/** The quiet text's strength against a bubble's content colour. */
+private const val IN_BUBBLE_MUTED_ALPHA = 0.72f
+
+/** The header's two inks: the agent names (and failures), and the quiet text around them. */
+private data class ProvenanceHeaderColors(val tint: Color, val muted: Color)
+
 private data class ProvenanceLabelSpec(
     val fromLabel: String,
     val toLabel: String,
@@ -139,7 +156,7 @@ private fun AgentMessageProvenance.toLabelSpec(resolveName: (String) -> String?)
 private fun AgentMessageProvenanceHeader(
     provenance: AgentMessageProvenance,
     spec: ProvenanceLabelSpec,
-    tint: Color,
+    colors: ProvenanceHeaderColors,
     expanded: Boolean,
     onToggleExpand: () -> Unit,
     onAgentClick: (String) -> Unit,
@@ -152,8 +169,8 @@ private fun AgentMessageProvenanceHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        AgentRoute(provenance, spec, tint, onAgentClick)
-        DeliveryState(provenance.deliveryState, spec.isFailed)
+        AgentRoute(provenance, spec, colors, onAgentClick)
+        DeliveryState(provenance.deliveryState, spec.isFailed, colors.muted)
         DisclosureChevron(
             expanded = expanded,
             contentDescription = if (expanded) {
@@ -169,7 +186,7 @@ private fun AgentMessageProvenanceHeader(
 private fun RowScope.AgentRoute(
     provenance: AgentMessageProvenance,
     spec: ProvenanceLabelSpec,
-    tint: Color,
+    colors: ProvenanceHeaderColors,
     onAgentClick: (String) -> Unit,
 ) {
     Row(
@@ -177,13 +194,13 @@ private fun RowScope.AgentRoute(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.weight(1f, fill = false),
     ) {
-        AgentLink(spec.fromLabel, provenance.fromAgentId, tint, onAgentClick)
-        Text("→", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        AgentLink(spec.toLabel, provenance.toAgentId, tint, onAgentClick)
+        AgentLink(spec.fromLabel, provenance.fromAgentId, colors.tint, onAgentClick)
+        Text("→", style = MaterialTheme.typography.labelMedium, color = colors.muted)
+        AgentLink(spec.toLabel, provenance.toAgentId, colors.tint, onAgentClick)
         Text(
             text = " · Agent message",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = colors.muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -203,12 +220,12 @@ private fun AgentLink(label: String, agentId: String, tint: Color, onAgentClick:
 }
 
 @Composable
-private fun DeliveryState(state: AgentMessageDeliveryState, isFailed: Boolean) {
+private fun DeliveryState(state: AgentMessageDeliveryState, isFailed: Boolean, muted: Color) {
     if (state == AgentMessageDeliveryState.RECEIVER_CONFIRMED) return
     Text(
         text = state.displayLabel(),
         style = MaterialTheme.typography.labelSmall,
-        color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (isFailed) MaterialTheme.colorScheme.error else muted,
     )
 }
 
