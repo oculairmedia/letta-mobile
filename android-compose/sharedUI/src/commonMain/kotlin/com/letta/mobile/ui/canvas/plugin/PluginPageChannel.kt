@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.canvas.plugin
 
 import com.letta.mobile.data.plugin.view.PostMessagePort
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -16,7 +15,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
  * page asked and so cannot outrun it. Both ends stop at [close].
  */
 class PluginPageChannel(capacity: Int = DEFAULT_CAPACITY) : PostMessagePort {
-    private val fromPage = Channel<String>(capacity, BufferOverflow.DROP_LATEST)
+    // trySend on a full buffer fails rather than suspends: the newest message is the one dropped.
+    private val fromPage = Channel<String>(capacity)
     private val toPageQueue = Channel<String>(Channel.UNLIMITED)
 
     override val incoming: Flow<String> = fromPage.receiveAsFlow()
