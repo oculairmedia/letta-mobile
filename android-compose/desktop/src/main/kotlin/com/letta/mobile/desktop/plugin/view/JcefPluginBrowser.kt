@@ -56,7 +56,7 @@ internal class JcefPluginBrowser private constructor(
             val client = app.createClient()
             val config = CefMessageRouter.CefMessageRouterConfig(PluginPageShim.QUERY_FUNCTION, PluginPageShim.CANCEL_FUNCTION)
             val router = CefMessageRouter.create(config)
-            router.addHandler(JcefQueryHandler(wiring.queries), true)
+            router.addHandler(JcefQueryHandler(wiring.queries).asRouterHandler(), true)
             client.addMessageRouter(router)
             client.addRequestHandler(RenderFaults(wiring))
             client.addLifeSpanHandler(JcefNoPopups)
