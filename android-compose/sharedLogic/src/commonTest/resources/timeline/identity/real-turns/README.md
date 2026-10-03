@@ -112,6 +112,35 @@ model replies, and the App Server's own device-info `system-reminder`.
    jdcoj's `RecordedTurnsStampDeterministicallyTest` should treat these files as
    `CumulativeSnapshot` input.
 
+### Raw upstream (pre-fanout) deltas are pure increments
+
+Every capture above was taken after the wrapper's accumulator (`CumulativeStreamText`) had
+already run, so it could not show what the App Server itself sends. `raw-upstream/` closes
+that gap. Each file is one turn sent **directly on the App Server WebSocket**
+(`ws://127.0.0.1:4500`, the same upstream the Iroh wrapper consumes), on the
+`identity-capture` agent, recording every raw frame (`{recv_ms, channel, wire}`), plus the
+`message.list` read after it.
+
+| file | route | text messages | raw text frames |
+|---|---|---|---|
+| `MiniMax-M3` | lmstudio | 2 assistant (preamble + reply) | 110 |
+| `claude-sonnet-5-5` | lmstudio | 1 assistant | 79 |
+| `or-glm-5.3-flash` | OpenRouter | 2 reasoning + 1 assistant | 188 |
+| `or-gpt-6.1-sol` | OpenRouter | 1 assistant | 103 |
+| `or-grok-4.7` | OpenRouter | 1 reasoning + 1 assistant | 112 |
+| `or-qwen3.8-flash` | OpenRouter | 2 reasoning + 1 assistant | 89 |
+
+- **Every raw assistant and reasoning delta is a pure increment**: the next chunk only
+  (`"The"`, `" date"`, `" command"`…). There are 0 snapshot frames in 681.
+- **Concatenating the increments for each message id reproduces the stored `message.list`
+  text exactly for 12 of 12 messages**, reasoning included.
+- So for the App Server delta source, **append-always is correct**, and the host's
+  `CumulativeStreamText` is what turns increments into the snapshots seen downstream.
+  Snapshot text into append-always would stack copies, but this source does not produce it.
+- Not covered: other producers that may emit cumulative text (jdcoj's
+  `StreamTextFrameSource.CumulativeSnapshot`, e.g. external-transport frames). These
+  captures cover the App Server `stream_delta` path only.
+
 ## Gaps
 
 - **No Anthropic reasoning.** Claude via the `lmstudio` and `anthropic` routes, and via
