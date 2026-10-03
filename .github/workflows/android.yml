@@ -62,6 +62,10 @@ env:
   # can affect the daemon. CI runs on Java 26, so acknowledge this access at the
   # workflow boundary and keep project-level flags scoped to daemon/test workers.
   GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
+  # Bump to discard the shared Gradle User Home caches. A transient Maven Central
+  # 404 (leakcanary-android .aar, 2026-10-02) was persisted into the main-written
+  # cache as a missing-artifact entry and failed build-apk until it was replaced.
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v2
 
 jobs:
   test:
