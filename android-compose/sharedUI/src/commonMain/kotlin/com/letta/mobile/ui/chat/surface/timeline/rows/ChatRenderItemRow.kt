@@ -95,6 +95,8 @@ internal object ChatRowTestTags {
     const val SUBAGENT_DISPATCH = "subagent-dispatch"
     const val SUBAGENT_NOTIFICATION = "subagent-notification"
     const val USER_PROMPT = "chat-user-prompt"
+    /** An inter-agent prompt's provenance header, inside its bubble. */
+    const val PROMPT_PROVENANCE = "chat-user-prompt-provenance"
     const val AGENT_TEXT = "chat-agent-text"
     const val REASONING_TOGGLE = "chat-reasoning-toggle"
     const val RUN_BLOCK = "chat-run-block"
