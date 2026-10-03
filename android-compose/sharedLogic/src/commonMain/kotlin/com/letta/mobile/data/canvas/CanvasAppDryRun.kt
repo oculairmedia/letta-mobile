@@ -18,10 +18,6 @@ internal object CanvasAppDryRun {
         encodeDefaults = true
     }
 
-    /** The ops a `canvas_apply_ops` [input] would write, or null when it has none to read. */
-    fun applyOps(input: JsonObject): List<CanvasOp>? =
-        input["ops"]?.let { runCatching { HostCanvasToolInputs.ops(it) }.getOrNull() }
-
     /** The replace a `canvas_replace_scene` [input] would write, or null when it names no scene. */
     fun replaceScene(input: JsonObject): List<CanvasOp>? =
         (input["scene_json"] as? JsonPrimitive)?.contentOrNull?.let { listOf(CanvasOp.ReplaceSceneOp("", "", 0L, it)) }
