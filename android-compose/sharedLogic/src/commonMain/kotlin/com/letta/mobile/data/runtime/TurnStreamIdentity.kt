@@ -69,12 +69,11 @@ internal class TurnStreamIdentity(
     }
 
     private fun stampRow(frame: DeltaFrame): String =
-        frame.restamped(rowIdentity(noteRowFrame(frame), frame.delta), text = null)
+        frame.restamped(noteRowFrame(frame).let(::rowIdentity), text = null)
 
-    private fun noteRowFrame(frame: DeltaFrame): String {
-        val type = frame.type.orEmpty()
-        boundaries.noteNonTextFrame(type)
-        return type
+    private fun noteRowFrame(frame: DeltaFrame): DeltaFrame {
+        boundaries.noteNonTextFrame()
+        return frame
     }
 
     /**
@@ -87,18 +86,18 @@ internal class TurnStreamIdentity(
         val frame = DeltaFrame(JsonObject(emptyMap()), delta)
         val stampable = frame.type != null && frame.type !in TEXT_TYPES && frame.type !in UNSTAMPED_TYPES
         if (!stampable || delta.containsKey("logical_message_id")) return delta
-        return frame.stampedDelta(rowIdentity(noteRowFrame(frame), delta), text = null)
+        return frame.stampedDelta(rowIdentity(noteRowFrame(frame)), text = null)
     }
 
     /** A projected tool call or return the processor never sees as a stream frame still ends a text run. */
-    fun noteNonStreamRow(type: String) {
-        boundaries.noteNonTextFrame(type)
+    fun noteNonStreamRow() {
+        boundaries.noteNonTextFrame()
     }
 
-    private fun rowIdentity(type: String, delta: JsonObject): FrameIdentity = when (type) {
-        "user_message" -> (delta.stampString("otid") ?: turnId).let { FrameIdentity(LogicalMessageId(it), it) }
-        "tool_call_message" -> FrameIdentity(toolCallRowId(delta), turnId)
-        "tool_return_message" -> FrameIdentity(toolReturnRowId(delta), turnId)
+    private fun rowIdentity(frame: DeltaFrame): FrameIdentity = when (frame.type) {
+        "user_message" -> (frame.delta.stampString("otid") ?: turnId).let { FrameIdentity(LogicalMessageId(it), it) }
+        "tool_call_message" -> FrameIdentity(toolCallRowId(frame.delta), turnId)
+        "tool_return_message" -> FrameIdentity(toolReturnRowId(frame.delta), turnId)
         else -> FrameIdentity(mint(), turnId)
     }
 
@@ -134,8 +133,8 @@ internal fun TurnStreamIdentity.stampPayload(payload: RuntimeEventPayload): Runt
             stamp(payload.body, StreamTextFrameSource.AppServerDelta)?.let { payload.copy(body = it) }
         is RuntimeEventPayload.ExternalTransportFrame ->
             stamp(payload.body, StreamTextFrameSource.CumulativeSnapshot)?.let { payload.copy(body = it) }
-        is RuntimeEventPayload.ToolCallObserved -> payload.also { noteNonStreamRow("tool_call_message") }
-        is RuntimeEventPayload.ToolReturnObserved -> payload.also { noteNonStreamRow("tool_return_message") }
+        is RuntimeEventPayload.ToolCallObserved -> payload.also { noteNonStreamRow() }
+        is RuntimeEventPayload.ToolReturnObserved -> payload.also { noteNonStreamRow() }
         else -> payload
     }
 
@@ -188,8 +187,9 @@ private class TextMessageBoundaries(private val mintId: () -> LogicalMessageId) 
         return LogicalMessageId(rowId)
     }
 
-    fun noteNonTextFrame(type: String) {
-        lastStampedType = type
+    /** A non-text row (tool call, tool return, user echo...) ends the current text run of every type. */
+    fun noteNonTextFrame() {
+        lastStampedType = null
     }
 
     private fun segmentedId(type: String): LogicalMessageId {
