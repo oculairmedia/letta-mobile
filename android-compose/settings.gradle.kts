@@ -56,6 +56,9 @@ include(":core:testutil")
 include(":avatar:core")
 include(":avatar:renderer-rive")
 include(":sharedLogic")
+// The Kotlin SPI jvm canvas plugins compile against, and its conformance kit (letta-mobile-s416w.26).
+include(":plugin-api")
+include(":plugin-api-testkit")
 include(":sharedUI")
 // Phone fixtures for the shared chat page: sharedUI's snapshot tests and desktop's phone playground.
 include(":sharedUI-devfixtures")

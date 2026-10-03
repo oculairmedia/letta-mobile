@@ -201,6 +201,17 @@ git -C "$repo" add . && git -C "$repo" commit -qm "add appserver-cli file"
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base2")"
 assert_eq "$actual" ":appserver-cli:test"
 
+# An SPI change re-runs the conformance kit; a kit change runs only the kit.
+mkdir -p "$repo/android-compose/plugin-api/src" "$repo/android-compose/plugin-api-testkit/src"
+touch "$repo/android-compose/plugin-api/src/CanvasPlugin.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch plugin-api"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" ":plugin-api:jvmTest :plugin-api-testkit:jvmTest"
+touch "$repo/android-compose/plugin-api-testkit/src/PluginConformance.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch plugin-api-testkit"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" ":plugin-api-testkit:jvmTest"
+
 repo="$TMP/policy"
 new_repo "$repo"
 mkdir -p "$repo/android-compose/app/src" "$repo/android-compose/sharedLogic/src/commonMain/kotlin" \
