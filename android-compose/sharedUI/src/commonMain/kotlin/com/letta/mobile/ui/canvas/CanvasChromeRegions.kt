@@ -11,6 +11,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import com.letta.mobile.data.canvas.CanvasHistory
 
 /**
  * The board's own controls, by where they are on screen.
@@ -107,6 +108,12 @@ private class ChromeBounds {
 fun interface CanvasDocumentRecorder {
     /** Runs [block] and records whatever it changed as one step called [label]. */
     suspend fun recording(label: String, block: suspend () -> Unit)
+
+    /**
+     * Records [step], a change already made that worked out its own undo (a plugin element's move
+     * or removal, letta-mobile-s416w.3/.4). A recorder with no history ignores it.
+     */
+    fun record(step: CanvasHistory.Step.Documents) = Unit
 }
 
 /** The board's recorder, for editors composed inside it. */
@@ -121,4 +128,10 @@ val LocalCanvasDocumentRecorder = androidx.compose.runtime.compositionLocalOf<Ca
  */
 suspend fun CanvasDocumentRecorder?.recordingOrJust(label: String, block: suspend () -> Unit) {
     if (this == null) block() else recording(label, block)
+}
+
+/** Runs [change] and records the step it returns, when there is a board listening and it changed something. */
+suspend fun CanvasDocumentRecorder?.recordingStep(change: suspend () -> CanvasHistory.Step.Documents?) {
+    val step = change() ?: return
+    this?.record(step)
 }
