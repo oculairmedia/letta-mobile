@@ -67,7 +67,7 @@ object HostCanvasTools {
 
     private suspend fun getLayout(backend: HostCanvasBackend, entry: HostCanvasEntry, input: JsonObject): ExternalToolResult {
         val scene = backend.scene(entry)
-        return layoutAnswer(CanvasLayoutRead.answer(scene.sceneJson, scene.revision, input))
+        return layoutAnswer(CanvasLayoutRead.answer(scene.sceneJson, LayoutRevision(scene.revision), input))
     }
 
     private fun layoutAnswer(answer: CanvasLayoutAnswer): ExternalToolResult = when (answer) {

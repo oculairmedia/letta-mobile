@@ -409,7 +409,7 @@ class CanvasGetLayoutTool(
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
                 is CanvasLookupResult.Found -> layoutAnswer(
-                    CanvasLayoutRead.answer(lookup.doc.sceneJson, lookup.doc.revision, input),
+                    CanvasLayoutRead.answer(lookup.doc.sceneJson, LayoutRevision(lookup.doc.revision), input),
                 )
             }
         }

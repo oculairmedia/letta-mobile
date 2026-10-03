@@ -100,10 +100,6 @@ import io.ak1.drawbox.domain.model.hitTest
 import io.ak1.drawbox.domain.model.resizeBoundsForElement
 import io.ak1.drawbox.domain.model.rotateAround
 import io.ak1.drawbox.domain.model.topmostHit
-import io.ak1.drawbox.domain.model.textTopLeft
-import io.ak1.drawbox.domain.model.textBox
-import io.ak1.drawbox.domain.model.resolvedTextColor
-import io.ak1.drawbox.domain.model.canHoldText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -1690,78 +1686,6 @@ private fun DrawScope.renderElementContent(
         }
     }
 }
-
-/**
- * A shape's text, wrapped to [textBox] and centred in it. Laid out through the same
- * [TextLayoutCache] as text elements, under the shape's id plus [SHAPE_TEXT_KEY]. Skipped on
- * the read-only preview path, which has no measurer.
- */
-private fun DrawScope.drawShapeText(
-    shape: Element.Shape,
-    textCache: TextLayoutCache?,
-    textMeasurer: androidx.compose.ui.text.TextMeasurer?,
-) {
-    if (shape.text.isEmpty()) return
-    if (shape.shapeType == ShapeType.ARROW || shape.shapeType == ShapeType.LINE) {
-        drawConnectorLabel(shape, textCache, textMeasurer)
-        return
-    }
-    if (!shape.canHoldText) return
-    if (textCache == null || textMeasurer == null) return
-    val box = shape.textBox()
-    val layout = textCache.layoutFor(
-        id = shape.id + SHAPE_TEXT_KEY,
-        text = shape.text,
-        fontFamilyKey = shape.fontFamilyKey,
-        fontSize = shape.fontSize,
-        alignment = shape.textAlignment,
-        wrapWidth = box.width.coerceAtLeast(1f),
-        measurer = textMeasurer,
-    )
-    drawText(
-        textLayoutResult = layout,
-        color = shape.resolvedTextColor,
-        topLeft = shape.textTopLeft(layout.size.height.toFloat()),
-    )
-}
-
-/**
- * A connector has no interior ([canHoldText] is false), so its label is drawn on the
- * midpoint of the two endpoints, on a small white chip, instead of inside a box.
- */
-private fun DrawScope.drawConnectorLabel(
-    shape: Element.Shape,
-    textCache: TextLayoutCache?,
-    textMeasurer: androidx.compose.ui.text.TextMeasurer?,
-) {
-    if (textCache == null || textMeasurer == null) return
-    if (shape.points.size < 2) return
-    val layout = textCache.layoutFor(
-        id = shape.id + SHAPE_TEXT_KEY,
-        text = shape.text,
-        fontFamilyKey = shape.fontFamilyKey,
-        fontSize = shape.fontSize,
-        alignment = shape.textAlignment,
-        wrapWidth = connectorLabelWidth(shape.text, shape.fontSize),
-        measurer = textMeasurer,
-    )
-    val start = shape.points.first()
-    val end = shape.points.last()
-    val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
-    val topLeft = Offset(mid.x - layout.size.width / 2f, mid.y - layout.size.height / 2f)
-    val pad = 3f
-    drawRoundRect(
-        color = Color.White,
-        topLeft = Offset(topLeft.x - pad, topLeft.y - pad),
-        size = Size(layout.size.width.toFloat() + pad * 2, layout.size.height.toFloat() + pad * 2),
-        cornerRadius = CornerRadius(3f, 3f),
-    )
-    drawText(textLayoutResult = layout, color = shape.resolvedTextColor, topLeft = topLeft)
-}
-
-/** Width of the centred chip: wide enough for the glyphs, tight enough to stay off the cards. */
-private fun connectorLabelWidth(text: String, fontSize: Float): Float =
-    (text.length * fontSize * 0.72f + 4f).coerceAtLeast(fontSize)
 
 /**
  * Render an [Element.Text] inside its wrap box. Layout is delegated to

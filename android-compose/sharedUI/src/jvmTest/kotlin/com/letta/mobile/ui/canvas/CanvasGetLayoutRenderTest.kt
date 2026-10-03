@@ -90,28 +90,28 @@ class CanvasGetLayoutRenderTest {
             open(path).also { catchUp(it) }
         }
         val before = runBlocking { layout() }
-        render(session, before, PHONE_W, PHONE_H, "layout-phone.png")
-        render(session, before, DESKTOP_W, DESKTOP_H, "layout-desktop.png")
+        render(session, before, PHONE, "layout-phone.png")
+        render(session, before, DESKTOP, "layout-desktop.png")
         assertEndpoints(session, PLAN)
 
         val moved = PLAN.copy(x = PLAN.x + 36f)
         runBlocking {
-            publish(listOf(noteOp("n-plan", "Plan", "The shape of it", "#bbf7d0", moved)))
+            publish(listOf(noteOp("n-plan", NoteCopy("Plan", "The shape of it", "#bbf7d0"), moved)))
             reaim("n-plan", moved)
             catchUp(session)
         }
         val after = runBlocking { layout() }
-        render(session, after, PHONE_W, PHONE_H, "layout-phone-moved.png")
-        render(session, after, DESKTOP_W, DESKTOP_H, "layout-desktop-moved.png")
+        render(session, after, PHONE, "layout-phone-moved.png")
+        render(session, after, DESKTOP, "layout-desktop-moved.png")
         assertEndpoints(session, moved)
         assertEquals(listOf(moved.x.toInt(), moved.y.toInt(), moved.width.toInt(), moved.height.toInt()), after.rows.single { it.id == "n-plan" }.frame)
     }
 
-    private fun render(session: CanvasSession, reported: CanvasLayoutResult, width: Int, height: Int, snapshot: String) {
+    private fun render(session: CanvasSession, reported: CanvasLayoutResult, size: BoardSize, snapshot: String) {
         val documents = session.documents()
         val elements = DrawingSerializer.deserialize(CanvasOpProjector.stripMetadataForDrawBox(session.sceneJsonOrEmpty())).elements
         val viewport = Viewport(offset = Offset.Zero, scale = 1f)
-        runDesktopComposeUiTest(width = width, height = height) {
+        runDesktopComposeUiTest(width = size.width, height = size.height) {
             setContent {
                 CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                     MaterialTheme(colorScheme = lightColorScheme()) {
@@ -133,7 +133,7 @@ class CanvasGetLayoutRenderTest {
                 assertEquals(frame[3].toFloat(), node.size.height.toFloat(), 1.5f, "${row.id} height")
                 val right = node.positionInRoot.x + node.size.width
                 val bottom = node.positionInRoot.y + node.size.height
-                assertTrue(node.positionInRoot.x >= -1f && node.positionInRoot.y >= -1f && right <= width + 1f && bottom <= height + 1f, "${row.id} clipped at $right,$bottom on ${width}x$height")
+                assertTrue(node.positionInRoot.x >= -1f && node.positionInRoot.y >= -1f && right <= size.width + 1f && bottom <= size.height + 1f, "${row.id} clipped at $right,$bottom on ${size.width}x${size.height}")
             }
             val shape = elements.single { it.id == "shape-box" }.bounds()
             val shapeRow = reported.rows.single { it.id == "shape-box" }.frame!!
@@ -141,11 +141,11 @@ class CanvasGetLayoutRenderTest {
             assertEquals(shape.top, shapeRow[1].toFloat(), 1f)
             assertEquals(shape.width, shapeRow[2].toFloat(), 1f)
             assertEquals(shape.height, shapeRow[3].toFloat(), 1f)
-            assertTrue(shape.right <= width + 1f && shape.bottom <= height + 1f, "shape clipped")
+            assertTrue(shape.right <= size.width + 1f && shape.bottom <= size.height + 1f, "shape clipped")
             val file = File("build/canvas-compose-e2e").apply { mkdirs() }.resolve(snapshot)
             ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", file)
             assertTrue(file.length() > 0L)
-            println("canvas-layout snapshot: ${file.absolutePath} (${width}x$height)")
+            println("canvas-layout snapshot: ${file.absolutePath} (${size.width}x${size.height})")
         }
     }
 
@@ -227,55 +227,52 @@ class CanvasGetLayoutRenderTest {
 
     private fun board(): List<JsonObject> {
         val notes = listOf(
-            noteOp("n-inbox", "Inbox", "New mail", "#dbeafe", noteFrame("n-inbox")),
-            noteOp("n-triage", "Triage", "Sort it", "#fde68a", noteFrame("n-triage")),
-            noteOp("n-plan", "Plan", "The shape of it", "#bbf7d0", PLAN),
-            noteOp("n-design", "Design", "Screens", "#fecaca", noteFrame("n-design")),
-            noteOp("n-build", "Build", "The work", "#e9d5ff", noteFrame("n-build")),
-            noteOp("n-review", "Review", "Look twice", "#fed7aa", noteFrame("n-review")),
-            noteOp("n-ship", "Ship", "Ready", "#bae6fd", noteFrame("n-ship")),
-            noteOp("n-notes", "Notes", "Left over", "#fbcfe8", noteFrame("n-notes")),
-            noteOp("n-done", "Done", "Shipped", "#d9f99d", noteFrame("n-done")),
+            noteOp("n-inbox", NoteCopy("Inbox", "New mail", "#dbeafe"), noteFrame("n-inbox")),
+            noteOp("n-triage", NoteCopy("Triage", "Sort it", "#fde68a"), noteFrame("n-triage")),
+            noteOp("n-plan", NoteCopy("Plan", "The shape of it", "#bbf7d0"), PLAN),
+            noteOp("n-design", NoteCopy("Design", "Screens", "#fecaca"), noteFrame("n-design")),
+            noteOp("n-build", NoteCopy("Build", "The work", "#e9d5ff"), noteFrame("n-build")),
+            noteOp("n-review", NoteCopy("Review", "Look twice", "#fed7aa"), noteFrame("n-review")),
+            noteOp("n-ship", NoteCopy("Ship", "Ready", "#bae6fd"), noteFrame("n-ship")),
+            noteOp("n-notes", NoteCopy("Notes", "Left over", "#fbcfe8"), noteFrame("n-notes")),
+            noteOp("n-done", NoteCopy("Done", "Shipped", "#d9f99d"), noteFrame("n-done")),
         )
         val shape = element(
             "shape-box",
             shapeJson(
                 ShapeEnds(from = "${SHAPE.x},${SHAPE.y}", to = "${SHAPE.x + SHAPE.width},${SHAPE.y + SHAPE.height}"),
-                "RECTANGLE",
-                "Milestone",
-                "#334155ff",
-                "#e2e8f0ff",
+                ShapePaint("RECTANGLE", "Milestone", "#334155ff", "#e2e8f0ff"),
             ),
         )
         return notes + shape + arrows()
     }
 
     private fun arrows(): List<JsonObject> = listOf(
-        arrow("a-sort", "n-inbox", "right", "n-triage", "left", "sort"),
-        arrow("a-next", "n-triage", "bottom", "n-plan", "top", "next"),
-        arrow("a-check", "n-plan", "bottom", "n-review", "top", "check"),
-        arrow("a-file", "n-ship", "right", "n-notes", "left", "file"),
-        arrowToShape("a-box", "n-done", "right", "shape-box", "left", "ship"),
+        arrow("a-sort", ArrowLink(Anchor("n-inbox", "right"), Anchor("n-triage", "left"), "sort")),
+        arrow("a-next", ArrowLink(Anchor("n-triage", "bottom"), Anchor("n-plan", "top"), "next")),
+        arrow("a-check", ArrowLink(Anchor("n-plan", "bottom"), Anchor("n-review", "top"), "check")),
+        arrow("a-file", ArrowLink(Anchor("n-ship", "right"), Anchor("n-notes", "left"), "file")),
+        arrowToShape("a-box", ArrowLink(Anchor("n-done", "right"), Anchor("shape-box", "left"), "ship")),
     ).flatten()
 
-    private fun arrow(id: String, fromId: String, fromSide: String, toId: String, toSide: String, label: String): List<JsonObject> {
-        val from = CanvasSnap.anchorOn(noteFrame(fromId), fromSide)
-        val to = CanvasSnap.anchorOn(noteFrame(toId), toSide)
+    private fun arrow(id: String, link: ArrowLink): List<JsonObject> {
+        val from = CanvasSnap.anchorOn(noteFrame(link.from.id), link.from.side)
+        val to = CanvasSnap.anchorOn(noteFrame(link.to.id), link.to.side)
         return listOf(
-            element(id, shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}"), "ARROW", label, "#0f172aff", null)),
-            bind(id, fromId, fromSide, toId, toSide),
+            element(id, shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}"), ARROW_PAINT.copy(label = link.label))),
+            bind(id, link.from, link.to),
         )
     }
 
-    private fun arrowToShape(id: String, fromId: String, fromSide: String, shapeId: String, shapeSide: String, label: String): List<JsonObject> {
-        val from = CanvasSnap.anchorOn(noteFrame(fromId), fromSide)
-        val to = CanvasSnap.anchorOn(SHAPE, shapeSide)
+    private fun arrowToShape(id: String, link: ArrowLink): List<JsonObject> {
+        val from = CanvasSnap.anchorOn(noteFrame(link.from.id), link.from.side)
+        val to = CanvasSnap.anchorOn(SHAPE, link.to.side)
         return listOf(
             element(
                 id,
-                shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}", endBinding = shapeId), "ARROW", label, "#0f172aff", null),
+                shapeJson(ShapeEnds("${from.first},${from.second}", "${to.first},${to.second}", endBinding = link.to.id), ARROW_PAINT.copy(label = link.label)),
             ),
-            bind(id, fromId, fromSide, toId = null, toSide = null),
+            bind(id, link.from, to = null),
         )
     }
 
@@ -283,33 +280,30 @@ class CanvasGetLayoutRenderTest {
         shape.id,
         shapeJson(
             ShapeEnds("${points.first().x},${points.first().y}", "${points.last().x},${points.last().y}"),
-            "ARROW",
-            shape.text,
-            "#0f172aff",
-            null,
+            ARROW_PAINT.copy(label = shape.text),
         ),
         update = true,
     )
 
     private fun noteFrame(id: String): CanvasDocumentFrame = when (id) {
-        "n-inbox" -> frame(16f, 24f, 140f, 80f)
-        "n-triage" -> frame(240f, 24f, 150f, 80f)
+        "n-inbox" -> CanvasDocumentFrame(16f, 24f, 140f, 80f)
+        "n-triage" -> CanvasDocumentFrame(240f, 24f, 150f, 80f)
         "n-plan" -> PLAN
-        "n-design" -> frame(16f, 300f, 140f, 90f)
-        "n-build" -> frame(250f, 290f, 130f, 100f)
-        "n-review" -> frame(103f, 440f, 170f, 80f)
-        "n-ship" -> frame(16f, 560f, 130f, 72f)
-        "n-notes" -> frame(230f, 550f, 150f, 90f)
-        "n-done" -> frame(16f, 690f, 140f, 80f)
+        "n-design" -> CanvasDocumentFrame(16f, 300f, 140f, 90f)
+        "n-build" -> CanvasDocumentFrame(250f, 290f, 130f, 100f)
+        "n-review" -> CanvasDocumentFrame(103f, 440f, 170f, 80f)
+        "n-ship" -> CanvasDocumentFrame(16f, 560f, 130f, 72f)
+        "n-notes" -> CanvasDocumentFrame(230f, 550f, 150f, 90f)
+        "n-done" -> CanvasDocumentFrame(16f, 690f, 140f, 80f)
         else -> error(id)
     }
 
-    private fun noteOp(id: String, title: String, body: String, color: String, frame: CanvasDocumentFrame): JsonObject = buildJsonObject {
+    private fun noteOp(id: String, copy: NoteCopy, frame: CanvasDocumentFrame): JsonObject = buildJsonObject {
         put("type", "set_document")
         put("documentId", id)
-        put("documentJson", NOTE_JSON.format(body))
-        put("title", title)
-        put("color", color)
+        put("documentJson", NOTE_JSON.format(copy.body))
+        put("title", copy.title)
+        put("color", copy.color)
         putJsonObject("frame") {
             put("x", frame.x)
             put("y", frame.y)
@@ -324,28 +318,26 @@ class CanvasGetLayoutRenderTest {
         put("elementJson", element)
     }
 
-    private fun shapeJson(ends: ShapeEnds, shapeType: String, label: String, stroke: String, fill: String?): JsonObject = buildJsonObject {
+    private fun shapeJson(ends: ShapeEnds, paint: ShapePaint): JsonObject = buildJsonObject {
         put("type", "Shape")
-        put("shapeType", shapeType)
+        put("shapeType", paint.shapeType)
         put("points", buildJsonArray { add(JsonPrimitive(ends.from)); add(JsonPrimitive(ends.to)) })
-        put("strokeColor", stroke)
+        put("strokeColor", paint.stroke)
         put("strokeWidth", 2.0)
-        put("text", label)
+        put("text", paint.label)
         put("fontSize", 13.0)
-        fill?.let { put("fillColor", it) }
+        paint.fill?.let { put("fillColor", it) }
         ends.endBinding?.let { put("endBinding", it) }
     }
 
-    private fun bind(id: String, fromId: String?, fromSide: String?, toId: String?, toSide: String?): JsonObject = buildJsonObject {
+    private fun bind(id: String, from: Anchor?, to: Anchor?): JsonObject = buildJsonObject {
         put("type", "set_arrow_binding")
         put("elementId", id)
         putJsonObject("binding") {
-            if (fromId != null && fromSide != null) putJsonObject("start") { put("documentId", fromId); put("side", fromSide) }
-            if (toId != null && toSide != null) putJsonObject("end") { put("documentId", toId); put("side", toSide) }
+            if (from != null) putJsonObject("start") { put("documentId", from.id); put("side", from.side) }
+            if (to != null) putJsonObject("end") { put("documentId", to.id); put("side", to.side) }
         }
     }
-
-    private fun frame(x: Float, y: Float, width: Float, height: Float) = CanvasDocumentFrame(x, y, width, height)
 
     private fun ExternalToolResult.content(): String = assertIs<ExternalToolResult.Success>(this, "tool call failed: $this").content
 
@@ -358,15 +350,20 @@ class CanvasGetLayoutRenderTest {
         const val AGENT = "agent-1"
         const val CONVERSATION = "conv-layout"
         const val PEER = "layout-render-peer"
-        const val PHONE_W = 412
-        const val PHONE_H = 915
-        const val DESKTOP_W = 1440
-        const val DESKTOP_H = 900
         const val NOTE_JSON =
             """{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"%s","spans":[]}}]}"""
         val PLAN = CanvasDocumentFrame(98f, 150f, 180f, 100f)
         val SHAPE = CanvasDocumentFrame(240f, 700f, 140f, 70f)
+        val PHONE = BoardSize(412, 915)
+        val DESKTOP = BoardSize(1440, 900)
+        val ARROW_PAINT = ShapePaint("ARROW", label = "", stroke = "#0f172aff", fill = null)
     }
+
+    private data class BoardSize(val width: Int, val height: Int)
+    private data class NoteCopy(val title: String, val body: String, val color: String)
+    private data class Anchor(val id: String, val side: String)
+    private data class ArrowLink(val from: Anchor, val to: Anchor, val label: String)
+    private data class ShapePaint(val shapeType: String, val label: String, val stroke: String, val fill: String?)
 }
 
 /** Magenta layout frames and cyan lines between the centres of bound rows. */
@@ -374,21 +371,37 @@ class CanvasGetLayoutRenderTest {
 private fun LayoutOverlay(rows: List<CanvasLayoutRow>, viewport: Viewport) {
     val byId = rows.associateBy { it.id }
     Canvas(Modifier.fillMaxSize()) {
-        rows.forEach { row ->
-            val frame = row.frame ?: return@forEach
-            val topLeft = viewport.worldToScreen(Offset(frame[0].toFloat(), frame[1].toFloat()))
-            val bottomRight = viewport.worldToScreen(Offset((frame[0] + frame[2]).toFloat(), (frame[1] + frame[3]).toFloat()))
-            drawRect(Color.Magenta, topLeft, Size(bottomRight.x - topLeft.x, bottomRight.y - topLeft.y), style = Stroke(1f))
-        }
-        rows.forEach { row ->
-            val binding = row.bindings ?: return@forEach
-            val from = binding.from?.let { byId[it]?.frame }
-            val to = binding.to?.let { byId[it]?.frame }
-            if (from != null && to != null) {
-                drawLine(Color.Cyan, centre(viewport, from), centre(viewport, to), strokeWidth = 2f)
-            }
-        }
+        drawReportedFrames(rows, viewport)
+        drawReportedBindings(byId, viewport)
     }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawReportedFrames(rows: List<CanvasLayoutRow>, viewport: Viewport) {
+    rows.forEach { row ->
+        val frame = row.frame ?: return@forEach
+        val topLeft = viewport.worldToScreen(Offset(frame[0].toFloat(), frame[1].toFloat()))
+        val bottomRight = viewport.worldToScreen(Offset((frame[0] + frame[2]).toFloat(), (frame[1] + frame[3]).toFloat()))
+        drawRect(Color.Magenta, topLeft, Size(bottomRight.x - topLeft.x, bottomRight.y - topLeft.y), style = Stroke(1f))
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawReportedBindings(
+    byId: Map<String, CanvasLayoutRow>,
+    viewport: Viewport,
+) {
+    byId.values.forEach { row ->
+        val line = bindingLine(byId, row) ?: return@forEach
+        drawLine(Color.Cyan, centre(viewport, line.from), centre(viewport, line.to), strokeWidth = 2f)
+    }
+}
+
+private data class FramePair(val from: List<Int>, val to: List<Int>)
+
+private fun bindingLine(byId: Map<String, CanvasLayoutRow>, row: CanvasLayoutRow): FramePair? {
+    val binding = row.bindings ?: return null
+    val from = binding.from?.let { byId[it]?.frame } ?: return null
+    val to = binding.to?.let { byId[it]?.frame } ?: return null
+    return FramePair(from, to)
 }
 
 private fun centre(viewport: Viewport, frame: List<Int>): Offset {

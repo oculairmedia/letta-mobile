@@ -12,6 +12,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import kotlin.jvm.JvmInline
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -35,7 +36,7 @@ class CanvasGetLayoutTest {
         val host = PluginToolHost.Iroh()
         host.applyOps(*mixedBoard().toTypedArray()).content()
         val scene = host.scene()
-        val pages = pages(host, limit = 3)
+        val pages = pages(host, limit = RowLimit(3))
         val rows = pages.flatMap { it.rows }
 
         assertEquals(sceneIds(scene), rows.map { it.id }.toSet(), "union of pages is every id canvas_get_scene reports")
@@ -89,12 +90,12 @@ class CanvasGetLayoutTest {
     fun staleCursorRefused() = runTest {
         val host = PluginToolHost.Iroh()
         host.applyOps(
-            note("note-a", title = "A", body = "a", x = 0.0, y = 0.0),
-            note("note-b", title = "B", body = "b", x = 40.0, y = 0.0),
+            note(id = "note-a", title = "A", body = "a", frame = CanvasDocumentFrame(0f, 0f, 120f, 80f)),
+            note(id = "note-b", title = "B", body = "b", frame = CanvasDocumentFrame(40f, 0f, 120f, 80f)),
         ).content()
-        val first = layout(host, limit = 1)
+        val first = layout(host, limit = RowLimit(1))
         val cursor = assertNotNull(first.nextCursor)
-        host.applyOps(note("note-c", title = "C", body = "c", x = 80.0, y = 0.0)).content()
+        host.applyOps(note(id = "note-c", title = "C", body = "c", frame = CanvasDocumentFrame(80f, 0f, 120f, 80f))).content()
 
         val refused = host.call(CanvasToolContract.GET_LAYOUT, buildJsonObject { put("cursor", cursor) }).error()
         val body = json.decodeFromString(CanvasLayoutRefusal.serializer(), refused)
@@ -102,7 +103,7 @@ class CanvasGetLayoutTest {
         assertEquals(host.scene().revision, body.revision)
         assertTrue(body.revision != first.revision)
 
-        val restarted = layout(host, limit = 50)
+        val restarted = layout(host, limit = RowLimit(50))
         assertNull(restarted.nextCursor)
         assertEquals(setOf("note-a", "note-b", "note-c"), restarted.rows.map { it.id }.toSet())
     }
@@ -112,11 +113,16 @@ class CanvasGetLayoutTest {
         val host = PluginToolHost.Iroh()
         val count = 220
         val ops = (0 until count).map { index ->
-            note("n-${index.toString().padStart(3, '0')}", title = "N".repeat(70), body = "row", x = index.toDouble(), y = 0.0)
+            note(
+                id = "n-${index.toString().padStart(3, '0')}",
+                title = "N".repeat(70),
+                body = "row",
+                frame = CanvasDocumentFrame(index.toFloat(), 0f, 120f, 80f),
+            )
         }
         host.applyOps(*ops.toTypedArray()).content()
 
-        val rawPages = rawPages(host, limit = CanvasLayoutRead.MAX_LIMIT)
+        val rawPages = rawPages(host, limit = RowLimit(CanvasLayoutRead.MAX_LIMIT))
         assertTrue(rawPages.size >= 2, "220 labelled notes must span pages under ${CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES} bytes")
         rawPages.forEach { raw ->
             assertTrue(raw.encodeToByteArray().size <= CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES, "${raw.encodeToByteArray().size} bytes")
@@ -131,7 +137,7 @@ class CanvasGetLayoutTest {
         val ops = mixedBoard()
         val rows = PluginToolHost.all().map { host ->
             host.applyOps(*ops.toTypedArray()).content()
-            layout(host, limit = 50).rows
+            layout(host, limit = RowLimit(50)).rows
         }
         assertEquals(rows[0], rows[1], "the Iroh host and an open board")
         assertEquals(rows[0], rows[2], "the Iroh host and a closed board")
@@ -139,7 +145,7 @@ class CanvasGetLayoutTest {
         assertTrue(rows[0].any { it.bindings != null })
     }
 
-    private suspend fun pages(host: PluginToolHost, limit: Int): List<CanvasLayoutResult> {
+    private suspend fun pages(host: PluginToolHost, limit: RowLimit): List<CanvasLayoutResult> {
         val out = mutableListOf<CanvasLayoutResult>()
         var cursor: String? = null
         repeat(20) {
@@ -150,7 +156,7 @@ class CanvasGetLayoutTest {
         error("layout did not finish")
     }
 
-    private suspend fun rawPages(host: PluginToolHost, limit: Int): List<String> {
+    private suspend fun rawPages(host: PluginToolHost, limit: RowLimit): List<String> {
         val out = mutableListOf<String>()
         var cursor: String? = null
         repeat(20) {
@@ -161,11 +167,11 @@ class CanvasGetLayoutTest {
         error("layout did not finish")
     }
 
-    private suspend fun layout(host: PluginToolHost, limit: Int, cursor: String? = null): CanvasLayoutResult =
+    private suspend fun layout(host: PluginToolHost, limit: RowLimit, cursor: String? = null): CanvasLayoutResult =
         json.decodeFromString(CanvasLayoutResult.serializer(), host.call(CanvasToolContract.GET_LAYOUT, layoutInput(limit, cursor)).content())
 
-    private fun layoutInput(limit: Int, cursor: String?): JsonObject = buildJsonObject {
-        put("limit", limit)
+    private fun layoutInput(limit: RowLimit, cursor: String?): JsonObject = buildJsonObject {
+        put("limit", limit.value)
         cursor?.let { put("cursor", it) }
     }
 
@@ -178,8 +184,13 @@ class CanvasGetLayoutTest {
     }
 
     private fun mixedBoard(): List<String> = listOf(
-        note("note-body", title = null, body = "First line of the note\nsecond line", x = 0.0, y = 0.0),
-        note("note-title", title = "T".repeat(70), body = "ignored when a title is set", x = 10.5, y = 20.0, width = 30.5, height = 40.0),
+        note(id = "note-body", title = null, body = "First line of the note\nsecond line", frame = CanvasDocumentFrame(0f, 0f, 120f, 80f)),
+        note(
+            id = "note-title",
+            title = "T".repeat(70),
+            body = "ignored when a title is set",
+            frame = CanvasDocumentFrame(10.5f, 20f, 30.5f, 40f),
+        ),
         element(
             "box-plan",
             buildJsonObject {
@@ -237,24 +248,16 @@ class CanvasGetLayoutTest {
         PluginToolHost.PLACE,
     )
 
-    private fun note(
-        id: String,
-        title: String?,
-        body: String,
-        x: Double,
-        y: Double,
-        width: Double = 120.0,
-        height: Double = 80.0,
-    ): String = buildJsonObject {
+    private fun note(id: String, title: String?, body: String, frame: CanvasDocumentFrame): String = buildJsonObject {
         put("type", "set_document")
         put("documentId", id)
         put("documentJson", """{"version":2,"blocks":[{"id":"b","content":{"text":${JsonPrimitive(body)}}}]}""")
         title?.let { put("title", it) }
         putJsonObject("frame") {
-            put("x", x)
-            put("y", y)
-            put("width", width)
-            put("height", height)
+            put("x", frame.x)
+            put("y", frame.y)
+            put("width", frame.width)
+            put("height", frame.height)
         }
     }.toString()
 
@@ -271,4 +274,8 @@ class CanvasGetLayoutTest {
     private fun ExternalToolResult.content(): String = assertIs<ExternalToolResult.Success>(this, "tool call failed: $this").content
 
     private fun ExternalToolResult.error(): String = assertIs<ExternalToolResult.Error>(this, "expected a refusal, got $this").error
+
+    /** A page size for canvas_get_layout, so the helpers don't take a raw int. */
+    @JvmInline
+    private value class RowLimit(val value: Int)
 }
