@@ -147,7 +147,7 @@ class ChatTimelineProjector {
         isActiveRunStreaming: Boolean,
         ownAgentId: String? = null,
     ): TimelineProjection {
-        val startedAtMs = System.currentTimeMillis()
+        val startedAtMs = kotlin.time.Clock.System.now().toEpochMilliseconds()
         // letta-mobile-bglj6.13: canvas_compose receipts move across events (onto the narrating
         // message), so they are attached once over the whole timeline, after the per-event cache.
         val scope = ProjectionScope(ownAgentId, CanvasArtifactReceipts.attach(timeline.events))
@@ -556,7 +556,7 @@ class ChatTimelineProjector {
             // no in-flight reconcile flag is exposed here yet. Keep the field
             // present so load-pressure telemetry has a stable schema.
             "isReconciling" to false,
-            durationMs = System.currentTimeMillis() - startedAtMs,
+            durationMs = kotlin.time.Clock.System.now().toEpochMilliseconds() - startedAtMs,
         )
     }
 
