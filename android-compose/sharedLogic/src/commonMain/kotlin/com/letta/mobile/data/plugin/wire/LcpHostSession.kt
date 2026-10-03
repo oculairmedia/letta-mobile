@@ -82,7 +82,7 @@ class LcpHostSession(transport: LcpTransport, binding: LcpHostBinding, scope: Co
     private fun serve(handlers: LcpHostHandlers) {
         peer.serve(LcpCalls.EMIT) { EmitResult(handlers.emit(it)) }
         peer.serve(LcpCalls.PUT_ASSET_BEGIN) { uploads.begin(it) }
-        peer.serve(LcpCalls.PUT_ASSET_CHUNK) { uploads.chunk(it).let { LcpEmpty() } }
+        peer.serve(LcpCalls.PUT_ASSET_CHUNK) { uploads.chunk(it).let { LcpEmpty } }
         peer.serve(LcpCalls.PUT_ASSET_END) { PutAssetEndResult(handlers.storeAsset(uploads.end(it))) }
         peer.serve(LcpCalls.READ_ELEMENTS) { ReadElementsResult(handlers.readElements(it.query)) }
         peer.serve(LcpCalls.LOG) { handlers.log(it) }
@@ -94,10 +94,10 @@ class LcpHostSession(transport: LcpTransport, binding: LcpHostBinding, scope: Co
     }
 
     suspend fun activate() {
-        peer.call(LcpCalls.ACTIVATE, LcpEmpty())
+        peer.call(LcpCalls.ACTIVATE, LcpEmpty)
     }
 
-    suspend fun health(): PluginHealth = peer.call(LcpCalls.HEALTH, LcpEmpty())
+    suspend fun health(): PluginHealth = peer.call(LcpCalls.HEALTH, LcpEmpty)
 
     /** Runs an action (SPI `CanvasPlugin.invoke`); the plugin's own failure is [ActionResult.Error], a protocol failure throws. */
     suspend fun invoke(call: ActionCall): ActionResult = try {
@@ -119,7 +119,7 @@ class LcpHostSession(transport: LcpTransport, binding: LcpHostBinding, scope: Co
     suspend fun deactivate() {
         session.stop()
         withTimeoutOrNull(LcpMethod.DEACTIVATE.deadline ?: LcpPeerLimits().defaultDeadline) { peer.awaitIdle() }
-        closingOnFailure { peer.call(LcpCalls.DEACTIVATE, LcpEmpty()) }
+        closingOnFailure { peer.call(LcpCalls.DEACTIVATE, LcpEmpty) }
         close()
     }
 

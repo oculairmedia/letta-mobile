@@ -80,7 +80,7 @@ object LcpErrorCode {
     const val UPLOAD_REFUSED: Int = -32011
 
     /** Every code with the one-line meaning the reference doc lists. */
-    val meanings: Map<Int, String> = linkedMapOf(
+    val meanings: Map<Int, String> = mapOf(
         PARSE_ERROR to "the line or frame is not JSON",
         INVALID_REQUEST to "not a JSON-RPC 2.0 message LCP accepts (batches included)",
         METHOD_NOT_FOUND to "no such method in this direction",

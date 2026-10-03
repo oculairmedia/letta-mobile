@@ -58,9 +58,9 @@ class TestPlugin {
         peer.serve(LcpCalls.INITIALIZE) {
             InitializeResult(ok = true, LcpHandshake.choose(it.contractVersions, spoken), PluginInfo(build = "1.2.0"))
         }
-        peer.serve(LcpCalls.ACTIVATE) { LcpEmpty() }
+        peer.serve(LcpCalls.ACTIVATE) { LcpEmpty }
         peer.serve(LcpCalls.HEALTH) { health() }
-        peer.serve(LcpCalls.DEACTIVATE) { LcpEmpty().also { deactivated = true } }
+        peer.serve(LcpCalls.DEACTIVATE) { LcpEmpty.also { deactivated = true } }
         peer.serve(LcpCalls.INVOKE) { invoke(it) }
         peer.serve(LcpCalls.ELEMENT_EVENT) { events += it }
         peer.serve(LcpCalls.SETTINGS_CHANGED) { settings += it.settings }

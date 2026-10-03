@@ -80,10 +80,6 @@ data class CancelParams(val id: JsonPrimitive)
 
 /** The params of a method that takes none, and the result of one that answers nothing: `{}`. */
 @Serializable
-class LcpEmpty {
-    override fun equals(other: Any?): Boolean = other is LcpEmpty
-
-    override fun hashCode(): Int = 0
-
+object LcpEmpty {
     override fun toString(): String = "{}"
 }

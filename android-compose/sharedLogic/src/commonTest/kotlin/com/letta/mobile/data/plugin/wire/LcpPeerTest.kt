@@ -20,6 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -109,6 +110,7 @@ class LcpPeerTest {
         started.await()
         caller.cancel()
         cancelled.await()
+        assertTrue(cancelled.isCompleted)
     }
 
     @Test
