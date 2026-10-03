@@ -23,6 +23,8 @@ import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.ReportShellWidth
 import com.letta.mobile.desktop.phone.agentPaneVisible
 import com.letta.mobile.desktop.phone.sidebarVisible
+import com.letta.mobile.desktop.plugin.view.DesktopPluginBindings
+import com.letta.mobile.desktop.plugin.view.ProvideDesktopPluginViews
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 
@@ -41,7 +43,11 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                     .fillMaxWidth()
                     .railLightDismiss(navigator.railExpanded) { navigator.railExpanded = false },
             ) {
-                DesktopShellLayoutBody(context, frame)
+                // Plugin elements render live where a plugin view is bound (letta-mobile-s416w.14);
+                // until the host's plugin catalog reaches the client, none is, and every element is its card.
+                ProvideDesktopPluginViews(DesktopPluginBindings.None) {
+                    DesktopShellLayoutBody(context, frame)
+                }
                 DesktopShellOverlays(context, frame)
             }
         }
