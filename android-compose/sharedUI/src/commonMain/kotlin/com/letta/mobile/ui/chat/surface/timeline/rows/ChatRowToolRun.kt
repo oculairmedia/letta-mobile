@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -41,6 +42,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
@@ -65,6 +67,8 @@ import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
@@ -82,6 +86,10 @@ import kotlin.time.Clock
  * sheet on a touch host ([ChatToolDetails.Sheet]), or expanded in place under the line, as a
  * disclosure, on a pointer host ([ChatToolDetails.Inline]). Approvals that wait on the user show
  * their controls under the line.
+ *
+ * letta-mobile-bglj6.1.11: when the line opens its run, the run's plain [title] ("Worked for 1m 7s")
+ * leads it, so a run reads as ONE line with ONE chevron. Only the tool part of the line is the
+ * disclosure; the title never takes a click.
  */
 @Composable
 internal fun ToolRunGroup(
@@ -90,6 +98,7 @@ internal fun ToolRunGroup(
     callbacks: ChatRowCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    val title = calls.title
     val toolCalls = calls.toolCalls
     val approvals = calls.approvals
     if (toolCalls.isEmpty()) return
@@ -103,17 +112,20 @@ internal fun ToolRunGroup(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
-        ToolRunSummaryRow(
-            summary = summary,
-            startedAtEpochMs = startedAtEpochMs,
-            disclosure = toolRunDisclosure(inline, detailsOpen),
-            onClick = { detailsOpen = if (inline) !detailsOpen else true },
-        )
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            title?.let { RunSummaryLead(it) }
+            ToolRunSummaryRow(
+                line = ToolRunLine(summary, startedAtEpochMs),
+                disclosure = toolRunDisclosure(inline, detailsOpen),
+                onClick = { detailsOpen = if (inline) !detailsOpen else true },
+                modifier = Modifier.weight(1f),
+            )
+        }
         if (inline) ToolRunInlineCards(visible = detailsOpen, toolCalls, callbacks)
         approvals.filter { it.requiresUserInput() }.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
     if (detailsOpen && !inline) {
-        ToolRunDetailsSheet(toolCalls, ToolRunSheetHeading(summary, startedAtEpochMs), callbacks) { detailsOpen = false }
+        ToolRunDetailsSheet(toolCalls, ToolRunLine(summary, startedAtEpochMs), callbacks) { detailsOpen = false }
     }
 }
 
@@ -126,6 +138,8 @@ internal data class ToolRunCalls(
     val toolCalls: ImmutableList<UiToolCall>,
     val approvals: ImmutableList<UiApprovalRequest> = persistentListOf(),
     val startedAtTimestamp: String? = null,
+    /** The run's plain label, when the line opens its run (bglj6.1.11). */
+    val title: RunSummaryTitle? = null,
 )
 
 private fun toolRunDisclosure(inline: Boolean, detailsOpen: Boolean): ToolRunDisclosure {
@@ -153,9 +167,9 @@ private fun ColumnScope.ToolRunInlineCards(
     }
 }
 
-/** What the sheet's title says: the summary line's own words, approvals and running clock included. */
+/** What the summary line (and the sheet titled after it) says: its words, approvals and running clock included. */
 @Immutable
-private class ToolRunSheetHeading(val summary: ToolRunSummary, val startedAtEpochMs: Long?)
+private class ToolRunLine(val summary: ToolRunSummary, val startedAtEpochMs: Long?)
 
 /** What the summary line's chevron promises: a sheet, or an in-place disclosure and its state. */
 @Immutable
@@ -190,12 +204,13 @@ internal fun summarizeToolRun(toolCalls: List<UiToolCall>, approvals: List<UiApp
 
 @Composable
 private fun ToolRunSummaryRow(
-    summary: ToolRunSummary,
-    startedAtEpochMs: Long?,
+    line: ToolRunLine,
     disclosure: ToolRunDisclosure,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val elapsed by rememberElapsedSeconds(summary.running, startedAtEpochMs)
+    val summary = line.summary
+    val elapsed by rememberElapsedSeconds(summary.running, line.startedAtEpochMs)
     val click = rememberQuietClick()
     val color = toolRunColor(summary, click.lifted)
     val description = stringResource(Res.string.rows_tool_run_summary)
@@ -208,8 +223,7 @@ private fun ToolRunSummaryRow(
         },
     )
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .testTag(ChatRowTestTags.TOOL_RUN_SUMMARY)
             .semantics {
                 contentDescription = description
@@ -217,15 +231,18 @@ private fun ToolRunSummaryRow(
             }
             // No hover block: the label lifts instead (the Android line has no inset).
             .quietClickable(click, onClick = onClick)
-            // Shares the Thought rows' leading edge: no horizontal inset.
-            .padding(vertical = LettaDimens.Space.xs),
+            // Shares the prose's leading edge: no horizontal inset; the run label's floor and beat.
+            .heightIn(min = ChatRowSpacing.summaryLineMinHeight)
+            .padding(vertical = ChatRowSpacing.summaryLineVertical),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = toolRunLabel(summary, elapsed),
-            style = MaterialTheme.typography.bodyMedium,
+            style = ChatRowType.summaryLine,
             color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         DisclosureChevron(
@@ -283,7 +300,7 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 @Composable
 private fun ToolRunDetailsSheet(
     toolCalls: ImmutableList<UiToolCall>,
-    heading: ToolRunSheetHeading,
+    heading: ToolRunLine,
     callbacks: ChatRowCallbacks,
     onDismiss: () -> Unit,
 ) {

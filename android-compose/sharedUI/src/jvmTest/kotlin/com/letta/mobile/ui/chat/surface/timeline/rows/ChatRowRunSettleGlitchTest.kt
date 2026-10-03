@@ -24,25 +24,18 @@ import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.collections.immutable.toImmutableSet
 import kotlin.test.Test
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 /**
- * letta-mobile-bglj6.1: a settled run's body tucks up under the run-header by [ChatRowSpacing.completedRunBodyLift]
- * (22dp) so the next row sits flush against the header. The geometry comes from [com.letta.mobile.ui.chat.surface.timeline.rows.RunBody]'s
- * pullUp modifier, which shifts the body AND reports it shorter; this is a layout-time decision, NOT an
- * animated transition.
+ * letta-mobile-bglj6.1.12: settling a run must not move the timeline. The settle once slid the run's
+ * body 22dp up under its header (an animated `completedRunBodyLift`); #1758 made that lift structural
+ * so it snapped instead of sliding.
  *
- * Previous shape: `animateDpAsState(targetValue = lift, tween(CONTENT_SIZE_MILLIS = 220ms))` made the
- * body slide 22dp upward over 220ms on every settle — the visible "things are moving at that point"
- * glitch the user reported. The lift now snaps: the body sits at its settled position on the very
- * first frame after `isActive` flips false, with no animation-driver intermediate value.
- *
- * This test asserts the snap by holding the Compose clock still across the active -> settled
- * transition. With `mainClock.autoAdvance = false`, the row is recomposed synchronously when the
- * state object changes; if the lift were animated, the row's measured height on the next read would
- * land somewhere between H (active) and H - lift (settled) because `animateDpAsState` returns the
- * start of its animation, not the target. The post-transition measurement MUST equal the target
- * regardless of how much clock time has passed.
+ * letta-mobile-bglj6.1.11: the run header and its tuck are gone. The run's label ("Working" ->
+ * "Worked for 9s") leads the tool summary's own line, so the newest run has the same shape working
+ * and settled: settling only rewrites the label. These tests hold that: on the first frame after
+ * `isActive` flips false (the clock held still, so no animation can have run) the row is already
+ * exactly its settled height, and that height is the one a run composed cold as settled reports.
  */
 class ChatRowRunSettleGlitchTest {
     private fun call(id: String) = UiToolCall(name = "shell", arguments = "ls", result = "ok", status = "success", toolCallId = id)
@@ -75,7 +68,7 @@ class ChatRowRunSettleGlitchTest {
     )
 
     @Test
-    fun runBodySnapsToSettledHeightOnSettleNotAnimates() = runComposeUiTest {
+    fun settlingTheNewestRunDoesNotMoveIt() = runComposeUiTest {
         // The state is a mutableStateOf so flipping the value drives a recompose, not a stale
         // captured reference. The composition reads `streamingState.value` and the row sees the
         // new ChatRenderItemState without re-running setContent.
@@ -90,37 +83,21 @@ class ChatRowRunSettleGlitchTest {
             }
         }
 
-        // Active: lift = 0dp, row reports full body height.
         val activeHeight = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
 
-        // Settle: flip the state. With mainClock.autoAdvance = false, Compose has not run any
-        // animation frame; the recomposition's measured layout is the layout the user will see on
-        // the first frame after settle. If the lift were animated, this measurement would still
-        // report activeHeight (the start of the animation) or only partway toward the target.
+        // Settle, then draw ONE frame: nothing animated can have advanced.
         streamingState = renderState(isStreaming = false)
-
-        // Drive the recomposition without advancing the animator.
         mainClock.advanceTimeByFrame()
         val settledHeight = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
 
-        // The structural lift is a layout-time decision: regardless of how much clock time has
-        // passed, the body is already at its target position. The post-transition height must be
-        // strictly less than the active height (proving the body shifted upward), and the diff
-        // must NOT be 0 (proving the lift actually applied). If the lift were animated, the
-        // measurement would still be at the active height (the start of the tween) because no
-        // animation time has elapsed.
-        assertTrue(settledHeight < activeHeight,
-            "expected the body to shift upward on settle (active=$activeHeight, settled=$settledHeight); " +
-                "if settledHeight == activeHeight, the lift is animated and mainClock is paused at the tween start")
+        assertEquals(activeHeight, settledHeight, "the run changed height on settle (active=$activeHeight, settled=$settledHeight)")
     }
 
     @Test
-    fun settledRunFromFirstCompositionReportsLiftedHeight() = runComposeUiTest {
-        // Control case: a settled run composed cold (history scroll, never streamed) must report
-        // the same lifted height. Pairs with the transition test to guarantee the lift is a
-        // structural property of the row, not a side effect of an animation that finished.
+    fun aRunComposedSettledHasTheSameShapeAsAWorkingOne() = runComposeUiTest {
+        // Control case: a settled run composed cold (history scroll, never streamed). Pairs with
+        // the transition test: the settled shape is structural, not where an animation stopped.
         val settledState = renderState(isStreaming = false)
-        var settledFromCold: Float = 0f
         setContent {
             MaterialTheme {
                 Box(Modifier.width(400.dp)) {
@@ -128,7 +105,7 @@ class ChatRowRunSettleGlitchTest {
                 }
             }
         }
-        settledFromCold = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
+        val settledFromCold = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
 
         val activeState = renderState(isStreaming = true)
         setContent {
@@ -140,20 +117,7 @@ class ChatRowRunSettleGlitchTest {
         }
         val activeHeight = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
 
-        // The settled row must be strictly shorter than the active row, and the diff must match
-        // the structural lift exactly (proving the lift is applied by the same pullUp modifier in
-        // both cases — no animation residue).
-        val diff = activeHeight - settledFromCold
-        assertTrue(diff > 0f, "expected the settled row to be shorter than the active row (active=$activeHeight, settled=$settledFromCold)")
-        // The diff is the lift value, which is `min(completedRunBodyLift, bodyHeight)`. Since the
-        // body in this test setup is short, the diff is bodyHeight itself, capped by the lift.
-        // We don't assert a specific value — that depends on body content. We assert the diff is
-        // bounded by the lift value (proving the lift cap).
-        assertTrue(diff <= LIFT_DP, "expected the lift to be at most ChatRowSpacing.completedRunBodyLift (22dp), got $diff")
-    }
-
-    private companion object {
-        // ChatRowSpacing.completedRunBodyLift = 22.dp.
-        const val LIFT_DP = 22f
+        // Cold (history scroll, never streamed) or settled live, the row is one shape.
+        assertEquals(activeHeight, settledFromCold, "a settled run is not the working run's shape (active=$activeHeight, settled=$settledFromCold)")
     }
 }

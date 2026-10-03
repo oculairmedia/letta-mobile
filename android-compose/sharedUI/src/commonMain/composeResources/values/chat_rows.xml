@@ -35,25 +35,13 @@
     <string name="rows_run_thought">Thought</string>
     <string name="rows_run_worked">Worked</string>
     <string name="rows_run_for_duration">%1$s for %2$s</string>
-    <string name="rows_work_expand">Expand agent work</string>
-    <string name="rows_work_collapse">Collapse agent work</string>
     <string name="rows_run_state_working">Agent work in progress</string>
-    <string name="rows_run_state_collapsed">Agent work collapsed</string>
-    <string name="rows_run_state_expanded">Agent work expanded</string>
     <string name="rows_list_separator"> · </string>
     <string name="rows_duration_ms">%1$d ms</string>
     <string name="rows_duration_ms_compact">%1$dms</string>
     <string name="rows_duration_tenths">%1$d.%2$ds</string>
     <string name="rows_duration_seconds">%1$ds</string>
     <string name="rows_duration_minutes">%1$dm %2$ds</string>
-    <plurals name="rows_run_tools">
-        <item quantity="one">%1$d tool</item>
-        <item quantity="other">%1$d tools</item>
-    </plurals>
-    <plurals name="rows_run_failure_count">
-        <item quantity="one">%1$d failure</item>
-        <item quantity="other">%1$d failures</item>
-    </plurals>
 
     <!-- Tool run summary (one line per run's tool calls) -->
     <plurals name="rows_command_count">
@@ -61,9 +49,9 @@
         <item quantity="other">%1$d commands</item>
     </plurals>
     <string name="rows_tool_run_ran">Ran %1$s</string>
-    <string name="rows_tool_run_failed">%1$d ran - %2$d failed</string>
-    <string name="rows_tool_run_running">Running %1$s - %2$s - %3$s</string>
-    <string name="rows_tool_run_approval">Approval needed - %1$s</string>
+    <string name="rows_tool_run_failed">%1$d ran · %2$d failed</string>
+    <string name="rows_tool_run_running">Running %1$s · %2$s · %3$s</string>
+    <string name="rows_tool_run_approval">Approval needed · %1$s</string>
     <string name="rows_tool_run_default_name">tool</string>
     <string name="rows_tool_run_open">Open command details</string>
     <string name="rows_tool_run_show">Show command details</string>
