@@ -1,0 +1,2 @@
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":2,"method":"plugin.activate","params":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":2,"result":{}}}

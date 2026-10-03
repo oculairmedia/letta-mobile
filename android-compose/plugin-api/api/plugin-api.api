@@ -289,6 +289,7 @@ public static final com.letta.mobile.plugin.api.HostInfo$Companion : java.lang.O
 public final com.letta.mobile.plugin.api.LcpDirection : java.lang.Enum<com.letta.mobile.plugin.api.LcpDirection>
     public static com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.valueOf(java.lang.String)
     public static com.letta.mobile.plugin.api.LcpDirection[] com.letta.mobile.plugin.api.LcpDirection.values()
+    public static final com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.EITHER
     public static final com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.HOST_TO_PLUGIN
     public static final com.letta.mobile.plugin.api.LcpDirection com.letta.mobile.plugin.api.LcpDirection.PLUGIN_TO_HOST
     public static kotlin.enums.EnumEntries<com.letta.mobile.plugin.api.LcpDirection> com.letta.mobile.plugin.api.LcpDirection.getEntries()
@@ -302,6 +303,7 @@ public final com.letta.mobile.plugin.api.LcpMethod : java.lang.Enum<com.letta.mo
     public static com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.valueOf(java.lang.String)
     public static com.letta.mobile.plugin.api.LcpMethod[] com.letta.mobile.plugin.api.LcpMethod.values()
     public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.ACTIVATE
+    public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.CANCEL
     public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.DEACTIVATE
     public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.ELEMENT_EVENT
     public static final com.letta.mobile.plugin.api.LcpMethod com.letta.mobile.plugin.api.LcpMethod.EMIT

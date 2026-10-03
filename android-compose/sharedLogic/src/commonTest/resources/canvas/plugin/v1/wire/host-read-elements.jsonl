@@ -1,0 +1,2 @@
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-5","method":"host.readElements","params":{"query":{"kinds":["widget"]}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-5","result":{"elements":[{"id":"el-1","type":"ext:letta.example/widget","canvasId":"canvas-1"}]}}}

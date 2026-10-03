@@ -7,6 +7,9 @@ public enum class LcpDirection {
 
     /** The plugin calls the host. */
     PLUGIN_TO_HOST,
+
+    /** Either side sends it: protocol plumbing, no SPI member ([LcpMethod.CANCEL]). */
+    EITHER,
 }
 
 /**
@@ -41,6 +44,13 @@ public enum class LcpMethod(
     PUT_ASSET_END("host.putAsset.end", LcpDirection.PLUGIN_TO_HOST, "PluginHost.putAsset"),
     READ_ELEMENTS("host.readElements", LcpDirection.PLUGIN_TO_HOST, "PluginHost.readElements"),
     LOG("host.log", LcpDirection.PLUGIN_TO_HOST, "PluginHost.log", notification = true),
+
+    /**
+     * `$/cancel {id}`, sent by either side: the caller gave up on its request [id] (its own deadline
+     * or its own cancellation); the receiver cancels the work and answers the request with error
+     * `-32800`. On the SPI side it is coroutine cancellation, not a member.
+     */
+    CANCEL("\$/cancel", LcpDirection.EITHER, "(coroutine cancellation)", notification = true),
     ;
 
     public companion object {
