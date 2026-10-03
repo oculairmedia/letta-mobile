@@ -1,0 +1,4 @@
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":4,"method":"plugin.health","params":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":4,"result":{"status":"ok"}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":5,"method":"plugin.health","params":{}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":5,"result":{"status":"degraded","reason":"ComfyUI is unreachable"}}}
