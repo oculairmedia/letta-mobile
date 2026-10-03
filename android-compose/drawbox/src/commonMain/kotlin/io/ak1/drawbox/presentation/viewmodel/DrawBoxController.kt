@@ -473,7 +473,8 @@ class DrawBoxController(
      */
     fun exportSvg() {
         val svgContent = SvgExporter.exportToSvg(
-            elements = _state.value.elements
+            elements = _state.value.elements,
+            bgColor = _state.value.bgColor,
         )
         _events.tryEmit(Event.SvgExported(svgContent))
     }

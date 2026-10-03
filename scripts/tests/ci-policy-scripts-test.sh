@@ -212,6 +212,13 @@ git -C "$repo" add . && git -C "$repo" commit -qm "touch plugin-api-testkit"
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
 assert_eq "$actual" ":plugin-api-testkit:jvmTest"
 
+# A DrawBox change runs its own tests and sharedUI's, which render through it.
+mkdir -p "$repo/android-compose/drawbox/src"
+touch "$repo/android-compose/drawbox/src/ShapeLabel.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch drawbox"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" ":drawbox:jvmTest :sharedUI:jvmTest"
+
 repo="$TMP/policy"
 new_repo "$repo"
 mkdir -p "$repo/android-compose/app/src" "$repo/android-compose/sharedLogic/src/commonMain/kotlin" \
