@@ -1,5 +1,11 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.ActionCall
+import com.letta.mobile.plugin.api.ActionResult
+import com.letta.mobile.plugin.api.ElementEvent
+import com.letta.mobile.plugin.api.LcpMethod
+import com.letta.mobile.plugin.api.PluginEmit
+import com.letta.mobile.plugin.api.PluginHealth
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
@@ -39,18 +45,19 @@ private fun <T> decodeOrRefuse(serializer: KSerializer<T>, json: JsonElement, wh
 }
 
 /**
- * Every method of [LcpMethod] with its typed params and result: the table a typed host or plugin
- * calls through, and the one the golden transcripts are held to.
+ * Every method of `:plugin-api`'s [LcpMethod] with its typed params and result (the SPI's DTOs, or
+ * the wire-only envelopes of `LcpMessages.kt`): the table a typed host or plugin calls through, and
+ * the one the golden transcripts are held to.
  */
 object LcpCalls {
     val INITIALIZE = LcpRequestType(LcpMethod.INITIALIZE, InitializeParams.serializer(), InitializeResult.serializer())
     val ACTIVATE = LcpRequestType(LcpMethod.ACTIVATE, LcpEmpty.serializer(), LcpEmpty.serializer())
-    val HEALTH = LcpRequestType(LcpMethod.HEALTH, LcpEmpty.serializer(), HealthResult.serializer())
+    val HEALTH = LcpRequestType(LcpMethod.HEALTH, LcpEmpty.serializer(), PluginHealth.serializer())
     val DEACTIVATE = LcpRequestType(LcpMethod.DEACTIVATE, LcpEmpty.serializer(), LcpEmpty.serializer())
-    val INVOKE = LcpRequestType(LcpMethod.INVOKE, InvokeParams.serializer(), InvokeResult.serializer())
-    val ELEMENT_EVENT = LcpNotificationType(LcpMethod.ELEMENT_EVENT, ElementEventParams.serializer())
+    val INVOKE = LcpRequestType(LcpMethod.INVOKE, ActionCall.serializer(), ActionResult.Ok.serializer())
+    val ELEMENT_EVENT = LcpNotificationType(LcpMethod.ELEMENT_EVENT, ElementEvent.serializer())
     val SETTINGS_CHANGED = LcpNotificationType(LcpMethod.SETTINGS_CHANGED, SettingsChangedParams.serializer())
-    val EMIT = LcpRequestType(LcpMethod.EMIT, LcpEmit.serializer(), EmitResult.serializer())
+    val EMIT = LcpRequestType(LcpMethod.EMIT, PluginEmit.serializer(), EmitResult.serializer())
     val PUT_ASSET_BEGIN = LcpRequestType(LcpMethod.PUT_ASSET_BEGIN, PutAssetBeginParams.serializer(), PutAssetBeginResult.serializer())
     val PUT_ASSET_CHUNK = LcpRequestType(LcpMethod.PUT_ASSET_CHUNK, PutAssetChunkParams.serializer(), LcpEmpty.serializer())
     val PUT_ASSET_END = LcpRequestType(LcpMethod.PUT_ASSET_END, PutAssetEndParams.serializer(), PutAssetEndResult.serializer())

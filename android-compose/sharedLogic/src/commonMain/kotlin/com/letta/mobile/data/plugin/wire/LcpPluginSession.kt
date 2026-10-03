@@ -1,10 +1,13 @@
 package com.letta.mobile.data.plugin.wire
 
 import com.letta.mobile.data.canvas.compose.Sha256
+import com.letta.mobile.plugin.api.ElementQuery
+import com.letta.mobile.plugin.api.EmitReceipt
+import com.letta.mobile.plugin.api.PluginElementView
+import com.letta.mobile.plugin.api.PluginEmit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
@@ -23,9 +26,9 @@ class LcpPluginSession(transport: LcpTransport, scope: CoroutineScope) {
 
     fun start(): Job = peer.start()
 
-    suspend fun emit(emit: LcpEmit): EmitReceipt = peer.call(LcpCalls.EMIT, emit).receipt
+    suspend fun emit(emit: PluginEmit): EmitReceipt = peer.call(LcpCalls.EMIT, emit).receipt
 
-    /** Uploads [bytes] in chunks of at most 1 MiB of base64 and answers the host's ref. */
+    /** Uploads [bytes] in chunks of at most 1 MiB and answers the host's ref (SPI `PluginHost.putAsset`). */
     @OptIn(ExperimentalEncodingApi::class)
     suspend fun putAsset(mediaType: String, bytes: ByteArray): String {
         val uploadId = peer.call(LcpCalls.PUT_ASSET_BEGIN, PutAssetBeginParams(mediaType, bytes.size.toLong())).uploadId
@@ -35,7 +38,7 @@ class LcpPluginSession(transport: LcpTransport, scope: CoroutineScope) {
         return peer.call(LcpCalls.PUT_ASSET_END, PutAssetEndParams(uploadId, LcpAssetUploads.hex(Sha256.digest(bytes)))).ref
     }
 
-    suspend fun readElements(query: LcpElementQuery): List<JsonObject> = peer.call(LcpCalls.READ_ELEMENTS, ReadElementsParams(query)).elements
+    suspend fun readElements(query: ElementQuery): List<PluginElementView> = peer.call(LcpCalls.READ_ELEMENTS, ReadElementsParams(query)).elements
 
     suspend fun log(line: LogParams) = peer.notify(LcpCalls.LOG, line)
 
@@ -45,8 +48,8 @@ class LcpPluginSession(transport: LcpTransport, scope: CoroutineScope) {
     }
 
     companion object {
-        /** Raw bytes per chunk: their base64 is exactly [LcpWire.MAX_CHUNK_BASE64_CHARS]. */
-        const val CHUNK_BYTES: Int = LcpWire.MAX_CHUNK_BASE64_CHARS / 4 * 3
+        /** Raw bytes per chunk: the registry's limit. */
+        const val CHUNK_BYTES: Int = LcpWire.MAX_CHUNK_BYTES
 
         fun chunksOf(bytes: ByteArray): List<ByteArray> =
             (bytes.indices step CHUNK_BYTES).map { bytes.copyOfRange(it, minOf(it + CHUNK_BYTES, bytes.size)) }

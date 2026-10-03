@@ -1,5 +1,7 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpMethod
+import com.letta.mobile.plugin.api.PluginApi
 import kotlinx.serialization.json.Json
 
 /**
@@ -7,23 +9,27 @@ import kotlinx.serialization.json.Json
  * plugin speaks as NDJSON on stdio and a `service` plugin speaks as WebSocket text frames. JSON-RPC
  * 2.0, UTF-8, one message per line or frame. The reference for authors is
  * `docs/reference/canvas-plugin-wire-v1.md`; the golden transcripts are under
- * `commonTest/resources/canvas/plugin/v1/wire/`.
+ * `commonTest/resources/canvas/plugin/v1/wire/`. The method set, deadlines and size limits are
+ * `:plugin-api`'s [LcpMethod]; the message shapes are its DTOs wherever the SPI has one.
  */
 object LcpWire {
     /** The JSON-RPC version every message carries in `jsonrpc`. */
     const val JSONRPC: String = "2.0"
 
     /** The contract version this host speaks best; [SUPPORTED_CONTRACT_VERSIONS] is all it accepts. */
-    const val CONTRACT_VERSION: Int = 1
+    const val CONTRACT_VERSION: Int = PluginApi.CONTRACT_VERSION
 
     /** Every contract version this host can speak, offered in `plugin.initialize`. */
     val SUPPORTED_CONTRACT_VERSIONS: List<Int> = listOf(CONTRACT_VERSION)
 
     /** The largest message, in UTF-8 bytes, either side sends or accepts (4 MiB). */
-    const val MAX_MESSAGE_BYTES: Int = 4 * 1024 * 1024
+    const val MAX_MESSAGE_BYTES: Int = LcpMethod.MAX_MESSAGE_BYTES
 
-    /** The largest `base64` text of one `host.putAsset.chunk` (1 MiB). */
-    const val MAX_CHUNK_BASE64_CHARS: Int = 1024 * 1024
+    /** The most decoded bytes one `host.putAsset.chunk` carries (1 MiB). */
+    const val MAX_CHUNK_BYTES: Int = LcpMethod.MAX_ASSET_CHUNK_BYTES
+
+    /** The longest `base64` text of one chunk: [MAX_CHUNK_BYTES] encoded, padded. */
+    const val MAX_CHUNK_BASE64_CHARS: Int = (MAX_CHUNK_BYTES + 2) / 3 * 4
 
     /** The largest asset one upload may declare and deliver (8 MiB, the snapshot cap). */
     const val MAX_ASSET_BYTES: Long = 8L * 1024 * 1024
@@ -39,13 +45,13 @@ object LcpWire {
 
     /**
      * The one JSON configuration of the wire: unknown fields are ignored (a later minor version may
-     * add some), absent optional fields stay absent, sealed shapes are tagged by `kind`.
+     * add some), absent optional fields stay absent, sealed shapes are tagged by `type` (as
+     * `:plugin-api`'s DTOs are; `plugin.health` by `status`).
      */
     val json: Json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
         encodeDefaults = false
-        classDiscriminator = "kind"
     }
 }
 

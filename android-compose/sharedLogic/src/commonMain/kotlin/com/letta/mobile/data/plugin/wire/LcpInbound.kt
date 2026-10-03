@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpMethod
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -80,7 +81,7 @@ internal class LcpInbound(
     }
 
     private fun admit(side: LcpSide, request: JsonRpcMessage.Request): InboundVerdict {
-        val method = LcpMethod.of(request.method)?.takeIf { it.direction.deliversTo(side) }
+        val method = LcpMethod.byWire(request.method)?.takeIf { it.direction.deliversTo(side) }
         val handler = method?.let(handlers::get)
         return when {
             method == null || handler == null -> refuse(LcpErrorCode.METHOD_NOT_FOUND, "no method ${request.method} towards the ${side.name.lowercase()}")
@@ -125,7 +126,7 @@ internal class LcpInbound(
     }
 
     private suspend fun onNotification(side: LcpSide, notification: JsonRpcMessage.Notification) {
-        val method = LcpMethod.of(notification.method)?.takeIf { it.direction.deliversTo(side) && !it.isRequest } ?: return
+        val method = LcpMethod.byWire(notification.method)?.takeIf { it.direction.deliversTo(side) && !it.isRequest } ?: return
         if (method == LcpMethod.CANCEL) return cancel(notification.params)
         val handler = handlers[method] ?: return
         val admission = config.guard.incoming(method, notification.params) as? LcpAdmission.Admit ?: return

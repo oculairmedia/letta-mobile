@@ -1,5 +1,7 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpMethod
+import com.letta.mobile.plugin.api.LcpDirection
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

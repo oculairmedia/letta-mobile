@@ -1,6 +1,15 @@
 package com.letta.mobile.data.plugin.wire
 
-import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
+import com.letta.mobile.plugin.api.ActionResult
+import com.letta.mobile.plugin.api.ElementFallback
+import com.letta.mobile.plugin.api.ElementQuery
+import com.letta.mobile.plugin.api.LcpMethod
+import com.letta.mobile.plugin.api.LogLevel
+import com.letta.mobile.plugin.api.PlaceElement
+import com.letta.mobile.plugin.api.PlaceImage
+import com.letta.mobile.plugin.api.PluginEmit
+import com.letta.mobile.plugin.api.SnapshotSource
+import com.letta.mobile.plugin.api.UpdateElement
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginSecrets
 import com.letta.mobile.data.plugin.SecretScrubber
@@ -16,8 +25,8 @@ import kotlin.test.assertFailsWith
 
 /** Capability enforcement and the secret discipline at the wire's boundary (letta-mobile-s416w.25). */
 class LcpHostGuardsTest {
-    private val place = LcpEmit(place = listOf(LcpPlaceElement("widget", 2, JsonObject(emptyMap()), CanvasPluginFallback("Job"))))
-    private val image = LcpEmit(placeImages = listOf(LcpPlaceImage(LcpSnapshot.Asset("sha256:abc"))))
+    private val place = PluginEmit(place = listOf(PlaceElement("widget", 2, JsonObject(emptyMap()), ElementFallback("Job"))))
+    private val image = PluginEmit(placeImages = listOf(PlaceImage(SnapshotSource.Asset("sha256:abc"))))
     private val secrets = PluginSecrets().with("apiToken", "tok-s3cret-123")
 
     private suspend fun refusal(block: suspend () -> Unit): LcpCallException = assertFailsWith<LcpCallException> { block() }
@@ -28,7 +37,7 @@ class LcpHostGuardsTest {
         assertEquals(listOf("el-1"), rig.pluginSession.emit(place).placed)
         val cases = mapOf<PluginCapability, suspend () -> Unit>(
             PluginCapability.ASSETS_WRITE to { rig.pluginSession.emit(image) },
-            PluginCapability.CANVAS_READ to { rig.pluginSession.readElements(LcpElementQuery()) },
+            PluginCapability.CANVAS_READ to { rig.pluginSession.readElements(ElementQuery()) },
         )
         cases.forEach { (capability, call) ->
             val refused = refusal(call)
@@ -41,8 +50,8 @@ class LcpHostGuardsTest {
 
     @Test
     fun anEmitNeedsCapabilitiesByWhatItCarries() {
-        val bytes = LcpEmit(update = listOf(LcpUpdateElement("el-1", snapshot = LcpSnapshot.Bytes("image/png", "AQ=="))))
-        val needs = { emit: LcpEmit -> LcpCapabilityGuard.required(LcpMethod.EMIT, LcpCalls.EMIT.encodeParams(emit)) }
+        val bytes = PluginEmit(update = listOf(UpdateElement("el-1", snapshot = SnapshotSource.Bytes("image/png", byteArrayOf(1)))))
+        val needs = { emit: PluginEmit -> LcpCapabilityGuard.required(LcpMethod.EMIT, LcpCalls.EMIT.encodeParams(emit)) }
         assertEquals(setOf(PluginCapability.CANVAS_PLACE), needs(place))
         assertEquals(setOf(PluginCapability.ASSETS_WRITE), needs(image))
         assertEquals(setOf(PluginCapability.CANVAS_PLACE, PluginCapability.ASSETS_WRITE), needs(bytes))
@@ -52,9 +61,9 @@ class LcpHostGuardsTest {
     @Test
     fun aLogLineKeepsItsShapeWithTheSecretReplaced() = runTest {
         val rig = LcpTestRig(backgroundScope, secrets = secrets).ready()
-        rig.pluginSession.log(LogParams(LcpLogLevel.WARN, "auth with tok-s3cret-123", mapOf("token" to "tok-s3cret-123", "status" to "401")))
+        rig.pluginSession.log(LogParams(LogLevel.WARN, "auth with tok-s3cret-123", mapOf("token" to "tok-s3cret-123", "status" to "401")))
         assertEquals(
-            LogParams(LcpLogLevel.WARN, SecretScrubber.REFUSED, mapOf("token" to SecretScrubber.REFUSED, "status" to "401")),
+            LogParams(LogLevel.WARN, SecretScrubber.REFUSED, mapOf("token" to SecretScrubber.REFUSED, "status" to "401")),
             rig.host.logged.receive(),
         )
     }
@@ -62,7 +71,7 @@ class LcpHostGuardsTest {
     @Test
     fun anEmitHoldingASecretIsRefusedWhole() = runTest {
         val rig = LcpTestRig(backgroundScope, secrets = secrets).ready()
-        val leaking = LcpEmit(update = listOf(LcpUpdateElement("el-1", props = buildJsonObject { put("label", "tok-s3cret-123") })))
+        val leaking = PluginEmit(update = listOf(UpdateElement("el-1", props = buildJsonObject { put("label", "tok-s3cret-123") })))
         assertEquals(LcpErrorCode.SECRET_REFUSED, refusal { rig.pluginSession.emit(leaking) }.code)
         assertEquals(emptyList(), rig.host.emits)
     }
@@ -70,7 +79,7 @@ class LcpHostGuardsTest {
     @Test
     fun anActionResultHoldingASecretInAnyEncodingIsRefused() = runTest {
         val rig = LcpTestRig(backgroundScope, secrets = secrets).ready()
-        rig.plugin.invoke = { InvokeResult("done", structured = buildJsonObject { put("debug", "dG9rLXMzY3JldC0xMjM=") }) }
+        rig.plugin.invoke = { ActionResult.Ok("done", structured = buildJsonObject { put("debug", "dG9rLXMzY3JldC0xMjM=") }) }
         assertEquals(LcpErrorCode.SECRET_REFUSED, refusal { rig.hostSession.invoke(LcpTestRig.agentInvoke("start")) }.code)
     }
 
@@ -78,7 +87,7 @@ class LcpHostGuardsTest {
     fun anActionErrorIsScrubbed() = runTest {
         val rig = LcpTestRig(backgroundScope, secrets = secrets).ready()
         rig.plugin.invoke = { throw LcpPluginSession.actionFailed("auth", "token tok-s3cret-123 rejected") }
-        assertEquals(LcpActionOutcome.Failed("auth", SecretScrubber.REFUSED), rig.hostSession.invoke(LcpTestRig.agentInvoke("start")))
+        assertEquals(ActionResult.Error("auth", SecretScrubber.REFUSED), rig.hostSession.invoke(LcpTestRig.agentInvoke("start")))
     }
 
     @Test

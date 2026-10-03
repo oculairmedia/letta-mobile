@@ -12,7 +12,7 @@ class LcpUploadedAsset(val mediaType: String, val bytes: ByteArray, val sha256: 
 /**
  * The host's half of `host.putAsset.begin/chunk/end` (plan section 5): at most
  * [LcpWire.MAX_OPEN_UPLOADS] open uploads, each at most [LcpWire.MAX_ASSET_BYTES], chunks in order
- * from 0 with at most [LcpWire.MAX_CHUNK_BASE64_CHARS] of base64, the total exactly the declared
+ * from 0 of at most [LcpWire.MAX_CHUNK_BYTES] bytes each, the total exactly the declared
  * size, and the lowercase hex SHA-256 matching. Any broken rule refuses the call with
  * [LcpErrorCode.UPLOAD_REFUSED] and drops the upload, so nothing half-sent is ever stored.
  */
@@ -37,7 +37,7 @@ class LcpAssetUploads {
     }
 
     fun chunk(params: PutAssetChunkParams) {
-        if (params.base64.length > LcpWire.MAX_CHUNK_BASE64_CHARS) drop(params.uploadId, "a chunk is at most ${LcpWire.MAX_CHUNK_BASE64_CHARS} base64 characters")
+        if (params.base64.length > LcpWire.MAX_CHUNK_BASE64_CHARS) drop(params.uploadId, "a chunk is at most ${LcpWire.MAX_CHUNK_BYTES} bytes")
         val bytes = decode(params)
         val problem = synchronized(lock) { append(openUpload(params.uploadId), params.index, bytes) }
         problem?.let { drop(params.uploadId, it) }

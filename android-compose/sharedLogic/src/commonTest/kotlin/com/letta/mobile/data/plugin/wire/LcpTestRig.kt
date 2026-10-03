@@ -1,22 +1,32 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.ActionCall
+import com.letta.mobile.plugin.api.ActionContext
+import com.letta.mobile.plugin.api.ActionOrigin
+import com.letta.mobile.plugin.api.ActionResult
+import com.letta.mobile.plugin.api.ElementQuery
+import com.letta.mobile.plugin.api.ElementEvent
+import com.letta.mobile.plugin.api.EmitReceipt
+import com.letta.mobile.plugin.api.HostInfo
+import com.letta.mobile.plugin.api.PluginElementView
+import com.letta.mobile.plugin.api.PluginEmit
+import com.letta.mobile.plugin.api.PluginHealth
+import com.letta.mobile.plugin.api.PluginInfo
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginSecrets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** A host that records what plugins ask of it, answering deterministically (`el-1`, `el-2`, … and real asset hashes). */
 class RecordingHost : LcpHostHandlers {
-    val emits = mutableListOf<LcpEmit>()
+    val emits = mutableListOf<PluginEmit>()
     val assets = mutableListOf<LcpUploadedAsset>()
     /** Every log line, in order, as the host kept it. */
     val logged = Channel<LogParams>(Channel.UNLIMITED)
     private var placed = 0
 
-    override suspend fun emit(emit: LcpEmit): EmitReceipt {
+    override suspend fun emit(emit: PluginEmit): EmitReceipt {
         emits += emit
         return EmitReceipt(placed = emit.place.map { "el-${++placed}" })
     }
@@ -26,12 +36,8 @@ class RecordingHost : LcpHostHandlers {
         return "sha256:${asset.sha256}"
     }
 
-    override suspend fun readElements(query: LcpElementQuery): List<JsonObject> = listOf(
-        buildJsonObject {
-            put("id", "el-1")
-            put("type", "ext:letta.example/widget")
-        },
-    )
+    override suspend fun readElements(query: ElementQuery): List<PluginElementView> =
+        listOf(PluginElementView("el-1", "ext:letta.example/widget", "canvas-1"))
 
     override suspend fun log(line: LogParams) {
         logged.send(line)
@@ -41,16 +47,16 @@ class RecordingHost : LcpHostHandlers {
 /** The plugin side of the tests: what it answers to each host method. */
 class TestPlugin {
     var spoken: List<Int> = listOf(LcpWire.CONTRACT_VERSION)
-    var invoke: suspend (InvokeParams) -> InvokeResult = { InvokeResult("ran ${it.action}") }
-    var health: suspend () -> HealthResult = { HealthResult(LcpHealthStatus.OK) }
-    val events = mutableListOf<ElementEventParams>()
+    var invoke: suspend (ActionCall) -> ActionResult.Ok = { ActionResult.Ok("ran ${it.action}") }
+    var health: suspend () -> PluginHealth = { PluginHealth.Ok }
+    val events = mutableListOf<ElementEvent>()
     val settings = mutableListOf<JsonObject>()
     var deactivated = false
 
     fun serveOn(session: LcpPluginSession) {
         val peer = session.peer
         peer.serve(LcpCalls.INITIALIZE) {
-            InitializeResult(ok = true, LcpHandshake.choose(it.contractVersions, spoken), LcpPluginInfo("Example", "1.2.0"))
+            InitializeResult(ok = true, LcpHandshake.choose(it.contractVersions, spoken), PluginInfo(build = "1.2.0"))
         }
         peer.serve(LcpCalls.ACTIVATE) { LcpEmpty() }
         peer.serve(LcpCalls.HEALTH) { health() }
@@ -90,10 +96,10 @@ class LcpTestRig(
             contractVersions = offered,
             pluginId = "letta.example",
             settings = settings,
-            hostInfo = LcpHostInfo("letta-host", "test"),
+            hostInfo = HostInfo("letta-host", "test"),
         )
 
         fun agentInvoke(action: String, input: JsonObject = JsonObject(emptyMap())) =
-            InvokeParams(action, input, LcpActionContext(LcpOrigin.Agent("agent-1", "conv-1", "call-1")))
+            ActionCall(action, input, ActionContext(ActionOrigin.Agent("agent-1", "conv-1", "call-1")))
     }
 }

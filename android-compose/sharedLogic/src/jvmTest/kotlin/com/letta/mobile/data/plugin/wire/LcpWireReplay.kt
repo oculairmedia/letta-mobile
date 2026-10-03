@@ -1,5 +1,7 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpDirection
+import com.letta.mobile.plugin.api.LcpMethod
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -22,13 +24,13 @@ internal class HostDriver(private val peer: LcpPeer, private val lines: List<Wir
     suspend fun drive() = lines.filter { it.dir == LcpDirection.HOST_TO_PLUGIN }.forEach { line ->
         when (val message = line.message) {
             is JsonRpcMessage.Request -> request(message)
-            is JsonRpcMessage.Notification -> peer.notify(checkNotNull(LcpMethod.of(message.method)), message.params)
+            is JsonRpcMessage.Notification -> peer.notify(checkNotNull(LcpMethod.byWire(message.method)), message.params)
             else -> Unit
         }
     }
 
     private suspend fun request(request: JsonRpcMessage.Request) {
-        val method = checkNotNull(LcpMethod.of(request.method))
+        val method = checkNotNull(LcpMethod.byWire(request.method))
         when (val answer = answerTo(request)) {
             is JsonRpcMessage.Success -> assertEquals(normalized(answer.result), normalized(peer.request(method, request.params)), request.method)
             is JsonRpcMessage.Failure -> assertEquals(answer.error.code, assertFailsWith<LcpCallException> { peer.request(method, request.params) }.code)

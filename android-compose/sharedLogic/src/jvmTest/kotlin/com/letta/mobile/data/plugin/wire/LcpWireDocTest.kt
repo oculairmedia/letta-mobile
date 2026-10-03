@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpMethod
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,8 +29,9 @@ class LcpWireDocTest {
         add("|---|---|---|---|---|---|")
         LcpMethod.entries.forEach { method ->
             val deadline = method.deadline?.toString() ?: "-"
-            val capability = method.capability?.wire ?: if (method == LcpMethod.EMIT) "by content" else "-"
-            add("| `${method.wire}` | ${method.direction.wire} | ${method.route.kind.name.lowercase()} | $deadline | $capability | `${method.spi}` |")
+            val capability = LcpCapabilityGuard.byMethod[method]?.wire ?: if (method == LcpMethod.EMIT) "by content" else "-"
+            val kind = if (method.isRequest) "request" else "notification"
+            add("| `${method.wire}` | ${method.direction.label} | $kind | $deadline | $capability | `${method.spiMember}` |")
         }
     }.joinToString("\n")
 

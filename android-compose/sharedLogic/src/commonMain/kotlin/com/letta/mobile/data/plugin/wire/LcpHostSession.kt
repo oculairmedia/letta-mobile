@@ -2,6 +2,15 @@ package com.letta.mobile.data.plugin.wire
 
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.SecretScrubber
+import com.letta.mobile.plugin.api.ActionCall
+import com.letta.mobile.plugin.api.ActionResult
+import com.letta.mobile.plugin.api.ElementEvent
+import com.letta.mobile.plugin.api.ElementQuery
+import com.letta.mobile.plugin.api.EmitReceipt
+import com.letta.mobile.plugin.api.LcpMethod
+import com.letta.mobile.plugin.api.PluginElementView
+import com.letta.mobile.plugin.api.PluginEmit
+import com.letta.mobile.plugin.api.PluginHealth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withTimeoutOrNull
@@ -14,12 +23,12 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /** What the host does for a plugin's calls (SPI `PluginHost`); the guards have already held each call. */
 interface LcpHostHandlers {
-    suspend fun emit(emit: LcpEmit): EmitReceipt
+    suspend fun emit(emit: PluginEmit): EmitReceipt
 
     /** Stores a verified upload and answers its ref (`sha256:<hex>`). */
     suspend fun storeAsset(asset: LcpUploadedAsset): String
 
-    suspend fun readElements(query: LcpElementQuery): List<JsonObject>
+    suspend fun readElements(query: ElementQuery): List<PluginElementView>
 
     /** A scrubbed log line. */
     suspend fun log(line: LogParams)
@@ -27,14 +36,6 @@ interface LcpHostHandlers {
 
 /** What the host knows of the plugin at the other end: what it may do, and the secrets its output is held to. */
 data class LcpHostBinding(val capabilities: Set<PluginCapability>, val scrubber: SecretScrubber, val handlers: LcpHostHandlers)
-
-/** An action's end as the host sees it (SPI `ActionResult`). */
-sealed interface LcpActionOutcome {
-    data class Ok(val result: InvokeResult) : LcpActionOutcome
-
-    /** The plugin's own failure: [code] is its `data.code`. */
-    data class Failed(val code: String, val message: String) : LcpActionOutcome
-}
 
 /**
  * Contract version negotiation (plan section 3.2): the host offers every version it speaks, the
@@ -96,17 +97,17 @@ class LcpHostSession(transport: LcpTransport, binding: LcpHostBinding, scope: Co
         peer.call(LcpCalls.ACTIVATE, LcpEmpty())
     }
 
-    suspend fun health(): HealthResult = peer.call(LcpCalls.HEALTH, LcpEmpty())
+    suspend fun health(): PluginHealth = peer.call(LcpCalls.HEALTH, LcpEmpty())
 
-    /** Runs an action; the plugin's own failure is [LcpActionOutcome.Failed], a protocol failure throws. */
-    suspend fun invoke(params: InvokeParams): LcpActionOutcome = try {
-        LcpActionOutcome.Ok(peer.call(LcpCalls.INVOKE, params))
+    /** Runs an action (SPI `CanvasPlugin.invoke`); the plugin's own failure is [ActionResult.Error], a protocol failure throws. */
+    suspend fun invoke(call: ActionCall): ActionResult = try {
+        peer.call(LcpCalls.INVOKE, call)
     } catch (e: LcpCallException) {
         if (e.code != LcpErrorCode.ACTION_FAILED) throw e
-        LcpActionOutcome.Failed(actionCodeOf(e.error), e.error.message)
+        ActionResult.Error(actionCodeOf(e.error), e.error.message)
     }
 
-    suspend fun elementEvent(params: ElementEventParams) = peer.notify(LcpCalls.ELEMENT_EVENT, params)
+    suspend fun elementEvent(event: ElementEvent) = peer.notify(LcpCalls.ELEMENT_EVENT, event)
 
     suspend fun settingsChanged(params: SettingsChangedParams) = peer.notify(LcpCalls.SETTINGS_CHANGED, params)
 
@@ -135,5 +136,5 @@ class LcpHostSession(transport: LcpTransport, binding: LcpHostBinding, scope: Co
     }
 
     private fun actionCodeOf(error: JsonRpcError): String =
-        ((error.data as? JsonObject)?.get("code"))?.jsonPrimitive?.contentOrNull ?: "action_failed"
+        ((error.data as? JsonObject)?.get("code"))?.jsonPrimitive?.contentOrNull ?: ActionResult.Error.INTERNAL
 }

@@ -1,5 +1,12 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.ActionResult
+import com.letta.mobile.plugin.api.ElementEvent
+import com.letta.mobile.plugin.api.ElementEventType
+import com.letta.mobile.plugin.api.LcpMethod
+import com.letta.mobile.plugin.api.PluginEmit
+import com.letta.mobile.plugin.api.PluginHealth
+import com.letta.mobile.plugin.api.PluginInfo
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -20,7 +27,7 @@ class LcpSessionTest {
     fun theHandshakeAgreesOnAContractVersionAndActivates() = runTest {
         val rig = LcpTestRig(backgroundScope)
         val result = rig.initialize(buildJsonObject { put("baseUrl", "https://api.example.test") })
-        assertEquals(InitializeResult(true, 1, LcpPluginInfo("Example", "1.2.0")), result)
+        assertEquals(InitializeResult(true, 1, PluginInfo(build = "1.2.0")), result)
         assertEquals(LcpSessionState.INITIALIZED, rig.hostSession.state.value)
         rig.hostSession.activate()
         assertEquals(LcpSessionState.ACTIVE, rig.hostSession.state.value)
@@ -39,7 +46,7 @@ class LcpSessionTest {
     fun aPluginAnsweringAVersionTheHostDidNotOfferIsRefused() = runTest {
         val rig = LcpTestRig(backgroundScope)
         rig.pluginSession.peer.handle(LcpMethod.INITIALIZE) {
-            LcpCalls.INITIALIZE.encodeResult(InitializeResult(true, 2, LcpPluginInfo("Example", "9.0.0")))
+            LcpCalls.INITIALIZE.encodeResult(InitializeResult(true, 2, PluginInfo(build = "9.0.0")))
         }
         assertEquals(LcpErrorCode.CONTRACT_MISMATCH, assertFailsWith<LcpCallException> { rig.initialize() }.code)
         assertEquals(LcpSessionState.CLOSED, rig.hostSession.state.value)
@@ -56,7 +63,7 @@ class LcpSessionTest {
         val rig = LcpTestRig(backgroundScope)
         val hostRefusal = assertFailsWith<LcpCallException> { rig.hostSession.invoke(LcpTestRig.agentInvoke("start")) }
         assertEquals(LcpErrorCode.NOT_INITIALIZED, hostRefusal.code)
-        val pluginRefusal = assertFailsWith<LcpCallException> { rig.pluginSession.emit(LcpEmit(remove = listOf("el-1"))) }
+        val pluginRefusal = assertFailsWith<LcpCallException> { rig.pluginSession.emit(PluginEmit(remove = listOf("el-1"))) }
         assertEquals(LcpErrorCode.NOT_INITIALIZED, pluginRefusal.code)
     }
 
@@ -81,18 +88,18 @@ class LcpSessionTest {
     @Test
     fun actionsAnswerResultsAndThePluginsOwnFailures() = runTest {
         val rig = LcpTestRig(backgroundScope).ready()
-        assertEquals(LcpActionOutcome.Ok(InvokeResult("ran start")), rig.hostSession.invoke(LcpTestRig.agentInvoke("start")))
+        assertEquals((ActionResult.Ok("ran start")), rig.hostSession.invoke(LcpTestRig.agentInvoke("start")))
         rig.plugin.invoke = { throw LcpPluginSession.actionFailed("busy", "a job is already running") }
-        assertEquals(LcpActionOutcome.Failed("busy", "a job is already running"), rig.hostSession.invoke(LcpTestRig.agentInvoke("start")))
+        assertEquals(ActionResult.Error("busy", "a job is already running"), rig.hostSession.invoke(LcpTestRig.agentInvoke("start")))
     }
 
     @Test
     fun eventsAndSettingsReachThePlugin() = runTest {
         val rig = LcpTestRig(backgroundScope).ready()
-        rig.hostSession.elementEvent(ElementEventParams("widget", "el-1", LcpElementEvent.REMOVED))
+        rig.hostSession.elementEvent(ElementEvent("widget", "el-1", ElementEventType.REMOVED))
         rig.hostSession.settingsChanged(SettingsChangedParams(buildJsonObject { put("quality", 90) }))
-        assertEquals(HealthResult(LcpHealthStatus.OK), rig.hostSession.health())
-        assertEquals(listOf(ElementEventParams("widget", "el-1", LcpElementEvent.REMOVED)), rig.plugin.events)
+        assertEquals(PluginHealth.Ok, rig.hostSession.health())
+        assertEquals(listOf(ElementEvent("widget", "el-1", ElementEventType.REMOVED)), rig.plugin.events)
         assertEquals(listOf(buildJsonObject { put("quality", 90) }), rig.plugin.settings)
     }
 
@@ -104,7 +111,7 @@ class LcpSessionTest {
         rig.plugin.invoke = {
             running.complete(Unit)
             release.await()
-            InvokeResult("finished", emit = null).also { rig.pluginSession.emit(LcpEmit(remove = listOf("el-9"))) }
+            ActionResult.Ok("finished", emit = null).also { rig.pluginSession.emit(PluginEmit(remove = listOf("el-9"))) }
         }
         val action = async { rig.hostSession.invoke(LcpTestRig.agentInvoke("start")) }
         running.await()
@@ -115,10 +122,10 @@ class LcpSessionTest {
         assertEquals(LcpErrorCode.SESSION_STATE, refused.code)
         assertTrue(!rig.plugin.deactivated, "deactivate waits for the action")
         release.complete(Unit)
-        assertEquals(LcpActionOutcome.Ok(InvokeResult("finished")), action.await())
+        assertEquals((ActionResult.Ok("finished")), action.await())
         stopping.await()
         assertTrue(rig.plugin.deactivated)
-        assertEquals(listOf(LcpEmit(remove = listOf("el-9"))), rig.host.emits, "the drained action's emit was served")
+        assertEquals(listOf(PluginEmit(remove = listOf("el-9"))), rig.host.emits, "the drained action's emit was served")
         assertEquals(LcpSessionState.CLOSED, rig.hostSession.state.value)
     }
 

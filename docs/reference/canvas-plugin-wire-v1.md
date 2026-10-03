@@ -3,9 +3,11 @@
 The protocol a `process` plugin (any language, a subprocess of the host) and a `service` plugin (a
 WebSocket server the host connects to) speak with the Letta host. It mirrors the Kotlin SPI of
 `:plugin-api` one to one (`CanvasPlugin` / `PluginHost`), so a plugin behaves the same whatever its
-runtime. Design: `docs/design/canvas-plugin-platform-plan.md` section 5. Implementation:
-`sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/wire/` (registry `LcpMethod`,
-typed shapes `LcpCalls`).
+runtime. Design: `docs/design/canvas-plugin-platform-plan.md` section 5. The method registry
+(names, directions, SPI members, deadlines, size limits) and the message shapes are `:plugin-api`'s
+(`com.letta.mobile.plugin.api.LcpMethod` and its DTOs); the codec, framing, peer, session and
+guards are `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
+`LcpCalls`).
 
 The golden transcripts in
 `android-compose/sharedLogic/src/commonTest/resources/canvas/plugin/v1/wire/` are the normative
@@ -44,8 +46,8 @@ uninitialized --plugin.initialize--> initialized --plugin.activate--> active
 The host offers every contract version it speaks; the plugin answers the one it chose:
 
 ```json
-{"jsonrpc":"2.0","id":1,"method":"plugin.initialize","params":{"contractVersion":1,"contractVersions":[1],"pluginId":"letta.example","settings":{"baseUrl":"https://api.example.test"},"hostInfo":{"name":"letta-host","version":"1.0.0"}}}
-{"jsonrpc":"2.0","id":1,"result":{"ok":true,"contractVersion":1,"pluginInfo":{"name":"Example","version":"1.2.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"plugin.initialize","params":{"contractVersion":1,"contractVersions":[1],"pluginId":"letta.example","settings":{"baseUrl":"https://api.example.test"},"hostInfo":{"name":"letta-iroh-wrapper","version":"1.0.0","platform":"linux-x64"}}}
+{"jsonrpc":"2.0","id":1,"result":{"ok":true,"contractVersion":1,"pluginInfo":{"build":"1.2.0"}}}
 ```
 
 A plugin that speaks none of the offered versions answers `-32004` with
@@ -57,20 +59,20 @@ host. Either way the host closes the connection.
 <!-- lcp_wire_tables:start -->
 | Method | Direction | Kind | Deadline | Capability | SPI member |
 |---|---|---|---|---|---|
-| `plugin.initialize` | host->plugin | request | 10s | - | `PluginHost.contractVersion + PluginHost.settings` |
+| `plugin.initialize` | host->plugin | request | 10s | - | `CanvasPlugin.initialize` |
 | `plugin.activate` | host->plugin | request | 30s | - | `CanvasPlugin.activate` |
-| `plugin.health` | host->plugin | request | 5s | - | `CanvasPlugin.health` |
 | `plugin.deactivate` | host->plugin | request | 10s | - | `CanvasPlugin.deactivate` |
+| `plugin.health` | host->plugin | request | 5s | - | `CanvasPlugin.health` |
 | `action.invoke` | host->plugin | request | 1m 40s | - | `CanvasPlugin.invoke` |
 | `element.event` | host->plugin | notification | - | - | `CanvasPlugin.onElementEvent` |
-| `host.settingsChanged` | host->plugin | notification | - | - | `PluginHost.settings` |
-| `host.emit` | plugin->host | request | 30s | by content | `PluginHost.emit` |
-| `host.putAsset.begin` | plugin->host | request | 10s | assets:write | `PluginHost.putAsset` |
-| `host.putAsset.chunk` | plugin->host | request | 10s | assets:write | `PluginHost.putAsset` |
-| `host.putAsset.end` | plugin->host | request | 30s | assets:write | `PluginHost.putAsset` |
-| `host.readElements` | plugin->host | request | 10s | canvas:read | `PluginHost.readElements` |
+| `host.settingsChanged` | host->plugin | notification | - | - | `CanvasPlugin.onSettingsChanged` |
+| `host.emit` | plugin->host | request | - | by content | `PluginHost.emit` |
+| `host.putAsset.begin` | plugin->host | request | - | assets:write | `PluginHost.putAsset` |
+| `host.putAsset.chunk` | plugin->host | request | - | assets:write | `PluginHost.putAsset` |
+| `host.putAsset.end` | plugin->host | request | - | assets:write | `PluginHost.putAsset` |
+| `host.readElements` | plugin->host | request | - | canvas:read | `PluginHost.readElements` |
 | `host.log` | plugin->host | notification | - | - | `PluginHost.log` |
-| `$/cancel` | either | notification | - | - | `coroutine cancellation` |
+| `$/cancel` | either | notification | - | - | `(coroutine cancellation)` |
 
 | Code | Meaning |
 |---|---|
@@ -96,23 +98,25 @@ host. Either way the host closes the connection.
 Shapes (see the transcripts for complete examples):
 
 - `action.invoke {action, input, context: {origin, canvasId?, elementId?}}` where `origin` is
-  `{"kind":"agent","agentId","conversationId?","toolCallId?"}`, `{"kind":"view","elementId","peerId"}`
-  or `{"kind":"host","reason"}`. Result `{text, structured?, emit?}`. The plugin's own failure is
+  `{"type":"agent","agentId","conversationId?","toolCallId?"}`, `{"type":"view","elementId","peerId?"}`
+  or `{"type":"host","reason"}`. Result `{text, structured?, emit?}`. The plugin's own failure is
   the error `{"code":-32010,"message":...,"data":{"code":"<its code>"}}`.
-- `element.event {kind, elementId, event: moved|removed|focused|viewOpened|viewClosed, frame?}`.
+- `element.event {kind, elementId, event: moved|removed|focused|viewOpened|viewClosed, frame?, canvasId?}`.
 - `host.emit {place[], update[], remove[], placeImages[]}` with `place` entries
-  `{kind, v, props, fallback: {title, subtitle?, icon?, openUrl?}, ref?, frame?: {x, y, width, height}, snapshot?}`,
+  `{kind, v, props, fallback: {title, subtitle?, icon?, openUrl?}, ref?, frame?: {x, y, width, height}, snapshot?, canvasId?}`,
   `update` entries `{elementId, props?, fallback?, snapshot?, ref?}` and `placeImages` entries
-  `{image, frame?, provenance?}`. A snapshot or image is `{"kind":"asset","ref":"sha256:<hex>"}` or
-  small inline bytes `{"kind":"bytes","mediaType","base64"}`. Result
+  `{image, frame?, alt?, canvasId?}`. A snapshot or image is `{"type":"asset","ref":"sha256:<hex>"}` or
+  small inline bytes `{"type":"bytes","mediaType","bytes":"<base64>"}`. Result
   `{"receipt":{"placed":[ids],"refused":[{"index","reason"}]}}`: a refused entry never fails the call.
 - `host.putAsset.begin {mediaType, byteSize}` (at most 8 MiB, at most 4 uploads open) answers
   `{uploadId}`; `host.putAsset.chunk {uploadId, index, base64}` in order from 0, each at most 1 MiB
-  of base64; `host.putAsset.end {uploadId, sha256}` (lowercase hex of all the bytes) answers
+  of bytes; `host.putAsset.end {uploadId, sha256}` (lowercase hex of all the bytes) answers
   `{"ref":"sha256:<hex>"}`. Any broken rule answers `-32011` and drops the upload.
-- `host.readElements {query: {canvasId?, elementIds?, kinds?, includeOthers?}}` answers `{elements}`.
+- `host.readElements {query: {canvasId?, elementIds?, kinds?, ownOnly?}}` answers `{elements}`, each
+  `{id, type, canvasId, v?, frame?, props?, ref?, fallback?}` (props, ref and fallback for the plugin's own only).
 - `host.log {level: debug|info|warn|error, message, fields}`.
 - `plugin.health` answers `{status: ok|degraded|failed, reason?}`.
+- `$/cancel` is wire plumbing: it has no SPI member (on the SPI side the call's coroutine is cancelled).
 
 ## Deadlines and cancellation
 

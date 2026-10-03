@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpMethod
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 

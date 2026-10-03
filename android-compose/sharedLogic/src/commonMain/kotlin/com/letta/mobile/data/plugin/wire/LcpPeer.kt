@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpMethod
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -144,9 +145,6 @@ class LcpPeer(private val transport: LcpTransport, private val config: LcpPeerCo
 
     private fun deadlineOf(method: LcpMethod): Duration = method.deadline ?: config.limits.defaultDeadline
 }
-
-/** The side opposite this one. */
-fun LcpSide.other(): LcpSide = if (this == LcpSide.HOST) LcpSide.PLUGIN else LcpSide.HOST
 
 /** A transport seen as messages: encodes and sends them, holding each to the size cap, and reads frames. */
 internal class LcpIo(private val transport: LcpTransport) {

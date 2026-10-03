@@ -1,5 +1,8 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.EmitReceipt
+import com.letta.mobile.plugin.api.LcpDirection
+import com.letta.mobile.plugin.api.LcpMethod
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginSecrets
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +44,7 @@ class LcpWireFixturesTest {
 
     private fun lines(name: String): List<WireLine> = resource(name).lines().filter(String::isNotBlank).map { raw ->
         val entry = json.parseToJsonElement(raw).jsonObject
-        val dir = LcpDirection.entries.single { it.wire == entry.getValue("dir").jsonPrimitive.content }
+        val dir = LcpDirection.entries.single { it.label == entry.getValue("dir").jsonPrimitive.content }
         WireLine(dir, assertIs<JsonRpcDecoding.Decoded>(JsonRpcCodec.decode(entry.getValue("message")), raw).message)
     }
 
@@ -108,8 +111,8 @@ internal data class WireLine(val dir: LcpDirection, val message: JsonRpcMessage)
 
 /** The method a call names, or null for an answer. */
 internal fun methodOf(message: JsonRpcMessage): LcpMethod? = when (message) {
-    is JsonRpcMessage.Request -> LcpMethod.of(message.method)
-    is JsonRpcMessage.Notification -> LcpMethod.of(message.method)
+    is JsonRpcMessage.Request -> LcpMethod.byWire(message.method)
+    is JsonRpcMessage.Notification -> LcpMethod.byWire(message.method)
     else -> null
 }
 
@@ -136,7 +139,7 @@ private class TranscriptChecker(private val name: String) {
     }
 
     private fun call(dir: LcpDirection, wire: String, params: JsonObject): LcpMethod {
-        val method = checkNotNull(LcpMethod.of(wire)) { "$name: unknown method $wire" }
+        val method = checkNotNull(LcpMethod.byWire(wire)) { "$name: unknown method $wire" }
         assertTrue(method.direction == dir || method.direction == LcpDirection.EITHER, "$name: $wire sent $dir")
         assertRoundTrips(LcpCalls.of(method), params)
         return method

@@ -1,7 +1,10 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.plugin.api.LcpMethod
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.SecretScrubber
+import com.letta.mobile.plugin.api.PluginEmit
+import com.letta.mobile.plugin.api.SnapshotSource
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -29,19 +32,36 @@ class LcpCapabilityGuard(private val granted: Set<PluginCapability>) : LcpGuard 
     )
 
     companion object {
+        /**
+         * The capability each plugin-to-host method needs as a whole (plan section 3.3); `host.emit`
+         * is checked by what it carries, `host.log` needs none. The host's policy over the one
+         * method registry in `:plugin-api`.
+         */
+        val byMethod: Map<LcpMethod, PluginCapability> = mapOf(
+            LcpMethod.PUT_ASSET_BEGIN to PluginCapability.ASSETS_WRITE,
+            LcpMethod.PUT_ASSET_CHUNK to PluginCapability.ASSETS_WRITE,
+            LcpMethod.PUT_ASSET_END to PluginCapability.ASSETS_WRITE,
+            LcpMethod.READ_ELEMENTS to PluginCapability.CANVAS_READ,
+        )
+
         /** The capabilities a call of [method] with [params] needs; params that do not decode need none here (their handler refuses them). */
         fun required(method: LcpMethod, params: JsonObject): Set<PluginCapability> = when (method) {
             LcpMethod.EMIT -> emitNeeds(params)
-            else -> setOfNotNull(method.capability)
+            else -> setOfNotNull(byMethod[method])
         }
 
         private fun emitNeeds(params: JsonObject): Set<PluginCapability> {
             val emit = runCatching { LcpCalls.EMIT.decodeParams(params) }.getOrNull() ?: return emptySet()
             return buildSet {
-                if (emit.touchesElements) add(PluginCapability.CANVAS_PLACE)
-                if (emit.carriesBytes) add(PluginCapability.ASSETS_WRITE)
+                if (emit.touchesElements()) add(PluginCapability.CANVAS_PLACE)
+                if (emit.carriesBytes()) add(PluginCapability.ASSETS_WRITE)
             }
         }
+
+        private fun PluginEmit.touchesElements(): Boolean = place.isNotEmpty() || update.isNotEmpty() || remove.isNotEmpty()
+
+        private fun PluginEmit.carriesBytes(): Boolean =
+            placeImages.isNotEmpty() || place.any { it.snapshot is SnapshotSource.Bytes } || update.any { it.snapshot is SnapshotSource.Bytes }
     }
 }
 
