@@ -48,7 +48,7 @@ internal class TimelineRowBindings(
 /** The list frame's overlays and their actions. */
 @Immutable
 internal class TimelineFrameOverlays(
-    val pinnedPrompt: ChatRenderItem?,
+    val pinnedPrompt: PinnedPrompt,
     val showScrollToLatest: Boolean,
     val onScrollToLatest: () -> Unit,
     /** The list's scroll-to-latest glide: the button stands down while it runs, its springback lifts the rows. */
@@ -80,14 +80,16 @@ internal fun TimelineListFrame(
     val fades = rememberTimelineFadeAlphas(
         canScrollTowardOlder = listState.canScrollForward,
         canScrollTowardNewer = listState.canScrollBackward,
-        promptPinned = overlays.pinnedPrompt != null,
+        promptPinned = overlays.pinnedPrompt.item != null,
     )
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
         backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = ChatTimelineDimens.Alpha.selection),
     )
+    // Under floating chrome the prompt's sticky copy stands in for its row, which hides meanwhile.
+    val sticky = overlays.pinnedPrompt.takeIf { it.sticky }
     Box(modifier = modifier.fillMaxWidth()) {
-        CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+        CompositionLocalProvider(LocalTextSelectionColors provides selectionColors, LocalStickyPrompt provides sticky) {
             LazyColumn(
                 state = listState,
                 reverseLayout = true,
@@ -122,21 +124,8 @@ internal fun TimelineListFrame(
                 content = content,
             )
         }
-        overlays.pinnedPrompt?.let { prompt ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(top = overlays.topReserve)
-                    .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
-                    .testTag(ChatTimelineTags.PINNED_PROMPT),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                // A copy, never a send flight's landing spot: only the prompt's own row can be.
-                CompositionLocalProvider(LocalSendFlight provides null) {
-                    TimelineItemRow(prompt, bindings, leadingSpace = false)
-                }
-            }
+        overlays.pinnedPrompt.item?.let { prompt ->
+            PinnedPromptCopy(prompt, overlays.pinnedPrompt, bindings, Modifier.align(Alignment.TopCenter))
         }
         val showScrollToLatest = overlays.showScrollToLatest && !overlays.glide.isGliding
         if (touchStyle()) {
@@ -162,8 +151,37 @@ internal fun TimelineListFrame(
 }
 
 /**
+ * The pinned prompt's copy over the list. On the desktop it rests in a card's inset below the top
+ * edge. Under floating chrome ([PinnedPrompt.sticky]) it is the prompt's row exactly (the list's
+ * gutter, its leading space), placed by [PinnedPrompt.copyTop]: on its row, then held at the
+ * visible top, so it never travels up under the chrome and never jumps.
+ */
+@Composable
+private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindings: TimelineRowBindings, modifier: Modifier) {
+    val frame = if (pinned.sticky) {
+        Modifier
+            .padding(horizontal = ChatRowSpacing.contentPaddingHorizontal)
+            .stickyCopyPlacement(pinned)
+    } else {
+        Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
+    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(frame)
+            .testTag(ChatTimelineTags.PINNED_PROMPT),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        // A copy, never a send flight's landing spot: only the prompt's own row can be.
+        CompositionLocalProvider(LocalSendFlight provides null) {
+            TimelineItemRow(prompt, bindings, leadingSpace = pinned.sticky)
+        }
+    }
+}
+
+/**
  * One render item, at the chat column's width, through the shared row seam. In the list it
- * carries its own leading space ([timelineLeadingSpace]); the pinned copy over the list does not.
+ * carries its own leading space ([timelineLeadingSpace]); the desktop's pinned copy does not.
  */
 @Composable
 internal fun TimelineItemRow(
@@ -172,10 +190,12 @@ internal fun TimelineItemRow(
     modifier: Modifier = Modifier,
     leadingSpace: Boolean = true,
 ) {
+    val sticky = LocalStickyPrompt.current.takeIf { item.isUserPrompt() }
     Box(
         modifier = modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
+            .hiddenUnderStickyCopy(sticky, item.key)
             .padding(top = if (leadingSpace) timelineLeadingSpace(item) else 0.dp),
     ) {
         ChatRenderItemRow(item = item, context = bindings.contexts.forItem(item), callbacks = bindings.callbacks)

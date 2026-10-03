@@ -119,7 +119,7 @@ private fun PagedTimelineBody(
     } else {
         RecordReadingPosition(presentation, listState, rows)
     }
-    val pinned by rememberPinnedPrompt(listState, rows.size, rows::itemAt)
+    val pinned = rememberPinnedPrompt(listState, rows.size, params.topReserve, rows::itemAt)
     val glide = rememberNewestEdgeGlide(listState)
     val today = rememberCurrentDate()
     // The newest row is the live overlay's head, not necessarily the owner state's last message.

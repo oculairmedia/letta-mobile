@@ -84,7 +84,7 @@ internal fun LegacyTimelineList(params: LegacyTimelineParams, modifier: Modifier
     )
     // One midnight watcher for the whole list, not one per divider.
     val today = rememberCurrentDate()
-    val pinned by rememberPinnedPrompt(listState, leading + rows.size) { index ->
+    val pinned = rememberPinnedPrompt(listState, leading + rows.size, params.topReserve) { index ->
         (rows.getOrNull(index - leading) as? TimelineRow.Item)?.item
     }
     TimelineListFrame(

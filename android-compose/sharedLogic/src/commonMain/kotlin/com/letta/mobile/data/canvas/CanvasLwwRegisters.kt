@@ -53,6 +53,10 @@ internal data class CanvasWriter(val lamport: Long, val actorId: String, val opI
  *
  * [groups] are provenance summaries for readers (the newest writer of each group's registers,
  * under the group's key), and the entry-level `_lamport`/`_actorId`/`_opId` is the newest of all.
+ *
+ * What a newer build keeps in an entry and this one does not know (a field outside every
+ * register, a clock of a register it does not have) is [Foreign]: carried through every write, so
+ * a board shared through a notebook with a newer peer does not lose it here.
  */
 internal class CanvasLwwRegisters(
     /** Register name to the entry fields it holds. */
@@ -60,6 +64,10 @@ internal class CanvasLwwRegisters(
     /** Summary key (e.g. `_frame`) to the registers it summarises. */
     private val groups: Map<String, List<String>>,
 ) {
+    /** Every key this build reads or writes in an entry; anything else is [Foreign]. */
+    private val knownKeys: Set<String> = registers.values.flatten().toSet() + groups.keys +
+        setOf(ID, CLOCK, REMOVED, CanvasWriter.LAMPORT, CanvasWriter.ACTOR, CanvasWriter.OP_ID)
+
     /** [entry] (null for a new one) after [writer] sets [values], register name to its fields. */
     fun write(entry: JsonObject?, id: String, writer: CanvasWriter, values: Map<String, Map<String, JsonElement>>): JsonObject {
         val state = parse(entry)
@@ -73,12 +81,13 @@ internal class CanvasLwwRegisters(
         val state = parse(entry)
         if (state.removedAfter(writer)) return state.render(id)
         state.clocks.filterValues { it < writer }.keys.forEach(state::clear)
+        state.foreign = state.foreign.removedBy(writer)
         state.removed = writer
         return state.render(id)
     }
 
     /** Whether [entry] holds no register at all: a tombstone, or nothing. */
-    fun isEmpty(entry: JsonObject): Boolean = parse(entry).clocks.isEmpty()
+    fun isEmpty(entry: JsonObject): Boolean = parse(entry).let { it.clocks.isEmpty() && it.foreign.clocks.isEmpty() }
 
     private fun parse(entry: JsonObject?): Registers {
         val clockTable = entry?.get(CLOCK) as? JsonObject
@@ -86,13 +95,33 @@ internal class CanvasLwwRegisters(
         val values = clocks.keys.associateWith { register ->
             registers.getValue(register).mapNotNull { field -> entry?.get(field)?.let { field to it } }.toMap()
         }
-        return Registers(values.toMutableMap(), clocks.toMutableMap(), CanvasWriter.from(entry?.get(REMOVED)))
+        return Registers(values.toMutableMap(), clocks.toMutableMap(), CanvasWriter.from(entry?.get(REMOVED)), foreignOf(entry, clockTable))
+    }
+
+    private fun foreignOf(entry: JsonObject?, clockTable: JsonObject?): Foreign = Foreign(
+        fields = entry.orEmpty().filterKeys { it !in knownKeys },
+        clocks = clockTable.orEmpty().filterKeys { it !in registers }.mapNotNull { (name, value) ->
+            CanvasWriter.from(value)?.let { name to it }
+        }.toMap(),
+    )
+
+    /**
+     * Fields and register clocks of a newer build. This build cannot tell which fields belong to
+     * which of those registers, so a removal clears all of the fields unless one of the clocks is
+     * newer than the removal, and drops the clocks older than it.
+     */
+    private class Foreign(val fields: Map<String, JsonElement>, val clocks: Map<String, CanvasWriter>) {
+        fun removedBy(writer: CanvasWriter): Foreign {
+            val kept = clocks.filterValues { it > writer }
+            return Foreign(if (kept.isEmpty()) emptyMap() else fields, kept)
+        }
     }
 
     private inner class Registers(
         val values: MutableMap<String, Map<String, JsonElement>>,
         val clocks: MutableMap<String, CanvasWriter>,
         var removed: CanvasWriter?,
+        var foreign: Foreign,
     ) {
         fun removedAfter(writer: CanvasWriter): Boolean = removed?.let { writer < it } == true
 
@@ -110,13 +139,15 @@ internal class CanvasLwwRegisters(
 
         fun render(id: String): JsonObject = buildJsonObject {
             put(ID, JsonPrimitive(id))
-            values.values.flatMap { it.entries }.sortedBy { it.key }.forEach { (key, value) -> put(key, value) }
-            if (clocks.isNotEmpty()) put(CLOCK, JsonObject(clocks.entries.sortedBy { it.key }.associate { it.key to it.value.toJson() }))
+            val fields = values.values.flatMap { it.entries } + foreign.fields.entries
+            fields.sortedBy { it.key }.forEach { (key, value) -> put(key, value) }
+            val allClocks = clocks + foreign.clocks
+            if (allClocks.isNotEmpty()) put(CLOCK, JsonObject(allClocks.entries.sortedBy { it.key }.associate { it.key to it.value.toJson() }))
             groups.entries.sortedBy { it.key }.forEach { (key, members) ->
                 members.mapNotNull(clocks::get).maxOrNull()?.let { put(key, it.toJson()) }
             }
             removed?.let { put(REMOVED, it.toJson()) }
-            (clocks.values + listOfNotNull(removed)).maxOrNull()?.toJson()?.forEach { (key, value) -> put(key, value) }
+            (allClocks.values + listOfNotNull(removed)).maxOrNull()?.toJson()?.forEach { (key, value) -> put(key, value) }
         }
     }
 
