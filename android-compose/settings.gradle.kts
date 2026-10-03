@@ -15,8 +15,8 @@ dependencyResolutionManagement {
         // negative-cache entry from Google's mirror cannot shadow Maven Central.
         google {
             content {
-                includeGroupByRegex("com\.android.*")
-                includeGroupByRegex("com\.google.*")
+                includeGroupByRegex("com[.]android.*")
+                includeGroupByRegex("com[.]google.*")
                 includeGroupByRegex("androidx.*")
             }
         }
