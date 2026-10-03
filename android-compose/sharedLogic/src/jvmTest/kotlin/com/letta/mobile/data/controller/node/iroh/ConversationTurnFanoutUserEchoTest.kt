@@ -116,7 +116,7 @@ class ConversationTurnFanoutUserEchoTest {
 
         val fanout = fanoutFor(registry, initiator)
         fanout.broadcastUserEcho(clientMessageId = "cm-1", text = "hello", contentParts = null)
-        for (payload in assistantDrafts()) fanout.onDraft(payload)
+        for (payload in assistantDrafts()) fanout.onStampedDraft(payload)
 
         listOf(sinkInit to "initiator", sinkObs to "observer").forEach { (sink, who) ->
             val frames = sink.frames()
@@ -143,7 +143,7 @@ class ConversationTurnFanoutUserEchoTest {
 
         val fanout = fanoutFor(registry, initiator, parked)
         fanout.broadcastUserEcho(clientMessageId = "cm-1", text = "hello", contentParts = null)
-        for (payload in assistantDrafts()) fanout.onDraft(payload)
+        for (payload in assistantDrafts()) fanout.onStampedDraft(payload)
 
         // assistant + stop_reason = 2 parked deltas; the user echo must NOT park.
         assertEquals(2, parked.size, "user echo must not consume a parking slot")

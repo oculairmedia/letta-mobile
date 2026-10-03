@@ -32,6 +32,8 @@ internal data class TurnDraftCallbacks(
 internal class TurnDraftProcessor(
     private val callbacks: TurnDraftCallbacks,
     private val coroutineScope: CoroutineScope,
+    /** letta-mobile-jdcoj: the turn's one identity stamper; every stream-frame draft passes through it. */
+    val identity: TurnStreamIdentity = turnStreamIdentityFor(null),
 ) {
     val ledger = TurnToolCallLedger()
     private var pendingCompleted: RuntimeEventDraft? = null
@@ -97,7 +99,8 @@ internal class TurnDraftProcessor(
      * lifecycle completes the turn immediately, superseding any pending settle window, instead of
      * waiting out the quiet period the `stop_reason` delta fallback needs.
      */
-    suspend fun process(draft: RuntimeEventDraft, frameSeq: Long?, authoritative: Boolean = false) {
+    suspend fun process(incoming: RuntimeEventDraft, frameSeq: Long?, authoritative: Boolean = false) {
+        val draft = identity.stampDraft(incoming) ?: return
         flushClosedRoundTail(draft)
         if (emitAutoApproved(draft)) return
         callbacks.track(draft, ledger)

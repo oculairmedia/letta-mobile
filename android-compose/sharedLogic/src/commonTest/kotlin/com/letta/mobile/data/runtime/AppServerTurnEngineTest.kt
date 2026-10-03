@@ -305,7 +305,7 @@ class AppServerTurnEngineTest {
             client.emit(streamDelta(messageType = "client_tool_end", runId = "run-1", toolCallId = "call-1"))
             assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
 
-            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1", key = "evt-assistant-round-2"))
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             // Inter-round usage tail — the model is NOT done; another tool call follows.
@@ -321,7 +321,7 @@ class AppServerTurnEngineTest {
             client.emit(streamDelta(messageType = "client_tool_end", runId = "run-1", toolCallId = "call-2"))
             assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
 
-            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1", key = "evt-assistant-round-3"))
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             // Real terminal now completes the turn. The KEY assertion of this test
@@ -1319,7 +1319,7 @@ private class FakeAppServerClient(
                 frame = frame,
                 raw = buildJsonObject {
                     put("type", frame.type ?: "unknown")
-                    put("idempotency_key", "evt-1")
+                    put("idempotency_key", (frame as? AppServerInboundFrame.StreamDelta)?.idempotencyKey ?: "evt-1")
                     if (frame is AppServerInboundFrame.StreamDelta) {
                         put("delta", frame.delta)
                     }
@@ -1336,12 +1336,13 @@ private fun streamDelta(
     stopReason: String? = null,
     totalTokens: Int? = null,
     toolCallId: String? = null,
+    key: String = "evt-$messageType-$runId-${toolCallId.orEmpty()}",
 ): AppServerInboundFrame.StreamDelta =
     AppServerInboundFrame.StreamDelta(
         runtime = runtime,
         eventSeq = 1,
         emittedAt = "2026-06-24T00:00:00Z",
-        idempotencyKey = "evt-1",
+        idempotencyKey = key,
         delta = buildJsonObject {
             put("message_type", messageType)
             put("run_id", runId)

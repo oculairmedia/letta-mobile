@@ -1223,6 +1223,7 @@ class AppServerTurnEngine(
                 settleDelayMs = terminalSettleQuietMs,
             ),
             coroutineScope = this,
+            identity = turnStreamIdentityFor(lease.queuedInput.clientMessageId),
         )
         val emittedToolCallIds = draftProcessor.ledger.emitted
         val returnedToolCallIds = draftProcessor.ledger.returned
