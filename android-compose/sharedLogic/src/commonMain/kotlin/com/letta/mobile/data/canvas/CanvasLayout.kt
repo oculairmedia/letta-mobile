@@ -195,7 +195,8 @@ internal object CanvasLayoutPage {
         var index = start
         var packed = PageBytes(0)
         while (chosen.size < limit.raw) {
-            val step = admit(revision, rows, index, chosen, packed) ?: break
+            val walk = PageWalk(revision, rows, index)
+            val step = admit(walk, chosen, packed) ?: break
             chosen.add(rows[index.raw])
             packed = step.packed
             index = step.next
@@ -204,25 +205,22 @@ internal object CanvasLayoutPage {
     }
 
     /** The next row, or null when it does not fit or the rows have run out. */
-    private fun admit(
-        revision: LayoutRevision,
-        rows: List<CanvasLayoutRow>,
-        index: RowIndex,
-        chosen: List<CanvasLayoutRow>,
-        packed: PageBytes,
-    ): Step? {
-        val row = rows.getOrNull(index.raw) ?: return null
+    private fun admit(walk: PageWalk, chosen: List<CanvasLayoutRow>, packed: PageBytes): Step? {
+        val row = walk.rows.getOrNull(walk.index.raw) ?: return null
         val comma = if (chosen.isEmpty()) PageBytes(0) else PageBytes(1)
-        val total = CanvasLayoutJson.shellBytes(revision, cursorOf(revision, rows, index)) + packed.raw + comma.raw + CanvasLayoutJson.rowBytes(row)
+        val rowSize = CanvasLayoutJson.rowBytes(row)
+        val total = CanvasLayoutJson.shellBytes(walk.revision, cursorOf(walk)) + packed.raw + comma.raw + rowSize
         if (chosen.isNotEmpty() && total > CanvasLayoutRead.LAYOUT_PAGE_MAX_BYTES) return null
-        return Step(PageBytes(packed.raw + comma.raw + CanvasLayoutJson.rowBytes(row)), RowIndex(index.raw + 1))
+        return Step(PageBytes(packed.raw + comma.raw + rowSize), RowIndex(walk.index.raw + 1))
     }
 
-    private fun cursorOf(revision: LayoutRevision, rows: List<CanvasLayoutRow>, index: RowIndex): String? =
-        if (index.raw + 1 < rows.size) CanvasLayoutCursor.encode(revision, index) else null
+    private fun cursorOf(walk: PageWalk): String? =
+        if (walk.index.raw + 1 < walk.rows.size) CanvasLayoutCursor.encode(walk.revision, walk.index) else null
 
     private fun trailing(revision: LayoutRevision, rows: List<CanvasLayoutRow>, index: RowIndex, chosen: List<CanvasLayoutRow>): String? =
         if (index.raw < rows.size && chosen.isNotEmpty()) CanvasLayoutCursor.encode(revision, RowIndex(index.raw - 1)) else null
+
+    private data class PageWalk(val revision: LayoutRevision, val rows: List<CanvasLayoutRow>, val index: RowIndex)
 
     private data class Step(val packed: PageBytes, val next: RowIndex)
 }
