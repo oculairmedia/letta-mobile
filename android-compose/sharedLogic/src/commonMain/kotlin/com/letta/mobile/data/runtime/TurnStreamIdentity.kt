@@ -50,19 +50,28 @@ internal class TurnStreamIdentity(
     private val texts = CumulativeTexts()
     private val seenTextFrameKeys = HashSet<String>()
 
-    /** Stamps a RemoteStreamFrame/ExternalTransportFrame body; returns the body to forward, or null to drop. */
+    /**
+     * Stamps a RemoteStreamFrame/ExternalTransportFrame body; returns the body to forward, or null to drop.
+     *
+     * A frame that already carries `logical_message_id` was stamped upstream (the Iroh host's own
+     * turn processor) and is forwarded as is: its text is already the cumulative snapshot and its
+     * ids are the host's, which its ledger serves on `message.list`. Re-stamping it here would
+     * re-mint the ids and, for text, append each cumulative snapshot onto the last one
+     * (letta-mobile-4vtng: the desktop's engine on the Iroh route stacked `M[0:k1]+M[0:k2]+…+M`).
+     */
     fun stamp(body: String, source: StreamTextFrameSource): String? {
         val frame = parseDeltaFrame(body) ?: return body
         return when (frame.type) {
             in TEXT_TYPES -> stampText(frame, source)
             in UNSTAMPED_TYPES, null -> body
-            else -> stampRow(frame)
+            else -> if (frame.isStamped) body.also { boundaries.noteNonTextFrame() } else stampRow(frame)
         }
     }
 
     private fun stampText(frame: DeltaFrame, source: StreamTextFrameSource): String? {
         val frameKey = frame.idempotencyKey
         if (frameKey != null && !seenTextFrameKeys.add(frameKey)) return null
+        if (frame.isStamped) return frame.body
         val logicalId = boundaries.textMessageId(frame.boundaryKey())
         val text = frame.textChunk()?.let { texts.next(logicalId, it, source) }
         return frame.restamped(FrameIdentity(logicalId, turnId), text)
@@ -214,9 +223,12 @@ private class CumulativeTexts {
     }
 }
 
-private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject) {
+private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject, val body: String = "") {
     val type: String? = delta.stampString("message_type")
     val idempotencyKey: String? = envelope.stampString("idempotency_key")
+
+    /** Already stamped by an upstream [TurnStreamIdentity]: the ids and the cumulative text are final. */
+    val isStamped: Boolean get() = delta.containsKey("logical_message_id")
 
     private val textField: String get() = if (type == "assistant_message") "content" else "reasoning"
 
@@ -256,7 +268,7 @@ private class DeltaFrame(val envelope: JsonObject, val delta: JsonObject) {
 private fun parseDeltaFrame(body: String): DeltaFrame? = runCatching {
     val envelope = AppServerProtocol.json.parseToJsonElement(body).jsonObject
     val delta = envelope["delta"] as? JsonObject
-    delta.takeIf { envelope.stampString("type") == "stream_delta" }?.let { DeltaFrame(envelope, it) }
+    delta.takeIf { envelope.stampString("type") == "stream_delta" }?.let { DeltaFrame(envelope, it, body) }
 }.getOrNull()
 
 private fun JsonObject.stampString(key: String): String? =

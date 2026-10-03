@@ -132,12 +132,15 @@ class RealTurnFixturesStampTest {
 
     private companion object {
         val ROW_TYPES = setOf("tool_call_message", "tool_return_message", "user_message")
-        val ALL_MODELS = listOf(
-            "minimax-m3", "qwen3.8-max", "claude-sonnet-5-5", "kat-coder-pro-v2.5",
+        // #1763 renamed the mislabelled qwen3.8-max / kat-coder-pro-v2.5 captures to the
+        // minimax-m3-fallback-* directories; these lists name the directories that exist.
+        val MODELS = listOf(
+            "minimax-m3", "claude-sonnet-5-5",
             "minimax-m3-fallback-from-kat-coder", "minimax-m3-fallback-from-qwen3.8-max",
+        )
+        val ALL_MODELS = MODELS + listOf(
             "openrouter-deepseek-v4.1-flash", "openrouter-gemini-3.8-flash", "openrouter-glm-5.3-flash",
             "openrouter-gpt-6.1-sol", "openrouter-grok-4.7", "openrouter-qwen3.8-flash",
         )
-        val MODELS = listOf("minimax-m3", "qwen3.8-max", "claude-sonnet-5-5", "kat-coder-pro-v2.5")
     }
 }
