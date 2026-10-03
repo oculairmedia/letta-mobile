@@ -115,7 +115,8 @@ private fun promptBubbleStyle(interAgent: Boolean): PromptBubbleStyle {
  * letta-mobile-bglj6.1: the user's prompt as the Android timeline draws it (feature-chat
  * ChatMessageItem + MessageBubbleSurface): an end-aligned primaryContainer bubble, at most 88%
  * of the column and sized to its text, with a tight top-end corner and a "You" label. Another
- * agent's message reads "Inter-agent" in the tertiary tint, its provenance above the bubble.
+ * agent's message reads "Inter-agent" in the tertiary tint, its provenance (sender -> recipient,
+ * expandable to its metadata) the bubble's header line, inside it.
  *
  * Kept from the shared prompt card: a long prompt clamps to three lines with an expand chevron,
  * a long press opens the message actions (Copy, and Send again when the owner can rerun), a
@@ -141,7 +142,6 @@ internal fun UserPromptRow(
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        if (interAgent) ProvenanceLabel(message, callbacks)
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val bubbleMaxWidth = maxWidth * ChatRowSpacing.bubbleMaxWidthFraction
             Row(
@@ -232,6 +232,12 @@ private fun RowScope.PromptBody(
     callbacks: ChatRowCallbacks,
 ) {
     Column(modifier = Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart)) {
+        // Another agent's message: who sent it to whom heads the bubble, in the bubble's own ink.
+        if (message.agentMessageProvenance != null) {
+            Box(Modifier.testTag(ChatRowTestTags.PROMPT_PROVENANCE)) {
+                ProvenanceLabel(message, callbacks, contentColor = style.content)
+            }
+        }
         val role = stringResource(style.role)
         Text(
             text = if (message.isSendFailed) stringResource(Res.string.rows_role_not_sent, role) else role,

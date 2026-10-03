@@ -139,7 +139,7 @@ internal fun MessageImages(message: UiMessage, callbacks: ChatRowCallbacks) {
 
 /** Inter-agent provenance above a message: sender -> recipient, expandable to metadata. */
 @Composable
-internal fun ProvenanceLabel(message: UiMessage, callbacks: ChatRowCallbacks) {
+internal fun ProvenanceLabel(message: UiMessage, callbacks: ChatRowCallbacks, contentColor: Color? = null) {
     val provenance = message.agentMessageProvenance ?: return
     var expanded by remember(message.id) { mutableStateOf(false) }
     AgentMessageProvenanceLabel(
@@ -148,6 +148,7 @@ internal fun ProvenanceLabel(message: UiMessage, callbacks: ChatRowCallbacks) {
         onToggleExpand = { expanded = !expanded },
         resolveName = callbacks.resolveAgentName,
         onAgentClick = callbacks.host.openAgent,
+        contentColor = contentColor,
     )
 }
 

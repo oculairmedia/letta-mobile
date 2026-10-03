@@ -79,20 +79,27 @@ internal object ChatTimelineTags {
     const val FONT_SCALE = "chat-timeline-font-scale"
 }
 
-/** The two edge-fade strengths, already animated. */
+/**
+ * The edge-fade strengths, already animated: the top and bottom bands, and [pinned], the band that
+ * runs the content out under a sticky pinned prompt (TimelineListFrame).
+ */
 @Immutable
-internal data class TimelineFadeAlphas(val top: Float, val bottom: Float)
+internal data class TimelineFadeAlphas(val top: Float, val bottom: Float, val pinned: Float = 0f)
 
 /**
  * Edge fades for a REVERSED list: "can scroll forward" is toward older rows (the top) and "can
  * scroll backward" toward the newest (the bottom). The top fade stands down while a prompt is
- * pinned there: the opaque card already terminates the content (desktop rememberChatListFadeAlphas).
+ * pinned there as a card ([promptPinned], the desktop): the opaque card already terminates the
+ * content (desktop rememberChatListFadeAlphas). A sticky prompt under floating chrome
+ * ([stickyPromptPinned], the phone) keeps the top fade, and adds the pinned band below it, so the
+ * rows dissolve before they reach the prompt instead of running hard under it and the chrome.
  */
 @Composable
 internal fun rememberTimelineFadeAlphas(
     canScrollTowardOlder: Boolean,
     canScrollTowardNewer: Boolean,
     promptPinned: Boolean,
+    stickyPromptPinned: Boolean = false,
 ): TimelineFadeAlphas {
     val top by animateFloatAsState(
         targetValue = if (canScrollTowardOlder && !promptPinned) 1f else 0f,
@@ -104,27 +111,57 @@ internal fun rememberTimelineFadeAlphas(
         animationSpec = tween(ChatTimelineDimens.fadeAnimationMillis),
         label = "timelineBottomFade",
     )
-    return TimelineFadeAlphas(top, bottom)
+    val pinned by animateFloatAsState(
+        targetValue = if (stickyPromptPinned) 1f else 0f,
+        animationSpec = tween(ChatTimelineDimens.fadeAnimationMillis),
+        label = "timelinePinnedFade",
+    )
+    return TimelineFadeAlphas(top, bottom, pinned)
 }
 
 /**
  * Dissolves the top and bottom of the content to transparent with a DstIn gradient mask, so the
  * list grades into the surrounding chrome instead of hard-clipping. Lifted from desktop's
- * fadingEdges (Android's chatFadingEdges is the same idea). No-op when both alphas are 0.
+ * fadingEdges (Android's chatFadingEdges is the same idea). No-op when every alpha is 0.
+ *
+ * [pinnedEdgePx] is the sticky pinned prompt's bottom edge, read at draw time: while
+ * [TimelineFadeAlphas.pinned] is up the content is gone down to it and grades back in over
+ * [topLength]'s fade length below it.
  */
 internal fun Modifier.timelineFadingEdges(
     alphas: TimelineFadeAlphas,
     topLength: Dp = ChatTimelineDimens.topFadeLength,
     bottomLength: Dp = ChatTimelineDimens.bottomFadeLength,
+    pinnedEdgePx: () -> Float = { 0f },
 ): Modifier {
-    if (alphas.top <= 0f && alphas.bottom <= 0f) return this
+    if (alphas.top <= 0f && alphas.bottom <= 0f && alphas.pinned <= 0f) return this
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
             drawFadeBand(topLength.toPx(), alphas.top, fromTop = true)
             drawFadeBand(bottomLength.toPx(), alphas.bottom, fromTop = false)
+            drawPinnedBand(pinnedEdgePx(), ChatTimelineDimens.topFadeLength.toPx(), alphas.pinned)
         }
+}
+
+/** Clears the content down to [edgePx] at [alpha]'s strength, then grades it back in over [lengthPx]. */
+private fun DrawScope.drawPinnedBand(edgePx: Float, lengthPx: Float, alpha: Float) {
+    val end = (edgePx + lengthPx).coerceAtMost(size.height)
+    if (alpha <= 0f || edgePx <= 0f || end <= 0f) return
+    val faded = Color.Black.copy(alpha = 1f - alpha)
+    val solidUntil = (edgePx / end).coerceIn(0f, 1f)
+    drawRect(
+        brush = Brush.verticalGradient(
+            0f to faded,
+            solidUntil to faded,
+            1f to Color.Black,
+            startY = 0f,
+            endY = end,
+        ),
+        size = Size(size.width, end),
+        blendMode = BlendMode.DstIn,
+    )
 }
 
 private fun DrawScope.drawFadeBand(lengthPx: Float, alpha: Float, fromTop: Boolean) {

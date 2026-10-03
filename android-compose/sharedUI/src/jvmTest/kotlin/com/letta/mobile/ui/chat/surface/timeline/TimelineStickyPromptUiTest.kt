@@ -11,10 +11,16 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -29,6 +35,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.math.abs
@@ -41,6 +48,7 @@ import kotlinx.collections.immutable.toPersistentList
  * ChatSurfacePlatform.topChromeInset) the timeline draws up under the chrome, and the prompt that
  * scrolls off becomes a sticky header at the visible top. It rides its row up to the inset, holds
  * there without ever travelling under the chrome, and takes over from its row without a jump.
+ * Its bubble holds snug against the chrome's bottom edge, and the rows still fade out above it.
  */
 class TimelineStickyPromptUiTest {
     private val longAnswer = (1..120).joinToString("\n\n") { "Paragraph $it of a long answer." }
@@ -56,10 +64,13 @@ class TimelineStickyPromptUiTest {
         messages = messages.toPersistentList(),
     )
 
+    private var pageBackground = Color.Unspecified
+
     private fun ComposeUiTest.show(listState: LazyListState, topInset: Dp, chrome: Boolean = false) {
         setContent {
             MaterialTheme {
-                Box(Modifier.size(width = 420.dp, height = 640.dp).background(MaterialTheme.colorScheme.background)) {
+                pageBackground = MaterialTheme.colorScheme.background
+                Box(Modifier.size(width = 420.dp, height = 640.dp).background(pageBackground)) {
                     ChatTimeline(
                         state = state,
                         pagedTimeline = null,
@@ -108,11 +119,45 @@ class TimelineStickyPromptUiTest {
             ?.let { (info.viewportEndOffset - it.offset - it.size).toFloat() }
     }
 
-    /** The pinned copy's top, px from the list's top edge; null while nothing is pinned. */
-    private fun ComposeUiTest.pinnedTop(): Float? {
+    /** The first prompt's row bottom in the list, px from its top edge; null off screen. */
+    private fun ComposeUiTest.promptRowBottom(listState: LazyListState): Float? = runOnIdle {
+        val info = listState.layoutInfo
+        info.visibleItemsInfo.firstOrNull { it.key.toString().contains("q1") }
+            ?.let { (info.viewportEndOffset - it.offset).toFloat() }
+    }
+
+    /** The pinned copy's bounds, relative to the list's top edge; null while nothing is pinned. */
+    private fun ComposeUiTest.pinnedBounds(): Rect? {
         val pinned = onAllNodesWithTag(ChatTimelineTags.PINNED_PROMPT).fetchSemanticsNodes().firstOrNull() ?: return null
         val list = onNodeWithTag(ChatTimelineTags.LIST).fetchSemanticsNode().boundsInRoot
-        return pinned.boundsInRoot.top - list.top
+        return pinned.boundsInRoot.translate(0f, -list.top)
+    }
+
+    /** The pinned copy's top, px from the list's top edge; null while nothing is pinned. */
+    private fun ComposeUiTest.pinnedTop(): Float? = pinnedBounds()?.top
+
+    /** The bubble drawn in the pinned copy, in root px. */
+    private fun ComposeUiTest.pinnedBubble(): Rect = onAllNodes(
+        hasTestTag(ChatRowTestTags.USER_PROMPT) and hasAnyAncestor(hasTestTag(ChatTimelineTags.PINNED_PROMPT)),
+        useUnmergedTree = true,
+    ).fetchSemanticsNodes().single().boundsInRoot
+
+    /** Scrolls the first prompt up until its copy holds at the inset, then a little further. */
+    private fun ComposeUiTest.scrollUntilHeld(listState: LazyListState, line: Float) {
+        var steps = 0
+        while (steps < MAX_STEPS) {
+            steps++
+            runOnIdle { listState.dispatchRawDelta(-STEP_PX) }
+            waitForIdle()
+            val top = pinnedTop()
+            if (top != null && abs(top - line) <= TOLERANCE_PX) break
+        }
+        repeat(HELD_STEPS) {
+            runOnIdle { listState.dispatchRawDelta(-STEP_PX) }
+            waitForIdle()
+        }
+        val top = pinnedTop() ?: error("nothing pinned after $steps steps")
+        assertTrue(abs(top - line) <= TOLERANCE_PX, "the prompt holds at the inset: $top vs $line")
     }
 
     private fun ComposeUiTest.stickLinePx(topInset: Dp): Float = with(density) { topInset.toPx() }
@@ -130,11 +175,12 @@ class TimelineStickyPromptUiTest {
             // Scroll toward the newest: the content, the first prompt with it, moves up.
             runOnIdle { listState.dispatchRawDelta(-STEP_PX) }
             waitForIdle()
-            val pinned = pinnedTop()
-            val shown = pinned ?: promptRowTop(listState) ?: error("the first prompt vanished at step $steps")
+            val pinned = pinnedBounds()
+            // Bottoms: the copy is the bubble alone, bottom-aligned with its row.
+            val shown = pinned?.bottom ?: promptRowBottom(listState) ?: error("the first prompt vanished at step $steps")
             if (pinned != null) {
-                assertTrue(pinned >= line - TOLERANCE_PX, "the pinned prompt went under the chrome: $pinned < $line")
-                if (abs(pinned - line) <= TOLERANCE_PX) heldSteps++
+                assertTrue(pinned.top >= line - TOLERANCE_PX, "the pinned prompt went under the chrome: ${pinned.top} < $line")
+                if (abs(pinned.top - line) <= TOLERANCE_PX) heldSteps++
             }
             previous?.let { last ->
                 assertTrue(shown <= last + TOLERANCE_PX, "the prompt moved back down: $last -> $shown at step $steps")
@@ -143,6 +189,49 @@ class TimelineStickyPromptUiTest {
             previous = shown
         }
         assertTrue(heldSteps >= HELD_STEPS, "the prompt never held at the inset ($steps steps, last at $previous, line $line)")
+    }
+
+    /** The held bubble's top is the chrome's bottom edge: no gap under the bar (Pixel report). */
+    @Test
+    fun theHeldBubbleSitsSnugAgainstTheChromeBottom() = runComposeUiTest {
+        val listState = LazyListState()
+        show(listState, TOP_INSET)
+        val line = stickLinePx(TOP_INSET)
+        scrollUntilHeld(listState, line)
+        val list = onNodeWithTag(ChatTimelineTags.LIST).fetchSemanticsNode().boundsInRoot
+        val bubbleTop = pinnedBubble().top - list.top
+        assertTrue(abs(bubbleTop - line) <= TOLERANCE_PX, "the pinned bubble sits at the bar's bottom: $bubbleTop vs $line")
+    }
+
+    /**
+     * The top fade stays on under a sticky prompt: nothing of the rows draws under the chrome or
+     * beside the pinned bubble (the Pixel report: a run header ran hard into the bubble), and the
+     * rows draw again below it.
+     */
+    @Test
+    fun theTopFadeStaysOnWhileAPromptIsPinned() = runComposeUiTest {
+        val listState = LazyListState()
+        show(listState, TOP_INSET)
+        val line = stickLinePx(TOP_INSET)
+        scrollUntilHeld(listState, line)
+        val bubble = pinnedBubble()
+        val image = onRoot().captureToImage().toAwtImage()
+        val background = pageBackground.toArgb()
+        val left = with(density) { 1.dp.toPx() }.toInt()
+        val right = (bubble.left - with(density) { 2.dp.toPx() }).toInt()
+        val bottom = (bubble.bottom - 1f).toInt()
+        assertTrue(right > left && bottom > line, "a band to look at beside the bubble: $left..$right x 0..$bottom")
+        val drawn = (0 until bottom).sumOf { y -> (left until right).count { x -> !near(image.getRGB(x, y), background) } }
+        assertTrue(drawn == 0, "$drawn row pixels drew under the chrome or beside the pinned bubble (to y=$bottom)")
+        val belowFrom = (bubble.bottom + with(density) { BELOW_FADE.toPx() }).toInt()
+        val below = (belowFrom until image.height - 1)
+            .sumOf { y -> (left until right).count { x -> !near(image.getRGB(x, y), background) } }
+        assertTrue(below > 0, "the rows draw again below the pinned prompt's fade")
+    }
+
+    private fun near(argb: Int, other: Int): Boolean {
+        fun channel(c: Int, shift: Int) = (c shr shift) and 0xFF
+        return listOf(0, 8, 16).all { abs(channel(argb, it) - channel(other, it)) <= PIXEL_TOLERANCE }
     }
 
     @Test
@@ -186,5 +275,7 @@ class TimelineStickyPromptUiTest {
         const val MAX_STEPS = 200
         const val SNAPSHOT_STEPS = 60
         const val CHROME_ALPHA = 0.85f
+        const val PIXEL_TOLERANCE = 6
+        val BELOW_FADE = 96.dp
     }
 }
