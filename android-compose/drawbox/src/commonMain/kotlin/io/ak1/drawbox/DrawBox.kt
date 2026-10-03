@@ -2006,8 +2006,6 @@ private fun StrokeStyle.offLength(width: Float): Float = when (this) {
 private fun lerp(a: Offset, b: Offset, t: Float): Offset =
     Offset(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
 
-private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
-
 /**
  * Render a variable-width pen-pressure stroke that also respects [style].
  *

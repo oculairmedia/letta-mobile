@@ -147,32 +147,32 @@ class CanvasGetLayoutTest {
 
     private suspend fun pages(host: PluginToolHost, limit: RowLimit): List<CanvasLayoutResult> {
         val out = mutableListOf<CanvasLayoutResult>()
-        var cursor: String? = null
+        var cursor: LayoutCursor? = null
         repeat(20) {
             val page = layout(host, limit, cursor)
             out += page
-            cursor = page.nextCursor ?: return out
+            cursor = page.nextCursor?.let(::LayoutCursor) ?: return out
         }
         error("layout did not finish")
     }
 
     private suspend fun rawPages(host: PluginToolHost, limit: RowLimit): List<String> {
         val out = mutableListOf<String>()
-        var cursor: String? = null
+        var cursor: LayoutCursor? = null
         repeat(20) {
             val raw = host.call(CanvasToolContract.GET_LAYOUT, layoutInput(limit, cursor)).content()
             out += raw
-            cursor = json.decodeFromString(CanvasLayoutResult.serializer(), raw).nextCursor ?: return out
+            cursor = json.decodeFromString(CanvasLayoutResult.serializer(), raw).nextCursor?.let(::LayoutCursor) ?: return out
         }
         error("layout did not finish")
     }
 
-    private suspend fun layout(host: PluginToolHost, limit: RowLimit, cursor: String? = null): CanvasLayoutResult =
+    private suspend fun layout(host: PluginToolHost, limit: RowLimit, cursor: LayoutCursor? = null): CanvasLayoutResult =
         json.decodeFromString(CanvasLayoutResult.serializer(), host.call(CanvasToolContract.GET_LAYOUT, layoutInput(limit, cursor)).content())
 
-    private fun layoutInput(limit: RowLimit, cursor: String?): JsonObject = buildJsonObject {
+    private fun layoutInput(limit: RowLimit, cursor: LayoutCursor?): JsonObject = buildJsonObject {
         put("limit", limit.value)
-        cursor?.let { put("cursor", it) }
+        cursor?.let { put("cursor", it.value) }
     }
 
     private fun sceneIds(scene: CanvasGetSceneResult): Set<String> {
@@ -196,7 +196,7 @@ class CanvasGetLayoutTest {
             buildJsonObject {
                 put("type", "Shape")
                 put("shapeType", "RECTANGLE")
-                put("points", points("100.0,100.0", "400.0,260.0"))
+                put("points", points(listOf("100.0,100.0", "400.0,260.0")))
                 put("text", "Plan")
             },
         ),
@@ -214,14 +214,14 @@ class CanvasGetLayoutTest {
             "stroke-1",
             buildJsonObject {
                 put("type", "Path")
-                put("samples", points("0.0,0.0,2.0", "10.0,4.0,2.0"))
+                put("samples", points(listOf("0.0,0.0,2.0", "10.0,4.0,2.0")))
             },
         ),
         element(
             "image-1",
             buildJsonObject {
                 put("type", "Image")
-                put("points", points("10.0,20.0", "50.0,40.0"))
+                put("points", points(listOf("10.0,20.0", "50.0,40.0")))
                 put("imageRef", "sha256:" + "ab".repeat(32))
             },
         ),
@@ -230,7 +230,7 @@ class CanvasGetLayoutTest {
             buildJsonObject {
                 put("type", "Shape")
                 put("shapeType", "ARROW")
-                put("points", points("0.0,0.0", "40.0,0.0"))
+                put("points", points(listOf("0.0,0.0", "40.0,0.0")))
                 put("text", "flows")
                 put("startBinding", "box-plan")
             },
@@ -267,7 +267,7 @@ class CanvasGetLayoutTest {
         put("elementJson", element)
     }.toString()
 
-    private fun points(vararg values: String) = buildJsonArray { values.forEach { add(JsonPrimitive(it)) } }
+    private fun points(values: List<String>) = buildJsonArray { values.forEach { add(JsonPrimitive(it)) } }
 
     private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 
@@ -278,4 +278,8 @@ class CanvasGetLayoutTest {
     /** A page size for canvas_get_layout, so the helpers don't take a raw int. */
     @JvmInline
     private value class RowLimit(val value: Int)
+
+    /** The nextCursor string from a previous page. */
+    @JvmInline
+    private value class LayoutCursor(val value: String)
 }

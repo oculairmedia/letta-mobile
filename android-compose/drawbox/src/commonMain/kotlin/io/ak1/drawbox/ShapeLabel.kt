@@ -70,7 +70,7 @@ private fun DrawScope.drawConnectorLabel(
     )
     val start = shape.points.first()
     val end = shape.points.last()
-    val mid = Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
+    val mid = labelMidpoint(start, end)
     val topLeft = Offset(mid.x - layout.size.width / 2f, mid.y - layout.size.height / 2f)
     val pad = 3f
     drawRoundRect(
@@ -85,3 +85,9 @@ private fun DrawScope.drawConnectorLabel(
 /** Wide enough for the glyphs, tight enough that the chip stays off the cards it joins. */
 private fun connectorLabelWidth(shape: Element.Shape): Float =
     (shape.text.length * shape.fontSize * 0.72f + 4f).coerceAtLeast(shape.fontSize)
+
+private fun labelMidpoint(start: Offset, end: Offset): Offset =
+    Offset((start.x + end.x) / 2f, (start.y + end.y) / 2f)
+
+/** Shared with the stroke sampler in DrawBox. Three floats, no objects, so it lives beside the label math. */
+internal fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
