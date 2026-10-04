@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
@@ -13,6 +14,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
+import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -103,7 +105,7 @@ class IrohChannelTransport(
     // Process-owned store shared with canvas/document APIs; transport never closes or polls it.
     private val notebookStore: NotebookLocalStore? = null,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
-    FrameCollectorOverflowAwareChannelTransport {
+    FrameCollectorOverflowAwareChannelTransport, SubagentScopeAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
@@ -841,74 +843,88 @@ class IrohChannelTransport(
             onFailure = IrohTransportSupport::cronDeleteAllFailure,
         )
     }
-    override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {
-        val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
-        val scope = currentSubagentScope()
-            ?: return IrohTransportSupport.subagentListFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
+    override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
+        invokeSubagentRpc(subagentListCall(all), currentSubagentScope(), timeoutMs)
+
+    /** letta-mobile-fxoew.5: target the caller's conversation, not the viewed one. */
+    override suspend fun sendSubagentListForScope(
+        scope: SubagentParentScope,
+        all: Boolean,
+        timeoutMs: Long,
+    ): ServerFrame.SubagentListResponse = invokeSubagentRpc(
+        subagentListCall(all),
+        SubagentRpcScope(scope.parentConversationId, scope.parentAgentId),
+        timeoutMs,
+    )
+
+    override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
+        invokeSubagentRpc(subagentTodosCall(toolCallId), currentSubagentScope(), timeoutMs)
+
+    /** One `subagent.*` bridge call: its method, body, and response mapping. */
+    private class SubagentRpcCall<T>(
+        val method: String,
+        val body: JsonObject,
+        val mapSuccess: (requestId: String, result: JsonElement) -> T,
+        val onFailure: (ScopedRpcFailure) -> T,
+    )
+
+    /** Shared scope check, labels and dispatch for every `subagent.*` call. */
+    private suspend fun <T> invokeSubagentRpc(
+        rpc: SubagentRpcCall<T>,
+        rpcScope: SubagentRpcScope?,
+        timeoutMs: Long,
+    ): T {
+        val requestId = "iroh-${rpc.method.replace('.', '-')}-${UUID.randomUUID()}"
+        val scope = rpcScope
+            ?: return rpc.onFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
         return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
             labels = ScopedRpcLabels(
                 unsupported = SUBAGENT_RPC_UNSUPPORTED,
-                timedOut = "subagent.list timed out",
-                failed = "subagent.list failed",
+                timedOut = "${rpc.method} timed out",
+                failed = "${rpc.method} failed",
             ),
-            call = {
-                callScopedSubagentRpc(
-                    method = "subagent.list",
-                    scope = scope,
-                    body = buildJsonObject { put("all", all) }.toString(),
-                )
-            },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result)
-                ServerFrame.SubagentListResponse(
-                    id = IrohTransportSupport.frameId("subagent_list"),
-                    ts = IrohTransportSupport.nowIso(),
-                    requestId = requestId,
-                    success = true,
-                    subagents = decoded.subagents,
-                )
-            },
-            onFailure = IrohTransportSupport::subagentListFailure,
+            call = { callScopedSubagentRpc(method = rpc.method, scope = scope, body = rpc.body.toString()) },
+            mapSuccess = { result -> rpc.mapSuccess(requestId, result) },
+            onFailure = rpc.onFailure,
         )
     }
 
-    override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse {
-        val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
-        val scope = currentSubagentScope()
-            ?: return IrohTransportSupport.subagentTodosFailure(ScopedRpcFailure(requestId, "subagent scope unavailable; hydrate a conversation first"))
-        return invokeScopedRpc(
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            labels = ScopedRpcLabels(
-                unsupported = SUBAGENT_RPC_UNSUPPORTED,
-                timedOut = "subagent.todos timed out",
-                failed = "subagent.todos failed",
-            ),
-            call = {
-                callScopedSubagentRpc(
-                    method = "subagent.todos",
-                    scope = scope,
-                    body = buildJsonObject { put("tool_call_id", toolCallId) }.toString(),
-                )
-            },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<SubagentTodosRpcResult>(result)
-                ServerFrame.SubagentTodosResponse(
-                    id = IrohTransportSupport.frameId("subagent_todos"),
-                    ts = IrohTransportSupport.nowIso(),
-                    requestId = requestId,
-                    success = true,
-                    found = decoded.found,
-                    subagent = decoded.subagent,
-                    todos = decoded.todos,
-                    todosFound = decoded.todosFound,
-                )
-            },
-            onFailure = IrohTransportSupport::subagentTodosFailure,
-        )
-    }
+    private fun subagentListCall(all: Boolean) = SubagentRpcCall(
+        method = "subagent.list",
+        body = buildJsonObject { put("all", all) },
+        mapSuccess = { requestId, result ->
+            val decoded = subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result)
+            ServerFrame.SubagentListResponse(
+                id = IrohTransportSupport.frameId("subagent_list"),
+                ts = IrohTransportSupport.nowIso(),
+                requestId = requestId,
+                success = true,
+                subagents = decoded.subagents,
+            )
+        },
+        onFailure = IrohTransportSupport::subagentListFailure,
+    )
+
+    private fun subagentTodosCall(toolCallId: String) = SubagentRpcCall(
+        method = "subagent.todos",
+        body = buildJsonObject { put("tool_call_id", toolCallId) },
+        mapSuccess = { requestId, result ->
+            val decoded = subagentJson.decodeFromJsonElement<SubagentTodosRpcResult>(result)
+            ServerFrame.SubagentTodosResponse(
+                id = IrohTransportSupport.frameId("subagent_todos"),
+                ts = IrohTransportSupport.nowIso(),
+                requestId = requestId,
+                success = true,
+                found = decoded.found,
+                subagent = decoded.subagent,
+                todos = decoded.todos,
+                todosFound = decoded.todosFound,
+            )
+        },
+        onFailure = IrohTransportSupport::subagentTodosFailure,
+    )
 
 
     private data class ScopedRpcLabels(

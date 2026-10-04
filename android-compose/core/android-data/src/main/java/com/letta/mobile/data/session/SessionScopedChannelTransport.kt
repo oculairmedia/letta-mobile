@@ -3,6 +3,7 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
@@ -10,6 +11,8 @@ import com.letta.mobile.data.transport.api.FrameCollectorOverflowIncident
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
+import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
+import com.letta.mobile.data.transport.api.sendSubagentListFor
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -50,7 +53,8 @@ class SessionScopedChannelTransport internal constructor(
     private val sessionManager: SessionManager,
     private val proxyScope: CoroutineScope,
     private val overflowReconciler: FrameCollectorOverflowReconciler,
-) : IChannelTransport, RedialAwareChannelTransport, FrameCollectorOverflowRecoveryMonitor {
+) : IChannelTransport, RedialAwareChannelTransport, FrameCollectorOverflowRecoveryMonitor,
+    SubagentScopeAwareChannelTransport {
     @Inject
     constructor(
         sessionManager: SessionManager,
@@ -354,6 +358,14 @@ class SessionScopedChannelTransport internal constructor(
 
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
         sessionManager.withCurrentSession { it.channelTransport.sendSubagentList(all, timeoutMs) }
+
+    override suspend fun sendSubagentListForScope(
+        scope: SubagentParentScope,
+        all: Boolean,
+        timeoutMs: Long,
+    ): ServerFrame.SubagentListResponse = sessionManager.withCurrentSession {
+        it.channelTransport.sendSubagentListFor(scope, all, timeoutMs)
+    }
 
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
         sessionManager.withCurrentSession { it.channelTransport.sendSubagentTodos(toolCallId, timeoutMs) }

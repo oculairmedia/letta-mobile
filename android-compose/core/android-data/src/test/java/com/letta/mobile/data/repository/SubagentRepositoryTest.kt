@@ -328,21 +328,23 @@ class SubagentRepositoryTest {
         assertEquals(2, transport.subagentListCalls.size)
     }
 
+    // letta-mobile-fxoew.5: the initial fetch is per scope, so concurrent first
+    // collections of ONE scope must still share a single round-trip.
     @Test
-    fun `refresh dedups parallel callers to a single in-flight WS round-trip`() = runTest {
+    fun `concurrent first collections of one scope share a single in-flight WS round-trip`() = runTest {
         transport.subagentListDelayMs = 50
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
         val repo = repository(backgroundScope)
 
-        val initial = async(start = CoroutineStart.UNDISPATCHED) {
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
             repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         }
-        val manual = async(start = CoroutineStart.UNDISPATCHED) { repo.refresh() }
+        val second = async(start = CoroutineStart.UNDISPATCHED) {
+            repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+        }
 
-        initial.await()
-        val manualResult = manual.await()
-        assertTrue(manualResult.isSuccess)
-
+        assertEquals(listOf("toolu_1"), first.await().map { it.toolCallId })
+        assertEquals(listOf("toolu_1"), second.await().map { it.toolCallId })
         assertEquals(1, transport.subagentListCalls.size)
     }
 

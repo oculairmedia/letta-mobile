@@ -113,6 +113,19 @@ class ActiveSubagentRingsTest {
         assertFalse(keep.isHiddenReflection())
     }
 
+    // letta-mobile-fxoew.4: the host registry sends capitalized display labels.
+    @Test
+    fun `host Reflection labels are hidden from production rings`() {
+        val reflection = running(id = "ref_host").copy(subagentType = "Reflection")
+        val integration = running(id = "ref_integration").copy(subagentType = "Reflection integration")
+        val generalPurpose = running(id = "gp").copy(subagentType = "General-purpose")
+
+        assertTrue(reflection.isHiddenReflection())
+        assertTrue(integration.isHiddenReflection())
+        assertFalse(generalPurpose.isHiddenReflection())
+        assertFalse(persistentListOf(reflection, integration).hasVisibleActiveSubagentBarEntries())
+    }
+
     @Test
     fun `only RUNNING and FAILED subagents pass the visibility filter`() {
         val all = persistentListOf(

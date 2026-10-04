@@ -20,10 +20,11 @@ data class SubagentParentScope(
  */
 interface ISubagentRepository {
     /**
-     * Hot stream of the active-subagent snapshot. The first subscriber
-     * triggers a `subagent_list` round-trip; subsequent subscribers share
-     * the same flow so no duplicate fetches fire. `subagents_updated`
-     * pushes fold in by replacement.
+     * Hot stream of the active-subagent snapshot for [scope]. The first
+     * collection of each distinct scope triggers a scoped `subagent_list`
+     * round-trip; later collections of that scope share the cache so no
+     * duplicate fetches fire. `subagents_updated` pushes fold in by
+     * replacement.
      */
     fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>>
 
