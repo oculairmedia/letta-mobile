@@ -255,7 +255,10 @@ sealed interface ServerFrame {
          * [promptTokens] this includes the cached prefix, so it is the context total.
          */
         @SerialName("context_tokens") val contextTokens: Long? = null,
-        /** The runtime the frame came from; null on transports that do not stamp it. */
+        /**
+         * The runtime the frame came from. Stamped by the Iroh mapper, the only channel transport
+         * still shipped (the legacy shim WebSocket was removed under letta-mobile-g70jb).
+         */
         @SerialName("agent_id") val agentId: String? = null,
         @SerialName("conversation_id") val conversationId: String? = null,
     ) : ServerFrame

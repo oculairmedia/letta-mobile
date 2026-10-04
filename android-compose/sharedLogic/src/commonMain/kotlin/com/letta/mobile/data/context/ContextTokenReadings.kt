@@ -1,5 +1,6 @@
 package com.letta.mobile.data.context
 
+import com.letta.mobile.data.chat.runtime.SharedChatSessionResolver
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
@@ -8,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
 /** The conversation a context reading belongs to. */
@@ -36,30 +37,54 @@ fun reduceContextReadings(
     val usage = frame as? ServerFrame.UsageStatistics ?: return readings
     val key = usage.readingKey() ?: return readings
     val tokens = usage.contextTokens?.toReadingTokens() ?: return readings
-    return if (readings[key] == tokens) readings else readings + (key to tokens)
+    // Re-inserted at the end, so the map stays in update order: the oldest entry is first,
+    // which is what a bounded snapshot evicts.
+    return if (readings[key] == tokens) readings else (readings - key) + (key to tokens)
 }
 
-private fun ServerFrame.UsageStatistics.readingKey(): ContextReadingKey? {
+private fun ServerFrame.UsageStatistics.readingKey(): ContextReadingKey? = contextReadingKeyOf(agentId, conversationId)
+
+/**
+ * The key a reading is stored and looked up under — the ONE place both sides (the frame
+ * writing it, the chip reading it) name a conversation.
+ *
+ * An agent's default conversation has two spellings: the App Server's bare `default`, and the
+ * app's addressable `conv-default-<agentId>` (what conversation lists, routes and the send
+ * coordinator use). Both map to the app's form, so a frame stamped either way reaches the chip.
+ * Null when either half is blank.
+ */
+fun contextReadingKeyOf(agentId: String?, conversationId: String?): ContextReadingKey? {
     val agent = agentId?.takeIf { it.isNotBlank() } ?: return null
     val conversation = conversationId?.takeIf { it.isNotBlank() } ?: return null
-    return ContextReadingKey(agent, conversation)
+    val canonical = if (conversation == BARE_DEFAULT_CONVERSATION) "$DEFAULT_CONVERSATION_PREFIX$agent" else conversation
+    return ContextReadingKey(agent, canonical)
 }
+
+private const val BARE_DEFAULT_CONVERSATION = "default"
+private const val DEFAULT_CONVERSATION_PREFIX = SharedChatSessionResolver.DEFAULT_SHIM_CONVERSATION_PREFIX
 
 private fun Long.toReadingTokens(): Int? =
     takeIf { it >= 0 }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
 
 /**
  * Thin holder over [reduceContextReadings]: one per session graph, fed by
- * [observeContextReadings], read by every chat surface. In memory only — a restart
- * starts empty until the next turn reports (letta-mobile-r2zo8 follow-up bead).
+ * [observeContextReadings], read by every chat surface.
+ *
+ * @param initial readings to start from — what [ContextReadingSnapshots] saved last run.
+ * @param onChange called with the new map whenever a frame changes it (to save it).
  */
-class ContextTokenReadings {
-    private val state = MutableStateFlow<Map<ContextReadingKey, Int>>(emptyMap())
+class ContextTokenReadings(
+    initial: Map<ContextReadingKey, Int> = emptyMap(),
+    private val onChange: (Map<ContextReadingKey, Int>) -> Unit = {},
+) {
+    private val state = MutableStateFlow(initial)
 
     val readings: StateFlow<Map<ContextReadingKey, Int>> = state.asStateFlow()
 
     fun record(frame: ServerFrame) {
-        state.update { reduceContextReadings(it, frame) }
+        val before = state.value
+        val after = state.updateAndGet { reduceContextReadings(it, frame) }
+        if (after !== before) onChange(after)
     }
 
     fun latest(agentId: String?, conversationId: String?): Int? =
@@ -67,10 +92,8 @@ class ContextTokenReadings {
 }
 
 /** The reading for one conversation, or null when either half of its identity is unknown. */
-fun Map<ContextReadingKey, Int>.readingFor(agentId: String?, conversationId: String?): Int? {
-    if (agentId.isNullOrBlank() || conversationId.isNullOrBlank()) return null
-    return this[ContextReadingKey(agentId, conversationId)]
-}
+fun Map<ContextReadingKey, Int>.readingFor(agentId: String?, conversationId: String?): Int? =
+    contextReadingKeyOf(agentId, conversationId)?.let(::get)
 
 /** Folds every frame of [frames] into [readings] until [scope] ends. */
 fun CoroutineScope.observeContextReadings(
@@ -78,8 +101,17 @@ fun CoroutineScope.observeContextReadings(
     readings: ContextTokenReadings,
 ): Job = launch { frames.collect(readings::record) }
 
-/** A holder fed by [transport] for as long as [scope] lives — what a session graph owns. */
+/**
+ * A holder fed by [transport] for as long as [scope] lives — what a session graph owns. With
+ * [snapshots], it starts from the last saved readings and saves every change, so the chip
+ * survives a restart (letta-mobile-wdm6i).
+ */
 fun contextTokenReadingsOf(
     transport: IChannelTransport,
     scope: CoroutineScope,
-): ContextTokenReadings = ContextTokenReadings().also { scope.observeContextReadings(transport.events, it) }
+    snapshots: ContextReadingSnapshots? = null,
+): ContextTokenReadings =
+    ContextTokenReadings(
+        initial = snapshots?.load().orEmpty(),
+        onChange = { snapshots?.save(it) },
+    ).also { scope.observeContextReadings(transport.events, it) }

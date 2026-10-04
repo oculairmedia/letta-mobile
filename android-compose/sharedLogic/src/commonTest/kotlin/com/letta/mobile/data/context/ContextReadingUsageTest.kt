@@ -120,6 +120,29 @@ class ContextReadingUsageTest {
         assertNull(contextWindowTokensOf(agent, models, modelOverride = "openai/unknown"))
     }
 
+    @Test
+    fun theChipForAnAgentsDefaultConversationUpdatesFromABareDefaultFrame() {
+        val readings = ContextTokenReadings()
+        readings.record(
+            com.letta.mobile.data.transport.ServerFrame.UsageStatistics(
+                agentId = AGENT,
+                conversationId = "default",
+                contextTokens = 28_864,
+            ),
+        )
+        val chipConversation = "conv-default-$AGENT"
+
+        val shown = ContextReadingDisplay().advance(
+            inputs(conversation = chipConversation, tokens = readings.readings.value.readingFor(AGENT, chipConversation)),
+        )
+        val other = ContextReadingDisplay().advance(
+            inputs(conversation = CONV_A, tokens = readings.readings.value.readingFor(AGENT, CONV_A)),
+        )
+
+        assertEquals(28_864, shown.state.usage?.usedTokens)
+        assertNull(other.state.usage)
+    }
+
     private companion object {
         const val AGENT = "agent-1"
         const val CONV_A = "conv-a"

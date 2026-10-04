@@ -83,6 +83,48 @@ class ContextTokenReadingsTest {
         assertNull(readings.readingFor("agent-other", CONV_A))
     }
 
+    @Test
+    fun aDefaultConversationFrameStampedBareReachesTheAppsDefaultConversation() {
+        // The App Server names an agent's default conversation `default`; the app opens it as
+        // `conv-default-<agentId>`. The chip asks with the app's form.
+        val readings = ContextTokenReadings()
+
+        readings.record(usage(conversation = "default", contextTokens = 28_864))
+
+        assertEquals(28_864, readings.latest(AGENT, "conv-default-$AGENT"))
+        assertEquals(28_864, readings.latest(AGENT, "default"))
+    }
+
+    @Test
+    fun aDefaultConversationFrameStampedInTheAppsFormIsReadTheSame() {
+        val readings = ContextTokenReadings()
+
+        readings.record(usage(conversation = "conv-default-$AGENT", contextTokens = 29_193))
+
+        assertEquals(29_193, readings.latest(AGENT, "conv-default-$AGENT"))
+    }
+
+    @Test
+    fun anotherAgentsDefaultConversationIsNotThisOne() {
+        val readings = ContextTokenReadings()
+
+        readings.record(usage(agent = "agent-other", conversation = "default", contextTokens = 45_117))
+
+        assertNull(readings.latest(AGENT, "conv-default-$AGENT"))
+        assertNull(readings.latest(AGENT, "default"))
+        assertEquals(45_117, readings.latest("agent-other", "conv-default-agent-other"))
+    }
+
+    @Test
+    fun aRealConversationIdIsKeptVerbatim() {
+        assertEquals(ContextReadingKey(AGENT, "local-conv-575"), contextReadingKeyOf(AGENT, "local-conv-575"))
+        val readings = ContextTokenReadings()
+        readings.record(usage(conversation = "local-conv-575", contextTokens = 45_515))
+
+        assertNull(readings.latest(AGENT, "local-conv-576"))
+        assertNull(readings.latest(AGENT, "conv-default-$AGENT"))
+    }
+
     private companion object {
         const val AGENT = "agent-1"
         const val CONV_A = "conv-a"
