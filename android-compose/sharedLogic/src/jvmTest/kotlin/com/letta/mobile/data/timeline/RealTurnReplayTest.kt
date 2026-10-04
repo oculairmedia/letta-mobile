@@ -9,13 +9,15 @@ import kotlin.test.assertTrue
  * lines through the phone's observer mapping, the real coordinator and presentation, then settled
  * into the stored rows it produced - checked on every frame by [timelineInvariantViolations].
  *
- * One test per model keeps each run short. Turn 1 of each model is replayed; claude and grok also
+ * One test per model keeps each run short.
+ * The two "ServedFor...Request" tests replay the captures that #1763 renamed from the mislabelled kat-coder-pro-v2.5 and
+ * qwen3.8-max dirs: MiniMax-M3 served as the fallback for those requested models. Turn 1 of each model is replayed; claude and grok also
  * replay turn 2 over turn 1's history. Frames without a host stamp get one from [ObserverFrameReplay]. Every model is clean.
  */
 class RealTurnReplayTest {
     @Test fun realClaudeSonnet55TurnsHoldTheIdentityInvariants() = assertModelHoldsInvariants("claude-sonnet-5-5", bothTurns = true)
 
-    @Test fun realKatCoderProV25TurnsHoldTheIdentityInvariants() = assertModelHoldsInvariants("kat-coder-pro-v2.5")
+    @Test fun realMinimaxM3ServedForKatCoderRequestHoldsTheIdentityInvariants() = assertModelHoldsInvariants("minimax-m3-fallback-from-kat-coder")
 
     @Test fun realMinimaxM3TurnsHoldTheIdentityInvariants() = assertModelHoldsInvariants("minimax-m3")
 
@@ -35,7 +37,7 @@ class RealTurnReplayTest {
 
     @Test fun realOpenrouterQwen38FlashTurnsHoldTheIdentityInvariants() = assertModelHoldsInvariants("openrouter-qwen3.8-flash")
 
-    @Test fun realQwen38MaxTurnsHoldTheIdentityInvariants() = assertModelHoldsInvariants("qwen3.8-max")
+    @Test fun realMinimaxM3ServedForQwen38MaxRequestHoldsTheIdentityInvariants() = assertModelHoldsInvariants("minimax-m3-fallback-from-qwen3.8-max")
 
     private fun assertModelHoldsInvariants(model: String, bothTurns: Boolean = false) = runBlocking {
         val violations = RealTurnCaptures.model(model, bothTurns).associate { it.name to replay(it) }.filterValues { it.isNotEmpty() }
