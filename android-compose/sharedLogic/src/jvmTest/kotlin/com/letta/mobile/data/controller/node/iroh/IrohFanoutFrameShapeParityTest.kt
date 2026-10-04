@@ -15,6 +15,7 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
@@ -166,6 +167,16 @@ class IrohFanoutFrameShapeParityTest {
 
     private fun deltaBodiesOf(sink: CapturingSink): List<JsonObject> =
         sink.frames().mapNotNull { json.parseToJsonElement(it).jsonObject["delta"]?.jsonObject }
+
+    /**
+     * The text an assistant delta carries. Host-stamped frames are forwarded unchanged and keep the
+     * wire shape of content parts (`[{"type":"text","text":...}]`); older drafts carry a plain string.
+     */
+    private fun contentTextOf(delta: JsonObject): String =
+        when (val content = delta["content"]) {
+            is JsonArray -> content.joinToString("") { it.jsonObject["text"]?.jsonPrimitive?.content.orEmpty() }
+            else -> content!!.jsonPrimitive.content
+        }
 
     private fun assistantDeltaBodiesOf(sink: CapturingSink): List<JsonObject> =
         deltaBodiesOf(sink).filter {
@@ -334,7 +345,7 @@ class IrohFanoutFrameShapeParityTest {
                 gate = "gate1.emit",
                 key = delta["otid"]?.jsonPrimitive?.content ?: delta["id"]!!.jsonPrimitive.content,
                 messageType = "assistant_message",
-                content = delta["content"]!!.jsonPrimitive.content,
+                content = contentTextOf(delta),
             )
         }
 
@@ -362,8 +373,8 @@ class IrohFanoutFrameShapeParityTest {
             .maxOf { (it.attrs["len"] as? Int) ?: 0 }
         val maxEmitLen = maxLenAt("gate1.emit")
         val maxIngestLen = maxLenAt("gate.reduceIngest")
-        val finalObserverBodyLen = obsAssistantDeltas.last()["content"]!!.jsonPrimitive.content.length
+        val longestObserverBodyLen = obsAssistantDeltas.maxOf { contentTextOf(it).length }
         assertEquals(maxEmitLen, maxIngestLen, "no dropped characters between observer emit and reduce-ingest")
-        assertEquals(finalObserverBodyLen, maxIngestLen, "reducer ingested the full final cumulative body")
+        assertEquals(longestObserverBodyLen, maxIngestLen, "reducer ingested the longest observer body")
     }
 }
