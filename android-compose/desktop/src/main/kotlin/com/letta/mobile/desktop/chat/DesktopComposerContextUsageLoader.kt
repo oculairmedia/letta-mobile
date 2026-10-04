@@ -25,6 +25,14 @@ internal data class DesktopContextFocus(
     val settled: Boolean,
 )
 
+/** What the model window is sized from: all cached, no extra call. */
+internal data class DesktopContextWindowSources(
+    val agents: List<Agent>,
+    val models: List<LlmModel>,
+    /** conversation id -> the model switched to this session. */
+    val modelSelections: Map<String, String>,
+)
+
 /**
  * letta-mobile-r2zo8: the focused conversation's context reading — the latest
  * `usage_statistics.context_tokens` the session's transport streamed for it, against the
@@ -36,15 +44,16 @@ internal data class DesktopContextFocus(
 internal fun rememberFocusedContextUsage(
     focus: DesktopContextFocus,
     readings: ContextTokenReadings,
-    agents: List<Agent>,
-    models: List<LlmModel>,
+    window: DesktopContextWindowSources,
 ): ContextWindowUsageState {
     val byConversation by readings.readings.collectAsState()
-    val agent = agents.firstOrNull { it.id.value == focus.agentId }
+    val agent = window.agents.firstOrNull { it.id.value == focus.agentId }
+    // Same order as Android: this conversation's own model switch first, then the agent's limit.
+    val override = focus.conversationId?.let(window.modelSelections::get)
     val inputs = ContextReadingInputs(
         key = ContextWindowUsageKey(focus.agentId, focus.conversationId, focus.settled),
         contextTokens = byConversation.readingFor(focus.agentId, focus.conversationId),
-        windowTokens = contextWindowTokensOf(agent, models),
+        windowTokens = contextWindowTokensOf(agent, window.models, override),
     )
     val latest by rememberUpdatedState(inputs)
     val states = remember { snapshotFlow { latest }.contextUsageStates() }

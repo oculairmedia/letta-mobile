@@ -20,6 +20,7 @@ import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopContextFocus
+import com.letta.mobile.desktop.chat.DesktopContextWindowSources
 import com.letta.mobile.desktop.chat.DesktopSharedChatPage
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
@@ -81,24 +82,31 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
         ),
     )
     val rosterAgents = focus.rosterAgents
-    val sessionGraph = core.sessionGraph.value
-    val models by sessionGraph.modelRepository.llmModels.collectAsState()
-    val contextUsage = rememberFocusedContextUsage(
-        focus = DesktopContextFocus(
-            agentId = focus.selectedAgentId,
-            conversationId = selectedConversationId,
-            settled = !frame.activity.isThinkingSelected && !frame.activity.isStreamingReplySelected,
-        ),
-        readings = sessionGraph.contextTokenReadings,
-        agents = rosterAgents,
-        models = models,
-    )
+    val contextUsage = rememberShellContextUsage(context, frame)
     return DesktopShellChatHost(
         composerCommands = composerCommands,
         contextUsage = contextUsage,
         openConversationCanvas = showDockedCanvas ?: { core.canvasShell.openForConversation(frame.conversationCanvasOwner()) },
         agentNamesById = remember(rosterAgents) { rosterAgents.associate { it.id.value to it.name } },
         canSubmitApprovals = canSubmitApprovals,
+    )
+}
+
+/** letta-mobile-r2zo8: the composer chip's reading for the focused conversation. */
+@Composable
+private fun rememberShellContextUsage(context: DesktopShellContext, frame: DesktopShellFrame): ContextWindowUsageState {
+    val core = context.core
+    val sessionGraph = core.sessionGraph.value
+    val models by sessionGraph.modelRepository.llmModels.collectAsState()
+    val modelSelections by core.chatController.conversationModelSelections.collectAsState()
+    return rememberFocusedContextUsage(
+        focus = DesktopContextFocus(
+            agentId = frame.focus.selectedAgentId,
+            conversationId = frame.chatState.selectedConversationId,
+            settled = !frame.activity.isThinkingSelected && !frame.activity.isStreamingReplySelected,
+        ),
+        readings = sessionGraph.contextTokenReadings,
+        window = DesktopContextWindowSources(frame.focus.rosterAgents, models, modelSelections),
     )
 }
 
