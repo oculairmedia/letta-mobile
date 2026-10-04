@@ -80,10 +80,10 @@ class LiveTurnReducerTest {
 
     @Test
     fun toolReturnAttachesByCallIdExactly() {
-        val date = Tool("call-1", """{"command":"date"}""")
-        val uptime = Tool("call-2", """{"command":"uptime"}""")
+        val date = Tool("call-1")
+        val uptime = Tool("call-2")
         val fold = LiveFold().apply {
-            feed(date.call(), uptime.call())
+            feed(date.call(Args.DATE), uptime.call(Args.UPTIME))
             feed(uptime.returned("up 3 days"), date.returned("Sat Oct 3"))
         }
 
@@ -108,8 +108,8 @@ class LiveTurnReducerTest {
 
     @Test
     fun aDuplicateToolCallEmissionWithEmptyArgumentsKeepsTheArguments() {
-        val tool = Tool("call-1", """{"command":"date"}""")
-        val fold = LiveFold().apply { feed(tool.call(), tool.returned("Sat Oct 3"), Tool("call-1").call()) }
+        val tool = Tool("call-1")
+        val fold = LiveFold().apply { feed(tool.call(Args.DATE), tool.returned("Sat Oct 3"), tool.call(Args.EMPTY)) }
 
         val row = fold.row("tc-call-1")
         assertEquals(1, fold.rows().size)
@@ -214,11 +214,17 @@ class LiveTurnReducerTest {
     }
 
     /** One tool call and its return, named the way the host names them: `tc-<call id>` and `tr-<call id>`. */
-    private class Tool(private val callId: String, private val arguments: String = "{}") {
-        fun call() = ToolCallMessage(
+    private enum class Args(val json: String) {
+        EMPTY("{}"),
+        DATE("""{"command":"date"}"""),
+        UPTIME("""{"command":"uptime"}"""),
+    }
+
+    private class Tool(private val callId: String) {
+        fun call(args: Args = Args.EMPTY) = ToolCallMessage(
             id = "toolcall-$callId",
-            toolCall = ToolCall(toolCallId = callId, name = "Bash", arguments = arguments),
-            toolCalls = listOf(ToolCall(toolCallId = callId, name = "Bash", arguments = arguments)),
+            toolCall = ToolCall(toolCallId = callId, name = "Bash", arguments = args.json),
+            toolCalls = listOf(ToolCall(toolCallId = callId, name = "Bash", arguments = args.json)),
             logicalMessageId = "tc-$callId",
         )
 
