@@ -672,7 +672,7 @@ private fun preserveSettledToolCalls(
 /**
  * Attach any tool_return frames that arrived before their tool_call frame.
  */
-private fun applyPendingToolReturns(
+internal fun applyPendingToolReturns(
     ev: TimelineEvent.Confirmed,
     pendingToolReturnsByCallId: LinkedHashMap<String, ToolReturnMessage>,
 ): TimelineEvent.Confirmed {

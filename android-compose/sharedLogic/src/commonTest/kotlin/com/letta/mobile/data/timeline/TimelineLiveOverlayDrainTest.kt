@@ -21,7 +21,7 @@ class TimelineLiveOverlayDrainTest {
         val engine = engine()
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", "reply-id"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(message("hello", "reply-id")))))
         // A still-streaming turn has no settlement revision, so nothing can acknowledge it.
         assertFalse(engine.acknowledgeSettlement(fence, mapOf(TimelineMessageId("reply-id") to 99L)))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
@@ -45,7 +45,7 @@ class TimelineLiveOverlayDrainTest {
         val engine = engine()
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", "reply-1"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(message("hello", "reply-1")))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
 
@@ -68,7 +68,7 @@ class TimelineLiveOverlayDrainTest {
         val engine = engine()
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", "reply-stranded"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(message("hello", "reply-stranded")))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
 
@@ -99,7 +99,7 @@ class TimelineLiveOverlayDrainTest {
         val fence = engine.beginLive(selection)
 
         // Live stream emits the reply under the id the transport gave it
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", synthesizedId))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(message("hello", synthesizedId)))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val live = assertNotNull(engine.live.value)
         assertEquals(1, live.block.events.size)
@@ -142,8 +142,8 @@ class TimelineLiveOverlayDrainTest {
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("hello", synthesizedId))))
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("world", "reply-2"))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(message("hello", synthesizedId)))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(message("world", "reply-2")))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         assertEquals(2, assertNotNull(engine.live.value).block.events.size)
 
@@ -178,7 +178,7 @@ class TimelineLiveOverlayDrainTest {
         assertEquals(null, engine.live.value)
         // The fence really was released: the same selection can start and settle another turn.
         val next = engine.beginLive(selection)
-        assertTrue(engine.ingest(next, TimelineStreamFrame.Message(message("after"))))
+        assertTrue(engine.ingest(next, TimelineStreamFrame.Message(hostStamped(message("after")))))
     }
 
     @Test fun staleFenceCannotAcknowledgeSettlement() = runTest {
@@ -186,12 +186,12 @@ class TimelineLiveOverlayDrainTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val presented = mapOf(TimelineMessageId("second-id") to SETTLEMENT)
         val stale = engine.beginLive(selection)
-        assertTrue(engine.ingest(stale, TimelineStreamFrame.Message(message("first", "first-id"))))
+        assertTrue(engine.ingest(stale, TimelineStreamFrame.Message(hostStamped(message("first", "first-id")))))
         assertTrue(engine.ingest(stale, TimelineStreamFrame.Done))
         val current = engine.beginLive(selection)
         // The replacement turn owns the overlay; the finished turn's late acknowledgment is inert.
         assertFalse(engine.acknowledgeSettlement(stale, presented))
-        assertTrue(engine.ingest(current, TimelineStreamFrame.Message(message("second", "second-id"))))
+        assertTrue(engine.ingest(current, TimelineStreamFrame.Message(hostStamped(message("second", "second-id")))))
         assertTrue(engine.ingest(current, TimelineStreamFrame.Done))
         assertFalse(engine.acknowledgeSettlement(stale, presented))
         assertEquals(current, engine.live.value?.fence)

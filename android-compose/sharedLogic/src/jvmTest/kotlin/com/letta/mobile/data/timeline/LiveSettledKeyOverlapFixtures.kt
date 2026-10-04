@@ -77,7 +77,7 @@ internal class OverlapHarness private constructor(
 
     suspend fun streamTurn(frames: List<LettaMessage>) {
         val fence = coordinator.beginLive(owner)
-        frames.forEach { assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(it))) }
+        frames.forEach { assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(it)))) }
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         awaitCondition({ "live turn never projected: ${presentation.live.value}" }) {
             presentation.live.value.size == 2 && presentation.live.value.first().containsMessageId(OverlapTurn.reply.id)

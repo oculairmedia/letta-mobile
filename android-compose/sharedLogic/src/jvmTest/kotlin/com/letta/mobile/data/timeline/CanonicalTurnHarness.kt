@@ -46,7 +46,7 @@ internal class CanonicalTurnHarness private constructor(
         projected: (List<ChatRenderItem>) -> Boolean,
     ): List<ChatRenderItem> {
         val fence = coordinator.beginLive(owner)
-        frames.forEach { assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(it))) }
+        frames.forEach { assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(it)))) }
         if (finished) assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         // The presentation projects on its own dispatcher: wait for the final frame, not the first.
         awaitCondition({ "live turn never projected: ${presentation.live.value.map { it.key }}" }) {

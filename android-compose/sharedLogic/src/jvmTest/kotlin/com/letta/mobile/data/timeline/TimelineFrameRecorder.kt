@@ -110,7 +110,7 @@ internal class TimelineFrameRecorder private constructor(
         val fence = coordinator.beginLive(owner)
         frames.forEach { message ->
             step = "stream ${message.id}"
-            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(message)))
+            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(message))))
             settleUi()
         }
         if (finished) {

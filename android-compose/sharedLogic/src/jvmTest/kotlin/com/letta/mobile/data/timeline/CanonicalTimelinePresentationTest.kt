@@ -30,8 +30,8 @@ class CanonicalTimelinePresentationTest {
 
         repeat(4) { index ->
             val number = index + 1
-            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(toolCall(number))))
-            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(toolReturn(number))))
+            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(toolCall(number)))))
+            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(toolReturn(number)))))
         }
         runCurrent()
 
@@ -86,7 +86,7 @@ class CanonicalTimelinePresentationTest {
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
         val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
         val fence = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "reply"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(assistant("hello", "reply")))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         runCurrent()
         // Live ingest wrote nothing durable, so the overlay is the only copy of this reply.
@@ -112,7 +112,7 @@ class CanonicalTimelinePresentationTest {
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
         val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
         val fence = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "cm-stream-reply"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(assistant("hello", "cm-stream-reply")))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         runCurrent()
         assertEquals(listOf("hello"), contents(presentation.live.value))
@@ -132,8 +132,8 @@ class CanonicalTimelinePresentationTest {
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
         val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
         val fence = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(reasoning("private thought", "thought-1"))))
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("answer", "reply-1"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(reasoning("private thought", "thought-1")))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(assistant("answer", "reply-1")))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         runCurrent()
         assertEquals(1, thoughtCount(presentation.live.value))
@@ -160,8 +160,8 @@ class CanonicalTimelinePresentationTest {
         runCurrent()
         assertEquals(listOf("question"), contents(presentation.live.value))
         val fence = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(echo("question", "echo", "local-1"))))
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(assistant("hello", "reply"))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(echo("question", "echo", "local-1")))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(assistant("hello", "reply")))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         runCurrent()
         // The send is on screen exactly once, as the turn's own echoed row.
@@ -193,15 +193,15 @@ class CanonicalTimelinePresentationTest {
             owner, CanonicalPendingLocalStore.Record("local-1", "question", emptyList(), "2026-01-01T00:00:00Z"),
         )
         val first = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(echo("question", "echo", "local-1"))))
-        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(assistant("hello", "reply"))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(hostStamped(echo("question", "echo", "local-1")))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(hostStamped(assistant("hello", "reply")))))
         assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Done))
         runCurrent()
         assertEquals(listOf("hello", "question"), contents(presentation.live.value))
 
         // The durable echo never landed; the agent's next turn opens over the settled overlay.
         val next = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Message(assistant("again", "reply-2"))))
+        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Message(hostStamped(assistant("again", "reply-2")))))
         runCurrent()
 
         assertEquals(listOf("local-1"), owner.session.pending.value.map { it.otid })
@@ -214,13 +214,13 @@ class CanonicalTimelinePresentationTest {
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
         val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
         val first = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(assistant("first", "reply-1"))))
+        assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Message(hostStamped(assistant("first", "reply-1")))))
         assertTrue(coordinator.ingest(owner, first, TimelineStreamFrame.Done))
         runCurrent()
         assertEquals(listOf("first"), contents(presentation.live.value))
 
         val second = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, second, TimelineStreamFrame.Message(assistant("second", "reply-2"))))
+        assertTrue(coordinator.ingest(owner, second, TimelineStreamFrame.Message(hostStamped(assistant("second", "reply-2")))))
         runCurrent()
         assertEquals(listOf("second", "first"), contents(presentation.live.value))
 

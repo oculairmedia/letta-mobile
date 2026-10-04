@@ -71,7 +71,7 @@ internal class TimelineDomainRig private constructor(
 
     inner class Stream internal constructor(private val fence: TimelineLiveFence) {
         suspend fun emit(message: LettaMessage) {
-            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(message)))
+            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(message))))
         }
 
         suspend fun done() {
@@ -115,4 +115,16 @@ internal class TimelineDomainRig private constructor(
             arrayOf(TimelineTransport::class.java),
         ) { _, method, _ -> fail("unexpected transport call: ${method.name}") } as TimelineTransport
     }
+}
+
+/**
+ * A fixture frame as the host delivers it (letta-mobile-nbha6): a text frame is named by a logical id
+ * and numbered by a `text_seq` that grows with its cumulative text. Frames that already carry a stamp
+ * are left alone; tool and user frames are not text and pass through.
+ */
+private fun hostStamped(message: LettaMessage): LettaMessage = when {
+    message.logicalMessageId != null -> message
+    message is AssistantMessage -> message.copy(logicalMessageId = message.id, textSeq = message.content.length.coerceAtLeast(1))
+    message is ReasoningMessage -> message.copy(logicalMessageId = message.id, textSeq = message.reasoning.length.coerceAtLeast(1))
+    else -> message
 }

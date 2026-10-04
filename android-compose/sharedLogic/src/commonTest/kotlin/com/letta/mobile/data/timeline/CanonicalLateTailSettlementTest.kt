@@ -27,12 +27,12 @@ class CanonicalLateTailSettlementTest {
     private val sentAt = timelineNow().toString()
     private val otid = "cm-android-7e148aa8"
 
-    /** One streamed fragment of the reply ui-msg-9173252 (run local-run-50). */
-    private enum class ReplyFragment(val text: String) { First("Hel"), Second("lo"), Tail(" there") }
+    /** One streamed snapshot of the reply ui-msg-9173252 (run local-run-50): the text so far. */
+    private enum class ReplyFragment(val text: String) { First("Hel"), Second("Hello"), Tail("Hello there") }
 
-    private fun reply(fragment: ReplyFragment) = AssistantMessage(
+    private fun reply(fragment: ReplyFragment) = hostStamped(AssistantMessage(
         id = "ui-msg-9173252", contentRaw = JsonPrimitive(fragment.text), date = sentAt, runId = "local-run-50",
-    )
+    ))
 
     // The 0.32.17 message list: seq_id and run_id null, no otid on the assistant row, the user
     // row carries the client message id as its otid.
@@ -152,7 +152,7 @@ class CanonicalLateTailSettlementTest {
         val tail = AssistantMessage(
             id = "ui-msg-9173262", contentRaw = JsonPrimitive("Hello there"), date = sentAt, runId = "local-run-55",
         )
-        harness.external.ingestExternalTransportMessage(agent, conversation, tail, TimelineIngestSources.RETIRED_TURN_TAIL)
+        harness.external.ingestExternalTransportMessage(agent, conversation, hostStamped(tail), TimelineIngestSources.RETIRED_TURN_TAIL)
 
         val settled = assertNotNull(owner.session.live.value)
         assertNotNull(settled.settlementRevision)
@@ -177,7 +177,7 @@ class CanonicalLateTailSettlementTest {
             id = "ui-msg-1", contentRaw = JsonPrimitive("old"), date = sentAt, runId = "local-run-49",
         )
         harness.external.ingestExternalTransportMessage(
-            scope.agentId, scope.conversationId, stale, TimelineIngestSources.RETIRED_TURN_TAIL,
+            scope.agentId, scope.conversationId, hostStamped(stale), TimelineIngestSources.RETIRED_TURN_TAIL,
         )
         assertEquals(null, owner.session.live.value?.block?.events?.firstOrNull { it.serverId == "ui-msg-1" })
         advanceUntilIdle()
@@ -195,7 +195,7 @@ class CanonicalLateTailSettlementTest {
         val next = AssistantMessage(
             id = "ui-msg-9173300", contentRaw = JsonPrimitive("again"), date = sentAt, runId = "local-run-51",
         )
-        harness.external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, next)
+        harness.external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, hostStamped(next))
 
         val live = assertNotNull(owner.session.live.value)
         assertEquals(null, live.settlementRevision)
