@@ -2,6 +2,7 @@ package com.letta.mobile.data.context
 
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.ServerFrame
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -27,7 +28,7 @@ class ContextReadingSnapshotsTest {
     )
 
     @Test
-    fun aReadingSavedInOneRunSeedsTheNext() {
+    fun aReadingSavedInOneRunSeedsTheNext() = runTest {
         val store = MemoryStore()
         val firstRun = ContextTokenReadings(onChange = ContextReadingSnapshots(store)::save)
         firstRun.record(usage("conv-a", 28_864))
@@ -39,7 +40,7 @@ class ContextReadingSnapshotsTest {
     }
 
     @Test
-    fun aDefaultConversationSavedBareRestoresUnderTheAppsForm() {
+    fun aDefaultConversationSavedBareRestoresUnderTheAppsForm() = runTest {
         val store = MemoryStore()
         ContextTokenReadings(onChange = ContextReadingSnapshots(store)::save).record(usage("default", 28_864))
 
@@ -49,7 +50,7 @@ class ContextReadingSnapshotsTest {
     }
 
     @Test
-    fun theLeastRecentlyUpdatedConversationIsEvictedFirst() {
+    fun theLeastRecentlyUpdatedConversationIsEvictedFirst() = runTest {
         val store = MemoryStore()
         val snapshots = ContextReadingSnapshots(store, maxEntries = 2)
         val readings = ContextTokenReadings(onChange = snapshots::save)
@@ -90,6 +91,19 @@ class ContextReadingSnapshotsTest {
         val store = MemoryStore().apply { values[ContextReadingSnapshots.KEY] = raw }
 
         assertEquals(mapOf(ContextReadingKey(AGENT, "conv-c") to 29_193), ContextReadingSnapshots(store).load())
+    }
+
+    @Test
+    fun aFailedWriteNeitherThrowsNorStopsLaterReadings() = runTest {
+        val failing = object : SecureSettingsStore by MemoryStore() {
+            override fun putString(key: String, value: String) = throw kotlinx.io.IOException("disk full")
+        }
+        val readings = ContextTokenReadings(onChange = ContextReadingSnapshots(failing)::save)
+
+        readings.record(usage("conv-a", 28_864))
+        readings.record(usage("conv-a", 29_193))
+
+        assertEquals(29_193, readings.latest(AGENT, "conv-a"))
     }
 
     @Test

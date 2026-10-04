@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -19,7 +20,7 @@ import kotlin.test.assertEquals
 class RealTurnContextReadingTest {
 
     @Test
-    fun theLastModelCallsContextTokensIsTheConversationsReading() {
+    fun theLastModelCallsContextTokensIsTheConversationsReading() = runTest {
         val frames = wire("claude-sonnet-5-5", 1).flatMap { envelope ->
             IrohStreamDeltaServerFrameMapper.map(
                 payload = RuntimeEventPayload.RemoteStreamFrame(
@@ -34,7 +35,7 @@ class RealTurnContextReadingTest {
         val usage = frames.filterIsInstance<ServerFrame.UsageStatistics>()
         val readings = ContextTokenReadings()
 
-        frames.forEach(readings::record)
+        frames.forEach { readings.record(it) }
 
         assertEquals(listOf(45_117L, 45_515L), usage.map { it.contextTokens })
         // The second call's prompt_tokens is only the uncached tail; the total is context_tokens.

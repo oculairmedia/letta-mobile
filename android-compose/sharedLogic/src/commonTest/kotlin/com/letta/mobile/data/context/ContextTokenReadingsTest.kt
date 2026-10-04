@@ -1,6 +1,7 @@
 package com.letta.mobile.data.context
 
 import com.letta.mobile.data.transport.ServerFrame
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -24,7 +25,7 @@ class ContextTokenReadingsTest {
     )
 
     @Test
-    fun keepsTheLatestReadingForAConversation() {
+    fun keepsTheLatestReadingForAConversation() = runTest {
         val readings = ContextTokenReadings()
 
         readings.record(usage(contextTokens = 28_864))
@@ -34,7 +35,7 @@ class ContextTokenReadingsTest {
     }
 
     @Test
-    fun anotherConversationsFrameLeavesThisReadingAlone() {
+    fun anotherConversationsFrameLeavesThisReadingAlone() = runTest {
         val readings = ContextTokenReadings()
         readings.record(usage(contextTokens = 29_193))
 
@@ -45,7 +46,7 @@ class ContextTokenReadingsTest {
     }
 
     @Test
-    fun aFrameWithoutContextTokensDoesNotOverwrite() {
+    fun aFrameWithoutContextTokensDoesNotOverwrite() = runTest {
         val readings = ContextTokenReadings()
         readings.record(usage(contextTokens = 29_193))
 
@@ -55,7 +56,7 @@ class ContextTokenReadingsTest {
     }
 
     @Test
-    fun promptTokensAreNeverTakenAsTheTotal() {
+    fun promptTokensAreNeverTakenAsTheTotal() = runTest {
         val readings = ContextTokenReadings()
 
         readings.record(usage(contextTokens = null, promptTokens = 73))
@@ -84,7 +85,7 @@ class ContextTokenReadingsTest {
     }
 
     @Test
-    fun aDefaultConversationFrameStampedBareReachesTheAppsDefaultConversation() {
+    fun aDefaultConversationFrameStampedBareReachesTheAppsDefaultConversation() = runTest {
         // The App Server names an agent's default conversation `default`; the app opens it as
         // `conv-default-<agentId>`. The chip asks with the app's form.
         val readings = ContextTokenReadings()
@@ -96,7 +97,7 @@ class ContextTokenReadingsTest {
     }
 
     @Test
-    fun aDefaultConversationFrameStampedInTheAppsFormIsReadTheSame() {
+    fun aDefaultConversationFrameStampedInTheAppsFormIsReadTheSame() = runTest {
         val readings = ContextTokenReadings()
 
         readings.record(usage(conversation = "conv-default-$AGENT", contextTokens = 29_193))
@@ -105,7 +106,7 @@ class ContextTokenReadingsTest {
     }
 
     @Test
-    fun anotherAgentsDefaultConversationIsNotThisOne() {
+    fun anotherAgentsDefaultConversationIsNotThisOne() = runTest {
         val readings = ContextTokenReadings()
 
         readings.record(usage(agent = "agent-other", conversation = "default", contextTokens = 45_117))
@@ -116,7 +117,7 @@ class ContextTokenReadingsTest {
     }
 
     @Test
-    fun aRealConversationIdIsKeptVerbatim() {
+    fun aRealConversationIdIsKeptVerbatim() = runTest {
         assertEquals(ContextReadingKey(AGENT, "local-conv-575"), contextReadingKeyOf(AGENT, "local-conv-575"))
         val readings = ContextTokenReadings()
         readings.record(usage(conversation = "local-conv-575", contextTokens = 45_515))

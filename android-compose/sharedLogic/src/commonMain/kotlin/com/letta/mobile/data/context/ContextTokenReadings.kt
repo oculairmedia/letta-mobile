@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.updateAndGet
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 
 /**
@@ -37,7 +38,6 @@ fun reduceContextReadings(
 
 private fun ServerFrame.UsageStatistics.readingKey(): ContextReadingKey? = contextReadingKeyOf(agentId, conversationId)
 
-
 private fun Long.toReadingTokens(): Int? =
     takeIf { it >= 0 }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
 
@@ -54,12 +54,19 @@ class ContextTokenReadings(
 ) {
     private val state = MutableStateFlow(initial)
 
+    // Held across the update AND its onChange, so two concurrent records can never hand a save
+    // the newer map before the older one.
+    private val recordLock = Mutex()
+
     val readings: StateFlow<Map<ContextReadingKey, Int>> = state.asStateFlow()
 
-    fun record(frame: ServerFrame) {
+    suspend fun record(frame: ServerFrame) = recordLock.withLock {
         val before = state.value
-        val after = state.updateAndGet { reduceContextReadings(it, frame) }
-        if (after !== before) onChange(after)
+        val after = reduceContextReadings(before, frame)
+        if (after !== before) {
+            state.value = after
+            onChange(after)
+        }
     }
 
     fun latest(agentId: String?, conversationId: String?): Int? =

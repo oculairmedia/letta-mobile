@@ -121,7 +121,7 @@ class ContextReadingUsageTest {
     }
 
     @Test
-    fun theChipForAnAgentsDefaultConversationUpdatesFromABareDefaultFrame() {
+    fun theChipForAnAgentsDefaultConversationUpdatesFromABareDefaultFrame() = runTest {
         val readings = ContextTokenReadings()
         readings.record(
             com.letta.mobile.data.transport.ServerFrame.UsageStatistics(

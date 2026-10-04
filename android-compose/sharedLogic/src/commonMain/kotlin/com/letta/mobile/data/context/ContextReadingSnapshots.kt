@@ -1,6 +1,8 @@
 package com.letta.mobile.data.context
 
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.util.Telemetry
+import kotlinx.io.IOException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -31,7 +33,14 @@ class ContextReadingSnapshots(
         val kept = readings.entries.toList().takeLast(maxEntries).map { (key, tokens) ->
             SavedReading(key.agentId, key.conversationId, tokens)
         }
-        store.putString(KEY, json.encodeToString(SavedReadings.serializer(), SavedReadings(entries = kept)))
+        val encoded = json.encodeToString(SavedReadings.serializer(), SavedReadings(entries = kept))
+        // Best effort: a failed write (desktop keeps this store in a file) must not end the
+        // observer that called it, or later turns would stop updating the chip.
+        try {
+            store.putString(KEY, encoded)
+        } catch (failure: IOException) {
+            Telemetry.event("ContextReadings", "snapshot.saveFailed", "error" to failure.message, level = Telemetry.Level.WARN)
+        }
     }
 
     /** Corrupt or foreign data is no reading; [IllegalArgumentException] covers non-JSON input. */
