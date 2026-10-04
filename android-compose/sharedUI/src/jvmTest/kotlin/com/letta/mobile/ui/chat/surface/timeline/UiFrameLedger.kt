@@ -83,20 +83,14 @@ internal class UiFrameLedger {
 
     private fun select(position: TimelineReadPosition, limit: Int): List<TimelineStoredRecord> = when (position) {
         TimelineReadPosition.Tail -> rows.values.toList().takeLast(limit)
-        is TimelineReadPosition.Before -> before(position.key, limit)
-        is TimelineReadPosition.After -> after(position.key, limit)
-        is TimelineReadPosition.Around -> around(position.key, limit)
-    }
-
-    private fun before(key: TimelinePageKey, limit: Int) = rows.headMap(key, false).values.toList().takeLast(limit)
-
-    private fun after(key: TimelinePageKey, limit: Int) = rows.tailMap(key, false).values.take(limit)
-
-    /** A window centred on [key], as Room reads it: up to half before, the row itself, the rest after. */
-    private fun around(key: TimelinePageKey, limit: Int): List<TimelineStoredRecord> {
-        val exact = listOfNotNull(rows[key])
-        val older = before(key, (limit - 1) / 2)
-        return older + exact + after(key, limit - older.size - exact.size)
+        is TimelineReadPosition.Before -> rows.headMap(position.key, false).values.toList().takeLast(limit)
+        is TimelineReadPosition.After -> rows.tailMap(position.key, false).values.take(limit)
+        // A window centred on the key, as Room reads it: up to half before, the row itself, the rest after.
+        is TimelineReadPosition.Around -> {
+            val exact = listOfNotNull(rows[position.key])
+            val older = rows.headMap(position.key, false).values.toList().takeLast((limit - 1) / 2)
+            older + exact + rows.tailMap(position.key, false).values.take(limit - older.size - exact.size)
+        }
     }
 
     @Synchronized fun evidenceFor(key: String): ByteArray? = evidence[key]?.copyOf()
