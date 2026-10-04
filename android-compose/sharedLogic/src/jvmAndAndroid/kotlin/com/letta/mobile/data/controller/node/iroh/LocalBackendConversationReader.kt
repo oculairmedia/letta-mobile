@@ -117,8 +117,8 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
         return ConvIds(convId, convAgent)
     }
 
-    /** Parse the raw `archived` value: null for a missing/string value, else the strict boolean. */
-    private fun parseArchivedFlag(value: JsonElement?): Boolean? =
+    /** Parse a raw `archived` / `hidden` value: null for a missing/string value, else the strict boolean. */
+    private fun parseBooleanFlag(value: JsonElement?): Boolean? =
         (value as? JsonPrimitive)?.let { if (it.isString) null else it.content.toBooleanStrictOrNull() }
 
     /** Build the ConvRecord from resolved identity + the raw conversation.json object. */
@@ -129,7 +129,7 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
         updatedAt = obj["updated_at"]?.stringOrNull(),
         lastMessageAt = obj["last_message_at"]?.stringOrNull(),
         summary = obj["summary"]?.stringOrNull(),
-        archived = parseArchivedFlag(obj["archived"]),
+        archived = parseBooleanFlag(obj["archived"]),
         archivedAt = obj["archived_at"]?.stringOrNull(),
         inContextMessageIds = obj["in_context_message_ids"] as? JsonArray ?: JsonArray(emptyList()),
         raw = obj,
@@ -160,17 +160,21 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
         return v
     }
 
+    private fun String?.orJsonNull(): JsonElement = this?.let(::JsonPrimitive) ?: JsonNull
+
     private fun conversationToLetta(c: ConvRecord): JsonObject = buildJsonObject {
         put("id", if (c.id == "default") "conv-default-${c.agentId}" else c.id)
         put("agent_id", c.agentId)
-        put("created_at", c.createdAt?.let { JsonPrimitive(it) } ?: JsonNull)
-        put("updated_at", c.updatedAt?.let { JsonPrimitive(it) } ?: JsonNull)
-        put("last_message_at", c.lastMessageAt?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("created_at", c.createdAt.orJsonNull())
+        put("updated_at", c.updatedAt.orJsonNull())
+        put("last_message_at", c.lastMessageAt.orJsonNull())
         put("created_by_id", CANNED_USER_ID)
         put("last_updated_by_id", CANNED_USER_ID)
-        put("summary", c.summary?.let { JsonPrimitive(it) } ?: JsonNull)
-        put("archived", c.archived?.let { JsonPrimitive(it) } ?: JsonNull)
-        put("archived_at", c.archivedAt?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("summary", c.summary.orJsonNull())
+        put("archived", c.archived?.let(::JsonPrimitive) ?: JsonNull)
+        put("archived_at", c.archivedAt.orJsonNull())
+        // letta-mobile-fxoew.6: carry the store's hidden flag; it used to be dropped here.
+        put("hidden", parseBooleanFlag(c.raw["hidden"])?.let(::JsonPrimitive) ?: JsonNull)
         put("in_context_message_ids", c.inContextMessageIds)
         put("isolated_block_ids", JsonArray(emptyList()))
         put("model", JsonNull)

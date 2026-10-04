@@ -68,9 +68,7 @@ class ConversationListAgentHandlerTest {
         // receives an empty conversations array and falls through to
         // its null branch.
         val conversations = extractConversationsArray(resp)
-        if (conversations.isNotEmpty()) {
-            throw AssertionError("Expected empty conversations for unknown agent; got $resp")
-        }
+        assertTrue(conversations.isEmpty(), "Expected empty conversations for unknown agent; got $resp")
     }
 
     @Test
@@ -120,6 +118,32 @@ class ConversationListAgentHandlerTest {
         if (agentId != agentIdStr) {
             throw AssertionError("agent_id mismatch: expected=$agentId actual=$agentIdStr in $first")
         }
+    }
+
+    /** letta-mobile-fxoew.6: the on-disk tier used to list hidden (subagent) conversations. */
+    @Test
+    fun excludesHiddenConversationsFromTheList() = runTest {
+        val root = createTempDirectory("fxoew6-list-agent-hidden").toFile()
+        LocalBackendFixtureStore.create(root)
+        val agentId = LocalBackendFixtureStore.AGENT_ID
+        writeConversationJson(root, "default:$agentId", """{"id":"conv-visible","agent_id":"$agentId"}""")
+        writeConversationJson(
+            root,
+            "conversation:conv-hidden",
+            """{"id":"conv-hidden","agent_id":"$agentId","hidden":true}""",
+        )
+
+        val router = AdminRpcRegistry.buildRouter(localBackendDir = root.absolutePath)
+        val resp = invoke(router, "conversation.list_agent", buildJsonObject { put("agent_id", agentId) })
+
+        val ids = extractConversationsArray(resp).map { it["id"]?.jsonPrimitive?.contentOrNull }
+        assertEquals(listOf("conv-visible"), ids, resp)
+    }
+
+    private fun writeConversationJson(root: java.io.File, key: String, json: String) {
+        val dirName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(key.toByteArray())
+        val dir = java.io.File(java.io.File(root, "conversations"), dirName).apply { mkdirs() }
+        java.io.File(dir, "conversation.json").writeText(json)
     }
 
     private suspend fun invoke(

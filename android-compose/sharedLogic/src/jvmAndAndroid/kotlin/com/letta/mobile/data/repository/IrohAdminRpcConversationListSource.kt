@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
@@ -45,7 +46,7 @@ class IrohAdminRpcConversationListSource(
             error(response.error ?: "Iroh admin_rpc conversation.list failed")
         }
         val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+        return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result).visibleConversationsInLists()
     }
 
     // letta-mobile-i9h61.3.2: agent-scoped conversation list — the
@@ -76,7 +77,7 @@ class IrohAdminRpcConversationListSource(
             return emptyList()
         }
         val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+        return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result).visibleConversationsInLists()
     }
 
     // letta-mobile-qfa81 (P4 rows 3-6): conversation reads/writes whose

@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.visibleInLists
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
@@ -220,7 +221,8 @@ class IrohAdminRpcAgentSource(
             }
         }
         reportRosterCompleteness(merged.size)
-        return merged
+        // letta-mobile-fxoew.6: subagent agents never reach a roster list.
+        return merged.visibleInLists()
     }
 
     /**

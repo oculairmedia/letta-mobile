@@ -6,6 +6,7 @@ import com.letta.mobile.data.commands.SlashCommandsResponse
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.visibleInLists
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockId
@@ -123,7 +124,8 @@ class IrohAdminRpcAgentDirectory(
             offset += page.size
         }
         lastAgentListTruncated = collector.isTruncated
-        return collector.collectedAgents
+        // letta-mobile-fxoew.6: subagent agents never reach a roster list.
+        return collector.collectedAgents.visibleInLists()
     }
 
     private class AgentListCollector(private val maxLimit: Int) {

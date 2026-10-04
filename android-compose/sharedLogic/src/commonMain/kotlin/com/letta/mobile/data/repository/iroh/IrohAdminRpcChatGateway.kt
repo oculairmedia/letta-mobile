@@ -18,6 +18,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.AppServerListModelsAdapter
@@ -150,6 +151,7 @@ class IrohAdminRpcChatGateway(
             .also { conversations ->
                 conversations.forEach { agentIdByConversation[it.id] = it.agentId }
             }
+            .visibleConversationsInLists()
     }
 
     override suspend fun listConversationsForAgent(
@@ -184,6 +186,7 @@ class IrohAdminRpcChatGateway(
                 .also { conversations ->
                     conversations.forEach { agentIdByConversation[it.id] = it.agentId }
                 }
+                .visibleConversationsInLists()
         }.getOrElse { emptyList() }
     }
 
