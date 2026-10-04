@@ -18,7 +18,9 @@ import com.letta.mobile.data.api.RunApi
 import com.letta.mobile.data.api.ScheduleApi
 import com.letta.mobile.data.api.StepApi
 import com.letta.mobile.data.api.ToolApi
+import com.letta.mobile.data.context.ContextReadingSnapshots
 import com.letta.mobile.data.context.contextTokenReadingsOf
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
@@ -106,6 +108,8 @@ class SessionGraphAssembler @Inject constructor(
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val localModelSource: LocalRuntimeModelSource? = null,
+    /** letta-mobile-wdm6i: where the context chip's last readings survive a restart. */
+    private val settingsStore: SecureSettingsStore? = null,
 ) {
     suspend fun clearCachesForNewSession() {
         agentDao.get().deleteAll()
@@ -165,7 +169,11 @@ class SessionGraphAssembler @Inject constructor(
                 scope = request.scope,
                 logger = AndroidVibesyncEventStreamLogger(),
             ),
-            contextTokenReadings = contextTokenReadingsOf(request.channelTransport, request.scope),
+            contextTokenReadings = contextTokenReadingsOf(
+                transport = request.channelTransport,
+                scope = request.scope,
+                snapshots = settingsStore?.let(::ContextReadingSnapshots),
+            ),
         )
     }
 

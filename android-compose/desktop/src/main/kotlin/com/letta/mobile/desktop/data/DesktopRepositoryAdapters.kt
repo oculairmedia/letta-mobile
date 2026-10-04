@@ -2,6 +2,7 @@ package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatSessionGraph
+import com.letta.mobile.data.context.ContextReadingSnapshots
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.model.LettaConfig
@@ -111,12 +112,15 @@ class DesktopSessionGraphFactory(
     private val configProvider: () -> LettaConfig? = { null },
     private val channelTransportFactory: () -> IChannelTransport = ::NoOpChannelTransport,
     private val irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
+    /** letta-mobile-wdm6i: where the context chip's last readings survive a restart. */
+    private val contextReadingSnapshots: ContextReadingSnapshots? = null,
     private val repositoryAdaptersFactory: (LettaConfig?, IChannelTransport) -> DesktopRepositoryAdapters =
         { config, transport ->
             DesktopRepositoryAdapters(
                 config = config,
                 irohAgentDirectoryProvider = irohAgentDirectoryProvider,
                 channelTransport = transport,
+                contextReadingSnapshots = contextReadingSnapshots,
             )
         },
 ) : SessionRepositoryGraphFactory<DesktopSessionGraph> {
@@ -202,6 +206,7 @@ class DesktopRepositoryAdapters(
     config: LettaConfig? = null,
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
     channelTransport: IChannelTransport = NoOpChannelTransport(),
+    contextReadingSnapshots: ContextReadingSnapshots? = null,
 ) {
     // letta-mobile-9v9nu: mode is authoritative — LOCAL never binds remote Iroh
     // even if serverUrl still carries a leftover iroh:// ticket.
@@ -238,7 +243,8 @@ class DesktopRepositoryAdapters(
     private val boundCronRepository = CronRepository(channelTransport, transportBoundScope)
 
     /** Fed by the same transport-bound scope, so it retires with the transport generation. */
-    val contextTokenReadings: ContextTokenReadings = contextTokenReadingsOf(channelTransport, transportBoundScope)
+    val contextTokenReadings: ContextTokenReadings =
+        contextTokenReadingsOf(channelTransport, transportBoundScope, contextReadingSnapshots)
     private val boundSelfTodoRepository = SelfTodoRepository(channelTransport, transportBoundScope)
     private val boundSubagentRepository = SubagentRepository(
         transport = channelTransport,
