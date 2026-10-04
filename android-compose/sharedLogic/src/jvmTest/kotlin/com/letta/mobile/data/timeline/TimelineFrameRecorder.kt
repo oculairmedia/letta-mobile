@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import androidx.paging.CombinedLoadStates
+import androidx.paging.LoadState
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.model.LettaMessage
@@ -10,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlin.test.assertEquals
@@ -32,11 +35,16 @@ internal class TimelineFrameRecorder private constructor(
     private val ui: CoroutineScope,
     private val presentation: CanonicalTimelinePresentation,
     private val transport: MutableDurableTransport,
+    private val scope: TimelineScope,
 ) {
     /** One row as the list keys and draws it. */
     data class FrameRow(val key: String, val source: String, val messages: List<String>, val contents: List<String>)
 
-    data class Frame(val index: Int, val step: String, val rows: List<FrameRow>) {
+    /**
+     * [loadStates] are the Paging refresh/append states the presenter reported since the previous
+     * recorded frame (for example `refresh:Loading`), the signal behind a spinner flash.
+     */
+    data class Frame(val index: Int, val step: String, val rows: List<FrameRow>, val loadStates: List<String> = emptyList()) {
         val keys: List<String> get() = rows.map { it.key }
         override fun toString() = "#$index [$step] " + rows.joinToString { "${it.key}<${it.source}>${it.messages}" }
     }
@@ -44,6 +52,7 @@ internal class TimelineFrameRecorder private constructor(
     private val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
     private val lock = Any()
     private val recorded = mutableListOf<Frame>()
+    private val pendingLoadStates = mutableListOf<String>()
     private var step = "open"
 
     val frames: List<Frame> get() = synchronized(lock) { recorded.toList() }
@@ -58,7 +67,15 @@ internal class TimelineFrameRecorder private constructor(
             }
         }
         ui.launch { presentation.live.collect { record() } }
+        ui.launch { presenter.loadStateFlow.filterNotNull().collect(::noteLoadState) }
     }
+
+    private fun noteLoadState(states: CombinedLoadStates) = synchronized(lock) {
+        val named = "refresh:${states.refresh.name()} append:${states.append.name()}"
+        if (pendingLoadStates.lastOrNull() != named) pendingLoadStates += named
+    }
+
+    private fun LoadState.name(): String = this::class.simpleName.orEmpty()
 
     private fun record() = synchronized(lock) {
         val live = presentation.live.value
@@ -74,8 +91,9 @@ internal class TimelineFrameRecorder private constructor(
                 contents = item?.messageRows().orEmpty().map { it.content },
             )
         }
-        val frame = Frame(recorded.size, step, rows)
-        if (recorded.lastOrNull()?.rows != rows) recorded += frame
+        if (recorded.lastOrNull()?.rows == rows) return@synchronized
+        recorded += Frame(recorded.size, step, rows, pendingLoadStates.toList())
+        pendingLoadStates.clear()
     }
 
     /** A prompt the user just sent, before the server has seen it. */
@@ -102,6 +120,13 @@ internal class TimelineFrameRecorder private constructor(
         }
     }
 
+    /**
+     * Streams raw `stream_delta` wire lines (as recorded on a host or viewer) through the observer
+     * mapping the phone uses, so a captured turn replays without being rewritten as typed messages.
+     */
+    suspend fun streamRaw(frames: List<String>, finished: Boolean = false) =
+        stream(ObserverFrameReplay(scope).messages(frames), finished)
+
     /** The durable turn lands: the ledger reconciles, Paging re-presents, the overlay drains. */
     suspend fun settle(durable: List<LettaMessage>) {
         step = "settle"
@@ -121,6 +146,15 @@ internal class TimelineFrameRecorder private constructor(
         transport.durable = durable
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
         presenter.awaitRows(durable.count { it.renders() }) { "history never paged in: ${frames.lastOrNull()}" }
+        presenter.awaitIdle()
+    }
+
+    /** Opens on stored history whose grouping into rows is not known up front (a captured turn). */
+    suspend fun openOnHistory(durable: List<LettaMessage>) {
+        step = "history"
+        transport.durable = durable
+        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        awaitCondition({ "history never paged in: ${frames.lastOrNull()}" }) { presenter.size > 0 }
         presenter.awaitIdle()
     }
 
@@ -156,7 +190,7 @@ internal class TimelineFrameRecorder private constructor(
             val owner = coordinator.acquire(scope)
             val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
-            return TimelineFrameRecorder(coordinator, owner, ui, presentation, transport).also { it.start() }
+            return TimelineFrameRecorder(coordinator, owner, ui, presentation, transport, scope).also { it.start() }
         }
 
         private fun LettaMessage.renders(): Boolean =

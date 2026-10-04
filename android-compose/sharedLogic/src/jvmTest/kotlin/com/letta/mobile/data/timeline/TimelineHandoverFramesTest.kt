@@ -84,6 +84,8 @@ class TimelineHandoverFramesTest {
             val frames = recorder.frames
             val flickers = handoverFlickers(frames)
             assertTrue(flickers.isEmpty(), flickers.joinToString("\n") + "\n\nframes:\n" + frames.joinToString("\n"))
+            val violations = timelineInvariantViolations(frames)
+            assertTrue(violations.isEmpty(), violations.joinToString("\n") + "\n\nframes:\n" + frames.joinToString("\n"))
             // Settled output equals the live render: the same keys over the same messages.
             assertEquals(final.rows.map { it.key to it.messages }, recorder.lastFrame().rows.map { it.key to it.messages })
         } finally {
