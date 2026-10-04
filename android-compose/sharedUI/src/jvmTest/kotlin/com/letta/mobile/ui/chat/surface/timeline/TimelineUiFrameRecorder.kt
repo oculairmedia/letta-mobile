@@ -28,6 +28,8 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import java.io.File
 import javax.imageio.ImageIO
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /**
  * letta-mobile-29sxj: mounts the shared ChatTimeline over a [TimelineDomainRig]'s presentation and
@@ -50,6 +52,9 @@ internal class TimelineUiFrameRecorder(
     private var state by mutableStateOf(ChatUiState(conversationState = ConversationState.Ready(CONVERSATION), isLoadingMessages = false))
 
     val frames: List<UiFrame> get() = recorded.toList()
+
+    /** The last frame composed no row content: what the previous step changed has all been drawn. */
+    val isQuiet: Boolean get() = recorded.lastOrNull()?.rowCompositions == 0
 
     fun mount() = with(test) {
         mainClock.autoAdvance = false
@@ -85,12 +90,14 @@ internal class TimelineUiFrameRecorder(
     /**
      * Advances at least [minFrames] frames of [step], then keeps going until [done] holds: a slow
      * machine takes more frames to the same place, and the frames in between are still recorded.
+     * The bound is wall-clock time, not a frame count, so how many frames a step takes may vary with
+     * the machine; only a step that never completes fails.
      */
     fun advanceUntil(step: String, minFrames: Int, done: () -> Boolean) {
         advance(step, minFrames)
-        var extra = 0
+        val deadline = TimeSource.Monotonic.markNow() + STEP_TIMEOUT
         while (!done()) {
-            check(extra++ < MAX_EXTRA_FRAMES) { "$step never finished (store failures: [${rig.storeFailures}]); last frame: ${recorded.last()}" }
+            check(deadline.hasNotPassedNow()) { "$step never finished (store failures: [${rig.storeFailures}]); last frame: ${recorded.last()}" }
             advance(step, 1)
         }
     }
@@ -149,7 +156,11 @@ internal class TimelineUiFrameRecorder(
         const val FRAME_MILLIS = 16L
         const val FRAMES_PER_STEP = 6
         private const val REAL_MILLIS_PER_FRAME = 12L
-        private const val MAX_EXTRA_FRAMES = 500
+        /**
+         * Generous: a completing step takes well under a second even on a loaded runner. Kept under
+         * runComposeUiTest's own one-minute limit so a stuck step reports where it stuck.
+         */
+        private val STEP_TIMEOUT = 20.seconds
         private const val FOOTER_LOADING_KEY = "canonical-loading"
         private val SPINNER_TAGS = listOf(ChatTimelineTags.SKELETON, TimelineMascotTags.LOADING)
     }

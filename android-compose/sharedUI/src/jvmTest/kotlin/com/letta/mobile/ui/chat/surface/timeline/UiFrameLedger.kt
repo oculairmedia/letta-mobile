@@ -57,11 +57,23 @@ internal class UiFrameLedger {
     @Synchronized fun body(pointer: TimelineBodyPointer): ByteArray =
         rows.values.single { it.key.identity.value == pointer.value }.body
 
-    /** The rows a read at [position] selects, with the exclusive neighbours either side. */
+    /**
+     * The rows a read at [position] selects, under the page contract the shipped stores keep
+     * (RoomTimelineBoundedStore, DesktopTimelineBoundedStore): [TimelineMetadataPage.older] and
+     * [TimelineMetadataPage.newer] are the page's own first and last keys, null at a real end, and
+     * [TimelineReadPosition.Before] / [TimelineReadPosition.After] exclude the key they are given.
+     *
+     * letta-mobile-8p8mj: this used to return the neighbour OUTSIDE the page instead. Paging then
+     * asked for Before(neighbour) and After(neighbour), each excluding that neighbour, so every page
+     * boundary lost one row. It only bit when Paging refreshed around an anchor (a single-row page
+     * with a boundary on each side), which is timing: on a loaded runner the turn's prompt and the
+     * one before it went missing from the settled list, the overlay never drained, and the frame
+     * tests failed with "settle never finished".
+     */
     @Synchronized fun page(position: TimelineReadPosition, limit: Int): TimelineMetadataPage {
         val selected = select(position, limit)
-        val older = selected.firstOrNull()?.let { rows.lowerKey(it.key) }
-        val newer = selected.lastOrNull()?.let { rows.higherKey(it.key) }
+        val older = selected.firstOrNull()?.key?.takeIf { rows.lowerKey(it) != null }
+        val newer = selected.lastOrNull()?.key?.takeIf { rows.higherKey(it) != null }
         val revision = checkpoint.revision
         val metadata = selected.map {
             TimelineLedgerMetadata(it.key, TimelineBodyPointer(it.key.identity.value, it.body.size.toLong()), it.contentType, revision)
@@ -71,9 +83,20 @@ internal class UiFrameLedger {
 
     private fun select(position: TimelineReadPosition, limit: Int): List<TimelineStoredRecord> = when (position) {
         TimelineReadPosition.Tail -> rows.values.toList().takeLast(limit)
-        is TimelineReadPosition.Before -> rows.headMap(position.key, false).values.toList().takeLast(limit)
-        is TimelineReadPosition.After -> rows.tailMap(position.key, false).values.take(limit)
-        is TimelineReadPosition.Around -> listOfNotNull(rows[position.key])
+        is TimelineReadPosition.Before -> before(position.key, limit)
+        is TimelineReadPosition.After -> after(position.key, limit)
+        is TimelineReadPosition.Around -> around(position.key, limit)
+    }
+
+    private fun before(key: TimelinePageKey, limit: Int) = rows.headMap(key, false).values.toList().takeLast(limit)
+
+    private fun after(key: TimelinePageKey, limit: Int) = rows.tailMap(key, false).values.take(limit)
+
+    /** A window centred on [key], as Room reads it: up to half before, the row itself, the rest after. */
+    private fun around(key: TimelinePageKey, limit: Int): List<TimelineStoredRecord> {
+        val exact = listOfNotNull(rows[key])
+        val older = before(key, (limit - 1) / 2)
+        return older + exact + after(key, limit - older.size - exact.size)
     }
 
     @Synchronized fun evidenceFor(key: String): ByteArray? = evidence[key]?.copyOf()
