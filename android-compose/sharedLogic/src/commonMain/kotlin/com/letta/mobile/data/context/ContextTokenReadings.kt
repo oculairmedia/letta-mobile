@@ -1,6 +1,5 @@
 package com.letta.mobile.data.context
 
-import com.letta.mobile.data.chat.runtime.SharedChatSessionResolver
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
@@ -11,12 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
-
-/** The conversation a context reading belongs to. */
-data class ContextReadingKey(
-    val agentId: String,
-    val conversationId: String,
-)
 
 /**
  * letta-mobile-r2zo8: the latest context total per conversation, folded from the
@@ -44,24 +37,6 @@ fun reduceContextReadings(
 
 private fun ServerFrame.UsageStatistics.readingKey(): ContextReadingKey? = contextReadingKeyOf(agentId, conversationId)
 
-/**
- * The key a reading is stored and looked up under — the ONE place both sides (the frame
- * writing it, the chip reading it) name a conversation.
- *
- * An agent's default conversation has two spellings: the App Server's bare `default`, and the
- * app's addressable `conv-default-<agentId>` (what conversation lists, routes and the send
- * coordinator use). Both map to the app's form, so a frame stamped either way reaches the chip.
- * Null when either half is blank.
- */
-fun contextReadingKeyOf(agentId: String?, conversationId: String?): ContextReadingKey? {
-    val agent = agentId?.takeIf { it.isNotBlank() } ?: return null
-    val conversation = conversationId?.takeIf { it.isNotBlank() } ?: return null
-    val canonical = if (conversation == BARE_DEFAULT_CONVERSATION) "$DEFAULT_CONVERSATION_PREFIX$agent" else conversation
-    return ContextReadingKey(agent, canonical)
-}
-
-private const val BARE_DEFAULT_CONVERSATION = "default"
-private const val DEFAULT_CONVERSATION_PREFIX = SharedChatSessionResolver.DEFAULT_SHIM_CONVERSATION_PREFIX
 
 private fun Long.toReadingTokens(): Int? =
     takeIf { it >= 0 }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt()
@@ -90,10 +65,6 @@ class ContextTokenReadings(
     fun latest(agentId: String?, conversationId: String?): Int? =
         readings.value.readingFor(agentId, conversationId)
 }
-
-/** The reading for one conversation, or null when either half of its identity is unknown. */
-fun Map<ContextReadingKey, Int>.readingFor(agentId: String?, conversationId: String?): Int? =
-    contextReadingKeyOf(agentId, conversationId)?.let(::get)
 
 /** Folds every frame of [frames] into [readings] until [scope] ends. */
 fun CoroutineScope.observeContextReadings(
