@@ -83,10 +83,15 @@ class TimelineUiFramesTest {
             try {
                 runBlocking { rig.openOn(history) }
                 recorder.mount()
-                recorder.advanceUntil("open", OPEN_FRAMES) { recorder.frames.last().rows.size > MIN_HISTORY_ROWS }
+                // Each step waits for its own outcome, drawn and quiet, before the next begins: a slow
+                // runner takes more frames to get there, but never carries one step's work into the
+                // frames another step is judged on (letta-mobile-8p8mj).
+                recorder.advanceUntil("open", OPEN_FRAMES) { recorder.frames.last().rows.size > MIN_HISTORY_ROWS && recorder.isQuiet }
                 recorder.writeFrameImage("reply-first")
                 runBlocking { rig.send(echo) }
-                recorder.advance("send")
+                recorder.advanceUntil("send", TimelineUiFrameRecorder.FRAMES_PER_STEP) {
+                    recorder.frames.last().newestKey == OPTIMISTIC_PROMPT_KEY && recorder.isQuiet
+                }
                 val stream = runBlocking { rig.beginStream() }
                 runBlocking { stream.emit(echo) }
                 tokens.forEach { text ->
@@ -110,6 +115,8 @@ class TimelineUiFramesTest {
 
     private companion object {
         const val PROMPT_OTID = "cm-android-5d1e"
+        /** The optimistic prompt row: the pending send, keyed by its otid. */
+        const val OPTIMISTIC_PROMPT_KEY = "msg-$PROMPT_OTID"
         const val MAX_HEIGHT_JUMP_DP = 2f
         const val MAX_ROW_COMPOSITIONS_PER_FRAME = 2
         /** Few enough that the oldest edge, and so the older-history footer, is on screen. */

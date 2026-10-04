@@ -81,6 +81,8 @@ private fun contextChipValue(state: ContextWindowUsageState): String {
     val usage = state.usage
     return when {
         usage != null && usage.maxTokens > 0 -> formatContextPercent(usage.usedFraction)
+        // A total with no known window: show the count rather than a share of nothing.
+        usage != null && usage.usedTokens > 0 -> formatContextTokens(usage.usedTokens)
         state.loading -> stringResource(Res.string.composer_context_loading_value)
         else -> stringResource(Res.string.composer_context_unknown_value)
     }
@@ -94,8 +96,11 @@ private fun ContextUsageBody(state: ContextWindowUsageState) {
         if (usage == null) {
             ContextUsagePlaceholder(state)
         } else {
-            Box(modifier = Modifier.height(LettaDimens.Space.md))
-            ContextUsageBar(usage)
+            // No window, no scale: the bar would only be invented, so the rows stand alone.
+            if (usage.maxTokens > 0) {
+                Box(modifier = Modifier.height(LettaDimens.Space.md))
+                ContextUsageBar(usage)
+            }
             Box(modifier = Modifier.height(LettaDimens.Space.md))
             ContextUsageRows(usage)
         }

@@ -437,6 +437,10 @@ class DesktopChatController(
     // effective composer model otherwise comes from the conversation's agent.
     private val conversationModels = ConversationModelSelections()
 
+    /** conversation id -> the model switched to this session; the context chip sizes its window from it. */
+    val conversationModelSelections: StateFlow<Map<String, String>>
+        get() = conversationModels.byConversation
+
     private val gatewayExtras: ChatGatewayExtras?
         get() = gateway as? ChatGatewayExtras
     private val conversationSummaryGateway: ConversationSummaryGateway?

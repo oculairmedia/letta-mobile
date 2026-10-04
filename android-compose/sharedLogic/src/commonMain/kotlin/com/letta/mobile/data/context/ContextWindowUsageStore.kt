@@ -68,6 +68,10 @@ object ContextWindowUsagePolicy {
     fun read(overview: ContextWindowOverview): ContextWindowUsageState =
         ContextWindowUsageState(usage = ContextWindowUsage.from(overview))
 
+    /** A streamed total-only reading (letta-mobile-r2zo8), against the model's window if known. */
+    fun readTotal(contextTokens: Int, windowTokens: Int?): ContextWindowUsageState =
+        ContextWindowUsageState(usage = ContextWindowUsage.total(contextTokens, windowTokens))
+
     fun failed(current: ContextWindowUsageState, message: String?): ContextWindowUsageState =
         current.copy(
             loading = false,

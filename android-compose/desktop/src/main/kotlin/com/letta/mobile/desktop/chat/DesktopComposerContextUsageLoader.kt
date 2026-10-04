@@ -1,79 +1,62 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import com.letta.mobile.data.context.ContextReadingInputs
+import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.ContextWindowUsageKey
 import com.letta.mobile.data.context.ContextWindowUsagePolicy
 import com.letta.mobile.data.context.ContextWindowUsageState
-import com.letta.mobile.data.model.ContextWindowOverview
-import com.letta.mobile.data.repository.api.IAgentRepository
-import kotlinx.coroutines.CancellationException
+import com.letta.mobile.data.context.contextUsageStates
+import com.letta.mobile.data.context.contextWindowTokensOf
+import com.letta.mobile.data.context.readingFor
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.LlmModel
 
-/**
- * The focused conversation's context-window reading — the shell's one-call
- * entry point, so it binds a repository and a focus rather than assembling a
- * key and a loader at the call site.
- */
-@Composable
-internal fun rememberFocusedContextUsage(
-    agentId: String?,
-    conversationId: String?,
-    settled: Boolean,
-    repository: IAgentRepository,
-): ContextWindowUsageState = rememberComposerContextUsage(
-    key = ContextWindowUsageKey(agentId, conversationId, settled),
-    load = rememberContextWindowLoader(repository),
+/** The conversation the composer's context chip describes. */
+internal data class DesktopContextFocus(
+    val agentId: String?,
+    val conversationId: String?,
+    /** False while a turn is in flight. */
+    val settled: Boolean,
+)
+
+/** What the model window is sized from: all cached, no extra call. */
+internal data class DesktopContextWindowSources(
+    val agents: List<Agent>,
+    val models: List<LlmModel>,
+    /** conversation id -> the model switched to this session. */
+    val modelSelections: Map<String, String>,
 )
 
 /**
- * Stable loader bound to the session's repository. Remembered so the reading
- * effect keys off the conversation rather than restarting on every
- * recomposition.
+ * letta-mobile-r2zo8: the focused conversation's context reading — the latest
+ * `usage_statistics.context_tokens` the session's transport streamed for it, against the
+ * focused agent's model window. Desktop only binds inputs; when to take a reading, what to
+ * keep and what to drop on a focus change live in the shared [contextUsageStates] fold, the
+ * same one Android runs.
  */
 @Composable
-internal fun rememberContextWindowLoader(
-    repository: IAgentRepository,
-): suspend (String, String?) -> ContextWindowOverview =
-    remember(repository) {
-        { agentId, conversationId -> repository.getContextWindow(agentId, conversationId) }
-    }
-
-/**
- * Desktop host binding for the context-window reading: runs the read as a
- * Compose effect and holds the result. When to read, what to keep on failure,
- * and what to drop when the focus changes all live in the shared
- * [ContextWindowUsagePolicy] so other clients behave identically.
- */
-@Composable
-internal fun rememberComposerContextUsage(
-    key: ContextWindowUsageKey,
-    load: (suspend (String, String?) -> ContextWindowOverview)?,
+internal fun rememberFocusedContextUsage(
+    focus: DesktopContextFocus,
+    readings: ContextTokenReadings,
+    window: DesktopContextWindowSources,
 ): ContextWindowUsageState {
-    var state by remember { mutableStateOf(ContextWindowUsagePolicy.cleared()) }
-    var readFor by remember { mutableStateOf<ContextWindowUsageKey?>(null) }
-    LaunchedEffect(key, load) {
-        if (load == null || !ContextWindowUsagePolicy.readable(key)) {
-            // Includes the mid-turn case: drop another conversation's reading
-            // immediately, but leave this one's in place until it is replaced.
-            if (!key.sameIdentityAs(readFor)) {
-                state = ContextWindowUsagePolicy.cleared()
-                readFor = null
-            }
-            return@LaunchedEffect
-        }
-        state = ContextWindowUsagePolicy.reading(state, key, readFor)
-        state = try {
-            ContextWindowUsagePolicy.read(load(key.agentId.orEmpty(), key.conversationId))
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (failure: Exception) {
-            ContextWindowUsagePolicy.failed(state, failure.message)
-        }
-        readFor = key
-    }
+    val byConversation by readings.readings.collectAsState()
+    val agent = window.agents.firstOrNull { it.id.value == focus.agentId }
+    // Same order as Android: this conversation's own model switch first, then the agent's limit.
+    val override = focus.conversationId?.let(window.modelSelections::get)
+    val inputs = ContextReadingInputs(
+        key = ContextWindowUsageKey(focus.agentId, focus.conversationId, focus.settled),
+        contextTokens = byConversation.readingFor(focus.agentId, focus.conversationId),
+        windowTokens = contextWindowTokensOf(agent, window.models, override),
+    )
+    val latest by rememberUpdatedState(inputs)
+    val states = remember { snapshotFlow { latest }.contextUsageStates() }
+    val state by states.collectAsState(ContextWindowUsagePolicy.cleared())
     return state
 }

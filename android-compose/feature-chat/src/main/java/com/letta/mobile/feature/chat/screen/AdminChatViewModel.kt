@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
+import com.letta.mobile.data.context.ContextReadingKey
 import com.letta.mobile.data.presence.RunScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,6 +54,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -608,6 +610,15 @@ internal class AdminChatViewModel @Inject constructor(
 
     val llmModels: StateFlow<List<LlmModel>> = modelRepository.llmModels
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * letta-mobile-r2zo8: the session's latest streamed context total per conversation. Follows
+     * the session graph, so a backend switch never shows the previous backend's numbers.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val contextReadings: Flow<Map<ContextReadingKey, Int>> by lazy {
+        sessionManager.currentGraph.flatMapLatest { it.contextTokenReadings.readings }
+    }
 
     fun refreshModels() = modelCoordinator.refreshModels()
 

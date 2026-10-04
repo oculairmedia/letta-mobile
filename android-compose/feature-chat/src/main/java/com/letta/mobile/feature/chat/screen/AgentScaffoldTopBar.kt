@@ -94,7 +94,8 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
             AgentScaffoldTopBarActions(
                 onMenuClick = {
                     HapticEffects.contextClick(state.haptic, state.view)
-                    state.projectBindings.refreshContextWindow()
+                    // letta-mobile-0ofhc: the composer's context chip loads from the streamed
+                    // reading on its own; opening the drawer is no longer what feeds it.
                     state.scope.launch {
                         state.drawerState.open()
                         runCatching {

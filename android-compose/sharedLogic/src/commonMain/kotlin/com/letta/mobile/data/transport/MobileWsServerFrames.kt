@@ -248,6 +248,19 @@ sealed interface ServerFrame {
         @SerialName("cached_input_tokens") val cachedInputTokens: Long = 0,
         @SerialName("reasoning_tokens") val reasoningTokens: Long = 0,
         val seq: Long? = null,
+        /**
+         * letta-mobile-r2zo8: how many tokens the model call that produced this frame held in
+         * context — the provider's count when it reports one, the App Server's own estimate
+         * otherwise (the wire does not say which). Null when the server sent none. Unlike
+         * [promptTokens] this includes the cached prefix, so it is the context total.
+         */
+        @SerialName("context_tokens") val contextTokens: Long? = null,
+        /**
+         * The runtime the frame came from. Stamped by the Iroh mapper, the only channel transport
+         * still shipped (the legacy shim WebSocket was removed under letta-mobile-g70jb).
+         */
+        @SerialName("agent_id") val agentId: String? = null,
+        @SerialName("conversation_id") val conversationId: String? = null,
     ) : ServerFrame
 
     /**

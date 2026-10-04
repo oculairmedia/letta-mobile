@@ -1,11 +1,13 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.lifecycle.SavedStateHandle
+import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
@@ -32,6 +34,19 @@ internal fun openedChatViewModel(
     agent: Agent,
     conversationId: String,
     tag: String,
+): AdminChatViewModel = openedChatViewModel(pagingHost, agent, conversationId, FixtureSession(tag))
+
+/** The session the fixture's ViewModel sees: its backend tag and the context readings it streams. */
+internal data class FixtureSession(
+    val tag: String,
+    val contextReadings: ContextTokenReadings = ContextTokenReadings(),
+)
+
+internal fun openedChatViewModel(
+    pagingHost: ChatPagingHost,
+    agent: Agent,
+    conversationId: String,
+    session: FixtureSession,
 ): AdminChatViewModel = AdminChatViewModel(
     routeArgs = ChatRouteArgs(
         SavedStateHandle(mapOf("agentId" to agent.id.value, "conversationId" to conversationId)),
@@ -44,7 +59,7 @@ internal fun openedChatViewModel(
     bugReportRepository = mockk(relaxed = true),
     conversationRepository = mockk(relaxed = true),
     settingsRepository = stubSettingsRepository(),
-    sessionManager = stubSessionManager(tag),
+    sessionManager = stubSessionManager(session),
     runtimeEventOutbox = mockk(relaxed = true),
     currentConversationTracker = mockk(relaxed = true),
     shimBackendDetector = mockk<ShimBackendDetector>(relaxed = true) {
@@ -92,8 +107,11 @@ private fun stubChatBridge() = mockk<WsChatBridge>(relaxed = true) {
     every { a2uiEvents } returns emptyFlow()
 }
 
-private fun stubSessionManager(tag: String) = mockk<SessionManager>(relaxed = true) {
+private fun stubSessionManager(session: FixtureSession) = mockk<SessionManager>(relaxed = true) {
     every { current.localRuntimeBackend } returns null
-    every { current.backendDescriptor.backendId } returns BackendId(tag)
-    every { current.backendDescriptor.runtimeId } returns RuntimeId(tag)
+    every { current.backendDescriptor.backendId } returns BackendId(session.tag)
+    every { current.backendDescriptor.runtimeId } returns RuntimeId(session.tag)
+    every { currentGraph } returns MutableStateFlow(
+        mockk<SessionGraph>(relaxed = true) { every { contextTokenReadings } returns session.contextReadings },
+    )
 }

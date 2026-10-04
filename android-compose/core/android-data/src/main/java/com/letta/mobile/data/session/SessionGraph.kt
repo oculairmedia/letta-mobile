@@ -1,5 +1,7 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.context.ContextTokenReadings
+import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
@@ -65,6 +67,8 @@ class SessionGraph internal constructor(
     val conversationCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null,
     /** Configuration captured at creation, never resolved from mutable settings. */
     val capturedConfig: LettaConfig? = null,
+    /** letta-mobile-r2zo8: each conversation's latest context total, fed by [channelTransport]. */
+    val contextTokenReadings: ContextTokenReadings = contextTokenReadingsOf(channelTransport, scope),
 ) : SessionRepositoryGraph {
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {

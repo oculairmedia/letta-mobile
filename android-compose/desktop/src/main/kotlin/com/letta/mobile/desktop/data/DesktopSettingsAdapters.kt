@@ -328,6 +328,7 @@ fun createDefaultDesktopDataBindings(
             channelTransportProvider() ?: NoOpChannelTransport()
         },
         irohAgentDirectoryProvider = irohAgentDirectoryProvider,
+        contextReadingSnapshots = com.letta.mobile.data.context.ContextReadingSnapshots(secureSettingsStore),
     )
     return DesktopDataBindings(
         secureSettingsStore = secureSettingsStore,
