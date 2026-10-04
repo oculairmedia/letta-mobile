@@ -512,6 +512,8 @@ class AppServerServeIrohCommand : CliktCommand(
         admin.nativeClient?.let(admin.identityRows::bind)
         val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
         val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
+        // letta-mobile-fxoew.2: the registry pushes its snapshot to conversation viewers.
+        var subagentPublisher: com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher? = null
         val adminRpcRouter = buildProductionAdminRouter(
             controller = admin.controller,
             pairingService = admin.pairingService,
@@ -525,8 +527,13 @@ class AppServerServeIrohCommand : CliktCommand(
             conversationChanges = conversationChanges,
             modelExposureFile = resolvedModelExposureFile(),
             turnIdentity = admin.turnIdentity,
+            subagentPublisher = { source ->
+                com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher(scope, source)
+                    .also { subagentPublisher = it }
+            },
         )
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
+        subagentPublisher?.let(endpoint::attachSubagentPublisher)
         agentChanges.attach(endpoint.agentChangeTarget())
         conversationChanges.attach(endpoint.conversationChangeTarget())
         println(

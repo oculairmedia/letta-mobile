@@ -81,9 +81,18 @@ class AdminRpcRouter(
         return this
     }
 
+    /**
+     * letta-mobile-fxoew.2: capabilities a host feature behind this router
+     * enables beyond its methods (for example the subagent registry push),
+     * advertised to clients on auth.
+     */
+    @Volatile
+    var featureCapabilities: Set<String> = emptySet()
+
     fun copyHandlersFrom(other: AdminRpcRouter): AdminRpcRouter {
         handlers.clear()
         handlers.putAll(other.handlers)
+        featureCapabilities = other.featureCapabilities
         return requireNonEmpty(other.methodCount)
     }
 

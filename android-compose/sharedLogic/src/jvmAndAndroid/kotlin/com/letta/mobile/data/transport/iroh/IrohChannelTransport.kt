@@ -360,6 +360,7 @@ class IrohChannelTransport(
             adminRpc = { method, path, body -> adminRpc(method, path, body) },
             recordFrameOwnership = ::recordFrameOwnership,
             observerTerminalGraceMs = observerTerminalGraceMs,
+            hostCapabilities = connectionSession::hostCapabilities,
         )
     }
 

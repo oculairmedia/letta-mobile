@@ -3,9 +3,11 @@ package com.letta.mobile.cli.commands
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
+import com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.util.Telemetry
@@ -47,6 +49,12 @@ fun buildProductionAdminRouter(
     modelExposureFile: String? = null,
     /** letta-mobile-r1xkl: serves stream-joined ids on `message.list`; null serves rows as stored. */
     turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
+    /**
+     * letta-mobile-fxoew.2: builds the publisher that pushes the controller-native
+     * registry to conversation viewers. Applies only to the default registry source;
+     * when set, the router advertises [ControllerSubagentRegistrySource.PUSH_CAPABILITY].
+     */
+    subagentPublisher: ((ControllerSubagentRegistrySource) -> SubagentRegistryPublisher)? = null,
 ): AdminRpcRouter {
     val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
@@ -73,14 +81,19 @@ fun buildProductionAdminRouter(
     val subagentStore = subagentRegistryFile
         ?.let { com.letta.mobile.data.subagents.FileSubagentRegistryStore(java.nio.file.Path.of(it)) }
         ?: com.letta.mobile.data.subagents.InMemorySubagentRegistryStore()
-    val subagentSource = subagentRegistrySource
-        ?: com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource(
+    val nativeSource = if (subagentRegistrySource == null) {
+        ControllerSubagentRegistrySource(
             com.letta.mobile.data.subagents.DurableSubagentRegistry(store = subagentStore),
         ).also { source ->
+            subagentPublisher?.let { build -> source.changeListener = build(source) }
             if (nativeClient != null && eventScope != null) {
                 source.start(eventScope, nativeClient.events)
             }
         }
+    } else {
+        null
+    }
+    val subagentSource = subagentRegistrySource ?: requireNotNull(nativeSource)
     if (nativeClient != null && eventScope != null) {
         skillsCatalog.start(eventScope, nativeClient.events)
     }
@@ -96,5 +109,7 @@ fun buildProductionAdminRouter(
         conversationChanges = conversationChanges,
         modelExposureFile = modelExposureFile,
         turnIdentity = turnIdentity,
-    )
+    ).also { router ->
+        if (nativeSource?.changeListener != null) router.featureCapabilities += ControllerSubagentRegistrySource.PUSH_CAPABILITY
+    }
 }
