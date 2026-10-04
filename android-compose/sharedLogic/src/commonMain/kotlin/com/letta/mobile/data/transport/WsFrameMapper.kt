@@ -84,9 +84,7 @@ object WsFrameMapper {
         runId = runId,
         otid = otid,
         seqId = seqId ?: seq.toSeqId(),
-        logicalMessageId = logicalMessageId,
-        turnId = turnId,
-    )
+    ).stamped(logicalMessageId, turnId)
 
     // The wire shape carries content as a bare string; the model's `contentRaw` accepts JsonElement.
     private fun ServerFrame.AssistantMessage.toModel() = AssistantMessage(
@@ -96,10 +94,7 @@ object WsFrameMapper {
         runId = runId,
         otid = otid,
         seqId = seqId ?: seq.toSeqId(),
-        logicalMessageId = logicalMessageId,
-        turnId = turnId,
-        textSeq = textSeq,
-    )
+    ).stamped(logicalMessageId, turnId, textSeq)
 
     private fun ServerFrame.ReasoningMessage.toModel() = ReasoningMessage(
         id = id,
@@ -108,10 +103,7 @@ object WsFrameMapper {
         runId = runId,
         signature = signature,
         seqId = seqId ?: seq.toSeqId(),
-        logicalMessageId = logicalMessageId,
-        turnId = turnId,
-        textSeq = textSeq,
-    )
+    ).stamped(logicalMessageId, turnId, textSeq)
 
     private fun ServerFrame.ToolReturnMessage.toModel() = ToolReturnMessage(
         id = id,
@@ -123,10 +115,7 @@ object WsFrameMapper {
         date = ts,
         runId = runId,
         seqId = seq.toSeqId(),
-        logicalMessageId = logicalMessageId,
-        turnId = turnId,
-    )
-
+    ).stamped(logicalMessageId, turnId)
 
     private fun ToolCallPayload.toModel(): ToolCall = ToolCall(
         id = toolCallId,
@@ -138,33 +127,33 @@ object WsFrameMapper {
     )
 
     private fun ServerFrame.ToolCallMessage.toLettaToolMessage(): LettaMessage {
-        val toolCall = toolCall?.toModel()
-        val toolCalls = toolCalls?.map { it.toModel() }
-        val resolvedSeqId = seq.toSeqId()
-        return if (type == "approval_request_message") {
-            ApprovalRequestMessage(
-                id = id,
-                toolCall = toolCall,
-                toolCalls = toolCalls,
-                date = ts,
-                runId = runId,
-                seqId = resolvedSeqId,
-                logicalMessageId = logicalMessageId,
-                turnId = turnId,
-            )
-        } else {
-            ToolCallMessage(
-                id = id,
-                toolCall = toolCall,
-                toolCalls = toolCalls,
-                date = ts,
-                runId = runId,
-                seqId = resolvedSeqId,
-                logicalMessageId = logicalMessageId,
-                turnId = turnId,
-            )
-        }
+        val call = ToolCallMessage(
+            id = id,
+            toolCall = toolCall?.toModel(),
+            toolCalls = toolCalls?.map { it.toModel() },
+            date = ts,
+            runId = runId,
+            seqId = seq.toSeqId(),
+        )
+        return if (type == "approval_request_message") asApprovalRequestFrom(call) else call.stamped(logicalMessageId, turnId)
     }
+
+    private fun ServerFrame.ToolCallMessage.asApprovalRequestFrom(call: ToolCallMessage) = ApprovalRequestMessage(
+        id = call.id, toolCall = call.toolCall, toolCalls = call.toolCalls, date = call.date, runId = call.runId,
+        seqId = call.seqId,
+    ).stamped(logicalMessageId, turnId)
+
+    /** The wire stamp (letta-mobile-ys9it) is applied in one place, whatever the row type. */
+    private fun LettaMessage.stamped(logicalId: String?, turn: String?, seq: Int? = null): LettaMessage =
+        when (this) {
+            is UserMessage -> copy(logicalMessageId = logicalId, turnId = turn)
+            is AssistantMessage -> copy(logicalMessageId = logicalId, turnId = turn, textSeq = seq)
+            is ReasoningMessage -> copy(logicalMessageId = logicalId, turnId = turn, textSeq = seq)
+            is ToolCallMessage -> copy(logicalMessageId = logicalId, turnId = turn)
+            is ToolReturnMessage -> copy(logicalMessageId = logicalId, turnId = turn)
+            is ApprovalRequestMessage -> copy(logicalMessageId = logicalId, turnId = turn)
+            else -> this
+        }
 
     private fun Long?.toSeqId(): Int? =
         this?.takeIf { it in 0L..Int.MAX_VALUE.toLong() }?.toInt()
