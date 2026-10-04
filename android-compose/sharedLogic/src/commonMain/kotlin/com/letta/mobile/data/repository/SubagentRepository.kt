@@ -8,6 +8,7 @@ import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.sendSubagentListFor
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
@@ -18,6 +19,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -40,14 +43,16 @@ import kotlin.time.Duration.Companion.milliseconds
  * agent id.
  *
  * Lifecycle:
- *  - The first subscriber triggers a `subagent_list` WS round-trip; subsequent
- *    subscribers share the same [kotlinx.coroutines.flow.StateFlow] so no
- *    duplicate fetches fire.
+ *  - The first collection of each parent scope triggers one scoped
+ *    `subagent_list` round-trip (letta-mobile-fxoew.5); later collections of
+ *    that scope share the cached [kotlinx.coroutines.flow.StateFlow] so no
+ *    duplicate fetches fire. A failed fetch is retried by the next collection.
  *  - A `subagents_updated` push folds its `subagents_active` snapshot into the
  *    cache without dropping previously running entries that are merely omitted;
  *    explicit terminal states remove entries.
- *  - On WS reconnect (`Disconnected → Connected`) the snapshot is refreshed so
- *    the UI doesn't keep showing a stale list after a dropped socket.
+ *  - On WS reconnect (`Disconnected → Connected`) every scope still being
+ *    collected is re-fetched so the UI doesn't keep showing a stale list after
+ *    a dropped socket.
  *
  * letta-mobile-sqdqe: INCREMENTAL push snapshots can be transiently
  * incomplete, so replacement is conservative: running entries survive omission
@@ -76,9 +81,10 @@ open class SubagentRepository(
 
     private val state = MutableStateFlow<List<SubagentEntry>>(emptyList())
     private val inFlightRefresh = atomic<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
-    // Whether the initial subagent_list has been dispatched. Repeated
-    // subscribe/unsubscribe must not duplicate the initial fetch.
-    private val initialized = atomic(false)
+    // letta-mobile-fxoew.5: per-scope fetch marks. Repeated subscribe /
+    // unsubscribe of one scope must not duplicate its fetch, but each new
+    // conversation needs its own (the host list is conversation-scoped).
+    private val scopeFetches = SubagentScopeFetchTracker()
     // Track when a running entry was first noticed absent from an INCREMENTAL
     // push so absence-bound eviction can fire later.
     //
@@ -124,11 +130,48 @@ open class SubagentRepository(
      * subscribers; only the first subscription triggers the initial
      * `subagent_list` round-trip.
      */
-    override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> {
-        if (initialized.compareAndSet(expect = false, update = true)) {
-            repositoryScope.launch { refresh() }
+    override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> =
+        state.asStateFlow()
+            .map { entries -> entries.inParentScope(scope) }
+            .onStart {
+                scopeFetches.collectionStarted(scope)
+                fetchScopeOnce(scope)
+            }
+            .onCompletion { scopeFetches.collectionStopped(scope) }
+
+    /**
+     * letta-mobile-fxoew.5: fetch [scope] the first time it is collected. A
+     * failed fetch releases the mark so the next collection (or a reconnect)
+     * retries; nothing polls.
+     */
+    private fun fetchScopeOnce(scope: SubagentParentScope) {
+        if (!scopeFetches.claim(scope)) return
+        repositoryScope.launch {
+            refreshScope(scope).onFailure { error ->
+                scopeFetches.release(scope)
+                Telemetry.event("SubagentRepo", "scopeFetch.failed", "error" to (error.message ?: "unknown"))
+            }
         }
-        return state.asStateFlow().map { entries -> entries.inParentScope(scope) }
+    }
+
+    private suspend fun refreshScope(scope: SubagentParentScope): Result<List<SubagentEntry>> = runCatching {
+        applyListResponse(transport.sendSubagentListFor(scope, all = includeAll), scope)
+    }
+
+    private suspend fun applyListResponse(
+        response: ServerFrame.SubagentListResponse,
+        scope: SubagentParentScope?,
+    ): List<SubagentEntry> {
+        if (!response.success) {
+            throw IllegalStateException(response.error ?: "subagent_list failed")
+        }
+        return stateMutex.withLock {
+            mergeSnapshot(
+                incoming = response.subagents,
+                kind = SnapshotKind.AUTHORITATIVE,
+                scope = scope,
+            ).also { merged -> state.value = merged }
+        }
     }
 
     override fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry> =
@@ -148,16 +191,7 @@ open class SubagentRepository(
             val deferred = CompletableDeferred<Result<List<SubagentEntry>>>()
             if (inFlightRefresh.compareAndSet(current, deferred)) {
                 val result = runCatching {
-                    val response = transport.sendSubagentList(all = includeAll)
-                    if (!response.success) {
-                        throw IllegalStateException(response.error ?: "subagent_list failed")
-                    }
-                    stateMutex.withLock {
-                        mergeSnapshot(
-                            incoming = response.subagents,
-                            kind = SnapshotKind.AUTHORITATIVE,
-                        ).also { merged -> state.value = merged }
-                    }
+                    applyListResponse(transport.sendSubagentList(all = includeAll), scope = null)
                 }
                 deferred.complete(result)
                 inFlightRefresh.compareAndSet(deferred, null)
@@ -181,16 +215,29 @@ open class SubagentRepository(
 
     enum class SnapshotKind { AUTHORITATIVE, INCREMENTAL }
 
+    /**
+     * Folds one snapshot into the cache. A non-null [scope] means the snapshot
+     * only describes that parent conversation (a scoped `subagent.list`), so
+     * cached entries of every other scope are carried over untouched.
+     *
+     * letta-mobile-fxoew.1: this is the ONE place that stamps liveness. Every
+     * RUNNING entry a snapshot mentions (pushed or listed) gets
+     * `lastSeenAtMs = now`, so the stream-timeout watchdog never fails an
+     * entry the host just reported as running.
+     */
     private fun mergeSnapshot(
         incoming: List<SubagentEntry>,
         terminal: SubagentEntry? = null,
         kind: SnapshotKind,
+        scope: SubagentParentScope? = null,
     ): List<SubagentEntry> {
         val now = clock()
         val stampedTerminal = terminal
             ?.takeIf { it.status in TERMINAL_STATUSES }
             ?.let { entry -> entry.copy(terminalAtEpochMs = entry.terminalAtEpochMs ?: now) }
-        val completeIncoming = if (stampedTerminal == null) incoming else incoming + stampedTerminal
+        val completeIncoming = (if (stampedTerminal == null) incoming else incoming + stampedTerminal)
+            .map { entry -> entry.markSeen(now) }
+        val (cached, untouched) = state.value.partition { scope == null || it.isInScope(scope) }
         val incomingByKey = completeIncoming.associateBy { it.cacheKey() }
         val terminalKey = stampedTerminal?.cacheKey()
 
@@ -202,10 +249,10 @@ open class SubagentRepository(
         // Clear absence tracking for entries that ARE present in this snapshot.
         incomingByKey.keys.forEach { key -> absence.remove(key) }
 
-        val absentRunning = absentRunningEntries(incomingByKey, terminalKey)
+        val absentRunning = absentRunningEntries(cached, incomingByKey, terminalKey)
         val retained = when (kind) {
             SnapshotKind.AUTHORITATIVE -> {
-                emitDeltaRunningCount(incoming)
+                emitDeltaRunningCount(cached, incoming)
                 retainWithinLinger(absentRunning, absence, now, kind)
             }
             SnapshotKind.INCREMENTAL -> retainWithinLinger(absentRunning, absence, now, kind)
@@ -214,19 +261,26 @@ open class SubagentRepository(
         // Publish the absence clock once, after every branch above has settled.
         runningAbsentSince.value = absence.toMap()
 
-        val previousTerminals = state.value.filter { previous ->
+        val previousTerminals = cached.filter { previous ->
             previous.status in TERMINAL_STATUSES &&
                 previous.cacheKey() !in incomingByKey &&
                 previous.terminalAtEpochMs?.let { now - it < TERMINAL_LINGER_MS } == true
         }
-        return (completeIncoming + retained + previousTerminals).distinctBy { it.cacheKey() }
+        return (completeIncoming + retained + previousTerminals + untouched).distinctBy { it.cacheKey() }
     }
+
+    private fun SubagentEntry.markSeen(now: Long): SubagentEntry =
+        if (status == SubagentStatus.RUNNING) copy(lastSeenAtMs = now) else this
+
+    private fun SubagentEntry.isInScope(scope: SubagentParentScope): Boolean =
+        parentAgentId == scope.parentAgentId && parentConversationId == scope.parentConversationId
 
     /** Locally-RUNNING entries that this snapshot did not mention. */
     private fun absentRunningEntries(
+        cached: List<SubagentEntry>,
         incomingByKey: Map<String, SubagentEntry>,
         terminalKey: String?,
-    ): List<SubagentEntry> = state.value.filter { previous ->
+    ): List<SubagentEntry> = cached.filter { previous ->
         val key = previous.cacheKey()
         previous.status == SubagentStatus.RUNNING &&
             key !in incomingByKey &&
@@ -234,8 +288,8 @@ open class SubagentRepository(
     }
 
     /** Delta signal: AUTHORITATIVE snapshot count disagrees with local. */
-    private fun emitDeltaRunningCount(incoming: List<SubagentEntry>) {
-        val localRunning = state.value.count { it.status == SubagentStatus.RUNNING }
+    private fun emitDeltaRunningCount(cached: List<SubagentEntry>, incoming: List<SubagentEntry>) {
+        val localRunning = cached.count { it.status == SubagentStatus.RUNNING }
         val incomingRunning = incoming.count { it.status == SubagentStatus.RUNNING }
         if (localRunning == incomingRunning) return
         Telemetry.event(
@@ -298,27 +352,18 @@ open class SubagentRepository(
     ).joinToString("|")
 
     private fun List<SubagentEntry>.inParentScope(scope: SubagentParentScope): List<SubagentEntry> =
-        filter { entry ->
-            entry.parentAgentId == scope.parentAgentId &&
-                entry.parentConversationId == scope.parentConversationId
-        }
+        filter { entry -> entry.isInScope(scope) }
 
     private suspend fun observePushEvents() {
         transport.events.collect { frame ->
             if (frame !is ServerFrame.SubagentsUpdated) return@collect
-            // Mark initialized so a later first-subscriber doesn't kick off a
-            // redundant subagent_list (the cache is already warm).
-            initialized.value = true
-            val now = clock()
-            // letta-mobile-ve08r AC#4: stamp lastSeenAtMs on every push that
-            // mentions each entry, so the stream-timeout watchdog knows it's alive.
-            val stamped = frame.subagentsActive.map { entry ->
-                if (entry.status == SubagentStatus.RUNNING && entry.lastSeenAtMs == 0L) {
-                    entry.copy(lastSeenAtMs = now)
-                } else entry
-            }
+            // mergeSnapshot stamps lastSeenAtMs for the watchdog (ve08r AC#4).
             stateMutex.withLock {
-                state.value = mergeSnapshot(stamped, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
+                state.value = mergeSnapshot(
+                    frame.subagentsActive,
+                    terminal = frame.subagent,
+                    kind = SnapshotKind.INCREMENTAL,
+                )
             }
         }
     }
@@ -364,10 +409,11 @@ open class SubagentRepository(
         var wasConnected: Boolean? = null
         transport.state.collect { connectionState ->
             val nowConnected = connectionState is ChannelTransportState.Connected
-            if (wasConnected == false && nowConnected && initialized.value) {
-                // Best-effort refresh; a failure here is non-fatal (the next
-                // push or manual refresh recovers the snapshot).
-                runCatching { refresh() }
+            if (wasConnected == false && nowConnected) {
+                // Every snapshot may be stale after a dropped socket: forget
+                // all fetched scopes and re-fetch the ones still on screen.
+                // The rest re-fetch on their next collection.
+                scopeFetches.resetForReconnect().forEach(::fetchScopeOnce)
             }
             wasConnected = nowConnected
         }

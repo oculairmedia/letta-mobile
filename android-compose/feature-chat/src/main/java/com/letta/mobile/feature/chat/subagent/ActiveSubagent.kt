@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.subagent
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.SubagentKind
 
 /**
  * letta-mobile-73o2h.2: clean UI-facing data model for a single
@@ -277,9 +278,11 @@ data class ActiveSubagent(
 /**
  * True when this entry is a sleeptime reflection dispatch that must stay out
  * of the active-subagent chrome (bar chips and production rings).
+ * letta-mobile-fxoew.4: delegates to [SubagentKind] so the host's
+ * "Reflection" / "Reflection integration" labels are hidden too.
  */
 internal fun ActiveSubagent.isHiddenReflection(): Boolean =
-    subagentType == ActiveSubagent.REFLECTION_SUBAGENT_TYPE
+    SubagentKind.fromWire(subagentType).isBackground
 
 /**
  * Whether the active-subagent bar should reserve layout: self plan and/or any
