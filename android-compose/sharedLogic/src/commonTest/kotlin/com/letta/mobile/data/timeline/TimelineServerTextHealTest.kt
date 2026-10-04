@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -14,7 +15,7 @@ class TimelineServerTextHealTest {
     private val reply = (1..80).joinToString(" ") { "Sentence number $it of a long assistant reply." }
 
     /** The pre-#1768 garble: M[0:k1] + M[0:k2] + ... + M. */
-    private val garbled = listOf(4, 40, 400, 1200).joinToString("") { reply.take(it) } + reply
+    private val garbled = listOf(400, 1200, 2400, 3000).joinToString("") { reply.take(it) } + reply
 
     private fun row(
         type: TimelineMessageType,
@@ -34,8 +35,8 @@ class TimelineServerTextHealTest {
     private fun timelineOf(event: TimelineEvent.Confirmed) =
         Timeline(conversationId = "conv-heal", events = persistentListOf(event))
 
-    private fun assistantFromServer(text: String): LettaMessage =
-        AssistantMessage(id = "ui-msg-9184765", content = text, date = "2026-10-03T00:00:00Z", runId = "run-real-1", otid = "ui-msg-9184765")
+    private fun assistantFromServer(text: String, runId: String? = "run-real-1"): LettaMessage =
+        AssistantMessage(id = "ui-msg-9184765", contentRaw = JsonPrimitive(text), date = "2026-10-03T00:00:00Z", runId = runId, otid = "ui-msg-9184765")
 
     private fun reasoningFromServer(text: String): LettaMessage =
         ReasoningMessage(id = "ui-msg-9184765", reasoning = text, date = "2026-10-03T00:00:00Z", runId = "run-real-1", otid = "ui-msg-9184765")
@@ -61,7 +62,7 @@ class TimelineServerTextHealTest {
     fun `streaming row on a synthetic live run is never overwritten`() {
         val live = row(TimelineMessageType.ASSISTANT, garbled, runId = "iroh-run-turn-1")
         val timeline = timelineOf(live)
-        val (merged, _) = timeline.mergeServerMessages(listOf(assistantFromServer(reply)))
+        val (merged, _) = timeline.mergeServerMessages(listOf(assistantFromServer(reply, runId = null)))
         assertEquals(garbled, merged.events.single().content)
     }
 
