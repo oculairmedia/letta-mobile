@@ -73,13 +73,13 @@ internal object IrohStreamDeltaServerFrameMapper {
                     ts = meta.timestamp,
                     agentId = meta.agentId,
                     conversationId = meta.conversationId,
-                    turnId = meta.wireTurnId,
+                    turnId = meta.stamp.turnId,
                     runId = meta.runId,
                     contentRaw = delta["content"]?.takeIf { it != JsonNull } ?: JsonPrimitive(delta.contentText()),
                     otid = delta.string("otid") ?: delta.string("client_message_id"),
                     seq = meta.eventSeq,
                     seqId = meta.seqId,
-                    logicalMessageId = meta.logicalId,
+                    logicalMessageId = meta.stamp.logicalId,
                 ),
             )
 
@@ -126,7 +126,7 @@ internal object IrohStreamDeltaServerFrameMapper {
      * in the timeline, so it is dropped and counted rather than appended under a guessed identity.
      */
     private fun mapTextRow(messageType: String, delta: JsonObject, meta: Metadata): List<ServerFrame> {
-        val logicalId = meta.logicalId ?: return dropUnstampedText(messageType, meta.frameId)
+        val logicalId = meta.stamp.logicalId ?: return dropUnstampedText(messageType, meta.frameId)
         return listOf(
             if (messageType == "assistant_message") {
                 assistantRow(logicalId, delta, meta)
@@ -142,14 +142,14 @@ internal object IrohStreamDeltaServerFrameMapper {
             ts = meta.timestamp,
             agentId = meta.agentId,
             conversationId = meta.conversationId,
-            turnId = meta.wireTurnId,
+            turnId = meta.stamp.turnId,
             runId = meta.runId,
             content = delta.contentText(),
             otid = delta.string("otid") ?: delta.string("client_message_id"),
             seq = meta.eventSeq,
             seqId = meta.seqId,
             logicalMessageId = logicalId,
-            textSeq = meta.textSeq,
+            textSeq = meta.stamp.textSeq,
         )
 
     private fun reasoningRow(logicalId: String, delta: JsonObject, meta: Metadata) =
@@ -158,14 +158,14 @@ internal object IrohStreamDeltaServerFrameMapper {
             ts = meta.timestamp,
             agentId = meta.agentId,
             conversationId = meta.conversationId,
-            turnId = meta.wireTurnId,
+            turnId = meta.stamp.turnId,
             runId = meta.runId,
             reasoning = delta.reasoningText(),
             signature = delta.string("signature"),
             seq = meta.eventSeq,
             seqId = meta.seqId,
             logicalMessageId = logicalId,
-            textSeq = meta.textSeq,
+            textSeq = meta.stamp.textSeq,
         )
 
     private fun dropUnstampedText(messageType: String, frameId: String): List<ServerFrame> {
@@ -238,12 +238,12 @@ internal object IrohStreamDeltaServerFrameMapper {
                 ts = meta.timestamp,
                 agentId = meta.agentId,
                 conversationId = meta.conversationId,
-                turnId = meta.wireTurnId,
+                turnId = meta.stamp.turnId,
                 runId = meta.runId,
                 toolCall = firstCall,
                 toolCalls = calls.takeIf { it.isNotEmpty() },
                 seq = meta.eventSeq,
-                logicalMessageId = meta.logicalId,
+                logicalMessageId = meta.stamp.logicalId,
             ),
         )
     }
@@ -258,7 +258,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             ts = meta.timestamp,
             agentId = meta.agentId,
             conversationId = meta.conversationId,
-            turnId = meta.wireTurnId,
+            turnId = meta.stamp.turnId,
             runId = meta.runId,
             toolCallId = canonical.toolCallId,
             status = canonical.status,
@@ -266,7 +266,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             stdout = delta["stdout"].stringArrayOrNull(),
             stderr = delta["stderr"].stringArrayOrNull(),
             seq = meta.eventSeq,
-            logicalMessageId = meta.logicalId,
+            logicalMessageId = meta.stamp.logicalId,
         )
     }
 
@@ -287,6 +287,17 @@ internal object IrohStreamDeltaServerFrameMapper {
             seq = meta.eventSeq,
         )
 
+    /** What the host's stream stamper wrote on a delta; every field is null for a frame it never saw. */
+    private data class Stamp(val logicalId: String?, val turnId: String?, val textSeq: Int?) {
+        companion object {
+            fun from(envelope: JsonObject, delta: JsonObject) = Stamp(
+                logicalId = delta.string("logical_message_id")?.takeIf { it.isNotBlank() },
+                turnId = (delta.string("turn_id") ?: envelope.string("turn_id"))?.takeIf { it.isNotBlank() },
+                textSeq = delta.long("text_seq")?.takeIf { it in 0L..Int.MAX_VALUE.toLong() }?.toInt(),
+            )
+        }
+    }
+
     private data class Metadata(
         val frameId: String,
         val eventSeq: Long?,
@@ -294,15 +305,11 @@ internal object IrohStreamDeltaServerFrameMapper {
         val timestamp: String,
         val agentId: String,
         val conversationId: String,
-        /** The `turn_id` the stream stamper wrote on the wire; null when the frame carries none. */
-        val wireTurnId: String?,
-        /** [wireTurnId] or the caller's lifecycle turn: for error / stop / usage frames only. */
+        val stamp: Stamp,
+        /** The stamp's turn or the caller's lifecycle turn: for error / stop / usage frames only. */
         val turnId: String?,
         val runId: String?,
         private val messageId: String?,
-        /** The stamped `logical_message_id`; null when the frame was never stamped. */
-        val logicalId: String?,
-        val textSeq: Int?,
     ) {
         fun messageId(): String = messageId ?: frameId
 
@@ -315,7 +322,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             ): Metadata {
                 val runtime = envelope["runtime"].objectOrNull()
                 val eventSeq = envelope.long("event_seq") ?: delta.long("event_seq")
-                val wireTurnId = (delta.string("turn_id") ?: envelope.string("turn_id"))?.takeIf { it.isNotBlank() }
+                val stamp = Stamp.from(envelope, delta)
                 return Metadata(
                     frameId = envelope.string("idempotency_key") ?: payload.frameId,
                     eventSeq = eventSeq,
@@ -330,14 +337,12 @@ internal object IrohStreamDeltaServerFrameMapper {
                     conversationId = runtime?.string("conversation_id")
                         ?: delta.string("conversation_id")
                         ?: context.conversationId,
-                    wireTurnId = wireTurnId,
-                    turnId = wireTurnId ?: context.turnId,
+                    stamp = stamp,
+                    turnId = stamp.turnId ?: context.turnId,
                     runId = delta.string("run_id")
                         ?: envelope.string("run_id")
                         ?: context.runId,
                     messageId = delta.string("id") ?: delta.string("message_id") ?: payload.messageId,
-                    logicalId = delta.string("logical_message_id")?.takeIf { it.isNotBlank() },
-                    textSeq = delta.long("text_seq")?.takeIf { it in 0L..Int.MAX_VALUE.toLong() }?.toInt(),
                 )
             }
         }
