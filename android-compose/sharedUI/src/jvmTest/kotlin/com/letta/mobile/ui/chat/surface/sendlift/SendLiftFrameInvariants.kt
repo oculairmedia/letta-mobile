@@ -27,11 +27,22 @@ private fun Rect.sizeDiffers(other: Rect): Boolean =
 private fun Rect.boundsDiffer(other: Rect): Boolean =
     sizeDiffers(other) || abs(left - other.left) > POSITION_TOLERANCE_PX || abs(top - other.top) > POSITION_TOLERANCE_PX
 
+/** Null-safe: only two rects that both exist can differ. */
+private fun Rect?.sizeDiffersFrom(other: Rect?): Boolean {
+    if (this == null || other == null) return false
+    return sizeDiffers(other)
+}
+
+private fun Rect?.boundsDifferFrom(other: Rect?): Boolean {
+    if (this == null || other == null) return false
+    return boundsDiffer(other)
+}
+
 /** Any frame where the prompt the person sees (the ghost, then the row's bubble) changes size from the one before. */
 internal fun bubbleSizeJumps(frames: List<SendFrame>): List<String> = frames.pairs().mapNotNull { (before, after) ->
     val was = before.visiblePrompt
     val now = after.visiblePrompt
-    if (was != null && now != null && was.sizeDiffers(now)) "t=${after.t}: prompt ${was.width}x${was.height} -> ${now.width}x${now.height}" else null
+    if (was.sizeDiffersFrom(now)) "t=${after.t}: prompt ${was?.width}x${was?.height} -> ${now?.width}x${now?.height}" else null
 }
 
 /** The previous row's top must only move up, and never by more than [maxPxPerFrame] in a frame. */
@@ -39,7 +50,7 @@ internal fun olderRowStepJumps(frames: List<SendFrame>, maxPxPerFrame: Float): L
     val was = before.olderRow?.top
     val now = after.olderRow?.top
     val step = if (was != null && now != null) now - was else 0f
-    if (step > POSITION_TOLERANCE_PX || step < -maxPxPerFrame) "t=${after.t}: previous row top $was -> $now (${step}px)" else null
+    if (step !in -maxPxPerFrame..POSITION_TOLERANCE_PX) "t=${after.t}: previous row top $was -> $now (${step}px)" else null
 }
 
 /**
@@ -56,9 +67,9 @@ private fun boundsChangesAfterFirstFrame(frames: List<SendFrame>): List<String> 
 }
 
 private fun ghostMismatchAtHandOff(frames: List<SendFrame>): List<String> = frames.pairs().mapNotNull { (before, after) ->
-    val ghost = before.ghost
+    val ghost = before.ghost.takeIf { after.ghost == null }
     val row = after.promptBubble
-    if (ghost != null && after.ghost == null && row != null && ghost.boundsDiffer(row)) "hand-off at t=${after.t}: ghost $ghost vs row $row" else null
+    if (ghost.boundsDifferFrom(row)) "hand-off at t=${after.t}: ghost $ghost vs row $row" else null
 }
 
 /** From the send frame on, timeline rows compose at most the sent prompt's first composition and its chevron frame. */
