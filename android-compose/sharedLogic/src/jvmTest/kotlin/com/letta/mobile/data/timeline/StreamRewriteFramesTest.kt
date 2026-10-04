@@ -60,12 +60,13 @@ class StreamRewriteFramesTest {
         }
     }
 
-    @Test fun incrementalTokensStillAppend() = runBlocking {
+    @Test fun growingSnapshotsOfOneStampedReplyReplaceItsText() = runBlocking {
         val recorder = TimelineFrameRecorder.open(scope)
         try {
-            val tokens = listOf("Your", " threat", " box", " already", " says", " so.")
-            recorder.stream(listOf(prompt) + tokens.mapIndexed { i, token -> chunk(i, token) }, finished = false)
-            assertEquals(listOf(tokens.joinToString("")), recorder.lastFrame().rows.first().contents)
+            val words = listOf("Your", " threat", " box", " already", " says", " so.")
+            val snapshots = words.runningReduce { held, word -> held + word }
+            recorder.stream(listOf(prompt) + snapshots.mapIndexed { i, snapshot -> chunk(i, snapshot) }, finished = false)
+            assertEquals(listOf(snapshots.last()), recorder.lastFrame().rows.first().contents)
         } finally {
             recorder.close()
         }

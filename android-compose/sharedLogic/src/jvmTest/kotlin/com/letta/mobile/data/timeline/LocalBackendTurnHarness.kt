@@ -42,7 +42,7 @@ internal class LocalBackendTurnHarness(name: String) {
         val writer = engine()
         val selection = assertIs<TimelineEngineOpen.Opened>(writer.open(scope)).selection
         val fence = writer.beginLive(selection)
-        messages.forEach { assertTrue(writer.ingest(fence, TimelineStreamFrame.Message(it))) }
+        messages.forEach { assertTrue(writer.ingest(fence, TimelineStreamFrame.Message(hostStamped(it)))) }
         assertTrue(writer.ingest(fence, TimelineStreamFrame.Done))
         val live = renderItems(assertNotNull(writer.live.value).block.events)
         reconcile(writer, selection, messages)

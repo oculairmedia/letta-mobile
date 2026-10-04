@@ -259,8 +259,8 @@ class CanonicalTimelinePagingTest {
         val fence = coordinator.beginLive(owner)
         val liveThought = thought.copy(id = "cm-stream-thought", runId = "local-run-1967")
         val liveReply = reply.copy(id = "cm-stream-reply", runId = "local-run-1967")
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(liveThought)))
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(liveReply)))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(liveThought))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(liveReply))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
         val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>()
@@ -325,7 +325,7 @@ class CanonicalTimelinePagingTest {
             contentRaw = JsonPrimitive("streamed content"),
             date = "2026-01-01T00:00:00Z",
         )
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(streamedMsg)))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(streamedMsg))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         val liveKey = awaitLiveKey(presentation)
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
@@ -398,7 +398,7 @@ class CanonicalTimelinePagingTest {
         val presentation = CanonicalTimelinePresentation.open(coordinator, owner, ui)
         val fence = coordinator.beginLive(owner)
         // The overlay holds the reply under the stream's (and ledger's) id, short of its tail.
-        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(reply.copy(contentRaw = JsonPrimitive("Hello")))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(reply.copy(contentRaw = JsonPrimitive("Hello"))))))
         assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Done))
         val liveKey = awaitLiveKey(presentation)
         assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))

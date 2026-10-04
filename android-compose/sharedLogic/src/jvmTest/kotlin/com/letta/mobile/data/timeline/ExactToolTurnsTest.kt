@@ -42,7 +42,7 @@ class ExactToolTurnsTest {
             val writer = engine()
             val selection = assertIs<TimelineEngineOpen.Opened>(writer.open(scope)).selection
             val fence = writer.beginLive(selection)
-            messages.forEach { assertTrue(writer.ingest(fence, TimelineStreamFrame.Message(it))) }
+            messages.forEach { assertTrue(writer.ingest(fence, TimelineStreamFrame.Message(hostStamped(it)))) }
             assertTrue(writer.ingest(fence, TimelineStreamFrame.Done))
             val live = buildChatRenderModel(assertNotNull(writer.live.value).block.events.mapNotNull {
                 timelineEventToUiMessage(it)
@@ -63,7 +63,8 @@ class ExactToolTurnsTest {
             val block = items.filterIsInstance<ChatRenderItem.RunBlock>().single()
             val liveBlock = live.filterIsInstance<ChatRenderItem.RunBlock>().single()
             // Concurrent calls from one source row share a timestamp; durable keys break ties by ID.
-            fun comparable(block: ChatRenderItem.RunBlock) = block.messages.map { it.first }
+            // The settled reader derives clientMessageId from the stored row until the ledger persists the logical id (C3, letta-mobile-hrrb2).
+            fun comparable(block: ChatRenderItem.RunBlock) = block.messages.map { it.first.copy(clientMessageId = null) }
                 .sortedWith(compareBy({ it.timestamp }, { it.id }))
             assertEquals(comparable(liveBlock), comparable(block))
             assertTrue(page.projectionInput.records.mapNotNull { it.event }.all { it.runId == null })

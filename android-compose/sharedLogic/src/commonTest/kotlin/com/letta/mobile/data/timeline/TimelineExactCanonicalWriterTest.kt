@@ -21,6 +21,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TimelineExactCanonicalWriterTest {
+    private fun TimelineEvent.Confirmed.withoutLogicalIdentity() =
+        copy(otid = if (messageType == TimelineMessageType.USER) otid else "", logicalId = "", textSeq = 0, turnId = null)
+
     @Test fun alternatingNativeTurnHasIdenticalLiveAndColdCanonicalShape() = runTest {
         val store = InMemoryTimelineStore()
         fun engine() = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
@@ -44,7 +47,7 @@ class TimelineExactCanonicalWriterTest {
             add(AssistantMessage(id = "ui-msg-9170349",
                 contentRaw = kotlinx.serialization.json.JsonPrimitive("Done"), date = "2026-01-01T00:00:09Z"))
         }
-        messages.forEach { assertTrue(liveEngine.ingest(fence, TimelineStreamFrame.Message(it))) }
+        messages.forEach { assertTrue(liveEngine.ingest(fence, TimelineStreamFrame.Message(hostStamped(it)))) }
         assertTrue(liveEngine.ingest(fence, TimelineStreamFrame.Done))
         val live = kotlin.test.assertNotNull(liveEngine.live.value).block.events
         // Exercise sync's durable writer, not a hand-seeded StoredTimelineEvent page.
@@ -58,7 +61,9 @@ class TimelineExactCanonicalWriterTest {
         val reopened = page.projectionInput.records.mapNotNull { it.event }
         assertEquals(live.map { it.messageType }, reopened.map { it.messageType },
             "Cold canonical rows must have the live shape, including attached rather than standalone returns")
-        assertEquals(live.map { it.copy(position = 0.0) }, reopened,
+        // The live rows carry the host-stamped logical ids; the ledger persists them only with C3 (letta-mobile-hrrb2),
+        // so the cold read derives its own until then.
+        assertEquals(live.map { it.copy(position = 0.0).withoutLogicalIdentity() }, reopened.map { it.withoutLogicalIdentity() },
             "Durable ordering lives in TimelinePageKey; decoded canonical facts must match live")
         val liveItems = com.letta.mobile.data.chat.projection.buildChatRenderModel(
             messages = live.mapNotNull { com.letta.mobile.data.chat.projection.timelineEventToUiMessage(it) },
@@ -73,8 +78,10 @@ class TimelineExactCanonicalWriterTest {
                     is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item.runId
                 }
                 identity to when (item) {
-                    is com.letta.mobile.data.chat.projection.ChatRenderItem.Single -> item.copy(keyOverride = null)
-                    is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock -> item
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.Single ->
+                        item.copy(message = item.message.copy(clientMessageId = null), keyOverride = null)
+                    is com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock ->
+                        item.copy(messages = item.messages.map { (message, position) -> message.copy(clientMessageId = null) to position })
                 }
             }.sortedBy { it.first }
         assertEquals(liveItems.size, reopenedItems.size,
@@ -96,8 +103,8 @@ class TimelineExactCanonicalWriterTest {
             id = "cm-stream-reply", contentRaw = kotlinx.serialization.json.JsonPrimitive("The state is current"),
             runId = "local-run-1967", date = "2026-01-01T00:00:02Z",
         )
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(thought)))
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(thought))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(reply))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
 
         val settledThought = thought.copy(id = "server-thought", runId = null)
@@ -123,7 +130,7 @@ class TimelineExactCanonicalWriterTest {
         val live = listOf("cm-stream-thought-1", "cm-stream-thought-2").map { id ->
             ReasoningMessage(id = id, reasoning = "Check both inputs", runId = "local-run-1967", date = "2026-01-01T00:00:01Z")
         }
-        live.forEach { assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(it))) }
+        live.forEach { assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(it)))) }
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val settled = listOf(
             ReasoningMessage(id = "server-thought-1", reasoning = "Check both inputs", runId = null, date = "2026-01-01T00:00:01Z"),
@@ -206,8 +213,8 @@ class TimelineExactCanonicalWriterTest {
         val stale = engine.beginLive(selection)
         val fence = engine.beginLive(selection)
         val reply = message("hello")
-        assertFalse(engine.ingest(stale, TimelineStreamFrame.Message(message("old"))))
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
+        assertFalse(engine.ingest(stale, TimelineStreamFrame.Message(hostStamped(message("old")))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(reply))))
         assertEquals(0L, engine.publication.value.durableRevision)
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         // The terminal frame only names the first revision the sync writer can reach; it commits nothing.
@@ -233,7 +240,7 @@ class TimelineExactCanonicalWriterTest {
         val published = engine.publication.value
         val fence = engine.beginLive(selection)
         repeat(1_000) { n ->
-            assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(message("x".repeat(n + 1)))))
+            assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(message("x".repeat(n + 1))))))
             assertTrue(engine.publication.value === published)
             assertEquals(0, store.rows.size)
             assertEquals(1, engine.live.value?.block?.events?.size)
@@ -345,7 +352,7 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(0, store.rows.size)
         assertEquals(0L, engine.publication.value.durableRevision)
         val typed = message("typed")
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(typed)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(typed))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         // The rejected raw frame consumed neither the fence nor the turn's settlement revision.
         assertEquals(0, store.rows.size)
@@ -360,7 +367,7 @@ class TimelineExactCanonicalWriterTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         val prior = message("visible history")
-        engine.ingest(fence, TimelineStreamFrame.Message(prior))
+        engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(prior)))
         engine.ingest(fence, TimelineStreamFrame.Done)
         // Streamed rows are not history until the sync writer commits them, so drive that first.
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(prior)))
@@ -383,7 +390,7 @@ class TimelineExactCanonicalWriterTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         val fragment = message("Hi").copy(runId = "run")
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(fragment)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(fragment))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         // An abandoned tail is only suppressible once the sync path has made it durable.
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(fragment)))
@@ -406,7 +413,7 @@ class TimelineExactCanonicalWriterTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val first = engine.beginLive(selection)
         val firstMessage = message("first")
-        assertTrue(engine.ingest(first, TimelineStreamFrame.Message(firstMessage)))
+        assertTrue(engine.ingest(first, TimelineStreamFrame.Message(hostStamped(firstMessage))))
         assertTrue(engine.ingest(first, TimelineStreamFrame.Done))
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(firstMessage)))
         val firstBody = store.rows.values.single().body.copyOf()
@@ -416,7 +423,7 @@ class TimelineExactCanonicalWriterTest {
         assertTrue(engine.acknowledgeSettlement(first, mapOf(TimelineMessageId("id") to 1L)))
         assertTrue(engine.settling.value.isEmpty())
         val secondMessage = message("second").copy(id = "second", otid = "second")
-        assertTrue(engine.ingest(second, TimelineStreamFrame.Message(secondMessage)))
+        assertTrue(engine.ingest(second, TimelineStreamFrame.Message(hostStamped(secondMessage))))
         kotlin.test.assertContentEquals(firstBody, store.rows.values.single().body)
         assertTrue(engine.ingest(second, TimelineStreamFrame.Done))
         // The new turn settles one past the revision the previous turn already committed.
@@ -448,10 +455,10 @@ class TimelineExactCanonicalWriterTest {
         val owner = coordinator.acquire(scope)
         val screen = kotlin.test.assertNotNull(coordinator.attach(owner))
         external.turnStarted(scope.agentId, scope.conversationId, "run", "turn")
-        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, message("hello"))
+        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, hostStamped(message("hello")))
         external.turnEnded(scope.agentId, scope.conversationId, clean = true)
         assertEquals(1L, owner.session.live.value?.settlementRevision)
-        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, reply("second", "next turn"))
+        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, hostStamped(reply("second", "next turn")))
         // The next turn is live again, carrying only its own frame.
         assertEquals(null, owner.session.live.value?.settlementRevision)
         assertEquals(listOf(TimelineMessageId("second")),
@@ -467,7 +474,7 @@ class TimelineExactCanonicalWriterTest {
         )
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        repeat(4) { n -> assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply("m$n", "body $n")))) }
+        repeat(4) { n -> assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(reply("m$n", "body $n"))))) }
         assertEquals(2, engine.live.value?.block?.events?.size)
         // The turn still settles, so the durable reconcile can carry the rows the overlay dropped.
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
@@ -509,7 +516,7 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(CanonicalPendingLocalStore.Delivery.Sent, owner.session.pending.value.single().delivery)
         val screen = kotlin.test.assertNotNull(coordinator.attach(owner))
         val fence = coordinator.beginLive(owner)
-        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, message("hello"))
+        external.ingestExternalTransportMessage(scope.agentId, scope.conversationId, hostStamped(message("hello")))
         coordinator.detach(screen)
         assertFalse(coordinator.retire(owner))
         external.turnEnded(scope.agentId, scope.conversationId, clean = false)
@@ -808,7 +815,7 @@ class TimelineExactCanonicalWriterTest {
             id = "toolcall-$callId", date = "2026-01-01T00:00:00Z",
             toolCalls = listOf(com.letta.mobile.data.model.ToolCall(toolCallId = callId, name = "Bash", arguments = "{}")),
         )
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(streamedCall)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(streamedCall))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val streamedNames = kotlin.test.assertNotNull(engine.live.value).block.events
             .filter { it.messageType == TimelineMessageType.TOOL_CALL }
@@ -846,7 +853,7 @@ class TimelineExactCanonicalWriterTest {
             id = streamedId, contentRaw = kotlinx.serialization.json.JsonPrimitive("Hey. What's up?"),
             date = "2026-01-01T00:00:00Z",
         )
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(reply))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val settlement = kotlin.test.assertNotNull(engine.live.value?.settlementRevision)
         val presented = mapOf(TimelineMessageId(committedId) to settlement)
@@ -879,11 +886,11 @@ class TimelineExactCanonicalWriterTest {
         val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(AssistantMessage(
             id = streamedId, otid = segmentOtid,
             contentRaw = kotlinx.serialization.json.JsonPrimitive("What color did you want it to be"),
             date = "2026-01-01T00:00:00Z",
-        ))))
+        )))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val settlement = kotlin.test.assertNotNull(engine.live.value?.settlementRevision)
         val presented = mapOf(TimelineMessageId(committedId) to settlement)
@@ -910,14 +917,14 @@ class TimelineExactCanonicalWriterTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         val text = kotlinx.serialization.json.JsonPrimitive("Sure.")
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(AssistantMessage(
             id = "cm-stream-provider-assistant-0-aaa", otid = "provider-assistant-0-aaa",
             contentRaw = text, date = "2026-01-01T00:00:00Z",
-        ))))
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+        )))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(AssistantMessage(
             id = "cm-stream-provider-assistant-2-bbb", otid = "provider-assistant-2-bbb",
             contentRaw = text, date = "2026-01-01T00:00:01Z",
-        ))))
+        )))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
 
         assertEquals(
@@ -956,11 +963,11 @@ class TimelineExactCanonicalWriterTest {
         val engine = CanonicalTimelineEngine(InMemoryTimelineStore(), TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(AssistantMessage(
             id = streamedId,
             contentRaw = kotlinx.serialization.json.JsonPrimitive("What color did you want it to be"),
             date = "2026-01-01T00:00:00Z",
-        ))))
+        )))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
         val settlement = kotlin.test.assertNotNull(engine.live.value?.settlementRevision)
         val presented = mapOf(TimelineMessageId(committedId) to settlement)
@@ -982,14 +989,14 @@ class TimelineExactCanonicalWriterTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val fence = engine.beginLive(selection)
         // Both truncated, so nothing matches by text.
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(AssistantMessage(
             id = "cm-stream-a", contentRaw = kotlinx.serialization.json.JsonPrimitive("first repl"),
             date = "2026-01-01T00:00:00Z",
-        ))))
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+        )))))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(AssistantMessage(
             id = "cm-stream-b", contentRaw = kotlinx.serialization.json.JsonPrimitive("second rep"),
             date = "2026-01-01T00:00:01Z",
-        ))))
+        )))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
 
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(
@@ -1022,10 +1029,10 @@ class TimelineExactCanonicalWriterTest {
         assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, record(older)))
 
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(AssistantMessage(
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(AssistantMessage(
             id = "cm-stream-new", contentRaw = kotlinx.serialization.json.JsonPrimitive("a new repl"),
             date = "2026-01-01T00:00:02Z",
-        ))))
+        )))))
         assertTrue(engine.ingest(fence, TimelineStreamFrame.Done))
 
         // The page carries the older row again and nothing new: there is nothing to pair with.
@@ -1129,7 +1136,7 @@ class TimelineExactCanonicalWriterTest {
         assertFalse(coordinator.retire(owner))
         maintenance.turnStarted(owner, "next", null)
         val next = coordinator.beginLive(owner)
-        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Message(message("next"))))
+        assertTrue(coordinator.ingest(owner, next, TimelineStreamFrame.Message(hostStamped(message("next")))))
         release.complete(Unit)
         runCurrent()
         assertEquals(0, owner.activeRepairs)
@@ -1148,7 +1155,7 @@ class TimelineExactCanonicalWriterTest {
         val presentation = kotlin.test.assertNotNull(coordinator.attach(owner))
         val first = coordinator.beginLive(owner)
         val firstMessage = message("durable off-tail")
-        coordinator.ingest(owner, first, TimelineStreamFrame.Message(firstMessage))
+        coordinator.ingest(owner, first, TimelineStreamFrame.Message(hostStamped(firstMessage)))
         coordinator.ingest(owner, first, TimelineStreamFrame.Done)
         // While a viewport is attached the overlay is the turn's only copy, and nothing is durable.
         assertEquals(0, store.rows.size)
@@ -1166,7 +1173,7 @@ class TimelineExactCanonicalWriterTest {
         kotlin.test.assertContentEquals(bytes, store.rows.values.single().body)
         val next = coordinator.beginLive(owner)
         val nextMessage = message("next").copy(id = "next", otid = "next")
-        coordinator.ingest(owner, next, TimelineStreamFrame.Message(nextMessage))
+        coordinator.ingest(owner, next, TimelineStreamFrame.Message(hostStamped(nextMessage)))
         assertFalse(coordinator.acknowledgeSettlement(owner, first, mapOf(TimelineMessageId("id") to 1L)))
         assertEquals(next, owner.session.live.value?.fence)
         coordinator.ingest(owner, next, TimelineStreamFrame.Done)
@@ -1192,7 +1199,7 @@ class TimelineExactCanonicalWriterTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
         val reply = message("hello")
         val fence = engine.beginLive(selection)
-        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(reply)))
+        assertTrue(engine.ingest(fence, TimelineStreamFrame.Message(hostStamped(reply))))
         // Mid-stream the turn is still being reduced, so the sync writer must not commit under it.
         assertEquals(TimelineEnginePageOutcome.NoProgress, reconcile(engine, selection, record(reply)))
         assertEquals(0, store.rows.size)

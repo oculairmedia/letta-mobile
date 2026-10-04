@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.ToolReturnMessage
 
 /** One streamed frame folded into a live turn's resident reduction. */
 internal fun TimelineReducerState.reduceLive(message: LettaMessage, agentId: String?): TimelineReducerState {
-    val output = reduceStreamFrame(TimelineReducerInput(timeline, message, pendingToolReturnsByCallId, agentId = agentId))
+    val output = reduceLiveFrame(TimelineReducerInput(timeline, message, pendingToolReturnsByCallId, agentId = agentId))
     return copy(timeline = output.next, pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId)
 }
 

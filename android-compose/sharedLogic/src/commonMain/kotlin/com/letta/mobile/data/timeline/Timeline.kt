@@ -236,6 +236,14 @@ data class Timeline(
         }
     }
 
+    private val logicalIdToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        HashMap<String, Int>(events.size).also { map ->
+            events.forEachIndexed { i, e ->
+                if (e is TimelineEvent.Confirmed) map[e.logicalId] = i
+            }
+        }
+    }
+
     private val identityKeySet: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         HashSet<String>(events.size * 3).also { keys ->
             events.forEach { event -> keys += event.identityKeys() }
@@ -276,6 +284,10 @@ data class Timeline(
     fun findByOtid(otid: String): TimelineEvent? =
         otidToIndex[AgentMessageClientId.dedupIdentity(otid)]?.let { events[it] }
 
+    /** The confirmed row that carries [id] as its logical id (letta-mobile-nbha6); at most one exists. */
+    fun findByLogicalId(id: String): TimelineEvent.Confirmed? =
+        logicalIdToIndex[id]?.let { events[it] as? TimelineEvent.Confirmed }
+
     fun containsIdentityFor(event: TimelineEvent): Boolean {
         val tail = events.lastOrNull()
         if (tail != null && tail.identityKeys().any { it in event.identityKeys() }) return true
@@ -315,6 +327,15 @@ data class Timeline(
      * the chat screen.
      */
     fun append(event: TimelineEvent): Timeline {
+        if (event is TimelineEvent.Confirmed && findByLogicalId(event.logicalId) != null) {
+            Telemetry.event(
+                "Timeline", "live.duplicateAppend",
+                "conversationId" to conversationId,
+                "logicalId" to event.logicalId,
+                level = Telemetry.Level.WARN,
+            )
+            return this
+        }
         val eventIdentity = AgentMessageClientId.dedupIdentity(event.otid)
         if (eventIdentity in residentOtids) {
             Telemetry.event(
@@ -525,6 +546,19 @@ data class Timeline(
             level = Telemetry.Level.WARN,
         )
         return copy(events = deduped.toPersistentList(), stablePrefixVersion = stablePrefixVersion + 1)
+    }
+
+    /**
+     * Replaces the confirmed row that carries [confirmed]'s logical id, in place: its position and
+     * otid stay, so the row keeps its slot and its key. Returns this timeline unchanged when no row
+     * has that id (the caller appends instead).
+     */
+    fun replaceByLogicalId(confirmed: TimelineEvent.Confirmed): Timeline {
+        val idx = logicalIdToIndex[confirmed.logicalId] ?: return this
+        val existing = events[idx] as? TimelineEvent.Confirmed ?: return this
+        val replaced = events.replacingAt(idx, confirmed.copy(position = existing.position, otid = existing.otid))
+        return if (idx == events.lastIndex) copy(events = replaced)
+        else copy(events = replaced, stablePrefixVersion = stablePrefixVersion + 1)
     }
 
     private fun List<TimelineEvent>.hasDuplicateOtidOutside(index: Int, otid: String): Boolean {
