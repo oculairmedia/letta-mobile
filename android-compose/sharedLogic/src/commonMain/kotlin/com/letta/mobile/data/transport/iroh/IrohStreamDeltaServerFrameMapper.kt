@@ -285,6 +285,9 @@ internal object IrohStreamDeltaServerFrameMapper {
             cachedInputTokens = delta.long("cached_input_tokens") ?: 0L,
             reasoningTokens = delta.long("reasoning_tokens") ?: 0L,
             seq = meta.eventSeq,
+            contextTokens = delta.long("context_tokens"),
+            agentId = meta.agentId,
+            conversationId = meta.conversationId,
         )
 
     /** What the host's stream stamper wrote on a delta; every field is null for a frame it never saw. */

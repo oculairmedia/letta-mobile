@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import com.letta.mobile.data.context.ContextWindowUsagePolicy
+import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
@@ -34,7 +36,7 @@ internal class AdminChatSessionPort(
     override val uiState: StateFlow<ChatUiState> = viewModel.uiState
 
     override val composer: StateFlow<ChatComposerUiState> =
-        combine(viewModel.composerState, viewModel.uiState, modelFlow(), ::composerSnapshot)
+        combine(viewModel.composerState, viewModel.uiState, modelFlow(), contextUsageFlow(), ::composerSnapshot)
             .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialComposer())
 
     override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport)
@@ -46,7 +48,21 @@ internal class AdminChatSessionPort(
         viewModel.composerState.value,
         viewModel.uiState.value,
         modelState(viewModel.activeAgent.value, viewModel.llmModels.value, viewModel.conversationModelSelections.value),
+        ContextWindowUsagePolicy.cleared(),
     )
+
+    /**
+     * letta-mobile-0ofhc: the chip follows the streamed reading on its own — when the chat opens,
+     * after every settled turn, and on a conversation switch — with no drawer tap involved.
+     */
+    private fun contextUsageFlow(): Flow<ContextWindowUsageState> = AdminChatContextSources(
+        agentId = viewModel.agentId.value,
+        ui = viewModel.uiState,
+        readings = viewModel.contextReadings,
+        agent = viewModel.activeAgent,
+        models = viewModel.llmModels,
+        modelSelections = viewModel.conversationModelSelections,
+    ).contextUsage()
 
     private fun modelFlow(): Flow<ChatModelUiState?> =
         combine(viewModel.activeAgent, viewModel.llmModels, viewModel.conversationModelSelections, ::modelState)
@@ -72,6 +88,7 @@ internal class AdminChatSessionPort(
         composer: ChatComposerState,
         ui: ChatUiState,
         model: ChatModelUiState?,
+        contextUsage: ContextWindowUsageState,
     ): ChatComposerUiState =
         AdminChatComposerMapping.composerUiState(
             AdminChatComposerMapping.ComposerInputs(
@@ -81,7 +98,7 @@ internal class AdminChatSessionPort(
                 maxAttachments = viewModel.attachmentLimits.maxAttachmentCount,
                 attachmentLimits = viewModel.attachmentLimits,
                 model = model,
-                contextWindow = ui.contextWindow,
+                contextUsage = contextUsage,
             ),
         )
 

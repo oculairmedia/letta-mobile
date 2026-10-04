@@ -1,17 +1,14 @@
 package com.letta.mobile.feature.chat.screen.shared
 
 import com.letta.mobile.data.attachment.AttachmentLimits
-import com.letta.mobile.data.context.ContextWindowUsage
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.EffortSelection
-import com.letta.mobile.ui.chat.render.ContextWindowUiState
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelOption
@@ -33,7 +30,8 @@ internal object AdminChatComposerMapping {
         val maxAttachments: Int,
         val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
         val model: ChatModelUiState?,
-        val contextWindow: ContextWindowUiState,
+        /** The streamed context reading; the placeholder state while there is none yet. */
+        val contextUsage: ContextWindowUsageState,
     )
 
     /** What the ViewModel knows about the conversation's model at one instant. */
@@ -54,7 +52,7 @@ internal object AdminChatComposerMapping {
         attachmentLimits = inputs.attachmentLimits,
         commands = inputs.composer.slashCommands.map(ChatComposerCommand::fromSlashCommand).toImmutableList(),
         model = inputs.model,
-        contextUsage = contextUsage(inputs.contextWindow),
+        contextUsage = inputs.contextUsage,
         workingDirectory = null,
     )
 
@@ -95,41 +93,6 @@ internal object AdminChatComposerMapping {
 
     private fun findModel(models: List<LlmModel>, handle: String): LlmModel? =
         models.firstOrNull { it.handle == handle || it.id == handle || handle in it.selectionAliases }
-
-    /**
-     * The project-chat context window, re-expressed as the shared usage reading. Sections the
-     * Android state does not carry (memory files, directories, tool rules) fall into the
-     * reading's "Other" remainder rather than being dropped.
-     */
-    fun contextUsage(window: ContextWindowUiState): ContextWindowUsageState? {
-        if (!window.hasAnythingToReport()) return null
-        val hasReading = window.maxTokens > 0
-        return ContextWindowUsageState(
-            usage = if (hasReading) ContextWindowUsage.from(window.toOverview()) else null,
-            loading = window.isLoading,
-            error = window.error,
-        )
-    }
-
-    /** A reading, a load in flight, or an error: anything the usage chip can show. */
-    private fun ContextWindowUiState.hasAnythingToReport(): Boolean {
-        if (maxTokens > 0) return true
-        return isLoading || error != null
-    }
-
-    private fun ContextWindowUiState.toOverview(): ContextWindowOverview = ContextWindowOverview(
-        contextWindowSizeMax = maxTokens,
-        contextWindowSizeCurrent = currentTokens,
-        numMessages = messageCount,
-        numArchivalMemory = archivalMemoryCount,
-        numRecallMemory = recallMemoryCount,
-        numTokensExternalMemorySummary = externalMemoryTokens,
-        numTokensSystem = systemTokens,
-        numTokensCoreMemory = coreMemoryTokens,
-        numTokensSummaryMemory = summaryMemoryTokens,
-        numTokensFunctionsDefinitions = toolTokens,
-        numTokensMessages = messageTokens,
-    )
 
     fun effortSelection(choice: ReasoningEffortChoice): EffortSelection = when (choice) {
         ReasoningEffortChoice.Unchanged -> EffortSelection.Keep

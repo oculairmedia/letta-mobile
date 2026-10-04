@@ -97,6 +97,42 @@ data class ContextWindowUsage(
             )
         }
 
+        /**
+         * letta-mobile-r2zo8: a reading that is a total and nothing more — what the App
+         * Server's `usage_statistics.context_tokens` gives. One "In context" segment, then the
+         * free remainder; no category rows, because the source has none to give.
+         *
+         * [windowTokens] null or non-positive means the model's window is unknown: the total
+         * is still reported, with every fraction 0 and no free space claimed.
+         */
+        fun total(usedTokens: Int, windowTokens: Int?): ContextWindowUsage {
+            val used = usedTokens.coerceAtLeast(0)
+            val stated = windowTokens?.takeIf { it > 0 } ?: 0
+            val window = if (stated > 0) maxOf(stated, used) else 0
+            val free = (window - used).coerceAtLeast(0)
+            val inContext = ContextWindowSegment(
+                kind = ContextWindowSegmentKind.Unitemised,
+                label = IN_CONTEXT_LABEL,
+                tokens = used,
+                fraction = fractionOf(used, window),
+            )
+            return ContextWindowUsage(
+                usedTokens = used,
+                maxTokens = window,
+                freeTokens = free,
+                segments = if (used > 0) listOf(inContext) else emptyList(),
+                freeSegment = ContextWindowSegment(
+                    kind = ContextWindowSegmentKind.FreeSpace,
+                    label = "Free space",
+                    tokens = free,
+                    fraction = fractionOf(free, window),
+                ),
+            )
+        }
+
+        /** Label of the single segment a total-only reading draws. */
+        const val IN_CONTEXT_LABEL: String = "In context"
+
         /** The slice the server counts as used but never itemises. */
         private fun unitemisedRemainder(tokens: Int): List<Itemised> =
             if (tokens > 0) {

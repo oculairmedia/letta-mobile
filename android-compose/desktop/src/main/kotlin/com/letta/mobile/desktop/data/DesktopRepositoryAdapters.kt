@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatSessionGraph
+import com.letta.mobile.data.context.ContextTokenReadings
+import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ActiveConfigSettingsRepository
 import com.letta.mobile.data.repository.CronRepository
@@ -88,6 +90,8 @@ class DesktopSessionGraph internal constructor(
     override val toolRepository: IToolRepository,
     override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository,
     private val closeables: List<AutoCloseable> = emptyList(),
+    /** letta-mobile-r2zo8: each conversation's latest context total; inert unless a transport feeds it. */
+    val contextTokenReadings: ContextTokenReadings = ContextTokenReadings(),
 ) : SessionRepositoryGraph {
     private val closedRef = AtomicBoolean(false)
 
@@ -150,6 +154,7 @@ class DesktopSessionGraphFactory(
             toolRepository = adapters.toolRepository,
             vibesyncEventStreamRepository = adapters.vibesyncEventStreamRepository,
             closeables = adapters.closeables,
+            contextTokenReadings = adapters.contextTokenReadings,
         )
     }
 }
@@ -231,6 +236,9 @@ class DesktopRepositoryAdapters(
         null
     }
     private val boundCronRepository = CronRepository(channelTransport, transportBoundScope)
+
+    /** Fed by the same transport-bound scope, so it retires with the transport generation. */
+    val contextTokenReadings: ContextTokenReadings = contextTokenReadingsOf(channelTransport, transportBoundScope)
     private val boundSelfTodoRepository = SelfTodoRepository(channelTransport, transportBoundScope)
     private val boundSubagentRepository = SubagentRepository(
         transport = channelTransport,

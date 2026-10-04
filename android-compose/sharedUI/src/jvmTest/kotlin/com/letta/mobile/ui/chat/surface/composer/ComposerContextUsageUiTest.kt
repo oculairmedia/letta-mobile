@@ -44,4 +44,30 @@ class ComposerContextUsageUiTest {
 
         onNodeWithText("Backend unreachable.").assertExists()
     }
+
+    @Test
+    fun chipShowsAStreamedTotalAgainstTheModelWindowWithNoCategoryRows() = runComposeUiTest {
+        // letta-mobile-r2zo8: usage_statistics gives a total only, so only the total is drawn.
+        val total = ContextWindowUsage.total(usedTokens = 29_193, windowTokens = 128_000)
+        setContent { MaterialTheme { ComposerContextChip(ContextWindowUsageState(usage = total)) } }
+
+        onNodeWithText("Context 23%").performClick()
+
+        onNodeWithText("29.2k / 128k (23%)").assertExists()
+        onNodeWithText("In context").assertExists()
+        onNodeWithText("Free space").assertExists()
+        onNodeWithText("Tool definitions").assertDoesNotExist()
+        onNodeWithText("Messages").assertDoesNotExist()
+    }
+
+    @Test
+    fun chipShowsTheTotalAloneWhenTheWindowIsUnknown() = runComposeUiTest {
+        val total = ContextWindowUsage.total(usedTokens = 29_193, windowTokens = null)
+        setContent { MaterialTheme { ComposerContextChip(ContextWindowUsageState(usage = total)) } }
+
+        onNodeWithText("Context 29.2k").performClick()
+
+        onNodeWithText("29.2k / ?").assertExists()
+        onNodeWithText("Free space").assertDoesNotExist()
+    }
 }

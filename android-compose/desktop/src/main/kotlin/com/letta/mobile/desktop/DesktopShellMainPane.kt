@@ -19,6 +19,7 @@ import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
+import com.letta.mobile.desktop.chat.DesktopContextFocus
 import com.letta.mobile.desktop.chat.DesktopSharedChatPage
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
@@ -79,13 +80,19 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
             showDockedCanvas = showDockedCanvas,
         ),
     )
-    val contextUsage = rememberFocusedContextUsage(
-        agentId = focus.selectedAgentId,
-        conversationId = selectedConversationId,
-        settled = !frame.activity.isThinkingSelected && !frame.activity.isStreamingReplySelected,
-        repository = core.bootstrap.dataBindings.sessionGraphProvider.current.agentRepository,
-    )
     val rosterAgents = focus.rosterAgents
+    val sessionGraph = core.sessionGraph.value
+    val models by sessionGraph.modelRepository.llmModels.collectAsState()
+    val contextUsage = rememberFocusedContextUsage(
+        focus = DesktopContextFocus(
+            agentId = focus.selectedAgentId,
+            conversationId = selectedConversationId,
+            settled = !frame.activity.isThinkingSelected && !frame.activity.isStreamingReplySelected,
+        ),
+        readings = sessionGraph.contextTokenReadings,
+        agents = rosterAgents,
+        models = models,
+    )
     return DesktopShellChatHost(
         composerCommands = composerCommands,
         contextUsage = contextUsage,

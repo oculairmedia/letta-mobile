@@ -186,7 +186,7 @@ class AgentScaffoldHiltTest {
     }
 
     @Test
-    fun menuClickRefreshesContextWindowAndOpensDrawer() {
+    fun menuClickOpensDrawerWithoutLoadingTheContextWindow() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
                 navigation = testNavigation(),
@@ -196,7 +196,8 @@ class AgentScaffoldHiltTest {
         }
 
         composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
-        verify(exactly = 1) { projectBindings.refreshContextWindow() }
+        // letta-mobile-0ofhc: the drawer is no longer the context chip's trigger.
+        verify(exactly = 0) { projectBindings.refreshContextWindow() }
         composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_CONTENT).assertIsDisplayed()
     }
 

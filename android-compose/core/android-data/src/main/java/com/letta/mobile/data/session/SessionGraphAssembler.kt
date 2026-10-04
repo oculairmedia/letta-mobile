@@ -18,6 +18,7 @@ import com.letta.mobile.data.api.RunApi
 import com.letta.mobile.data.api.ScheduleApi
 import com.letta.mobile.data.api.StepApi
 import com.letta.mobile.data.api.ToolApi
+import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
@@ -164,6 +165,7 @@ class SessionGraphAssembler @Inject constructor(
                 scope = request.scope,
                 logger = AndroidVibesyncEventStreamLogger(),
             ),
+            contextTokenReadings = contextTokenReadingsOf(request.channelTransport, request.scope),
         )
     }
 

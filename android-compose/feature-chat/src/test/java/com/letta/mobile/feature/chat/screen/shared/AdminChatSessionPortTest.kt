@@ -29,6 +29,9 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import com.letta.mobile.data.context.ContextTokenReadings
+import com.letta.mobile.data.context.ContextWindowUsage
+import com.letta.mobile.data.transport.ServerFrame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -197,17 +200,38 @@ class AdminChatSessionPortTest {
     }
 
     @Test
-    fun `context window maps only when there is a reading, a load or an error`() {
-        val empty = com.letta.mobile.ui.chat.render.ContextWindowUiState()
-        assertEquals(null, AdminChatComposerMapping.contextUsage(empty))
+    fun `the context chip shows the streamed total without any drawer refresh`() = runTest {
+        // letta-mobile-0ofhc: nothing but the streamed reading feeds the chip. No refresh call,
+        // no hamburger: a reading for the open conversation is on the composer once settled.
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        var viewModel: AdminChatViewModel? = null
+        try {
+            val agent = TestData.agent("agent-context", "Context").copy(contextWindowLimit = 128_000)
+            val readings = ContextTokenReadings()
+            val vm = openedChatViewModel(canonicalPagingHost(), agent, "conversation-context", "context", readings)
+            viewModel = vm
+            val port = AdminChatSessionPort(vm, vm.viewModelScope)
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.composer.collect {} }
 
-        val usage = AdminChatComposerMapping.contextUsage(
-            empty.copy(maxTokens = 1_000, currentTokens = 400, messageTokens = 300, systemTokens = 50),
-        )
-        assertEquals(1_000, usage?.usage?.maxTokens)
-        assertEquals(400, usage?.usage?.usedTokens)
-        assertEquals(true, AdminChatComposerMapping.contextUsage(empty.copy(isLoading = true))?.loading)
+            val placeholder = port.composer.value.contextUsage
+            assertEquals(null, placeholder?.usage)
+            assertTrue("the chip shows its placeholder rather than hiding", placeholder != null)
+
+            readings.record(usage("agent-context", "conversation-context", 28_864))
+            readings.record(usage("agent-context", "conversation-context", 29_193))
+
+            val usage = port.composer.value.contextUsage?.usage
+            assertEquals(29_193, usage?.usedTokens)
+            assertEquals(128_000, usage?.maxTokens)
+            assertEquals(listOf(ContextWindowUsage.IN_CONTEXT_LABEL), usage?.segments?.map { it.label })
+        } finally {
+            viewModel?.viewModelScope?.cancel()
+            Dispatchers.resetMain()
+        }
     }
+
+    private fun usage(agentId: String, conversationId: String, contextTokens: Long) =
+        ServerFrame.UsageStatistics(agentId = agentId, conversationId = conversationId, contextTokens = contextTokens)
 
     @Test
     fun `open canvas from the full-screen page goes to canvas navigation`() {
@@ -240,6 +264,6 @@ class AdminChatSessionPortTest {
         canQueueWhileStreaming = false,
         maxAttachments = 4,
         model = null,
-        contextWindow = com.letta.mobile.ui.chat.render.ContextWindowUiState(),
+        contextUsage = com.letta.mobile.data.context.ContextWindowUsageState(),
     )
 }
