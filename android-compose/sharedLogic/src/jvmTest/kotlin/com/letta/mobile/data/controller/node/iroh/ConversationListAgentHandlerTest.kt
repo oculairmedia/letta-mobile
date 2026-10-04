@@ -122,6 +122,32 @@ class ConversationListAgentHandlerTest {
         }
     }
 
+    /** letta-mobile-fxoew.6: the on-disk tier used to list hidden (subagent) conversations. */
+    @Test
+    fun excludesHiddenConversationsFromTheList() = runTest {
+        val root = createTempDirectory("fxoew6-list-agent-hidden").toFile()
+        LocalBackendFixtureStore.create(root)
+        val agentId = LocalBackendFixtureStore.AGENT_ID
+        writeConversationJson(root, "default:$agentId", """{"id":"conv-visible","agent_id":"$agentId"}""")
+        writeConversationJson(
+            root,
+            "conversation:conv-hidden",
+            """{"id":"conv-hidden","agent_id":"$agentId","hidden":true}""",
+        )
+
+        val router = AdminRpcRegistry.buildRouter(localBackendDir = root.absolutePath)
+        val resp = invoke(router, "conversation.list_agent", buildJsonObject { put("agent_id", agentId) })
+
+        val ids = extractConversationsArray(resp).map { it["id"]?.jsonPrimitive?.contentOrNull }
+        assertEquals(listOf("conv-visible"), ids, resp)
+    }
+
+    private fun writeConversationJson(root: java.io.File, key: String, json: String) {
+        val dirName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(key.toByteArray())
+        val dir = java.io.File(java.io.File(root, "conversations"), dirName).apply { mkdirs() }
+        java.io.File(dir, "conversation.json").writeText(json)
+    }
+
     private suspend fun invoke(
         router: AdminRpcRouter,
         method: String,

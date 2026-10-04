@@ -136,9 +136,13 @@ object ConversationAdminHandlers {
                 level = Telemetry.Level.WARN,
             )
         }
-        val authorized = context.authorizedConversationIds ?: return result
         if (result !is JsonArray) return result
-        val filtered = result.filter { element ->
+        // letta-mobile-fxoew.6: lists never carry hidden (subagent) conversations. The App
+        // Server's own list already drops them (`include_hidden` defaults off); this covers the
+        // on-disk list_agent tier, which did not.
+        val visible = result.filterNot { element -> (element as? JsonObject)?.isHiddenConversation() == true }
+        val authorized = context.authorizedConversationIds ?: return JsonArray(visible)
+        val filtered = visible.filter { element ->
             val id = (element as? JsonObject)?.get("id")?.let { it as? JsonPrimitive }?.contentOrNull
             id != null && id in authorized
         }

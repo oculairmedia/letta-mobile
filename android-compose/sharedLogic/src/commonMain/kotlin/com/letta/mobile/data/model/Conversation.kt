@@ -30,6 +30,12 @@ data class Conversation(
     @SerialName("isolated_block_ids") val isolatedBlockIds: List<String> = emptyList(),
     // letta-mobile-bn008.3: routing class; null/absent = INTERACTIVE (see effectiveClass).
     @SerialName("conversation_class") val conversationClass: ConversationClass? = null,
+    /**
+     * letta-mobile-fxoew.6: the store's `"hidden": true` (subagent / background
+     * conversations). Lists drop hidden conversations ([HiddenListFilter]);
+     * opening one by id still works.
+     */
+    val hidden: Boolean? = null,
 ) {
     /** INTERACTIVE unless explicitly tagged AUTONOMOUS. */
     val effectiveClass: ConversationClass get() = conversationClass ?: ConversationClass.INTERACTIVE
