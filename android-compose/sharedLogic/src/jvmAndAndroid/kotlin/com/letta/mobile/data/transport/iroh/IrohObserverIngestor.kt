@@ -52,6 +52,8 @@ internal class IrohObserverIngestor(
     internal val engineOwnedSkipTelemetry: EngineOwnedSkipTelemetry = EngineOwnedSkipTelemetry(),
     /** How long the engine has to publish its own terminal before the observer's copy stands in. */
     private val observerTerminalGraceMs: Long = OBSERVER_TERMINAL_GRACE_MS,
+    /** Capabilities of the host this transport is connected to (letta-mobile-fxoew.2). */
+    private val hostCapabilities: () -> Set<String> = { emptySet() },
 ) {
     /** Observer terminal fallbacks waiting out their grace window, one per engine-owned turn. */
     private val pendingObserverTerminals = java.util.concurrent.ConcurrentHashMap<String, Job>()
@@ -74,6 +76,16 @@ internal class IrohObserverIngestor(
 
     @Volatile
     private var lastEmittedSubagentRevision: Long = 0L
+
+    /**
+     * letta-mobile-fxoew.2: the connected host pushes its authoritative
+     * registry (`subagents_updated`, capability [SUBAGENT_PUSH_CAPABILITY]),
+     * read from the current Ready handle. While true the correlator keeps
+     * tracking dispatches (return sanitizing still needs it) but no longer
+     * emits its own RUNNING-only snapshots, so the host is the one writer.
+     */
+    private val hostPushesSubagents: Boolean
+        get() = SUBAGENT_PUSH_CAPABILITY in hostCapabilities()
 
     val isIngesting: Boolean get() = observerJob?.isActive == true
     val currentObserverGeneration: Int get() = observerGeneration.value
@@ -139,14 +151,18 @@ internal class IrohObserverIngestor(
      * Meridian's device-wide `agent_updated` / `conversation_updated` pushes (not App Server
      * messages, so they decode as [AppServerInboundFrame.Unknown]) are republished as
      * [ServerFrame.AgentUpdated] / [ServerFrame.ConversationUpdated], the frames the agent and
-     * conversation repositories react to. Returns true when [received] was one of them.
+     * conversation repositories react to. The host registry's `subagents_updated`
+     * (letta-mobile-fxoew.2) takes the same path to `SubagentRepository`.
+     * Returns true when [received] was one of them.
      */
     private suspend fun republishDevicePush(received: AppServerReceivedFrame): Boolean {
         val unknown = received.frame as? AppServerInboundFrame.Unknown ?: return false
-        if (unknown.type != AGENT_UPDATED_TYPE && unknown.type != CONVERSATION_UPDATED_TYPE) return false
+        if (unknown.type !in HOST_PUSH_TYPES) return false
         val frame = runCatching {
             DEVICE_PUSH_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
-        }.getOrNull()?.takeIf { it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated }
+        }.getOrNull()?.takeIf {
+            it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated || it is ServerFrame.SubagentsUpdated
+        }
         if (frame == null) {
             Telemetry.event("IrohObserver", "${unknown.type}.undecodable", level = Telemetry.Level.WARN)
             return true
@@ -454,10 +470,17 @@ internal class IrohObserverIngestor(
         return received.copy(frame = frame, raw = raw)
     }
 
+    /**
+     * The client correlator's own `subagents_updated`. RULE (letta-mobile-fxoew.2):
+     * a host that advertises [SUBAGENT_PUSH_CAPABILITY] is authoritative and
+     * this emits nothing; against older hosts it stays the only live source.
+     * Kept in place for those hosts; a later cleanup deletes it.
+     */
     private fun buildSubagentsUpdatedIfChanged(
         changedToolCallId: String,
         reason: String,
     ): List<ServerFrame> {
+        if (hostPushesSubagents) return emptyList()
         val revision = subagentCorrelator.revision
         if (revision == lastEmittedSubagentRevision) return emptyList()
         lastEmittedSubagentRevision = revision
@@ -517,6 +540,14 @@ internal class IrohObserverIngestor(
 
         /** Meridian's device-wide conversation change push; see ConversationChangeNotifier on the host. */
         private const val CONVERSATION_UPDATED_TYPE = "conversation_updated"
+
+        /** letta-mobile-fxoew.2: the host registry's push; see SubagentRegistryPublisher on the host. */
+        private const val SUBAGENTS_UPDATED_TYPE = "subagents_updated"
+
+        private val HOST_PUSH_TYPES = setOf(AGENT_UPDATED_TYPE, CONVERSATION_UPDATED_TYPE, SUBAGENTS_UPDATED_TYPE)
+
+        /** Mirrors ControllerSubagentRegistrySource.PUSH_CAPABILITY on the host (not imported across layers). */
+        internal const val SUBAGENT_PUSH_CAPABILITY = "subagent_registry_push_v1"
 
         /** Longer than the engine's settle window (1.5 s), so a healthy engine always wins. */
         internal const val OBSERVER_TERMINAL_GRACE_MS = 3_000L

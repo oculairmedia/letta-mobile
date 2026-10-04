@@ -36,6 +36,11 @@ interface ViewerHandle {
     fun receivesConversationEvents(): Boolean = false
 }
 
+/** letta-mobile-fxoew.2: told when a connection starts viewing a conversation. */
+fun interface ViewerJoinedListener {
+    suspend fun onViewerJoined(conversationId: String, viewer: ViewerHandle)
+}
+
 /** Opaque ownership token for one canonical endpoint connection generation. */
 class ViewerRegistration internal constructor(
     internal val endpointId: String,
@@ -81,11 +86,29 @@ class ConnectionRegistry {
         registration
     }
 
-    /** Register [registration] only while it remains the endpoint's current generation. */
-    suspend fun register(conversationId: String, registration: ViewerRegistration): Boolean = mutex.withLock {
-        if (activeByEndpoint[registration.endpointId] !== registration) return@withLock false
-        viewersByConversation.getOrPut(conversationId) { mutableMapOf() }[registration.endpointId] = registration
-        true
+    /**
+     * Register [registration] only while it remains the endpoint's current generation.
+     *
+     * letta-mobile-fxoew.2: when this makes the connection a NEW viewer of
+     * [conversationId] (not a re-registration from paging), every
+     * [ViewerJoinedListener] hears it after the lock is released.
+     */
+    suspend fun register(conversationId: String, registration: ViewerRegistration): Boolean {
+        val joined = mutex.withLock {
+            if (activeByEndpoint[registration.endpointId] !== registration) return false
+            val viewers = viewersByConversation.getOrPut(conversationId) { mutableMapOf() }
+            val previous = viewers.put(registration.endpointId, registration)
+            previous !== registration
+        }
+        if (joined) joinListeners.forEach { it.onViewerJoined(conversationId, registration.viewer) }
+        return true
+    }
+
+    private val joinListeners = java.util.concurrent.CopyOnWriteArrayList<ViewerJoinedListener>()
+
+    /** letta-mobile-fxoew.2: hear each connection that starts viewing a conversation. */
+    fun addViewerJoinedListener(listener: ViewerJoinedListener) {
+        joinListeners += listener
     }
 
     /** Remove [viewer] only when it is the exact handle currently registered. */

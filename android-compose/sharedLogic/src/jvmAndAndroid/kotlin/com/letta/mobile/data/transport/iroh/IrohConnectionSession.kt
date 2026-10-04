@@ -31,7 +31,14 @@ internal class IrohConnectionSession(
     @Volatile
     private var viewedConversation: IrohViewedConversation? = null
 
+    @Volatile
+    private var readyCapabilities: Set<String> = emptySet()
+
+    /** Capabilities the host advertised for the current Ready handle; empty when not ready. */
+    fun hostCapabilities(): Set<String> = readyCapabilities
+
     fun onReady(handle: IrohConnectionHandle) {
+        readyCapabilities = handle.serverCapabilities.orEmpty()
         val readyGeneration = nextGeneration()
         startObserverIngest(handle, readyGeneration)
         reSubscribeViewedConversation(readyGeneration)
@@ -53,6 +60,7 @@ internal class IrohConnectionSession(
     private fun nextGeneration() = IrohSessionGeneration(generation.incrementAndGet())
 
     private fun stopSessionWork(reason: SessionStopReason): Job? {
+        readyCapabilities = emptySet()
         nextGeneration()
         resubscribeJob?.cancel()
         resubscribeJob = null

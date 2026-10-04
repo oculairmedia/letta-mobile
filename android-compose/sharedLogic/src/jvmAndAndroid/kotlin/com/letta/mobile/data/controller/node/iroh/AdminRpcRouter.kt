@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -81,9 +82,18 @@ class AdminRpcRouter(
         return this
     }
 
+    /**
+     * letta-mobile-fxoew.2: capabilities a host feature behind this router
+     * enables beyond its methods (for example the subagent registry push),
+     * advertised to clients on auth.
+     */
+    @Volatile
+    var featureCapabilities: Set<String> = emptySet()
+
     fun copyHandlersFrom(other: AdminRpcRouter): AdminRpcRouter {
         handlers.clear()
         handlers.putAll(other.handlers)
+        featureCapabilities = other.featureCapabilities
         return requireNonEmpty(other.methodCount)
     }
 
@@ -109,6 +119,8 @@ class AdminRpcRouter(
                     put("result", result)
                 },
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Telemetry.event(
                 "AdminRpc",

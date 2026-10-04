@@ -1084,7 +1084,7 @@ class IrohNodeConnection(
         private val SUBAGENT_RPC_METHODS = setOf("subagent.list", "subagent.todos")
 
         internal fun advertisedCapabilities(router: AdminRpcRouter): List<String> = buildList {
-            add(IrohFrameCodec.FRAME_PART_CAPABILITY)
+            addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY) + router.featureCapabilities)
             if (SUBAGENT_RPC_METHODS.all { it in router.registeredMethods }) {
                 add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
             }

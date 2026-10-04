@@ -165,6 +165,14 @@ data class SubagentChipRecord(
     @SerialName("first_seen_epoch_ms") val firstSeenEpochMs: Long = 0,
     @SerialName("last_seen_epoch_ms") val lastSeenEpochMs: Long = 0,
     @SerialName("terminal_at_epoch_ms") val terminalAtEpochMs: Long? = null,
+    /**
+     * letta-mobile-fxoew.3: why the host, not the App Server, ended this chip.
+     * [TERMINAL_REASON_STALE] marks a RUNNING chip that went unobserved past
+     * [DurableSubagentRegistry.STALE_RUNNING_AFTER_MS]. Null for every
+     * App-Server-reported terminal and for reconcile orphaning (its state,
+     * ORPHANED, already says why). Older readers ignore the field.
+     */
+    @SerialName("terminal_reason") val terminalReason: String? = null,
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 
@@ -183,6 +191,11 @@ data class SubagentChipRecord(
         activity = activity,
         terminalAtEpochMs = terminalAtEpochMs,
     )
+
+    companion object {
+        /** letta-mobile-fxoew.3: the host's TTL terminalized an unobserved RUNNING chip. */
+        const val TERMINAL_REASON_STALE = "stale"
+    }
 }
 
 /**

@@ -122,6 +122,22 @@ class IrohNodeEndpoint(
     }
 
     /**
+     * letta-mobile-fxoew.2: wires [publisher] to this endpoint. Its
+     * `subagents_updated` frames go to the connections viewing the frame's
+     * conversation (the same audience as that conversation's turn stream), and
+     * each connection that starts viewing a conversation gets its snapshot
+     * replayed to it alone.
+     */
+    fun attachSubagentPublisher(publisher: SubagentRegistryPublisher) {
+        publisher.attach { conversationId, frame ->
+            connectionRegistry.viewersFor(conversationId).count { it.writeFrame(frame) }
+        }
+        connectionRegistry.addViewerJoinedListener { conversationId, viewer ->
+            publisher.replayTo(conversationId, viewer)
+        }
+    }
+
+    /**
      * The admin RPC router for this endpoint. Created lazily so handlers can
      * register before [start] is called. Passed to every incoming connection.
      */

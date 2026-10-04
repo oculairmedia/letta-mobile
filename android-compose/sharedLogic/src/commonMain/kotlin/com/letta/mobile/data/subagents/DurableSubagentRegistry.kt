@@ -43,6 +43,8 @@ class DurableSubagentRegistry(
     private val store: SubagentRegistryStore = InMemorySubagentRegistryStore(),
     private val maxEntries: Int = MAX_ENTRIES,
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /** letta-mobile-fxoew.3: how long a live chip may go unobserved; see [staleRunningChips]. */
+    private val staleAfterMs: Long = STALE_RUNNING_AFTER_MS,
 ) {
     private val lock = SynchronizedObject()
 
@@ -51,6 +53,38 @@ class DurableSubagentRegistry(
 
     init {
         rehydrate()
+        // Zombies persisted by an earlier process end now, not on some later mutation.
+        expireStale()
+    }
+
+    /**
+     * letta-mobile-fxoew.3: terminalize every live chip unobserved for longer
+     * than [staleAfterMs] (see [staleRunningChips]). Returns the chips it
+     * ended so the caller can tell their conversations' viewers.
+     */
+    fun expireStale(): List<SubagentChipRecord> {
+        val expired = synchronized(lock) {
+            expireStaleLocked().also { if (it.isNotEmpty()) persistLocked() }
+        }
+        expired.forEach { record ->
+            Telemetry.event(
+                TAG,
+                "ttl.expired",
+                "conversationId" to record.conversationId,
+                "toolCallId" to record.toolCallId,
+                "subagentType" to record.subagentType,
+                "lastSeenEpochMs" to record.lastSeenEpochMs,
+                level = Telemetry.Level.WARN,
+            )
+        }
+        return expired
+    }
+
+    private fun expireStaleLocked(): List<SubagentChipRecord> {
+        val expired = staleRunningChips(entries.values, clock(), staleAfterMs)
+        expired.forEach { entries[it.key] = it }
+        if (expired.isNotEmpty()) enforceCapacityLocked()
+        return expired
     }
 
     /**
@@ -403,6 +437,9 @@ class DurableSubagentRegistry(
      */
     private fun enforceCapacityLocked() {
         if (entries.size <= maxEntries) return
+        // letta-mobile-fxoew.3: a stale live chip must not pin the cap. Past
+        // the TTL it is terminal, and therefore evictable below.
+        staleRunningChips(entries.values, clock(), staleAfterMs).forEach { entries[it.key] = it }
         val evictable = entries.values
             .filter { it.state.isTerminal }
             .sortedBy { it.terminalAtEpochMs ?: it.lastSeenEpochMs }
@@ -457,5 +494,13 @@ class DurableSubagentRegistry(
          * eviction is recorded at WARN because it means chip history was lost.
          */
         const val MAX_ENTRIES = 512
+
+        /**
+         * letta-mobile-fxoew.3: a live chip unobserved for this long is ended as
+         * stale. Six hours is far beyond any subagent run seen in the live
+         * registry, so it only catches chips whose worker is gone; the zombies it
+         * targets were days to weeks old.
+         */
+        const val STALE_RUNNING_AFTER_MS: Long = 6 * 60 * 60 * 1000L
     }
 }
