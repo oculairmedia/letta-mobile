@@ -68,9 +68,7 @@ class ConversationListAgentHandlerTest {
         // receives an empty conversations array and falls through to
         // its null branch.
         val conversations = extractConversationsArray(resp)
-        if (conversations.isNotEmpty()) {
-            throw AssertionError("Expected empty conversations for unknown agent; got $resp")
-        }
+        assertTrue(conversations.isEmpty(), "Expected empty conversations for unknown agent; got $resp")
     }
 
     @Test
