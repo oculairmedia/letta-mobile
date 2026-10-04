@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -118,6 +119,8 @@ class AdminRpcRouter(
                     put("result", result)
                 },
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Telemetry.event(
                 "AdminRpc",
