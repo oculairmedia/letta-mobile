@@ -3,7 +3,7 @@
 package com.letta.mobile.ui.chat.surface.sendlift
 
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.timeline.ManualMainDispatcher
@@ -209,7 +209,7 @@ class SendLiftFramesTest {
 
     private fun run(case: SendLiftCase): SendLiftRun {
         var recorded = SendLiftRun(emptyList(), false)
-        runComposeUiTest {
+        runDesktopComposeUiTest(width = SendLiftFrameRecorder.WIDTH, height = SendLiftFrameRecorder.HEIGHT) {
             val rig = if (case.paged) PagedSendLiftRig.open(main, case.history) else null
             try {
                 val port = SendLiftPort(if (rig == null) case.history else 0, case.draft, rig?.let { it::send })
