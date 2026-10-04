@@ -34,7 +34,19 @@ internal fun openedChatViewModel(
     agent: Agent,
     conversationId: String,
     tag: String,
-    contextReadings: ContextTokenReadings = ContextTokenReadings(),
+): AdminChatViewModel = openedChatViewModel(pagingHost, agent, conversationId, FixtureSession(tag))
+
+/** The session the fixture's ViewModel sees: its backend tag and the context readings it streams. */
+internal data class FixtureSession(
+    val tag: String,
+    val contextReadings: ContextTokenReadings = ContextTokenReadings(),
+)
+
+internal fun openedChatViewModel(
+    pagingHost: ChatPagingHost,
+    agent: Agent,
+    conversationId: String,
+    session: FixtureSession,
 ): AdminChatViewModel = AdminChatViewModel(
     routeArgs = ChatRouteArgs(
         SavedStateHandle(mapOf("agentId" to agent.id.value, "conversationId" to conversationId)),
@@ -47,7 +59,7 @@ internal fun openedChatViewModel(
     bugReportRepository = mockk(relaxed = true),
     conversationRepository = mockk(relaxed = true),
     settingsRepository = stubSettingsRepository(),
-    sessionManager = stubSessionManager(tag, contextReadings),
+    sessionManager = stubSessionManager(session),
     runtimeEventOutbox = mockk(relaxed = true),
     currentConversationTracker = mockk(relaxed = true),
     shimBackendDetector = mockk<ShimBackendDetector>(relaxed = true) {
@@ -95,11 +107,11 @@ private fun stubChatBridge() = mockk<WsChatBridge>(relaxed = true) {
     every { a2uiEvents } returns emptyFlow()
 }
 
-private fun stubSessionManager(tag: String, contextReadings: ContextTokenReadings) = mockk<SessionManager>(relaxed = true) {
+private fun stubSessionManager(session: FixtureSession) = mockk<SessionManager>(relaxed = true) {
     every { current.localRuntimeBackend } returns null
-    every { current.backendDescriptor.backendId } returns BackendId(tag)
-    every { current.backendDescriptor.runtimeId } returns RuntimeId(tag)
+    every { current.backendDescriptor.backendId } returns BackendId(session.tag)
+    every { current.backendDescriptor.runtimeId } returns RuntimeId(session.tag)
     every { currentGraph } returns MutableStateFlow(
-        mockk<SessionGraph>(relaxed = true) { every { this@mockk.contextTokenReadings } returns contextReadings },
+        mockk<SessionGraph>(relaxed = true) { every { contextTokenReadings } returns session.contextReadings },
     )
 }

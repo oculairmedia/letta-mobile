@@ -10,6 +10,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.EffortSelection
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.ChatPagingHost
+import com.letta.mobile.feature.chat.screen.FixtureSession
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.openedChatViewModel
 import com.letta.mobile.testutil.TestData
@@ -208,7 +209,7 @@ class AdminChatSessionPortTest {
         try {
             val agent = TestData.agent("agent-context", "Context").copy(contextWindowLimit = 128_000)
             val readings = ContextTokenReadings()
-            val vm = openedChatViewModel(canonicalPagingHost(), agent, "conversation-context", "context", readings)
+            val vm = openedChatViewModel(canonicalPagingHost(), agent, "conversation-context", FixtureSession("context", readings))
             viewModel = vm
             val port = AdminChatSessionPort(vm, vm.viewModelScope)
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { port.composer.collect {} }
