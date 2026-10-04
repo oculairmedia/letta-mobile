@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator

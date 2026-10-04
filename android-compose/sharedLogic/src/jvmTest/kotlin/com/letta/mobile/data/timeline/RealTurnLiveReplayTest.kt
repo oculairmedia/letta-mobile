@@ -31,9 +31,10 @@ class RealTurnLiveReplayTest {
     @Test
     fun everyRealTurnFoldsIntoOneRowPerLogicalIdWithTheStoredText() {
         Telemetry.clear()
-        forEachTurn { label, model, turn ->
-            val replay = Replay().apply { liveMessages(model, turn).forEach(::feed) }
-            val stored = storedTexts(model, turn)
+        forEachTurn { turn ->
+            val label = turn.label
+            val replay = Replay().apply { liveMessages(turn).forEach(::feed) }
+            val stored = storedTexts(turn)
 
             val streamedIds = replay.texts.keys
             assertTrue(streamedIds.isNotEmpty(), label)
@@ -47,9 +48,10 @@ class RealTurnLiveReplayTest {
 
     @Test
     fun textGrowsMonotonicallyAndNeverAppendsASecondRow() {
-        forEachTurn { label, model, turn ->
+        forEachTurn { turn ->
+            val label = turn.label
             val replay = Replay()
-            liveMessages(model, turn).forEach { message ->
+            liveMessages(turn).forEach { message ->
                 replay.feed(message)
                 replay.texts.forEach { (id, history) ->
                     history.zipWithNext().forEach { (before, after) ->
@@ -63,9 +65,10 @@ class RealTurnLiveReplayTest {
 
     @Test
     fun replayedAndOutOfOrderTextFramesAreDroppedAsStaleAndNeverChangeTheRows() {
-        forEachTurn { label, model, turn ->
+        forEachTurn { turn ->
+            val label = turn.label
             Telemetry.clear()
-            val messages = liveMessages(model, turn)
+            val messages = liveMessages(turn)
             val clean = Replay().apply { messages.forEach(::feed) }
             val textFrames = messages.count { it.isStampedText() }
             val noisy = Replay().apply {
@@ -83,8 +86,9 @@ class RealTurnLiveReplayTest {
     @Test
     fun everyToolReturnAttachesToItsCallRowAndNothingStaysParked() {
         var callsSeen = 0
-        forEachTurn { label, model, turn ->
-            val replay = Replay().apply { liveMessages(model, turn).forEach(::feed) }
+        forEachTurn { turn ->
+            val label = turn.label
+            val replay = Replay().apply { liveMessages(turn).forEach(::feed) }
             val calls = replay.rows().filter { it.messageType == TimelineMessageType.TOOL_CALL }
             callsSeen += calls.size
             assertEquals(1, calls.size, label)
@@ -102,7 +106,7 @@ class RealTurnLiveReplayTest {
     @Test
     fun grokWritesTwoAssistantMessagesPerTurnAndTheyStayTwoRows() {
         listOf(1, 2).forEach { turn ->
-            val replay = Replay().apply { liveMessages("openrouter-grok-4.7", turn).forEach(::feed) }
+            val replay = Replay().apply { liveMessages(Turn("openrouter-grok-4.7", turn)).forEach(::feed) }
             val assistants = replay.rows().filter { it.messageType == TimelineMessageType.ASSISTANT }
             assertEquals(2, assistants.size, "turn $turn")
             assertEquals(2, assistants.map { it.logicalId }.toSet().size)
@@ -112,6 +116,11 @@ class RealTurnLiveReplayTest {
     private fun LettaMessage.isStampedText(): Boolean = textSeq != null
 
     private fun telemetryCount(name: String): Int = Telemetry.events.value.count { it.name == name }
+
+    /** One captured turn: the model route it came from and its number. */
+    private data class Turn(val model: String, val number: Int) {
+        val label: String get() = "$model/turn$number"
+    }
 
     private class Replay {
         private var state = TimelineReducerState(Timeline("conv"))
@@ -138,11 +147,11 @@ class RealTurnLiveReplayTest {
     }
 
     /** The turn as the client receives it: the viewer wire stamped by the host, then mapped. */
-    private fun liveMessages(model: String, turn: Int): List<LettaMessage> {
+    private fun liveMessages(turn: Turn): List<LettaMessage> {
         var minted = 0
-        val tag = "$model-$turn"
+        val tag = turn.label.replace("/", "-")
         val identity = TurnStreamIdentity("turn-$tag") { "lm-${++minted}-$tag" }
-        return RealTurnLedgerFixtures.wireFrames(model, turn)
+        return RealTurnLedgerFixtures.wireFrames(turn.model, turn.number)
             .filter { it.str("type") == "stream_delta" }
             .mapNotNull { identity.stamp(it.toString(), StreamTextFrameSource.CumulativeSnapshot) }
             .flatMap { body ->
@@ -155,8 +164,8 @@ class RealTurnLiveReplayTest {
     }
 
     /** The stored assistant and reasoning text of the rows `message.list` returned for the turn. */
-    private fun storedTexts(model: String, turn: Int): Map<String, String> =
-        RealTurnLedgerFixtures.listedRows(model, turn)
+    private fun storedTexts(turn: Turn): Map<String, String> =
+        RealTurnLedgerFixtures.listedRows(turn.model, turn.number)
             .filter { it.str("message_type") == "assistant_message" || it.str("message_type") == "reasoning_message" }
             .associate { it.str("id") to storedText(it) }
 
@@ -164,9 +173,9 @@ class RealTurnLiveReplayTest {
         (row["content"] as? JsonArray)?.joinToString("") { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull.orEmpty() }
             ?: row.str("reasoning")
 
-    private fun forEachTurn(block: (label: String, model: String, turn: Int) -> Unit) {
+    private fun forEachTurn(block: (Turn) -> Unit) {
         RealTurnLedgerFixtures.MODELS.forEach { model ->
-            listOf(1, 2).forEach { turn -> block("$model/turn$turn", model, turn) }
+            listOf(1, 2).forEach { number -> block(Turn(model, number)) }
         }
     }
 

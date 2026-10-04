@@ -31,9 +31,9 @@ class TimelineIdentityInvariantsTest {
     /**
      * What the stopgap cannot give: under it the two writers take the row in turns, so the text jumps
      * between A and B instead of stacking. Only a text sequence (C2, letta-mobile-nbha6) makes the
-     * stale writer's frames lose, so the text only grows. Red until C2.
+     * stale writer's frames lose, so the text only grows. The reducer rule itself is covered with pre-stamped frames in LiveTurnReducerTest.
      */
-    @Ignore("RED until C2: letta-mobile-nbha6")
+    @Ignore("Cannot go green from a raw fixture: the host stamper numbers A and B frames in arrival order, so B always carries the higher text_seq; the stale-writer rule is pinned by LiveTurnReducerTest.twoWritersOnOneIdCannotStack (letta-mobile-nbha6)")
     @Test fun stackedCopiesFixtureTextOnlyGrows() = replay(STACKED_COPIES) { frames ->
         assertEquals(emptyList(), textGrowthViolations(frames), frames.joinToString("\n"))
     }

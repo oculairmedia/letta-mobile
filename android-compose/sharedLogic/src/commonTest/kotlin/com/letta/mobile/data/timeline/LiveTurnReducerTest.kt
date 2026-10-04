@@ -22,7 +22,7 @@ class LiveTurnReducerTest {
 
     @Test
     fun firstFrameAppendsOnce() {
-        val fold = LiveFold().apply { feed(reply("lm-1", 1, "Hel")) }
+        val fold = LiveFold().apply { feed(Reply("lm-1").at(1, "Hel")) }
 
         assertEquals(listOf("lm-1"), fold.rows().map { it.logicalId })
         assertEquals("Hel", fold.row("lm-1").content)
@@ -30,7 +30,8 @@ class LiveTurnReducerTest {
 
     @Test
     fun higherTextSeqReplacesText() {
-        val fold = LiveFold().apply { feed(reply("lm-1", 1, "Hel"), reply("lm-1", 2, "Hello"), reply("lm-1", 3, "Hello there")) }
+        val reply = Reply("lm-1")
+        val fold = LiveFold().apply { feed(reply.at(1, "Hel"), reply.at(2, "Hello"), reply.at(3, "Hello there")) }
 
         assertEquals(listOf("Hello there"), fold.rows().map { it.content })
         assertEquals(3, fold.row("lm-1").textSeq)
@@ -38,47 +39,52 @@ class LiveTurnReducerTest {
 
     @Test
     fun replacingTextKeepsThePositionAndKeyOfTheRow() {
-        val fold = LiveFold().apply { feed(reply("lm-1", 1, "a"), reasoning("lm-2", 1, "think"), reply("lm-1", 2, "ab")) }
+        val reply = Reply("lm-1")
+        val thought = Reply("lm-2")
+        val before = LiveFold().apply { feed(reply.at(1, "a"), thought.thought(1, "think")) }.rows()
+        val after = LiveFold().apply { feed(reply.at(1, "a"), thought.thought(1, "think"), reply.at(2, "ab")) }.rows()
 
-        val before = LiveFold().apply { feed(reply("lm-1", 1, "a"), reasoning("lm-2", 1, "think")) }.rows()
-        assertEquals(before.map { it.position }, fold.rows().map { it.position })
-        assertEquals(before.map { it.otid }, fold.rows().map { it.otid })
+        assertEquals(before.map { it.position }, after.map { it.position })
+        assertEquals(before.map { it.otid }, after.map { it.otid })
     }
 
     @Test
     fun lowerOrEqualTextSeqIsDropped() {
         Telemetry.clear()
+        val reply = Reply("lm-1")
         val fold = LiveFold().apply {
-            feed(reply("lm-1", 1, "Hel"), reply("lm-1", 3, "Hello there"))
-            feed(reply("lm-1", 2, "Hello"), reply("lm-1", 3, "Hello there, rewritten"), reply("lm-1", 1, "Hel"))
+            feed(reply.at(1, "Hel"), reply.at(3, "Hello there"))
+            feed(reply.at(2, "Hello"), reply.at(3, "Hello there, rewritten"), reply.at(1, "Hel"))
         }
 
         assertEquals(listOf("Hello there"), fold.rows().map { it.content })
-        assertEquals(3, telemetryCount("live.staleTextFrame"))
+        assertEquals(3, telemetryCount(STALE))
     }
 
     @Test
     fun twoWritersOnOneIdCannotStack() {
         Telemetry.clear()
-        val answer = (1..12).map { "This reply grows by one word at a time, word ${it}." }
-        val cumulative = answer.runningReduce { held, next -> "$held $next" }
-        // Writer A delivers the reply's cumulative snapshots 1..n. Writer B re-delivers a different body under
+        val reply = Reply("lm-reply")
+        val cumulative = (1..12).map { "This reply grows by one word at a time, word $it." }.runningReduce { held, next -> "$held $next" }
+        // Writer A delivers the reply's cumulative snapshots. Writer B re-delivers a different body under
         // the same logical id with a seq that is always behind the snapshot it interleaves with.
-        val frames = cumulative.mapIndexed { index, text ->
-            listOf(reply("lm-reply", index * 2 + 2, text), reply("lm-reply", index * 2 + 1, "I rewrote the green box."))
-        }.flatten()
+        val frames = cumulative.flatMapIndexed { index, text ->
+            listOf(reply.at(index * 2 + 2, text), reply.at(index * 2 + 1, "I rewrote the green box."))
+        }
         val fold = LiveFold().apply { feed(*frames.toTypedArray()) }
 
         assertEquals(listOf("lm-reply"), fold.rows().map { it.logicalId })
         assertEquals(cumulative.last(), fold.row("lm-reply").content)
-        assertEquals(cumulative.size, telemetryCount("live.staleTextFrame"))
+        assertEquals(cumulative.size, telemetryCount(STALE))
     }
 
     @Test
     fun toolReturnAttachesByCallIdExactly() {
+        val date = Tool("call-1", """{"command":"date"}""")
+        val uptime = Tool("call-2", """{"command":"uptime"}""")
         val fold = LiveFold().apply {
-            feed(call("tc-call-1", "call-1", """{"command":"date"}"""), call("tc-call-2", "call-2", """{"command":"uptime"}"""))
-            feed(returned("call-2", "up 3 days"), returned("call-1", "Sat Oct 3"))
+            feed(date.call(), uptime.call())
+            feed(uptime.returned("up 3 days"), date.returned("Sat Oct 3"))
         }
 
         assertEquals(listOf("tc-call-1", "tc-call-2"), fold.rows().map { it.logicalId })
@@ -89,11 +95,12 @@ class LiveTurnReducerTest {
 
     @Test
     fun aReturnBeforeItsCallIsParkedAndAttachedWhenTheCallAppends() {
-        val fold = LiveFold().apply { feed(returned("call-9", "early")) }
+        val tool = Tool("call-9")
+        val fold = LiveFold().apply { feed(tool.returned("early")) }
         assertEquals(listOf("call-9"), fold.pending.keys.toList())
         assertTrue(fold.rows().isEmpty())
 
-        fold.feed(call("tc-call-9", "call-9", "{}"))
+        fold.feed(tool.call())
 
         assertEquals("early", fold.row("tc-call-9").toolReturnContentByCallId["call-9"])
         assertTrue(fold.pending.isEmpty())
@@ -101,9 +108,8 @@ class LiveTurnReducerTest {
 
     @Test
     fun aDuplicateToolCallEmissionWithEmptyArgumentsKeepsTheArguments() {
-        val fold = LiveFold().apply {
-            feed(call("tc-call-1", "call-1", """{"command":"date"}"""), returned("call-1", "Sat Oct 3"), call("tc-call-1", "call-1", "{}"))
-        }
+        val tool = Tool("call-1", """{"command":"date"}""")
+        val fold = LiveFold().apply { feed(tool.call(), tool.returned("Sat Oct 3"), Tool("call-1").call()) }
 
         val row = fold.row("tc-call-1")
         assertEquals(1, fold.rows().size)
@@ -120,17 +126,18 @@ class LiveTurnReducerTest {
         }
 
         assertTrue(fold.rows().isEmpty())
-        assertEquals(2, telemetryCount("live.unstampedFrame"))
+        assertEquals(2, telemetryCount(UNSTAMPED))
     }
 
     @Test
     fun redialSeqResetDoesNotShrinkText() {
         // A redial restarts the wire's event_seq / seq_id; the text sequence keeps growing, so the reply
         // never reads shorter and no frame of the old connection is mistaken for a newer one.
+        val reply = Reply("lm-1")
         val fold = LiveFold().apply {
-            feed(reply("lm-1", 1, "The", seqId = 90_001), reply("lm-1", 2, "The answer", seqId = 90_002))
-            feed(reply("lm-1", 3, "The answer is", seqId = 1), reply("lm-1", 4, "The answer is 42", seqId = 2))
-            feed(reply("lm-1", 2, "The answer", seqId = 3))
+            feed(reply.at(1, "The", seqId = 90_001), reply.at(2, "The answer", seqId = 90_002))
+            feed(reply.at(3, "The answer is", seqId = 1), reply.at(4, "The answer is 42", seqId = 2))
+            feed(reply.at(2, "The answer", seqId = 3))
         }
 
         assertEquals(listOf("The answer is 42"), fold.rows().map { it.content })
@@ -140,12 +147,13 @@ class LiveTurnReducerTest {
     @Test
     fun appendOfAnExistingLogicalIdIsANoOpThatReportsIt() {
         Telemetry.clear()
-        val timeline = Timeline("conv").append(row("lm-1", 1, "x"))
+        val reply = Reply("lm-1")
+        val timeline = Timeline("conv").append(reply.row(1, "x"))
 
-        val again = timeline.append(row("lm-1", 2, "y").copy(otid = "other-otid", position = 9.0))
+        val again = timeline.append(reply.row(2, "y").copy(otid = "other-otid", position = 9.0))
 
         assertEquals(timeline.events, again.events)
-        assertEquals(1, telemetryCount("live.duplicateAppend"))
+        assertEquals(1, telemetryCount(DUPLICATE_APPEND))
     }
 
     @Test
@@ -153,70 +161,75 @@ class LiveTurnReducerTest {
         val random = Random(SEED)
         repeat(ITERATIONS) { iteration ->
             Telemetry.clear()
-            val ids = (1..random.nextInt(1, 4)).map { "lm-$it" }
-            val frames = interleavedFrames(random, ids)
+            val replies = (1..random.nextInt(1, 4)).map { Reply("lm-$it") }
+            val frames = interleavedFrames(random, replies)
             val fold = LiveFold()
-            val held = mutableMapOf<String, Pair<Int, String>>()
+            val heldSeq = mutableMapOf<String, Int>()
             frames.forEach { frame ->
                 fold.feed(frame)
-                fold.rows().filter { it.logicalId in ids }.forEach { row ->
-                    val before = held[row.logicalId]
-                    assertTrue(before == null || row.textSeq >= before.first, "iteration $iteration: text_seq went backwards")
-                    held[row.logicalId] = row.textSeq to row.content
+                fold.rows().forEach { row ->
+                    assertTrue(row.textSeq >= (heldSeq[row.logicalId] ?: 0), "iteration $iteration: text_seq went backwards")
+                    heldSeq[row.logicalId] = row.textSeq
                 }
             }
-            assertEquals(ids.size, fold.rows().count { it.logicalId in ids }, "iteration $iteration: one row per logical id")
-            assertEquals(fold.rows().size, fold.rows().map { it.logicalId }.toSet().size, "iteration $iteration")
-            ids.forEach { id -> assertEquals(finalText(frames, id), fold.row(id).content, "iteration $iteration $id") }
-            assertEquals(0, telemetryCount("live.duplicateAppend"), "iteration $iteration")
+            val rows = fold.rows()
+            assertEquals(replies.size, rows.count { it.logicalId.startsWith("lm-") }, "iteration $iteration: one row per logical id")
+            assertEquals(rows.size, rows.map { it.logicalId }.toSet().size, "iteration $iteration")
+            replies.forEach { reply ->
+                assertEquals(finalText(frames, reply), fold.row(reply.id).content, "iteration $iteration ${reply.id}")
+            }
+            assertEquals(0, telemetryCount(DUPLICATE_APPEND), "iteration $iteration")
         }
     }
 
     /** Every id's snapshots 1..n, shuffled with duplicates and a tool round between the ids. */
-    private fun interleavedFrames(random: Random, ids: List<String>): List<LettaMessage> {
-        val perId = ids.map { id ->
+    private fun interleavedFrames(random: Random, replies: List<Reply>): List<LettaMessage> {
+        val perReply = replies.map { reply ->
             val snapshots = (1..random.nextInt(1, 7)).runningFold("") { held, n -> "$held w$n" }.drop(1)
-            snapshots.mapIndexed { i, text -> reply(id, i + 1, text) as LettaMessage }
+            snapshots.mapIndexed { i, text -> reply.at(i + 1, text) as LettaMessage }
         }
-        val tool = listOf(call("tc-call-x", "call-x", "{}"), returned("call-x", "ok"))
-        val pool = perId.flatten().flatMap { frame -> List(random.nextInt(1, 3)) { frame } } + tool
-        return pool.shuffled(random).let { shuffled -> shuffled + perId.map { it.last() } }
+        val tool = Tool("call-x")
+        val pool = perReply.flatten().flatMap { frame -> List(random.nextInt(1, 3)) { frame } } + tool.call() + tool.returned("ok")
+        return pool.shuffled(random) + perReply.map { it.last() }
     }
 
-    private fun finalText(frames: List<LettaMessage>, id: String): String =
-        frames.filterIsInstance<AssistantMessage>().filter { it.logicalMessageId == id }.maxBy { it.textSeq ?: 0 }.content
+    private fun finalText(frames: List<LettaMessage>, reply: Reply): String =
+        frames.filterIsInstance<AssistantMessage>().filter { it.logicalMessageId == reply.id }.maxBy { it.textSeq ?: 0 }.content
 
-    private fun telemetryCount(name: String): Int = Telemetry.events.value.count { it.name == name }
+    private fun telemetryCount(event: String): Int = Telemetry.events.value.count { it.name == event }
 
-    private fun reply(id: String, seq: Int, text: String, seqId: Int? = null) = AssistantMessage(
-        id = id,
-        contentRaw = JsonPrimitive(text),
-        logicalMessageId = id,
-        textSeq = seq,
-        seqId = seqId,
-    )
+    /** The frames of one streamed reply or thought: the host's logical id and a numbered cumulative text. */
+    private class Reply(val id: String) {
+        fun at(seq: Int, text: String, seqId: Int? = null) = AssistantMessage(
+            id = id,
+            contentRaw = JsonPrimitive(text),
+            logicalMessageId = id,
+            textSeq = seq,
+            seqId = seqId,
+        )
 
-    private fun reasoning(id: String, seq: Int, text: String) =
-        ReasoningMessage(id = id, reasoning = text, logicalMessageId = id, textSeq = seq)
+        fun thought(seq: Int, text: String) = ReasoningMessage(id = id, reasoning = text, logicalMessageId = id, textSeq = seq)
 
-    private fun call(logicalId: String, callId: String, arguments: String) = ToolCallMessage(
-        id = "toolcall-$callId",
-        toolCall = ToolCall(toolCallId = callId, name = "Bash", arguments = arguments),
-        toolCalls = listOf(ToolCall(toolCallId = callId, name = "Bash", arguments = arguments)),
-        logicalMessageId = logicalId,
-    )
+        fun row(seq: Int, text: String): TimelineEvent.Confirmed = checkNotNull(at(seq, text).toTimelineEvent(position = 1.0))
+    }
 
-    private fun returned(callId: String, body: String) = ToolReturnMessage(
-        id = "toolreturn-$callId",
-        toolReturnRaw = JsonPrimitive(body),
-        toolCallId = callId,
-        status = "success",
-        logicalMessageId = "tr-$callId",
-    )
+    /** One tool call and its return, named the way the host names them: `tc-<call id>` and `tr-<call id>`. */
+    private class Tool(private val callId: String, private val arguments: String = "{}") {
+        fun call() = ToolCallMessage(
+            id = "toolcall-$callId",
+            toolCall = ToolCall(toolCallId = callId, name = "Bash", arguments = arguments),
+            toolCalls = listOf(ToolCall(toolCallId = callId, name = "Bash", arguments = arguments)),
+            logicalMessageId = "tc-$callId",
+        )
 
-    private fun row(logicalId: String, seq: Int, text: String) = checkNotNull(
-        reply(logicalId, seq, text).toTimelineEvent(position = 1.0),
-    )
+        fun returned(body: String) = ToolReturnMessage(
+            id = "toolreturn-$callId",
+            toolReturnRaw = JsonPrimitive(body),
+            toolCallId = callId,
+            status = "success",
+            logicalMessageId = "tr-$callId",
+        )
+    }
 
     private class LiveFold {
         private var state = TimelineReducerState(Timeline("conv"))
@@ -233,5 +246,8 @@ class LiveTurnReducerTest {
     private companion object {
         const val SEED = 20_261_003
         const val ITERATIONS = 200
+        const val STALE = "live.staleTextFrame"
+        const val UNSTAMPED = "live.unstampedFrame"
+        const val DUPLICATE_APPEND = "live.duplicateAppend"
     }
 }
