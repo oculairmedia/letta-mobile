@@ -7,6 +7,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
+import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -45,8 +46,16 @@ fun CanonicalTimelineSession.paging(
         publication.distinctUntilChanged { old, new ->
             old.selection === new.selection && old.durableRevision == new.durableRevision
         }.collectIndexed { index, current ->
-            if (current.selection !== selection) pump.cancel()
-            else if (index > 0) active.value?.invalidate()
+            if (current.selection !== selection) {
+                pump.cancel()
+            } else if (index > 0) {
+                // Every replaced generation redraws the list; a capture names what moved it.
+                Telemetry.event(
+                    "TimelinePaging", "generation.replaced",
+                    "revision" to current.durableRevision, level = Telemetry.Level.DEBUG,
+                )
+                active.value?.invalidate()
+            }
         }
     }
 }

@@ -76,8 +76,36 @@ class TimelineUiFramesTest {
         assertTrue(perFrame.all { it <= MAX_ROW_COMPOSITIONS_PER_FRAME }, "row compositions per frame: $perFrame")
     }
 
+    /**
+     * letta-mobile-bglj6.1.12: a few seconds after every turn the maintenance reconciles the recent
+     * page again, and anything that advances the durable revision replaces the Paging generation
+     * under the list. Nothing on screen changed, so nothing on screen may move: no drawn row may
+     * leave the list for a frame, and none may change height (a reply whose markdown re-parses
+     * draws empty for a frame or two, and every row above it shifts down).
+     */
+    @Test
+    fun durableReconcileOfUnchangedRowsLeavesEveryDrawnRowInPlace() = replyTurn(
+        afterSettle = { rig, recorder ->
+            // A new usage row: invisible, but a real change, so the generation is replaced.
+            runBlocking { rig.settle(listOf(usage.copy(id = "usage-5b"), usage, stop, reply(tokens.last()), prompt) + history) }
+            recorder.advance("reconcile", RECONCILE_FRAMES)
+        },
+    ) { frames ->
+        val settled = frames.last { it.step == "settle" }
+        val reconcile = listOf(settled) + frames.filter { it.step == "reconcile" }
+        val vanished = vanishedRows(reconcile)
+        val jumps = heightJumps(reconcile, MAX_HEIGHT_JUMP_DP)
+        assertTrue(
+            vanished.isEmpty() && jumps.isEmpty(),
+            (vanished + jumps).joinToString("\n") + "\n\n" + reconcile.joinToString("\n"),
+        )
+    }
+
     /** One reply turn over some history; [assertFrames] reads every frame it drew. */
-    private fun replyTurn(assertFrames: (List<UiFrame>) -> Unit) = runComposeUiTest {
+    private fun replyTurn(
+        afterSettle: (TimelineDomainRig, TimelineUiFrameRecorder) -> Unit = { _, _ -> },
+        assertFrames: (List<UiFrame>) -> Unit,
+    ) = runComposeUiTest {
         val rig = runBlocking { TimelineDomainRig.open(scope) }
         TimelineUiFrameRecorder(this, rig, main).use { recorder ->
             try {
@@ -103,9 +131,10 @@ class TimelineUiFramesTest {
                 runBlocking { rig.settle(listOf(usage, stop, reply(tokens.last()), prompt) + history) }
                 recorder.advanceUntil("settle", SETTLE_FRAMES) { rig.drained }
                 recorder.writeFrameImage("reply-last")
-                recorder.writeFrameLog("reply-frames")
                 assertTrue(rig.drained, "the overlay never handed over to the settled ledger")
                 assertTrue(recorder.frames.any { it.rows.size > MIN_HISTORY_ROWS }, "history never drew")
+                afterSettle(rig, recorder)
+                recorder.writeFrameLog("reply-frames")
                 assertFrames(recorder.frames)
             } finally {
                 runBlocking { rig.close() }
@@ -125,6 +154,8 @@ class TimelineUiFramesTest {
         const val OPEN_FRAMES = 30
         const val TOKEN_FRAMES = 2
         const val SETTLE_FRAMES = 20
+        /** Long enough for the replaced generation's page to load (25 ms read latency) and draw. */
+        const val RECONCILE_FRAMES = 24
         val scope = TimelineScope("backend", "conv-frames", "agent")
 
         val history: List<LettaMessage> = (0 until HISTORY_EXCHANGES).flatMap { i ->

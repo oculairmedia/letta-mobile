@@ -145,6 +145,17 @@ object TimelineHydrationReducer {
         val runtimeAndDisk: List<TimelineEvent>,
     )
 
+    /**
+     * [serverEvent] with every fact [localEvent] knows that the server copy does not: an approval
+     * decision, an attachment set, and each tool call's return.
+     *
+     * A return the server copy says nothing about stays exactly as stored (letta-mobile-bglj6.1.12):
+     * the recent page lists a tool call and its return as two messages, so merging the bare call
+     * used to drop the stored return (its text, truncation and error flag) and the page's return
+     * put it straight back. The row was rewritten on every reconcile of an unchanged page, each
+     * one advancing the durable revision and replacing the Paging generation under the chat.
+     * A call the server does return wins outright, full body over a stored preview included.
+     */
     internal fun mergeRicherEventFacts(
         serverEvent: TimelineEvent.Confirmed,
         localEvent: TimelineEvent.Confirmed,
@@ -152,22 +163,26 @@ object TimelineHydrationReducer {
         val mergedApprovalDecided = serverEvent.approvalDecided || localEvent.approvalDecided
         val mergedApprovalDecision = serverEvent.approvalDecision ?: localEvent.approvalDecision
 
-        val mergedToolReturnContentByCallId = (serverEvent.toolReturnContentByCallId + localEvent.toolReturnContentByCallId.filter { (callId, _) ->
-            callId !in localEvent.toolReturnTruncationByCallId || callId in serverEvent.toolReturnTruncationByCallId
-        }).toTimelinePersistentMap()
+        val serverReturns = serverEvent.toolReturnContentByCallId.keys
+        val keptLocalReturns = localEvent.toolReturnContentByCallId.filterKeys { it !in serverReturns }
+        val mergedToolReturnContentByCallId = (keptLocalReturns + serverEvent.toolReturnContentByCallId).toTimelinePersistentMap()
+        val mergedTruncations = (localEvent.toolReturnTruncationByCallId.filterKeys { it in keptLocalReturns } +
+            serverEvent.toolReturnTruncationByCallId.filterKeys { it in serverReturns }).toTimelinePersistentMap()
+        val mergedIsErrorByCallId = (localEvent.toolReturnIsErrorByCallId.filterKeys { it in keptLocalReturns } +
+            serverEvent.toolReturnIsErrorByCallId.filterKeys { it in serverReturns }).toTimelinePersistentMap()
 
-        val mergedTruncations = (serverEvent.toolReturnTruncationByCallId.filterKeys {
-            it !in localEvent.toolReturnContentByCallId || it in localEvent.toolReturnTruncationByCallId
-        }).toTimelinePersistentMap()
-
+        val serverHasReturn = serverReturns.isNotEmpty() || !serverEvent.toolReturnContent.isNullOrBlank()
         val mergedToolReturnContent = localEvent.toolReturnContent.takeIf { !it.isNullOrBlank() } ?: serverEvent.toolReturnContent
+        val mergedToolReturnIsError = if (serverHasReturn) serverEvent.toolReturnIsError else localEvent.toolReturnIsError
         val mergedAttachments = if (serverEvent.attachments.isEmpty()) localEvent.attachments else serverEvent.attachments
 
         return serverEvent.copy(
             approvalDecided = mergedApprovalDecided,
             approvalDecision = mergedApprovalDecision,
             toolReturnContent = mergedToolReturnContent,
+            toolReturnIsError = mergedToolReturnIsError,
             toolReturnContentByCallId = mergedToolReturnContentByCallId,
+            toolReturnIsErrorByCallId = mergedIsErrorByCallId,
             toolReturnTruncationByCallId = mergedTruncations,
             attachments = mergedAttachments,
         )
