@@ -4,13 +4,19 @@ package com.letta.mobile.ui.haptics
  * Platform-neutral haptic vocabulary. Feature UI should describe intent with
  * these cues instead of choosing Android or iOS haptic APIs directly.
  */
-enum class LettaHapticCue(val playback: LettaHapticPlayback) {
+enum class LettaHapticCue(
+    val playback: LettaHapticPlayback,
+    /** Accompanies an animation; [HapticPolicy] drops it under reduced motion. */
+    val motionCoupled: Boolean = false,
+    /** Per-cue rate floor enforced by [HapticPolicy]; 0 means only the global floor applies. */
+    val minIntervalMillis: Int = 0,
+) {
     Confirm(LettaHapticPlayback.PlatformFeedback),
     Reject(LettaHapticPlayback.PlatformFeedback),
     ToggleOn(LettaHapticPlayback.PlatformFeedback),
     ToggleOff(LettaHapticPlayback.PlatformFeedback),
     SegmentTick(LettaHapticPlayback.PlatformFeedback),
-    SegmentFrequentTick(LettaHapticPlayback.PlatformFeedback),
+    SegmentFrequentTick(LettaHapticPlayback.PlatformFeedback, minIntervalMillis = 40),
     GestureThreshold(LettaHapticPlayback.PlatformFeedback),
     GestureStart(LettaHapticPlayback.PlatformFeedback),
     GestureEnd(LettaHapticPlayback.PlatformFeedback),
@@ -25,6 +31,29 @@ enum class LettaHapticCue(val playback: LettaHapticPlayback) {
     ToolCallStarted(LettaHapticPlayback.Pattern),
     ToolCallSucceeded(LettaHapticPlayback.Pattern),
     ToolCallFailed(LettaHapticPlayback.Pattern),
+
+    // Product-feel cues (letta-mobile-86njl.8). Playback is realised per platform by the actual
+    // (letta-mobile-86njl.9). Error, success, selection and chat-head moments reuse the cues
+    // above (Reject, Confirm, SegmentFrequentTick, GestureStart/GestureEnd).
+    SendLaunch(LettaHapticPlayback.PlatformFeedback, motionCoupled = true),
+    SendLand(LettaHapticPlayback.PlatformFeedback, motionCoupled = true),
+    ReplyArrived(LettaHapticPlayback.PlatformFeedback),
+    RunFinished(LettaHapticPlayback.PlatformFeedback),
+    RunFailed(LettaHapticPlayback.PlatformFeedback),
+    ApprovalNeeded(LettaHapticPlayback.PlatformFeedback),
+    ApprovalDecided(LettaHapticPlayback.PlatformFeedback),
+    ScrollToLatest(LettaHapticPlayback.PlatformFeedback),
+    OverscrollBounce(LettaHapticPlayback.PlatformFeedback, motionCoupled = true),
+    Snap(LettaHapticPlayback.PlatformFeedback, minIntervalMillis = 80),
+    Undo(LettaHapticPlayback.PlatformFeedback),
+    Redo(LettaHapticPlayback.PlatformFeedback),
+    Erase(LettaHapticPlayback.PlatformFeedback, minIntervalMillis = 120),
+    ZoomLimit(LettaHapticPlayback.PlatformFeedback),
+    Create(LettaHapticPlayback.PlatformFeedback),
+    MicStop(LettaHapticPlayback.PlatformFeedback),
+    Navigate(LettaHapticPlayback.PlatformFeedback),
+    DestructiveConfirm(LettaHapticPlayback.PlatformFeedback),
+    MascotTap(LettaHapticPlayback.PlatformFeedback),
 }
 
 enum class LettaHapticPlayback {
