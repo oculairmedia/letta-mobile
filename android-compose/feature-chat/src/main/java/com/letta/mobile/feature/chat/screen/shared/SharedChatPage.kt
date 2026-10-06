@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.NonRestartableComposable
@@ -42,6 +43,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
+import com.letta.mobile.ui.haptics.LocalHaptics
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
 internal data class SharedChatPageParams(
@@ -116,24 +118,29 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
     val appearance = rememberSharedChatAppearance(params)
     Box(modifier) {
-        ChatSurface(
-            port = port,
-            presentation = presentation,
-            onIntent = onIntent,
-            host = host,
-            modifier = Modifier.fillMaxSize(),
-            appearance = appearance,
-            platform = rememberAndroidChatSurfacePlatform(
-                pageBackground = params.pageBackground,
-                onComposerHeightChange = params.onComposerHeightChange,
-                timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
-                topChromeInset = topChromeInset,
-            ),
-            pagedTimeline = params.pagingPresentation?.canonical,
-            canvas = canvas,
-            dockGeometry = dockGeometry,
-            onDockGeometryChange = { dockGeometry = it },
-        )
+        // letta-mobile-bglj6.1.17: the Android haptics backend behind the shared seam — the
+        // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
+        // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
+        CompositionLocalProvider(LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled)) {
+            ChatSurface(
+                port = port,
+                presentation = presentation,
+                onIntent = onIntent,
+                host = host,
+                modifier = Modifier.fillMaxSize(),
+                appearance = appearance,
+                platform = rememberAndroidChatSurfacePlatform(
+                    pageBackground = params.pageBackground,
+                    onComposerHeightChange = params.onComposerHeightChange,
+                    timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
+                    topChromeInset = topChromeInset,
+                ),
+                pagedTimeline = params.pagingPresentation?.canonical,
+                canvas = canvas,
+                dockGeometry = dockGeometry,
+                onDockGeometryChange = { dockGeometry = it },
+            )
+        }
         SharedChatSubagentSheet(
             state = subagentSheet,
             inputs = params.subagents,

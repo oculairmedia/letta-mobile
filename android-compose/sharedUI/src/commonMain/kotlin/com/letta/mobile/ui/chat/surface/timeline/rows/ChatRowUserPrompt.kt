@@ -56,6 +56,8 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -191,10 +193,11 @@ private fun UiMessage.sendFlightKey(): String {
 @Composable
 private fun Modifier.promptBubbleClicks(state: PromptCardState, hasActions: Boolean): Modifier {
     val actionsLabel = stringResource(Res.string.rows_message_actions)
+    val haptics = LocalHaptics.current
     return combinedClickable(
         onClickLabel = null,
         onLongClickLabel = actionsLabel,
-        onLongClick = if (hasActions) ({ state.menuOpen = true }) else null,
+        onLongClick = if (hasActions) ({ haptics.play(LettaHapticCue.LongPress); state.menuOpen = true }) else null,
         onClick = { if (state.canToggle) state.expanded = !state.expanded },
     )
 }

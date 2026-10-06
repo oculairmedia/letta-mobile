@@ -53,9 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -68,6 +66,8 @@ import com.letta.mobile.sharedui.resources.composer_open_canvas
 import com.letta.mobile.sharedui.resources.composer_send
 import com.letta.mobile.sharedui.resources.composer_stop
 import com.letta.mobile.sharedui.resources.composer_stopping
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.icons.LettaIcons
@@ -238,7 +238,7 @@ private fun touchBarPadding(): Pair<Dp, Dp> {
 @Composable
 private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
     if (!visible) return
-    val haptics = LocalHapticFeedback.current
+    val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val reducedMotion = LocalReducedMotion.current
@@ -252,7 +252,7 @@ private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
             .size(TouchComposerDimens.actionTarget)
             .clip(CircleShape)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button) {
-                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                haptics.play(LettaHapticCue.ContextClick)
                 onClick()
             }
             .testTag(ComposerTestTags.TOUCH_PLUS),
@@ -327,7 +327,7 @@ private const val EXIT_SCALE = 0.76f
 @Composable
 private fun TouchActionButton(model: ComposerModel) {
     val stops = model.decisions.action == ComposerAction.Stop
-    val haptics = LocalHapticFeedback.current
+    val haptics = LocalHaptics.current
     val size by animateFloatAsState(
         if (stops) TouchComposerDimens.stopScale else 1f,
         chipSpec(),
@@ -336,7 +336,8 @@ private fun TouchActionButton(model: ComposerModel) {
     val pulse = rememberStopPulse(stopPulses(model))
     FilledIconButton(
         onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            // A send launches the flight; stopping the run reads as a plain confirm.
+            haptics.play(if (stops) LettaHapticCue.Confirm else LettaHapticCue.SendLaunch)
             model.runAction()
         },
         enabled = stops || model.decisions.sendEnabled,

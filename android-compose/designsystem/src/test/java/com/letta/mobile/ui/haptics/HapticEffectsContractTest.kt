@@ -34,4 +34,14 @@ class HapticEffectsContractTest {
         assertNull(HapticEffects.platformSpecFor(LettaHapticCue.StreamingStart))
         assertNull(HapticEffects.platformSpecFor(LettaHapticCue.ToolCallFailed))
     }
+
+    @Test
+    fun `chat product-feel cues map to platform constants`() {
+        // letta-mobile-bglj6.1.17: the send flight launches like a confirm and lands as a light
+        // tick; an approval that needs a decision draws attention; the scroll glide ticks.
+        assertEquals(HapticFeedbackConstants.CONFIRM, HapticEffects.platformSpecFor(LettaHapticCue.SendLaunch)?.modernPlatformType)
+        assertEquals(HapticFeedbackConstants.CLOCK_TICK, HapticEffects.platformSpecFor(LettaHapticCue.SendLand)?.modernPlatformType)
+        assertEquals(HapticFeedbackConstants.CONTEXT_CLICK, HapticEffects.platformSpecFor(LettaHapticCue.ApprovalNeeded)?.fallbackPlatformType)
+        assertEquals(HapticFeedbackConstants.CLOCK_TICK, HapticEffects.platformSpecFor(LettaHapticCue.ScrollToLatest)?.modernPlatformType)
+    }
 }

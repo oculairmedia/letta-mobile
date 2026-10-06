@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,8 @@ import com.letta.mobile.sharedui.resources.rows_send_answer
 import com.letta.mobile.sharedui.resources.rows_sending
 import com.letta.mobile.sharedui.resources.rows_tool_decisions
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.pluralStringResource
@@ -96,6 +99,12 @@ internal fun ApprovalRequestCard(
     callbacks: ChatRowCallbacks,
 ) {
     val decider = rememberApprovalDecider(approval, context, callbacks)
+    // The moment a decision lands on the person: one attention cue per request, before the
+    // structured-question branch returns.
+    val haptics = LocalHaptics.current
+    LaunchedEffect(approval.requestId) {
+        if (decider.submit != null && approval.requiresUserInput()) haptics.play(LettaHapticCue.ApprovalNeeded)
+    }
     // A structured AskUserQuestion takes precedence over the generic disclosure.
     if (AskUserQuestionCard(approval, decider)) return
     ArtifactCard(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
@@ -131,6 +140,7 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
     val toolCallIds = remember(approval) { approval.toolCalls.map { it.toolCallId } }
     var rejecting by remember(approval.requestId) { mutableStateOf(false) }
     var reason by remember(approval.requestId) { mutableStateOf("") }
+    val haptics = LocalHaptics.current
     if (rejecting) {
         OutlinedTextField(
             value = reason,
@@ -144,14 +154,29 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
         if (rejecting) {
             OutlinedButton(onClick = { rejecting = false }) { Text(stringResource(Res.string.rows_cancel)) }
             Button(
-                onClick = { decider.submit?.invoke(toolCallIds, false, reason.takeIf { it.isNotBlank() }) },
+                onClick = {
+                    haptics.play(LettaHapticCue.Reject)
+                    decider.submit?.invoke(toolCallIds, false, reason.takeIf { it.isNotBlank() })
+                },
                 enabled = decider.enabled,
             ) { Text(stringResource(Res.string.rows_reject)) }
         } else {
-            OutlinedButton(onClick = { rejecting = true }, enabled = decider.enabled) {
+            OutlinedButton(
+                onClick = {
+                    haptics.play(LettaHapticCue.ContextClick)
+                    rejecting = true
+                },
+                enabled = decider.enabled,
+            ) {
                 Text(stringResource(Res.string.rows_reject))
             }
-            Button(onClick = { decider.submit?.invoke(toolCallIds, true, null) }, enabled = decider.enabled) {
+            Button(
+                onClick = {
+                    haptics.play(LettaHapticCue.Confirm)
+                    decider.submit?.invoke(toolCallIds, true, null)
+                },
+                enabled = decider.enabled,
+            ) {
                 Text(stringResource(if (decider.isSubmitting) Res.string.rows_sending else Res.string.rows_approve))
             }
         }

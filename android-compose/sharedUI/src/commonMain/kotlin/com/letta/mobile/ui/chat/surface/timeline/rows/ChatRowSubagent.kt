@@ -53,6 +53,8 @@ import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.markdown.SharedMarkdownText
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.StringResource
@@ -124,7 +126,11 @@ private fun DispatchHeader(dispatch: UiSubagentDispatch, modifier: Modifier) {
 private fun DispatchPrompt(dispatch: UiSubagentDispatch) {
     var expanded by remember(dispatch.toolCallId, dispatch.prompt) { mutableStateOf(false) }
     val label = stringResource(if (expanded) Res.string.rows_hide_prompt else Res.string.rows_show_prompt)
-    DisclosureLink(label = label, expanded = expanded) { expanded = !expanded }
+    val haptics = LocalHaptics.current
+    DisclosureLink(label = label, expanded = expanded) {
+        haptics.play(LettaHapticCue.SegmentTick)
+        expanded = !expanded
+    }
     if (expanded) {
         Text(
             text = dispatch.prompt,
@@ -333,7 +339,11 @@ private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, a
             )
         }
         if (model.hasDetails()) {
-            DisclosureLink(label = detailsLabel(model, expanded), expanded = expanded, onToggle = actions.onToggleDetails)
+            val haptics = LocalHaptics.current
+            DisclosureLink(label = detailsLabel(model, expanded), expanded = expanded, onToggle = {
+                haptics.play(LettaHapticCue.SegmentTick)
+                actions.onToggleDetails()
+            })
         }
     }
 }
