@@ -12,6 +12,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelUiState
+import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
+import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
@@ -79,9 +81,15 @@ class ChatHapticCuesTest {
     @Test
     fun tappingPlusPlaysTheContextClickCue() = runComposeUiTest {
         val played = mutableListOf<LettaHapticCue>()
-        setContent {
-            TouchPanel(ComposerInputs(composer = ready(), actions = RecordingChatActions()), Haptics { played += it })
-        }
+        // The "+" runs its single item directly; with image attach off and a canvas to open, the
+        // single item is a mode intent — a file picker would throw HeadlessException on CI.
+        val inputs = ComposerInputs(
+            composer = ready(),
+            actions = RecordingChatActions(),
+            capabilities = ChatSurfaceCapabilities(attachImages = false),
+            host = ChatSurfaceHost(openCanvas = {}),
+        )
+        setContent { TouchPanel(inputs, Haptics { played += it }) }
 
         onNodeWithTag(ComposerTestTags.TOUCH_PLUS).performClick()
         runOnIdle { assertEquals(listOf(LettaHapticCue.ContextClick), played) }
