@@ -26,7 +26,8 @@ enum class LettaHapticCue(
     ReorderDragStart(LettaHapticPlayback.PlatformFeedback),
     ReorderDragEnd(LettaHapticPlayback.PlatformFeedback),
     StreamingStart(LettaHapticPlayback.Pattern),
-    StreamingPulse(LettaHapticPlayback.Pattern),
+    // letta-mobile-bglj6.1.18: the reveal pulse keeps the legacy Android chat's 96ms cadence.
+    StreamingPulse(LettaHapticPlayback.Pattern, minIntervalMillis = 96),
     StreamingComplete(LettaHapticPlayback.Pattern),
     ToolCallStarted(LettaHapticPlayback.Pattern),
     ToolCallSucceeded(LettaHapticPlayback.Pattern),

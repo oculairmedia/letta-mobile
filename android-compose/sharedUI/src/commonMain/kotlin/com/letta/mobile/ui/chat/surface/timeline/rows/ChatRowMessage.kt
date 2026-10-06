@@ -30,6 +30,9 @@ import com.letta.mobile.sharedui.resources.rows_copy_response
 import com.letta.mobile.sharedui.resources.rows_role_error
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
+import com.letta.mobile.ui.chat.render.shouldPulseForStreamingReveal
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -175,8 +178,25 @@ internal data class AgentTextParams(
  */
 @Composable
 internal fun AgentText(params: AgentTextParams) {
+    // letta-mobile-bglj6.1.18: while the reply lands, the smoother reveals it progressively —
+    // seeded with whatever was already painted (the uoiu6 first-word-flash fix: a round-two
+    // stream engaging on visible text keeps it instead of re-revealing it), and its reveal
+    // steps pulse the streaming haptic cue through the LocalHaptics seam, gated exactly as the
+    // legacy Android chat gated it. A host backend makes the pulse audible (bglj6.1.17).
     val displayText = if (params.isStreaming) {
-        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true)
+        val haptics = LocalHaptics.current
+        var lastRevealLength by remember { mutableStateOf(0) }
+        rememberSmoothedStreamingText(
+            rawText = params.text,
+            isStreaming = true,
+            seedText = params.text,
+            onRevealStep = { revealed ->
+                if (shouldPulseForStreamingReveal(lastRevealLength, revealed)) {
+                    haptics.play(LettaHapticCue.StreamingPulse)
+                }
+                lastRevealLength = revealed.length
+            },
+        )
     } else {
         params.text
     }
