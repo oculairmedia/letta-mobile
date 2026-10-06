@@ -69,7 +69,6 @@ import com.composables.icons.lucide.X
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_reply
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_reply_unnamed
-import com.letta.mobile.sharedui.resources.chat_surface_collapsed_working
 import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_dismiss
 import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_expand
 import com.letta.mobile.sharedui.resources.chat_surface_head
@@ -376,20 +375,20 @@ private fun popupLayout(placement: PopupPlacement, tailAtTop: Boolean): Modifier
 /** What the popup says, as one announcement: the reply (with who says it) and the working line. */
 @Composable
 private fun popupAnnouncement(turn: CollapsedTurn, agentName: String): String {
-    val working = stringResource(Res.string.chat_surface_collapsed_working)
+    val working = if (turn.working) collapsedWorkingLabel(turn) else null
     val reply = if (agentName.isBlank()) {
         stringResource(Res.string.chat_surface_collapsed_reply_unnamed, turn.text)
     } else {
         stringResource(Res.string.chat_surface_collapsed_reply, agentName, turn.text)
     }
-    return listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working.takeIf { turn.working }).joinToString(" ")
+    return listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working).joinToString(" ")
 }
 
 /** The popup's reply, working line and input chip; a tap opens the chat. */
 @Composable
 private fun PopupReply(turn: CollapsedTurn, content: TouchHeadContent, placement: PopupPlacement) {
     val openLabel = stringResource(Res.string.chat_surface_docked_reply_expand)
-    val working = stringResource(Res.string.chat_surface_collapsed_working)
+    val working = if (turn.working) collapsedWorkingLabel(turn) else null
     val announcement = popupAnnouncement(turn, content.agentName)
     val onOpen = content.openChat
     val tail = ChatSurfaceDimens.collapsedBubbleTailWidth
@@ -417,7 +416,7 @@ private fun PopupReply(turn: CollapsedTurn, content: TouchHeadContent, placement
                 fadeLength = ChatHeadDimens.popupFadeLength,
             )
         }
-        if (turn.working) WorkingLine(working)
+        if (working != null) WorkingLine(working)
         if (turn.needsInput) NeedsInputChip(onOpen)
     }
 }

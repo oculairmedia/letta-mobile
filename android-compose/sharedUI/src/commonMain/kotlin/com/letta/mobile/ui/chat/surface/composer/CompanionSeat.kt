@@ -19,6 +19,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.layout.boundsInWindow
@@ -182,12 +183,18 @@ internal fun CompanionSeatOverlay(
                     // bounds published (whole, under reduced motion), and the mascot layer would go
                     // on drawing it there and taking its taps over the bar.
                     val shown = (1f - pageWeight().coerceIn(0f, 1f) * (1f - anchors.pageShown)).coerceAtLeast(0f)
+                    // Fully hidden collapses to nothing so the mascot layer publishes no bounds
+                    // (TouchCompanionHiddenSeatTest). While appearing it matches legacy
+                    // ChatComposerCompanion: fade + scale 0.5→1 from the feet + a half-height rise.
+                    val appearScale = if (shown <= 0f) 0f else HIDDEN_SCALE + (1f - HIDDEN_SCALE) * shown
                     placeable.placeWithLayer(
                         (rect.center.x - placeable.width / 2f - placement.origin.x).roundToInt(),
                         (rect.center.y - placeable.height / 2f - placement.origin.y).roundToInt(),
                     ) {
-                        scaleX = scale * (HIDDEN_SCALE + (1f - HIDDEN_SCALE) * shown)
-                        scaleY = scale * (HIDDEN_SCALE + (1f - HIDDEN_SCALE) * shown)
+                        transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
+                        scaleX = scale * appearScale
+                        scaleY = scale * appearScale
+                        translationY = (1f - shown) * placeable.height / 2f
                         alpha = shown
                     }
                 }
@@ -204,9 +211,10 @@ internal fun CompanionSeatOverlay(
 
 /**
  * A hidden companion shrinks away into the bar (the mascot layer draws the character at the seat's
- * bounds, so the size is what reaches it; legacy faded and scaled it out).
+ * bounds, so a zero scale is what reaches it when [shown] is 0). While it appears, legacy
+ * ChatComposerCompanion scaled from 0.5 at the feet.
  */
-private const val HIDDEN_SCALE = 0f
+private const val HIDDEN_SCALE = 0.5f
 
 /** Resolves the seat's rect from the anchors; keeps the last one for the frames between anchors. */
 @Stable
