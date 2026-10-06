@@ -219,7 +219,6 @@ private fun ReasoningBody(message: UiMessage, isActive: Boolean) {
     SelectionContainer {
         SharedMarkdownText(
             text = message.content.trim(),
-            retainState = false,
             textColor = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

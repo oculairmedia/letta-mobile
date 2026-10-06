@@ -69,7 +69,7 @@ class SharedRichMarkdownScreenshotTest {
                         .background(MaterialTheme.colorScheme.background),
                 ) {
                     CompositionLocalProvider(LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown) {
-                        SharedMarkdownText(text = FIXTURE, isStreaming = streaming, retainState = false)
+                        SharedMarkdownText(text = FIXTURE, isStreaming = streaming)
                     }
                 }
             }

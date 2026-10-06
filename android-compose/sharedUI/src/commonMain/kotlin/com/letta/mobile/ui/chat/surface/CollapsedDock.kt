@@ -390,8 +390,6 @@ internal fun BubbleText(
     ) {
         SharedMarkdownText(
             text = shown,
-            // Retaining the previous AST across a reshaped update can crash Compose Desktop.
-            retainState = false,
             paint = MarkdownPaint(
                 textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 textStyle = textStyle,

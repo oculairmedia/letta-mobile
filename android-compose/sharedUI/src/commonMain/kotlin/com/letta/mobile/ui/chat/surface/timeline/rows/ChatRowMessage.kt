@@ -124,7 +124,7 @@ private fun ErrorBubble(text: String) {
         ) {
             Text(text = stringResource(Res.string.rows_role_error), style = ChatRowType.roleLabel)
             SelectionContainer {
-                SharedMarkdownText(text = text, retainState = false, textColor = MaterialTheme.colorScheme.onErrorContainer)
+                SharedMarkdownText(text = text, textColor = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
     }
@@ -190,9 +190,6 @@ internal fun AgentText(params: AgentTextParams) {
             SelectionContainer {
                 SharedMarkdownText(
                     text = displayText,
-                    // Retaining the previous markdown AST while parsing an update can pair stale
-                    // annotation offsets with a reshaped block (a Compose Desktop crash).
-                    retainState = false,
                     textColor = if (params.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                     // A rich host renderer owns the streaming reveal (cursor, committed blocks,
                     // settle) itself; the default renderer ignores the flag.
