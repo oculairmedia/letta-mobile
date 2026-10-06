@@ -178,18 +178,17 @@ internal data class AgentTextParams(
  */
 @Composable
 internal fun AgentText(params: AgentTextParams) {
-    // letta-mobile-bglj6.1.18: while the reply lands, the smoother reveals it progressively —
-    // seeded with whatever was already painted (the uoiu6 first-word-flash fix: a round-two
-    // stream engaging on visible text keeps it instead of re-revealing it), and its reveal
-    // steps pulse the streaming haptic cue through the LocalHaptics seam, gated exactly as the
-    // legacy Android chat gated it. A host backend makes the pulse audible (bglj6.1.17).
+    // letta-mobile-bglj6.1.18: while the reply lands, the smoother reveals it progressively
+    // (seeded with the already-painted text — pulled forward into PR #1784 as the fix for the
+    // settle-glitch test's reveal race), and its reveal steps pulse the streaming haptic cue
+    // through the LocalHaptics seam, gated exactly as the legacy Android chat gated it. A host
+    // backend makes the pulse audible (bglj6.1.17, PR #1784).
     val displayText = if (params.isStreaming) {
         val haptics = LocalHaptics.current
         var lastRevealLength by remember { mutableStateOf(0) }
         rememberSmoothedStreamingText(
             rawText = params.text,
             isStreaming = true,
-            seedText = params.text,
             onRevealStep = { revealed ->
                 if (shouldPulseForStreamingReveal(lastRevealLength, revealed)) {
                     haptics.play(LettaHapticCue.StreamingPulse)
