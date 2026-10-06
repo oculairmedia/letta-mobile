@@ -203,9 +203,15 @@ object HapticEffects {
             fallbackPlatformType = HapticFeedbackConstants.LONG_PRESS,
             composeType = HapticFeedbackType.LongPress,
         )
-        // letta-mobile-bglj6.1.17: the chat product-feel cues (letta-mobile-86njl.8) realised
-        // per platform. A send launches confidently, lands as a light tick; an approval that
-        // needs the user's decision draws attention; the scroll-to-latest glide ticks at the end.
+        else -> productFeelSpecFor(cue)
+    }
+
+    /**
+     * letta-mobile-bglj6.1.17: the chat product-feel cues (letta-mobile-86njl.8) realised
+     * per platform. A send launches confidently and lands as a light tick; an approval that
+     * needs the user's decision draws attention; the scroll-to-latest glide ticks at the end.
+     */
+    private fun productFeelSpecFor(cue: LettaHapticCue): PlatformHapticSpec? = when (cue) {
         LettaHapticCue.SendLaunch -> PlatformHapticSpec(
             modernPlatformType = HapticFeedbackConstants.CONFIRM,
             fallbackPlatformType = HapticFeedbackConstants.CONTEXT_CLICK,
