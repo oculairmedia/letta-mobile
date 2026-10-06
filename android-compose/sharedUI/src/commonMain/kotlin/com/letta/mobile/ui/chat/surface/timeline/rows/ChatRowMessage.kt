@@ -194,6 +194,9 @@ internal fun AgentText(params: AgentTextParams) {
                     // annotation offsets with a reshaped block (a Compose Desktop crash).
                     retainState = false,
                     textColor = if (params.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    // A rich host renderer owns the streaming reveal (cursor, committed blocks,
+                    // settle) itself; the default renderer ignores the flag.
+                    isStreaming = params.isStreaming,
                 )
             }
             params.deliveryTimestamp?.let { DeliveryTime(it) }
