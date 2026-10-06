@@ -84,6 +84,7 @@ import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
+import com.letta.mobile.ui.chat.surface.timeline.ActiveRunActivity
 import com.letta.mobile.ui.chat.surface.timeline.activeRunActivity
 import com.letta.mobile.ui.chat.surface.timeline.rows.formatElapsedClock
 import com.letta.mobile.ui.chat.surface.timeline.rows.rememberElapsedSeconds
@@ -165,21 +166,25 @@ internal fun collapsedTurnOf(newestFirst: List<ChatRenderItem>, state: ChatUiSta
     val replies = messages.filterNot { it.isPrompt() }
     val text = replies.lastOrNull { it.isNarration() }
     val newestReply = replies.lastOrNull()
-    val toolRunning = newestReply?.toolCalls.orEmpty().any { it.result == null }
     val activity = activeRunActivity(messages)
-    val runningTool = activity.runningToolName ?: state.pendingTools.lastOrNull()?.name
     return CollapsedTurn(
         turnKey = turn.first().key,
         text = text?.content.orEmpty(),
         isError = text?.isError == true,
         streaming = state.isStreaming && text != null && text === newestReply,
-        working = busy && (state.pendingTools.isNotEmpty() || toolRunning),
+        working = busy && turnHasLiveTool(newestReply, state),
         needsInput = state.a2uiSurfaces.isNotEmpty() || awaitsApproval(messages),
         busy = busy,
-        runningToolName = runningTool.takeIf { busy },
+        runningToolName = runningToolNameOf(activity, state, busy),
         startedAtEpochMs = activity.startedAtEpochMs,
     )
 }
+
+private fun turnHasLiveTool(newestReply: UiMessage?, state: ChatUiState): Boolean =
+    state.pendingTools.isNotEmpty() || newestReply?.toolCalls.orEmpty().any { it.result == null }
+
+private fun runningToolNameOf(activity: ActiveRunActivity, state: ChatUiState, busy: Boolean): String? =
+    (activity.runningToolName ?: state.pendingTools.lastOrNull()?.name).takeIf { busy }
 
 private fun ChatRenderItem.messagesInOrder(): List<UiMessage> = when (this) {
     is ChatRenderItem.Single -> listOf(message)
