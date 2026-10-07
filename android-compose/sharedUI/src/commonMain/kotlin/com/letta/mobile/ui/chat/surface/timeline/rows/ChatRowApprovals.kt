@@ -1,18 +1,25 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,9 +29,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Terminal
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -44,11 +56,16 @@ import com.letta.mobile.sharedui.resources.rows_other
 import com.letta.mobile.sharedui.resources.rows_question
 import com.letta.mobile.sharedui.resources.rows_reject
 import com.letta.mobile.sharedui.resources.rows_reject_reason
+import com.letta.mobile.sharedui.resources.rows_reject_reason_placeholder
+import com.letta.mobile.sharedui.resources.rows_reject_title
 import com.letta.mobile.sharedui.resources.rows_rejected
+import com.letta.mobile.sharedui.resources.rows_requesting_input
 import com.letta.mobile.sharedui.resources.rows_send_answer
 import com.letta.mobile.sharedui.resources.rows_sending
 import com.letta.mobile.sharedui.resources.rows_tool_decisions
+import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
@@ -60,10 +77,17 @@ import org.jetbrains.compose.resources.stringResource
 // ApprovalResponseCard, with Android's approve / reject-with-reason controls
 // (ChatApprovals.kt). Decisions go to ChatActions.submitApproval; desktop's
 // LocalDesktopApprovalDecision is now the row's callbacks + capabilities.
+//
+// letta-mobile-bglj6.1.22: on Touch the cards wear Android's chrome (no card surface, the
+// requested calls as expanded tool cards with a "requesting input" chip), and rejecting asks for
+// the reason in a modal dialog in every idiom, as Android's TextInputDialog did.
 
-/** A decision the card may raise, or null when the owner cannot take approvals. */
+/**
+ * A decision the card may raise, or null when the owner cannot take approvals. Wherever the card
+ * is drawn (a timeline row, the Touch canvas's input tray) it decides through one of these.
+ */
 @Immutable
-private class ApprovalDecider(
+internal class ApprovalDecider(
     val requestId: String,
     val isSubmitting: Boolean,
     val submit: ((toolCallIds: List<String>, approve: Boolean, reason: String?) -> Unit)?,
@@ -71,20 +95,24 @@ private class ApprovalDecider(
     val enabled: Boolean get() = !isSubmitting && submit != null
 }
 
+/**
+ * The decider for [approval]: submitting while it is the owner's [activeApprovalRequestId], and
+ * deciding through [actions] only when the owner takes approvals ([approvalsEnabled]).
+ */
 @Composable
-private fun rememberApprovalDecider(
+internal fun rememberApprovalDecider(
     approval: UiApprovalRequest,
-    context: ChatRowContext,
-    callbacks: ChatRowCallbacks,
+    activeApprovalRequestId: String?,
+    approvalsEnabled: Boolean,
+    actions: ChatActions,
 ): ApprovalDecider {
-    val isSubmitting = context.itemState.activeApprovalRequestId == approval.requestId
-    val enabled = context.capabilities.approvals
-    return remember(approval.requestId, isSubmitting, enabled, callbacks) {
+    val isSubmitting = activeApprovalRequestId == approval.requestId
+    return remember(approval.requestId, isSubmitting, approvalsEnabled, actions) {
         ApprovalDecider(
             requestId = approval.requestId,
             isSubmitting = isSubmitting,
-            submit = if (enabled) {
-                { ids, approve, reason -> callbacks.actions.submitApproval(ChatApprovalAnswer(approval.requestId, ids, approve, reason)) }
+            submit = if (approvalsEnabled) {
+                { ids, approve, reason -> actions.submitApproval(ChatApprovalAnswer(approval.requestId, ids, approve, reason)) }
             } else {
                 null
             },
@@ -98,32 +126,75 @@ internal fun ApprovalRequestCard(
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
 ) {
-    val decider = rememberApprovalDecider(approval, context, callbacks)
-    // The moment a decision lands on the person: one attention cue per request, before the
-    // structured-question branch returns.
+    val decider = rememberApprovalDecider(
+        approval = approval,
+        activeApprovalRequestId = context.itemState.activeApprovalRequestId,
+        approvalsEnabled = context.capabilities.approvals,
+        actions = callbacks.actions,
+    )
+    // The moment a decision lands on the person: one attention cue per request.
     val haptics = LocalHaptics.current
     LaunchedEffect(approval.requestId) {
         if (decider.submit != null && approval.requiresUserInput()) haptics.play(LettaHapticCue.ApprovalNeeded)
     }
+    ApprovalRequestCard(approval, decider)
+}
+
+/** The approval (or its structured AskUserQuestion) with its controls, deciding through [decider]. */
+@Composable
+internal fun ApprovalRequestCard(approval: UiApprovalRequest, decider: ApprovalDecider) {
     // A structured AskUserQuestion takes precedence over the generic disclosure.
     if (AskUserQuestionCard(approval, decider)) return
-    ArtifactCard(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
-        approval.toolCalls.forEach { ApprovalToolCallLine(it) }
-        // Only runtime user-input tools wait on the user (Android's requiresUserInput); every
-        // other approval is resolved by the runtime, so its card stays read-only, as on desktop.
-        if (decider.submit != null && approval.requiresUserInput()) {
-            Text(
-                text = stringResource(Res.string.rows_approval_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ApprovalActionRow(approval, decider)
-        }
+    // Only runtime user-input tools wait on the user (Android's requiresUserInput); every
+    // other approval is resolved by the runtime, so its card stays read-only, as on desktop.
+    val actionable = decider.submit != null && approval.requiresUserInput()
+    ApprovalChrome(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
+        ApprovalCardContent(approval, decider, actionable)
+    }
+}
+
+@Composable
+private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider: ApprovalDecider, actionable: Boolean) {
+    val touch = touchStyle()
+    // Android leads with what it asks, then the calls; desktop lists the calls first.
+    if (touch && actionable) ApprovalBody()
+    approval.toolCalls.forEach { if (touch) ApprovalToolCallCard(it) else ApprovalToolCallLine(it) }
+    if (actionable) {
+        if (!touch) ApprovalBody()
+        ApprovalActionRow(approval, decider)
     }
 }
 
 internal fun UiApprovalRequest.requiresUserInput(): Boolean =
     toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
+
+/**
+ * The approval's container: desktop's [ArtifactCard]; on Touch Android's chrome, the title in the
+ * tool label's voice over the content with no card around it (the timeline row is the surface).
+ */
+@Composable
+private fun ApprovalChrome(icon: ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+    if (!touchStyle()) {
+        ArtifactCard(icon = icon, title = title, content = content)
+        return
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        Text(text = title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        content()
+    }
+}
+
+@Composable
+private fun ApprovalBody() {
+    Text(
+        text = stringResource(Res.string.rows_approval_body),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
 
 @Composable
 private fun ApprovalToolCallLine(toolCall: UiApprovalToolCall) {
@@ -134,54 +205,137 @@ private fun ApprovalToolCallLine(toolCall: UiApprovalToolCall) {
     }
 }
 
-/** Approve, or reject with an optional reason typed inline (Android's reject dialog). */
+/**
+ * Android's requested call (ToolCallCard with keepExpanded and the RequestingInput chip): the
+ * tool's row, held open, with its primary argument under it. It has nothing to collapse, so it
+ * takes no tap.
+ */
+@Composable
+private fun ApprovalToolCallCard(toolCall: UiApprovalToolCall) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ChatRowTestTags.APPROVAL_TOOL_CALL)
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        ) {
+            Icon(
+                imageVector = Lucide.Terminal,
+                contentDescription = null,
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = toolCall.name,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            RequestingInputChip()
+        }
+        if (toolCall.arguments.isNotBlank()) {
+            Box(Modifier.padding(start = LettaDimens.Space.xxl)) { ToolArgumentLine(toolCall.arguments) }
+        }
+    }
+}
+
+/** Android's ToolApprovalChip in its RequestingInput state. */
+@Composable
+private fun RequestingInputChip() {
+    Surface(
+        modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT),
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = REQUESTING_INPUT_CHIP_ALPHA),
+    ) {
+        Text(
+            text = stringResource(Res.string.rows_requesting_input),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+        )
+    }
+}
+
+/** Android's chip container alpha (ChatToolCallCards.ToolApprovalChip). */
+private const val REQUESTING_INPUT_CHIP_ALPHA = 0.72f
+
+/** Approve, or reject with an optional reason typed in a modal dialog (Android's TextInputDialog). */
 @Composable
 private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDecider) {
     val toolCallIds = remember(approval) { approval.toolCalls.map { it.toolCallId } }
     var rejecting by remember(approval.requestId) { mutableStateOf(false) }
-    var reason by remember(approval.requestId) { mutableStateOf("") }
     val haptics = LocalHaptics.current
     if (rejecting) {
-        OutlinedTextField(
-            value = reason,
-            onValueChange = { reason = it },
-            label = { Text(stringResource(Res.string.rows_reject_reason)) },
-            minLines = 2,
-            modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_REASON),
+        RejectReasonDialog(
+            onReject = { reason ->
+                haptics.play(LettaHapticCue.Reject)
+                rejecting = false
+                decider.submit?.invoke(toolCallIds, false, reason)
+            },
+            onDismiss = { rejecting = false },
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        if (rejecting) {
-            OutlinedButton(onClick = { rejecting = false }) { Text(stringResource(Res.string.rows_cancel)) }
-            Button(
-                onClick = {
-                    haptics.play(LettaHapticCue.Reject)
-                    decider.submit?.invoke(toolCallIds, false, reason.takeIf { it.isNotBlank() })
-                },
-                enabled = decider.enabled,
-            ) { Text(stringResource(Res.string.rows_reject)) }
-        } else {
-            OutlinedButton(
-                onClick = {
-                    haptics.play(LettaHapticCue.ContextClick)
-                    rejecting = true
-                },
-                enabled = decider.enabled,
-            ) {
-                Text(stringResource(Res.string.rows_reject))
-            }
-            Button(
-                onClick = {
-                    haptics.play(LettaHapticCue.Confirm)
-                    decider.submit?.invoke(toolCallIds, true, null)
-                },
-                enabled = decider.enabled,
-            ) {
-                Text(stringResource(if (decider.isSubmitting) Res.string.rows_sending else Res.string.rows_approve))
-            }
+        OutlinedButton(
+            onClick = {
+                haptics.play(LettaHapticCue.ContextClick)
+                rejecting = true
+            },
+            enabled = decider.enabled,
+        ) {
+            Text(stringResource(Res.string.rows_reject))
+        }
+        Button(
+            onClick = {
+                haptics.play(LettaHapticCue.Confirm)
+                decider.submit?.invoke(toolCallIds, true, null)
+            },
+            enabled = decider.enabled,
+        ) {
+            Text(stringResource(if (decider.isSubmitting) Res.string.rows_sending else Res.string.rows_approve))
         }
     }
 }
+
+/**
+ * The reject flow's focused modal (Android's TextInputDialog): a three-line reason, optional, so
+ * Reject is always enabled; Cancel leaves the request pending. A blank reason rejects without one.
+ */
+@Composable
+private fun RejectReasonDialog(onReject: (reason: String?) -> Unit, onDismiss: () -> Unit) {
+    var reason by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_REJECT_DIALOG),
+        title = { Text(stringResource(Res.string.rows_reject_title)) },
+        text = {
+            OutlinedTextField(
+                value = reason,
+                onValueChange = { reason = it },
+                label = { Text(stringResource(Res.string.rows_reject_reason)) },
+                placeholder = { Text(stringResource(Res.string.rows_reject_reason_placeholder)) },
+                minLines = REJECT_REASON_MIN_LINES,
+                modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_REASON),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onReject(reason.takeIf { it.isNotBlank() }) },
+                modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_REJECT_CONFIRM),
+            ) { Text(stringResource(Res.string.rows_reject)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.rows_cancel)) } },
+    )
+}
+
+private const val REJECT_REASON_MIN_LINES = 3
 
 /** The answers a user is composing for one AskUserQuestion request. */
 @Immutable
@@ -238,7 +392,7 @@ private fun AskUserQuestionCard(approval: UiApprovalRequest, decider: ApprovalDe
     val toolCallIds = remember(toolCall.toolCallId) { listOf(toolCall.toolCallId) }
     val stateKey = "${approval.requestId}:${toolCall.toolCallId}:${toolCall.arguments}"
     val answers = remember(stateKey) { QuestionAnswers(mutableStateMapOf(), mutableStateMapOf()) }
-    ArtifactCard(icon = LettaIcons.Help, title = stringResource(Res.string.rows_question)) {
+    ApprovalChrome(icon = LettaIcons.Help, title = stringResource(Res.string.rows_question)) {
         spec.questions.forEach { QuestionBlock(it, answers) }
         val built = answers.build(spec.questions)
         val canSubmit = built.isNotEmpty() && built.size == spec.questions.count { it.question.isNotBlank() }
@@ -309,7 +463,7 @@ internal fun ApprovalResponseCard(response: UiApprovalResponse) {
         false -> stringResource(Res.string.rows_rejected) to LettaIcons.Error
         null -> stringResource(Res.string.rows_approval_response) to LettaIcons.CheckCircle
     }
-    ArtifactCard(icon = icon, title = title) {
+    ApprovalChrome(icon = icon, title = title) {
         response.reason?.takeIf { it.isNotBlank() }?.let {
             Text(text = it, style = MaterialTheme.typography.bodySmall)
         }

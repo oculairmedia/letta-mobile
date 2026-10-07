@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.click
@@ -22,6 +23,9 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipe
+import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalResponse
+import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -53,6 +57,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class TouchCanvasDockUiTest {
     private val prompt = UiMessage(id = "u1", role = "user", content = "Sketch a kitchen layout.", timestamp = "2026-09-30T18:02:00Z")
     private val reply = UiMessage(id = "a1", role = "assistant", content = "Here's an L-shaped plan.", timestamp = "2026-09-30T18:02:09Z", runId = "run-1")
+    private val question = UiMessage(
+        id = "q1",
+        role = "assistant",
+        content = "",
+        timestamp = "2026-09-30T18:02:10Z",
+        runId = "run-1",
+        approvalRequest = UiApprovalRequest(
+            requestId = "req-1",
+            toolCalls = listOf(
+                UiApprovalToolCall(
+                    toolCallId = "ask-1",
+                    name = "AskUserQuestion",
+                    arguments = """{"questions":[{"question":"Which layout?","options":[{"label":"Island"},{"label":"Galley"}]}]}""",
+                ),
+            ),
+        ),
+    )
 
     private class Port : ChatSessionPort {
         override val uiState = MutableStateFlow(
@@ -126,6 +147,38 @@ class TouchCanvasDockUiTest {
         waitForIdle()
         onNodeWithTag(TOUCH_POPUP_TAG).performClick()
         assertEquals(listOf<ChatSurfaceIntent>(ChatSurfaceIntent.Expand), harness.intents)
+    }
+
+    /** letta-mobile-bglj6.1.22: the canvas answers a question without opening the full page. */
+    @Test
+    fun aPendingQuestionIsAnsweredOnTheCanvas() = runComposeUiTest {
+        val port = Port()
+        port.uiState.value = port.uiState.value.copy(messages = persistentListOf(prompt, question))
+        val harness = show(port, ChatSurfacePresentation.CanvasFirst)
+        onNodeWithTag(TOUCH_INPUT_TRAY_TAG).assertExists()
+        onNodeWithText("Island").performClick()
+        onNodeWithText("Send answer").performClick()
+        waitForIdle()
+        val answer = (port.actions as RecordingChatActions).approvals.single()
+        assertEquals("req-1", answer.requestId)
+        assertTrue(answer.approve)
+        assertTrue(answer.reason.orEmpty().contains("Island"))
+        assertTrue(harness.intents.isEmpty(), "answering opened the chat: ${harness.intents}")
+    }
+
+    @Test
+    fun anAnsweredQuestionLeavesTheCanvasClear() = runComposeUiTest {
+        val port = Port()
+        val answered = UiMessage(
+            id = "r1",
+            role = "user",
+            content = "",
+            timestamp = "2026-09-30T18:02:20Z",
+            approvalResponse = UiApprovalResponse(requestId = "req-1", approved = true),
+        )
+        port.uiState.value = port.uiState.value.copy(messages = persistentListOf(prompt, question, answered))
+        show(port, ChatSurfacePresentation.CanvasFirst)
+        onAllNodesWithTag(TOUCH_INPUT_TRAY_TAG).assertCountEquals(0)
     }
 
     @Test
