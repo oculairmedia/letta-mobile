@@ -130,13 +130,15 @@ internal fun showsSpeakerHeader(message: UiMessage, position: GroupPosition): Bo
     if (message.isError) return false
     return when (message.role) {
         "tool" -> true
-        "assistant" -> message.generatedUi != null ||
-            message.approvalRequest != null ||
-            message.approvalResponse != null ||
-            message.subagentNotification != null ||
-            message.attachments.isNotEmpty()
+        "assistant" -> message.hasStructuredContent()
         else -> false
     }
+}
+
+/** What turns an assistant message into a bubbled card in the legacy timeline (not shouldRenderBubbleLess). */
+private fun UiMessage.hasStructuredContent(): Boolean {
+    val cards = listOf(generatedUi, approvalRequest, approvalResponse, subagentNotification)
+    return cards.any { it != null } || attachments.isNotEmpty()
 }
 
 /** "Agent" (or "Agent · Live"), "Inter-agent", the single tool's name, or "Tool output". */
