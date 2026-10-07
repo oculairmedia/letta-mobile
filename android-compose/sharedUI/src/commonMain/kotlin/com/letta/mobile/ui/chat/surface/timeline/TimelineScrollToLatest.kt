@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_scroll_to_latest
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatTimelineDimens
@@ -157,8 +159,12 @@ internal fun TouchScrollToLatestButton(visible: Boolean, onClick: () -> Unit, mo
         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
         exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 }),
     ) {
+        val haptics = LocalHaptics.current
         SmallFloatingActionButton(
-            onClick = onClick,
+            onClick = {
+                haptics.play(LettaHapticCue.ScrollToLatest)
+                onClick()
+            },
             modifier = Modifier.testTag(ChatTimelineTags.SCROLL_TO_LATEST),
             shape = CircleShape,
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

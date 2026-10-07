@@ -43,6 +43,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
@@ -121,7 +122,13 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         // letta-mobile-bglj6.1.16: the shared rows render markdown through the designsystem
         // renderer the legacy chat used (highlighted code fences + copy, KaTeX, Mermaid,
         // autolinks, editorial padding); without a provider desktop and web keep the default.
-        CompositionLocalProvider(LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown) {
+        // letta-mobile-bglj6.1.17: the Android haptics backend behind the shared seam — the
+        // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
+        // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
+        CompositionLocalProvider(
+            LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
+            LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
+        ) {
             ChatSurface(
                 port = port,
                 presentation = presentation,

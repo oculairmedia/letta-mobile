@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_role_you
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -61,8 +63,11 @@ fun SendFlightLayer(state: SendFlightState, modifier: Modifier = Modifier, conte
         ) {
             content()
             state.flight?.let { flight ->
+                // A flight that handed off to its row landed; the abandon path fades silently.
+                val haptics = LocalHaptics.current
                 LaunchedEffect(flight) {
                     flight.fly()
+                    if (flight.phase == SendFlightPhase.HandingOff) haptics.play(LettaHapticCue.SendLand)
                     state.finish(flight)
                 }
                 SendFlightGhost(flight, Modifier.matchParentSize())

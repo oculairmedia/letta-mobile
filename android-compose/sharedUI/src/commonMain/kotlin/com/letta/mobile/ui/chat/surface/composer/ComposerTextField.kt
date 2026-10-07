@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_placeholder
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.LettaDimens
@@ -112,6 +114,15 @@ internal fun ComposerTextField(
     LaunchedEffect(primary, handoff) {
         if (focus.restores()) focusRequester.requestFocus()
     }
+    // A keyboard send (IME action, Enter) launches the flight like the bar's button does.
+    val haptics = LocalHaptics.current
+    val sendFromKeyboard = {
+        if (model.decisions.sendEnabled) {
+            haptics.play(LettaHapticCue.SendLaunch)
+            model.actions.send()
+        }
+        true
+    }
     BasicTextField(
         value = fieldValue,
         onValueChange = { next ->
@@ -136,7 +147,7 @@ internal fun ComposerTextField(
                         matchedCommands = model.decisions.autocomplete.matchedCommands,
                         canSend = model.decisions.sendEnabled,
                         onRunCommand = { chooseComposerCommand(model.composer, model.decisions.autocomplete, model.actions, it) },
-                        onSend = model.actions::send,
+                        onSend = { sendFromKeyboard() },
                     ),
                 )
             },
@@ -145,7 +156,7 @@ internal fun ComposerTextField(
         singleLine = style.singleLine,
         maxLines = style.maxLines,
         keyboardOptions = style.keyboardOptions(),
-        keyboardActions = KeyboardActions(onSend = { if (model.decisions.sendEnabled) model.actions.send() }),
+        keyboardActions = KeyboardActions(onSend = { sendFromKeyboard() }),
         decorationBox = { inner ->
             // Centred in the field's height, so a one-line bar's text sits mid-bar, not at its top.
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {

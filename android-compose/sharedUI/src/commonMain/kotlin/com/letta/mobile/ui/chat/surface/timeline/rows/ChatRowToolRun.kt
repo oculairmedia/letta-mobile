@@ -67,6 +67,8 @@ import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
@@ -108,6 +110,7 @@ internal fun ToolRunGroup(
     val inline = context.toolDetails == ChatToolDetails.Inline
     val summary = remember(toolCalls, approvals) { summarizeToolRun(toolCalls, approvals) }
     val startedAtEpochMs = remember(calls.startedAtTimestamp) { calls.startedAtTimestamp?.let(::parseTimestampEpochMillis) }
+    val haptics = LocalHaptics.current
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
@@ -117,7 +120,10 @@ internal fun ToolRunGroup(
             ToolRunSummaryRow(
                 line = ToolRunLine(summary, startedAtEpochMs),
                 disclosure = toolRunDisclosure(inline, detailsOpen),
-                onClick = { detailsOpen = if (inline) !detailsOpen else true },
+                onClick = {
+                    haptics.play(LettaHapticCue.SegmentTick)
+                    detailsOpen = if (inline) !detailsOpen else true
+                },
                 modifier = Modifier.weight(1f),
             )
         }

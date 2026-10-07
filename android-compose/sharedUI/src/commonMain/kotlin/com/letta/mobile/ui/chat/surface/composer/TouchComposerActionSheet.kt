@@ -23,11 +23,11 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_title
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import org.jetbrains.compose.resources.stringResource
@@ -70,10 +70,10 @@ internal fun TouchComposerActionSheet(items: List<TouchSheetItem>, onDismiss: ()
 
 @Composable
 private fun TouchSheetRow(item: TouchSheetItem, onClick: () -> Unit) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = LocalHaptics.current
     Surface(
         onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+            haptics.play(LettaHapticCue.ContextClick)
             onClick()
         },
         modifier = Modifier

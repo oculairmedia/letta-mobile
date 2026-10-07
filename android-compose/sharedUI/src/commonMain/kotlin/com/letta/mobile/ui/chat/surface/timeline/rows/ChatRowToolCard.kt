@@ -60,6 +60,8 @@ import com.letta.mobile.sharedui.resources.rows_tool_status_duration
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
 import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.stringResource
@@ -90,9 +92,14 @@ internal fun ToolCard(
     var expanded by remember(disclosureKey) { mutableStateOf(toolCall.shouldInitiallyExpand()) }
     RequestFullResultOnExpand(toolCall, expanded, callbacks)
     val isError = toolCall.isErrorStatus()
+    val haptics = LocalHaptics.current
+    val toggle = {
+        haptics.play(LettaHapticCue.SegmentTick)
+        expanded = !expanded
+    }
     val body: @Composable () -> Unit = {
         Column {
-            ToolCardHeader(toolCall, expanded, callbacks) { expanded = !expanded }
+            ToolCardHeader(toolCall, expanded, callbacks) { toggle() }
             if (expanded) ToolCardBody(toolCall, isError, callbacks)
         }
     }

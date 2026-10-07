@@ -176,7 +176,12 @@ internal data class AgentTextParams(
 @Composable
 internal fun AgentText(params: AgentTextParams) {
     val displayText = if (params.isStreaming) {
-        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true)
+        // letta-mobile-bglj6.1.18: seeded with whatever was already painted (the uoiu6
+        // first-word-flash fix), so a stream engaging on visible text keeps it instead of
+        // re-revealing it — and a streaming row's first frame already has the settled shape
+        // (the invariant ChatRowRunSettleGlitchTest asserts; the unseeded reveal raced the test's
+        // measurement and flaked CI).
+        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true, seedText = params.text)
     } else {
         params.text
     }
