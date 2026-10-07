@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
+import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomeShortcut
@@ -39,28 +40,27 @@ import com.letta.mobile.ui.theme.LettaDimens
  * quick-chat composer) merged with the desktop fleet view (recent conversations across every agent
  * and the sortable agent table).
  *
- * All state lives in [HomePageState] (sharedLogic's HomePageController); navigation goes out through
- * [navigation] and presentation choices come in through [options]. At or above
- * [LettaDimens.Pane.wideBreakpoint] the page is one scrolling column with the composer up top and the
- * full fleet table; below it the composer docks at the bottom like a phone chat bar and the fleet
- * collapses to compact rows with sort chips.
+ * All state lives in [HomePageState] (sharedLogic's HomePageController); the controller's actions
+ * and the host's navigation go out through [callbacks] and presentation choices come in through
+ * [options]. At or above [LettaDimens.Pane.wideBreakpoint] the page is one scrolling column with the
+ * composer up top and the full fleet table; below it the composer docks at the bottom like a phone
+ * chat bar and the fleet collapses to compact rows with sort chips.
  *
- * [document] is the Letta Code mod seam: a recognised A2UI document replaces the native page.
+ * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
+ * native page.
  */
 @Composable
 fun HomePage(
     state: HomePageState,
-    actions: HomePageActions,
-    navigation: HomePageNavigation,
+    callbacks: HomePageCallbacks,
     modifier: Modifier = Modifier,
     options: HomePageOptions = HomePageOptions(),
-    document: UiGeneratedComponent? = null,
 ) {
-    val documentSurface = remember(document) { document?.toA2uiSurfaceStateOrNull() }
+    val documentSurface = remember(options.document) { options.document?.toA2uiSurfaceStateOrNull() }
     val base = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(HomePageTags.PAGE)
     if (documentSurface != null) {
         Box(base.verticalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xl)) {
-            A2uiSurfaceRenderer(surface = documentSurface, modifier = Modifier.fillMaxWidth(), onAction = navigation.onA2uiAction)
+            A2uiSurfaceRenderer(surface = documentSurface, modifier = Modifier.fillMaxWidth(), onAction = callbacks.navigation.onA2uiAction)
         }
         return
     }
@@ -68,8 +68,7 @@ fun HomePage(
     BoxWithConstraints(base) {
         val page = HomePageScope(
             state = state,
-            actions = actions,
-            navigation = navigation,
+            callbacks = callbacks,
             options = options,
             wide = maxWidth >= LettaDimens.Pane.wideBreakpoint,
             editingPins = editingPins,
@@ -79,12 +78,19 @@ fun HomePage(
     }
 }
 
+/** Everything the page calls out to: the controller's [actions] and the host's [navigation]. */
+@Immutable
+data class HomePageCallbacks(
+    val actions: HomePageActions,
+    val navigation: HomePageNavigation,
+)
+
 /** Where the page sends the user. Optional destinations a host cannot open stay null or no-op. */
 @Immutable
 data class HomePageNavigation(
     /** Send the composer's text into the host's chat pipeline. */
     val onSubmitPrompt: (String) -> Unit,
-    val onOpenConversation: (String) -> Unit,
+    val onOpenConversation: (FleetRecentConversation) -> Unit,
     val onOpenAgent: (String) -> Unit,
     val onOpenShortcut: (HomeShortcut) -> Unit,
     /** Edit an agent's settings; null hides the configure action on pinned agents. */
@@ -99,7 +105,8 @@ data class HomePageNavigation(
  * Host presentation choices: [showTitle] false when the host already titles the screen;
  * [showSearch] false when the host's own app bar carries the search; [touch] grows the controls to
  * touch-target size; [orbIndexByAgentId] colours the agent orbs; [headerActions] are the host's own
- * header controls (a backend chip, a refresh button).
+ * header controls (a backend chip, a refresh button); [document] replaces the page with a mod's
+ * A2UI document when it is one the renderer recognises.
  */
 @Immutable
 data class HomePageOptions(
@@ -109,49 +116,19 @@ data class HomePageOptions(
     val composerPlaceholder: String = "Message your agent",
     val orbIndexByAgentId: Map<String, Int> = emptyMap(),
     val headerActions: (@Composable RowScope.() -> Unit)? = null,
+    val document: UiGeneratedComponent? = null,
 )
-
-/** Test tags for the shared Home page. */
-object HomePageTags {
-    const val PAGE = "home_page"
-    const val SEARCH = "home_search"
-    const val SEARCH_RESULTS = "home_search_results"
-    const val SEARCH_EMPTY = "home_search_empty"
-    const val COMPOSER = "home_composer"
-    const val SEND = "home_send"
-    const val PINNED_GRID = "home_pinned_grid"
-    const val EDIT_PINS = "home_edit_pins"
-    const val ADD_PIN = "home_add_pin"
-    const val STATS = "home_stats"
-
-    fun pin(key: String): String = "home_pin_$key"
-
-    fun unpin(key: String): String = "home_unpin_$key"
-
-    fun configure(agentId: String): String = "home_configure_$agentId"
-
-    fun addShortcut(shortcut: HomeShortcut): String = "home_add_${shortcut.name}"
-
-    fun recent(conversationId: String): String = "home_recent_$conversationId"
-
-    fun agentRow(agentId: String): String = "home_agent_$agentId"
-
-    fun pinAgent(agentId: String): String = "home_pin_agent_$agentId"
-
-    fun sort(label: String): String = "home_sort_$label"
-
-    fun searchHit(id: String): String = "home_hit_$id"
-}
 
 internal class HomePageScope(
     val state: HomePageState,
-    val actions: HomePageActions,
-    val navigation: HomePageNavigation,
+    callbacks: HomePageCallbacks,
     val options: HomePageOptions,
     val wide: Boolean,
     val editingPins: Boolean,
     val onEditingPinsChange: (Boolean) -> Unit,
 ) {
+    val actions: HomePageActions = callbacks.actions
+    val navigation: HomePageNavigation = callbacks.navigation
     val horizontalPadding = if (wide) LettaDimens.Space.xxl else LettaDimens.Space.lg
 
     fun orbIndex(agentId: String?): Int = agentId?.let { options.orbIndexByAgentId[it] } ?: 0

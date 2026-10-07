@@ -69,23 +69,22 @@ class HomePageTest {
         recent = listOf(recent),
     )
 
+    private val toolsPin = HomePinnedItem.Shortcut(HomeShortcut.TOOLS)
+
     private fun baseState(pins: List<String> = listOf("shortcut:TOOLS")): HomePageState {
         val withFleet = HomePageReducer.withFleet(HomePageState(availableShortcuts = setOf(HomeShortcut.TOOLS, HomeShortcut.SCHEDULES)), fleet)
         val withPins = HomePageReducer.withPins(withFleet, pins)
         return HomePageReducer.withStats(withPins, HomeStats(loading = false, toolCount = 12))
     }
 
-    private fun ComposeUiTest.show(
-        state: HomePageState,
-        actions: HomePageActions = RecordingActions(),
-        navigation: RecordingNavigation = RecordingNavigation(),
-        width: Dp = WIDE,
-        document: UiGeneratedComponent? = null,
-    ) {
+    private val actions = RecordingActions()
+    private val navigation = RecordingNavigation()
+
+    private fun ComposeUiTest.show(state: HomePageState, width: Dp = WIDE, document: UiGeneratedComponent? = null) {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                    HomePage(state = state, actions = actions, navigation = navigation.navigation, document = document)
+                    HomePage(state = state, callbacks = HomePageCallbacks(actions, navigation.navigation), options = HomePageOptions(document = document))
                 }
             }
         }
@@ -96,28 +95,26 @@ class HomePageTest {
         show(baseState())
         onNodeWithText("Home").assertExists()
         onNodeWithText("1 agents · 3 conversations").assertExists()
-        onNodeWithTag(HomePageTags.pin("shortcut:TOOLS")).assertExists()
+        onNodeWithTag(HomePageTags.pin(toolsPin)).assertExists()
         assertEquals(2, onAllNodesWithText("12").fetchSemanticsNodes().size, "the pinned Tools tile and the Tools stat tile")
         onNodeWithTag(HomePageTags.STATS).assertExists()
-        onNodeWithTag(HomePageTags.recent("c-1")).assertExists()
+        onNodeWithTag(HomePageTags.recent(recent)).assertExists()
         onNodeWithText("Booked the train").assertExists()
     }
 
     @Test
     fun rowsAndTilesNavigate() = runComposeUiTest {
-        val navigation = RecordingNavigation()
-        show(baseState(), navigation = navigation)
-        onNodeWithTag(HomePageTags.pin("shortcut:TOOLS")).performClick()
-        onNodeWithTag(HomePageTags.recent("c-1")).performClick()
-        scrollTo(HomePageTags.agentRow("a-1"))
-        onNodeWithTag(HomePageTags.agentRow("a-1")).performClick()
+        show(baseState())
+        onNodeWithTag(HomePageTags.pin(toolsPin)).performClick()
+        onNodeWithTag(HomePageTags.recent(recent)).performClick()
+        scrollTo(HomePageTags.agentRow(scout))
+        onNodeWithTag(HomePageTags.agentRow(scout)).performClick()
         assertEquals(listOf("shortcut:TOOLS", "conversation:c-1", "agent:a-1"), navigation.events)
     }
 
     @Test
     fun theComposerSendsTrimmedText() = runComposeUiTest {
-        val navigation = RecordingNavigation()
-        show(baseState(), navigation = navigation)
+        show(baseState())
         onNodeWithTag(HomePageTags.COMPOSER).performTextInput("  plan my week  ")
         onNodeWithTag(HomePageTags.SEND).performClick()
         assertEquals(listOf("prompt:plan my week"), navigation.events)
@@ -125,10 +122,9 @@ class HomePageTest {
 
     @Test
     fun editingPinsUnpinsAndAddsShortcuts() = runComposeUiTest {
-        val actions = RecordingActions()
-        show(baseState(), actions = actions)
+        show(baseState())
         onNodeWithTag(HomePageTags.EDIT_PINS).performClick()
-        onNodeWithTag(HomePageTags.unpin("shortcut:TOOLS")).performClick()
+        onNodeWithTag(HomePageTags.unpin(toolsPin)).performClick()
         onNodeWithTag(HomePageTags.ADD_PIN).performClick()
         onNodeWithTag(HomePageTags.addShortcut(HomeShortcut.SCHEDULES)).performClick()
         assertEquals(listOf("pin:TOOLS=false", "pin:SCHEDULES=true"), actions.events)
@@ -136,34 +132,30 @@ class HomePageTest {
 
     @Test
     fun theFleetTableSortsAndPinsAgents() = runComposeUiTest {
-        val actions = RecordingActions()
-        show(baseState(), actions = actions)
-        scrollTo(HomePageTags.pinAgent("a-1"))
-        onNodeWithTag(HomePageTags.sort(FleetSortKey.Model.label)).performClick()
-        onNodeWithTag(HomePageTags.pinAgent("a-1")).performClick()
+        show(baseState())
+        scrollTo(HomePageTags.pinAgent(scout))
+        onNodeWithTag(HomePageTags.sort(FleetSortKey.Model)).performClick()
+        onNodeWithTag(HomePageTags.pinAgent(scout)).performClick()
         assertEquals(listOf("sort:Model", "agent:a-1=true"), actions.events)
     }
 
     @Test
     fun aPhoneGetsSortChipsAndTheComposerDockedBelow() = runComposeUiTest {
-        val actions = RecordingActions()
-        show(baseState(), actions = actions, width = COMPACT)
+        show(baseState(), width = COMPACT)
         onNodeWithTag(HomePageTags.COMPOSER).assertExists()
-        scrollTo(HomePageTags.sort(FleetSortKey.Conversations.label))
-        onNodeWithTag(HomePageTags.sort(FleetSortKey.Conversations.label)).performClick()
+        scrollTo(HomePageTags.sort(FleetSortKey.Conversations))
+        onNodeWithTag(HomePageTags.sort(FleetSortKey.Conversations)).performClick()
         assertEquals(listOf("sort:Chats"), actions.events)
         onNodeWithText("gpt-5 · 3 chats").assertExists()
     }
 
     @Test
     fun typingSearchesAndHitsNavigate() = runComposeUiTest {
-        val actions = RecordingActions()
-        val navigation = RecordingNavigation()
         val catalog = HomeSearchCatalog(agents = listOf(Agent(id = AgentId("a-1"), name = "Planner")))
         val searching = HomePageReducer.withQuery(HomePageReducer.withCatalog(baseState(), catalog), "plan", awaitMessages = true)
         val message = ParsedSearchMessage("m-1", "a-1", "assistant", "the plan", null, "c-9")
         val withHits = HomePageReducer.withMessages(searching, "plan", listOf(message))
-        show(withHits, actions = actions, navigation = navigation)
+        show(withHits)
 
         onNodeWithTag(HomePageTags.SEARCH_RESULTS).assertExists()
         onNodeWithTag(HomePageTags.COMPOSER).assertDoesNotExist()
@@ -195,9 +187,8 @@ class HomePageTest {
 
     @Test
     fun aDocumentActionReachesTheHost() = runComposeUiTest {
-        val navigation = RecordingNavigation()
         val document = UiGeneratedComponent(name = "Button", propsJson = """{"label":"Open issue","action":{"name":"issue.open"}}""")
-        show(baseState(), navigation = navigation, document = document)
+        show(baseState(), document = document)
         onNodeWithText("Open issue").performClick()
         assertEquals(listOf("a2ui:issue.open"), navigation.events)
     }
@@ -249,7 +240,7 @@ class HomePageTest {
         val events = mutableListOf<String>()
         val navigation = HomePageNavigation(
             onSubmitPrompt = { events += "prompt:$it" },
-            onOpenConversation = { events += "conversation:$it" },
+            onOpenConversation = { events += "conversation:${it.conversationId}" },
             onOpenAgent = { events += "agent:$it" },
             onOpenShortcut = { events += HomePinnedItem.shortcutKey(it) },
             onOpenMessage = { events += "message:${it.conversationId}" },

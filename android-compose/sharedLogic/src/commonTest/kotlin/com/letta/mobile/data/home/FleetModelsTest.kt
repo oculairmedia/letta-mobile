@@ -24,13 +24,12 @@ class FleetModelsTest {
         agentId: String,
         agentName: String = agentId,
         updatedAt: String,
-        preview: String = "",
     ) = FleetConversation(
         id = id,
         agentId = agentId,
         agentName = agentName,
         title = id,
-        preview = preview,
+        preview = "",
         updatedAtLabel = updatedAt,
     )
 
@@ -142,7 +141,7 @@ class FleetModelsTest {
         val result = overview(
             conversations = listOf(
                 conversation("old", "a-1", updatedAt = "2026-07-20T10:00:00Z"),
-                conversation("newest", "a-2", "Ops", "2026-07-26T11:00:00Z", preview = " hi "),
+                conversation("newest", "a-2", "Ops", "2026-07-26T11:00:00Z").copy(preview = " hi "),
                 conversation("mid", "a-1", updatedAt = "2026-07-26T08:00:00Z"),
             ),
             agents = listOf(agent("a-1", "Scout"), agent("a-2", "Ops")),

@@ -128,24 +128,29 @@ internal fun HomeComposer(page: HomePageScope, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
-            HomeComposerField(draft, page.options.composerPlaceholder, { draft = it }, submit, Modifier.weight(1f))
+            val field = ComposerField(draft, page.options.composerPlaceholder, { draft = it }, submit)
+            HomeComposerField(field, Modifier.weight(1f))
             HomeSendButton(canSend = canSend, onSend = submit)
         }
     }
 }
 
+/** The composer field's draft, its placeholder and what typing and sending do. */
+private class ComposerField(
+    val text: String,
+    val placeholder: String,
+    val onTextChanged: (String) -> Unit,
+    val onSubmit: () -> Unit,
+)
+
 @Composable
-private fun HomeComposerField(
-    text: String,
-    placeholder: String,
-    onTextChanged: (String) -> Unit,
-    onSubmit: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun HomeComposerField(field: ComposerField, modifier: Modifier = Modifier) {
+    val text = field.text
+    val onSubmit = field.onSubmit
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
     BasicTextField(
         value = text,
-        onValueChange = onTextChanged,
+        onValueChange = field.onTextChanged,
         modifier = modifier
             .heightIn(min = LettaDimens.Control.fieldHeight, max = ComposerMaxHeight)
             .padding(vertical = LettaDimens.Space.xs)
@@ -164,7 +169,7 @@ private fun HomeComposerField(
         keyboardActions = KeyboardActions(onSend = { onSubmit() }),
         decorationBox = { innerTextField ->
             Box(Modifier.fillMaxWidth()) {
-                if (text.isEmpty()) Text(placeholder, style = textStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (text.isEmpty()) Text(field.placeholder, style = textStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 innerTextField()
             }
         },
@@ -263,8 +268,8 @@ private fun RecentConversationRow(conversation: FleetRecentConversation, page: H
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(LettaDimens.Radius.md))
-            .clickable { page.navigation.onOpenConversation(conversation.conversationId) }
-            .testTag(HomePageTags.recent(conversation.conversationId))
+            .clickable { page.navigation.onOpenConversation(conversation) }
+            .testTag(HomePageTags.recent(conversation))
             .padding(LettaDimens.Space.sm),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),

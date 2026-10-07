@@ -86,25 +86,34 @@ sealed interface HomePinnedItem {
 }
 
 /**
+ * What pinned agent tiles are called: [live] names from the current backend; while the agent list
+ * is still loading ([settled] false) a pin missing from it falls back to its [persisted] name so
+ * tiles do not flash away mid-refresh.
+ */
+@Immutable
+data class PinnedAgentNames(
+    val live: Map<String, String>,
+    val settled: Boolean,
+    val persisted: Map<String, String> = emptyMap(),
+) {
+    fun nameOf(agentId: String): String? = live[agentId] ?: persisted[agentId]?.takeUnless { settled }
+}
+
+/**
  * Resolves persisted pin [keys] into tiles. Shortcuts outside [availableShortcuts] are hidden (the
- * host cannot open them). An agent pin uses its live name from [agentNames]; while [agentsSettled] is
- * false a pin missing from it is still drawn under [persistedNames] so tiles do not flash away
- * mid-refresh, and once settled an unknown agent is an orphan from another backend and is hidden
- * (its key stays stored so switching back restores it).
+ * host cannot open them); an agent [names] cannot name is an orphan from another backend and is
+ * hidden too (its key stays stored, so switching back restores it).
  */
 fun resolvePinnedItems(
     keys: List<String>,
-    agentNames: Map<String, String>,
-    agentsSettled: Boolean,
+    names: PinnedAgentNames,
     availableShortcuts: Set<HomeShortcut> = HomeShortcut.entries.toSet(),
-    persistedNames: Map<String, String> = emptyMap(),
 ): List<HomePinnedItem> = keys.distinct().mapNotNull { key ->
     HomePinnedItem.parseShortcutKey(key)?.let { shortcut ->
         return@mapNotNull HomePinnedItem.Shortcut(shortcut).takeIf { shortcut in availableShortcuts }
     }
     val agentId = HomePinnedItem.parseAgentKey(key) ?: return@mapNotNull null
-    val name = agentNames[agentId] ?: persistedNames[agentId]?.takeUnless { agentsSettled }
-    name?.let { HomePinnedItem.Agent(HomeAgentRef(agentId, it)) }
+    names.nameOf(agentId)?.let { HomePinnedItem.Agent(HomeAgentRef(agentId, it)) }
 }
 
 /** Token usage of one model over the usage window. */
@@ -230,16 +239,15 @@ fun HomePageState.statTiles(): List<HomeStatTile> {
     )
     val usage = stats.usage
     val backendTiles = listOfNotNull(
-        backendTile("Tools", stats.toolCount?.let(::formatGroupedNumber)),
-        backendTile("Blocks", stats.blockCount?.let(::formatGroupedNumber)),
-        backendTile("Tokens · ${USAGE_WINDOW_HOURS}h", usage?.let { formatGroupedNumber(it.totalTokens) })
-            ?.copy(caption = usage?.let(::usageCaption)),
+        backendTile("Tools", stats.toolCount),
+        backendTile("Blocks", stats.blockCount),
+        backendTile("Tokens · ${USAGE_WINDOW_HOURS}h", usage?.totalTokens)?.copy(caption = usage?.let(::usageCaption)),
     )
     return fleetTiles + backendTiles
 }
 
-private fun HomePageState.backendTile(label: String, value: String?): HomeStatTile? = when {
-    value != null -> HomeStatTile(label, value)
+private fun HomePageState.backendTile(label: String, value: Int?): HomeStatTile? = when {
+    value != null -> HomeStatTile(label, formatGroupedNumber(value))
     stats.loading -> HomeStatTile(label, "—")
     else -> null
 }

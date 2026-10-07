@@ -85,7 +85,7 @@ private fun SortHeaderCell(key: FleetSortKey, page: HomePageScope, modifier: Mod
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .clickable { page.actions.selectSort(key) }
-            .testTag(HomePageTags.sort(key.label))
+            .testTag(HomePageTags.sort(key))
             .padding(vertical = LettaDimens.Space.xs, horizontal = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (alignEnd) Arrangement.spacedBy(LettaDimens.Space.xs, Alignment.End) else Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -116,7 +116,7 @@ private fun FleetSortChips(page: HomePageScope) {
                 selected = active,
                 onClick = { page.actions.selectSort(key) },
                 label = { Text(if (active) "${key.label} ${sortArrow(sort.descending)}" else key.label) },
-                modifier = chipModifier.testTag(HomePageTags.sort(key.label)),
+                modifier = chipModifier.testTag(HomePageTags.sort(key)),
             )
         }
     }
@@ -130,7 +130,7 @@ private fun FleetAgentRow(agent: FleetAgentStat, page: HomePageScope) {
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.small)
                 .clickable { page.navigation.onOpenAgent(agent.agentId) }
-                .testTag(HomePageTags.agentRow(agent.agentId))
+                .testTag(HomePageTags.agentRow(agent))
                 .padding(vertical = LettaDimens.Space.sm, horizontal = LettaDimens.Space.hair),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -145,7 +145,7 @@ private fun FleetAgentRow(agent: FleetAgentStat, page: HomePageScope) {
                     FleetBarSpark(values = agent.activityByHour, modifier = Modifier.width(SparkBarsWidth).height(LettaDimens.Space.lg))
                 }
             }
-            AgentPinToggle(agent.agentId, page)
+            AgentPinToggle(agent, page)
         }
         RowHairline()
     }
@@ -175,11 +175,12 @@ private fun FleetAgentIdentity(agent: FleetAgentStat, page: HomePageScope, modif
 }
 
 @Composable
-private fun AgentPinToggle(agentId: String, page: HomePageScope) {
+private fun AgentPinToggle(agent: FleetAgentStat, page: HomePageScope) {
+    val agentId = agent.agentId
     val pinned = page.state.isAgentPinned(agentId)
     IconButton(
         onClick = { page.actions.setAgentPinned(agentId, !pinned) },
-        modifier = Modifier.width(PinWidth).testTag(HomePageTags.pinAgent(agentId)),
+        modifier = Modifier.width(PinWidth).testTag(HomePageTags.pinAgent(agent)),
     ) {
         Icon(
             imageVector = if (pinned) LettaIcons.PinOff else LettaIcons.Pin,

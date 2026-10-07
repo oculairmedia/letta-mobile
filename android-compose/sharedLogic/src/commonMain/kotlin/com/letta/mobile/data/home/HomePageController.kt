@@ -146,8 +146,7 @@ object HomePageReducer {
         return state.copy(
             pinnedItems = resolvePinnedItems(
                 keys = state.pinKeys,
-                agentNames = names,
-                agentsSettled = state.catalog.agentsSettled,
+                names = PinnedAgentNames(live = names, settled = state.catalog.agentsSettled),
                 availableShortcuts = state.availableShortcuts,
             ),
             sortedAgents = sortFleet(state.fleet.agents, state.sort),

@@ -32,9 +32,9 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
-import com.letta.mobile.desktop.home.DesktopHomeCallbacks
 import com.letta.mobile.desktop.home.DesktopHomeInputs
 import com.letta.mobile.ui.shell.pages.home.HomePage
+import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
@@ -128,7 +128,7 @@ internal data class DestinationNucleusActions(
 )
 
 internal data class DestinationContentActions(
-    val home: DesktopHomeCallbacks,
+    val home: HomePageCallbacks,
     val onRetryConnection: () -> Unit,
     val memory: MemoryPageActions,
     val schedules: DestinationScheduleActions,
@@ -262,8 +262,7 @@ private fun HomeDestinationContent(
     } else {
         HomePage(
             state = inputs.home.state,
-            actions = actions.home.actions,
-            navigation = actions.home.navigation,
+            callbacks = actions.home,
             modifier = modifier,
             options = inputs.home.options,
         )

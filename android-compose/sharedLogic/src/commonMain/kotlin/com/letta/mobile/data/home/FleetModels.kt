@@ -201,7 +201,7 @@ fun buildFleetOverview(params: FleetOverviewParams): FleetOverview {
         addAll(conversationsByAgent.keys)
     }
     val agents = agentIds.map { agentId ->
-        agentStat(agentId, rosterById[agentId], conversationsByAgent[agentId].orEmpty(), window, params.runningAgentIds)
+        window.agentStat(agentId, rosterById[agentId], conversationsByAgent[agentId].orEmpty())
     }
     return FleetOverview(
         summary = fleetSummary(agents, conversations.size, window, params),
@@ -214,12 +214,34 @@ fun buildFleetOverview(params: FleetOverviewParams): FleetOverview {
     )
 }
 
+/** The activity window every agent's buckets share, and who is running right now. */
 private class ActivityWindow(params: FleetOverviewParams) {
     val days = params.days.coerceAtLeast(1)
     val hours = params.hours.coerceAtLeast(1)
     val now = params.now
     val zone = params.zone
     val today: LocalDate = params.now.toLocalDateTime(params.zone).date
+    private val runningAgentIds = params.runningAgentIds
+
+    fun agentStat(agentId: String, roster: Agent?, conversations: List<FleetConversation>): FleetAgentStat {
+        val dayBuckets = IntArray(days)
+        val hourBuckets = IntArray(hours)
+        val instants = conversations.mapNotNull { parseConversationInstant(it.updatedAtLabel) }
+        instants.forEach { at ->
+            dayIndex(at)?.let { dayBuckets[it]++ }
+            hourIndex(at)?.let { hourBuckets[it]++ }
+        }
+        return FleetAgentStat(
+            agentId = agentId,
+            name = resolveAgentName(agentId, roster, conversations),
+            model = roster?.model?.takeIf { it.isNotBlank() },
+            conversationCount = conversations.size,
+            lastActivity = instants.maxOrNull(),
+            running = agentId in runningAgentIds,
+            activityByDay = dayBuckets.toList(),
+            activityByHour = hourBuckets.toList(),
+        )
+    }
 
     fun dayIndex(at: Instant): Int? {
         val ago = at.toLocalDateTime(zone).date.daysUntil(today)
@@ -232,32 +254,6 @@ private class ActivityWindow(params: FleetOverviewParams) {
     }
 
     fun isToday(at: Instant): Boolean = at.toLocalDateTime(zone).date == today
-}
-
-private fun agentStat(
-    agentId: String,
-    roster: Agent?,
-    conversations: List<FleetConversation>,
-    window: ActivityWindow,
-    runningAgentIds: Set<String>,
-): FleetAgentStat {
-    val dayBuckets = IntArray(window.days)
-    val hourBuckets = IntArray(window.hours)
-    val instants = conversations.mapNotNull { parseConversationInstant(it.updatedAtLabel) }
-    instants.forEach { at ->
-        window.dayIndex(at)?.let { dayBuckets[it]++ }
-        window.hourIndex(at)?.let { hourBuckets[it]++ }
-    }
-    return FleetAgentStat(
-        agentId = agentId,
-        name = resolveAgentName(agentId, roster, conversations),
-        model = roster?.model?.takeIf { it.isNotBlank() },
-        conversationCount = conversations.size,
-        lastActivity = instants.maxOrNull(),
-        running = agentId in runningAgentIds,
-        activityByDay = dayBuckets.toList(),
-        activityByHour = hourBuckets.toList(),
-    )
 }
 
 private fun fleetSummary(

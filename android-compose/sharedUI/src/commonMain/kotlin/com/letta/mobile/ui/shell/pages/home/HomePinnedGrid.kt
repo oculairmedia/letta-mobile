@@ -125,7 +125,7 @@ private fun PinnedTile(item: HomePinnedItem, page: HomePageScope, dragging: Bool
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             tonalElevation = if (dragging) DRAG_ELEVATION else 0.dp,
-            modifier = Modifier.fillMaxSize().testTag(HomePageTags.pin(item.key)),
+            modifier = Modifier.fillMaxSize().testTag(HomePageTags.pin(item)),
         ) {
             TileBody(tile)
         }
@@ -169,7 +169,7 @@ private fun TileEditActions(item: HomePinnedItem, page: HomePageScope, modifier:
                 Icon(LettaIcons.Edit, contentDescription = CONFIGURE_LABEL, modifier = Modifier.size(LettaDimens.Control.iconSm))
             }
         }
-        IconButton(onClick = { item.unpin(page) }, modifier = Modifier.testTag(HomePageTags.unpin(item.key))) {
+        IconButton(onClick = { item.unpin(page) }, modifier = Modifier.testTag(HomePageTags.unpin(item))) {
             Icon(LettaIcons.PinOff, contentDescription = UNPIN_LABEL, modifier = Modifier.size(LettaDimens.Control.iconSm))
         }
     }

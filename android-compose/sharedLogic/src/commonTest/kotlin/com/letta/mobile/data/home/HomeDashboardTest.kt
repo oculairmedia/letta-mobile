@@ -31,8 +31,7 @@ class HomeDashboardTest {
     fun pinsResolveInOrderAndHideWhatTheHostCannotOpen() {
         val items = resolvePinnedItems(
             keys = listOf(tools, "agent:a-1", conversations, tools, "junk"),
-            agentNames = mapOf("a-1" to "Scout"),
-            agentsSettled = true,
+            names = PinnedAgentNames(live = mapOf("a-1" to "Scout"), settled = true),
             availableShortcuts = setOf(HomeShortcut.TOOLS),
         )
         assertEquals(
@@ -47,9 +46,9 @@ class HomeDashboardTest {
         val persisted = mapOf("gone" to "Old friend")
         assertEquals(
             listOf(HomePinnedItem.Agent(HomeAgentRef("gone", "Old friend"))),
-            resolvePinnedItems(keys, emptyMap(), agentsSettled = false, persistedNames = persisted),
+            resolvePinnedItems(keys, PinnedAgentNames(emptyMap(), settled = false, persisted = persisted)),
         )
-        assertTrue(resolvePinnedItems(keys, emptyMap(), agentsSettled = true, persistedNames = persisted).isEmpty())
+        assertTrue(resolvePinnedItems(keys, PinnedAgentNames(emptyMap(), settled = true, persisted = persisted)).isEmpty())
     }
 
     @Test

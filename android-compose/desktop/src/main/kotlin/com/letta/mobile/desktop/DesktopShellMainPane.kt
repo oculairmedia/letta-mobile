@@ -26,8 +26,8 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.desktop.home.DesktopHome
-import com.letta.mobile.desktop.home.DesktopHomeCallbacks
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
+import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 
 /** What the chat surfaces in the main pane share: the composer's commands and context reading, and the canvas. */
@@ -320,19 +320,19 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
     )
 }
 
-private fun desktopHomeCallbacks(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHomeCallbacks {
+private fun desktopHomeCallbacks(context: DesktopShellContext, frame: DesktopShellFrame): HomePageCallbacks {
     val navigator = context.navigator
     val router = context.router
     val focus = frame.focus
     val openConversation = { id: String -> router.openConversation(ConversationId(id)) }
-    return DesktopHomeCallbacks(
+    return HomePageCallbacks(
         actions = context.panels.libraries.home,
         navigation = HomePageNavigation(
             onSubmitPrompt = { text ->
                 val rosterAgentId = focus.rosterAgents.firstOrNull()?.id?.value
                 router.submitHomePrompt(DesktopHomePrompt(text, focus.selectedAgentId, rosterAgentId))
             },
-            onOpenConversation = openConversation,
+            onOpenConversation = { openConversation(it.conversationId) },
             onOpenAgent = { router.openAgent(AgentId(it)) },
             onOpenShortcut = { shortcut -> DesktopHome.destinationFor(shortcut)?.let(navigator::navigate) },
             onConfigureAgent = { navigator.editAgentId = it },

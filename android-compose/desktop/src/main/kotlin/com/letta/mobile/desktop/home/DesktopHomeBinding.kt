@@ -2,7 +2,6 @@ package com.letta.mobile.desktop.home
 
 import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.home.FleetConversation
-import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageConfig
 import com.letta.mobile.data.home.HomePageController
 import com.letta.mobile.data.home.HomePageState
@@ -15,7 +14,6 @@ import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.DesktopDestination
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
-import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import kotlinx.coroutines.CoroutineScope
 
@@ -64,12 +62,6 @@ internal object DesktopHome {
 internal data class DesktopHomeInputs(
     val state: HomePageState,
     val options: HomePageOptions,
-)
-
-/** What the Home destination calls: the controller's actions and the shell's navigation. */
-internal data class DesktopHomeCallbacks(
-    val actions: HomePageActions,
-    val navigation: HomePageNavigation,
 )
 
 /** The fleet model's view of a desktop conversation row. */
