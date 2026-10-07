@@ -181,6 +181,7 @@ internal suspend fun closeDrawerThenRun(
 private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
     // letta-mobile-bglj6.1: the shared page's phone canvas mode keeps the board's top clear, so the
     // header (agent pill and menu) gives way to it; the board's menu carries both while it is hidden.
+    // letta-mobile-bglj6.1.22: the agent's pill alone stays, so the agent is known at a glance.
     var headerHidden by rememberSaveable { mutableStateOf(false) }
     val reducedMotion = com.letta.mobile.ui.theme.LocalReducedMotion.current
     Scaffold(
@@ -188,12 +189,21 @@ private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            AnimatedVisibility(
-                visible = !headerHidden,
-                enter = if (reducedMotion) EnterTransition.None else fadeIn(),
-                exit = if (reducedMotion) ExitTransition.None else fadeOut(),
-            ) {
-                AgentScaffoldTopBar(state)
+            androidx.compose.foundation.layout.Box {
+                AnimatedVisibility(
+                    visible = !headerHidden,
+                    enter = if (reducedMotion) EnterTransition.None else fadeIn(),
+                    exit = if (reducedMotion) ExitTransition.None else fadeOut(),
+                ) {
+                    AgentScaffoldTopBar(state)
+                }
+                AnimatedVisibility(
+                    visible = headerHidden,
+                    enter = if (reducedMotion) EnterTransition.None else fadeIn(),
+                    exit = if (reducedMotion) ExitTransition.None else fadeOut(),
+                ) {
+                    AgentScaffoldCanvasIdentityPill(state)
+                }
             }
         },
         floatingActionButton = { AgentScaffoldProjectBugFab(state) },

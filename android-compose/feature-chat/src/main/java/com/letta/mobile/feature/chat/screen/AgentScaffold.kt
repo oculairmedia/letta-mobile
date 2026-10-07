@@ -17,6 +17,7 @@ internal object AgentScaffoldTestTags {
     const val MENU_BUTTON = "agent_scaffold_menu_button"
     const val DRAWER_CONTENT = "agent_scaffold_drawer_content"
     const val CONVERSATION_PICKER_TRIGGER = "agent_scaffold_conversation_picker_trigger"
+    const val CANVAS_IDENTITY_PILL = "agent_scaffold_canvas_identity_pill"
     const val CONVERSATION_PICKER_SHEET = "agent_scaffold_conversation_picker_sheet"
     const val PROJECT_BUG_FAB = "agent_scaffold_project_bug_fab"
     const val PROJECT_BUG_REPORT_SHEET = "agent_scaffold_project_bug_report_sheet"

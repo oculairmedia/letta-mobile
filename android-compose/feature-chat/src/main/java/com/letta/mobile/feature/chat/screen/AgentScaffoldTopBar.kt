@@ -108,6 +108,51 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
     )
 }
 
+/**
+ * letta-mobile-bglj6.1.22: the agent at a glance while the shared page's phone canvas mode hides
+ * the header: the header's own pill (avatar, name, favorite and pin marks; tap to switch agents,
+ * long press to pin), alone at the top start of the board. The menu stays in the board's menu.
+ */
+@Composable
+internal fun AgentScaffoldCanvasIdentityPill(state: AgentScaffoldRuntimeState) {
+    val params = state.params
+    androidx.compose.foundation.layout.Box(
+        Modifier
+            .padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() })
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)
+            .testTag(AgentScaffoldTestTags.CANVAS_IDENTITY_PILL),
+    ) {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+            color = Color.Black,
+            contentColor = Color.White,
+        ) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+            ) {
+                AgentScaffoldAgentTopBarTitle(
+                    params = AgentScaffoldAgentTopBarTitleParams(
+                        agentId = state.agentIdValue,
+                        agentName = state.agentName,
+                        screenTitle = state.screenTitle,
+                        currentAgentIsFavorite = state.currentAgentIsFavorite,
+                        currentAgentIsPinned = state.currentAgentIsPinned,
+                        onAgentTitleClick = {
+                            HapticEffects.contextClick(state.haptic, state.view)
+                            params.viewModel.refreshAvailableAgents()
+                            params.sheetVisibility.onShowAgentSwitcherChange(true)
+                        },
+                        onAgentTitleLongClick = {
+                            HapticEffects.longPress(state.haptic)
+                            params.viewModel.toggleCurrentAgentPinned()
+                        },
+                    ),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun AgentScaffoldSearchTopBarTitle(
     searchQuery: String,
