@@ -30,7 +30,7 @@ import androidx.compose.ui.Alignment
  *
  * Every builder takes `reduced` (the [LocalReducedMotion] preference) and snaps when it is true.
  */
-internal object ChatRowMotion {
+internal class ChatRowMotion(private val reduced: Boolean) {
     private val enterSpec: FiniteAnimationSpec<Float> = tween(LettaMotionTokens.ENTER_MILLIS, easing = LinearOutSlowInEasing)
     private val fastFadeInSpec: FiniteAnimationSpec<Float> =
         tween(LettaMotionTokens.FAST_FADE_IN_MILLIS, easing = LinearOutSlowInEasing)
@@ -44,12 +44,12 @@ internal object ChatRowMotion {
     private fun <T> chipSize(): FiniteAnimationSpec<T> = tween(LettaMotionTokens.CHIP_MILLIS, easing = LinearOutSlowInEasing)
 
     /** Detail expansion (legacy ChatMotionPolicy.expansion): fade + vertical expand, 190 ms in, 130 ms out. */
-    fun expansionEnter(reduced: Boolean): EnterTransition {
+    fun expansionEnter(): EnterTransition {
         if (reduced) return EnterTransition.None
         return fadeIn(enterSpec) + expandVertically(enterSize(), expandFrom = Alignment.Top)
     }
 
-    fun expansionExit(reduced: Boolean): ExitTransition {
+    fun expansionExit(): ExitTransition {
         if (reduced) return ExitTransition.None
         return fadeOut(fastFadeOutSpec) + shrinkVertically(exitSize(), shrinkTowards = Alignment.Top)
     }
@@ -59,14 +59,14 @@ internal object ChatRowMotion {
      * from the leading edge and downwards at once, so it reads as the card opening rather than
      * content appearing. Mirrored on collapse.
      */
-    fun unfurlEnter(reduced: Boolean): EnterTransition {
+    fun unfurlEnter(): EnterTransition {
         if (reduced) return EnterTransition.None
         return fadeIn(enterSpec) +
             expandHorizontally(enterSize(), expandFrom = Alignment.Start) +
             expandVertically(enterSize(), expandFrom = Alignment.Top)
     }
 
-    fun unfurlExit(reduced: Boolean): ExitTransition {
+    fun unfurlExit(): ExitTransition {
         if (reduced) return ExitTransition.None
         return fadeOut(fastFadeOutSpec) +
             shrinkHorizontally(exitSize(), shrinkTowards = Alignment.Start) +
@@ -75,29 +75,29 @@ internal object ChatRowMotion {
 
     /**
      * A block sliding in from a share of its own height while it grows (legacy
-     * LettaMotion.verticalEnter); the reasoning body uses [slideDivisor] 4.
+     * LettaMotion.verticalEnter); the reasoning body slides from a quarter of its height.
      */
-    fun verticalEnter(reduced: Boolean, slideDivisor: Int = DEFAULT_SLIDE_DIVISOR): EnterTransition {
+    fun reasoningBodyEnter(): EnterTransition {
         if (reduced) return EnterTransition.None
         return fadeIn(fastFadeInSpec) +
-            slideInVertically(enterSize(), initialOffsetY = { it / slideDivisor }) +
+            slideInVertically(enterSize(), initialOffsetY = { it / REASONING_SLIDE_DIVISOR }) +
             expandVertically(enterSize(), expandFrom = Alignment.Top)
     }
 
-    fun verticalExit(reduced: Boolean, slideDivisor: Int = DEFAULT_SLIDE_DIVISOR): ExitTransition {
+    fun reasoningBodyExit(): ExitTransition {
         if (reduced) return ExitTransition.None
         return fadeOut(fastFadeOutSpec) +
-            slideOutVertically(exitSize(), targetOffsetY = { it / slideDivisor }) +
+            slideOutVertically(exitSize(), targetOffsetY = { it / REASONING_SLIDE_DIVISOR }) +
             shrinkVertically(exitSize(), shrinkTowards = Alignment.Top)
     }
 
     /** An inline chip (a spinner, a leading label) easing in sideways (legacy LettaMotion.horizontalEnter). */
-    fun horizontalEnter(reduced: Boolean): EnterTransition {
+    fun horizontalEnter(): EnterTransition {
         if (reduced) return EnterTransition.None
         return fadeIn(fastFadeInSpec) + expandHorizontally(chipSize(), expandFrom = Alignment.Start)
     }
 
-    fun horizontalExit(reduced: Boolean): ExitTransition {
+    fun horizontalExit(): ExitTransition {
         if (reduced) return ExitTransition.None
         return fadeOut(fastFadeOutSpec) + shrinkHorizontally(chipSize(), shrinkTowards = Alignment.Start)
     }
@@ -106,7 +106,7 @@ internal object ChatRowMotion {
      * The settled copy replacing the live one ("Working" to "Thought for 2s"; legacy
      * ChatMotionPolicy.terminalSwap): a 120 ms fade in over a 90 ms fade out.
      */
-    fun terminalSwap(reduced: Boolean): ContentTransform {
+    fun terminalSwap(): ContentTransform {
         // The label's width follows the copy on the content-size ramp (or snaps), never the
         // default spring, so a reduced-motion swap does not still glide.
         val size = SizeTransform(clip = false) { _, _ -> if (reduced) snap() else bodyLiftSize() }
@@ -125,23 +125,23 @@ internal object ChatRowMotion {
      * settles, so there is no header growth to pull the body back over; the body's rise is this
      * fold, on the same ramp.
      */
-    fun runLabelFoldExit(reduced: Boolean): ExitTransition {
+    fun runLabelFoldExit(): ExitTransition {
         if (reduced) return ExitTransition.None
         return fadeOut(fastFadeOutSpec) + shrinkVertically(bodyLiftSize(), shrinkTowards = Alignment.Top)
     }
 
     /** The run's leading label folding sideways (the tool summary slides home), on the same ramp. */
-    fun runLeadFoldExit(reduced: Boolean): ExitTransition {
+    fun runLeadFoldExit(): ExitTransition {
         if (reduced) return ExitTransition.None
         return fadeOut(fastFadeOutSpec) + shrinkHorizontally(bodyLiftSize(), shrinkTowards = Alignment.Start)
     }
 
     /** Legacy RunBlockMotion's lift: 220 ms, FastOutSlowIn. */
-    const val RUN_BODY_LIFT_MILLIS: Int = LettaMotionTokens.CONTENT_SIZE_MILLIS
+    private fun <T> bodyLiftSize(): FiniteAnimationSpec<T> = tween(LettaMotionTokens.CONTENT_SIZE_MILLIS, easing = FastOutSlowInEasing)
 
-    private fun <T> bodyLiftSize(): FiniteAnimationSpec<T> = tween(RUN_BODY_LIFT_MILLIS, easing = FastOutSlowInEasing)
-
-    private const val DEFAULT_SLIDE_DIVISOR = 5
+    private companion object {
+        const val REASONING_SLIDE_DIVISOR = 4
+    }
 }
 
 /**

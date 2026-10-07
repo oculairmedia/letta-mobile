@@ -143,8 +143,8 @@ private fun RowScope.ReasoningSpinner(disclosure: ReasoningDisclosure) {
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = disclosure.isActive && LocalChatWorkingCueAnimated.current,
-        enter = ChatRowMotion.horizontalEnter(reducedMotion),
-        exit = ChatRowMotion.horizontalExit(reducedMotion),
+        enter = ChatRowMotion(reducedMotion).horizontalEnter(),
+        exit = ChatRowMotion(reducedMotion).horizontalExit(),
         label = "reasoningSpinner",
     ) {
         ReasoningLoadingIndicator(reducedMotion)
@@ -195,8 +195,8 @@ private fun ColumnScope.ReasoningExpansion(message: UiMessage, disclosure: Reaso
     AnimatedVisibility(
         visible = !disclosure.collapsed,
         // Legacy ChatReasoning: slides in from a quarter of its height as it grows.
-        enter = ChatRowMotion.verticalEnter(reducedMotion, slideDivisor = REASONING_SLIDE_DIVISOR),
-        exit = ChatRowMotion.verticalExit(reducedMotion, slideDivisor = REASONING_SLIDE_DIVISOR),
+        enter = ChatRowMotion(reducedMotion).reasoningBodyEnter(),
+        exit = ChatRowMotion(reducedMotion).reasoningBodyExit(),
         label = "reasoningExpansion",
     ) {
         Column(modifier = Modifier.padding(top = LettaDimens.Space.lg, bottom = LettaDimens.Space.xs)) {
@@ -241,7 +241,6 @@ internal fun reasoningPreview(content: String): String? {
     }
 }
 
-private const val REASONING_SLIDE_DIVISOR = 4
 private val WHITESPACE = Regex("\\s+")
 private const val ELLIPSIS = "…"
 private const val REASONING_PREVIEW_MAX_LENGTH = 96

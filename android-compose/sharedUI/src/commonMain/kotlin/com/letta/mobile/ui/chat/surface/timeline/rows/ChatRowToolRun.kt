@@ -151,8 +151,8 @@ private fun ColumnScope.ToolRunInlineCards(
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = visible,
-        enter = ChatRowMotion.expansionEnter(reducedMotion),
-        exit = ChatRowMotion.expansionExit(reducedMotion),
+        enter = ChatRowMotion(reducedMotion).expansionEnter(),
+        exit = ChatRowMotion(reducedMotion).expansionExit(),
     ) {
         ToolRunCards(
             toolCalls = toolCalls,

@@ -101,8 +101,8 @@ internal fun ToolCard(
             // ChatToolCallCards / LettaMotion.unfurlEnter, 190 ms in, 130 ms out).
             AnimatedVisibility(
                 visible = expanded,
-                enter = ChatRowMotion.unfurlEnter(reducedMotion),
-                exit = ChatRowMotion.unfurlExit(reducedMotion),
+                enter = ChatRowMotion(reducedMotion).unfurlEnter(),
+                exit = ChatRowMotion(reducedMotion).unfurlExit(),
                 label = "toolCardBody",
             ) {
                 ToolCardBody(toolCall, isError, callbacks)

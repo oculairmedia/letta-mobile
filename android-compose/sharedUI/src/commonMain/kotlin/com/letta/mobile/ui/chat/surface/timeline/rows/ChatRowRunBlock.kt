@@ -112,9 +112,9 @@ private fun RunSummaryLine(title: RunSummaryTitle) {
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = title.visible,
-        enter = ChatRowMotion.expansionEnter(reducedMotion),
+        enter = ChatRowMotion(reducedMotion).expansionEnter(),
         // The steps below ease up into the label's place (legacy settled-run body lift).
-        exit = ChatRowMotion.runLabelFoldExit(reducedMotion),
+        exit = ChatRowMotion(reducedMotion).runLabelFoldExit(),
         label = "runSummaryLine",
     ) {
         Row(
@@ -139,8 +139,8 @@ internal fun RunSummaryLead(title: RunSummaryTitle) {
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = title.visible,
-        enter = ChatRowMotion.horizontalEnter(reducedMotion),
-        exit = ChatRowMotion.runLeadFoldExit(reducedMotion),
+        enter = ChatRowMotion(reducedMotion).horizontalEnter(),
+        exit = ChatRowMotion(reducedMotion).runLeadFoldExit(),
         label = "runSummaryLead",
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -173,8 +173,8 @@ private fun RunSummaryLabel(activity: RunActivityProjection) {
         val reducedMotion = LocalReducedMotion.current
         AnimatedVisibility(
             visible = activity.isActive && LocalChatWorkingCueAnimated.current,
-            enter = ChatRowMotion.horizontalEnter(reducedMotion),
-            exit = ChatRowMotion.horizontalExit(reducedMotion),
+            enter = ChatRowMotion(reducedMotion).horizontalEnter(),
+            exit = ChatRowMotion(reducedMotion).horizontalExit(),
             label = "runWorkingOrb",
         ) {
             WorkingOrb()
@@ -192,7 +192,7 @@ private fun RunSummaryLabel(activity: RunActivityProjection) {
 private fun RunSummaryTitleText(title: String, color: Color, reducedMotion: Boolean) {
     AnimatedContent(
         targetState = title,
-        transitionSpec = { ChatRowMotion.terminalSwap(reducedMotion) },
+        transitionSpec = { ChatRowMotion(reducedMotion).terminalSwap() },
         contentAlignment = Alignment.CenterStart,
         label = "runSummaryTitle",
     ) { shown ->
