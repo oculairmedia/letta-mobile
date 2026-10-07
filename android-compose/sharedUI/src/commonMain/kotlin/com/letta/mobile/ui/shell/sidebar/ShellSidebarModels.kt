@@ -77,7 +77,10 @@ data class ShellAgentPanelState(
     val canvases: List<ShellCanvasRowModel> = emptyList(),
 )
 
-/** What the agent panel asks its host to do. Every callback defaults to a no-op. */
+/**
+ * What the agent panel asks its host to do. Every callback defaults to a no-op, except
+ * [onArchiveCanvas]: null means the host keeps no canvas archive, so canvas rows offer none.
+ */
 data class ShellAgentPanelActions(
     val onOpenSection: (LensDestination) -> Unit = {},
     val onOpenSettings: () -> Unit = {},
@@ -88,5 +91,5 @@ data class ShellAgentPanelActions(
     val onArchiveConversation: (id: String, archived: Boolean) -> Unit = { _, _ -> },
     val onDeleteConversation: (String) -> Unit = {},
     val onOpenCanvas: (CanvasId) -> Unit = {},
-    val onArchiveCanvas: (id: CanvasId, archived: Boolean) -> Unit = { _, _ -> },
+    val onArchiveCanvas: ((id: CanvasId, archived: Boolean) -> Unit)? = null,
 )

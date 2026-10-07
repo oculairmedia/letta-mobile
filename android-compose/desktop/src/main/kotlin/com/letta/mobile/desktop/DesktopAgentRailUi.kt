@@ -43,6 +43,7 @@ import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
+import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.shell.rail.ShellAgentRail
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellAgentRailState
@@ -118,6 +119,8 @@ internal data class DesktopAgentRailActions(
     val onToggleExpanded: () -> Unit = {},
     /** Opens the fleet Home page. Home lives here in the rail, not in the per-agent sidebar. */
     val onHome: () -> Unit = {},
+    /** An orb's right-click "Agent settings": edits that agent. */
+    val onAgentSettings: ((String) -> Unit)? = null,
 )
 
 /**
@@ -134,16 +137,19 @@ internal fun DesktopAgentRail(
         ShellRailMapping.groups(state.agents, state.focus.selectedAgentId)
     }
     val entries = remember(groups, state.focus) { ShellRailMapping.entries(groups, state.focus) }
+    // The desktop keeps no agent pins, so the orb menu (right-click) offers Open and Agent settings.
+    val railActions = ShellAgentRailActions(
+        onAgentSelected = actions.onAgentSelected,
+        onHome = actions.onHome,
+        onNewSession = actions.onNewSession,
+        onAgentSettings = actions.onAgentSettings,
+    )
     CompositionLocalProvider(LocalShellChromeDecorations provides DesktopShellChromeDecorations) {
         ShellAgentRail(
             state = ShellAgentRailState(entries = entries, homeSelected = state.homeSelected, expanded = state.expanded),
-            actions = ShellAgentRailActions(
-                onAgentSelected = actions.onAgentSelected,
-                onHome = actions.onHome,
-                onNewSession = actions.onNewSession,
-            ),
+            actions = railActions,
             modifier = Modifier.background(MaterialTheme.colorScheme.background),
-            library = { ExpandedAgentLibrary(groups = groups, entries = entries, onAgentSelected = actions.onAgentSelected) },
+            library = { ExpandedAgentLibrary(groups = groups, entries = entries, actions = railActions) },
         )
     }
 }
@@ -158,7 +164,7 @@ internal fun DesktopAgentRail(
 private fun ColumnScope.ExpandedAgentLibrary(
     groups: List<AgentRailGroup>,
     entries: List<ShellRailEntry>,
-    onAgentSelected: (String) -> Unit,
+    actions: ShellAgentRailActions,
 ) {
     // Spotify-style in-panel filter: search never leaves the library.
     var query by remember { mutableStateOf(TextFieldValue("")) }
@@ -198,7 +204,10 @@ private fun ColumnScope.ExpandedAgentLibrary(
             }
             // Keyed by group name so per-row state (the thinking ring) follows its agent across recency reordering.
             items(spaceEntries, key = { "group-${it.key}" }) { entry ->
-                ExpandedAgentRow(entry = entry, onAgentSelected = onAgentSelected)
+                // The same agent menu as the collapsed orbs (right-click).
+                LocalShellChromeDecorations.current.rowMenu(ShellRowMenus.agent(entry, actions)) {
+                    ExpandedAgentRow(entry = entry, onAgentSelected = actions.onAgentSelected)
+                }
             }
         }
     }

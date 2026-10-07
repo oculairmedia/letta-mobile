@@ -38,6 +38,7 @@ internal val AndroidHiddenDrawerSections: Set<LensDestination> = setOf(LensDesti
 internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, drawer: SharedNavDrawerViewModel) {
     val canvases by drawer.canvases.collectAsStateWithLifecycle()
     val archiveFilter by drawer.archiveFilter.collectAsStateWithLifecycle()
+    val pinnedAgentIds by drawer.pinnedAgentIds.collectAsStateWithLifecycle()
     val identities = LocalMascotRegistry.current.identities
     val open = state.drawerState.isOpen
     LaunchedEffect(open) { if (open) drawer.refreshCanvases() }
@@ -50,6 +51,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         archiveFilter = archiveFilter,
         canvases = canvases,
         hiddenSections = AndroidHiddenDrawerSections,
+        pinnedAgentIds = pinnedAgentIds,
     )
     // Relative times are taken when the drawer opens; they do not tick while it is open.
     val now = remember(open) { Clock.System.now() }
@@ -68,10 +70,10 @@ private fun rememberSharedDrawerActions(
     state: AgentScaffoldRuntimeState,
     drawer: SharedNavDrawerViewModel,
 ): ShellNavDrawerActions = remember(state, drawer) {
-    ShellNavDrawerActions(rail = sharedDrawerRailActions(state), panel = sharedDrawerPanelActions(state, drawer))
+    ShellNavDrawerActions(rail = sharedDrawerRailActions(state, drawer), panel = sharedDrawerPanelActions(state, drawer))
 }
 
-internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState): ShellAgentRailActions {
+internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState, drawer: SharedNavDrawerViewModel): ShellAgentRailActions {
     val navigation = state.params.navigation
     return ShellAgentRailActions(
         // An agent opens on its most recent conversation, as the desktop rail does.
@@ -84,6 +86,9 @@ internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState): ShellAge
         },
         onHome = { closeDrawerAndRun(state) { navigation.onNavigateToAdmin?.invoke() } },
         onNewSession = { closeDrawerAndRun(state) { state.params.sheetVisibility.onShowAgentSwitcherChange(true) } },
+        // The orb's long-press menu: pin to Home, and that agent's settings.
+        onAgentPinnedChange = drawer::setAgentPinned,
+        onAgentSettings = { agentId -> closeDrawerAndRun(state) { navigation.onNavigateToSettings(agentId) } },
     )
 }
 
@@ -108,6 +113,8 @@ internal fun sharedDrawerPanelActions(
         onArchiveConversation = { id, archived -> drawer.setConversationArchived(id, agentId, archived) },
         onDeleteConversation = { id -> drawer.deleteConversation(id, agentId) },
         onOpenCanvas = { canvasId -> closeDrawerAndRun(state) { navigation.onOpenCanvas?.invoke(canvasId.value) } },
+        // onArchiveCanvas stays null: Android keeps no canvas archive yet (letta-mobile-c3np7.5.7),
+        // so canvas rows offer no archive, by hover or by long-press.
     )
 }
 

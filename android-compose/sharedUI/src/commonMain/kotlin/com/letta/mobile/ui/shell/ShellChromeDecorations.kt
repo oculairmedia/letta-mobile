@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 
-/** One entry of a row's secondary menu (desktop: right-click). */
+/** One entry of a row's secondary menu (desktop: right-click; touch: long-press). See [ShellRowMenus]. */
 @Immutable
 data class ShellRowMenuItem(val label: String, val onClick: () -> Unit)
 
@@ -29,9 +29,9 @@ data class ShellHoverCard(
 
 /**
  * The platform pieces the shared shell chrome (agent panel, rail) wraps around its rows. The defaults
- * suit a touch host: no hover tooltips, no secondary menu, a Material dialog for confirmations. A
- * pointer host provides cursor tooltips, a right-click menu and its own dialog window through
- * [LocalShellChromeDecorations].
+ * suit a touch host: no hover tooltips, a long-press menu for a row's secondary actions, a Material
+ * dialog for confirmations. A pointer host provides cursor tooltips, a right-click menu and its own
+ * dialog window through [LocalShellChromeDecorations].
  */
 @Immutable
 class ShellChromeDecorations(
@@ -39,9 +39,9 @@ class ShellChromeDecorations(
     val tooltip: @Composable (text: String, content: @Composable () -> Unit) -> Unit = { _, content -> content() },
     /** Wraps a control with a hover card (the rail's agent orbs). */
     val hoverCard: @Composable (card: ShellHoverCard, content: @Composable () -> Unit) -> Unit = { _, content -> content() },
-    /** Wraps a row with its secondary actions (archive, delete). */
+    /** Wraps a row with its secondary actions (archive, delete; an agent's open, pin, settings). */
     val rowMenu: @Composable (items: List<ShellRowMenuItem>, content: @Composable () -> Unit) -> Unit =
-        { _, content -> content() },
+        { items, content -> ShellLongPressMenu(items, content) },
     /** Asks before a destructive action. */
     val confirm: @Composable (request: ShellConfirmRequest, onConfirm: () -> Unit, onDismiss: () -> Unit) -> Unit =
         { request, onConfirm, onDismiss -> ShellConfirmAlert(request, onConfirm, onDismiss) },

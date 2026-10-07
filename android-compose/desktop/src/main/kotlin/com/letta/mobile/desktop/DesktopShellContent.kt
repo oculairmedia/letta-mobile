@@ -139,6 +139,7 @@ private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopSh
             // roster; agent creation lives inside it.
             onNewSession = { context.overlays.newConversation = true },
             onToggleExpanded = { navigator.railExpanded = !navigator.railExpanded },
+            onAgentSettings = { navigator.editAgentId = it },
         ),
     )
 }

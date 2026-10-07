@@ -28,17 +28,21 @@ internal val LocalSharedNavDrawer = staticCompositionLocalOf<SharedNavDrawerView
 /**
  * The Android side of the shared navigation drawer (letta-mobile-c3np7.5.5): whether it replaces the
  * legacy chat drawer, the canvases it lists, its archive filter, and the conversation actions its
- * rows offer. The drawer's look and its mapping live in sharedUI; this only binds Android's stores.
+ * rows offer (conversation archive / delete, agent pins). The drawer's look and its mapping live in sharedUI; this only binds Android's stores.
  */
 @HiltViewModel
 internal class SharedNavDrawerViewModel @Inject constructor(
-    settingsRepository: ISettingsRepository,
+    private val settingsRepository: ISettingsRepository,
     private val canvasStore: CanvasDocumentStore,
     private val conversationRepository: IConversationRepository,
 ) : ViewModel() {
 
     val enabled: StateFlow<Boolean> = settingsRepository.getFeatureFlag(FeatureFlag.SharedNavDrawer)
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Agents pinned to Home; the rail orbs' menu pins and unpins them. */
+    val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     private val _canvases = MutableStateFlow<List<CanvasDocument>>(emptyList())
     val canvases: StateFlow<List<CanvasDocument>> = _canvases.asStateFlow()
@@ -60,6 +64,12 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     fun setConversationArchived(conversationId: String, agentId: String, archived: Boolean) {
         viewModelScope.launch {
             runCatchingNonCancel { conversationRepository.setConversationArchived(conversationId, agentId, archived) }
+        }
+    }
+
+    fun setAgentPinned(agentId: String, pinned: Boolean) {
+        viewModelScope.launch {
+            runCatchingNonCancel { settingsRepository.setAgentPinned(agentId, pinned) }
         }
     }
 

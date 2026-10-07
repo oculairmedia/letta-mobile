@@ -20,6 +20,8 @@ data class ShellRailFocus(
     val identityByAgentId: Map<String, MascotIdentity> = emptyMap(),
     /** Latest conversation per agent, for the hover card. */
     val activityByAgentId: Map<String, ShellRailActivity> = emptyMap(),
+    /** Agents the user pinned; an orb's menu offers to unpin them. */
+    val pinnedAgentIds: Set<String> = emptySet(),
 )
 
 /** One orb on the rail: a stack of agents that share a name, resolved for display. */
@@ -36,6 +38,8 @@ data class ShellRailEntry(
     val thinking: Boolean = false,
     val identity: MascotIdentity? = null,
     val activity: ShellRailActivity? = null,
+    /** Whether [agentId] is pinned. */
+    val pinned: Boolean = false,
 ) {
     /** The letter a gradient orb shows. */
     val initial: String get() = name.firstOrNull()?.uppercase() ?: "?"
@@ -57,11 +61,16 @@ data class ShellAgentRailState(
     val expanded: Boolean = false,
 )
 
-/** What the rail asks its host to do. */
+/**
+ * What the rail asks its host to do. The orb menu (desktop: right-click, touch: long-press) always
+ * offers Open; Pin / Unpin and Agent settings show when the host supplies them (null: it cannot).
+ */
 data class ShellAgentRailActions(
     val onAgentSelected: (String) -> Unit = {},
     val onHome: () -> Unit = {},
     val onNewSession: () -> Unit = {},
+    val onAgentPinnedChange: ((agentId: String, pinned: Boolean) -> Unit)? = null,
+    val onAgentSettings: ((agentId: String) -> Unit)? = null,
 )
 
 /** Pure mapping from the agent roster to rail orbs. */
@@ -84,16 +93,18 @@ object ShellRailMapping {
 
     fun entry(group: AgentRailGroup, index: Int, focus: ShellRailFocus): ShellRailEntry {
         val ids = group.agentIds
+        val agentId = ids.firstOrNull { it == focus.selectedAgentId } ?: ids.first()
         return ShellRailEntry(
             key = group.name,
             name = group.name,
-            agentId = ids.firstOrNull { it == focus.selectedAgentId } ?: ids.first(),
+            agentId = agentId,
             orbStyle = ids.firstNotNullOfOrNull { focus.avatarStyleByAgentId[it] } ?: index,
             memberCount = ids.size,
             selected = focus.selectedAgentId != null && focus.selectedAgentId in ids,
             thinking = focus.thinkingAgentId != null && focus.thinkingAgentId in ids,
             identity = ids.firstNotNullOfOrNull { focus.identityByAgentId[it] },
             activity = ids.mapNotNull { focus.activityByAgentId[it] }.maxByOrNull { recency(it.updatedAtLabel) },
+            pinned = agentId in focus.pinnedAgentIds,
         )
     }
 

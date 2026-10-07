@@ -52,6 +52,7 @@ import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.components.lettaFadingEdges
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellHoverCard
+import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags for the rail's parts. */
@@ -95,7 +96,7 @@ fun ShellAgentRail(
             if (state.expanded && library != null) {
                 library()
             } else {
-                ShellRailOrbList(entries = state.entries, onAgentSelected = actions.onAgentSelected)
+                ShellRailOrbList(entries = state.entries, actions = actions)
             }
         }
         RailHeaderRow(onClick = actions.onNewSession, label = "New".takeIf { state.expanded }) {
@@ -131,7 +132,7 @@ private fun RailHeaderRow(onClick: () -> Unit, label: String?, icon: @Composable
 
 /** The orbs, lazy and scrolling so a long roster never pushes New off-screen; the edges fade while it scrolls. */
 @Composable
-private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, onAgentSelected: (String) -> Unit) {
+private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, actions: ShellAgentRailActions) {
     val listState = rememberLazyListState()
     LazyColumn(
         state = listState,
@@ -145,7 +146,7 @@ private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, onAgentS
     ) {
         // Keyed by name so each orb's thinking ring follows its agent across recency reordering.
         items(entries, key = { "orb-${it.key}" }) { entry ->
-            ShellRailOrb(entry = entry, onClick = { onAgentSelected(entry.agentId) })
+            ShellRailOrb(entry = entry, actions = actions)
         }
     }
 }
@@ -158,24 +159,28 @@ fun Modifier.railScrollFades(listState: LazyListState): Modifier {
     return lettaFadingEdges(top, bottom, LettaDimens.Space.xxl, LettaDimens.Space.xxl)
 }
 
+/** One orb: its hover card, and its agent menu (desktop: right-click, touch: long-press). */
 @Composable
-private fun ShellRailOrb(entry: ShellRailEntry, onClick: () -> Unit) {
+private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) {
     val card = ShellHoverCard(
         title = entry.tooltip,
         timestamp = entry.activity?.updatedAtLabel,
         body = entry.activity?.preview?.trim()?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) },
     )
-    LocalShellChromeDecorations.current.hoverCard(card) {
-        Box(
-            modifier = Modifier
-                .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight)
-                .testTag(ShellAgentRailTags.orb(entry.key)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (entry.selected) SelectedRailMarker(Modifier.align(Alignment.CenterStart))
-            // A live mascot shows thinking itself; the ring is for the gradient orb only.
-            if (entry.thinking && entry.identity == null) ShellThinkingRing(diameter = LettaDimens.Orb.md)
-            ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = onClick)
+    val decorations = LocalShellChromeDecorations.current
+    decorations.rowMenu(ShellRowMenus.agent(entry, actions)) {
+        decorations.hoverCard(card) {
+            Box(
+                modifier = Modifier
+                    .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight)
+                    .testTag(ShellAgentRailTags.orb(entry.key)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (entry.selected) SelectedRailMarker(Modifier.align(Alignment.CenterStart))
+                // A live mascot shows thinking itself; the ring is for the gradient orb only.
+                if (entry.thinking && entry.identity == null) ShellThinkingRing(diameter = LettaDimens.Orb.md)
+                ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = { actions.onAgentSelected(entry.agentId) })
+            }
         }
     }
 }

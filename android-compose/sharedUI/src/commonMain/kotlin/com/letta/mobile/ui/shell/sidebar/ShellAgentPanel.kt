@@ -297,7 +297,7 @@ private fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: 
             ShellCanvasRow(
                 model = canvas,
                 onClick = { actions.onOpenCanvas(canvas.id) },
-                onArchiveToggle = { actions.onArchiveCanvas(canvas.id, !canvas.archived) },
+                onArchiveToggle = actions.onArchiveCanvas?.let { archive -> { archive(canvas.id, !canvas.archived) } },
             )
         }
         if (state.canvases.isEmpty()) item { LettaEmptyHint("No canvases") }

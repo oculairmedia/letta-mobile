@@ -3,6 +3,7 @@ package com.letta.mobile.ui.shell.rail
 import com.letta.mobile.data.agents.AgentRailGroup
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -55,6 +56,13 @@ class ShellRailMappingTest {
         assertEquals("b1", entry.agentId)
         assertEquals(4, entry.orbStyle)
         assertNull(entry.activity)
+    }
+
+    @Test
+    fun anEntryIsPinnedWhenTheAgentItOpensIs() {
+        val group = AgentRailGroup("Letta Code", listOf("lc1", "lc2"))
+        assertTrue(ShellRailMapping.entry(group, index = 0, focus = ShellRailFocus(pinnedAgentIds = setOf("lc1"))).pinned)
+        assertFalse(ShellRailMapping.entry(group, index = 0, focus = ShellRailFocus(pinnedAgentIds = setOf("lc2"))).pinned)
     }
 
     @Test

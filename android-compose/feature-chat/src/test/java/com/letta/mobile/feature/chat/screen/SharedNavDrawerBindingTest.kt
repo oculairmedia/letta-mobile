@@ -75,6 +75,19 @@ class SharedNavDrawerBindingTest {
     }
 
     @Test
+    fun railPinsReachTheSettingsRepository() = runTest(mainDispatcherRule.dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
+        vm.setAgentPinned("agent-2", pinned = true)
+        advanceUntilIdle()
+        assertEquals(setOf("agent-2"), vm.pinnedAgentIds.value)
+        vm.setAgentPinned("agent-2", pinned = false)
+        advanceUntilIdle()
+        assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
+    }
+
+    @Test
     fun sectionsNavigateToTheAndroidPages() {
         val calls = mutableListOf<String>()
         val navigation = AgentScaffoldNavigationCallbacks(

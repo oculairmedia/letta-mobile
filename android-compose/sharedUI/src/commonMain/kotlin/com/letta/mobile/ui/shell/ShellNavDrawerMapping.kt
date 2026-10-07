@@ -34,13 +34,19 @@ data class ShellNavDrawerInput(
     val canvases: List<CanvasDocument> = emptyList(),
     val archivedCanvasIds: Set<CanvasId> = emptySet(),
     val hiddenSections: Set<LensDestination> = emptySet(),
+    /** Agents the user pinned, for the rail orbs' Pin / Unpin. */
+    val pinnedAgentIds: Set<String> = emptySet(),
 )
 
 /** Pure mapping from [ShellNavDrawerInput] to what the drawer draws. */
 object ShellNavDrawerMapping {
     fun state(input: ShellNavDrawerInput, now: Instant): ShellNavDrawerState {
         val agentId = input.agent.agentId
-        val focus = ShellRailFocus(selectedAgentId = agentId, identityByAgentId = input.identities)
+        val focus = ShellRailFocus(
+            selectedAgentId = agentId,
+            identityByAgentId = input.identities,
+            pinnedAgentIds = input.pinnedAgentIds,
+        )
         val rail = ShellAgentRailState(entries = ShellRailMapping.entries(ShellRailMapping.groups(input.agents, agentId), focus))
         val panel = ShellAgentPanelState(
             agent = input.agent.copy(identity = input.agent.identity ?: agentId?.let { input.identities[it] }),

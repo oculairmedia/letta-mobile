@@ -42,7 +42,7 @@ import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellConfirmRequest
-import com.letta.mobile.ui.shell.ShellRowMenuItem
+import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** What a conversation row can do besides open. */
@@ -55,7 +55,7 @@ data class ShellConversationRowActions(
 /**
  * One conversation: icon, title over a one-line preview, and its time. While its agent works the
  * icon pulses; on hover it becomes a one-click archive (or restore). The row menu (desktop:
- * right-click) offers archive and delete; delete asks first.
+ * right-click, touch: long-press) offers archive and delete; delete asks first.
  */
 @Composable
 fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConversationRowActions) {
@@ -63,14 +63,12 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     var confirmDelete by remember { mutableStateOf(false) }
-    val menuItems = if (model.deleting) {
-        emptyList()
-    } else {
-        listOf(
-            ShellRowMenuItem(if (model.archived) "Restore chat" else "Archive chat", actions.onArchiveToggle),
-            ShellRowMenuItem("Delete chat") { confirmDelete = true },
-        )
-    }
+    val menuItems = ShellRowMenus.conversation(
+        archived = model.archived,
+        deleting = model.deleting,
+        onArchiveToggle = actions.onArchiveToggle,
+        onRequestDelete = { confirmDelete = true },
+    )
     decorations.rowMenu(menuItems) {
         decorations.tooltip(model.title) {
             ShellConversationRowSurface(model, hovered, interactionSource, actions)
@@ -193,32 +191,36 @@ private fun ArchiveToggleIcon(archived: Boolean, noun: String, onToggle: () -> U
 
 /**
  * One canvas in the library: icon, title, last-edit time. On hover, or while the row has keyboard
- * focus, the icon becomes a one-click archive (or restore), as a conversation's does.
+ * focus, the icon becomes a one-click archive (or restore), as a conversation's does; the row menu
+ * (desktop: right-click, touch: long-press) offers the same. A null [onArchiveToggle] (a host with
+ * no canvas archive) leaves both out.
  */
 @Composable
-fun ShellCanvasRow(model: ShellCanvasRowModel, onClick: () -> Unit, onArchiveToggle: () -> Unit) {
+fun ShellCanvasRow(model: ShellCanvasRowModel, onClick: () -> Unit, onArchiveToggle: (() -> Unit)?) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var focused by remember { mutableStateOf(false) }
-    LettaListRow(
-        spec = LettaListRowSpec(title = model.title, icon = Lucide.Palette, trailing = model.timeLabel, selected = model.selected),
-        onClick = onClick,
-        modifier = Modifier
-            .hoverable(interaction)
-            .onFocusChanged { focused = it.hasFocus },
-        leading = {
-            if (hovered || focused) {
-                ArchiveToggleIcon(archived = model.archived, noun = "canvas", onToggle = onArchiveToggle)
-            } else {
-                Icon(
-                    imageVector = Lucide.Palette,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(LettaDimens.Control.icon),
-                )
-            }
-        },
-    )
+    LocalShellChromeDecorations.current.rowMenu(ShellRowMenus.canvas(model.archived, onArchiveToggle)) {
+        LettaListRow(
+            spec = LettaListRowSpec(title = model.title, icon = Lucide.Palette, trailing = model.timeLabel, selected = model.selected),
+            onClick = onClick,
+            modifier = Modifier
+                .hoverable(interaction)
+                .onFocusChanged { focused = it.hasFocus },
+            leading = {
+                if (onArchiveToggle != null && (hovered || focused)) {
+                    ArchiveToggleIcon(archived = model.archived, noun = "canvas", onToggle = onArchiveToggle)
+                } else {
+                    Icon(
+                        imageVector = Lucide.Palette,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(LettaDimens.Control.icon),
+                    )
+                }
+            },
+        )
+    }
 }
 
 private const val PREVIEW_ALPHA = 0.78f
