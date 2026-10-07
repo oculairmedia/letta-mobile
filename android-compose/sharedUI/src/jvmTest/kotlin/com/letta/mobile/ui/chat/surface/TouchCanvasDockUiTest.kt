@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getBoundsInRoot
@@ -179,6 +180,35 @@ class TouchCanvasDockUiTest {
         port.uiState.value = port.uiState.value.copy(messages = persistentListOf(prompt, question, answered))
         show(port, ChatSurfacePresentation.CanvasFirst)
         onAllNodesWithTag(TOUCH_INPUT_TRAY_TAG).assertCountEquals(0)
+    /** letta-mobile-bglj6.1.22: the host's canvas chrome (subagent rings) shows on the canvas, not on the page. */
+    @Test
+    fun theHostsCanvasOverlayShowsOnlyOnTheCanvas() = runComposeUiTest {
+        var presentation by mutableStateOf(ChatSurfacePresentation.CanvasFirst)
+        setContent {
+            MaterialTheme {
+                ChatSurface(
+                    port = Port(),
+                    presentation = presentation,
+                    onIntent = {},
+                    host = ChatSurfaceHost(openCanvas = {}),
+                    modifier = Modifier.fillMaxSize(),
+                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                    platform = ChatSurfacePlatform(
+                        showKeyboardHints = false,
+                        canvasOverlay = { Box(Modifier.fillMaxSize().testTag(RINGS_TAG)) },
+                    ),
+                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                )
+            }
+        }
+        waitForIdle()
+        onNodeWithTag(RINGS_TAG).assertExists()
+        val rings = onNodeWithTag(ChatSurfaceTags.CANVAS_OVERLAY).getBoundsInRoot()
+        val bar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
+        assertTrue(rings.bottom <= bar.top, "the overlay runs under the bar: $rings vs $bar")
+        presentation = ChatSurfacePresentation.ChatFirst
+        waitForIdle()
+        onAllNodesWithTag(RINGS_TAG).assertCountEquals(0)
     }
 
     @Test
@@ -383,5 +413,6 @@ class TouchCanvasDockUiTest {
         const val DRAG_PX = 700f
         const val NUDGE_PX = 40f
         const val SETTLE_MILLIS = 2_000L
+        const val RINGS_TAG = "test-canvas-rings"
     }
 }
