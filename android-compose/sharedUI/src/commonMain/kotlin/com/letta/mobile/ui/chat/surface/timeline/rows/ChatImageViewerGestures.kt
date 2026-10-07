@@ -105,7 +105,7 @@ private fun Size.centerOrZero(): Offset = if (width.isFinite() && height.isFinit
  * rest a horizontal drag is left to the pager.
  */
 internal fun Modifier.zoomableImageGestures(
-    key: Any,
+    key: Int,
     transform: MutableState<ImageTransformState>,
     containerSize: () -> Size,
     onDismiss: () -> Unit,
