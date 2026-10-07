@@ -229,43 +229,59 @@ private fun SelectedRailMarker(modifier: Modifier = Modifier) {
     )
 }
 
+/** A rail control: [icon] on a circle, raised while it is the open page. */
 @Composable
 private fun RailActionIcon(icon: ImageVector, description: String, selected: Boolean, onClick: () -> Unit) {
-    LocalShellChromeDecorations.current.tooltip(description) {
-        Box(
-            modifier = Modifier
-                .size(LettaDimens.Control.iconButtonLg)
-                .clip(CircleShape)
-                .background(if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = description,
-                tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Control.icon),
-            )
-        }
-    }
+    RailCircleButton(
+        RailCircleButtonStyle(
+            icon = icon,
+            description = description,
+            diameter = LettaDimens.Control.iconButtonLg,
+            container = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+        onClick = onClick,
+    )
 }
 
 /** The rail's plus: opens the agent picker, whose top rows are the create actions. */
 @Composable
 private fun NewSessionButton(onNewSession: () -> Unit) {
-    LocalShellChromeDecorations.current.tooltip("New") {
+    RailCircleButton(
+        RailCircleButtonStyle(
+            icon = Icons.Outlined.Add,
+            description = "New",
+            diameter = LettaDimens.Control.iconButton,
+            container = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+        onClick = onNewSession,
+    )
+}
+
+private data class RailCircleButtonStyle(
+    val icon: ImageVector,
+    val description: String,
+    val diameter: Dp,
+    val container: Color,
+    val tint: Color,
+)
+
+@Composable
+private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) {
+    LocalShellChromeDecorations.current.tooltip(style.description) {
         Box(
             modifier = Modifier
-                .size(LettaDimens.Control.iconButton)
+                .size(style.diameter)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .clickable(onClick = onNewSession),
+                .background(style.container)
+                .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Outlined.Add,
-                contentDescription = "New",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                imageVector = style.icon,
+                contentDescription = style.description,
+                tint = style.tint,
                 modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
