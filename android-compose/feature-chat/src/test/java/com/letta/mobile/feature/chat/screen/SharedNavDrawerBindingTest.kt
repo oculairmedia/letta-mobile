@@ -13,6 +13,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -40,6 +41,7 @@ class SharedNavDrawerBindingTest {
     @Test
     fun followsTheSettingsFlag() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
+        backgroundScope.launch { vm.enabled.collect {} }
         advanceUntilIdle()
         assertFalse(vm.enabled.value)
         settings.setFeatureFlag(FeatureFlag.SharedNavDrawer, true)
@@ -77,6 +79,7 @@ class SharedNavDrawerBindingTest {
     @Test
     fun railPinsReachTheSettingsRepository() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
+        backgroundScope.launch { vm.pinnedAgentIds.collect {} }
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
         vm.setAgentPinned("agent-2", pinned = true)

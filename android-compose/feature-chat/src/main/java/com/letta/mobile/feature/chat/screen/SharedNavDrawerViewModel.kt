@@ -38,11 +38,11 @@ internal class SharedNavDrawerViewModel @Inject constructor(
 ) : ViewModel() {
 
     val enabled: StateFlow<Boolean> = settingsRepository.getFeatureFlag(FeatureFlag.SharedNavDrawer)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
     /** Agents pinned to Home; the rail orbs' menu pins and unpins them. */
     val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
 
     private val _canvases = MutableStateFlow<List<CanvasDocument>>(emptyList())
     val canvases: StateFlow<List<CanvasDocument>> = _canvases.asStateFlow()
@@ -92,5 +92,6 @@ internal class SharedNavDrawerViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "SharedNavDrawer"
+        const val STOP_TIMEOUT_MS = 5_000L
     }
 }
