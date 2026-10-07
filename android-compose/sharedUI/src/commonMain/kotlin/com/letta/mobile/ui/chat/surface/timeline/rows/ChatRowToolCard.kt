@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -62,7 +63,9 @@ import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.stringResource
 
@@ -97,10 +100,20 @@ internal fun ToolCard(
         haptics.play(LettaHapticCue.SegmentTick)
         expanded = !expanded
     }
+    val reducedMotion = LocalReducedMotion.current
     val body: @Composable () -> Unit = {
         Column {
             ToolCardHeader(toolCall, expanded, callbacks) { toggle() }
-            if (expanded) ToolCardBody(toolCall, isError, callbacks)
+            // letta-mobile-bglj6.1.19: the body unfurls from the leading edge (legacy
+            // ChatToolCallCards / LettaMotion.unfurlEnter, 190 ms in, 130 ms out).
+            AnimatedVisibility(
+                visible = expanded,
+                enter = ChatRowMotion(reducedMotion).unfurlEnter(),
+                exit = ChatRowMotion(reducedMotion).unfurlExit(),
+                label = "toolCardBody",
+            ) {
+                ToolCardBody(toolCall, isError, callbacks)
+            }
         }
     }
     if (isError) {

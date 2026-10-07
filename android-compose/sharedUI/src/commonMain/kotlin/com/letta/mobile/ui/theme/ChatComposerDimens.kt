@@ -114,9 +114,11 @@ object TouchComposerDimens {
     /** The leading icon of an action sheet row. */
     val sheetIcon: Dp = LettaDimens.Space.xl
 
-    /** An action sheet row's tonal lift at rest and pressed. */
+    /** An action sheet row's tonal lift and corner at rest, and pressed (legacy ActionSheetItem). */
     val sheetItemElevation: Dp = LettaElevationTokens.ACTION_SHEET_ITEM_RESTING.dp
     val sheetItemCorner: Dp = LettaShapeTokens.ACTION_RADIUS.dp
+    val sheetItemPressedElevation: Dp = LettaElevationTokens.ACTION_SHEET_ITEM_PRESSED.dp
+    val sheetItemPressedCorner: Dp = LettaShapeTokens.LIST_RADIUS.dp
 }
 
 /**

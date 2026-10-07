@@ -3,6 +3,8 @@ package com.letta.mobile.feature.chat.screen.shared
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -42,9 +44,13 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
+import com.letta.mobile.ui.components.ChatLoadingIndicator
+import com.letta.mobile.ui.components.LocalChatLoadingIndicator
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
+import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
 internal data class SharedChatPageParams(
@@ -118,17 +124,27 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val canvas: (@Composable (ChatCanvasActions) -> Unit)? =
         canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
     val appearance = rememberSharedChatAppearance(params)
-    Box(modifier) {
-        // letta-mobile-bglj6.1.16: the shared rows render markdown through the designsystem
-        // renderer the legacy chat used (highlighted code fences + copy, KaTeX, Mermaid,
-        // autolinks, editorial padding); without a provider desktop and web keep the default.
-        // letta-mobile-bglj6.1.17: the Android haptics backend behind the shared seam — the
-        // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
-        // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
-        CompositionLocalProvider(
-            LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
-            LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
-        ) {
+    // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
+    // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
+    val platform = rememberAndroidChatSurfacePlatform(
+        pageBackground = params.pageBackground,
+        onComposerHeightChange = params.onComposerHeightChange,
+        timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
+        topChromeInset = topChromeInset,
+    )
+    // letta-mobile-bglj6.1.16: the shared rows render markdown through the designsystem
+    // renderer the legacy chat used (highlighted code fences + copy, KaTeX, Mermaid,
+    // autolinks, editorial padding); without a provider desktop and web keep the default.
+    // letta-mobile-bglj6.1.17: the Android haptics backend behind the shared seam — the
+    // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
+    // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
+    CompositionLocalProvider(
+        LocalReducedMotion provides rememberReducedMotionEnabled(),
+        LocalChatLoadingIndicator provides ExpressiveChatLoadingIndicator,
+        LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
+        LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
+    ) {
+        Box(modifier) {
             ChatSurface(
                 port = port,
                 presentation = presentation,
@@ -136,25 +152,20 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
                 host = host,
                 modifier = Modifier.fillMaxSize(),
                 appearance = appearance,
-                platform = rememberAndroidChatSurfacePlatform(
-                    pageBackground = params.pageBackground,
-                    onComposerHeightChange = params.onComposerHeightChange,
-                    timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
-                    topChromeInset = topChromeInset,
-                ),
+                platform = platform,
                 pagedTimeline = params.pagingPresentation?.canonical,
                 canvas = canvas,
                 dockGeometry = dockGeometry,
                 onDockGeometryChange = { dockGeometry = it },
             )
+            SharedChatSubagentSheet(
+                state = subagentSheet,
+                inputs = params.subagents,
+                currentConversationId = target.conversationId,
+                navigation = params.navigation,
+            )
+            ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
         }
-        SharedChatSubagentSheet(
-            state = subagentSheet,
-            inputs = params.subagents,
-            currentConversationId = target.conversationId,
-            navigation = params.navigation,
-        )
-        ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
     }
 }
 
@@ -290,6 +301,20 @@ private fun DictationButton(onDictated: (String) -> Unit) {
         onStop = voice::stopSpeechRecognition,
         onCancel = voice::cancelSpeechRecognition,
     )
+}
+
+/**
+ * letta-mobile-bglj6.1.19: the expressive Material 3 LoadingIndicator the legacy reasoning header
+ * shows, for the shared rows (Compose Multiplatform's material3 does not expose it). Still under
+ * reduced motion: determinate at rest, so the shape never morphs.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val ExpressiveChatLoadingIndicator = ChatLoadingIndicator { color, still, modifier ->
+    if (still) {
+        LoadingIndicator(progress = { 0f }, modifier = modifier, color = color)
+    } else {
+        LoadingIndicator(modifier = modifier, color = color)
+    }
 }
 
 /** Only the mode survives process death; floating stays disabled until in-app floating ships. */

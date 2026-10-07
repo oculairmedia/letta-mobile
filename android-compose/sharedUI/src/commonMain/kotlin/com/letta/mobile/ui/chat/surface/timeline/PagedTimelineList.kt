@@ -283,9 +283,12 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     items(count = rows.size - rows.leading, key = { rows.key(it + rows.leading) }) { offset ->
         val index = offset + rows.leading
         if (offset < rows.liveCount) {
-            PagedRow(rows.assembly.live[offset], rows.itemAt(index + 1), scope)
+            val item = rows.assembly.live[offset]
+            PagedRow(item, rows.itemAt(index + 1), scope, timelineRowMotion(fadesIn = !item.isUserPrompt()))
         } else {
-            SettledRow(scope, index)
+            // Settled rows page in from history: they glide when displaced but never fade in,
+            // or every page load would flash its rows.
+            SettledRow(scope, index, timelineRowMotion(fadesIn = false))
         }
     }
     pagedLoadFooter(scope)
@@ -297,20 +300,20 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
  * while a page loads and drag the reader with it.
  */
 @Composable
-private fun SettledRow(scope: PagedRowsScope, index: Int) {
+private fun SettledRow(scope: PagedRowsScope, index: Int, modifier: Modifier) {
     val settledIndex = index - scope.rows.leading - scope.rows.liveCount
     val row = scope.settled[settledIndex]
     if (row == null) {
-        Box(Modifier.height(ChatTimelineDimens.placeholderRowHeight))
+        Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
     } else {
-        PagedRow(row.item, scope.rows.itemAt(index + 1), scope)
+        PagedRow(row.item, scope.rows.itemAt(index + 1), scope, modifier)
     }
 }
 
 /** A row plus the divider that begins its day, decided against its older neighbour only. */
 @Composable
-private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope) {
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope, modifier: Modifier) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         pagedBoundaryDate(item, older)?.let { date ->
             DayDividerRow(date, scope.today)
         }

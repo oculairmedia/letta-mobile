@@ -1,16 +1,8 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -21,7 +13,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,8 +40,10 @@ import com.letta.mobile.sharedui.resources.rows_thought
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.ExpressiveLoadingIndicator
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowAlpha
+import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
@@ -150,15 +143,25 @@ private fun RowScope.ReasoningSpinner(disclosure: ReasoningDisclosure) {
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = disclosure.isActive && LocalChatWorkingCueAnimated.current,
-        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandHorizontally(),
-        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkHorizontally(),
+        enter = ChatRowMotion(reducedMotion).horizontalEnter(),
+        exit = ChatRowMotion(reducedMotion).horizontalExit(),
+        label = "reasoningSpinner",
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            color = MaterialTheme.colorScheme.primary,
-            strokeWidth = LettaDimens.Space.hair,
-        )
+        ReasoningLoadingIndicator(reducedMotion)
     }
+}
+
+/**
+ * The expressive Material 3 loading indicator (legacy ChatReasoning), its shape morph beside the
+ * title while the reasoning streams. Still under reduced motion; the title still says "Thinking…".
+ */
+@Composable
+private fun ReasoningLoadingIndicator(reducedMotion: Boolean) {
+    ExpressiveLoadingIndicator(
+        color = MaterialTheme.colorScheme.primary,
+        still = reducedMotion,
+        modifier = Modifier.size(LettaDimens.Control.icon).testTag(ChatRowTestTags.REASONING_SPINNER),
+    )
 }
 
 @Composable
@@ -191,8 +194,10 @@ private fun ColumnScope.ReasoningExpansion(message: UiMessage, disclosure: Reaso
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = !disclosure.collapsed,
-        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
-        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+        // Legacy ChatReasoning: slides in from a quarter of its height as it grows.
+        enter = ChatRowMotion(reducedMotion).reasoningBodyEnter(),
+        exit = ChatRowMotion(reducedMotion).reasoningBodyExit(),
+        label = "reasoningExpansion",
     ) {
         Column(modifier = Modifier.padding(top = LettaDimens.Space.lg, bottom = LettaDimens.Space.xs)) {
             ReasoningBody(message, disclosure.isActive)
