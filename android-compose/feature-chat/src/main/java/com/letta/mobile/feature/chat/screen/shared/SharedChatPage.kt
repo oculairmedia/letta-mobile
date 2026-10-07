@@ -3,6 +3,8 @@ package com.letta.mobile.feature.chat.screen.shared
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -42,6 +44,8 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
+import com.letta.mobile.ui.components.ChatLoadingIndicator
+import com.letta.mobile.ui.components.LocalChatLoadingIndicator
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -126,7 +130,10 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
         topChromeInset = topChromeInset,
     )
-    CompositionLocalProvider(LocalReducedMotion provides rememberReducedMotionEnabled()) {
+    CompositionLocalProvider(
+        LocalReducedMotion provides rememberReducedMotionEnabled(),
+        LocalChatLoadingIndicator provides ExpressiveChatLoadingIndicator,
+    ) {
         Box(modifier) {
             ChatSurface(
                 port = port,
@@ -284,6 +291,20 @@ private fun DictationButton(onDictated: (String) -> Unit) {
         onStop = voice::stopSpeechRecognition,
         onCancel = voice::cancelSpeechRecognition,
     )
+}
+
+/**
+ * letta-mobile-bglj6.1.19: the expressive Material 3 LoadingIndicator the legacy reasoning header
+ * shows, for the shared rows (Compose Multiplatform's material3 does not expose it). Still under
+ * reduced motion: determinate at rest, so the shape never morphs.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val ExpressiveChatLoadingIndicator = ChatLoadingIndicator { color, still, modifier ->
+    if (still) {
+        LoadingIndicator(progress = { 0f }, modifier = modifier, color = color)
+    } else {
+        LoadingIndicator(modifier = modifier, color = color)
+    }
 }
 
 /** Only the mode survives process death; floating stays disabled until in-app floating ships. */
