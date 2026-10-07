@@ -25,6 +25,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.home.HomePageActions
+import com.letta.mobile.data.home.HomePageState
+import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.ui.haptics.HapticEffects
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -32,9 +35,9 @@ import androidx.compose.material3.DrawerState
 import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class HomeScreenDrawerParams(
-    val state: DashboardUiState,
+    val state: HomePageState,
     val navigation: HomeNavigationCallbacks,
-    val viewModel: DashboardViewModel,
+    val actions: HomePageActions,
     val drawerState: DrawerState,
     val scope: CoroutineScope,
 )
@@ -74,9 +77,7 @@ private fun HomeDrawerShortcutRow(
     shortcut: DashboardShortcut,
     params: HomeScreenDrawerParams,
 ) {
-    val isPinned = params.state.pinnedItems.any {
-        it is PinnedItem.Shortcut && it.value == shortcut
-    }
+    val isPinned = HomePinnedItem.shortcutKey(shortcut.toHomeShortcut()) in params.state.pinKeys
     val context = LocalContext.current
     val label = stringResource(shortcut.labelResId)
     val haptic = LocalHapticFeedback.current
@@ -91,7 +92,7 @@ private fun HomeDrawerShortcutRow(
             .combinedClickable(
                 onClick = {
                     params.scope.launch { params.drawerState.close() }
-                    params.navigation.shortcutNavigator(shortcut, params.state)()
+                    params.navigation.shortcutNavigator(shortcut, params.state.favorite)()
                 },
                 onLongClick = {
                     HapticEffects.longPress(haptic, view)
@@ -101,7 +102,7 @@ private fun HomeDrawerShortcutRow(
                             isPinned = isPinned,
                             label = label,
                             context = context,
-                            viewModel = params.viewModel,
+                            actions = params.actions,
                         ),
                     )
                 },
@@ -128,17 +129,16 @@ private data class DrawerShortcutPinAction(
     val isPinned: Boolean,
     val label: String,
     val context: android.content.Context,
-    val viewModel: DashboardViewModel,
+    val actions: HomePageActions,
 )
 
 private fun toggleDrawerShortcutPin(action: DrawerShortcutPinAction) {
+    action.actions.setShortcutPinned(action.shortcut.toHomeShortcut(), pinned = !action.isPinned)
     if (action.isPinned) {
-        action.viewModel.unpinShortcut(action.shortcut)
         android.widget.Toast
             .makeText(action.context, "${action.label} unpinned", android.widget.Toast.LENGTH_SHORT)
             .show()
     } else {
-        action.viewModel.pinShortcut(action.shortcut)
         android.widget.Toast
             .makeText(action.context, "${action.label} pinned", android.widget.Toast.LENGTH_SHORT)
             .show()

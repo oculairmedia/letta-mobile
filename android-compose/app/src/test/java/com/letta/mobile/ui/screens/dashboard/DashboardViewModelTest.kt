@@ -1,10 +1,9 @@
 package com.letta.mobile.ui.screens.dashboard
 
-import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.Block
-import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationCountEstimate
+import com.letta.mobile.data.home.HomeAgentRef
+import com.letta.mobile.data.home.HomePinnedItem
+import com.letta.mobile.data.home.HomeShortcut
+import com.letta.mobile.data.home.conversationsLabel
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.repository.AgentRepository
@@ -12,113 +11,71 @@ import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ToolRepository
-import com.letta.mobile.data.repository.api.IBlockRepository
+import com.letta.mobile.data.session.SessionGraph
+import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import io.mockk.clearAllMocks
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import io.mockk.coVerify
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
+/** The Android binding of the shared Home page (letta-mobile-c3np7.3.11.1). */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("unit")
 class DashboardViewModelTest {
-
     private val testDispatcher = UnconfinedTestDispatcher()
-    private lateinit var settingsRepository: FakeSettingsRepository
+    private lateinit var settings: FakeSettingsRepository
     private lateinit var agentRepository: AgentRepository
-    private lateinit var conversationsRepository: AllConversationsRepository
-    private lateinit var toolRepository: ToolRepository
-    private lateinit var blockRepository: IBlockRepository
-    private lateinit var messageRepository: MessageRepository
-    private lateinit var runRepository: RunRepository
+    private lateinit var conversations: AllConversationsRepository
+    private lateinit var messages: MessageRepository
     private lateinit var fakeRunApi: FakeRunApi
+    private lateinit var graph: SessionGraph
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        settingsRepository = FakeSettingsRepository()
-
+        settings = FakeSettingsRepository()
         agentRepository = mockk(relaxed = true)
-        every {
-            agentRepository.agents
-        } returns MutableStateFlow(
-            listOf(
-                TestData.agent(id = "agent-1", name = "Agent One"),
-                TestData.agent(id = "agent-2", name = "Agent Two"),
-            )
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(TestData.agent(id = "agent-1", name = "Agent One"), TestData.agent(id = "agent-2", name = "Agent Two")),
         )
-        // Dashboard uses the dedicated count endpoint (commit 37421c7 —
-        // "use count endpoints instead of page size for stats"), not
-        // `agents.value.size`. The relaxed mock default for Int is 0,
-        // which made this test flake as "expected 2, was 0" (o7ob.6).
-        coEvery { agentRepository.countAgents() } returns 2
-        coEvery { agentRepository.refreshAgents() } returns Unit
-        every { agentRepository.getCachedAgent(any<AgentId>()) } answers {
-            val agentId = firstArg<AgentId>()
-            agentRepository.agents.value.firstOrNull { it.id == agentId }
-        }
-        every { agentRepository.getAgent(any<AgentId>()) } answers {
-            val agentId = firstArg<AgentId>()
-            flowOf(agentRepository.agents.value.first { it.id == agentId })
-        }
-
-        conversationsRepository = mockk(relaxed = true)
-        every {
-            conversationsRepository.conversations
-        } returns MutableStateFlow(listOf(TestData.conversation(id = "conv-1", agentId = "agent-1")))
-        every { conversationsRepository.hasMore } returns MutableStateFlow(false)
-        coEvery { conversationsRepository.countConversations() } returns 1
-        coEvery { conversationsRepository.refresh() } returns Unit
-        every { conversationsRepository.loadedCountEstimate() } returns ConversationCountEstimate(
-            count = 1,
-            isApproximate = false,
-        )
-
-        toolRepository = mockk(relaxed = true)
-        every { toolRepository.getTools() } returns MutableStateFlow(
-            listOf(
-                TestData.tool(id = "tool-1"),
-                TestData.tool(id = "tool-2"),
-                TestData.tool(id = "tool-3"),
-            )
-        )
-        coEvery { toolRepository.countTools() } returns 3
-        coEvery { toolRepository.refreshTools() } returns Unit
-
-        blockRepository = mockk(relaxed = true)
-        coEvery { blockRepository.countBlocks() } returns 2
-        coEvery { blockRepository.listAllBlocks() } returns listOf(
-            TestData.block(id = "block-1"),
-            TestData.block(id = "block-2", label = "human"),
-        )
-
-        messageRepository = mockk(relaxed = true)
-        coEvery { messageRepository.searchMessages(any()) } returns emptyList()
-
+        every { agentRepository.isRefreshing } returns MutableStateFlow(false)
+        conversations = mockk(relaxed = true)
+        every { conversations.conversations } returns MutableStateFlow(listOf(TestData.conversation(id = "conv-1", agentId = "agent-1")))
+        every { conversations.hasMore } returns MutableStateFlow(true)
+        val tools: ToolRepository = mockk(relaxed = true)
+        every { tools.getTools() } returns MutableStateFlow(listOf(TestData.tool(id = "tool-1"), TestData.tool(id = "tool-2")))
+        coEvery { tools.countTools() } returns 2
+        messages = mockk(relaxed = true)
+        coEvery { messages.searchMessages(any()) } returns emptyList()
         fakeRunApi = FakeRunApi()
-        runRepository = RunRepository(fakeRunApi)
+        graph = mockk(relaxed = true)
+        every { graph.agentRepository } returns agentRepository
+        every { graph.toolRepository } returns tools
+        every { graph.runRepository } returns RunRepository(fakeRunApi)
+        every { graph.blockRepository } returns null
+        every { graph.localRuntimeBackend } returns null
     }
 
     @After
@@ -127,304 +84,75 @@ class DashboardViewModelTest {
         Dispatchers.resetMain()
     }
 
-    @Test
-    fun `loadProgressively populates homepage usage analytics`() = runTest {
-        val now = Instant.now()
-        fakeRunApi.runs.addAll(
-            listOf(
-                sampleRun(id = "run-1", createdAt = now.minus(2, ChronoUnit.HOURS).toString()),
-                sampleRun(id = "run-2", createdAt = now.minus(1, ChronoUnit.HOURS).toString()),
-            )
-        )
-        fakeRunApi.runSteps["run-1"] = listOf(
-            sampleStep(id = "step-1", model = "gpt-4.1", totalTokens = 1200),
-            sampleStep(id = "step-2", model = "gpt-4.1", totalTokens = 300),
-        )
-        fakeRunApi.runSteps["run-2"] = listOf(
-            sampleStep(id = "step-3", model = "claude-3.7", totalTokens = 900),
-        )
-
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        val state = viewModel.uiState.value
-        assertEquals(2, state.agentCount)
-        assertEquals(1, state.conversationCount)
-        assertFalse(state.isConversationCountApproximate)
-        coVerify(exactly = 0) { conversationsRepository.countConversations() }
-        coVerify(exactly = 1) { conversationsRepository.refresh() }
-        assertEquals(3, state.toolCount)
-        assertEquals(2, state.blockCount)
-        assertFalse(state.isUsageLoading)
-        assertEquals(2400, state.usageSummary?.totalTokens)
-        assertEquals(100, state.usageSummary?.averageTokensPerHour)
-        assertEquals(listOf("gpt-4.1", "claude-3.7"), state.usageSummary?.modelUsage?.map { it.model })
-        assertEquals(1500, state.usageSummary?.modelUsage?.first()?.totalTokens)
-    }
-
-    @Test
-    fun `loadProgressively renders approximate conversation count`() = runTest {
-        every { conversationsRepository.loadedCountEstimate() } returns ConversationCountEstimate(
-            count = 50,
-            isApproximate = true,
-        )
-
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        val state = viewModel.uiState.value
-        assertEquals(50, state.conversationCount)
-        assertTrue(state.isConversationCountApproximate)
-        assertFalse(state.isConversationCountLoading)
-        coVerify(exactly = 0) { conversationsRepository.countConversations() }
-    }
-
-    @Test
-    fun `loadProgressively keeps conversation count unknown when estimate is unavailable`() = runTest {
-        every { conversationsRepository.loadedCountEstimate() } returns null
-
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        val state = viewModel.uiState.value
-        assertNull(state.conversationCount)
-        assertFalse(state.isConversationCountApproximate)
-        assertFalse(state.isConversationCountLoading)
-        coVerify(exactly = 0) { conversationsRepository.countConversations() }
-    }
-
-    @Test
-    fun `loadProgressively ignores runs outside the last 24 hours`() = runTest {
-        val now = Instant.now()
-        fakeRunApi.runs.addAll(
-            listOf(
-                sampleRun(id = "run-recent", createdAt = now.minus(30, ChronoUnit.MINUTES).toString()),
-                sampleRun(id = "run-old", createdAt = now.minus(30, ChronoUnit.HOURS).toString()),
-            )
-        )
-        fakeRunApi.runSteps["run-recent"] = listOf(
-            sampleStep(id = "step-recent", model = "gpt-4.1", totalTokens = 600),
-        )
-        fakeRunApi.runSteps["run-old"] = listOf(
-            sampleStep(id = "step-old", model = "claude-3.7", totalTokens = 2000),
-        )
-
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        val state = viewModel.uiState.value
-        assertFalse(state.isUsageLoading)
-        assertEquals(600, state.usageSummary?.totalTokens)
-        assertEquals(listOf("gpt-4.1"), state.usageSummary?.modelUsage?.map { it.model })
-    }
-
-    @Test
-    fun `loadProgressively leaves usage empty when analytics fetch fails`() = runTest {
-        fakeRunApi.shouldFail = true
-
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        val state = viewModel.uiState.value
-        assertFalse(state.isUsageLoading)
-        assertNull(state.usageSummary)
-        assertTrue(state.agentCount != null)
-    }
-
-    @Test
-    fun `updateSearchQuery filters homepage results across loaded sources`() = runTest {
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        viewModel.updateSearchQuery("human")
-        advanceTimeBy(350)
-
-        val state = viewModel.uiState.value
-        assertTrue(state.isSearchActive)
-        assertEquals(emptyList<String>(), state.agentResults.map { it.name })
-        assertEquals(emptyList<String>(), state.toolResults.map { it.name })
-        assertEquals(listOf("human"), state.blockResults.mapNotNull { it.label })
-        coVerify {
-            messageRepository.searchMessages(
-                match {
-                    it.query == "human" &&
-                        it.searchMode == "fts" &&
-                        it.roles == listOf("user", "assistant") &&
-                        it.limit == 20
-                }
-            )
-        }
-    }
-
-    @Test
-    fun `search returns results across agents tools and blocks simultaneously`() = runTest(testDispatcher) {
-        // Setup data with overlapping name "test" across categories.
-        // TestData.agent defaults tags=listOf("test"), which would
-        // inadvertently match the query via the haystack -- we pass
-        // empty tags explicitly so the assertions verify the
-        // name/description matching path, not the tag path.
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                TestData.agent(id = "a1", name = "Test Agent", description = "desc", tags = emptyList()),
-                TestData.agent(id = "a2", name = "Other Agent", description = "a test description", tags = emptyList()),
-                TestData.agent(id = "a3", name = "Unrelated", description = "nothing", tags = emptyList()),
-            )
-        )
-        every { toolRepository.getTools() } returns MutableStateFlow(
-            listOf(
-                TestData.tool(id = "t1", name = "test_tool", description = "does testing"),
-                TestData.tool(id = "t2", name = "send_email", description = "sends email"),
-            )
-        )
-        coEvery { blockRepository.listAllBlocks() } returns listOf(
-            TestData.block(id = "b1", label = "test_block", value = "value"),
-            TestData.block(id = "b2", label = "persona", value = "I am a test assistant"),
-            TestData.block(id = "b3", label = "system", value = "No match here"),
-        )
-
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        viewModel.updateSearchQuery("test")
-        advanceTimeBy(350)
-
-        val state = viewModel.uiState.value
-        assertTrue("Search should be active", state.isSearchActive)
-        assertEquals(
-            "Should match 2 agents (name contains 'test' or description contains 'test')",
-            listOf("Test Agent", "Other Agent"),
-            state.agentResults.map { it.name },
-        )
-        assertEquals(
-            "Should match 1 tool (name contains 'test')",
-            listOf("test_tool"),
-            state.toolResults.map { it.name },
-        )
-        assertEquals(
-            "Should match 2 blocks (label or value contains 'test')",
-            listOf("test_block", "persona"),
-            state.blockResults.mapNotNull { it.label },
-        )
-    }
-
-    @Test
-    fun `search narrows results as query becomes more specific`() = runTest(testDispatcher) {
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                TestData.agent(id = "a1", name = "Agent Alpha", description = null),
-                TestData.agent(id = "a2", name = "Agent Beta", description = null),
-                TestData.agent(id = "a3", name = "Alpha Bot", description = null),
-            )
-        )
-
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        viewModel.updateSearchQuery("agent")
-        advanceTimeBy(350)
-        assertEquals(2, viewModel.uiState.value.agentResults.size)
-
-        viewModel.updateSearchQuery("agent alpha")
-        advanceTimeBy(350)
-        assertEquals(
-            "Narrower query should match fewer results",
-            listOf("Agent Alpha"),
-            viewModel.uiState.value.agentResults.map { it.name },
-        )
-    }
-
-    @Test
-    fun `clearSearch resets homepage search results`() = runTest {
-        val viewModel = DashboardViewModel(
-            agentRepository = agentRepository,
-            allConversationsRepository = conversationsRepository,
-            toolRepository = toolRepository,
-            blockRepository = blockRepository,
-            settingsRepository = settingsRepository,
-            messageRepository = messageRepository,
-            runRepository = runRepository,
-        )
-
-        viewModel.updateSearchQuery("agent")
-        advanceTimeBy(350)
-        viewModel.clearSearch()
-
-        val state = viewModel.uiState.value
-        assertFalse(state.isSearchActive)
-        assertEquals("", state.searchQuery)
-        assertTrue(state.agentResults.isEmpty())
-        assertTrue(state.toolResults.isEmpty())
-        assertTrue(state.blockResults.isEmpty())
-        assertTrue(state.messageResults.isEmpty())
-    }
-
-    private fun sampleStep(id: String, model: String, totalTokens: Int) = Step(
-        id = id,
-        agentId = "agent-1",
-        model = model,
-        totalTokens = totalTokens,
+    private fun viewModel() = DashboardViewModel(
+        sessionGraphs = SingleGraph(graph),
+        repositories = DashboardRepositories(agentRepository, conversations, messages, settings),
     )
 
-    private fun sampleRun(id: String, createdAt: String) = Run(
-        id = id,
-        agentId = "agent-1",
-        createdAt = createdAt,
-        status = "completed",
-    )
+    @Test
+    fun `the fleet is folded from the conversation list and marks more pages as a lower bound`() = runTest {
+        val state = viewModel().state.value
+        assertEquals(2, state.fleet.summary.totalAgents)
+        assertEquals("1+", state.fleet.summary.conversationsLabel)
+        assertEquals(listOf("conv-1"), state.fleet.recent.map { it.conversationId })
+        coVerify(exactly = 1) { conversations.refresh() }
+    }
+
+    @Test
+    fun `stats come from the session graph including the day of token usage`() = runTest {
+        val now = Instant.now()
+        fakeRunApi.runs.add(sampleRun(id = "run-1", createdAt = now.minus(2, ChronoUnit.HOURS).toString()))
+        fakeRunApi.runSteps["run-1"] = listOf(sampleStep(id = "s-1", model = "gpt-4.1", totalTokens = 1_200))
+
+        val stats = viewModel().state.value.stats
+        assertFalse(stats.loading)
+        assertEquals(2, stats.toolCount)
+        assertEquals(null, stats.blockCount)
+        assertEquals(1_200, stats.usage?.totalTokens)
+    }
+
+    @Test
+    fun `existing pins and the favorite agent carry over from settings`() = runTest {
+        settings.pinnedItemsOrder.value = listOf("shortcut:TOOLS", "agent:agent-2")
+        settings.setFavoriteAgentId("agent-1")
+
+        val state = viewModel().state.value
+        assertEquals(
+            listOf(HomePinnedItem.Shortcut(HomeShortcut.TOOLS), HomePinnedItem.Agent(HomeAgentRef("agent-2", "Agent Two"))),
+            state.pinnedItems,
+        )
+        assertEquals(HomeAgentRef("agent-1", "Agent One"), state.favorite)
+        assertEquals("Agent Two", settings.pinnedAgentNames.value["agent-2"], "pinned names are cached for backend switches")
+    }
+
+    @Test
+    fun `pin actions write through to settings`() = runTest {
+        val vm = viewModel()
+        vm.actions.setShortcutPinned(HomeShortcut.SCHEDULES, pinned = true)
+        vm.actions.setAgentPinned("agent-1", pinned = true)
+        assertTrue(settings.pinnedItemsOrder.value.contains("shortcut:SCHEDULES"))
+        assertTrue(settings.pinnedItemsOrder.value.contains("agent:agent-1"))
+    }
+
+    @Test
+    fun `message search runs through the message repository`() = runTest {
+        val vm = viewModel()
+        vm.actions.updateSearchQuery("plan")
+        advanceTimeBy(1_000)
+        coVerify { messages.searchMessages(match { it.query == "plan" && it.searchMode == "fts" }) }
+    }
+
+    private fun sampleRun(id: String, createdAt: String) = Run(id = id, agentId = "agent-1", createdAt = createdAt, status = "completed")
+
+    private fun sampleStep(id: String, model: String, totalTokens: Int) = Step(id = id, agentId = "agent-1", model = model, totalTokens = totalTokens)
+
+    private class SingleGraph(graph: SessionGraph) : SessionRepositoryGraphProvider<SessionGraph> {
+        override val currentGraph: StateFlow<SessionGraph> = MutableStateFlow(graph)
+        override val sessionError: StateFlow<Throwable?> = MutableStateFlow(null)
+        override val current: SessionGraph get() = currentGraph.value
+
+        override fun rebuild(): SessionGraph = current
+
+        override suspend fun <T> withCurrentSession(block: suspend (SessionGraph) -> T): T = block(current)
+    }
 }

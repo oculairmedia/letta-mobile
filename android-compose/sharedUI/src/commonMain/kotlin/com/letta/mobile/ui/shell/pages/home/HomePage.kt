@@ -159,7 +159,7 @@ private fun CompactHomeLayout(page: HomePageScope) {
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.lg),
         ) {
-            if (page.options.showTitle || page.options.showSearch) item { HomeHeader(page) }
+            if (page.options.showTitle || page.options.showSearch || page.state.stats.error != null) item { HomeHeader(page) }
             if (page.state.search.isActive) homeSearchResults(page) else homeDashboard(page)
         }
         if (!page.state.search.isActive) {

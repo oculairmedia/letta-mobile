@@ -62,6 +62,9 @@ fun NavGraphBuilder.adminGraph(
             onNavigateToEditAgent = { agentId ->
                 navController.navigate(EditAgentRoute(agentId))
             },
+            onNavigateToConversation = { agentId, conversationId ->
+                navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
+            },
             onNavigateToUsage = { navController.navigate(UsageRoute) },
             onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
             onNavigateToArchives = { navController.navigate(ArchivesRoute) },

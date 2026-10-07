@@ -2,6 +2,8 @@ package com.letta.mobile.data.home
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -223,6 +225,24 @@ class FleetModelsTest {
             conversation("queued", "a-1", updatedAt = "Queued"),
         )
         assertEquals("queued", preferredComposerConversationId(conversations, "a-1"))
+    }
+
+    @Test
+    fun backendConversationsMapToFleetRowsAndHiddenOnesDrop() {
+        val listed = Conversation(
+            id = ConversationId("c-1"),
+            agentId = AgentId("a-1"),
+            agentName = "Scout",
+            summary = " ",
+            updatedAt = "2026-07-26T10:00:00Z",
+            lastMessageAt = "2026-07-26T11:00:00Z",
+        )
+        val row = listed.toFleetConversation()
+        assertEquals("c-1", row?.id)
+        assertEquals("a-1", row?.agentId)
+        assertEquals("Untitled conversation", row?.title)
+        assertEquals("2026-07-26T11:00:00Z", row?.updatedAtLabel, "last message wins over updated_at")
+        assertNull(listed.copy(hidden = true).toFleetConversation())
     }
 
     @Test

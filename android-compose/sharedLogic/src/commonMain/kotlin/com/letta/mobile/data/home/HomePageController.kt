@@ -36,10 +36,19 @@ interface HomePageSource : AutoCloseable {
 interface HomePinStore {
     val pinnedKeys: StateFlow<List<String>>
 
+    /**
+     * Last-known names of pinned agents, so their tiles render at once after a backend switch while
+     * the new agent list loads. Stores without such a cache keep the default (none).
+     */
+    val persistedAgentNames: StateFlow<Map<String, String>> get() = NoPersistedNames
+
     fun setOrder(keys: List<String>)
 
     fun setPinned(key: String, pinned: Boolean)
 }
+
+/** The default [HomePinStore.persistedAgentNames]: no cache. */
+private val NoPersistedNames: StateFlow<Map<String, String>> = MutableStateFlow(emptyMap<String, String>()).asStateFlow()
 
 /** What the shared Home page can ask of its controller. Navigation stays with the host. */
 interface HomePageActions {
@@ -79,6 +88,7 @@ data class HomePageState(
     val catalog: HomeSearchCatalog = HomeSearchCatalog(),
     val pinKeys: List<String> = emptyList(),
     val pinsLoaded: Boolean = false,
+    val persistedAgentNames: Map<String, String> = emptyMap(),
     val availableShortcuts: Set<HomeShortcut> = HomeShortcut.entries.toSet(),
     val favorite: HomeAgentRef? = null,
     val search: HomeSearchState = HomeSearchState(),
@@ -123,6 +133,9 @@ object HomePageReducer {
     fun withPins(state: HomePageState, keys: List<String>): HomePageState =
         derive(state.copy(pinKeys = keys, pinsLoaded = true))
 
+    fun withPersistedAgentNames(state: HomePageState, names: Map<String, String>): HomePageState =
+        derive(state.copy(persistedAgentNames = names))
+
     /** A new catalog re-runs the local search; message hits for the same query are kept. */
     fun withCatalog(state: HomePageState, catalog: HomeSearchCatalog): HomePageState {
         val local = searchHomeCatalog(catalog, state.search.query)
@@ -146,7 +159,7 @@ object HomePageReducer {
         return state.copy(
             pinnedItems = resolvePinnedItems(
                 keys = state.pinKeys,
-                names = PinnedAgentNames(live = names, settled = state.catalog.agentsSettled),
+                names = PinnedAgentNames(live = names, settled = state.catalog.agentsSettled, persisted = state.persistedAgentNames),
                 availableShortcuts = state.availableShortcuts,
             ),
             sortedAgents = sortFleet(state.fleet.agents, state.sort),
@@ -178,6 +191,7 @@ class HomePageController(
             scope.launch { source.catalog.collect { catalog -> stateFlow.update { HomePageReducer.withCatalog(it, catalog) } } },
             scope.launch { source.stats.collect { stats -> stateFlow.update { HomePageReducer.withStats(it, stats) } } },
             scope.launch { pins.pinnedKeys.collect { keys -> stateFlow.update { HomePageReducer.withPins(it, keys) } } },
+            scope.launch { pins.persistedAgentNames.collect { names -> stateFlow.update { HomePageReducer.withPersistedAgentNames(it, names) } } },
         )
     }
 
