@@ -84,9 +84,16 @@ class SharedNavDrawerBindingTest {
             onNavigateToSchedules = { calls += "schedules:$it" },
             onNavigateToTools = { calls += "tools" },
             onNavigateToConversationList = { calls += "conversations" },
+            onNavigateToChannels = { calls += "channels" },
         )
         LensDestination.entries.forEach { openSection(navigation, "agent-1", it) }
-        assertEquals(listOf("memory:agent-1", "schedules:agent-1", "tools", "conversations"), calls)
-        assertEquals(setOf(LensDestination.Channels), AndroidHiddenDrawerSections)
+        assertEquals(listOf("memory:agent-1", "schedules:agent-1", "channels", "tools", "conversations"), calls)
+        assertEquals(emptySet<LensDestination>(), androidHiddenDrawerSections(navigation))
+    }
+
+    @Test
+    fun channelsStaysHiddenWithoutAChannelsPage() {
+        val navigation = AgentScaffoldNavigationCallbacks(onNavigateBack = {}, onNavigateToSettings = {})
+        assertEquals(setOf(LensDestination.Channels), androidHiddenDrawerSections(navigation))
     }
 }

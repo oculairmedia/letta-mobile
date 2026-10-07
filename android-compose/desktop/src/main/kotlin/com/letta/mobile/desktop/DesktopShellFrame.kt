@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.memory.graph.MemoryPageState
@@ -19,7 +20,6 @@ import com.letta.mobile.data.presence.presenceByAgent
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
-import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -62,7 +62,7 @@ internal data class DesktopShellActivity(
 internal data class DesktopLibraryStates(
     val memory: MemoryPageState,
     val schedules: DesktopScheduleLibraryState,
-    val channels: DesktopChannelLibraryState,
+    val channels: ChannelsPageState,
     val tools: DesktopToolLibraryState,
 )
 
