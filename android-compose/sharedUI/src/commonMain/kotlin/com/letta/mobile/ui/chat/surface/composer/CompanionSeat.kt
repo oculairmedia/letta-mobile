@@ -194,7 +194,9 @@ internal fun CompanionSeatOverlay(
                         transformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
                         scaleX = scale * appearScale
                         scaleY = scale * appearScale
-                        translationY = (1f - shown) * placeable.height / 2f
+                        // Feet-pivot scale would drop the visual centre; lift by the unused
+                        // (1 - scale) so a smaller badge still sits on the anchor centre.
+                        translationY = ((1f - shown) - (1f - scale)) * placeable.height / 2f
                         alpha = shown
                     }
                 }

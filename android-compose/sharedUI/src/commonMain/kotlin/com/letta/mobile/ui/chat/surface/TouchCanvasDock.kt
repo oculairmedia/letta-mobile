@@ -374,8 +374,7 @@ private fun popupLayout(placement: PopupPlacement, tailAtTop: Boolean): Modifier
 
 /** What the popup says, as one announcement: the reply (with who says it) and the working line. */
 @Composable
-private fun popupAnnouncement(turn: CollapsedTurn, agentName: String): String {
-    val working = if (turn.working) collapsedWorkingLabel(turn) else null
+private fun popupAnnouncement(turn: CollapsedTurn, agentName: String, working: String?): String {
     val reply = if (agentName.isBlank()) {
         stringResource(Res.string.chat_surface_collapsed_reply_unnamed, turn.text)
     } else {
@@ -389,7 +388,7 @@ private fun popupAnnouncement(turn: CollapsedTurn, agentName: String): String {
 private fun PopupReply(turn: CollapsedTurn, content: TouchHeadContent, placement: PopupPlacement) {
     val openLabel = stringResource(Res.string.chat_surface_docked_reply_expand)
     val working = if (turn.working) collapsedWorkingLabel(turn) else null
-    val announcement = popupAnnouncement(turn, content.agentName)
+    val announcement = popupAnnouncement(turn, content.agentName, working)
     val onOpen = content.openChat
     val tail = ChatSurfaceDimens.collapsedBubbleTailWidth
     Column(
