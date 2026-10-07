@@ -25,9 +25,10 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPage
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
-import com.letta.mobile.desktop.home.DesktopHomeActions
-import com.letta.mobile.desktop.home.toggled
+import com.letta.mobile.desktop.home.DesktopHome
+import com.letta.mobile.desktop.home.DesktopHomeCallbacks
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
+import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 
 /** What the chat surfaces in the main pane share: the composer's commands and context reading, and the canvas. */
 private data class DesktopShellChatHost(
@@ -190,7 +191,7 @@ private fun destinationContentInputs(context: DesktopShellContext, frame: Deskto
     return DestinationContentInputs(
         railRecencyDays = core.railPrefs.recencyDays,
         state = core.bootstrap.bootstrapState,
-        home = rememberDesktopHomeState(context, frame),
+        home = rememberDesktopHomeInputs(context, frame),
         chat = frame.chatState,
         memoryState = libraries.memory,
         schedule = DestinationScheduleInputs(
@@ -287,7 +288,7 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
     return DestinationContentActions(
         onRailRecencyDaysChange = core.railPrefs::updateRecencyDays,
         onRetryConnection = core.chatController::retryConnection,
-        home = desktopHomeActions(context, frame),
+        home = desktopHomeCallbacks(context, frame),
         memory = controllers.memory,
         schedules = destinationScheduleActions(
             ScheduleWiringDeps(
@@ -319,19 +320,27 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
     )
 }
 
-private fun desktopHomeActions(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHomeActions {
+private fun desktopHomeCallbacks(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHomeCallbacks {
     val navigator = context.navigator
     val router = context.router
     val focus = frame.focus
-    return DesktopHomeActions(
-        onSortKeySelected = { navigator.homeSort = navigator.homeSort.toggled(it) },
-        onOpenAgent = { router.openAgent(AgentId(it)) },
-        onOpenConversation = { router.openConversation(ConversationId(it)) },
-        onSubmitPrompt = { text ->
-            val rosterAgentId = focus.rosterAgents.firstOrNull()?.id?.value
-            router.submitHomePrompt(DesktopHomePrompt(text, focus.selectedAgentId, rosterAgentId))
-        },
-        onA2uiAction = context.onA2uiAction,
+    val openConversation = { id: String -> router.openConversation(ConversationId(id)) }
+    return DesktopHomeCallbacks(
+        actions = context.panels.libraries.home,
+        navigation = HomePageNavigation(
+            onSubmitPrompt = { text ->
+                val rosterAgentId = focus.rosterAgents.firstOrNull()?.id?.value
+                router.submitHomePrompt(DesktopHomePrompt(text, focus.selectedAgentId, rosterAgentId))
+            },
+            onOpenConversation = openConversation,
+            onOpenAgent = { router.openAgent(AgentId(it)) },
+            onOpenShortcut = { shortcut -> DesktopHome.destinationFor(shortcut)?.let(navigator::navigate) },
+            onConfigureAgent = { navigator.editAgentId = it },
+            onOpenMessage = { message -> message.conversationId?.let(openConversation) },
+            onOpenTool = { navigator.navigate(DesktopDestination.Agents) },
+            onOpenBlock = { navigator.navigate(DesktopDestination.Memory) },
+            onA2uiAction = context.onA2uiAction,
+        ),
     )
 }
 

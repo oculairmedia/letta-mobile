@@ -211,6 +211,7 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
             sessionGraphId = sessionGraph.id,
             sessionGraphProvider = core.bootstrap.dataBindings.sessionGraphProvider,
             chatScope = chatScope,
+            settingsStore = core.bootstrap.secureSettingsStore,
         ),
     )
 }
