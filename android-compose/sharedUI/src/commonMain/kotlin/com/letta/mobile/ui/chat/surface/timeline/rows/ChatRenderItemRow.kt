@@ -97,6 +97,8 @@ internal object ChatRowTestTags {
     const val PROMPT_PROVENANCE = "chat-user-prompt-provenance"
     const val AGENT_TEXT = "chat-agent-text"
     const val REASONING_TOGGLE = "chat-reasoning-toggle"
+    /** The reasoning header's loading indicator while it streams. */
+    const val REASONING_SPINNER = "chat-reasoning-spinner"
     const val RUN_BLOCK = "chat-run-block"
     const val RUN_HEADER = "chat-run-header"
     const val APPROVAL_REASON = "chat-approval-reason"

@@ -1,20 +1,13 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +47,7 @@ import com.letta.mobile.sharedui.resources.rows_run_worked
 import com.letta.mobile.sharedui.resources.rows_run_working
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.theme.ChatRowAlpha
+import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
@@ -118,8 +112,10 @@ private fun RunSummaryLine(title: RunSummaryTitle) {
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = title.visible,
-        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
-        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+        enter = ChatRowMotion.expansionEnter(reducedMotion),
+        // The steps below ease up into the label's place (legacy settled-run body lift).
+        exit = ChatRowMotion.runLabelFoldExit(reducedMotion),
+        label = "runSummaryLine",
     ) {
         Row(
             modifier = Modifier
@@ -143,8 +139,9 @@ internal fun RunSummaryLead(title: RunSummaryTitle) {
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = title.visible,
-        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
-        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start),
+        enter = ChatRowMotion.horizontalEnter(reducedMotion),
+        exit = ChatRowMotion.runLeadFoldExit(reducedMotion),
+        label = "runSummaryLead",
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             RunSummaryLabel(title.activity)
@@ -173,11 +170,36 @@ private fun RunSummaryLabel(activity: RunActivityProjection) {
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         // Docked over the canvas the panel's ambient glow is the working cue, not the orb.
-        if (activity.isActive && LocalChatWorkingCueAnimated.current) WorkingOrb()
+        val reducedMotion = LocalReducedMotion.current
+        AnimatedVisibility(
+            visible = activity.isActive && LocalChatWorkingCueAnimated.current,
+            enter = ChatRowMotion.horizontalEnter(reducedMotion),
+            exit = ChatRowMotion.horizontalExit(reducedMotion),
+            label = "runWorkingOrb",
+        ) {
+            WorkingOrb()
+        }
+        RunSummaryTitleText(runActivityTitle(activity), runTitleColor(activity), reducedMotion)
+    }
+}
+
+/**
+ * letta-mobile-bglj6.1.19: "Working" cross-fades to "Thought for 2s" as the run settles (legacy
+ * RunBlockMotion RunHeaderLabel: the terminal swap, 120 ms in over 90 ms out) instead of swapping
+ * the text in one frame. Keyed on the copy, so only a change of words plays it.
+ */
+@Composable
+private fun RunSummaryTitleText(title: String, color: Color, reducedMotion: Boolean) {
+    AnimatedContent(
+        targetState = title,
+        transitionSpec = { ChatRowMotion.terminalSwap(reducedMotion) },
+        contentAlignment = Alignment.CenterStart,
+        label = "runSummaryTitle",
+    ) { shown ->
         Text(
-            text = runActivityTitle(activity),
+            text = shown,
             style = ChatRowType.summaryLine,
-            color = runTitleColor(activity),
+            color = color,
             maxLines = 1,
             softWrap = false,
         )

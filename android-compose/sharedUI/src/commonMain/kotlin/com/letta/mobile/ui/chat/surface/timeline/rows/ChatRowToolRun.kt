@@ -1,12 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +61,7 @@ import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
@@ -156,8 +151,8 @@ private fun ColumnScope.ToolRunInlineCards(
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = visible,
-        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
-        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+        enter = ChatRowMotion.expansionEnter(reducedMotion),
+        exit = ChatRowMotion.expansionExit(reducedMotion),
     ) {
         ToolRunCards(
             toolCalls = toolCalls,
