@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.NonRestartableComposable
@@ -42,6 +43,8 @@ import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
 internal data class SharedChatPageParams(
@@ -115,32 +118,37 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val canvas: (@Composable (ChatCanvasActions) -> Unit)? =
         canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
     val appearance = rememberSharedChatAppearance(params)
-    Box(modifier) {
-        ChatSurface(
-            port = port,
-            presentation = presentation,
-            onIntent = onIntent,
-            host = host,
-            modifier = Modifier.fillMaxSize(),
-            appearance = appearance,
-            platform = rememberAndroidChatSurfacePlatform(
-                pageBackground = params.pageBackground,
-                onComposerHeightChange = params.onComposerHeightChange,
-                timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
-                topChromeInset = topChromeInset,
-            ),
-            pagedTimeline = params.pagingPresentation?.canonical,
-            canvas = canvas,
-            dockGeometry = dockGeometry,
-            onDockGeometryChange = { dockGeometry = it },
-        )
-        SharedChatSubagentSheet(
-            state = subagentSheet,
-            inputs = params.subagents,
-            currentConversationId = target.conversationId,
-            navigation = params.navigation,
-        )
-        ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
+    // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
+    // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
+    val platform = rememberAndroidChatSurfacePlatform(
+        pageBackground = params.pageBackground,
+        onComposerHeightChange = params.onComposerHeightChange,
+        timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
+        topChromeInset = topChromeInset,
+    )
+    CompositionLocalProvider(LocalReducedMotion provides rememberReducedMotionEnabled()) {
+        Box(modifier) {
+            ChatSurface(
+                port = port,
+                presentation = presentation,
+                onIntent = onIntent,
+                host = host,
+                modifier = Modifier.fillMaxSize(),
+                appearance = appearance,
+                platform = platform,
+                pagedTimeline = params.pagingPresentation?.canonical,
+                canvas = canvas,
+                dockGeometry = dockGeometry,
+                onDockGeometryChange = { dockGeometry = it },
+            )
+            SharedChatSubagentSheet(
+                state = subagentSheet,
+                inputs = params.subagents,
+                currentConversationId = target.conversationId,
+                navigation = params.navigation,
+            )
+            ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
+        }
     }
 }
 
