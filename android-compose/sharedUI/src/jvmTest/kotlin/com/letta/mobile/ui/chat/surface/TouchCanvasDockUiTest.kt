@@ -180,6 +180,8 @@ class TouchCanvasDockUiTest {
         port.uiState.value = port.uiState.value.copy(messages = persistentListOf(prompt, question, answered))
         show(port, ChatSurfacePresentation.CanvasFirst)
         onAllNodesWithTag(TOUCH_INPUT_TRAY_TAG).assertCountEquals(0)
+    }
+
     /** letta-mobile-bglj6.1.22: the host's canvas chrome (subagent rings) shows on the canvas, not on the page. */
     @Test
     fun theHostsCanvasOverlayShowsOnlyOnTheCanvas() = runComposeUiTest {
