@@ -172,6 +172,7 @@ fun ChatSurface(
         LocalComposerFocusHandoff provides focusHandoff,
         LocalChatPlatformStyle provides appearance.platformStyle,
         LocalAmbientGlowShaders provides glowShaders,
+        LocalChatImageActions provides stablePlatform.imageActions,
     ) {
         SendFlightLayer(rememberSendFlightState(), modifier) {
             if (appearance.platformStyle == ChatPlatformStyle.Touch) {
