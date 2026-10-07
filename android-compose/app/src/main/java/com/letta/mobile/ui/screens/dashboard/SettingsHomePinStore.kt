@@ -12,16 +12,17 @@ import kotlinx.coroutines.launch
 /**
  * Android's [HomePinStore]: the unified pinned-item order and pinned-agent name cache Android has
  * always kept in [ISettingsRepository], so existing pins carry over to the shared Home page as-is.
+ * Shared while the Home controller follows them.
  */
 internal class SettingsHomePinStore(
     private val settings: ISettingsRepository,
     private val scope: CoroutineScope,
 ) : HomePinStore {
     override val pinnedKeys: StateFlow<List<String>> =
-        settings.getPinnedItemsOrder().stateIn(scope, SharingStarted.Eagerly, emptyList())
+        settings.getPinnedItemsOrder().stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
 
     override val persistedAgentNames: StateFlow<Map<String, String>> =
-        settings.getPinnedAgentNames().stateIn(scope, SharingStarted.Eagerly, emptyMap())
+        settings.getPinnedAgentNames().stateIn(scope, SharingStarted.WhileSubscribed(), emptyMap())
 
     override fun setOrder(keys: List<String>) {
         scope.launch { settings.setPinnedItemsOrder(keys) }

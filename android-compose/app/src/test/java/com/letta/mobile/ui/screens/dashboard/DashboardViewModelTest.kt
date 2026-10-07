@@ -141,6 +141,7 @@ class DashboardViewModelTest {
         vm.actions.updateSearchQuery("plan")
         advanceTimeBy(1_000)
         coVerify { messages.searchMessages(match { it.query == "plan" && it.searchMode == "fts" }) }
+        assertFalse(vm.state.value.search.searchingMessages)
     }
 
     private fun sampleRun(id: String, createdAt: String) = Run(id = id, agentId = "agent-1", createdAt = createdAt, status = "completed")
