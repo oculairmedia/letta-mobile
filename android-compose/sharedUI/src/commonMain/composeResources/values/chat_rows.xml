@@ -91,6 +91,9 @@
     <string name="rows_cancel">Cancel</string>
     <string name="rows_sending">Sending…</string>
     <string name="rows_reject_reason">Reason (optional)</string>
+    <string name="rows_reject_title">Reject approval request</string>
+    <string name="rows_reject_reason_placeholder">Optional context for the agent</string>
+    <string name="rows_requesting_input">requesting input</string>
     <string name="rows_approved">Approved</string>
     <string name="rows_rejected">Rejected</string>
     <string name="rows_approval_response">Approval response</string>

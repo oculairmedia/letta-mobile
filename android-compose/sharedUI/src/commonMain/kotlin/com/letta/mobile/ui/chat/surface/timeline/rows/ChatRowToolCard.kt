@@ -279,8 +279,9 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean, callbacks: Chat
     }
 }
 
+/** A call's primary argument, monospace ("> echo hello"); also the Touch approval card's body. */
 @Composable
-private fun ToolArgumentLine(arguments: String) {
+internal fun ToolArgumentLine(arguments: String) {
     val primary = remember(arguments) { primaryToolArgument(arguments) }
     SelectionContainer {
         Text(
