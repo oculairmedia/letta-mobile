@@ -46,7 +46,7 @@ class SharedMarkdownRecompositionTest {
     fun recomposingWithTheSameTextNeverBlanksIt() = runComposeUiTest {
         var color by mutableStateOf(Color.Black)
         setContent {
-            MaterialTheme { SharedMarkdownText(text = longText, textColor = color, retainState = false) }
+            MaterialTheme { SharedMarkdownText(text = longText, textColor = color) }
         }
         val rendered = hasText(FIRST_LINE, substring = true)
         // The first parse runs off the UI thread: wait for the text.
