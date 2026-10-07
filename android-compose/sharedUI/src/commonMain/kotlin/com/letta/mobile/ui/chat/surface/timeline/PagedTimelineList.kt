@@ -124,17 +124,7 @@ private fun PagedTimelineBody(
         newest is ChatRenderItem.Single && isUserRole(newest.message.role)
     }
     ForceFollowOnSend(listState, newestKey, newestIsUserPrompt) { following = true }
-    // The stream snaps back to the newest edge while following, coalesced to the legacy cadence
-    // (96ms) instead of once per raw live-overlay delta.
-    val streamClock = remember { TimeSource.Monotonic.markNow() }
-    var lastSnapAtMs by remember(presentation) { mutableStateOf(Long.MIN_VALUE) }
-    LaunchedEffect(rows.identity, following) {
-        if (!following || listState.isScrollInProgress) return@LaunchedEffect
-        val now = streamClock.elapsedNow().inWholeMilliseconds
-        if (now - lastSnapAtMs < STREAM_SNAP_INTERVAL_MS) return@LaunchedEffect
-        lastSnapAtMs = now
-        listState.scrollToItem(0)
-    }
+    SnapToNewestWhileFollowing(listState, rows.identity, following)
     if (!anchorRestored) {
         RestoreReadingPosition(listState, rows, restoreAnchor) { anchorRestored = true }
     } else {
@@ -182,6 +172,23 @@ private fun PagedTimelineBody(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = params.topReserve).padding(LettaDimens.Space.sm),
             )
         }
+    }
+}
+
+/**
+ * The stream snaps back to the newest edge while following, coalesced to the legacy cadence
+ * (96ms) instead of once per raw live-overlay delta.
+ */
+@Composable
+private fun SnapToNewestWhileFollowing(listState: LazyListState, identity: PagedRowsIdentity, following: Boolean) {
+    val streamClock = remember { TimeSource.Monotonic.markNow() }
+    var lastSnapAtMs by remember { mutableStateOf(Long.MIN_VALUE) }
+    LaunchedEffect(identity, following) {
+        if (!following || listState.isScrollInProgress) return@LaunchedEffect
+        val now = streamClock.elapsedNow().inWholeMilliseconds
+        if (now - lastSnapAtMs < STREAM_SNAP_INTERVAL_MS) return@LaunchedEffect
+        lastSnapAtMs = now
+        listState.scrollToItem(0)
     }
 }
 
