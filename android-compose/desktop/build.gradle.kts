@@ -1,4 +1,4 @@
-﻿import dev.nucleusframework.desktop.application.dsl.TargetFormat
+import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
 import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
@@ -270,9 +270,8 @@ dependencies {
     implementation(libs.compose.desktop.material.icons)
     implementation(libs.skiko.awt)
     // Conversation tab strip drag-to-reorder (letta-mobile#1258): same
-    // library the mobile dashboard already uses for its pinned-items grid
-    // (see app/build.gradle.kts and HomeScreenWidgets.kt's
-    // ReorderablePinnedItemsGrid) -- Kotlin Multiplatform, resolves to the
+    // library the shared Home page uses for its pinned-items grid
+    // (sharedUI ui/shell/pages/home/HomePinnedGrid.kt) -- Kotlin Multiplatform, resolves to the
     // JVM/desktop artifact here via Gradle module metadata.
     implementation(libs.reorderable)
     implementation(libs.texty)

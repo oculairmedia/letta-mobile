@@ -204,8 +204,8 @@ private fun applyEagerDragDelta(
 /**
  * Horizontal, drag-to-reorder conversation tab strip, built on
  * `sh.calvin.reorderable`'s lazy-list variant — the same library already
- * used for the mobile dashboard's pinned-items grid
- * (app/.../HomeScreenWidgets.kt's `ReorderablePinnedItemsGrid`). It owns
+ * used for the shared Home page's pinned-items grid
+ * (sharedUI ui/shell/pages/home/HomePinnedGrid.kt). It owns
  * keyed item tracking, neighbor reflow while dragging, drag-from-any-index
  * (including the first), and the drop-settle animation; a hand-rolled
  * version of all four shipped with real bugs (a positional-slot mismatch

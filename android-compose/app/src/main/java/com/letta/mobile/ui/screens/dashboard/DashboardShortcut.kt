@@ -20,7 +20,7 @@ enum class DashboardShortcut(
     @StringRes val descriptionResId: Int = 0,
 ) {
     // --- Group PRIMARY (above first divider) ---
-    // descriptionResId = 0 → contextual info comes from live counts in DashboardUiState
+    // descriptionResId = 0 → contextual info comes from live counts (HomePageState.shortcutInfo)
     CONVERSATIONS(LettaIcons.Chat, R.string.common_conversations, Group.PRIMARY),
     AGENTS(LettaIcons.People, R.string.common_agents, Group.PRIMARY),
     TOOLS(LettaIcons.Tool, R.string.common_tools, Group.PRIMARY),
