@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.chat.surface.composer
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -15,8 +18,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -53,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -72,6 +78,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
+import com.letta.mobile.ui.theme.ChatExpressiveMotion
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -300,25 +307,65 @@ private fun TouchTrailingSlot(model: ComposerModel) {
     val dictates = voice != null && !model.streaming && !model.composer.hasPayload
     val keyboard = keyboardOpen()
     val visible = dictates || model.streaming || !keyboard
-    val reducedMotion = LocalReducedMotion.current
+    val shown = rememberRetainedTrailingContent(visible, if (dictates) TouchTrailingContent.Voice else TouchTrailingContent.Action)
     AnimatedVisibility(
         visible = visible,
-        enter = if (reducedMotion) fadeIn(snap()) else fadeIn(tween(LettaMotionTokens.CHIP_MILLIS)) + expandHorizontally(expandFrom = Alignment.End),
-        exit = if (reducedMotion) {
-            fadeOut(snap())
-        } else {
-            fadeOut(tween(LettaMotionTokens.CHIP_MILLIS)) + scaleOut(targetScale = EXIT_SCALE) + shrinkHorizontally(shrinkTowards = Alignment.End)
-        },
+        enter = touchSlotEnter(),
+        exit = touchSlotExit(),
         label = "touchTrailingSlot",
     ) {
-        if (dictates) {
-            Box(Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE), contentAlignment = Alignment.Center) {
+        when (shown) {
+            TouchTrailingContent.Voice -> Box(
+                Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
+                contentAlignment = Alignment.Center,
+            ) {
                 ComposerVoiceButton(model)
             }
-        } else {
-            TouchActionButton(model)
+            TouchTrailingContent.Action -> TouchActionButton(model)
         }
     }
+}
+
+/** What the right-hand slot holds: the dictation mic, or the Send / Stop button. */
+internal enum class TouchTrailingContent { Voice, Action }
+
+/**
+ * letta-mobile-bglj6.1.19: the slot keeps what it showed while its exit runs (legacy
+ * LettaInputBar's retained custom slot). AnimatedVisibility composes its content through the exit,
+ * and typing the first character with the keyboard up both hides the slot and ends dictation: read
+ * live, the leaving mic would turn into Send for a frame.
+ */
+internal fun retainedTrailingContent(
+    visible: Boolean,
+    current: TouchTrailingContent,
+    retained: TouchTrailingContent,
+): TouchTrailingContent = if (visible) current else retained
+
+/** Not snapshot state: it only remembers the last visible content for the frames of an exit. */
+private class TrailingContentMemory(var last: TouchTrailingContent)
+
+@Composable
+private fun rememberRetainedTrailingContent(visible: Boolean, current: TouchTrailingContent): TouchTrailingContent {
+    val memory = remember { TrailingContentMemory(current) }
+    val shown = retainedTrailingContent(visible, current, memory.last)
+    memory.last = shown
+    return shown
+}
+
+/** The slot easing in from its end (legacy composerActionEnterTransition: the expressive fast springs). */
+@Composable
+private fun touchSlotEnter(): EnterTransition {
+    if (LocalReducedMotion.current) return fadeIn(snap())
+    return fadeIn(ChatExpressiveMotion.fastEffects()) +
+        expandHorizontally(ChatExpressiveMotion.fastSpatial(), expandFrom = Alignment.End)
+}
+
+@Composable
+private fun touchSlotExit(): ExitTransition {
+    if (LocalReducedMotion.current) return fadeOut(snap())
+    return fadeOut(ChatExpressiveMotion.fastEffects()) +
+        scaleOut(ChatExpressiveMotion.fastSpatial(), targetScale = EXIT_SCALE) +
+        shrinkHorizontally(ChatExpressiveMotion.fastSpatial(), shrinkTowards = Alignment.End)
 }
 
 private const val EXIT_SCALE = 0.76f
@@ -350,13 +397,34 @@ private fun TouchActionButton(model: ComposerModel) {
             .testTag(if (stops) ComposerTestTags.STOP else ComposerTestTags.SEND),
         colors = touchActionColors(stops),
     ) {
-        Icon(
-            imageVector = if (stops) LettaIcons.Close else LettaIcons.Send,
-            contentDescription = stringResource(touchActionLabel(model.decisions)),
-            modifier = Modifier.size(TouchComposerDimens.actionIcon),
-        )
+        TouchActionIcon(stops = stops, contentDescription = stringResource(touchActionLabel(model.decisions)))
     }
 }
+
+/**
+ * letta-mobile-bglj6.1.19: Send and Stop morph into each other (legacy LettaInputBar
+ * ComposerActionIcon): the leaving glyph fades and shrinks to 0.76 while the arriving one fades
+ * and grows from it, on the expressive fast springs. A plain swap under reduced motion.
+ */
+@Composable
+private fun TouchActionIcon(stops: Boolean, contentDescription: String) {
+    val iconModifier = Modifier.size(TouchComposerDimens.actionIcon)
+    if (LocalReducedMotion.current) {
+        Icon(touchActionIcon(stops), contentDescription = contentDescription, modifier = iconModifier)
+        return
+    }
+    val enter = fadeIn(ChatExpressiveMotion.fastEffects()) + scaleIn(ChatExpressiveMotion.fastSpatial(), initialScale = EXIT_SCALE)
+    val exit = fadeOut(ChatExpressiveMotion.fastEffects()) + scaleOut(ChatExpressiveMotion.fastSpatial(), targetScale = EXIT_SCALE)
+    AnimatedContent(
+        targetState = stops,
+        transitionSpec = { enter togetherWith exit },
+        label = "touchActionIconMorph",
+    ) { stopping ->
+        Icon(touchActionIcon(stopping), contentDescription = contentDescription, modifier = iconModifier)
+    }
+}
+
+private fun touchActionIcon(stops: Boolean): ImageVector = if (stops) LettaIcons.Close else LettaIcons.Send
 
 /** Stop beats while the run is live and not yet asked to stop; never under reduced motion. */
 @Composable
