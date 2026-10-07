@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.pendingUserInputApproval
+import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_needs_input
@@ -125,6 +127,11 @@ internal data class CollapsedTurn(
     val needsInput: Boolean = false,
     /** A run is in flight (or the agent is typing). */
     val busy: Boolean = false,
+    /**
+     * The turn's question that waits on the person (AskUserQuestion), which the Touch canvas
+     * answers in place (letta-mobile-bglj6.1.22); null when there is none.
+     */
+    val pendingApproval: UiApprovalRequest? = null,
 ) {
     /** Something to put in the bubble; before this the mascot just thinks. */
     val hasReply: Boolean get() = text.isNotBlank() || working || needsInput
@@ -165,6 +172,7 @@ internal fun collapsedTurnOf(newestFirst: List<ChatRenderItem>, state: ChatUiSta
         working = busy && (state.pendingTools.isNotEmpty() || toolRunning),
         needsInput = state.a2uiSurfaces.isNotEmpty() || awaitsApproval(messages),
         busy = busy,
+        pendingApproval = pendingUserInputApproval(messages),
     )
 }
 

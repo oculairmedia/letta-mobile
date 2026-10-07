@@ -13,12 +13,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,6 +81,7 @@ import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_expand
 import com.letta.mobile.sharedui.resources.chat_surface_head
 import com.letta.mobile.sharedui.resources.chat_surface_head_agent
 import com.letta.mobile.ui.chat.AgentSphere
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.mascot.mascotAvailable
@@ -126,6 +133,8 @@ internal fun TouchDockLayer(
     head: TouchHeadContent?,
     /** Host chrome over the canvas's top edge (ChatSurfacePlatform.topChromeInset): the head stays below it. */
     topChromeInset: Dp = 0.dp,
+    /** What waits on the person, over the canvas just above the bar ([TouchInputTray]); null for none. */
+    inputTray: (@Composable () -> Unit)? = null,
     composer: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -157,6 +166,17 @@ internal fun TouchDockLayer(
                     .graphicsLayer { alpha = morphDockedAlpha(fraction() * HEAD_FADE_SPEED) }
                     .then(fade),
             ) { TouchChatHead(head) }
+        }
+        if (inputTray != null) {
+            // Over the head: an answer waiting on the person outranks the reply's popup.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = topChromeInset, bottom = with(density) { bar.heightPx.toDp() })
+                    .graphicsLayer { alpha = morphDockedAlpha(fraction()) }
+                    .then(fade),
+                contentAlignment = Alignment.BottomCenter,
+            ) { inputTray() }
         }
         Box(
             Modifier
@@ -443,6 +463,39 @@ private fun PopupDismiss(placement: PopupPlacement, onDismiss: () -> Unit, modif
     }
 }
 
+/**
+ * letta-mobile-bglj6.1.22: the canvas's input tray. A question the agent waits on (and any
+ * generated form) is answered here, at thumb reach above the bar, without opening the full page.
+ * It keeps to a share of the band above the bar and scrolls past it, so the board stays in view.
+ */
+@Composable
+internal fun TouchInputTray(content: @Composable ColumnScope.() -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        Surface(
+            modifier = Modifier
+                .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)
+                .widthIn(max = ChatColumnMaxWidth)
+                .fillMaxWidth()
+                .heightIn(max = maxHeight * INPUT_TRAY_MAX_HEIGHT_FRACTION)
+                .testTag(TOUCH_INPUT_TRAY_TAG),
+            shape = RoundedCornerShape(LettaDimens.Radius.lg),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shadowElevation = ChatSurfaceDimens.dockedReplyElevation,
+            border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)),
+        ) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+                content = content,
+            )
+        }
+    }
+}
+
+/** The tray takes at most this share of the band between the canvas's top chrome and the bar. */
+private const val INPUT_TRAY_MAX_HEIGHT_FRACTION = 0.6f
+
 private const val HALF = 0.5f
 
 /** The head's layer fades this many times faster than the bar as the page grows over it. */
@@ -453,3 +506,4 @@ internal const val TOUCH_CANVAS_TAG = "chat-touch-canvas"
 internal const val TOUCH_HEAD_TAG = "chat-touch-head"
 internal const val TOUCH_POPUP_TAG = "chat-touch-popup"
 internal const val TOUCH_POPUP_DISMISS_TAG = "chat-touch-popup-dismiss"
+internal const val TOUCH_INPUT_TRAY_TAG = "chat-touch-input-tray"
