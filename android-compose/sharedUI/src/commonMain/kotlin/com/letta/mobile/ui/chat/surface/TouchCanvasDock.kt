@@ -134,7 +134,7 @@ internal fun TouchDockLayer(
     /** Host chrome over the canvas's top edge (ChatSurfacePlatform.topChromeInset): the head stays below it. */
     topChromeInset: Dp = 0.dp,
     /** What waits on the person, over the canvas just above the bar ([TouchInputTray]); null for none. */
-    inputTray: (@Composable () -> Unit)? = null,
+    inputTray: @Composable () -> Unit = {},
     composer: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -167,17 +167,15 @@ internal fun TouchDockLayer(
                     .then(fade),
             ) { TouchChatHead(head) }
         }
-        if (inputTray != null) {
-            // Over the head: an answer waiting on the person outranks the reply's popup.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(top = topChromeInset, bottom = with(density) { bar.heightPx.toDp() })
-                    .graphicsLayer { alpha = morphDockedAlpha(fraction()) }
-                    .then(fade),
-                contentAlignment = Alignment.BottomCenter,
-            ) { inputTray() }
-        }
+        // Over the head: an answer waiting on the person outranks the reply's popup.
+        DockInputTray(
+            tray = inputTray,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = topChromeInset, bottom = with(density) { bar.heightPx.toDp() })
+                .graphicsLayer { alpha = morphDockedAlpha(fraction()) }
+                .then(fade),
+        )
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
@@ -187,6 +185,11 @@ internal fun TouchDockLayer(
                 .then(fade),
         ) { composer() }
     }
+}
+
+@Composable
+private fun DockInputTray(tray: @Composable () -> Unit, modifier: Modifier) {
+    Box(modifier, contentAlignment = Alignment.BottomCenter) { tray() }
 }
 
 /**

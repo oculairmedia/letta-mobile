@@ -140,15 +140,20 @@ internal fun ApprovalRequestCard(approval: UiApprovalRequest, decider: ApprovalD
     // Only runtime user-input tools wait on the user (Android's requiresUserInput); every
     // other approval is resolved by the runtime, so its card stays read-only, as on desktop.
     val actionable = decider.submit != null && approval.requiresUserInput()
-    val touch = touchStyle()
     ApprovalChrome(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
-        // Android leads with what it asks, then the calls; desktop lists the calls first.
-        if (touch && actionable) ApprovalBody()
-        approval.toolCalls.forEach { if (touch) ApprovalToolCallCard(it) else ApprovalToolCallLine(it) }
-        if (actionable) {
-            if (!touch) ApprovalBody()
-            ApprovalActionRow(approval, decider)
-        }
+        ApprovalCardContent(approval, decider, actionable)
+    }
+}
+
+@Composable
+private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider: ApprovalDecider, actionable: Boolean) {
+    val touch = touchStyle()
+    // Android leads with what it asks, then the calls; desktop lists the calls first.
+    if (touch && actionable) ApprovalBody()
+    approval.toolCalls.forEach { if (touch) ApprovalToolCallCard(it) else ApprovalToolCallLine(it) }
+    if (actionable) {
+        if (!touch) ApprovalBody()
+        ApprovalActionRow(approval, decider)
     }
 }
 
