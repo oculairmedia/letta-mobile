@@ -75,8 +75,17 @@ internal fun TimelineListFrame(
     bindings: TimelineRowBindings,
     overlays: TimelineFrameOverlays,
     modifier: Modifier = Modifier,
+    /** Whether the older / newer end of the history is fully loaded, so a fling may bounce there. */
+    olderHistoryComplete: () -> Boolean = { true },
+    newerHistoryComplete: () -> Boolean = { true },
     content: LazyListScope.() -> Unit,
 ) {
+    // Reversed list: a fling with the finger moving down (positive) runs toward the oldest rows.
+    val overscroll = rememberTimelineElasticOverscroll(
+        pinching = bindings.pinch?.isPinching == true,
+        canBouncePastPositiveEdge = { !listState.canScrollForward && olderHistoryComplete() },
+        canBouncePastNegativeEdge = { !listState.canScrollBackward && newerHistoryComplete() },
+    )
     val pinned = overlays.pinnedPrompt
     val fades = rememberTimelineFadeAlphas(
         canScrollTowardOlder = listState.canScrollForward,
@@ -96,6 +105,8 @@ internal fun TimelineListFrame(
             LazyColumn(
                 state = listState,
                 reverseLayout = true,
+                // Replaces the platform's stretch, so the two never bounce together.
+                overscrollEffect = overscroll,
                 modifier = Modifier
                     .fillMaxSize()
                     // The glide's springback lifts the rows inside the list's bounds and fades.
