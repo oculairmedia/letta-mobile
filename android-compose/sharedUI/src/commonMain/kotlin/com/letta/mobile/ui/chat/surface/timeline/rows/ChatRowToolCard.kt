@@ -134,7 +134,13 @@ private fun RequestFullResultOnExpand(toolCall: UiToolCall, expanded: Boolean, c
 
 /** One tool call as a card draws it: the call, its classified state, and whether the host is a phone. */
 @Immutable
-private class ToolCardView(val toolCall: UiToolCall, val state: ToolTimelineState, val touch: Boolean)
+private class ToolCardView(val toolCall: UiToolCall, val state: ToolTimelineState, val touch: Boolean) {
+    /** A phone heads a settled call's output with its outcome row instead of "Output". */
+    val headsOutputWithOutcome: Boolean
+        get() = touch && state !in UnsettledStates
+}
+
+private val UnsettledStates = setOf(ToolTimelineState.Running, ToolTimelineState.AwaitingApproval)
 
 @Composable
 private fun ToolCardHeader(
@@ -378,7 +384,7 @@ private fun ToolResultSection(view: ToolCardView, result: String, isError: Boole
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The phone heads the output with its outcome (legacy ProjectedToolOutcomeLabel).
-        if (view.touch && view.state != ToolTimelineState.Running && view.state != ToolTimelineState.AwaitingApproval) {
+        if (view.headsOutputWithOutcome) {
             ToolOutcomeLabel(view.state)
         } else {
             Text(
