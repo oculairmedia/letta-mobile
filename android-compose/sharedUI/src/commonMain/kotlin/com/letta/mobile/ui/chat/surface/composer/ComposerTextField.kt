@@ -25,6 +25,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
@@ -106,7 +107,9 @@ internal fun ComposerTextField(
     val text = model.composer.text
     var fieldValue by remember { mutableStateOf(TextFieldValue(text, selection = TextRange(text.length))) }
     LaunchedEffect(text) { fieldValue = reconcileComposerFieldValue(fieldValue, text) }
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+    // letta-mobile-bglj6.1.23: greyed and unfocusable while the owner takes no input (legacy canSendMessages).
+    val enabled = model.composer.acceptsInput
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(color = composerFieldTextColor(enabled))
     val primary = LocalComposerPrimary.current
     val handoff = LocalComposerFocusHandoff.current
     val focus = remember(primary, handoff) { FieldFocus(primary, handoff) }
@@ -129,6 +132,7 @@ internal fun ComposerTextField(
             fieldValue = next
             if (next.text != text) model.actions.updateComposerText(next.text)
         },
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = LettaDimens.Space.xl, max = style.maxHeight)
@@ -191,13 +195,21 @@ private class FieldFocus(private val primary: Boolean, private val handoff: Comp
     }
 }
 
-/** The owner's placeholder, else the platform's own copy. */
+/** The field's text colour: onSurface, faded to the disabled alpha while the field is off. */
+@Composable
+private fun composerFieldTextColor(enabled: Boolean): Color {
+    val color = MaterialTheme.colorScheme.onSurface
+    return if (enabled) color else color.copy(alpha = LettaDimens.Alpha.disabled)
+}
+
+/** The owner's placeholder, else the platform's own copy; faded with the field while it is off. */
 @Composable
 private fun FieldPlaceholder(model: ComposerModel, style: ComposerFieldStyle, textStyle: TextStyle) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
     Text(
         text = model.composer.placeholder ?: stringResource(style.placeholderRes()),
         style = textStyle,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (model.composer.acceptsInput) color else color.copy(alpha = LettaDimens.Alpha.disabled),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )

@@ -47,6 +47,8 @@ internal object AdminChatComposerMapping {
         attachments = inputs.composer.pendingAttachments,
         error = inputs.composer.error,
         canSend = inputs.canSend,
+        // The ViewModel's canSendMessages is connection-level, not payload-level: it gates input too.
+        acceptsInput = inputs.canSend,
         canQueueWhileStreaming = inputs.canQueueWhileStreaming,
         maxAttachments = inputs.maxAttachments,
         attachmentLimits = inputs.attachmentLimits,

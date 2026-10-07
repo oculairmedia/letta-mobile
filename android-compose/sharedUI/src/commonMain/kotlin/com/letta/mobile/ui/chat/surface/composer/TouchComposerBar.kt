@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -64,7 +63,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.lerp
-import androidx.compose.ui.unit.max
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_open
 import com.letta.mobile.sharedui.resources.composer_attach_image
@@ -123,7 +121,7 @@ internal fun TouchComposerBar(
         TouchBarSurface(model) {
             leading?.invoke()
             TouchPlusButton(
-                visible = sheetItems.isNotEmpty(),
+                items = sheetItems,
                 onClick = { if (sheetItems.size == 1) sheetItems.single().onClick() else sheetOpen = true },
             )
             Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
@@ -226,25 +224,33 @@ private fun <T> chipSpec(): AnimationSpec<T> {
 
 /**
  * Top and bottom padding. Legacy: 24 dp at rest, easing to 12 dp as the keyboard rises (driven by
- * the inset itself, so it tracks the keyboard frame by frame). The bottom never drops under the
- * navigation bar's inset while the keyboard is down, so three-button navigation does not cover
- * the controls either; with gesture navigation the handle draws over the padding, as legacy.
+ * the inset itself, so it tracks the keyboard frame by frame). The bar runs flush to the screen's
+ * bottom edge (legacy ChatScreen's bottomInsetDp = 0, letta-mobile-bglj6.1.9): the opaque bar sits
+ * under the navigation bar, which draws over its bottom padding, instead of growing by the
+ * navigation inset and floating its controls ~48 dp up on three-button devices.
  */
 @Composable
 private fun touchBarPadding(): Pair<Dp, Dp> {
-    val density = LocalDensity.current
-    val imePx = WindowInsets.ime.getBottom(density)
-    val compact = (imePx / TouchComposerDimens.imeInsetForCompactPx).coerceIn(0f, 1f)
-    val vertical = lerp(TouchComposerDimens.restingVerticalPadding, TouchComposerDimens.compactVerticalPadding, compact)
-    val navigation = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
-    val bottom = if (imePx > 0) vertical else max(vertical, navigation)
-    return vertical to bottom
+    val imePx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val vertical = touchBarVerticalPadding(imePx)
+    return vertical to vertical
 }
 
-/** The round tonal "+": the action sheet, or (with one thing to do) that thing directly. */
+/** The bar's vertical padding for an IME inset of [imePx]: resting, easing to compact as it rises. */
+internal fun touchBarVerticalPadding(imePx: Int): Dp {
+    val compact = (imePx / TouchComposerDimens.imeInsetForCompactPx).coerceIn(0f, 1f)
+    return lerp(TouchComposerDimens.restingVerticalPadding, TouchComposerDimens.compactVerticalPadding, compact)
+}
+
+/**
+ * The round tonal "+": the action sheet, or (with one thing to do) that thing directly. It is
+ * announced as what it does (letta-mobile-bglj6.1.9): "Add to message" when it opens the sheet,
+ * the single item's own label ("Attach image") when it does that directly, as legacy.
+ */
 @Composable
-private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
-    if (!visible) return
+private fun TouchPlusButton(items: List<TouchSheetItem>, onClick: () -> Unit) {
+    if (items.isEmpty()) return
+    val description = items.singleOrNull()?.label ?: stringResource(Res.string.composer_actions_open)
     val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -277,7 +283,7 @@ private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     LettaIcons.Add,
-                    contentDescription = stringResource(Res.string.composer_actions_open),
+                    contentDescription = description,
                     modifier = Modifier.size(TouchComposerDimens.attachIcon),
                 )
             }
@@ -297,14 +303,22 @@ private fun touchSheetItems(model: ComposerModel, onAttachImage: () -> Unit): Li
 }
 
 /**
+ * The slot is the mic: the platform can dictate, nothing is drafted or running, and the field takes
+ * input (no dictating into a field that takes none: the slot falls back to the greyed Send, legacy).
+ */
+private fun touchSlotDictates(model: ComposerModel): Boolean {
+    if (model.platform.voiceInput == null || !model.composer.acceptsInput) return false
+    return !model.streaming && !model.composer.hasPayload
+}
+
+/**
  * The right-hand slot. Empty and idle, it is the platform's hold-to-dictate mic; otherwise Send,
  * or Stop while a run streams with nothing to queue. While the keyboard is up Send steps aside
  * (the keyboard's own action key sends), but Stop and the mic stay.
  */
 @Composable
 private fun TouchTrailingSlot(model: ComposerModel) {
-    val voice = model.platform.voiceInput
-    val dictates = voice != null && !model.streaming && !model.composer.hasPayload
+    val dictates = touchSlotDictates(model)
     val keyboard = keyboardOpen()
     val visible = dictates || model.streaming || !keyboard
     val shown = rememberRetainedTrailingContent(visible, if (dictates) TouchTrailingContent.Voice else TouchTrailingContent.Action)
