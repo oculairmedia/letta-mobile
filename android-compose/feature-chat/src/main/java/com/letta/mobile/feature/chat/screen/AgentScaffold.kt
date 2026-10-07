@@ -16,7 +16,10 @@ import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 internal object AgentScaffoldTestTags {
     const val MENU_BUTTON = "agent_scaffold_menu_button"
     const val DRAWER_CONTENT = "agent_scaffold_drawer_content"
-    const val CONVERSATION_PICKER_TRIGGER = "agent_scaffold_conversation_picker_trigger"
+    /** The agent pill's tappable row: the shared pill's own tag, in the header and on the canvas. */
+    const val CONVERSATION_PICKER_TRIGGER = com.letta.mobile.ui.chat.AgentIdentityPillTestTags.TRIGGER
+    const val HEADER = "agent_scaffold_header"
+    const val CANVAS_IDENTITY_PILL = "agent_scaffold_canvas_identity_pill"
     const val CONVERSATION_PICKER_SHEET = "agent_scaffold_conversation_picker_sheet"
     const val PROJECT_BUG_FAB = "agent_scaffold_project_bug_fab"
     const val PROJECT_BUG_REPORT_SHEET = "agent_scaffold_project_bug_report_sheet"

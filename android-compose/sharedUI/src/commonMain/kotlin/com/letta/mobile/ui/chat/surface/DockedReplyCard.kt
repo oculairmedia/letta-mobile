@@ -34,6 +34,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.surface.timeline.ObserveResidentRows
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowContexts
+import com.letta.mobile.ui.chat.surface.timeline.rememberTimelineElasticOverscroll
 import com.letta.mobile.ui.chat.surface.timeline.rememberTimelineFadeAlphas
 import com.letta.mobile.ui.chat.surface.timeline.timelineFadingEdges
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
@@ -89,9 +90,16 @@ internal fun DockedReplyCard(params: DockedReplyParams, modifier: Modifier = Mod
         canScrollTowardNewer = listState.canScrollBackward,
         promptPinned = false,
     )
+    // The full page's elastic bounce (letta-mobile-bglj6.1.20); the docked list holds no pinch.
+    val overscroll = rememberTimelineElasticOverscroll(
+        pinching = false,
+        canBouncePastPositiveEdge = { !listState.canScrollForward },
+        canBouncePastNegativeEdge = { !listState.canScrollBackward },
+    )
     LazyColumn(
         state = listState,
         reverseLayout = true,
+        overscrollEffect = overscroll,
         modifier = modifier
             .clipToBounds()
             .timelineFadingEdges(fades)

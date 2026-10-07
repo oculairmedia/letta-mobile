@@ -2,8 +2,12 @@
 
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
+import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
@@ -268,6 +272,55 @@ class ChatRowInteractionUiTest {
         onNodeWithText("Send answer").assertIsNotEnabled()
     }
 
+    /** letta-mobile-bglj6.1.22: the reason is typed in a focused modal, not an inline field. */
+    @Test
+    fun rejectingAsksForTheReasonInAModalDialog() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        setContent { MaterialTheme { RenderRow(single(genericApprovalMessage()), rowContext(), rowCallbacks(actions)) } }
+
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REASON).assertDoesNotExist()
+        onNodeWithText("Reject").performClick()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REJECT_DIALOG).assertExists()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REASON).performTextInput("Not this file")
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REJECT_CONFIRM).performClick()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REJECT_DIALOG).assertDoesNotExist()
+        runOnIdle {
+            val decision = actions.approvals.single()
+            assertEquals("req-2", decision.requestId)
+            assertEquals(listOf("ask-2"), decision.toolCallIds)
+            assertEquals(false, decision.approve)
+            assertEquals("Not this file", decision.reason)
+        }
+    }
+
+    @Test
+    fun cancellingTheRejectDialogLeavesTheRequestPending() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        setContent { MaterialTheme { RenderRow(single(genericApprovalMessage()), rowContext(), rowCallbacks(actions)) } }
+
+        onNodeWithText("Reject").performClick()
+        onNodeWithText("Cancel").performClick()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REJECT_DIALOG).assertDoesNotExist()
+        runOnIdle { assertTrue(actions.approvals.isEmpty()) }
+    }
+
+    @Test
+    fun onTouchTheRequestedCallsWearAndroidsToolCardChrome() = runComposeUiTest {
+        var style by mutableStateOf(ChatPlatformStyle.Touch)
+        setContent {
+            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+                MaterialTheme { RenderRow(single(genericApprovalMessage())) }
+            }
+        }
+
+        onNodeWithTag(ChatRowTestTags.APPROVAL_TOOL_CALL).assertExists()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT, useUnmergedTree = true).assertExists()
+        onNodeWithText("requesting input", useUnmergedTree = true).assertExists()
+        runOnIdle { style = ChatPlatformStyle.Pointer }
+        onNodeWithTag(ChatRowTestTags.APPROVAL_TOOL_CALL).assertDoesNotExist()
+        onNodeWithText("requesting input", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     @Test
     fun subagentDispatchOpensTheSubagentThroughTheHost() = runComposeUiTest {
         var opened: ChatSubagentTarget? = null
@@ -382,6 +435,15 @@ class ChatRowInteractionUiTest {
         assertEquals(null, messageClockLabel("not a time", TimeZone.UTC))
     }
 
+    @Test
+    fun clockLabelFollowsATwentyFourHourClock() {
+        // letta-mobile-bglj6.1.23: a 24-hour locale (or the user's toggle) reads "16:30", not "4:30 PM".
+        assertEquals("16:30", messageClockLabel("2026-07-19T16:30:00Z", TimeZone.UTC, twentyFourHour = true))
+        assertEquals("09:05", messageClockLabel("2026-07-19T09:05:00", TimeZone.UTC, twentyFourHour = true))
+        assertEquals(true, localeUses24HourClock(java.util.Locale.GERMANY))
+        assertEquals(false, localeUses24HourClock(java.util.Locale.US))
+    }
+
     private companion object {
         val SCROLL_VIEWPORT = 400.dp
         const val FILLER_ROWS = 30
@@ -402,6 +464,14 @@ class ChatRowInteractionUiTest {
         content = content,
         timestamp = "2026-07-19T12:00:00Z",
         runId = "run-1",
+    )
+
+    /** A user-input tool whose arguments are not a question spec: the generic approve/reject card. */
+    private fun genericApprovalMessage() = message("q-2", "assistant", "").copy(
+        approvalRequest = UiApprovalRequest(
+            requestId = "req-2",
+            toolCalls = listOf(UiApprovalToolCall(toolCallId = "ask-2", name = "AskUserQuestion", arguments = "rm -rf build")),
+        ),
     )
 
     private fun questionMessage() = message("q-1", "assistant", "").copy(

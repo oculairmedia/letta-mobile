@@ -26,6 +26,7 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatImageViewer
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.LettaDimens
@@ -77,8 +78,11 @@ internal fun ChatTimeline(
     Box(modifier = modifier.then(pinchModifier)) {
         Column(Modifier.fillMaxSize()) {
             val goal = state.goalStatus
-            if (goal != null) {
-                val goalActions = remember(actions, capabilities.goals) { GoalCardActions.of(actions, capabilities) }
+            val goalActions = remember(actions, capabilities.goals) { GoalCardActions.of(actions, capabilities) }
+            // letta-mobile-bglj6.1.22: on Touch the goal card sits at thumb reach over the composer, as
+            // Android's legacy composer column put it; a pointer host keeps it at the top.
+            val goalAtBottom = touchStyle()
+            if (goal != null && !goalAtBottom) {
                 GoalStatusCard(
                     goal,
                     state.isGoalStatusLoading,
@@ -86,8 +90,8 @@ internal fun ChatTimeline(
                     Modifier.align(Alignment.CenterHorizontally).padding(top = topInset),
                 )
             }
-            // The goal card, when there is one, already rests below the chrome; the list starts under it.
-            val bodyTopInset = if (goal != null) 0.dp else topInset
+            // The goal card, when there is one on top, already rests below the chrome; the list starts under it.
+            val bodyTopInset = if (goal != null && !goalAtBottom) 0.dp else topInset
             TimelineBody(
                 TimelineBodyParams(
                     state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, listState, host.editAgent,
@@ -95,6 +99,9 @@ internal fun ChatTimeline(
                 ),
                 Modifier.weight(1f).fillMaxWidth(),
             )
+            if (goal != null && goalAtBottom) {
+                GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))
+            }
         }
         A2uiSurfaceStack(
             surfaces = state.a2uiSurfaces,

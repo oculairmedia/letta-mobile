@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.pendingUserInputApproval
+import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_needs_input
@@ -65,7 +67,9 @@ import com.letta.mobile.sharedui.resources.chat_surface_collapsed_reply
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_reply_unnamed
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_thinking
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_thinking_unnamed
-import com.letta.mobile.sharedui.resources.chat_surface_collapsed_working
+import com.letta.mobile.sharedui.resources.timeline_running_tool
+import com.letta.mobile.sharedui.resources.timeline_thinking
+import com.letta.mobile.sharedui.resources.timeline_thinking_elapsed
 import com.letta.mobile.sharedui.resources.chat_surface_dock_restore
 import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_dismiss
 import com.letta.mobile.ui.chat.AgentSphere
@@ -82,6 +86,10 @@ import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
+import com.letta.mobile.ui.chat.surface.timeline.ActiveRunActivity
+import com.letta.mobile.ui.chat.surface.timeline.activeRunActivity
+import com.letta.mobile.ui.chat.surface.timeline.rows.formatElapsedClock
+import com.letta.mobile.ui.chat.surface.timeline.rows.rememberElapsedSeconds
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -125,6 +133,15 @@ internal data class CollapsedTurn(
     val needsInput: Boolean = false,
     /** A run is in flight (or the agent is typing). */
     val busy: Boolean = false,
+    /** The tool currently running, when [working]; shown on the working line. */
+    val runningToolName: String? = null,
+    /** When the current run started, for the working line's elapsed clock. */
+    val startedAtEpochMs: Long? = null,
+    /**
+     * The turn's question that waits on the person (AskUserQuestion), which the Touch canvas
+     * answers in place (letta-mobile-bglj6.1.22); null when there is none.
+     */
+    val pendingApproval: UiApprovalRequest? = null,
 ) {
     /** Something to put in the bubble; before this the mascot just thinks. */
     val hasReply: Boolean get() = text.isNotBlank() || working || needsInput
@@ -156,17 +173,26 @@ internal fun collapsedTurnOf(newestFirst: List<ChatRenderItem>, state: ChatUiSta
     val replies = messages.filterNot { it.isPrompt() }
     val text = replies.lastOrNull { it.isNarration() }
     val newestReply = replies.lastOrNull()
-    val toolRunning = newestReply?.toolCalls.orEmpty().any { it.result == null }
+    val activity = activeRunActivity(messages)
     return CollapsedTurn(
         turnKey = turn.first().key,
         text = text?.content.orEmpty(),
         isError = text?.isError == true,
         streaming = state.isStreaming && text != null && text === newestReply,
-        working = busy && (state.pendingTools.isNotEmpty() || toolRunning),
+        working = busy && turnHasLiveTool(newestReply, state),
         needsInput = state.a2uiSurfaces.isNotEmpty() || awaitsApproval(messages),
         busy = busy,
+        runningToolName = runningToolNameOf(activity, state, busy),
+        startedAtEpochMs = activity.startedAtEpochMs,
+        pendingApproval = pendingUserInputApproval(messages),
     )
 }
+
+private fun turnHasLiveTool(newestReply: UiMessage?, state: ChatUiState): Boolean =
+    state.pendingTools.isNotEmpty() || newestReply?.toolCalls.orEmpty().any { it.result == null }
+
+private fun runningToolNameOf(activity: ActiveRunActivity, state: ChatUiState, busy: Boolean): String? =
+    (activity.runningToolName ?: state.pendingTools.lastOrNull()?.name).takeIf { busy }
 
 private fun ChatRenderItem.messagesInOrder(): List<UiMessage> = when (this) {
     is ChatRenderItem.Single -> listOf(message)
@@ -305,13 +331,13 @@ private class BubbleActions(val open: () -> Unit, val dismiss: () -> Unit)
 @Composable
 private fun ReplyBubble(turn: CollapsedTurn, agentName: String, actions: BubbleActions, modifier: Modifier) {
     val restoreLabel = stringResource(Res.string.chat_surface_dock_restore)
-    val working = stringResource(Res.string.chat_surface_collapsed_working)
+    val working = if (turn.working) collapsedWorkingLabel(turn) else null
     val reply = if (agentName.isBlank()) {
         stringResource(Res.string.chat_surface_collapsed_reply_unnamed, turn.text)
     } else {
         stringResource(Res.string.chat_surface_collapsed_reply, agentName, turn.text)
     }
-    val announcement = listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working.takeIf { turn.working })
+    val announcement = listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working)
         .joinToString(" ")
     BubbleSurface(modifier.widthIn(max = ChatSurfaceDimens.collapsedBubbleMaxWidth)) {
         Box {
@@ -333,7 +359,7 @@ private fun ReplyBubble(turn: CollapsedTurn, agentName: String, actions: BubbleA
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 if (turn.text.isNotBlank()) BubbleText(turn)
-                if (turn.working) WorkingLine(working)
+                if (working != null) WorkingLine(working)
                 if (turn.needsInput) NeedsInputChip(actions.open)
             }
             IconButton(
@@ -390,14 +416,21 @@ internal fun BubbleText(
     ) {
         SharedMarkdownText(
             text = shown,
-            // Retaining the previous AST across a reshaped update can crash Compose Desktop.
-            retainState = false,
             paint = MarkdownPaint(
                 textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 textStyle = textStyle,
             ),
         )
     }
+}
+
+/** Elapsed clock plus the current phase, ticking while [turn] is working. */
+@Composable
+internal fun collapsedWorkingLabel(turn: CollapsedTurn): String {
+    val elapsed by rememberElapsedSeconds(turn.working, turn.startedAtEpochMs)
+    val phase = turn.runningToolName?.let { stringResource(Res.string.timeline_running_tool, it) }
+        ?: stringResource(Res.string.timeline_thinking)
+    return stringResource(Res.string.timeline_thinking_elapsed, formatElapsedClock(elapsed), phase)
 }
 
 /** Tool activity, summarised (the full cards are in the panel); the halo is its animation. */

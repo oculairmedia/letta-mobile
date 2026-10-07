@@ -3,7 +3,10 @@ package com.letta.mobile.feature.chat.screen.shared
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.NonRestartableComposable
@@ -11,6 +14,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,6 +31,8 @@ import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
+import com.letta.mobile.feature.chat.screen.saveAttachment
+import com.letta.mobile.feature.chat.screen.shareAttachment
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
@@ -35,13 +41,21 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
+import com.letta.mobile.ui.chat.surface.ChatImageActions
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
+import com.letta.mobile.ui.components.ChatLoadingIndicator
+import com.letta.mobile.ui.components.LocalChatLoadingIndicator
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
+import com.letta.mobile.ui.theme.LocalReducedMotion
+import kotlinx.coroutines.launch
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
 internal data class SharedChatPageParams(
@@ -115,32 +129,50 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val canvas: (@Composable (ChatCanvasActions) -> Unit)? =
         canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
     val appearance = rememberSharedChatAppearance(params)
-    Box(modifier) {
-        ChatSurface(
-            port = port,
-            presentation = presentation,
-            onIntent = onIntent,
-            host = host,
-            modifier = Modifier.fillMaxSize(),
-            appearance = appearance,
-            platform = rememberAndroidChatSurfacePlatform(
-                pageBackground = params.pageBackground,
-                onComposerHeightChange = params.onComposerHeightChange,
-                timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
-                topChromeInset = topChromeInset,
-            ),
-            pagedTimeline = params.pagingPresentation?.canonical,
-            canvas = canvas,
-            dockGeometry = dockGeometry,
-            onDockGeometryChange = { dockGeometry = it },
-        )
-        SharedChatSubagentSheet(
-            state = subagentSheet,
-            inputs = params.subagents,
-            currentConversationId = target.conversationId,
-            navigation = params.navigation,
-        )
-        ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
+    // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
+    // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
+    val platform = rememberAndroidChatSurfacePlatform(
+        pageBackground = params.pageBackground,
+        onComposerHeightChange = params.onComposerHeightChange,
+        // The rings show on the canvas too: subagent activity stays in sight in canvas mode.
+        subagentRings = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
+        topChromeInset = topChromeInset,
+    )
+    // letta-mobile-bglj6.1.16: the shared rows render markdown through the designsystem
+    // renderer the legacy chat used (highlighted code fences + copy, KaTeX, Mermaid,
+    // autolinks, editorial padding); without a provider desktop and web keep the default.
+    // letta-mobile-bglj6.1.17: the Android haptics backend behind the shared seam — the
+    // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
+    // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
+    CompositionLocalProvider(
+        LocalReducedMotion provides rememberReducedMotionEnabled(),
+        LocalChatLoadingIndicator provides ExpressiveChatLoadingIndicator,
+        LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
+        LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
+    ) {
+        Box(modifier) {
+            ChatSurface(
+                port = port,
+                presentation = presentation,
+                onIntent = onIntent,
+                host = host,
+                modifier = Modifier.fillMaxSize(),
+                appearance = appearance,
+                platform = platform,
+                pagedTimeline = params.pagingPresentation?.canonical,
+                canvas = canvas,
+                dockGeometry = dockGeometry,
+                onDockGeometryChange = { dockGeometry = it },
+            )
+            SharedChatSubagentSheet(
+                state = subagentSheet,
+                inputs = params.subagents,
+                currentConversationId = target.conversationId,
+                navigation = params.navigation,
+            )
+            SharedChatSubagentBanner(subagentSheet)
+            ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
+        }
     }
 }
 
@@ -232,18 +264,20 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(
 private fun rememberAndroidChatSurfacePlatform(
     pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)?,
     onComposerHeightChange: ((Dp) -> Unit)?,
-    timelineOverlay: @Composable () -> Unit,
+    subagentRings: @Composable () -> Unit,
     topChromeInset: Dp,
 ): ChatSurfacePlatform {
     val currentOnComposerHeight by rememberUpdatedState(onComposerHeightChange)
     val reportsComposerHeight = onComposerHeightChange != null
-    val currentOverlay by rememberUpdatedState(timelineOverlay)
+    val currentOverlay by rememberUpdatedState(subagentRings)
     // ChatScreen hands a fresh glow lambda per recomposition; forward to the latest one.
     val currentBackground by rememberUpdatedState(pageBackground)
-    val activity = LocalContext.current as? android.app.Activity
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
     val hasBackground = pageBackground != null
-    return remember(isHiltHost, hasBackground, reportsComposerHeight, topChromeInset) {
+    val imageActions = rememberAndroidImageActions(context)
+    return remember(isHiltHost, hasBackground, reportsComposerHeight, topChromeInset, imageActions) {
         ChatSurfacePlatform(
             voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
             pageBackground = if (hasBackground) {
@@ -255,11 +289,28 @@ private fun rememberAndroidChatSurfacePlatform(
             showKeyboardHints = false,
             topChromeInset = topChromeInset,
             timelineOverlay = { currentOverlay() },
+            canvasOverlay = { currentOverlay() },
             onComposerHeightChange = if (reportsComposerHeight) {
                 { height -> currentOnComposerHeight?.invoke(height) }
             } else {
                 null
             },
+            imageActions = imageActions,
+        )
+    }
+}
+
+/**
+ * letta-mobile-bglj6.1.23: the shared image viewer's Save and Share, as the legacy viewer did
+ * them (MediaStore under Pictures/Letta; the share sheet through the chat-image FileProvider).
+ */
+@Composable
+private fun rememberAndroidImageActions(context: android.content.Context): ChatImageActions {
+    val scope = rememberCoroutineScope()
+    return remember(context, scope) {
+        ChatImageActions(
+            save = { image -> scope.launch { saveAttachment(context, image) } },
+            share = { image -> scope.launch { shareAttachment(context, image) } },
         )
     }
 }
@@ -276,6 +327,20 @@ private fun DictationButton(onDictated: (String) -> Unit) {
         onStop = voice::stopSpeechRecognition,
         onCancel = voice::cancelSpeechRecognition,
     )
+}
+
+/**
+ * letta-mobile-bglj6.1.19: the expressive Material 3 LoadingIndicator the legacy reasoning header
+ * shows, for the shared rows (Compose Multiplatform's material3 does not expose it). Still under
+ * reduced motion: determinate at rest, so the shape never morphs.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val ExpressiveChatLoadingIndicator = ChatLoadingIndicator { color, still, modifier ->
+    if (still) {
+        LoadingIndicator(progress = { 0f }, modifier = modifier, color = color)
+    } else {
+        LoadingIndicator(modifier = modifier, color = color)
+    }
 }
 
 /** Only the mode survives process death; floating stays disabled until in-app floating ships. */

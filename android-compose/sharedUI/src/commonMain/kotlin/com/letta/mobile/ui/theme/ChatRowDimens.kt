@@ -47,6 +47,9 @@ object ChatRowDimens {
     const val promptGridMaxImages: Int = 3
     val promptGridCellHeight: Dp = 120.dp
 
+    /** A phone's tool row header: the legacy CollapsibleStatusRow's 48dp touch target (bglj6.1.23). */
+    val toolHeaderMinHeight: Dp = 48.dp
+
     /** How long the copy affordance shows its "copied" check, in ms. */
     const val copiedFeedbackMillis: Long = 1200L
 }

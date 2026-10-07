@@ -1,12 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -64,9 +58,13 @@ import com.letta.mobile.sharedui.resources.rows_tool_run_show
 import com.letta.mobile.sharedui.resources.rows_tool_run_state
 import com.letta.mobile.sharedui.resources.rows_tool_run_summary
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
@@ -108,6 +106,7 @@ internal fun ToolRunGroup(
     val inline = context.toolDetails == ChatToolDetails.Inline
     val summary = remember(toolCalls, approvals) { summarizeToolRun(toolCalls, approvals) }
     val startedAtEpochMs = remember(calls.startedAtTimestamp) { calls.startedAtTimestamp?.let(::parseTimestampEpochMillis) }
+    val haptics = LocalHaptics.current
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
@@ -117,7 +116,10 @@ internal fun ToolRunGroup(
             ToolRunSummaryRow(
                 line = ToolRunLine(summary, startedAtEpochMs),
                 disclosure = toolRunDisclosure(inline, detailsOpen),
-                onClick = { detailsOpen = if (inline) !detailsOpen else true },
+                onClick = {
+                    haptics.play(LettaHapticCue.SegmentTick)
+                    detailsOpen = if (inline) !detailsOpen else true
+                },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -156,8 +158,8 @@ private fun ColumnScope.ToolRunInlineCards(
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
         visible = visible,
-        enter = if (reducedMotion) EnterTransition.None else fadeIn() + expandVertically(),
-        exit = if (reducedMotion) ExitTransition.None else fadeOut() + shrinkVertically(),
+        enter = ChatRowMotion(reducedMotion).expansionEnter(),
+        exit = ChatRowMotion(reducedMotion).expansionExit(),
     ) {
         ToolRunCards(
             toolCalls = toolCalls,
@@ -330,10 +332,12 @@ private fun ToolRunDetailsSheet(
 /** Each call as a full [ToolCard], led by its step status: the sheet's body, or the inline disclosure's. */
 @Composable
 private fun ToolRunCards(toolCalls: ImmutableList<UiToolCall>, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier) {
+    // On a phone each row carries its own status glyph (letta-mobile-bglj6.1.23): no leading step circle.
+    val stepCircles = !touchStyle()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         toolCalls.forEachIndexed { index, call ->
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                Box(modifier = Modifier.padding(top = LettaDimens.Space.sm)) { StepStatusCircle(call.stepState()) }
+                if (stepCircles) Box(modifier = Modifier.padding(top = LettaDimens.Space.sm)) { StepStatusCircle(call.stepState()) }
                 Box(modifier = Modifier.weight(1f)) {
                     ToolCard(call, call.disclosureKey().ifBlank { "sheet:$index" }, callbacks)
                 }

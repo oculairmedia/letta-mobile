@@ -27,6 +27,12 @@ data class ChatComposerUiState(
     val error: String? = null,
     /** The owner will accept a send right now (connection, run and payload permitting). */
     val canSend: Boolean = false,
+    /**
+     * The owner takes input at all right now (connected, not mid-submit). False greys the prompt
+     * field and keeps it from taking focus, as the legacy composer's `canSendMessages` did; it is
+     * independent of the payload, unlike [canSend] for some owners.
+     */
+    val acceptsInput: Boolean = true,
     /** A send during an active run is queued rather than refused. */
     val canQueueWhileStreaming: Boolean = false,
     /** Overrides the default placeholder; null uses the shared resource string. */

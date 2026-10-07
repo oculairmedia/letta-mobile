@@ -37,7 +37,9 @@ internal fun rememberStableHost(host: ChatSurfaceHost): ChatSurfaceHost {
 @Composable
 internal fun rememberStablePlatform(platform: ChatSurfacePlatform): ChatSurfacePlatform {
     val current = rememberUpdatedState(platform)
-    return remember(platform.slotShape(), platform.showKeyboardHints, platform.topChromeInset) { forwardingPlatform(current) }
+    return remember(platform.slotShape(), platform.showKeyboardHints, platform.topChromeInset, platform.imageActions) {
+        forwardingPlatform(current)
+    }
 }
 
 /** Which of [ChatSurfaceHost]'s members are set, as a bit mask. */
@@ -52,7 +54,7 @@ internal fun ChatSurfaceHost.affordanceShape(): Int {
 }
 
 private fun ChatSurfacePlatform.slotShape(): Int {
-    return presenceMask(listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange))
+    return presenceMask(listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange, canvasOverlay))
 }
 
 /** Bit i set when [members]`[i]` is non-null. */
@@ -108,7 +110,10 @@ private fun forwardingPlatform(current: State<ChatSurfacePlatform>): ChatSurface
         },
         showKeyboardHints = platform.showKeyboardHints,
         topChromeInset = platform.topChromeInset,
+        // A stable holder the host remembers: passed through, a new one re-keys the platform.
+        imageActions = platform.imageActions,
         timelineOverlay = if (platform.timelineOverlay == null) null else { @Composable { current.value.timelineOverlay?.invoke() } },
+        canvasOverlay = if (platform.canvasOverlay == null) null else { @Composable { current.value.canvasOverlay?.invoke() } },
         onComposerHeightChange = if (platform.onComposerHeightChange == null) {
             null
         } else {

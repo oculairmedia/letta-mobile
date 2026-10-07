@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -14,7 +13,8 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import kotlin.math.abs
 
@@ -37,12 +37,12 @@ internal fun Modifier.swipeUpToCanvas(
     onTrigger: () -> Unit,
 ): Modifier = composed {
     if (!enabled) return@composed this
-    val haptic = LocalHapticFeedback.current
+    val haptics = LocalHaptics.current
     // Keyed on Unit: a fresh lambda must not restart the detector and drop an in-flight drag.
     val currentOnTrigger by rememberUpdatedState(onTrigger)
     pointerInput(Unit) {
         runSwipeUpGesture(
-            onThresholdCrossed = { haptic.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate) },
+            onThresholdCrossed = { haptics.play(LettaHapticCue.GestureThreshold) },
             onTrigger = { currentOnTrigger() },
         )
     }

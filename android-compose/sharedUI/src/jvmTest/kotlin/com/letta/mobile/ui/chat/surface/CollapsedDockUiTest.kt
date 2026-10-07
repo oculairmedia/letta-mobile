@@ -174,7 +174,7 @@ class CollapsedDockUiTest {
             )
         }
         settle()
-        onNodeWithTag(DOCK_COLLAPSED_BUBBLE_TAG).assertContentDescriptionContains("Working", substring = true)
+        onNodeWithTag(DOCK_COLLAPSED_BUBBLE_TAG).assertContentDescriptionContains("Running measure", substring = true)
     }
 
     @Test

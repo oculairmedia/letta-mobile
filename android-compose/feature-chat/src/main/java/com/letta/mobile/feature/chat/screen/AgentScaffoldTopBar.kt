@@ -1,23 +1,25 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,87 +28,153 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.chat.AgentIdentity
+import com.letta.mobile.ui.chat.AgentIdentityPill
+import com.letta.mobile.ui.chat.AgentPillSurface
 import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.haptics.HapticEffects
-import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.mascot.AgentAvatar
-import com.letta.mobile.ui.mascot.mascotAtWork
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.launch
-import com.letta.mobile.ui.theme.LettaDimens
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+/**
+ * The chat screen's top chrome: the header (agent pill and menu) or, while the shared page's phone
+ * canvas mode keeps the board's top clear (letta-mobile-bglj6.1), the agent pill alone in the same
+ * spot (letta-mobile-bglj6.1.22). Both draw the one [AgentIdentityPill].
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
+internal fun AgentScaffoldTopChrome(state: AgentScaffoldRuntimeState, headerHidden: Boolean) {
     val params = state.params
     val searchUi = params.searchUi
     val showSearchField = searchUi.isChatSearchExpanded || state.uiState.isSearchActive
-
-    TopAppBar(
-        title = {
-            androidx.compose.material3.Surface(
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
-                color = Color.Black,
-                contentColor = Color.White,
-            ) {
-                androidx.compose.foundation.layout.Box(Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)) {
-            if (showSearchField) {
+    AgentScaffoldTopChromeLayout(
+        headerHidden = headerHidden,
+        identity = AgentIdentity(
+            agentId = state.agentIdValue,
+            name = state.agentName.ifBlank { state.screenTitle },
+            isFavorite = state.currentAgentIsFavorite,
+            isPinned = state.currentAgentIsPinned,
+            onClick = {
+                HapticEffects.contextClick(state.haptic, state.view)
+                params.viewModel.refreshAvailableAgents()
+                params.sheetVisibility.onShowAgentSwitcherChange(true)
+            },
+            onLongClick = {
+                HapticEffects.longPress(state.haptic)
+                params.viewModel.toggleCurrentAgentPinned()
+            },
+        ),
+        searchField = if (showSearchField) {
+            {
                 AgentScaffoldSearchTopBarTitle(
                     searchQuery = state.uiState.searchQuery,
                     onSearchQueryChange = params.viewModel::updateChatSearchQuery,
                     onClearSearch = params.viewModel::clearChatSearch,
                     chatSearchFocusRequester = searchUi.chatSearchFocusRequester,
                 )
-            } else {
-                AgentScaffoldAgentTopBarTitle(
-                    params = AgentScaffoldAgentTopBarTitleParams(
-                        agentId = state.agentIdValue,
-                        agentName = state.agentName,
-                        screenTitle = state.screenTitle,
-                        currentAgentIsFavorite = state.currentAgentIsFavorite,
-                        currentAgentIsPinned = state.currentAgentIsPinned,
-                        onAgentTitleClick = {
-                            HapticEffects.contextClick(state.haptic, state.view)
-                            params.viewModel.refreshAvailableAgents()
-                            params.sheetVisibility.onShowAgentSwitcherChange(true)
-                        },
-                        onAgentTitleLongClick = {
-                            HapticEffects.longPress(state.haptic)
-                            params.viewModel.toggleCurrentAgentPinned()
-                        },
-                    ),
-                )
             }
+        } else {
+            null
+        },
+        onMenuClick = {
+            HapticEffects.contextClick(state.haptic, state.view)
+            // letta-mobile-0ofhc: the composer's context chip loads from the streamed
+            // reading on its own; opening the drawer is no longer what feeds it.
+            state.scope.launch {
+                state.drawerState.open()
+                runCatching {
+                    state.drawerConversationRepo.refreshConversations(params.viewModel.agentId)
                 }
             }
         },
-        modifier = Modifier.padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }),
+        scrollBehavior = state.scrollBehavior,
+    )
+}
+
+/** [AgentScaffoldTopChrome] without the runtime state, so tests can draw both of its modes. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AgentScaffoldTopChromeLayout(
+    headerHidden: Boolean,
+    identity: AgentIdentity,
+    searchField: (@Composable () -> Unit)?,
+    onMenuClick: () -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior?,
+) {
+    val reducedMotion = LocalReducedMotion.current
+    Box {
+        AnimatedVisibility(
+            visible = !headerHidden,
+            enter = if (reducedMotion) EnterTransition.None else fadeIn(),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut(),
+        ) {
+            AgentScaffoldHeader(identity, searchField, onMenuClick, scrollBehavior)
+        }
+        AnimatedVisibility(
+            visible = headerHidden,
+            enter = if (reducedMotion) EnterTransition.None else fadeIn(),
+            exit = if (reducedMotion) ExitTransition.None else fadeOut(),
+        ) {
+            AgentScaffoldCanvasIdentityPill(identity)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AgentScaffoldHeader(
+    identity: AgentIdentity,
+    searchField: (@Composable () -> Unit)?,
+    onMenuClick: () -> Unit,
+    scrollBehavior: TopAppBarScrollBehavior?,
+) {
+    TopAppBar(
+        title = {
+            if (searchField != null) AgentPillSurface { searchField() } else AgentIdentityPill(identity)
+        },
+        modifier = Modifier
+            .padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() })
+            .testTag(AgentScaffoldTestTags.HEADER),
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.Transparent,
             scrolledContainerColor = Color.Transparent,
         ),
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
-        scrollBehavior = state.scrollBehavior,
-        actions = {
-            AgentScaffoldTopBarActions(
-                onMenuClick = {
-                    HapticEffects.contextClick(state.haptic, state.view)
-                    // letta-mobile-0ofhc: the composer's context chip loads from the streamed
-                    // reading on its own; opening the drawer is no longer what feeds it.
-                    state.scope.launch {
-                        state.drawerState.open()
-                        runCatching {
-                            state.drawerConversationRepo.refreshConversations(params.viewModel.agentId)
-                        }
-                    }
-                },
-            )
-        },
+        scrollBehavior = scrollBehavior,
+        actions = { AgentScaffoldTopBarActions(onMenuClick = onMenuClick) },
     )
 }
+
+/**
+ * letta-mobile-bglj6.1.22: the agent at a glance while the phone canvas mode hides the header -
+ * the header's own pill, alone where the header drew it: the same top inset, the app bar's height
+ * and its title inset, so switching modes leaves the pill in place. Only the pill takes touches;
+ * the rest of the board's top stays clear. The menu stays in the board's menu.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AgentScaffoldCanvasIdentityPill(identity: AgentIdentity) {
+    Box(
+        Modifier
+            .padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() })
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+            .height(TopAppBarDefaults.TopAppBarExpandedHeight)
+            .padding(start = AppBarTitleInset)
+            .testTag(AgentScaffoldTestTags.CANVAS_IDENTITY_PILL),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        AgentIdentityPill(identity)
+    }
+}
+
+/**
+ * Where Material's small app bar starts its title when it has no navigation icon (16dp in the
+ * current Material 3; AgentScaffoldTopChromeUiTest pins the two placements together).
+ */
+private val AppBarTitleInset = 16.dp
 
 @Composable
 private fun AgentScaffoldSearchTopBarTitle(
@@ -128,73 +196,6 @@ private fun AgentScaffoldSearchTopBarTitle(
             .testTag(AgentScaffoldTestTags.CHAT_SEARCH_FIELD),
     )
 }
-
-internal data class AgentScaffoldAgentTopBarTitleParams(
-    val agentId: String,
-    val agentName: String,
-    val screenTitle: String,
-    val currentAgentIsFavorite: Boolean,
-    val currentAgentIsPinned: Boolean,
-    val onAgentTitleClick: () -> Unit,
-    val onAgentTitleLongClick: () -> Unit,
-)
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleParams) {
-    Row(
-        modifier = Modifier
-            .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
-            .combinedClickable(
-                onClick = params.onAgentTitleClick,
-                onLongClick = params.onAgentTitleLongClick,
-            )
-            .padding(end = LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        // The agent's avatar as a chip before its name (letta-mobile-8jtf3). Alive while the agent
-        // is idle; the moment a run starts it turns into a still and the composer companion carries
-        // the motion - one moving character per screen.
-        AgentAvatar(
-            agentId = params.agentId,
-            name = params.agentName.ifBlank { params.screenTitle },
-            size = TopBarMascotSize,
-            modifier = Modifier.padding(end = LettaDimens.Space.xs),
-            live = !mascotAtWork(params.agentId),
-        )
-        Text(
-            text = params.agentName.ifBlank { params.screenTitle },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        if (params.currentAgentIsFavorite) {
-            Icon(
-                LettaIcons.Star,
-                contentDescription = "Favorite agent",
-                modifier = Modifier.size(LettaIconSizing.Inline),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        if (params.currentAgentIsPinned) {
-            Icon(
-                LettaIcons.Pin,
-                contentDescription = "Pinned agent",
-                modifier = Modifier.size(LettaIconSizing.Inline),
-                tint = MaterialTheme.colorScheme.tertiary,
-            )
-        }
-        Icon(
-            LettaIcons.ArrowDropDown,
-            contentDescription = "Switch agent",
-            modifier = Modifier.size(LettaIconSizing.Inline),
-            tint = Color.White,
-        )
-    }
-}
-
-private val TopBarMascotSize = LettaDimens.Space.xxl
 
 @Composable
 private fun AgentScaffoldTopBarActions(

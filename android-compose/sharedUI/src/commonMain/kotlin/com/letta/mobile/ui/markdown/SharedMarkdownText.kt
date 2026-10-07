@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -22,20 +23,49 @@ import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.parser.MarkdownParser
 
 /**
+ * A host-supplied markdown renderer for the shared chat page (letta-mobile-bglj6.1.16).
+ *
+ * The default shared renderer is the stock library paint. A host that owns a richer renderer —
+ * Android binds the designsystem one the legacy chat used, with syntax-highlighted code fences
+ * carrying a language header and copy button, KaTeX math, Mermaid diagrams, autolinked bare URLs
+ * and the editorial block padding — provides it here and the shared rows render through it
+ * instead. Desktop and web keep the default. [isStreaming] marks a message whose text is still
+ * landing; a rich renderer may own the reveal pacing, cursor and settle animation itself.
+ */
+fun interface SharedRichMarkdownRenderer {
+    @Composable
+    fun Render(text: String, paint: MarkdownPaint, isStreaming: Boolean, modifier: Modifier)
+}
+
+val LocalSharedRichMarkdownRenderer = staticCompositionLocalOf<SharedRichMarkdownRenderer?> { null }
+
+/**
  * Common Android/Desktop Markdown paint adapter.
  *
  * Mobile keeps its mature extended renderer for math, Mermaid, images, and
  * accessibility while both platforms consume the extracted semantic document
  * model. Desktop uses this common renderer directly instead of raw Compose Text.
+ *
+ * Retained parser state (the previous AST kept visible while an update parses) is
+ * derived here: a settled row keeps it — the no-flicker path across recompositions —
+ * while a streaming row does not, because at paint cadence a retained-but-reshaped
+ * block can pair stale annotation offsets with new content and crash selectable
+ * desktop text. The retention key rebuilds the renderer on any non-prefix change,
+ * so a settled row whose text is later reconciled resets instead of retaining.
  */
 @Composable
 fun SharedMarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
-    retainState: Boolean = true,
+    isStreaming: Boolean = false,
 ) {
-    SharedMarkdownText(text = text, paint = MarkdownPaint(textColor), modifier = modifier, retainState = retainState)
+    SharedMarkdownText(
+        text = text,
+        paint = MarkdownPaint(textColor),
+        modifier = modifier,
+        isStreaming = isStreaming,
+    )
 }
 
 /** How a markdown body paints: its text colour, and its body type. */
@@ -55,22 +85,26 @@ fun SharedMarkdownText(
     text: String,
     paint: MarkdownPaint,
     modifier: Modifier = Modifier,
-    retainState: Boolean = true,
+    isStreaming: Boolean = false,
 ) {
     if (text.isBlank()) return
+    val rich = LocalSharedRichMarkdownRenderer.current
+    if (rich != null) {
+        rich.Render(text = text, paint = paint, isStreaming = isStreaming, modifier = modifier)
+        return
+    }
     val repaired = remember(text) { repairIncompleteMarkdownForStreaming(text) }
     val retentionTracker = remember { MarkdownRetentionTracker() }
     val retentionKey = retentionTracker.update(text)
     val components = rememberSharedMarkdownComponents(text)
-    // The renderer's retained state intentionally paints the previous AST while
-    // parsing an update. That is safe for append-only streaming, but a final
-    // reconciliation can shorten or replace the text. In that case old AST
-    // offsets may exceed the new content length and crash selectable desktop
-    // text in ParagraphBuilder. Reset only on non-prefix changes so ordinary
-    // streaming keeps the no-flicker retained-state path.
+    // Retained state paints the previous AST while parsing an update: the no-flicker path for a
+    // row that keeps growing. A streaming row instead re-parses per update, where a retained
+    // reshaped block could pair stale annotation offsets with new content; and the retention
+    // key below rebuilds the renderer on any non-prefix change, so a settled row whose text is
+    // reconciled (shortened or replaced) resets instead of retaining stale offsets.
     key(retentionKey) {
         Markdown(
-            markdownState = rememberSharedMarkdownState(repaired, retainState),
+            markdownState = rememberSharedMarkdownState(repaired, retainState = !isStreaming),
             modifier = modifier.fillMaxWidth(),
             components = components,
             colors = sharedMarkdownColors(paint.textColor),

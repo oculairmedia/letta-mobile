@@ -15,27 +15,28 @@ class ToolDisplayRegistry {
         INSTANCE = this
     }
 
+    // The emoji come from the shared table (ToolEmojis), so the shared rows read the same.
     private val registry = mapOf(
-        "web_search" to ToolDisplayInfo("🔍", "Searching the web"),
-        "archival_memory_search" to ToolDisplayInfo("🧠", "Searching memory"),
-        "archival_memory_insert" to ToolDisplayInfo("💾", "Saving to memory"),
-        "conversation_search" to ToolDisplayInfo("💬", "Searching conversations"),
-        "memory" to ToolDisplayInfo("🧠", "Updating memory"),
-        "memory_replace" to ToolDisplayInfo("✏️", "Editing memory"),
-        "memory_insert" to ToolDisplayInfo("📝", "Adding to memory"),
-        "memory_apply_patch" to ToolDisplayInfo("🩹", "Patching memory"),
-        "send_message" to ToolDisplayInfo("📤", "Sending message"),
-        "find_tools" to ToolDisplayInfo("🔧", "Discovering tools"),
-        "Read" to ToolDisplayInfo("📖", "Reading file"),
-        "Write" to ToolDisplayInfo("✍️", "Writing file"),
-        "Edit" to ToolDisplayInfo("✏️", "Editing file"),
-        "Bash" to ToolDisplayInfo("⚡", "Running command"),
-        "BashOutput" to ToolDisplayInfo("⚡", "Running command"),
-        "exec_command" to ToolDisplayInfo("⚡", "Running command"),
-        "functions.exec_command" to ToolDisplayInfo("⚡", "Running command"),
-        "Grep" to ToolDisplayInfo("🔍", "Searching files"),
-        "Glob" to ToolDisplayInfo("📁", "Finding files"),
-    )
+        "web_search" to "Searching the web",
+        "archival_memory_search" to "Searching memory",
+        "archival_memory_insert" to "Saving to memory",
+        "conversation_search" to "Searching conversations",
+        "memory" to "Updating memory",
+        "memory_replace" to "Editing memory",
+        "memory_insert" to "Adding to memory",
+        "memory_apply_patch" to "Patching memory",
+        "send_message" to "Sending message",
+        "find_tools" to "Discovering tools",
+        "Read" to "Reading file",
+        "Write" to "Writing file",
+        "Edit" to "Editing file",
+        "Bash" to "Running command",
+        "BashOutput" to "Running command",
+        "exec_command" to "Running command",
+        "functions.exec_command" to "Running command",
+        "Grep" to "Searching files",
+        "Glob" to "Finding files",
+    ).mapValues { (tool, label) -> ToolDisplayInfo(ToolEmojis.forTool(tool), label) }
 
     fun resolve(toolName: String, args: String? = null): ToolDisplayInfo {
         val known = registry[toolName]
@@ -48,7 +49,7 @@ class ToolDisplayRegistry {
         }
         // Unknown tool — show first 60 chars of args as detail
         val detail = args?.take(60)?.let { if ((args.length) > 60) "$it…" else it }
-        return ToolDisplayInfo("🔧", toolName, detailLine = detail)
+        return ToolDisplayInfo(ToolEmojis.DEFAULT, toolName, detailLine = detail)
     }
 
     private fun extractDetail(toolName: String, args: String?): String? {

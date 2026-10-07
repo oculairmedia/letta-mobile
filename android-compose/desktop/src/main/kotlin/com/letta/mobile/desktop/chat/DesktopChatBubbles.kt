@@ -632,8 +632,10 @@ internal fun AgentText(params: AgentTextParams) {
     // full text directly. The smoother continues revealing the buffered tail at
     // its own cadence even after [isStreaming] flips back to false, so the reply
     // still finishes smoothly once the in-flight signal clears.
+    // letta-mobile-bglj6.1.18: seeded with the already-painted text, so a stream
+    // engaging on visible content keeps it instead of re-revealing it.
     val displayText = if (params.isStreaming) {
-        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true)
+        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true, seedText = params.text)
     } else {
         params.text
     }
@@ -648,15 +650,15 @@ internal fun AgentText(params: AgentTextParams) {
             com.letta.mobile.ui.markdown.SharedMarkdownText(
                 text = displayText,
                 modifier = Modifier.padding(end = LettaDimens.Space.xxl),
-                // Retaining the previous markdown AST while parsing an update
-                // can pair stale annotation offsets with a newly reshaped block.
-                // Selectable Compose Desktop text then crashes in ParagraphBuilder.
-                retainState = false,
                 textColor = if (params.isError) {
                     MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
+                // Retention is derived inside: not while the stream lands (a retained
+                // reshaped block can pair stale annotation offsets and crash selectable
+                // Compose Desktop text), kept for the settled row across recompositions.
+                isStreaming = params.isStreaming,
             )
         }
         Surface(

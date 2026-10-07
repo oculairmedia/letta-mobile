@@ -29,8 +29,15 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.getBoundsInRoot
 import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,6 +47,9 @@ import kotlin.test.assertTrue
 class ChatTimelineUiTest {
 
     private val ready = ChatUiState(conversationState = ConversationState.Ready("c1"), isLoadingMessages = false)
+
+    /** Half the 640 dp test viewport. */
+    private val halfViewportDp = 320f
 
     private fun conversation(count: Int): List<UiMessage> = (0 until count).map { i ->
         UiMessage(
@@ -167,6 +177,34 @@ class ChatTimelineUiTest {
         onNodeWithTag(ChatTimelineTags.GOAL).assertExists()
         onNodeWithText("Pause").performClick()
         assertEquals(listOf(GoalCommands.PAUSE), actions.sent)
+    }
+
+    /** letta-mobile-bglj6.1.22: thumb reach on Touch, as the legacy composer column; the top on a pointer host. */
+    @Test
+    fun goalCardSitsAtTheBottomOnTouchAndTheTopOtherwise() = runComposeUiTest {
+        val goal = GoalStatusUi(objective = "Ship the shared page", status = "active", tokensUsed = 10)
+        var style by mutableStateOf(ChatPlatformStyle.Touch)
+        setContent {
+            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+                MaterialTheme {
+                    Box(Modifier.size(width = 420.dp, height = 640.dp)) {
+                        ChatTimeline(
+                            state = ready.copy(messages = conversation(2).toPersistentList(), goalStatus = goal),
+                            pagedTimeline = null,
+                            actions = RecordingChatActions(),
+                            capabilities = ChatSurfaceCapabilities.Default,
+                            host = ChatSurfaceHost(),
+                            appearance = ChatSurfaceAppearance(),
+                        )
+                    }
+                }
+            }
+        }
+        val touch = onNodeWithTag(ChatTimelineTags.GOAL).getBoundsInRoot()
+        assertTrue(touch.bottom.value > halfViewportDp, "the goal card is not at the bottom on Touch: $touch")
+        runOnIdle { style = ChatPlatformStyle.Pointer }
+        val pointer = onNodeWithTag(ChatTimelineTags.GOAL).getBoundsInRoot()
+        assertTrue(pointer.top.value < halfViewportDp, "the goal card is not at the top on a pointer host: $pointer")
     }
 
     @Test

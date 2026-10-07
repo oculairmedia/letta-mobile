@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,10 +37,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.ArrowUpRight
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Terminal
+import com.letta.mobile.data.chat.projection.ToolTimelineState
+import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.projection.extractSubagentNotification
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.AgentMessageProvenance
@@ -54,13 +60,22 @@ import com.letta.mobile.sharedui.resources.rows_state_collapsed
 import com.letta.mobile.sharedui.resources.rows_state_expanded
 import com.letta.mobile.sharedui.resources.rows_tool_argument_line
 import com.letta.mobile.sharedui.resources.rows_tool_done
+import com.letta.mobile.sharedui.resources.rows_tool_executing
 import com.letta.mobile.sharedui.resources.rows_tool_output
 import com.letta.mobile.sharedui.resources.rows_tool_result_preview
 import com.letta.mobile.sharedui.resources.rows_tool_status_duration
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
+import com.letta.mobile.ui.chat.render.ToolEmojis
 import com.letta.mobile.ui.chat.session.ChatMessageId
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.theme.ChatRowDimens
+import com.letta.mobile.ui.theme.ChatRowMotion
+import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.stringResource
 
@@ -90,13 +105,32 @@ internal fun ToolCard(
     var expanded by remember(disclosureKey) { mutableStateOf(toolCall.shouldInitiallyExpand()) }
     RequestFullResultOnExpand(toolCall, expanded, callbacks)
     val isError = toolCall.isErrorStatus()
+    val haptics = LocalHaptics.current
+    val toggle = {
+        haptics.play(LettaHapticCue.SegmentTick)
+        expanded = !expanded
+    }
+    val reducedMotion = LocalReducedMotion.current
+    // letta-mobile-bglj6.1.23: the phone draws the legacy status row (emoji, status glyph, 48dp
+    // header, outcome row); its glyph marks a failure, so the row needs no outlined card.
+    val touch = touchStyle()
+    val view = ToolCardView(toolCall, remember(toolCall) { classifyToolCallState(toolCall) }, touch)
     val body: @Composable () -> Unit = {
         Column {
-            ToolCardHeader(toolCall, expanded, callbacks) { expanded = !expanded }
-            if (expanded) ToolCardBody(toolCall, isError, callbacks)
+            ToolCardHeader(view, ToolDisclosure(expanded) { toggle() }, callbacks)
+            // letta-mobile-bglj6.1.19: the body unfurls from the leading edge (legacy
+            // ChatToolCallCards / LettaMotion.unfurlEnter, 190 ms in, 130 ms out).
+            AnimatedVisibility(
+                visible = expanded,
+                enter = ChatRowMotion(reducedMotion).unfurlEnter(),
+                exit = ChatRowMotion(reducedMotion).unfurlExit(),
+                label = "toolCardBody",
+            ) {
+                ToolCardBody(view, isError, callbacks)
+            }
         }
     }
-    if (isError) {
+    if (isError && !touch) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(LettaDimens.Radius.sm),
@@ -118,18 +152,83 @@ private fun RequestFullResultOnExpand(toolCall: UiToolCall, expanded: Boolean, c
     }
 }
 
+/** One tool call as a card draws it: the call, its classified state, and whether the host is a phone. */
+@Immutable
+private class ToolCardView(val toolCall: UiToolCall, val state: ToolTimelineState, val touch: Boolean) {
+    /** A phone heads a settled call's output with its outcome row instead of "Output". */
+    val headsOutputWithOutcome: Boolean
+        get() = touch && state !in UnsettledStates
+}
+
+private val UnsettledStates = setOf(ToolTimelineState.Running, ToolTimelineState.AwaitingApproval)
+
 @Composable
 private fun ToolCardHeader(
-    toolCall: UiToolCall,
-    expanded: Boolean,
+    view: ToolCardView,
+    disclosure: ToolDisclosure,
     callbacks: ChatRowCallbacks,
-    onToggle: () -> Unit,
 ) {
-    val provenance = toolCall.agentMessageProvenance
-    if (provenance != null) {
-        ToolCardProvenanceHeader(provenance, expanded, callbacks, onToggle)
-    } else {
-        ToolCardGenericHeader(toolCall, expanded, onToggle)
+    val provenance = view.toolCall.agentMessageProvenance
+    when {
+        provenance != null -> ToolCardProvenanceHeader(provenance, disclosure.expanded, callbacks, disclosure.onToggle)
+        view.touch -> ToolCardTouchHeader(view, disclosure)
+        else -> ToolCardGenericHeader(view.toolCall, disclosure.expanded, disclosure.onToggle)
+    }
+}
+
+/** A card's disclosure: whether it is open, and how to flip it. */
+@Immutable
+private class ToolDisclosure(val expanded: Boolean, val onToggle: () -> Unit)
+
+/**
+ * letta-mobile-bglj6.1.23: the legacy status row (CollapsibleStatusRow + ChatToolCallCards'
+ * collapsed line): a 48dp header with the tool's emoji, its name in the section title, the
+ * call's gist while closed, its status (duration, "Failed", ...) right-aligned while open, and
+ * the status glyph: turning while it runs, then a check, a warning or an error.
+ */
+@Composable
+private fun ToolCardTouchHeader(view: ToolCardView, disclosure: ToolDisclosure) {
+    val toolCall = view.toolCall
+    val expanded = disclosure.expanded
+    val label = remember(toolCall) { toolCall.stepLabel() }
+    val labelText = label.text()
+    val collapsedSummary = labelText.takeUnless { it == toolCall.name } ?: toolCall.stepSummary()
+    val disclosureState = stringResource(if (expanded) Res.string.rows_state_expanded else Res.string.rows_state_collapsed)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
+            .clickable(onClick = disclosure.onToggle, role = Role.Button)
+            .semantics { stateDescription = disclosureState }
+            .heightIn(min = ChatRowDimens.toolHeaderMinHeight)
+            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        Text(
+            text = ToolEmojis.forTool(toolCall.name),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.testTag(ChatRowTestTags.TOOL_EMOJI),
+        )
+        Text(
+            text = toolCall.name,
+            style = ChatRowType.sectionTitle,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val trailing = if (expanded) toolStatusLabel(view.state, toolCall.executionTimeMs) else collapsedSummary.takeIf { it.isNotBlank() }
+        Text(
+            text = trailing.orEmpty(),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (expanded) toolStatusColor(view.state) else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = if (expanded) TextAlign.End else TextAlign.Start,
+            modifier = Modifier.weight(1f),
+        )
+        ToolStatusGlyph(view.state)
+        ToolDisclosureIcon(expanded)
     }
 }
 
@@ -252,7 +351,8 @@ private fun ToolCardGenericHeader(
 }
 
 @Composable
-private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean, callbacks: ChatRowCallbacks) {
+private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRowCallbacks) {
+    val toolCall = view.toolCall
     val provenance = toolCall.agentMessageProvenance
     Column(
         modifier = Modifier
@@ -272,15 +372,23 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean, callbacks: Chat
                 if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
             )
         }
+        if (view.touch && view.state == ToolTimelineState.Running) {
+            LiveStatusText(
+                text = stringResource(Res.string.rows_tool_executing, toolCall.name),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag(ChatRowTestTags.TOOL_EXECUTING),
+            )
+        }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { ToolArgumentLine(it) }
-        toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolResultSection(toolCall, it, isError, callbacks) }
+        toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolResultSection(view, it, isError, callbacks) }
         ToolGeneratedImages(toolCall, callbacks)
         ToolExecutionFooter(toolCall)
     }
 }
 
+/** A call's primary argument, monospace ("> echo hello"); also the Touch approval card's body. */
 @Composable
-private fun ToolArgumentLine(arguments: String) {
+internal fun ToolArgumentLine(arguments: String) {
     val primary = remember(arguments) { primaryToolArgument(arguments) }
     SelectionContainer {
         Text(
@@ -292,18 +400,24 @@ private fun ToolArgumentLine(arguments: String) {
 }
 
 @Composable
-private fun ToolResultSection(toolCall: UiToolCall, result: String, isError: Boolean, callbacks: ChatRowCallbacks) {
+private fun ToolResultSection(view: ToolCardView, result: String, isError: Boolean, callbacks: ChatRowCallbacks) {
+    val toolCall = view.toolCall
     val hoverSource = remember { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
     Row(
         modifier = Modifier.fillMaxWidth().hoverable(hoverSource),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = stringResource(Res.string.rows_tool_output),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // The phone heads the output with its outcome (legacy ProjectedToolOutcomeLabel).
+        if (view.headsOutputWithOutcome) {
+            ToolOutcomeLabel(view.state)
+        } else {
+            Text(
+                text = stringResource(Res.string.rows_tool_output),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.weight(1f))
         CopyIconButton(
             CopyAction(
