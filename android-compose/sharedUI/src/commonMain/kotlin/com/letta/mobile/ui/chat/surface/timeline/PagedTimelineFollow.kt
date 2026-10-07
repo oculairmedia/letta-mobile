@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
 
@@ -48,7 +47,7 @@ internal class PagedFollow(following: Boolean) {
 }
 
 /** The send's and the stream's hold on the newest row: what [rememberPagedFollow] watches. */
-internal class PagedFollowInputs<I>(
+internal class PagedFollowInputs(
     val listState: LazyListState,
     /** The reader opens away from the newest edge (a restored reading position): no follow yet. */
     val restoring: Boolean,
@@ -56,8 +55,6 @@ internal class PagedFollowInputs<I>(
     val newerHistoryComplete: Boolean,
     val newestKey: String?,
     val newestIsUserPrompt: Boolean,
-    /** Changes whenever the rows do: the stream's ticks. */
-    val identity: I,
 )
 
 /**
@@ -66,12 +63,12 @@ internal class PagedFollowInputs<I>(
  * the stream keeps the list on the newest edge.
  */
 @Composable
-internal fun <K, I> rememberPagedFollow(key: K, inputs: PagedFollowInputs<I>): PagedFollow {
+internal fun <K> rememberPagedFollow(key: K, inputs: PagedFollowInputs): PagedFollow {
     val listState = inputs.listState
     val follow = remember(key) { PagedFollow(!inputs.restoring && listState.isAtNewestEdge()) }
     FollowTheNewestEdge(listState, follow, inputs.newerHistoryComplete)
     ForceFollowOnSend(listState, follow, inputs.newestKey, inputs.newestIsUserPrompt)
-    SnapToNewestWhileFollowing(listState, follow, inputs.identity)
+    SnapToNewestWhileFollowing(listState, follow)
     return follow
 }
 
@@ -132,25 +129,28 @@ private fun ForceFollowOnSend(
 }
 
 /**
- * While following, the stream snaps the list back to the newest edge whenever it has left it (a
- * new row arriving at the head), coalesced to the legacy cadence ([STREAM_SNAP_INTERVAL_MS])
- * instead of once per raw live-overlay delta. A tick inside the interval waits out the rest of it
- * rather than being dropped, so the stream's last tick always lands.
+ * While following, the list is held on the newest edge: whenever it rests off it (a row arriving
+ * at the head pushes the reader's position up once laid out), it snaps back, coalesced to the
+ * legacy cadence ([STREAM_SNAP_INTERVAL_MS]) instead of once per raw live-overlay delta. It watches
+ * the laid-out position itself rather than the rows, so a row that lands mid-glide or a frame after
+ * its tick is still caught, and a tick inside the interval waits out the rest of it rather than
+ * being dropped. A scroll under way (the send's glide, or the reader, who detaches the follow) is
+ * never interrupted.
  */
 @Composable
-private fun <I> SnapToNewestWhileFollowing(listState: LazyListState, follow: PagedFollow, identity: I) {
-    val streamClock = remember { TimeSource.Monotonic.markNow() }
-    val lastSnapAtMs = remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(identity, follow.following) {
-        if (!follow.following) return@LaunchedEffect
-        delay(streamSnapDelayMs(streamClock.elapsedNow().inWholeMilliseconds, lastSnapAtMs.value))
-        // A scroll under way (the send's glide) is waited out, not skipped: if it ends short of the
-        // edge, this tick still brings the list there. A reader's scroll detaches the follow, which
-        // cancels this wait.
-        snapshotFlow { listState.isScrollInProgress }.first { !it }
-        if (listState.isAtNewestEdge()) return@LaunchedEffect
-        lastSnapAtMs.value = streamClock.elapsedNow().inWholeMilliseconds
-        follow.ownScroll { listState.scrollToItem(0) }
+private fun SnapToNewestWhileFollowing(listState: LazyListState, follow: PagedFollow) {
+    LaunchedEffect(listState, follow) {
+        val clock = TimeSource.Monotonic.markNow()
+        var lastSnapAtMs: Long? = null
+        fun restingOffTheEdge() = follow.following && !listState.isScrollInProgress && !listState.isAtNewestEdge()
+        snapshotFlow { restingOffTheEdge() }.collect { offEdge ->
+            if (!offEdge) return@collect
+            delay(streamSnapDelayMs(clock.elapsedNow().inWholeMilliseconds, lastSnapAtMs))
+            // Whatever changed meanwhile, the flow reports it next; act only if it still holds.
+            if (!restingOffTheEdge()) return@collect
+            lastSnapAtMs = clock.elapsedNow().inWholeMilliseconds
+            follow.ownScroll { listState.scrollToItem(0) }
+        }
     }
 }
 

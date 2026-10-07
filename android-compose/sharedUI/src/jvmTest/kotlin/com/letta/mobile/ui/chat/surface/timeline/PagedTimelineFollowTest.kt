@@ -53,7 +53,6 @@ class PagedTimelineFollowTest {
                     newerHistoryComplete = newerHistoryComplete(),
                     newestKey = current.keys.firstOrNull(),
                     newestIsUserPrompt = current.newestIsPrompt,
-                    identity = current,
                 ),
             )
             Box(Modifier.size(width = 320.dp, height = 480.dp)) {

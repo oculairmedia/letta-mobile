@@ -192,7 +192,6 @@ private fun rememberPagedListFollow(
             newerHistoryComplete = settled.loadState.prepend.endOfPaginationReached,
             newestKey = newestKey,
             newestIsUserPrompt = newestIsUserPrompt,
-            identity = rows.identity,
         ),
     )
 }
