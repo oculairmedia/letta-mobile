@@ -46,6 +46,16 @@ internal fun FeaturesSection(
                 )
             },
         )
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_config_shared_nav_drawer)) },
+            supportingContent = { Text(stringResource(R.string.screen_config_shared_nav_drawer_description)) },
+            trailingContent = {
+                HapticSwitch(
+                    checked = state.sharedNavDrawerEnabled,
+                    onCheckedChange = callbacks.onSharedNavDrawerEnabledChange,
+                )
+            },
+        )
         if (state.sharedChatPageEnabled) {
             item(
                 headlineContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas)) },

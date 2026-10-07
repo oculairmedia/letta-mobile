@@ -401,6 +401,16 @@ open class CachedSettingsRepository(
         }
     }
 
+    override fun getSharedNavDrawerEnabled(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
+        prefs.getBoolean(SettingsPreferenceKeys.SHARED_NAV_DRAWER) ?: false
+    }
+
+    override suspend fun setSharedNavDrawerEnabled(enabled: Boolean) {
+        preferencesStore.edit { prefs ->
+            prefs.putBoolean(SettingsPreferenceKeys.SHARED_NAV_DRAWER, enabled)
+        }
+    }
+
     override fun observeResumeRecentConversation(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
         prefs.getBoolean(SettingsPreferenceKeys.RESUME_RECENT_CONVERSATION)
             ?: platformDefaults.defaultResumeRecentConversation

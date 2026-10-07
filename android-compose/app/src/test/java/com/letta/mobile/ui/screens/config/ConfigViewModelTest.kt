@@ -550,6 +550,14 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun updateSharedNavDrawerEnabled_updatesStateAndPersists() = runTest {
+        val successState = loadedFormAfter { updateSharedNavDrawerEnabled(true) }
+
+        assertEquals(true, successState.sharedNavDrawerEnabled)
+        assertEquals(true, fakeRepository.getSharedNavDrawerEnabled().first())
+    }
+
+    @Test
     fun openChatsOnCanvas_defaultsOn_andUpdatePersists() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()

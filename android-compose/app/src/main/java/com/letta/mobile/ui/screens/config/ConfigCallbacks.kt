@@ -53,4 +53,5 @@ internal class FeatureToggleCallbacks(
     val onHapticsEnabledChange: (Boolean) -> Unit,
     val onSharedChatPageEnabledChange: (Boolean) -> Unit,
     val onOpenChatsOnCanvasChange: (Boolean) -> Unit,
+    val onSharedNavDrawerEnabledChange: (Boolean) -> Unit = {},
 )

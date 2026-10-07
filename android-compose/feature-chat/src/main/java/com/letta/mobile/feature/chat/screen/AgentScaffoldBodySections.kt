@@ -30,6 +30,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
 import com.letta.mobile.ui.haptics.HapticEffects
@@ -81,9 +82,19 @@ internal fun AgentScaffoldInteractionEffects(state: AgentScaffoldRuntimeState) {
 @Composable
 internal fun AgentScaffoldDrawerScaffold(state: AgentScaffoldRuntimeState) {
     LogDrawerTransitions(state.drawerState)
+    // letta-mobile-c3np7.5.5: Settings > "Shared navigation drawer" swaps in the desktop's rail and
+    // agent panel (sharedUI). The legacy drawer stays the default until it is deleted.
+    val sharedDrawer = state.params.sharedNavDrawer
+    val sharedDrawerEnabled = sharedDrawer?.enabled?.collectAsStateWithLifecycle()?.value == true
     ModalNavigationDrawer(
         drawerState = state.drawerState,
-        drawerContent = { AgentScaffoldDrawerSheet(state) },
+        drawerContent = {
+            if (sharedDrawer != null && sharedDrawerEnabled) {
+                AgentScaffoldSharedDrawerSheet(state, sharedDrawer)
+            } else {
+                AgentScaffoldDrawerSheet(state)
+            }
+        },
     ) {
         AgentScaffoldChromeScaffold(state)
     }
@@ -157,7 +168,7 @@ private fun AgentScaffoldDrawerSheet(state: AgentScaffoldRuntimeState) {
     }
 }
 
-private fun closeDrawerAndRun(state: AgentScaffoldRuntimeState, action: () -> Unit) {
+internal fun closeDrawerAndRun(state: AgentScaffoldRuntimeState, action: () -> Unit) {
     state.scope.launch { state.drawerState.close() }
     action()
 }

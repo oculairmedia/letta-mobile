@@ -20,6 +20,7 @@ internal object SettingsPreferenceKeys {
     const val HAPTICS_ENABLED = "haptics_enabled"
     const val SHARED_CHAT_PAGE = "shared_chat_page"
     const val OPEN_CHATS_ON_CANVAS = "open_chats_on_canvas"
+    const val SHARED_NAV_DRAWER = "shared_nav_drawer"
 }
 
 /** Secret / identity keys persisted via [com.letta.mobile.data.storage.SecureSettingsStore]. */

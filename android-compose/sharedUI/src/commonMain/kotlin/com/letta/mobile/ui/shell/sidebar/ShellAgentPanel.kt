@@ -249,7 +249,7 @@ private fun ShellAgentOverflowMenu(actions: ShellAgentPanelActions) {
 /** The per-agent section rows for the lens, then New chat. */
 @Composable
 private fun ShellPanelSections(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
-    WorkPlayLens.navDestinations(state.mode).forEach { destination ->
+    WorkPlayLens.navDestinations(state.mode).filterNot { it in state.hiddenSections }.forEach { destination ->
         ShellNavRow(
             model = ShellNavRowModel(
                 label = WorkPlayLens.destinationLabel(state.mode, destination),

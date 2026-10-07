@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Surface of [com.letta.mobile.data.repository.SettingsRepository] used by
@@ -99,6 +100,14 @@ interface ISettingsRepository {
      */
     fun getOpenChatsOnCanvas(): Flow<Boolean>
     suspend fun setOpenChatsOnCanvas(enabled: Boolean)
+
+    /**
+     * letta-mobile-c3np7.5.5: the phone's hamburger opens the shared navigation drawer (sharedUI
+     * ShellAgentRail + ShellAgentPanel, the desktop's rail and agent panel) instead of the legacy
+     * chat drawer. Defaults to disabled; hosts without the preference keep the legacy drawer.
+     */
+    fun getSharedNavDrawerEnabled(): Flow<Boolean> = flowOf(false)
+    suspend fun setSharedNavDrawerEnabled(enabled: Boolean) = Unit
     suspend fun setTheme(theme: AppTheme)
     suspend fun setThemePreset(themePreset: ThemePreset)
     suspend fun setDynamicColor(enabled: Boolean)

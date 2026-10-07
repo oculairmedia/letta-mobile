@@ -63,6 +63,7 @@ class FakeSettingsRepository(
     private val hapticsEnabledState = MutableStateFlow(true)
     private val sharedChatPageEnabledState = MutableStateFlow(false)
     private val openChatsOnCanvasState = MutableStateFlow(true)
+    private val sharedNavDrawerEnabledState = MutableStateFlow(false)
 
     override val configs: StateFlow<List<LettaConfig>> = configsState.asStateFlow()
 
@@ -251,6 +252,12 @@ class FakeSettingsRepository(
 
     override suspend fun setOpenChatsOnCanvas(enabled: Boolean) {
         openChatsOnCanvasState.value = enabled
+    }
+
+    override fun getSharedNavDrawerEnabled(): Flow<Boolean> = sharedNavDrawerEnabledState
+
+    override suspend fun setSharedNavDrawerEnabled(enabled: Boolean) {
+        sharedNavDrawerEnabledState.value = enabled
     }
 
     override suspend fun setTheme(theme: AppTheme) {

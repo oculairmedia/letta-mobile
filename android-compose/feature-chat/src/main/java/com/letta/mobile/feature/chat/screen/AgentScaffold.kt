@@ -53,6 +53,8 @@ fun AgentScaffold(
     onNavigateToProjects: (() -> Unit)? = null,
     onNavigateToCanvas: ((agentId: String, conversationId: String?, shareRecipient: String) -> Unit)? = null,
     viewModelKey: String? = null,
+    onNavigateToAppSettings: (() -> Unit)? = null,
+    onOpenCanvas: ((canvasId: String) -> Unit)? = null,
 ) {
     AgentScaffoldContent(
         initialProjectStartAction = initialProjectStartAction,
@@ -70,9 +72,12 @@ fun AgentScaffold(
             onNavigateToSchedules = onNavigateToSchedules,
             onNavigateToProjects = onNavigateToProjects,
             onNavigateToCanvas = onNavigateToCanvas,
+            onNavigateToAppSettings = onNavigateToAppSettings,
+            onOpenCanvas = onOpenCanvas,
         ),
         conversationRepository = null,
         viewModel = hiltViewModel(key = viewModelKey),
+        sharedNavDrawer = hiltViewModel(),
     )
 }
 
@@ -83,6 +88,7 @@ internal fun AgentScaffoldContent(
     navigation: AgentScaffoldNavigationCallbacks,
     conversationRepository: IConversationRepository? = null,
     viewModel: AdminChatViewModel,
+    sharedNavDrawer: SharedNavDrawerViewModel? = null,
 ) {
     var showBugReportSheet by rememberSaveable {
         mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BUG_REPORT)
@@ -119,6 +125,7 @@ internal fun AgentScaffoldContent(
                 onProjectInfoExpandedChange = { isProjectInfoExpanded = it },
             ),
             conversationRepository = conversationRepository,
+            sharedNavDrawer = sharedNavDrawer,
         ),
     )
 }

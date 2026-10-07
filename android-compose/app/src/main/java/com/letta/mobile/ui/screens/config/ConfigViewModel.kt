@@ -52,6 +52,7 @@ data class ConfigUiState(
     val hapticsEnabled: Boolean = true,
     val sharedChatPageEnabled: Boolean = false,
     val openChatsOnCanvas: Boolean = true,
+    val sharedNavDrawerEnabled: Boolean = false,
     val localModelPath: String = "",
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
@@ -176,6 +177,7 @@ class ConfigViewModel @Inject constructor(
                 hapticsEnabled = preferences.hapticsEnabled,
                 sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                 openChatsOnCanvas = preferences.openChatsOnCanvas,
+                sharedNavDrawerEnabled = preferences.sharedNavDrawerEnabled,
                 localModelPath = activeConfig.localModelPath.orEmpty(),
                 localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                 localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
@@ -202,6 +204,7 @@ class ConfigViewModel @Inject constructor(
                 hapticsEnabled = preferences.hapticsEnabled,
                 sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                 openChatsOnCanvas = preferences.openChatsOnCanvas,
+                sharedNavDrawerEnabled = preferences.sharedNavDrawerEnabled,
                 huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                 savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                 embeddedModelCatalog = embeddedModelRepository.catalog.value,
@@ -228,6 +231,7 @@ class ConfigViewModel @Inject constructor(
         val hapticsEnabled = async { settingsRepository.getHapticsEnabled().first() }
         val sharedChatPageEnabled = async { settingsRepository.getSharedChatPageEnabled().first() }
         val openChatsOnCanvas = async { settingsRepository.getOpenChatsOnCanvas().first() }
+        val sharedNavDrawerEnabled = async { settingsRepository.getSharedNavDrawerEnabled().first() }
         DisplayPreferences(
             theme = theme.await(),
             themePreset = themePreset.await(),
@@ -236,6 +240,7 @@ class ConfigViewModel @Inject constructor(
             hapticsEnabled = hapticsEnabled.await(),
             sharedChatPageEnabled = sharedChatPageEnabled.await(),
             openChatsOnCanvas = openChatsOnCanvas.await(),
+            sharedNavDrawerEnabled = sharedNavDrawerEnabled.await(),
         )
     }
 
@@ -247,6 +252,7 @@ class ConfigViewModel @Inject constructor(
         val hapticsEnabled: Boolean,
         val sharedChatPageEnabled: Boolean,
         val openChatsOnCanvas: Boolean,
+        val sharedNavDrawerEnabled: Boolean,
     )
 
     fun updateMode(mode: ServerMode) {
@@ -351,6 +357,14 @@ class ConfigViewModel @Inject constructor(
         _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, openChatsOnCanvas = enabled))
         viewModelScope.launch {
             settingsRepository.setOpenChatsOnCanvas(enabled)
+        }
+    }
+
+    fun updateSharedNavDrawerEnabled(enabled: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, sharedNavDrawerEnabled = enabled))
+        viewModelScope.launch {
+            settingsRepository.setSharedNavDrawerEnabled(enabled)
         }
     }
 

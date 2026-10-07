@@ -67,6 +67,8 @@ data class ShellAgentPanelState(
     val home: Boolean = false,
     /** The section page that is open, drawn selected. */
     val selectedSection: LensDestination? = null,
+    /** Sections the host has no page for yet; their rows are left out. */
+    val hiddenSections: Set<LensDestination> = emptySet(),
     /** Whether the panel ends with a Settings row, and whether Settings is the open page. */
     val showSettings: Boolean = true,
     val settingsSelected: Boolean = false,

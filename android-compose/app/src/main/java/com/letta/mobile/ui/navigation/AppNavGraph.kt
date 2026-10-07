@@ -124,6 +124,8 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId, shareRecipient = shareRecipient),
             )
         },
+        onNavigateToAppSettings = { navController.navigate(ConfigRoute()) },
+        onOpenCanvas = { canvasId -> navController.navigate(CanvasRoute(canvasId = canvasId)) },
     )
 }
 
