@@ -45,7 +45,7 @@ internal class PagedFollow(following: Boolean) {
 }
 
 /** The send's and the stream's hold on the newest row: what [rememberPagedFollow] watches. */
-internal class PagedFollowInputs(
+internal class PagedFollowInputs<I>(
     val listState: LazyListState,
     /** The reader opens away from the newest edge (a restored reading position): no follow yet. */
     val restoring: Boolean,
@@ -54,7 +54,7 @@ internal class PagedFollowInputs(
     val newestKey: String?,
     val newestIsUserPrompt: Boolean,
     /** Changes whenever the rows do: the stream's ticks. */
-    val identity: Any,
+    val identity: I,
 )
 
 /**
@@ -63,7 +63,7 @@ internal class PagedFollowInputs(
  * the stream keeps the list on the newest edge.
  */
 @Composable
-internal fun rememberPagedFollow(key: Any, inputs: PagedFollowInputs): PagedFollow {
+internal fun <K, I> rememberPagedFollow(key: K, inputs: PagedFollowInputs<I>): PagedFollow {
     val listState = inputs.listState
     val follow = remember(key) { PagedFollow(!inputs.restoring && listState.isAtNewestEdge()) }
     FollowTheNewestEdge(listState, follow, inputs.newerHistoryComplete)
@@ -130,7 +130,7 @@ private fun ForceFollowOnSend(
  * rather than being dropped, so the stream's last tick always lands.
  */
 @Composable
-private fun SnapToNewestWhileFollowing(listState: LazyListState, follow: PagedFollow, identity: Any) {
+private fun <I> SnapToNewestWhileFollowing(listState: LazyListState, follow: PagedFollow, identity: I) {
     val streamClock = remember { TimeSource.Monotonic.markNow() }
     val lastSnapAtMs = remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(identity, follow.following) {
