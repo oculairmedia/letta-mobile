@@ -97,6 +97,13 @@ data class ChatSurfacePlatform(
      */
     val timelineOverlay: (@Composable () -> Unit)? = null,
     /**
+     * Drawn over the Touch canvas while it is the view (a box over the board, below
+     * [topChromeInset] and above the chat bar): host chrome the canvas mode must keep in sight,
+     * such as Android's active-subagent rings (letta-mobile-bglj6.1.22). Not drawn on the
+     * full-screen page, which has [timelineOverlay].
+     */
+    val canvasOverlay: (@Composable () -> Unit)? = null,
+    /**
      * Told the full-screen composer's measured height whenever it changes, so a [pageBackground]
      * that keeps clear of the composer (Android's ambient glow) can follow it.
      */

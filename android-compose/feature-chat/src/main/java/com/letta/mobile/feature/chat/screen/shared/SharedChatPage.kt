@@ -126,7 +126,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             platform = rememberAndroidChatSurfacePlatform(
                 pageBackground = params.pageBackground,
                 onComposerHeightChange = params.onComposerHeightChange,
-                timelineOverlay = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
+                // The rings show on the canvas too: subagent activity stays in sight in canvas mode.
+                subagentRings = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
                 topChromeInset = topChromeInset,
             ),
             pagedTimeline = params.pagingPresentation?.canonical,
@@ -140,6 +141,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             currentConversationId = target.conversationId,
             navigation = params.navigation,
         )
+        SharedChatSubagentBanner(subagentSheet)
         ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
     }
 }
@@ -232,12 +234,12 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(
 private fun rememberAndroidChatSurfacePlatform(
     pageBackground: (@Composable (content: @Composable () -> Unit) -> Unit)?,
     onComposerHeightChange: ((Dp) -> Unit)?,
-    timelineOverlay: @Composable () -> Unit,
+    subagentRings: @Composable () -> Unit,
     topChromeInset: Dp,
 ): ChatSurfacePlatform {
     val currentOnComposerHeight by rememberUpdatedState(onComposerHeightChange)
     val reportsComposerHeight = onComposerHeightChange != null
-    val currentOverlay by rememberUpdatedState(timelineOverlay)
+    val currentOverlay by rememberUpdatedState(subagentRings)
     // ChatScreen hands a fresh glow lambda per recomposition; forward to the latest one.
     val currentBackground by rememberUpdatedState(pageBackground)
     val activity = LocalContext.current as? android.app.Activity
@@ -255,6 +257,7 @@ private fun rememberAndroidChatSurfacePlatform(
             showKeyboardHints = false,
             topChromeInset = topChromeInset,
             timelineOverlay = { currentOverlay() },
+            canvasOverlay = { currentOverlay() },
             onComposerHeightChange = if (reportsComposerHeight) {
                 { height -> currentOnComposerHeight?.invoke(height) }
             } else {

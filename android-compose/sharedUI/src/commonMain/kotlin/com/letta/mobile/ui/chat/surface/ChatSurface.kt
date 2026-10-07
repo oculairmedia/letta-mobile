@@ -219,6 +219,7 @@ private fun PageWithoutCanvas(frame: ChatSurfaceFrame) {
 /** Test tags for the page's own layers. */
 internal object ChatSurfaceTags {
     const val TIMELINE_OVERLAY = "chat_surface_timeline_overlay"
+    const val CANVAS_OVERLAY = "chat_surface_canvas_overlay"
 }
 
 /** One composition's worth of what every part of the page reads. */
@@ -332,6 +333,16 @@ private fun TouchCanvasWithChat(frame: ChatSurfaceFrame, canvas: (@Composable ()
                     LocalCanvasChromeBottomInset provides barDp,
                     LocalCanvasHostChrome provides hostChrome,
                 ) { canvas() }
+            }
+            val overlay = frame.platform.canvasOverlay
+            if (overlay != null && frame.mode != ChatSurfaceMode.FullScreen) {
+                // The host's canvas-mode chrome (Android: the subagent rings), clear of the bar.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(top = frame.platform.topChromeInset, bottom = barDp)
+                        .testTag(ChatSurfaceTags.CANVAS_OVERLAY),
+                ) { overlay() }
             }
         }
         TouchChatLayers(frame, layers, bar)

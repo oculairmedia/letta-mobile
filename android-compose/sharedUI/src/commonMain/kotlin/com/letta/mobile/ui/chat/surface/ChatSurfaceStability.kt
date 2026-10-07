@@ -52,7 +52,7 @@ internal fun ChatSurfaceHost.affordanceShape(): Int {
 }
 
 private fun ChatSurfacePlatform.slotShape(): Int {
-    return presenceMask(listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange))
+    return presenceMask(listOf(voiceInput, pageBackground, timelineOverlay, onComposerHeightChange, canvasOverlay))
 }
 
 /** Bit i set when [members]`[i]` is non-null. */
@@ -109,6 +109,7 @@ private fun forwardingPlatform(current: State<ChatSurfacePlatform>): ChatSurface
         showKeyboardHints = platform.showKeyboardHints,
         topChromeInset = platform.topChromeInset,
         timelineOverlay = if (platform.timelineOverlay == null) null else { @Composable { current.value.timelineOverlay?.invoke() } },
+        canvasOverlay = if (platform.canvasOverlay == null) null else { @Composable { current.value.canvasOverlay?.invoke() } },
         onComposerHeightChange = if (platform.onComposerHeightChange == null) {
             null
         } else {
