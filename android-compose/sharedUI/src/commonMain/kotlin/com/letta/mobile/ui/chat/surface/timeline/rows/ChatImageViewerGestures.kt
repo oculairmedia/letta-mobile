@@ -65,7 +65,7 @@ internal data class ImageGestureFrame(val zoom: Float, val pan: Offset, val cent
 
 /** The pan that keeps a [scale]d image covering its container: none at rest. */
 internal fun clampImageOffset(offset: Offset, scale: Float, containerSize: Size): Offset {
-    if (scale <= MinImageScale || !scale.isFinite() || !containerSize.isUsable()) return Offset.Zero
+    if (!pans(scale, containerSize)) return Offset.Zero
     val maxX = (containerSize.width * scale - containerSize.width) / 2f
     val maxY = (containerSize.height * scale - containerSize.height) / 2f
     if (!maxX.isFinite() || !maxY.isFinite()) return Offset.Zero
@@ -89,6 +89,9 @@ internal fun doubleTapImageTransform(state: ImageTransformState, tap: Offset, co
 /** A one-finger vertical swipe past the threshold, at rest, dismisses the viewer. */
 internal fun shouldDismissImageViewer(scale: Float, verticalDragDistance: Float): Boolean =
     scale <= ZoomedScale && abs(verticalDragDistance) > SwipeDismissThresholdPx
+
+/** A zoomed image in a measured container can pan; at rest (or unmeasured) it cannot. */
+private fun pans(scale: Float, containerSize: Size): Boolean = scale.isFinite() && scale > MinImageScale && containerSize.isUsable()
 
 private fun Offset.finiteOrNull(): Offset? = takeIf { x.isFinite() && y.isFinite() }
 
@@ -135,18 +138,31 @@ private class ViewerGesture(
     fun onEvent(event: PointerEvent) {
         val pressed = event.changes.count { it.pressed }
         val zoom = event.calculateZoom()
-        val pan = event.calculatePan()
-        if (pressed > 0 && (pressed >= 2 || zoom != 1f || transform.value.zoomed)) {
-            transformed = true
-            val frame = ImageGestureFrame(zoom, pan, event.calculateCentroid(useCurrent = true))
-            transform.value = applyImageTransformGesture(transform.value, frame, containerSize())
-            event.changes.forEach { it.consume() }
-        } else if (!zoomedAtStart && pressed == 1) {
-            verticalDrag += pan.y
-            // A vertical drag is the swipe to dismiss; a horizontal one is the pager's.
-            if (abs(pan.y) > abs(pan.x)) event.changes.forEach { it.consume() }
+        when {
+            transforms(pressed, zoom) -> applyTransform(event, zoom)
+            !zoomedAtStart && pressed == 1 -> trackSwipe(event)
         }
         zoomedAtStart = zoomedAtStart || transform.value.zoomed
+    }
+
+    /** Two fingers, a pinch, or any drag while zoomed moves the image. */
+    private fun transforms(pressed: Int, zoom: Float): Boolean {
+        if (pressed == 0) return false
+        return pressed >= 2 || zoom != 1f || transform.value.zoomed
+    }
+
+    private fun applyTransform(event: PointerEvent, zoom: Float) {
+        transformed = true
+        val frame = ImageGestureFrame(zoom, event.calculatePan(), event.calculateCentroid(useCurrent = true))
+        transform.value = applyImageTransformGesture(transform.value, frame, containerSize())
+        event.changes.forEach { it.consume() }
+    }
+
+    /** At rest, one finger: a vertical drag is the swipe to dismiss; a horizontal one is the pager's. */
+    private fun trackSwipe(event: PointerEvent) {
+        val pan = event.calculatePan()
+        verticalDrag += pan.y
+        if (abs(pan.y) > abs(pan.x)) event.changes.forEach { it.consume() }
     }
 
     fun dismisses(): Boolean = !transformed && shouldDismissImageViewer(transform.value.scale, verticalDrag)
