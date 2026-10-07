@@ -58,6 +58,7 @@ import com.letta.mobile.sharedui.resources.rows_tool_run_show
 import com.letta.mobile.sharedui.resources.rows_tool_run_state
 import com.letta.mobile.sharedui.resources.rows_tool_run_summary
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
@@ -331,10 +332,12 @@ private fun ToolRunDetailsSheet(
 /** Each call as a full [ToolCard], led by its step status: the sheet's body, or the inline disclosure's. */
 @Composable
 private fun ToolRunCards(toolCalls: ImmutableList<UiToolCall>, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier) {
+    // On a phone each row carries its own status glyph (letta-mobile-bglj6.1.23): no leading step circle.
+    val stepCircles = !touchStyle()
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         toolCalls.forEachIndexed { index, call ->
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                Box(modifier = Modifier.padding(top = LettaDimens.Space.sm)) { StepStatusCircle(call.stepState()) }
+                if (stepCircles) Box(modifier = Modifier.padding(top = LettaDimens.Space.sm)) { StepStatusCircle(call.stepState()) }
                 Box(modifier = Modifier.weight(1f)) {
                     ToolCard(call, call.disclosureKey().ifBlank { "sheet:$index" }, callbacks)
                 }
