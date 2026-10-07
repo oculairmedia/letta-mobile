@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopTextField
+import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -85,20 +86,8 @@ internal fun DesktopRefreshAction(onRefresh: () -> Unit, enabled: Boolean = true
 
 /** A small, tokenized filter/segment chip used in catalog headers. */
 @Composable
-internal fun DesktopChipTab(text: String, active: Boolean, onClick: () -> Unit) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-        color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(if (active) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
-            .clickable(onClick = onClick)
-            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
-    )
-}
+internal fun DesktopChipTab(text: String, active: Boolean, onClick: () -> Unit) =
+    LettaChipTab(text = text, active = active, onClick = onClick)
 
 /** A thin vertical divider for separating chip groups in a header. */
 @Composable

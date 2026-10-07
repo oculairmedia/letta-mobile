@@ -109,6 +109,9 @@ object LettaDimens {
         val lg: Dp = 40.dp
         val railSlotWidth: Dp = 48.dp
         val railSlotHeight: Dp = 44.dp
+
+        /** The agent panel's hero seat; the mascot draws across ~60 % of it (~75 dp of character). */
+        val hero: Dp = 124.dp
     }
 
     /**
