@@ -142,7 +142,7 @@ class SendLiftFramesTest {
     @Test
     fun renamedPromptChevronNeverBlinks() = assertNoViolations("chevron", chevronNeverBlinks(framesOf(renameCase())))
 
-    @Ignore("red until letta-mobile-86njl.3")
+    /** letta-mobile-bglj6.1.18: green — the paged list now force-follows a send (ForceFollowOnSend). */
     @Test
     fun pagedSendWhileScrolledUpLandsAtTheNewestEdge() {
         val frames = framesOf(pagedScrolledUpCase())

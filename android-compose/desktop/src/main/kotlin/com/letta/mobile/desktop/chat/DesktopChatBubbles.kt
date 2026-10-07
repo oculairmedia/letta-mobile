@@ -632,8 +632,10 @@ internal fun AgentText(params: AgentTextParams) {
     // full text directly. The smoother continues revealing the buffered tail at
     // its own cadence even after [isStreaming] flips back to false, so the reply
     // still finishes smoothly once the in-flight signal clears.
+    // letta-mobile-bglj6.1.18: seeded with the already-painted text, so a stream
+    // engaging on visible content keeps it instead of re-revealing it.
     val displayText = if (params.isStreaming) {
-        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true)
+        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true, seedText = params.text)
     } else {
         params.text
     }

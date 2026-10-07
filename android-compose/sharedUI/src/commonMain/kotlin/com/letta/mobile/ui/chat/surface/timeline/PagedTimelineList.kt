@@ -40,11 +40,13 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_history_error
 import com.letta.mobile.sharedui.resources.timeline_missing_target
 import com.letta.mobile.sharedui.resources.timeline_retry_history
+import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import kotlin.time.TimeSource
 import org.jetbrains.compose.resources.stringResource
 
 /** Everything the paged list reads. */
@@ -111,9 +113,18 @@ private fun PagedTimelineBody(
     var anchorRestored by remember(presentation) { mutableStateOf(restoreAnchor == null) }
 
     FollowTheNewestEdge(listState, settled.loadState.prepend.endOfPaginationReached) { following = it }
-    LaunchedEffect(rows.identity, following) {
-        if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
+    // letta-mobile-bglj6.1.18: a NEW user prompt at the head is the user's own send — always
+    // bring them to it, exactly as the legacy list does (LegacyTimelineList's force-follow) and
+    // as the legacy Android chat did (shouldForceScrollOnUserSend). The paged list is missing it,
+    // so sending while scrolled up left the new prompt off-screen and the flight decorated a row
+    // the viewport never showed.
+    val newestKey = remember(rows.identity) { rows.key(rows.leading) }
+    val newestIsUserPrompt = remember(rows.identity) {
+        val newest = rows.itemAt(rows.leading)
+        newest is ChatRenderItem.Single && isUserRole(newest.message.role)
     }
+    ForceFollowOnSend(listState, newestKey, newestIsUserPrompt) { following = true }
+    SnapToNewestWhileFollowing(listState, rows.identity, following)
     if (!anchorRestored) {
         RestoreReadingPosition(listState, rows, restoreAnchor) { anchorRestored = true }
     } else {
@@ -161,6 +172,23 @@ private fun PagedTimelineBody(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = params.topReserve).padding(LettaDimens.Space.sm),
             )
         }
+    }
+}
+
+/**
+ * The stream snaps back to the newest edge while following, coalesced to the legacy cadence
+ * (96ms) instead of once per raw live-overlay delta.
+ */
+@Composable
+private fun SnapToNewestWhileFollowing(listState: LazyListState, identity: PagedRowsIdentity, following: Boolean) {
+    val streamClock = remember { TimeSource.Monotonic.markNow() }
+    var lastSnapAtMs by remember { mutableStateOf(Long.MIN_VALUE) }
+    LaunchedEffect(identity, following) {
+        if (!following || listState.isScrollInProgress) return@LaunchedEffect
+        val now = streamClock.elapsedNow().inWholeMilliseconds
+        if (now - lastSnapAtMs < STREAM_SNAP_INTERVAL_MS) return@LaunchedEffect
+        lastSnapAtMs = now
+        listState.scrollToItem(0)
     }
 }
 
@@ -351,6 +379,34 @@ private fun FollowTheNewestEdge(listState: LazyListState, atNewestEdge: Boolean,
         }
     }
 }
+
+/**
+ * letta-mobile-bglj6.1.18: a new user prompt at the head is the user's own send, so the viewport
+ * follows it — the port of LegacyTimelineList's force-follow (the legacy Android chat's
+ * shouldForceScrollOnUserSend): re-arm the follow and glide to the newest edge, wherever the
+ * reader was scrolled. The very first composition only records the key, so a prompt already at
+ * the head when the list opens is not mistaken for a send.
+ */
+@Composable
+private fun ForceFollowOnSend(
+    listState: LazyListState,
+    newestKey: String?,
+    newestIsUserPrompt: Boolean,
+    onFollow: () -> Unit,
+) {
+    val previousKey = remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(newestKey) {
+        val isNewPrompt = newestIsUserPrompt && previousKey.value != null && newestKey != previousKey.value
+        previousKey.value = newestKey
+        if (isNewPrompt) {
+            onFollow()
+            listState.animateScrollToItem(0)
+        }
+    }
+}
+
+/** The streaming snap-back cadence; the legacy Android chat coalesced these to 96ms. */
+private const val STREAM_SNAP_INTERVAL_MS = 96
 
 /** Puts the reader back where they left off, once, from resident rows only. */
 @Composable
