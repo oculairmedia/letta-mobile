@@ -1,18 +1,9 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -22,58 +13,48 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextOverflow
-import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
-import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.search.TextMatch
-import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.shell.LocalShellChromeDecorations
+import com.letta.mobile.ui.shell.rail.ShellAgentRail
+import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
+import com.letta.mobile.ui.shell.rail.ShellAgentRailState
+import com.letta.mobile.ui.shell.rail.ShellRailActivity
+import com.letta.mobile.ui.shell.rail.ShellRailAgentTile
+import com.letta.mobile.ui.shell.rail.ShellRailEntry
+import com.letta.mobile.ui.shell.rail.ShellRailFocus
+import com.letta.mobile.ui.shell.rail.ShellRailMapping
+import com.letta.mobile.ui.shell.rail.ShellThinkingRing
+import com.letta.mobile.ui.shell.rail.railScrollFades
 import com.letta.mobile.ui.theme.LettaDimens
-
-/**
- * Fade length for the rail's scroll edges — proportionate to the rail's own
- * ~34dp orb slots (roughly one orb's worth of fade at each edge), distinct
- * from the chat message list's taller 44/72dp fades which suit a much wider
- * reading column. Shared by both rail modes (collapsed orb list, expanded
- * library roster) so they match.
- */
-private val RailFadeLength = LettaDimens.Space.xxl
+import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
 /**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
@@ -114,69 +95,11 @@ internal fun RailDivider() {
     )
 }
 
-/** Orbiting comet ring used as the agent "thinking" indicator. */
-@Composable
-private fun ThinkingRing(
-    diameter: Dp,
-    modifier: Modifier = Modifier,
-) {
-    // Orbiting comet, not a blinking border: a sweep-gradient tail circling
-    // the orb with a bright head over a faint static track. Continuous motion
-    // with direction reads as "working"; the old alpha-pulsed rounded-square
-    // border just read as a blinking box.
-    val transition = rememberInfiniteTransition(label = "thinking")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
-        label = "thinkingOrbit",
-    )
-    val primary = MaterialTheme.colorScheme.primary
-    Canvas(modifier = modifier.size(diameter)) {
-        val strokeWidth = LettaDimens.Space.hair.toPx()
-        val radius = (size.minDimension - strokeWidth) / 2f
-        // Faint full track so the indicator reads as a ring, not a flying dash.
-        drawCircle(
-            color = primary.copy(alpha = 0.18f),
-            radius = radius,
-            style = Stroke(width = strokeWidth),
-        )
-        rotate(angle) {
-            // Tail: transparent at the seam's far side building to full primary
-            // at the head. The hard sweep seam IS the comet head edge.
-            drawCircle(
-                brush = Brush.sweepGradient(
-                    0.0f to Color.Transparent,
-                    0.35f to Color.Transparent,
-                    1.0f to primary,
-                ),
-                radius = radius,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-            )
-            // Rounded head cap at the seam (0° = +x axis in canvas space).
-            drawCircle(
-                color = primary,
-                radius = strokeWidth * 0.9f,
-                center = Offset(center.x + radius, center.y),
-            )
-        }
-    }
-}
-
-@Immutable
-internal data class DesktopAgentRailFocus(
-    val selectedAgentId: String?,
-    val thinkingAgentId: String?,
-    val avatarStyleByAgentId: Map<String, Int>,
-    /** Agents with a mascot identity draw their silhouette in their colour instead of the gradient orb. */
-    val identityByAgentId: Map<String, com.letta.mobile.avatar.core.MascotIdentity> = emptyMap(),
-    /** Latest conversation per agent, for the hover. */
-    val activityByAgentId: Map<String, RailAgentActivity> = emptyMap(),
-)
+/** The rail's focus (selected / thinking agent, looks, activity): the shared rail's. */
+internal typealias DesktopAgentRailFocus = ShellRailFocus
 
 /** What the orb hover shows: when the agent last spoke and what it said. */
-@Immutable
-internal data class RailAgentActivity(val updatedAtLabel: String, val preview: String)
+internal typealias RailAgentActivity = ShellRailActivity
 
 @Immutable
 internal data class DesktopAgentRailState(
@@ -198,118 +121,30 @@ internal data class DesktopAgentRailActions(
 )
 
 /**
- * Far-left workspace/agent rail (Penpot "App Mockups v2", 56.dp wide, #0A0A0A):
- * a "+" new-session button, a stack of gradient agent orbs (one per agent), and
- * search/settings/identity actions pinned to the bottom.
+ * Far-left workspace/agent rail (Penpot "App Mockups v2", 56.dp wide, #0A0A0A): the shared
+ * [ShellAgentRail] (letta-mobile-c3np7.2.11) - Home, the agent orbs, New - with the desktop's hover
+ * cards and, when expanded, the desktop's names-and-spaces library in place of the orbs.
  */
 @Composable
 internal fun DesktopAgentRail(
     state: DesktopAgentRailState,
     actions: DesktopAgentRailActions,
 ) {
-    // Collapse agents that share a display name — e.g. the many ephemeral
-    // "Letta Code" agents spawned per task — into a single stacked orb with a
-    // count chip, so the rail doesn't grow unbounded with near-duplicate spawns.
-    // Order follows first appearance in [agents].
-    // Keyed on IDENTITY for synthetic labels: agents that merely share an
-    // "Agent <short-id>" placeholder share nothing, and stacking them hides
-    // every member but one behind an orb that cannot select them. Only a real,
-    // shared name means "same fleet".
-    // The selected agent is already on screen as the composer companion; listing it here too
-    // draws the same mascot twice. It leaves the rail while selected and returns on switch.
-    val selectedAgentId = state.focus.selectedAgentId
-    val groups = remember(state.agents, selectedAgentId) {
-        state.agents
-            .filter { (id, _) -> id != selectedAgentId }
-            .groupBy { (id, name) -> if (DisplayNames.isAgentFallback(name)) id else name }
-            .map { (_, members) ->
-                AgentRailGroup(name = members.first().second, agentIds = members.map { it.first })
-            }
+    val groups = remember(state.agents, state.focus.selectedAgentId) {
+        ShellRailMapping.groups(state.agents, state.focus.selectedAgentId)
     }
-    val width by animateDpAsState(if (state.expanded) 248.dp else 56.dp, label = "railWidth")
-    // Start-aligned in BOTH modes, with each header control wrapped in a
-    // fixed 56dp-wide centering slot: expanding the rail must not shift the
-    // icons horizontally — labels appear beside them, the icons stay put.
-    Column(
-        modifier = Modifier
-            .width(width)
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(vertical = LettaDimens.Space.lg),
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        // Home is fleet-wide, so it sits at the top of the rail - always, in both
-        // rail modes - and not in the per-agent sidebar, whose header is then
-        // the agent's mascot alone.
-        RailHeaderRow(onClick = actions.onHome, label = if (state.expanded) "Home" else null) {
-            RailActionIcon(
-                RailActionIconModel(
-                    icon = Icons.Outlined.Home,
-                    description = "Home",
-                    onClick = actions.onHome,
-                    selected = state.homeSelected,
-                ),
-            )
-        }
-        // No extra spacer under Home: the column's own 8.dp arrangement is the
-        // whole gap. A Spacer here is an item in its own right, so the
-        // arrangement applied on both sides of it and Home sat 20.dp clear of
-        // the first orb — visibly detached from the list it heads.
-        // Then the orbs, with the plus pinned at the bottom (Grok Bot layout). There is no separate
-        // search trigger: the plus menu's "New chat" opens the agent picker, which searches.
-        Column(modifier = Modifier.weight(1f)) {
-            if (state.expanded) {
-                ExpandedAgentLibrary(
-                    groups = groups,
-                    focus = state.focus,
-                    onAgentSelected = actions.onAgentSelected,
-                )
-            } else {
-                AgentRailOrbList(
-                    groups = groups,
-                    focus = state.focus,
-                    onAgentSelected = actions.onAgentSelected,
-                )
-            }
-        }
-        RailHeaderRow(onClick = actions.onNewSession, label = if (state.expanded) "New" else null) {
-            NewSessionButton(onNewSession = actions.onNewSession)
-        }
-    }
-}
-
-/**
- * Header control slot: the icon is centered inside a fixed 56dp column (the
- * collapsed rail width) so it occupies the same x whether the rail is
- * collapsed or expanded; an optional [label] reveals to the icon's right in
- * expanded mode. The whole row is clickable so the label acts as part of the
- * control.
- */
-@Composable
-private fun RailHeaderRow(
-    onClick: () -> Unit,
-    label: String? = null,
-    icon: @Composable () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (label != null) Modifier.clickable(onClick = onClick) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.width(56.dp), contentAlignment = Alignment.Center) {
-            icon()
-        }
-        if (label != null) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+    val entries = remember(groups, state.focus) { ShellRailMapping.entries(groups, state.focus) }
+    CompositionLocalProvider(LocalShellChromeDecorations provides DesktopShellChromeDecorations) {
+        ShellAgentRail(
+            state = ShellAgentRailState(entries = entries, homeSelected = state.homeSelected, expanded = state.expanded),
+            actions = ShellAgentRailActions(
+                onAgentSelected = actions.onAgentSelected,
+                onHome = actions.onHome,
+                onNewSession = actions.onNewSession,
+            ),
+            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+            library = { ExpandedAgentLibrary(groups = groups, entries = entries, onAgentSelected = actions.onAgentSelected) },
+        )
     }
 }
 
@@ -322,49 +157,29 @@ private fun RailHeaderRow(
 @Composable
 private fun ColumnScope.ExpandedAgentLibrary(
     groups: List<AgentRailGroup>,
-    focus: DesktopAgentRailFocus,
+    entries: List<ShellRailEntry>,
     onAgentSelected: (String) -> Unit,
 ) {
     // Spotify-style in-panel filter: search never leaves the library.
     var query by remember { mutableStateOf(TextFieldValue("")) }
-    // Uses the shared TextMatch so the rail matches the same way as the command
-    // palette and every other catalog. The previous raw `contains` required the
-    // typed text to be a literal substring INCLUDING punctuation, so
-    // "pm letta mobile" could not find an agent named "PM - letta-mobile".
+    // The shared TextMatch, so the rail matches the way the command palette and every catalog do
+    // ("pm letta mobile" finds "PM - letta-mobile").
     val filtered = remember(groups, query.text) {
         val needle = query.text.trim()
         if (needle.isEmpty()) groups else groups.filter { TextMatch.matches(needle, it.name) }
     }
     val spaces = remember(filtered) { deriveAgentSpaces(filtered) }
-    // Orb colors key off the UNfiltered position so identities stay stable
-    // while filtering; precomputed map avoids O(n²) indexOf on big rosters.
-    val indexByGroup = remember(groups) {
-        groups.withIndex().associate { (index, group) -> group to index }
-    }
+    // Entries carry the UNfiltered position's colour, so identities stay stable while filtering.
+    val entryByName = remember(entries) { entries.associateBy { it.key } }
     LibrarySearchField(query = query, onQueryChange = { query = it })
     // Lazy: a large roster (hundreds of agents) must not compose every row.
     val listState = rememberLazyListState()
-    val topFadeAlpha by animateFloatAsState(
-        targetValue = if (listState.canScrollBackward) 1f else 0f,
-        animationSpec = tween(durationMillis = 250),
-        label = "railLibraryTopFadeAlpha",
-    )
-    val bottomFadeAlpha by animateFloatAsState(
-        targetValue = if (listState.canScrollForward) 1f else 0f,
-        animationSpec = tween(durationMillis = 250),
-        label = "railLibraryBottomFadeAlpha",
-    )
     LazyColumn(
         state = listState,
         modifier = Modifier
             .weight(1f)
             .fillMaxWidth()
-            .fadingEdges(
-                topFadeAlpha = topFadeAlpha,
-                bottomFadeAlpha = bottomFadeAlpha,
-                topFadeLength = RailFadeLength,
-                bottomFadeLength = RailFadeLength,
-            ),
+            .railScrollFades(listState),
     ) {
         if (filtered.isEmpty()) {
             item(key = "library-empty") {
@@ -377,20 +192,13 @@ private fun ColumnScope.ExpandedAgentLibrary(
             }
         }
         spaces.forEach { space ->
+            val spaceEntries = space.groups.mapNotNull { entryByName[it.name] }
             item(key = "space-${space.name}") {
-                SpaceHeader(space = space, focus = focus)
+                SpaceHeader(space = space, working = spaceEntries.any { it.thinking })
             }
-            // Keyed by group name so per-row state (the thinking-ring
-            // animation) follows its agent across recency reordering.
-            items(space.groups, key = { "group-${it.name}" }) { group ->
-                ExpandedAgentRow(
-                    params = AgentRailOrbParams(
-                        group = group,
-                        index = indexByGroup[group] ?: 0,
-                        focus = focus,
-                        onAgentSelected = onAgentSelected,
-                    ),
-                )
+            // Keyed by group name so per-row state (the thinking ring) follows its agent across recency reordering.
+            items(spaceEntries, key = { "group-${it.key}" }) { entry ->
+                ExpandedAgentRow(entry = entry, onAgentSelected = onAgentSelected)
             }
         }
     }
@@ -433,9 +241,7 @@ private fun LibrarySearchField(
 }
 
 @Composable
-private fun SpaceHeader(space: AgentRailSpace, focus: DesktopAgentRailFocus) {
-    val working = focus.thinkingAgentId != null &&
-        space.groups.any { focus.thinkingAgentId in it.agentIds }
+private fun SpaceHeader(space: AgentRailSpace, working: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.hair),
         verticalAlignment = Alignment.CenterVertically,
@@ -464,15 +270,13 @@ private fun SpaceHeader(space: AgentRailSpace, focus: DesktopAgentRailFocus) {
 }
 
 @Composable
-private fun ExpandedAgentRow(params: AgentRailOrbParams) {
-    val flags = params.toFlags()
-    val target = params.toTarget(flags)
+private fun ExpandedAgentRow(entry: ShellRailEntry, onAgentSelected: (String) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = { params.onAgentSelected(target.agentId) })
+            .clickable(onClick = { onAgentSelected(entry.agentId) })
             .background(
-                if (flags.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+                if (entry.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
             )
             .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -480,15 +284,15 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             // A live mascot shows thinking itself; the ring is for the gradient orb only.
-            if (flags.thinking && target.identity == null) {
-                ThinkingRing(diameter = LettaDimens.Orb.md)
+            if (entry.thinking && entry.identity == null) {
+                ShellThinkingRing(diameter = LettaDimens.Orb.md)
             }
-            RailAgentTile(target = target, initial = params.group.name.firstOrNull()?.uppercase() ?: "?", size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
+            ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, cornerRadius = LettaDimens.Radius.md)
         }
         Text(
-            text = params.group.name,
+            text = entry.name,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (flags.selected) FontWeight.SemiBold else FontWeight.Normal,
+            fontWeight = if (entry.selected) FontWeight.SemiBold else FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -497,232 +301,6 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
         // No per-row member count: PM groups aggregate hundreds of spawns, so
         // the number was always a meaningless "99+" — the space header already
         // carries the aggregate.
-    }
-}
-
-@Composable
-private fun ColumnScope.AgentRailOrbList(
-    groups: List<AgentRailGroup>,
-    focus: DesktopAgentRailFocus,
-    onAgentSelected: (String) -> Unit,
-) {
-    // The agent list scrolls so a long roster never pushes the bottom
-    // actions off-screen, and is lazy so hundreds of agents don't all
-    // compose. Keyed by group name so each row's thinking-ring animation
-    // follows its agent across recency reordering.
-    val listState = rememberLazyListState()
-    val topFadeAlpha by animateFloatAsState(
-        targetValue = if (listState.canScrollBackward) 1f else 0f,
-        animationSpec = tween(durationMillis = 250),
-        label = "railOrbTopFadeAlpha",
-    )
-    val bottomFadeAlpha by animateFloatAsState(
-        targetValue = if (listState.canScrollForward) 1f else 0f,
-        animationSpec = tween(durationMillis = 250),
-        label = "railOrbBottomFadeAlpha",
-    )
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth()
-            .fadingEdges(
-                topFadeAlpha = topFadeAlpha,
-                bottomFadeAlpha = bottomFadeAlpha,
-                topFadeLength = RailFadeLength,
-                bottomFadeLength = RailFadeLength,
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        // Each 40dp orb (Orb.lg) already sits in a 44dp slot (Orb.railSlotHeight,
-        // 2dp slack top and bottom), so this spacing is ON TOP of that.
-        // Sized to fit the slot so it doesn't crowd neighbouring orbs.
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
-    ) {
-        itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
-            AgentRailOrb(
-                AgentRailOrbParams(
-                    group = group,
-                    index = index,
-                    focus = focus,
-                    onAgentSelected = onAgentSelected,
-                ),
-            )
-        }
-    }
-}
-
-
-/** The rail's plus (Grok Bot layout): opens the agent picker, whose top rows are the create actions. */
-@Composable
-private fun NewSessionButton(onNewSession: () -> Unit) {
-    DesktopTooltip(text = "New") {
-        Box(
-            modifier = Modifier
-                .size(LettaDimens.Control.iconButton)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .clickable(onClick = onNewSession),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Add,
-                contentDescription = "New",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Control.icon),
-            )
-        }
-    }
-}
-
-private data class AgentRailOrbParams(
-    val group: AgentRailGroup,
-    val index: Int,
-    val focus: DesktopAgentRailFocus,
-    val onAgentSelected: (String) -> Unit,
-)
-
-private data class AgentRailOrbFlags(
-    val selected: Boolean,
-    val thinking: Boolean,
-    val count: Int,
-)
-
-private data class AgentRailOrbTarget(
-    val agentId: String,
-    val orbStyle: Int,
-    val tooltip: String,
-    val identity: com.letta.mobile.avatar.core.MascotIdentity? = null,
-    val activity: RailAgentActivity? = null,
-)
-
-private fun AgentRailOrbParams.toFlags(): AgentRailOrbFlags {
-    val group = group
-    return AgentRailOrbFlags(
-        selected = focus.selectedAgentId != null && focus.selectedAgentId in group.agentIds,
-        thinking = focus.thinkingAgentId != null && focus.thinkingAgentId in group.agentIds,
-        count = group.agentIds.size,
-    )
-}
-
-private fun AgentRailOrbParams.toTarget(flags: AgentRailOrbFlags): AgentRailOrbTarget {
-    val group = group
-    // Clicking a stack opens its already-selected member if one is
-    // selected, otherwise its first (most-recent) member.
-    val targetAgentId = group.agentIds.firstOrNull { it == focus.selectedAgentId } ?: group.agentIds.first()
-    // Use the stack member's saved avatar style if any set one,
-    // otherwise the position-derived colour.
-    val orbStyle = group.agentIds.firstNotNullOfOrNull { focus.avatarStyleByAgentId[it] } ?: index
-    val tooltip = buildString {
-        append(group.name)
-        if (flags.count > 1) append(" · ${flags.count} agents")
-        if (flags.thinking) append(" · thinking…")
-    }
-    val identity = group.agentIds.firstNotNullOfOrNull { focus.identityByAgentId[it] }
-    val activity = group.agentIds.mapNotNull { focus.activityByAgentId[it] }
-        .maxByOrNull { conversationRecency(it.updatedAtLabel) }
-    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip, identity = identity, activity = activity)
-}
-
-@Composable
-private fun AgentRailOrb(params: AgentRailOrbParams) {
-    val flags = params.toFlags()
-    val target = params.toTarget(flags)
-    DesktopRichTooltip(
-        title = target.tooltip,
-        timeLabel = target.activity?.let { hoverTimeLabel(it.updatedAtLabel) },
-        body = target.activity?.preview?.trim()?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) },
-    ) {
-        AgentRailOrbContent(
-            params = params,
-            flags = flags,
-            target = target,
-        )
-    }
-}
-
-@Composable
-private fun AgentRailOrbContent(
-    params: AgentRailOrbParams,
-    flags: AgentRailOrbFlags,
-    target: AgentRailOrbTarget,
-) {
-    Box(
-        // Square slot for a square tile (it was 46x34 for the old 30 dp orbs).
-        modifier = Modifier.size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (flags.selected) {
-            SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
-        }
-        if (flags.thinking && target.identity == null) {
-            // Concentric with the orb and sized to fit the
-            // slot so it doesn't crowd neighbouring orbs.
-            ThinkingRing(diameter = LettaDimens.Orb.md)
-        }
-        RailAgentTile(
-            target = target,
-            initial = params.group.name.firstOrNull()?.uppercase() ?: "?",
-            size = LettaDimens.Orb.lg,
-            onClick = { params.onAgentSelected(target.agentId) },
-        )
-        // No member-count chip on stacked orbs: PM groups aggregate hundreds
-        // of spawns, so every orb wore a meaningless "99+". The tooltip still
-        // reports the exact count for anyone who cares.
-    }
-}
-
-/** A rail slot: [AgentOrb] with the agent id, so it is the mascot when the agent has an identity. */
-@Composable
-private fun RailAgentTile(
-    target: AgentRailOrbTarget,
-    initial: String,
-    size: androidx.compose.ui.unit.Dp,
-    cornerRadius: androidx.compose.ui.unit.Dp = LettaDimens.Radius.sm,
-    onClick: (() -> Unit)? = null,
-) {
-    AgentOrb(index = target.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick, agentId = target.agentId) {
-        Text(text = initial, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
-    }
-}
-
-@Composable
-private fun SelectedAgentRailMarker(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(width = LettaDimens.Space.xs, height = LettaDimens.Control.iconButton)
-            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(LettaDimens.Radius.sm)),
-    )
-}
-
-
-private data class RailActionIconModel(
-    val icon: ImageVector,
-    val description: String,
-    val onClick: () -> Unit,
-    val tint: Color = Color.Unspecified,
-    /** The destination this icon opens is the one showing; drawn like a selected agent orb. */
-    val selected: Boolean = false,
-)
-
-@Composable
-private fun RailActionIcon(model: RailActionIconModel) {
-    DesktopTooltip(text = model.description) {
-        Box(
-            modifier = Modifier
-                .size(LettaDimens.Control.iconButtonLg)
-                .clip(CircleShape)
-                .background(if (model.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
-                .clickable(onClick = model.onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = model.icon,
-                contentDescription = model.description,
-                tint = model.tint.takeIf { it != Color.Unspecified }
-                    ?: if (model.selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(LettaDimens.Control.icon),
-            )
-        }
     }
 }
 
@@ -738,7 +316,7 @@ internal fun Modifier.railLightDismiss(expanded: Boolean, onDismiss: () -> Unit)
                 val event = awaitPointerEvent(PointerEventPass.Final)
                 if (event.type != PointerEventType.Release) continue
                 val x = event.changes.firstOrNull()?.position?.x ?: continue
-                if (x > 248.dp.toPx()) onDismiss()
+                if (x > LettaDimens.Pane.railExpandedWidth.toPx()) onDismiss()
             }
         }
     }

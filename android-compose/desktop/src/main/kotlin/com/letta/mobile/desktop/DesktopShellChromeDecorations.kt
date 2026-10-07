@@ -10,6 +10,9 @@ import com.letta.mobile.ui.shell.ShellChromeDecorations
  */
 internal val DesktopShellChromeDecorations = ShellChromeDecorations(
     tooltip = { text, content -> DesktopTooltip(text = text) { content() } },
+    hoverCard = { card, content ->
+        DesktopRichTooltip(title = card.title, timeLabel = card.timestamp?.let(::hoverTimeLabel), body = card.body) { content() }
+    },
     rowMenu = { items, content ->
         ContextMenuArea(items = { items.map { ContextMenuItem(it.label, it.onClick) } }) { content() }
     },

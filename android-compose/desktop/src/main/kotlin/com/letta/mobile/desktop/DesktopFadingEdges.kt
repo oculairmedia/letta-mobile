@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.components.lettaFadingEdges
 
 /**
  * Softly dissolves the top [topFadeLength] and bottom [bottomFadeLength] of
@@ -37,39 +38,7 @@ internal fun Modifier.fadingEdges(
     bottomFadeAlpha: Float,
     topFadeLength: Dp,
     bottomFadeLength: Dp,
-): Modifier {
-    if (topFadeAlpha <= 0f && bottomFadeAlpha <= 0f) return this
-    return this
-        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            drawFadeBand(topFadeLength.toPx(), topFadeAlpha, fromTop = true)
-            drawFadeBand(bottomFadeLength.toPx(), bottomFadeAlpha, fromTop = false)
-        }
-}
-
-/**
- * Masks one edge over [lengthPx], ramping the content out towards it. Drawn as
- * a BAND rather than over the whole content: a gradient brush clamps to its end
- * colours outside `[startY, endY]`, so a full-size rect would carry the ramp's
- * transparent end across every pixel beyond it.
- */
-private fun DrawScope.drawFadeBand(lengthPx: Float, alpha: Float, fromTop: Boolean) {
-    val band = lengthPx.coerceAtMost(size.height / 2f)
-    if (alpha <= 0f || band <= 0f) return
-    val startY = if (fromTop) 0f else size.height - band
-    val faded = Color.Black.copy(alpha = 1f - alpha)
-    drawRect(
-        brush = Brush.verticalGradient(
-            colors = if (fromTop) listOf(faded, Color.Black) else listOf(Color.Black, faded),
-            startY = startY,
-            endY = startY + band,
-        ),
-        topLeft = Offset(0f, startY),
-        size = Size(size.width, band),
-        blendMode = BlendMode.DstIn,
-    )
-}
+): Modifier = lettaFadingEdges(topFadeAlpha, bottomFadeAlpha, topFadeLength, bottomFadeLength)
 
 /**
  * The horizontal counterpart of [fadingEdges], for rows that scroll sideways.

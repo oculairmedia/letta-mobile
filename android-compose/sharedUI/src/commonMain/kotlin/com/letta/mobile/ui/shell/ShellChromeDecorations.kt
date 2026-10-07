@@ -19,6 +19,14 @@ data class ShellConfirmRequest(
     val confirmLabel: String,
 )
 
+/** A richer hover: a title, the raw ISO-8601 time of the last activity (the host formats it), a short body. */
+@Immutable
+data class ShellHoverCard(
+    val title: String,
+    val timestamp: String? = null,
+    val body: String? = null,
+)
+
 /**
  * The platform pieces the shared shell chrome (agent panel, rail) wraps around its rows. The defaults
  * suit a touch host: no hover tooltips, no secondary menu, a Material dialog for confirmations. A
@@ -29,6 +37,8 @@ data class ShellConfirmRequest(
 class ShellChromeDecorations(
     /** Wraps a control with a hover label. */
     val tooltip: @Composable (text: String, content: @Composable () -> Unit) -> Unit = { _, content -> content() },
+    /** Wraps a control with a hover card (the rail's agent orbs). */
+    val hoverCard: @Composable (card: ShellHoverCard, content: @Composable () -> Unit) -> Unit = { _, content -> content() },
     /** Wraps a row with its secondary actions (archive, delete). */
     val rowMenu: @Composable (items: List<ShellRowMenuItem>, content: @Composable () -> Unit) -> Unit =
         { _, content -> content() },
