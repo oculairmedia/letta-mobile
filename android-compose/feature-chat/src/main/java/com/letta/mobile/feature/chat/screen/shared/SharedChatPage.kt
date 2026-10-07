@@ -11,6 +11,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,6 +28,8 @@ import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
+import com.letta.mobile.feature.chat.screen.saveAttachment
+import com.letta.mobile.feature.chat.screen.shareAttachment
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
@@ -35,6 +38,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
+import com.letta.mobile.ui.chat.surface.ChatImageActions
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
@@ -42,6 +46,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
+import kotlinx.coroutines.launch
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
 internal data class SharedChatPageParams(
@@ -240,10 +245,12 @@ private fun rememberAndroidChatSurfacePlatform(
     val currentOverlay by rememberUpdatedState(timelineOverlay)
     // ChatScreen hands a fresh glow lambda per recomposition; forward to the latest one.
     val currentBackground by rememberUpdatedState(pageBackground)
-    val activity = LocalContext.current as? android.app.Activity
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
     val hasBackground = pageBackground != null
-    return remember(isHiltHost, hasBackground, reportsComposerHeight, topChromeInset) {
+    val imageActions = rememberAndroidImageActions(context)
+    return remember(isHiltHost, hasBackground, reportsComposerHeight, topChromeInset, imageActions) {
         ChatSurfacePlatform(
             voiceInput = if (isHiltHost) { onDictated -> DictationButton(onDictated) } else null,
             pageBackground = if (hasBackground) {
@@ -260,6 +267,22 @@ private fun rememberAndroidChatSurfacePlatform(
             } else {
                 null
             },
+            imageActions = imageActions,
+        )
+    }
+}
+
+/**
+ * letta-mobile-bglj6.1.23: the shared image viewer's Save and Share, as the legacy viewer did
+ * them (MediaStore under Pictures/Letta; the share sheet through the chat-image FileProvider).
+ */
+@Composable
+private fun rememberAndroidImageActions(context: android.content.Context): ChatImageActions {
+    val scope = rememberCoroutineScope()
+    return remember(context, scope) {
+        ChatImageActions(
+            save = { image -> scope.launch { saveAttachment(context, image) } },
+            share = { image -> scope.launch { shareAttachment(context, image) } },
         )
     }
 }
