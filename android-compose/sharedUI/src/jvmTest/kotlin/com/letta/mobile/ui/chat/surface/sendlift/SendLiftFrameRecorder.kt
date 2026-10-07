@@ -29,6 +29,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.chat.surface.sendflight.SendFlightTestTags
+import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
 import com.letta.mobile.ui.chat.surface.timeline.RowCompositionCounter
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.mascot.FakeMascotShell
@@ -139,6 +140,7 @@ internal class SendLiftFrameRecorder(
             rowCompositions = compositions.takeDelta(),
             chevronCount = count(hasContentDescription(EXPAND) or hasContentDescription(COLLAPSE)),
             departingTextCount = count(hasTestTag(DEPARTING_TEXT_TAG)),
+            latestButton = count(hasTestTag(ChatTimelineTags.SCROLL_TO_LATEST)) > 0,
         )
     }
 

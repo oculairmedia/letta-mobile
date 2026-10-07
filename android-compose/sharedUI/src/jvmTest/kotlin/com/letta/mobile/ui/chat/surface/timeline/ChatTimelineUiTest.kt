@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -144,6 +145,21 @@ class ChatTimelineUiTest {
         onNodeWithTag(ChatTimelineTags.LIST).performScrollToIndex(rowCount(messages) / 2)
         waitForIdle()
         onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertExists().performClick()
+        waitForIdle()
+        onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertDoesNotExist()
+    }
+
+    /** A nudge a few rows into history is not "far from the latest": the button waits for real distance. */
+    @Test
+    fun aNudgeIntoHistoryDoesNotOfferScrollToLatest() = runComposeUiTest {
+        show(ready.copy(messages = conversation(160).toPersistentList()), RecordingChatActions())
+        // Reversed list: dragging down reads older rows. Held still before lifting, so nothing flings.
+        onNodeWithTag(ChatTimelineTags.LIST).performTouchInput {
+            down(center)
+            repeat(NUDGE_STEPS) { moveBy(Offset(0f, NUDGE_STEP_PX)) }
+            advanceEventTime(HOLD_BEFORE_LIFT_MILLIS)
+            up()
+        }
         waitForIdle()
         onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertDoesNotExist()
     }
@@ -293,5 +309,12 @@ class ChatTimelineUiTest {
         waitUntil(timeoutMillis = 5_000L) {
             onAllNodesWithTag(ChatTimelineTags.PINNED_PROMPT).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    private companion object {
+        /** Six 40px steps: about 220px past the touch slop, a few rows but under the button's show distance (40% of 640dp). */
+        const val NUDGE_STEPS = 6
+        const val NUDGE_STEP_PX = 40f
+        const val HOLD_BEFORE_LIFT_MILLIS = 500L
     }
 }
