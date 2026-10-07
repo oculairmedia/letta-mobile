@@ -55,6 +55,16 @@ fun AgentPillSurface(modifier: Modifier = Modifier, content: @Composable () -> U
     }
 }
 
+/** What [AgentIdentityPill] shows and does: tap switches agents, long press pins. */
+data class AgentIdentity(
+    val agentId: String,
+    val name: String,
+    val isFavorite: Boolean,
+    val isPinned: Boolean,
+    val onClick: () -> Unit,
+    val onLongClick: () -> Unit,
+)
+
 /**
  * letta-mobile-bglj6.1.22: the agent at a glance - avatar, name, favourite and pin marks and the
  * switcher chevron in [AgentPillSurface]. The one element for the chat screen's header and the
@@ -62,20 +72,14 @@ fun AgentPillSurface(modifier: Modifier = Modifier, content: @Composable () -> U
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun AgentIdentityPill(
-    agentId: String,
-    name: String,
-    isFavorite: Boolean,
-    isPinned: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun AgentIdentityPill(identity: AgentIdentity, modifier: Modifier = Modifier) {
+    val agentId = identity.agentId
+    val name = identity.name
     AgentPillSurface(modifier.testTag(AgentIdentityPillTestTags.PILL)) {
         Row(
             modifier = Modifier
                 .testTag(AgentIdentityPillTestTags.TRIGGER)
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .combinedClickable(onClick = identity.onClick, onLongClick = identity.onLongClick)
                 .padding(end = LettaDimens.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -96,7 +100,7 @@ fun AgentIdentityPill(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            if (isFavorite) {
+            if (identity.isFavorite) {
                 Icon(
                     LettaIcons.Star,
                     contentDescription = "Favorite agent",
@@ -104,7 +108,7 @@ fun AgentIdentityPill(
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
-            if (isPinned) {
+            if (identity.isPinned) {
                 Icon(
                     LettaIcons.Pin,
                     contentDescription = "Pinned agent",

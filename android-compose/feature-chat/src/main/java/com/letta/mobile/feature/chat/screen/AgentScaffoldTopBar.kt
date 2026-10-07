@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.AgentIdentityPill
 import com.letta.mobile.ui.chat.AgentPillSurface
 import com.letta.mobile.ui.components.LettaSearchBar
@@ -51,7 +52,7 @@ internal fun AgentScaffoldTopChrome(state: AgentScaffoldRuntimeState, headerHidd
     val showSearchField = searchUi.isChatSearchExpanded || state.uiState.isSearchActive
     AgentScaffoldTopChromeLayout(
         headerHidden = headerHidden,
-        identity = AgentScaffoldIdentity(
+        identity = AgentIdentity(
             agentId = state.agentIdValue,
             name = state.agentName.ifBlank { state.screenTitle },
             isFavorite = state.currentAgentIsFavorite,
@@ -93,22 +94,12 @@ internal fun AgentScaffoldTopChrome(state: AgentScaffoldRuntimeState, headerHidd
     )
 }
 
-/** What the agent pill shows and does, built once for both of its places. */
-internal data class AgentScaffoldIdentity(
-    val agentId: String,
-    val name: String,
-    val isFavorite: Boolean,
-    val isPinned: Boolean,
-    val onClick: () -> Unit,
-    val onLongClick: () -> Unit,
-)
-
 /** [AgentScaffoldTopChrome] without the runtime state, so tests can draw both of its modes. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AgentScaffoldTopChromeLayout(
     headerHidden: Boolean,
-    identity: AgentScaffoldIdentity,
+    identity: AgentIdentity,
     searchField: (@Composable () -> Unit)?,
     onMenuClick: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior?,
@@ -135,14 +126,14 @@ internal fun AgentScaffoldTopChromeLayout(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AgentScaffoldHeader(
-    identity: AgentScaffoldIdentity,
+    identity: AgentIdentity,
     searchField: (@Composable () -> Unit)?,
     onMenuClick: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior?,
 ) {
     TopAppBar(
         title = {
-            if (searchField != null) AgentPillSurface { searchField() } else AgentScaffoldIdentityPill(identity)
+            if (searchField != null) AgentPillSurface { searchField() } else AgentIdentityPill(identity)
         },
         modifier = Modifier
             .padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() })
@@ -165,7 +156,7 @@ private fun AgentScaffoldHeader(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AgentScaffoldCanvasIdentityPill(identity: AgentScaffoldIdentity) {
+private fun AgentScaffoldCanvasIdentityPill(identity: AgentIdentity) {
     Box(
         Modifier
             .padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() })
@@ -175,20 +166,8 @@ private fun AgentScaffoldCanvasIdentityPill(identity: AgentScaffoldIdentity) {
             .testTag(AgentScaffoldTestTags.CANVAS_IDENTITY_PILL),
         contentAlignment = Alignment.CenterStart,
     ) {
-        AgentScaffoldIdentityPill(identity)
+        AgentIdentityPill(identity)
     }
-}
-
-@Composable
-private fun AgentScaffoldIdentityPill(identity: AgentScaffoldIdentity) {
-    AgentIdentityPill(
-        agentId = identity.agentId,
-        name = identity.name,
-        isFavorite = identity.isFavorite,
-        isPinned = identity.isPinned,
-        onClick = identity.onClick,
-        onLongClick = identity.onLongClick,
-    )
 }
 
 /**

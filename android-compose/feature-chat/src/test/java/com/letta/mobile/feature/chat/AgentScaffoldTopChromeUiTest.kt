@@ -11,9 +11,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import com.letta.mobile.feature.chat.screen.AgentScaffoldIdentity
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTopChromeLayout
+import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.AgentIdentityPillTestTags
 import com.letta.mobile.ui.test.setLettaTestContent
 import org.junit.Assert.assertEquals
@@ -40,7 +40,7 @@ class AgentScaffoldTopChromeUiTest {
     fun headerAndCanvasModeDrawTheSameSharedPill() {
         var headerHidden by mutableStateOf(false)
         var clicks = 0
-        val identity = AgentScaffoldIdentity(
+        val identity = AgentIdentity(
             agentId = "agent-pill-1",
             name = "PillBot",
             isFavorite = true,
