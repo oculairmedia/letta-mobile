@@ -161,6 +161,9 @@ private fun PagedTimelineBody(
                 topReserve = params.topReserve,
             ),
             modifier = Modifier.fillMaxSize(),
+            // Paging appends older history and prepends newer: a page boundary is not an edge.
+            olderHistoryComplete = { settled.loadState.append.endOfPaginationReached },
+            newerHistoryComplete = { settled.loadState.prepend.endOfPaginationReached },
         ) {
             pagedRows(PagedRowsScope(rows, settled, params, today, bindings))
         }
