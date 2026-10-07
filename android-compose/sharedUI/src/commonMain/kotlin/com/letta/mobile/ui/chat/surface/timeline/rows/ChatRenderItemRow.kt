@@ -39,7 +39,7 @@ internal fun ChatRenderItemRow(
                     if (inRun) {
                         RunBlockRow(listOf(item.message), context, callbacks)
                     } else {
-                        ChatMessageRow(item.message, context, callbacks)
+                        ChatMessageRow(item.message, context, callbacks, item.groupPosition)
                     }
                 }
             }
@@ -103,4 +103,5 @@ internal object ChatRowTestTags {
     const val IMAGE_GRID = "chat-image-grid"
     const val IMAGE_VIEWER = "chat-image-viewer"
     const val CLOCK = "chat-row-clock"
+    const val SPEAKER_HEADER = "chat-row-speaker-header"
 }

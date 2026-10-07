@@ -61,6 +61,8 @@
     <string name="rows_role_you">You</string>
     <string name="rows_role_error">Error</string>
     <string name="rows_role_inter_agent">Inter-agent</string>
+    <string name="rows_role_tool_output">Tool output</string>
+    <string name="rows_role_tool_activity">Tool activity</string>
     <string name="rows_role_not_sent">%1$s · Not sent</string>
     <string name="rows_step_done">done</string>
     <string name="rows_step_failed">failed</string>

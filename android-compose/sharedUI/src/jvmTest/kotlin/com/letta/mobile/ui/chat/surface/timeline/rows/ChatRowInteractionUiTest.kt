@@ -382,6 +382,15 @@ class ChatRowInteractionUiTest {
         assertEquals(null, messageClockLabel("not a time", TimeZone.UTC))
     }
 
+    @Test
+    fun clockLabelFollowsATwentyFourHourClock() {
+        // letta-mobile-bglj6.1.23: a 24-hour locale (or the user's toggle) reads "16:30", not "4:30 PM".
+        assertEquals("16:30", messageClockLabel("2026-07-19T16:30:00Z", TimeZone.UTC, twentyFourHour = true))
+        assertEquals("09:05", messageClockLabel("2026-07-19T09:05:00", TimeZone.UTC, twentyFourHour = true))
+        assertEquals(true, localeUses24HourClock(java.util.Locale.GERMANY))
+        assertEquals(false, localeUses24HourClock(java.util.Locale.US))
+    }
+
     private companion object {
         val SCROLL_VIEWPORT = 400.dp
         const val FILLER_ROWS = 30

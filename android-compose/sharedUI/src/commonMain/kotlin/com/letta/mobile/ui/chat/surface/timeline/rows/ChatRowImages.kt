@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,6 +27,7 @@ import com.letta.mobile.sharedui.resources.rows_attached_image
 import com.letta.mobile.sharedui.resources.rows_image_not_loaded
 import com.letta.mobile.sharedui.resources.rows_more_count
 import com.letta.mobile.ui.chat.surface.rememberDecodedImage
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.collections.immutable.ImmutableList
@@ -59,6 +61,12 @@ internal fun ChatImageAttachmentsGrid(
 ) {
     val images = tap.images
     if (images.isEmpty()) return
+    // letta-mobile-bglj6.1.23: a phone draws an assistant's images as the legacy bubble did
+    // (MessageAttachmentsGrid, the same grid a prompt uses): 120dp cells, a 4dp gap.
+    if (touchStyle()) {
+        ChatPromptImageGrid(tap, modifier)
+        return
+    }
     val cellHeight = if (images.size == 1) ChatRowDimens.imageSingleHeight else ChatRowDimens.imageGridHeight
     Row(
         modifier = modifier.testTag(ChatRowTestTags.IMAGE_GRID),
@@ -145,11 +153,13 @@ internal fun ChatAttachmentImage(
     modifier: Modifier = Modifier,
 ) {
     val bitmap = rememberAttachmentBitmap(attachment)
+    // Touch: the legacy cell (Radius.sm, no border); the pointer host keeps its outlined card.
+    val touch = touchStyle()
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
+        shape = if (touch) RoundedCornerShape(LettaDimens.Radius.sm) else MaterialTheme.shapes.medium,
+        border = if (touch) null else BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         if (bitmap != null) {
             Image(

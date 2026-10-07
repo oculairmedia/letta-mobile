@@ -28,8 +28,13 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_copy_response
 import com.letta.mobile.sharedui.resources.rows_role_error
+import com.letta.mobile.sharedui.resources.rows_role_tool_activity
+import com.letta.mobile.sharedui.resources.rows_role_tool_output
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
+import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
+import com.letta.mobile.ui.chat.surface.touchStyle
+import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -49,11 +54,13 @@ internal fun ChatMessageRow(
     message: UiMessage,
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
+    position: GroupPosition = GroupPosition.None,
 ) {
     when {
-        isUserRole(message.role) && message.subagentNotification == null -> UserPromptRow(message, context, callbacks)
+        isUserRole(message.role) && message.subagentNotification == null ->
+            UserPromptRow(message, context, callbacks, PromptGrouping.of(position))
         message.isReasoning && message.subagentNotification == null -> ReasoningRow(message, context, callbacks)
-        else -> AssistantMessageColumn(message, context, callbacks)
+        else -> AssistantMessageColumn(message, context, callbacks, position)
     }
 }
 
@@ -62,11 +69,13 @@ private fun AssistantMessageColumn(
     message: UiMessage,
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
+    position: GroupPosition,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart),
     ) {
+        if (touchStyle() && showsSpeakerHeader(message, position)) SpeakerHeader(message, context)
         message.agentMessageProvenance?.let { ProvenanceLabel(message, callbacks) }
         AssistantPrimaryContent(message, context, callbacks)
         MessageImages(message, callbacks)
@@ -108,6 +117,49 @@ private fun AssistantPrimaryContent(
             ),
         )
     }
+}
+
+/**
+ * letta-mobile-bglj6.1.23: the legacy bubble's role label (MessageBubbleSurface) on a structured
+ * row: generated UI, approvals, a subagent's report, images, a tool's own output. Plain prose and
+ * a bare tool-call line stay unlabelled (bubble-less), errors label themselves, and only the
+ * first row of a speaker's group carries it.
+ */
+internal fun showsSpeakerHeader(message: UiMessage, position: GroupPosition): Boolean {
+    if (position != GroupPosition.First && position != GroupPosition.None) return false
+    if (message.isError) return false
+    return when (message.role) {
+        "tool" -> true
+        "assistant" -> message.generatedUi != null ||
+            message.approvalRequest != null ||
+            message.approvalResponse != null ||
+            message.subagentNotification != null ||
+            message.attachments.isNotEmpty()
+        else -> false
+    }
+}
+
+/** "Agent" (or "Agent · Live"), "Inter-agent", the single tool's name, or "Tool output". */
+@Composable
+private fun SpeakerHeader(message: UiMessage, context: ChatRowContext) {
+    val style = bubbleStyle(
+        role = message.role,
+        isStreaming = context.isStreaming(message),
+        isAgentMessage = message.agentMessageProvenance != null,
+    )
+    val toolOutput = stringResource(Res.string.rows_role_tool_output)
+    val toolActivity = stringResource(Res.string.rows_role_tool_activity)
+    val label = message.toolCalls?.singleOrNull()?.name ?: when {
+        message.role != "tool" -> style.roleLabel
+        message.content.isNotBlank() -> toolOutput
+        else -> toolActivity
+    }
+    Text(
+        text = label,
+        style = ChatRowType.roleLabel,
+        color = style.roleColor,
+        modifier = Modifier.testTag(ChatRowTestTags.SPEAKER_HEADER),
+    )
 }
 
 /** A server error frame: the error-container bubble with its "Error" label (bubbleStyle isError). */
@@ -224,7 +276,8 @@ internal fun AgentText(params: AgentTextParams) {
 /** "4:06 PM" under the newest reply (DeliveryTimeText): small, at half strength. */
 @Composable
 private fun DeliveryTime(timestamp: String) {
-    val clock = remember(timestamp) { messageClockLabel(timestamp) } ?: return
+    val twentyFourHour = systemUses24HourClock()
+    val clock = remember(timestamp, twentyFourHour) { messageClockLabel(timestamp, twentyFourHour = twentyFourHour) } ?: return
     Text(
         text = clock,
         style = MaterialTheme.typography.labelSmall,
