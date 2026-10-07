@@ -8,11 +8,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
 
 /**
@@ -111,13 +114,18 @@ private fun ForceFollowOnSend(
 ) {
     val previousKey = remember { mutableStateOf<String?>(null) }
     val reducedMotion = LocalReducedMotion.current
+    // The glide outlives the key that started it: the reply arriving at the head a moment later
+    // changes the key again, and must not cancel the glide halfway to the edge.
+    val scope = rememberCoroutineScope()
     LaunchedEffect(newestKey) {
         val isNewPrompt = newestIsUserPrompt && previousKey.value != null && newestKey != previousKey.value
         previousKey.value = newestKey
         if (isNewPrompt) {
             follow.following = true
-            follow.ownScroll {
-                if (reducedMotion) listState.scrollToItem(0) else listState.animateScrollToItem(0)
+            scope.launch {
+                follow.ownScroll {
+                    if (reducedMotion) listState.scrollToItem(0) else listState.animateScrollToItem(0)
+                }
             }
         }
     }
@@ -136,7 +144,11 @@ private fun <I> SnapToNewestWhileFollowing(listState: LazyListState, follow: Pag
     LaunchedEffect(identity, follow.following) {
         if (!follow.following) return@LaunchedEffect
         delay(streamSnapDelayMs(streamClock.elapsedNow().inWholeMilliseconds, lastSnapAtMs.value))
-        if (listState.isScrollInProgress || listState.isAtNewestEdge()) return@LaunchedEffect
+        // A scroll under way (the send's glide) is waited out, not skipped: if it ends short of the
+        // edge, this tick still brings the list there. A reader's scroll detaches the follow, which
+        // cancels this wait.
+        snapshotFlow { listState.isScrollInProgress }.first { !it }
+        if (listState.isAtNewestEdge()) return@LaunchedEffect
         lastSnapAtMs.value = streamClock.elapsedNow().inWholeMilliseconds
         follow.ownScroll { listState.scrollToItem(0) }
     }

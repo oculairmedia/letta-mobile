@@ -81,8 +81,32 @@ class PagedTimelineFollowTest {
         assertTrue(listState().isAtNewestEdge(), "the send lands on the newest edge")
     }
 
+    /** The reply lands at the head while the send's glide is still on its way: the list still ends on the edge. */
     @Test
-    fun theReaderScrollingAwayStillDetachesTheFollow() = runComposeUiTest {
+    fun aReplyArrivingMidGlideStillLandsOnTheNewestEdge() = runComposeUiTest {
+        var rows by mutableStateOf(history(ROWS))
+        val (follow, listState) = mount(rows = { rows }, newerHistoryComplete = { true })
+        onNodeWithTag(LIST).performTouchInput {
+            down(center)
+            repeat(DRAG_STEPS) { moveBy(Offset(0f, DRAG_STEP_PX)) }
+            up()
+        }
+        waitForIdle()
+        assertFalse(listState().isAtNewestEdge(), "the reader starts scrolled up")
+
+        mainClock.autoAdvance = false
+        rows = Rows(listOf("prompt") + rows.keys, newestIsPrompt = true)
+        repeat(MID_GLIDE_FRAMES) { mainClock.advanceTimeByFrame() }
+        rows = Rows(listOf("reply") + rows.keys, newestIsPrompt = false)
+        mainClock.autoAdvance = true
+        waitForIdle()
+
+        assertTrue(follow().following, "the send re-armed the follow")
+        assertTrue(listState().isAtNewestEdge(), "ended at ${listState().firstVisibleItemIndex}/${listState().firstVisibleItemScrollOffset}")
+    }
+
+    @Test
+    fun theReaderScrollingAwayStillDetachesTheFollow()= runComposeUiTest {
         val (follow, _) = mount(rows = { history(ROWS) }, newerHistoryComplete = { true })
         assertTrue(follow().following)
 
@@ -103,5 +127,6 @@ class PagedTimelineFollowTest {
         const val ROW_DP = 80
         const val DRAG_STEPS = 6
         const val DRAG_STEP_PX = 40f
+        const val MID_GLIDE_FRAMES = 3
     }
 }
