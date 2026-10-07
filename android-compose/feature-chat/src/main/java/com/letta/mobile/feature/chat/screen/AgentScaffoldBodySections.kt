@@ -84,7 +84,7 @@ internal fun AgentScaffoldDrawerScaffold(state: AgentScaffoldRuntimeState) {
     LogDrawerTransitions(state.drawerState)
     // letta-mobile-c3np7.5.5: Settings > "Shared navigation drawer" swaps in the desktop's rail and
     // agent panel (sharedUI). The legacy drawer stays the default until it is deleted.
-    val sharedDrawer = state.params.sharedNavDrawer
+    val sharedDrawer = LocalSharedNavDrawer.current
     val sharedDrawerEnabled = sharedDrawer?.enabled?.collectAsStateWithLifecycle()?.value == true
     ModalNavigationDrawer(
         drawerState = state.drawerState,

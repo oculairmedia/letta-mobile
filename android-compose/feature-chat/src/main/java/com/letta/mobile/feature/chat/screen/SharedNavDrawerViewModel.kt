@@ -1,9 +1,11 @@
 package com.letta.mobile.feature.chat.screen
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
@@ -18,6 +20,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
+ * The shared navigation drawer's binding for the chat scaffold; null (tests, hosts without Hilt)
+ * keeps the legacy drawer. [AgentScaffold] provides it.
+ */
+internal val LocalSharedNavDrawer = staticCompositionLocalOf<SharedNavDrawerViewModel?> { null }
+
+/**
  * The Android side of the shared navigation drawer (letta-mobile-c3np7.5.5): whether it replaces the
  * legacy chat drawer, the canvases it lists, its archive filter, and the conversation actions its
  * rows offer. The drawer's look and its mapping live in sharedUI; this only binds Android's stores.
@@ -29,7 +37,7 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     private val conversationRepository: IConversationRepository,
 ) : ViewModel() {
 
-    val enabled: StateFlow<Boolean> = settingsRepository.getSharedNavDrawerEnabled()
+    val enabled: StateFlow<Boolean> = settingsRepository.getFeatureFlag(FeatureFlag.SharedNavDrawer)
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _canvases = MutableStateFlow<List<CanvasDocument>>(emptyList())

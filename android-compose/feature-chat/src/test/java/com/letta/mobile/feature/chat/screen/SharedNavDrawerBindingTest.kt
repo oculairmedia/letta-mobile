@@ -4,6 +4,7 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.MainDispatcherRule
@@ -41,7 +42,7 @@ class SharedNavDrawerBindingTest {
         val vm = viewModel()
         advanceUntilIdle()
         assertFalse(vm.enabled.value)
-        settings.setSharedNavDrawerEnabled(true)
+        settings.setFeatureFlag(FeatureFlag.SharedNavDrawer, true)
         advanceUntilIdle()
         assertTrue(vm.enabled.value)
     }

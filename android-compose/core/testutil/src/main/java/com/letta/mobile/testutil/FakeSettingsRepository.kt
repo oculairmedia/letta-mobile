@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
 import com.letta.mobile.data.repository.LastChatSelectionStorage
 import com.letta.mobile.data.repository.mergeLastChatSelection
+import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.backendIdentity
 import kotlinx.coroutines.flow.Flow
@@ -63,7 +64,7 @@ class FakeSettingsRepository(
     private val hapticsEnabledState = MutableStateFlow(true)
     private val sharedChatPageEnabledState = MutableStateFlow(false)
     private val openChatsOnCanvasState = MutableStateFlow(true)
-    private val sharedNavDrawerEnabledState = MutableStateFlow(false)
+    private val featureFlagStates = mutableMapOf<FeatureFlag, MutableStateFlow<Boolean>>()
 
     override val configs: StateFlow<List<LettaConfig>> = configsState.asStateFlow()
 
@@ -254,11 +255,14 @@ class FakeSettingsRepository(
         openChatsOnCanvasState.value = enabled
     }
 
-    override fun getSharedNavDrawerEnabled(): Flow<Boolean> = sharedNavDrawerEnabledState
+    override fun getFeatureFlag(flag: FeatureFlag): Flow<Boolean> = featureFlagState(flag)
 
-    override suspend fun setSharedNavDrawerEnabled(enabled: Boolean) {
-        sharedNavDrawerEnabledState.value = enabled
+    override suspend fun setFeatureFlag(flag: FeatureFlag, enabled: Boolean) {
+        featureFlagState(flag).value = enabled
     }
+
+    private fun featureFlagState(flag: FeatureFlag): MutableStateFlow<Boolean> =
+        featureFlagStates.getOrPut(flag) { MutableStateFlow(flag.defaultEnabled) }
 
     override suspend fun setTheme(theme: AppTheme) {
         themeState.value = theme

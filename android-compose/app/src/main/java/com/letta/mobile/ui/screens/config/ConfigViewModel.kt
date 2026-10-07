@@ -10,6 +10,7 @@ import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.modelvalidation.ModelHandleValidator
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
@@ -52,7 +53,8 @@ data class ConfigUiState(
     val hapticsEnabled: Boolean = true,
     val sharedChatPageEnabled: Boolean = false,
     val openChatsOnCanvas: Boolean = true,
-    val sharedNavDrawerEnabled: Boolean = false,
+    /** The Settings preview switches that are on. */
+    val enabledFeatureFlags: Set<FeatureFlag> = emptySet(),
     val localModelPath: String = "",
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
@@ -119,7 +121,7 @@ class ConfigViewModel @Inject constructor(
             val requestId = RetainedContentRefresh.nextRequestId(latestLoadRequestId)
             if (!beginLoad(requestId, retainedState)) return@launch
             try {
-                val configUiState = buildConfigUiState()
+                val configUiState = buildConfigUiState().copy(enabledFeatureFlags = loadEnabledFeatureFlags())
                 if (RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) {
                     _uiState.value = UiState.Success(configUiState)
                 }
@@ -177,7 +179,6 @@ class ConfigViewModel @Inject constructor(
                 hapticsEnabled = preferences.hapticsEnabled,
                 sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                 openChatsOnCanvas = preferences.openChatsOnCanvas,
-                sharedNavDrawerEnabled = preferences.sharedNavDrawerEnabled,
                 localModelPath = activeConfig.localModelPath.orEmpty(),
                 localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                 localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
@@ -204,7 +205,6 @@ class ConfigViewModel @Inject constructor(
                 hapticsEnabled = preferences.hapticsEnabled,
                 sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                 openChatsOnCanvas = preferences.openChatsOnCanvas,
-                sharedNavDrawerEnabled = preferences.sharedNavDrawerEnabled,
                 huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                 savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                 embeddedModelCatalog = embeddedModelRepository.catalog.value,
@@ -231,7 +231,6 @@ class ConfigViewModel @Inject constructor(
         val hapticsEnabled = async { settingsRepository.getHapticsEnabled().first() }
         val sharedChatPageEnabled = async { settingsRepository.getSharedChatPageEnabled().first() }
         val openChatsOnCanvas = async { settingsRepository.getOpenChatsOnCanvas().first() }
-        val sharedNavDrawerEnabled = async { settingsRepository.getSharedNavDrawerEnabled().first() }
         DisplayPreferences(
             theme = theme.await(),
             themePreset = themePreset.await(),
@@ -240,9 +239,11 @@ class ConfigViewModel @Inject constructor(
             hapticsEnabled = hapticsEnabled.await(),
             sharedChatPageEnabled = sharedChatPageEnabled.await(),
             openChatsOnCanvas = openChatsOnCanvas.await(),
-            sharedNavDrawerEnabled = sharedNavDrawerEnabled.await(),
         )
     }
+
+    private suspend fun loadEnabledFeatureFlags(): Set<FeatureFlag> =
+        FeatureFlag.entries.filter { settingsRepository.getFeatureFlag(it).first() }.toSet()
 
     private data class DisplayPreferences(
         val theme: AppTheme,
@@ -252,7 +253,6 @@ class ConfigViewModel @Inject constructor(
         val hapticsEnabled: Boolean,
         val sharedChatPageEnabled: Boolean,
         val openChatsOnCanvas: Boolean,
-        val sharedNavDrawerEnabled: Boolean,
     )
 
     fun updateMode(mode: ServerMode) {
@@ -360,11 +360,12 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
-    fun updateSharedNavDrawerEnabled(enabled: Boolean) {
+    fun updateFeatureFlag(flag: FeatureFlag, enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, sharedNavDrawerEnabled = enabled))
+        val flags = if (enabled) currentState.enabledFeatureFlags + flag else currentState.enabledFeatureFlags - flag
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, enabledFeatureFlags = flags))
         viewModelScope.launch {
-            settingsRepository.setSharedNavDrawerEnabled(enabled)
+            settingsRepository.setFeatureFlag(flag, enabled)
         }
     }
 

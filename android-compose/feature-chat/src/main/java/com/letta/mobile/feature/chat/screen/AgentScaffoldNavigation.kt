@@ -62,6 +62,4 @@ internal data class AgentScaffoldBodyParams(
     val searchUi: AgentScaffoldSearchUiState,
     val projectUi: AgentScaffoldProjectUiState,
     val conversationRepository: IConversationRepository?,
-    /** The shared navigation drawer's binding; null keeps the legacy drawer (tests, hosts without Hilt). */
-    val sharedNavDrawer: SharedNavDrawerViewModel? = null,
 )

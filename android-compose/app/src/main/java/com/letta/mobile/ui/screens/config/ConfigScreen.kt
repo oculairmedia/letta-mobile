@@ -148,7 +148,7 @@ private fun rememberConfigContentCallbacks(
                 onHapticsEnabledChange = { viewModel.updateHapticsEnabled(it) },
                 onSharedChatPageEnabledChange = { viewModel.updateSharedChatPageEnabled(it) },
                 onOpenChatsOnCanvasChange = { viewModel.updateOpenChatsOnCanvas(it) },
-                onSharedNavDrawerEnabledChange = { viewModel.updateSharedNavDrawerEnabled(it) },
+                onFeatureFlagChange = viewModel::updateFeatureFlag,
             ),
             onRefresh = viewModel::loadConfig,
             onSave = { currentOnSave() },
