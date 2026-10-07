@@ -36,29 +36,32 @@ import kotlin.test.assertTrue
 /** letta-mobile-bglj6.1.20: the legacy TimelineKineticOverscrollTest, on the common effect. */
 class TimelineElasticOverscrollTest {
 
+    private fun fling(initial: Float, consumed: Float, maxOffsetPx: Float) =
+        ElasticFling(Velocity(0f, initial), Velocity(0f, consumed), maxOffsetPx)
+
     @Test
     fun bounceKeepsOnlyTheResidualTowardAnAvailableEdge() {
-        assertEquals(300f, elasticBounceVelocity(1_000f, 700f, 40f, { true }, { true }))
-        assertEquals(-300f, elasticBounceVelocity(-1_000f, -700f, 40f, { true }, { true }))
+        assertEquals(300f, elasticBounceVelocity(fling(1_000f, 700f, 40f), { true }))
+        assertEquals(-300f, elasticBounceVelocity(fling(-1_000f, -700f, 40f), { true }))
         // Fully consumed, or under a pixel a second: nothing left to bounce with.
-        assertEquals(0f, elasticBounceVelocity(1_000f, 1_000f, 40f, { true }, { true }))
-        assertEquals(0f, elasticBounceVelocity(1_000f, 999.5f, 40f, { true }, { true }))
+        assertEquals(0f, elasticBounceVelocity(fling(1_000f, 1_000f, 40f), { true }))
+        assertEquals(0f, elasticBounceVelocity(fling(1_000f, 999.5f, 40f), { true }))
     }
 
     @Test
     fun aPageBoundaryIsNotAnEdge() {
-        assertEquals(0f, elasticBounceVelocity(1_000f, 0f, 40f, { false }, { true }))
-        assertEquals(0f, elasticBounceVelocity(-1_000f, 0f, 40f, { true }, { false }))
+        assertEquals(0f, elasticBounceVelocity(fling(1_000f, 0f, 40f), { positive -> !positive }))
+        assertEquals(0f, elasticBounceVelocity(fling(-1_000f, 0f, 40f), { positive -> positive }))
     }
 
     @Test
     fun launchVelocityIsCappedSoThePeakStaysInsideTheBand() {
         val cap = 40f * sqrt(TimelineElasticOverscroll.SPRING_STIFFNESS) * TimelineElasticOverscroll.VELOCITY_CAP_FACTOR
-        assertEquals(cap, elasticBounceVelocity(1e6f, 0f, 40f, { true }, { true }), 0.01f)
-        assertEquals(-cap, elasticBounceVelocity(-1e6f, 0f, 40f, { true }, { true }), 0.01f)
-        assertEquals(0f, elasticBounceVelocity(Float.NaN, 0f, 40f, { true }, { true }))
+        assertEquals(cap, elasticBounceVelocity(fling(1e6f, 0f, 40f), { true }), 0.01f)
+        assertEquals(-cap, elasticBounceVelocity(fling(-1e6f, 0f, 40f), { true }), 0.01f)
+        assertEquals(0f, elasticBounceVelocity(fling(Float.NaN, 0f, 40f), { true }))
         // Not measured yet: no band to stretch into.
-        assertEquals(0f, elasticBounceVelocity(1_000f, 0f, 0f, { true }, { true }))
+        assertEquals(0f, elasticBounceVelocity(fling(1_000f, 0f, 0f), { true }))
     }
 
     @Test

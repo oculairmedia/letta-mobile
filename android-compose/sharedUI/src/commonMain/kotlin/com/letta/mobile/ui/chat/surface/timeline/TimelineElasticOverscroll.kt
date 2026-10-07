@@ -106,11 +106,8 @@ internal class TimelineElasticOverscroll(
             val consumed = performFling(velocity)
             if (!enabled || epoch != animationEpoch) return
             val bounce = elasticBounceVelocity(
-                initial = velocity.y,
-                consumed = consumed.y,
-                maxOffsetPx = maxOffsetPx,
-                canBouncePastPositiveEdge = canBouncePastPositiveEdge,
-                canBouncePastNegativeEdge = canBouncePastNegativeEdge,
+                fling = ElasticFling(velocity, consumed, maxOffsetPx),
+                canBouncePast = { towardPositive -> if (towardPositive) canBouncePastPositiveEdge() else canBouncePastNegativeEdge() },
             )
             if (bounce == 0f) return
             animate(
@@ -146,23 +143,26 @@ internal class TimelineElasticOverscroll(
     }
 }
 
+/** A fling's launch velocity, what the list consumed of it, and the band it may stretch into. */
+internal class ElasticFling(val initial: Velocity, val consumed: Velocity, val maxOffsetPx: Float) {
+    fun isBounceable(): Boolean = initial.y.isFinite() && consumed.y.isFinite() && maxOffsetPx > 0f
+}
+
 /**
  * The velocity the bounce launches with, or 0 for none: the fling's residual past what the list
  * consumed, only toward an edge that is truly the end (not a page boundary), capped so the spring
  * peaks inside [maxOffsetPx].
  */
 internal fun elasticBounceVelocity(
-    initial: Float,
-    consumed: Float,
-    maxOffsetPx: Float,
-    canBouncePastPositiveEdge: () -> Boolean,
-    canBouncePastNegativeEdge: () -> Boolean,
+    fling: ElasticFling,
+    canBouncePast: (towardPositive: Boolean) -> Boolean,
 ): Float {
-    if (!initial.isFinite() || !consumed.isFinite() || maxOffsetPx <= 0f) return 0f
-    val residual = initial - consumed
+    if (!fling.isBounceable()) return 0f
+    val residual = fling.initial.y - fling.consumed.y
+    val maxOffsetPx = fling.maxOffsetPx
     val edgeIsAvailable = when {
-        residual > 0f -> canBouncePastPositiveEdge()
-        residual < 0f -> canBouncePastNegativeEdge()
+        residual > 0f -> canBouncePast(true)
+        residual < 0f -> canBouncePast(false)
         else -> false
     }
     if (!edgeIsAvailable) return 0f
