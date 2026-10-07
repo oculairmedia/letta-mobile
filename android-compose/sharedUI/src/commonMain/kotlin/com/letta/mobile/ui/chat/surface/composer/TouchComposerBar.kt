@@ -296,15 +296,22 @@ private fun touchSheetItems(model: ComposerModel, onAttachImage: () -> Unit): Li
 }
 
 /**
+ * The slot is the mic: the platform can dictate, nothing is drafted or running, and the field takes
+ * input (no dictating into a field that takes none: the slot falls back to the greyed Send, legacy).
+ */
+private fun touchSlotDictates(model: ComposerModel): Boolean {
+    if (model.platform.voiceInput == null || !model.composer.acceptsInput) return false
+    return !model.streaming && !model.composer.hasPayload
+}
+
+/**
  * The right-hand slot. Empty and idle, it is the platform's hold-to-dictate mic; otherwise Send,
  * or Stop while a run streams with nothing to queue. While the keyboard is up Send steps aside
  * (the keyboard's own action key sends), but Stop and the mic stay.
  */
 @Composable
 private fun TouchTrailingSlot(model: ComposerModel) {
-    val voice = model.platform.voiceInput
-    // No dictating into a field that takes no input: the slot falls back to the greyed Send (legacy).
-    val dictates = voice != null && !model.streaming && !model.composer.hasPayload && model.composer.acceptsInput
+    val dictates = touchSlotDictates(model)
     val keyboard = keyboardOpen()
     val visible = dictates || model.streaming || !keyboard
     val reducedMotion = LocalReducedMotion.current
