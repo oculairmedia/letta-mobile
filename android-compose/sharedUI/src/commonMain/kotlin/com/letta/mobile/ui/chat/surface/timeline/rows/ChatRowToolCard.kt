@@ -106,7 +106,7 @@ internal fun ToolCard(
     val view = ToolCardView(toolCall, remember(toolCall) { classifyToolCallState(toolCall) }, touch)
     val body: @Composable () -> Unit = {
         Column {
-            ToolCardHeader(view, expanded, callbacks) { expanded = !expanded }
+            ToolCardHeader(view, ToolDisclosure(expanded) { expanded = !expanded }, callbacks)
             if (expanded) ToolCardBody(view, isError, callbacks)
         }
     }
@@ -145,17 +145,20 @@ private val UnsettledStates = setOf(ToolTimelineState.Running, ToolTimelineState
 @Composable
 private fun ToolCardHeader(
     view: ToolCardView,
-    expanded: Boolean,
+    disclosure: ToolDisclosure,
     callbacks: ChatRowCallbacks,
-    onToggle: () -> Unit,
 ) {
     val provenance = view.toolCall.agentMessageProvenance
     when {
-        provenance != null -> ToolCardProvenanceHeader(provenance, expanded, callbacks, onToggle)
-        view.touch -> ToolCardTouchHeader(view, expanded, onToggle)
-        else -> ToolCardGenericHeader(view.toolCall, expanded, onToggle)
+        provenance != null -> ToolCardProvenanceHeader(provenance, disclosure.expanded, callbacks, disclosure.onToggle)
+        view.touch -> ToolCardTouchHeader(view, disclosure)
+        else -> ToolCardGenericHeader(view.toolCall, disclosure.expanded, disclosure.onToggle)
     }
 }
+
+/** A card's disclosure: whether it is open, and how to flip it. */
+@Immutable
+private class ToolDisclosure(val expanded: Boolean, val onToggle: () -> Unit)
 
 /**
  * letta-mobile-bglj6.1.23: the legacy status row (CollapsibleStatusRow + ChatToolCallCards'
@@ -164,8 +167,9 @@ private fun ToolCardHeader(
  * the status glyph: turning while it runs, then a check, a warning or an error.
  */
 @Composable
-private fun ToolCardTouchHeader(view: ToolCardView, expanded: Boolean, onToggle: () -> Unit) {
+private fun ToolCardTouchHeader(view: ToolCardView, disclosure: ToolDisclosure) {
     val toolCall = view.toolCall
+    val expanded = disclosure.expanded
     val label = remember(toolCall) { toolCall.stepLabel() }
     val labelText = label.text()
     val collapsedSummary = labelText.takeUnless { it == toolCall.name } ?: toolCall.stepSummary()
@@ -174,7 +178,7 @@ private fun ToolCardTouchHeader(view: ToolCardView, expanded: Boolean, onToggle:
         modifier = Modifier
             .fillMaxWidth()
             .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
-            .clickable(onClick = onToggle, role = Role.Button)
+            .clickable(onClick = disclosure.onToggle, role = Role.Button)
             .semantics { stateDescription = disclosureState }
             .heightIn(min = ChatRowDimens.toolHeaderMinHeight)
             .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
