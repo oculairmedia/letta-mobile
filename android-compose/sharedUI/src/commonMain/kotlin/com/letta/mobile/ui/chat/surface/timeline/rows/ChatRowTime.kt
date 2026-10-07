@@ -19,11 +19,23 @@ import org.jetbrains.compose.resources.stringResource
 // letta-mobile-bglj6.1: desktop's messageClockLabel (java.time) on kotlinx-datetime, so the
 // shared rows can show it on Android and desktop alike.
 
-/** "9:41 AM" in the system zone, or null for a blank or unparseable timestamp. */
-internal fun messageClockLabel(iso: String, zone: TimeZone = TimeZone.currentSystemDefault()): String? {
+/**
+ * "9:41 AM", or "09:41" on a [twentyFourHour] clock, in the system zone; null for a blank or
+ * unparseable timestamp. letta-mobile-bglj6.1.23: the rows pass [systemUses24HourClock], so the
+ * clock follows the system's 12/24-hour setting as the legacy DeliveryTimeText did.
+ */
+internal fun messageClockLabel(
+    iso: String,
+    zone: TimeZone = TimeZone.currentSystemDefault(),
+    twentyFourHour: Boolean = false,
+): String? {
     val local = parseLocalDateTime(iso, zone) ?: return null
-    return local.format(ClockFormat)
+    return local.format(if (twentyFourHour) Clock24Format else ClockFormat)
 }
+
+/** Whether the platform shows times on a 24-hour clock (the user's setting, else the locale's). */
+@Composable
+internal expect fun systemUses24HourClock(): Boolean
 
 /**
  * Accepts the shapes the backends emit: an instant (`…Z`), an offset date-time, and a bare
@@ -42,6 +54,12 @@ private val ClockFormat = LocalDateTime.Format {
     minute()
     char(' ')
     amPmMarker("AM", "PM")
+}
+
+private val Clock24Format = LocalDateTime.Format {
+    hour()
+    char(':')
+    minute()
 }
 
 private const val MILLIS_PER_SECOND = 1_000L

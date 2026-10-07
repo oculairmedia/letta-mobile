@@ -231,8 +231,14 @@ internal fun TimelineItemRow(
  */
 internal fun timelineLeadingSpace(item: ChatRenderItem): Dp = when (item) {
     // A run is a new turn: the section break above it, the same one the next speaker takes
-    // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11).
-    is ChatRenderItem.RunBlock -> ChatRowSpacing.ungrouped
+    // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11). A run
+    // of nothing but tool calls continues the turn above it and takes the tight beat, as the
+    // legacy list's ChatMessageListRenderRunParams did (letta-mobile-bglj6.1.23).
+    is ChatRenderItem.RunBlock -> if (item.messages.all { !it.first.toolCalls.isNullOrEmpty() }) {
+        ChatRowSpacing.grouped
+    } else {
+        ChatRowSpacing.ungrouped
+    }
     is ChatRenderItem.Single -> when {
         item.stableRunKey != null -> ChatRowSpacing.ungrouped
         item.message.isReasoning || !item.message.toolCalls.isNullOrEmpty() -> ChatRowSpacing.grouped

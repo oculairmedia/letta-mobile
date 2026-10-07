@@ -53,6 +53,7 @@ import com.letta.mobile.sharedui.resources.rows_role_you
 import com.letta.mobile.sharedui.resources.rows_send_again
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightTarget
 import com.letta.mobile.ui.chat.surface.touchStyle
+import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
@@ -88,13 +89,15 @@ private data class PromptBubbleStyle(
     val label: Color,
     val role: StringResource,
     val shape: Shape,
+    /** The role label heads only the first bubble of a run of the user's own (legacy groupPosition). */
+    val showsRole: Boolean = true,
 )
 
 @Composable
-private fun promptBubbleStyle(interAgent: Boolean): PromptBubbleStyle {
+private fun promptBubbleStyle(interAgent: Boolean, grouping: PromptGrouping): PromptBubbleStyle {
     val scheme = MaterialTheme.colorScheme
-    val shape = ChatBubbleShapes.user()
-    return if (interAgent) {
+    val shape = ChatBubbleShapes.user(continues = grouping.continues)
+    val style = if (interAgent) {
         PromptBubbleStyle(
             container = scheme.tertiaryContainer,
             content = scheme.onTertiaryContainer,
@@ -109,6 +112,23 @@ private fun promptBubbleStyle(interAgent: Boolean): PromptBubbleStyle {
             label = scheme.onPrimaryContainer.copy(alpha = ChatRowAlpha.userRoleLabel),
             role = Res.string.rows_role_you,
             shape = shape,
+        )
+    }
+    return style.copy(showsRole = grouping.leads)
+}
+
+/**
+ * letta-mobile-bglj6.1.23: where a prompt sits in a run of the user's own bubbles (the legacy
+ * MessageBubbleShape groupPosition): one that the next bubble continues tightens its bottom-end
+ * corner; only the first (or a lone one) carries the role label.
+ */
+internal data class PromptGrouping(val leads: Boolean, val continues: Boolean) {
+    companion object {
+        val Alone = PromptGrouping(leads = true, continues = false)
+
+        fun of(position: GroupPosition): PromptGrouping = PromptGrouping(
+            leads = position == GroupPosition.First || position == GroupPosition.None,
+            continues = position == GroupPosition.First || position == GroupPosition.Middle,
         )
     }
 }
@@ -130,6 +150,7 @@ internal fun UserPromptRow(
     message: UiMessage,
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
+    grouping: PromptGrouping = PromptGrouping.Alone,
 ) {
     val state = remember(message.id) { PromptCardState() }
     val availability = remember(message, context.capabilities.rerun) {
@@ -138,7 +159,7 @@ internal fun UserPromptRow(
     val hoverSource = remember(message.id) { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
     val interAgent = message.agentMessageProvenance != null
-    val style = promptBubbleStyle(interAgent)
+    val style = promptBubbleStyle(interAgent, grouping)
     Column(
         modifier = Modifier.fillMaxWidth().hoverable(hoverSource),
         horizontalAlignment = Alignment.End,
@@ -241,12 +262,15 @@ private fun RowScope.PromptBody(
                 ProvenanceLabel(message, callbacks, contentColor = style.content)
             }
         }
-        val role = stringResource(style.role)
-        Text(
-            text = if (message.isSendFailed) stringResource(Res.string.rows_role_not_sent, role) else role,
-            style = ChatRowType.roleLabel,
-            color = if (message.isSendFailed) MaterialTheme.colorScheme.error else style.label,
-        )
+        // A failed send always says so, even mid-group.
+        if (style.showsRole || message.isSendFailed) {
+            val role = stringResource(style.role)
+            Text(
+                text = if (message.isSendFailed) stringResource(Res.string.rows_role_not_sent, role) else role,
+                style = ChatRowType.roleLabel,
+                color = if (message.isSendFailed) MaterialTheme.colorScheme.error else style.label,
+            )
+        }
         if (message.attachments.isNotEmpty()) PromptImages(message, callbacks)
         if (message.content.isNotBlank()) PromptText(message.content, state)
     }
