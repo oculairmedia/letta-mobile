@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -122,7 +123,7 @@ class DashboardViewModelTest {
             state.pinnedItems,
         )
         assertEquals(HomeAgentRef("agent-1", "Agent One"), state.favorite)
-        assertEquals("Agent Two", settings.pinnedAgentNames.value["agent-2"], "pinned names are cached for backend switches")
+        assertEquals("pinned names are cached for backend switches", "Agent Two", settings.pinnedAgentNames.value["agent-2"])
     }
 
     @Test
@@ -130,8 +131,8 @@ class DashboardViewModelTest {
         val vm = viewModel()
         vm.actions.setShortcutPinned(HomeShortcut.SCHEDULES, pinned = true)
         vm.actions.setAgentPinned("agent-1", pinned = true)
-        assertTrue(settings.pinnedItemsOrder.value.contains("shortcut:SCHEDULES"))
-        assertTrue(settings.pinnedItemsOrder.value.contains("agent:agent-1"))
+        assertTrue(settings.getPinnedShortcutOrder().first().contains("SCHEDULES"))
+        assertTrue(settings.getPinnedAgentIds().first().contains("agent-1"))
     }
 
     @Test
