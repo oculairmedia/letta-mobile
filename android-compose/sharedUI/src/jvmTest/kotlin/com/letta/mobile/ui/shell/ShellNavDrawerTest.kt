@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.lens.LensDestination
@@ -26,6 +27,8 @@ import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 /** The phone drawer is the desktop's rail and agent panel (letta-mobile-c3np7.5.5). */
@@ -53,6 +56,23 @@ class ShellNavDrawerTest {
         assertEquals(listOf("lester", "PM - letta-mobile"), state.rail.entries.map { it.name })
         assertEquals("Meridian", state.panel.agent.name)
         assertEquals(setOf(LensDestination.Channels), state.panel.hiddenSections)
+    }
+
+    @Test
+    fun theRailIsTheSharedRecentsCutWithPinsAndTheFavouriteKept() {
+        val roster = (1..6).map { "a$it" to "Agent $it" }
+        val recentInput = input.copy(
+            agents = listOf("meridian" to "Meridian") + roster,
+            agentLastActiveAt = mapOf("a3" to now - 1.hours, "a1" to now - 2.hours, "a2" to now - 30.days),
+            pinnedAgentIds = setOf("a5"),
+            favoriteAgentId = "a6",
+            recentAgentsPolicy = RecentAgentsPolicy(maxAgents = 1),
+        )
+        val rail = ShellNavDrawerMapping.state(recentInput, now).rail
+        // Pins and the favourite in roster order, then the newest recent; Meridian is the panel's subject.
+        assertEquals(listOf("Agent 5", "Agent 6", "Agent 3"), rail.entries.map { it.name })
+        assertEquals(listOf(true, false, false), rail.entries.map { it.pinned })
+        assertEquals(3, rail.hiddenAgentCount)
     }
 
     @Test

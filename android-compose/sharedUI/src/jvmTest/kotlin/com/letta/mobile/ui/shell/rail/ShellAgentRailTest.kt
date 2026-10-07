@@ -5,6 +5,9 @@ package com.letta.mobile.ui.shell.rail
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -58,6 +61,43 @@ class ShellAgentRailTest {
         onNodeWithText("library").assertExists()
         onNodeWithText("Home").assertExists()
         onNodeWithTag(ShellAgentRailTags.orb("Alpha")).assertDoesNotExist()
+    }
+
+    @Test
+    fun hiddenAgentsAreOneTapAwayBehindAllAgents() = runComposeUiTest {
+        var opened = 0
+        setContent {
+            MaterialTheme {
+                ShellAgentRail(
+                    state = ShellAgentRailState(entries = entries, hiddenAgentCount = 5),
+                    actions = ShellAgentRailActions(onShowAllAgents = { opened++ }),
+                )
+            }
+        }
+        onNodeWithText("+5").assertExists()
+        onNodeWithContentDescription("All agents").performClick()
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun noAllAgentsControlWhenNothingIsHiddenOrTheHostHasNoList() = runComposeUiTest {
+        var hidden by mutableStateOf(0)
+        var action: (() -> Unit)? by mutableStateOf({})
+        setContent {
+            MaterialTheme {
+                ShellAgentRail(
+                    state = ShellAgentRailState(entries = entries, hiddenAgentCount = hidden),
+                    actions = ShellAgentRailActions(onShowAllAgents = action),
+                )
+            }
+        }
+        onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertDoesNotExist()
+        hidden = 120
+        waitForIdle()
+        onNodeWithText("99+").assertExists()
+        action = null
+        waitForIdle()
+        onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertDoesNotExist()
     }
 
     @Test

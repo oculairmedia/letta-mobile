@@ -59,11 +59,14 @@ data class ShellAgentRailState(
     val entries: List<ShellRailEntry>,
     val homeSelected: Boolean = false,
     val expanded: Boolean = false,
+    /** Agents the recents cut left off the rail; while non-zero the rail offers "All agents". */
+    val hiddenAgentCount: Int = 0,
 )
 
 /**
  * What the rail asks its host to do. The orb menu (desktop: right-click, touch: long-press) always
  * offers Open; Pin / Unpin and Agent settings show when the host supplies them (null: it cannot).
+ * [onShowAllAgents] opens the host's full agent list, reached from the rail's "+N" control.
  */
 data class ShellAgentRailActions(
     val onAgentSelected: (String) -> Unit = {},
@@ -71,6 +74,7 @@ data class ShellAgentRailActions(
     val onNewSession: () -> Unit = {},
     val onAgentPinnedChange: ((agentId: String, pinned: Boolean) -> Unit)? = null,
     val onAgentSettings: ((agentId: String) -> Unit)? = null,
+    val onShowAllAgents: (() -> Unit)? = null,
 )
 
 /** Pure mapping from the agent roster to rail orbs. */

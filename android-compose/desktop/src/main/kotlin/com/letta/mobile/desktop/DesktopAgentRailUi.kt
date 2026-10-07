@@ -110,6 +110,8 @@ internal data class DesktopAgentRailState(
     val expanded: Boolean = false,
     /** The fleet Home page is showing; its rail icon draws selected. */
     val homeSelected: Boolean = false,
+    /** Agents the shared recents cut left off the rail (the "+N" control). */
+    val hiddenAgentCount: Int = 0,
 )
 
 @Immutable
@@ -121,6 +123,8 @@ internal data class DesktopAgentRailActions(
     val onHome: () -> Unit = {},
     /** An orb's right-click "Agent settings": edits that agent. */
     val onAgentSettings: ((String) -> Unit)? = null,
+    /** The rail's "+N": the full agent directory. */
+    val onShowAllAgents: (() -> Unit)? = null,
 )
 
 /**
@@ -143,10 +147,16 @@ internal fun DesktopAgentRail(
         onHome = actions.onHome,
         onNewSession = actions.onNewSession,
         onAgentSettings = actions.onAgentSettings,
+        onShowAllAgents = actions.onShowAllAgents,
     )
     CompositionLocalProvider(LocalShellChromeDecorations provides DesktopShellChromeDecorations) {
         ShellAgentRail(
-            state = ShellAgentRailState(entries = entries, homeSelected = state.homeSelected, expanded = state.expanded),
+            state = ShellAgentRailState(
+                entries = entries,
+                homeSelected = state.homeSelected,
+                expanded = state.expanded,
+                hiddenAgentCount = state.hiddenAgentCount,
+            ),
             actions = railActions,
             modifier = Modifier.background(MaterialTheme.colorScheme.background),
             library = { ExpandedAgentLibrary(groups = groups, entries = entries, actions = railActions) },

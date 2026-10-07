@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -58,6 +60,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 /** Test tags for the rail's parts. */
 object ShellAgentRailTags {
     const val RAIL = "shell-agent-rail"
+    const val ALL_AGENTS = "shell-agent-rail-all-agents"
     fun orb(key: String) = "shell-agent-rail-orb-$key"
 }
 
@@ -96,7 +99,7 @@ fun ShellAgentRail(
             if (state.expanded && library != null) {
                 library()
             } else {
-                ShellRailOrbList(entries = state.entries, actions = actions)
+                ShellRailOrbList(entries = state.entries, hiddenAgentCount = state.hiddenAgentCount, actions = actions)
             }
         }
         RailHeaderRow(onClick = actions.onNewSession, label = "New".takeIf { state.expanded }) {
@@ -130,9 +133,13 @@ private fun RailHeaderRow(onClick: () -> Unit, label: String?, icon: @Composable
     }
 }
 
-/** The orbs, lazy and scrolling so a long roster never pushes New off-screen; the edges fade while it scrolls. */
+/**
+ * The orbs, lazy and scrolling so a long roster never pushes New off-screen; the edges fade while it
+ * scrolls. When the recents cut left agents out, a "+N" control after the orbs opens the full list.
+ */
 @Composable
-private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, actions: ShellAgentRailActions) {
+private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, hiddenAgentCount: Int, actions: ShellAgentRailActions) {
+    val onShowAllAgents = actions.onShowAllAgents.takeIf { hiddenAgentCount > 0 }
     val listState = rememberLazyListState()
     LazyColumn(
         state = listState,
@@ -147,6 +154,40 @@ private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, actions:
         // Keyed by name so each orb's thinking ring follows its agent across recency reordering.
         items(entries, key = { "orb-${it.key}" }) { entry ->
             ShellRailOrb(entry = entry, actions = actions)
+        }
+        if (onShowAllAgents != null) {
+            item(key = "all-agents") { AllAgentsButton(hiddenAgentCount = hiddenAgentCount, onClick = onShowAllAgents) }
+        }
+    }
+}
+
+/** The rail's way to every agent the recents cut left out: "+N", opening the host's full agent list. */
+@Composable
+private fun AllAgentsButton(hiddenAgentCount: Int, onClick: () -> Unit) {
+    LocalShellChromeDecorations.current.tooltip(ALL_AGENTS) {
+        Box(
+            modifier = Modifier
+                .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight)
+                .testTag(ShellAgentRailTags.ALL_AGENTS),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(LettaDimens.Control.iconButton)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable(onClickLabel = ALL_AGENTS, onClick = onClick)
+                    .semantics { contentDescription = ALL_AGENTS },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (hiddenAgentCount > MAX_COUNT_SHOWN) "$MAX_COUNT_SHOWN+" else "+$hiddenAgentCount",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
@@ -293,6 +334,8 @@ private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) 
     }
 }
 
+private const val ALL_AGENTS = "All agents"
+private const val MAX_COUNT_SHOWN = 99
 private const val FADE_MS = 250
 private const val ORBIT_MS = 1200
 private const val FULL_TURN = 360f

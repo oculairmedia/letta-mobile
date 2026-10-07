@@ -4,14 +4,20 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.MainDispatcherRule
+import com.letta.mobile.ui.shell.ShellNavDrawerInput
+import com.letta.mobile.ui.shell.ShellNavDrawerMapping
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
+import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -88,6 +94,29 @@ class SharedNavDrawerBindingTest {
         vm.setAgentPinned("agent-2", pinned = false)
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
+    }
+
+    @Test
+    fun theRailIsTheDesktopsRecentsStripNotTheWholeRoster() {
+        // Twelve agents; a1..a10 active an hour apart (a1 newest), a11 stale, a12 never ran.
+        val agents = (1..12).map { n ->
+            val updatedAt = when {
+                n <= 10 -> "2026-10-17T${(12 - n).toString().padStart(2, '0')}:00:00Z"
+                n == 11 -> "2026-08-01T12:00:00Z"
+                else -> null
+            }
+            Agent(id = AgentId("a$n"), name = "Agent $n", updatedAt = updatedAt)
+        }
+        val input = ShellNavDrawerInput(agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"))
+            .withRoster(SharedDrawerRoster(agents = agents, favoriteAgentId = "a12", pinnedAgentIds = setOf("a11")))
+        val state = ShellNavDrawerMapping.state(input, Instant.parse("2026-10-17T12:00:00Z"))
+        // Pins and the favourite first, then the eight newest; the focused agent heads the panel, not the rail.
+        assertEquals(
+            listOf("Agent 11", "Agent 12", "Agent 2", "Agent 3", "Agent 4", "Agent 5", "Agent 6", "Agent 7", "Agent 8"),
+            state.rail.entries.map { it.name },
+        )
+        // a9 and a10 fell off the strip; the rail's "+N" reaches them through the agent switcher.
+        assertEquals(2, state.rail.hiddenAgentCount)
     }
 
     @Test

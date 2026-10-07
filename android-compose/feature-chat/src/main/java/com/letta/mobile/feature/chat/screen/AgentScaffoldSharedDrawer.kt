@@ -9,8 +9,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellNavDrawer
@@ -42,17 +44,18 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val identities = LocalMascotRegistry.current.identities
     val open = state.drawerState.isOpen
     LaunchedEffect(open) { if (open) drawer.refreshCanvases() }
+    val roster = remember(state.switchableAgents, state.favoriteAgentId, pinnedAgentIds) {
+        SharedDrawerRoster(agents = state.switchableAgents, favoriteAgentId = state.favoriteAgentId, pinnedAgentIds = pinnedAgentIds)
+    }
     val input = ShellNavDrawerInput(
         agent = ShellPanelAgent(name = state.agentName.ifBlank { "Agent" }, agentId = state.agentIdValue),
-        agents = state.switchableAgents.map { it.id.value to it.name },
         identities = identities.toMap(),
         conversations = state.drawerConversations,
         openConversationId = state.conversationId,
         archiveFilter = archiveFilter,
         canvases = canvases,
         hiddenSections = AndroidHiddenDrawerSections,
-        pinnedAgentIds = pinnedAgentIds,
-    )
+    ).withRoster(roster)
     // Relative times are taken when the drawer opens; they do not tick while it is open.
     val now = remember(open) { Clock.System.now() }
     val drawerState = remember(input, now) { ShellNavDrawerMapping.state(input, now) }
@@ -65,6 +68,24 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     }
 }
 
+/** Android's agents as the drawer's rail sees them: the roster, its pins and its favourite. */
+internal data class SharedDrawerRoster(
+    val agents: List<Agent>,
+    val favoriteAgentId: String? = null,
+    val pinnedAgentIds: Set<String> = emptySet(),
+)
+
+/**
+ * The whole roster goes in; [ShellNavDrawerMapping] cuts it to the desktop rail's recents strip
+ * ([RecentAgents.cut]) using each agent's own last run / update as its activity.
+ */
+internal fun ShellNavDrawerInput.withRoster(roster: SharedDrawerRoster): ShellNavDrawerInput = copy(
+    agents = roster.agents.map { it.id.value to it.name },
+    agentLastActiveAt = RecentAgents.lastActiveAt(roster.agents),
+    favoriteAgentId = roster.favoriteAgentId,
+    pinnedAgentIds = roster.pinnedAgentIds,
+)
+
 @Composable
 private fun rememberSharedDrawerActions(
     state: AgentScaffoldRuntimeState,
@@ -75,6 +96,7 @@ private fun rememberSharedDrawerActions(
 
 internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState, drawer: SharedNavDrawerViewModel): ShellAgentRailActions {
     val navigation = state.params.navigation
+    val openAgentSwitcher = { closeDrawerAndRun(state) { state.params.sheetVisibility.onShowAgentSwitcherChange(true) } }
     return ShellAgentRailActions(
         // An agent opens on its most recent conversation, as the desktop rail does.
         onAgentSelected = { agentId ->
@@ -85,7 +107,9 @@ internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState, drawer: S
             }
         },
         onHome = { closeDrawerAndRun(state) { navigation.onNavigateToAdmin?.invoke() } },
-        onNewSession = { closeDrawerAndRun(state) { state.params.sheetVisibility.onShowAgentSwitcherChange(true) } },
+        onNewSession = openAgentSwitcher,
+        // The rail is a recents strip; "+N" opens the agent switcher, which lists every agent.
+        onShowAllAgents = openAgentSwitcher,
         // The orb's long-press menu: pin to Home, and that agent's settings.
         onAgentPinnedChange = drawer::setAgentPinned,
         onAgentSettings = { agentId -> closeDrawerAndRun(state) { navigation.onNavigateToSettings(agentId) } },
