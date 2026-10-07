@@ -152,7 +152,8 @@ private fun LazyListScope.legacyRows(
 ) {
     if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
-        TimelineRowContent(rows[index], bindings, today)
+        val row = rows[index]
+        TimelineRowContent(row, bindings, today, timelineRowMotion(fadesIn = !row.isUserPrompt()))
     }
     if (edges.loadingOlder) {
         item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(edges.agentId) }
@@ -160,11 +161,11 @@ private fun LazyListScope.legacyRows(
 }
 
 @Composable
-private fun TimelineRowContent(row: TimelineRow, bindings: TimelineRowBindings, today: LocalDate) {
+private fun TimelineRowContent(row: TimelineRow, bindings: TimelineRowBindings, today: LocalDate, modifier: Modifier) {
     when (row) {
-        is TimelineRow.Item -> TimelineItemRow(row.item, bindings)
-        is TimelineRow.ToolGroup -> ToolGroupRow(row, bindings.contexts, bindings.callbacks)
-        is TimelineRow.DayDivider -> DayDividerRow(row.date, today)
+        is TimelineRow.Item -> TimelineItemRow(row.item, bindings, modifier)
+        is TimelineRow.ToolGroup -> ToolGroupRow(row, bindings.contexts, bindings.callbacks, modifier)
+        is TimelineRow.DayDivider -> DayDividerRow(row.date, today, modifier)
     }
 }
 
