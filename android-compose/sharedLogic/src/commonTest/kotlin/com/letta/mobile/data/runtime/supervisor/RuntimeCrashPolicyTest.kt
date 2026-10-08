@@ -114,8 +114,10 @@ class RuntimeCrashPolicyTest {
     @Test
     fun healthNeedsForceRestartOnlyWhenNothingWillRestartIt() {
         assertEquals(false, RuntimeHealth(active = true).needsForceRestart)
-        assertEquals(false, RuntimeHealth(active = false, restartPending = true, lastExitCode = 1).needsForceRestart)
-        assertEquals(true, RuntimeHealth(active = false, gaveUp = true, lastExitCode = 1).needsForceRestart)
+        assertEquals(false, RuntimeHealth(restartPending = true, lastExitCode = 1, stoppedUnexpectedly = true).needsForceRestart)
+        assertEquals(true, RuntimeHealth(gaveUp = true, lastExitCode = 1).needsForceRestart)
+        assertEquals(true, RuntimeHealth(lastExitCode = 0, stoppedUnexpectedly = true).needsForceRestart, "an unasked-for clean exit")
+        assertEquals(false, RuntimeHealth(lastExitCode = 1).needsForceRestart, "our own stop after an old crash")
         assertEquals(false, RuntimeHealth().needsForceRestart, "never started is not a failure")
     }
 }

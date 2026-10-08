@@ -71,6 +71,7 @@ class AppServerProbeTest {
 
         assertIs<AppServerProbeResult.Incompatible>(result)
         assertTrue(result.isTerminal)
+        assertTrue(result.endpointMissing, "a 404 is flagged so callers can tell it from a bad info body")
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.appserver
 
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
@@ -31,8 +32,12 @@ sealed interface AppServerProbeResult {
     /** The server rejected the token (HTTP 401/403, or a failed auth exchange). */
     data class Authentication(val detail: String) : AppServerProbeResult
 
-    /** The server answered but is not an App Server this client can use. */
-    data class Incompatible(val reason: String) : AppServerProbeResult
+    /**
+     * The server answered but is not an App Server this client can use. [endpointMissing] marks a
+     * 404 on `/app-server-info`: either not an App Server at all, or one older than the HTTP
+     * discovery route, which a caller may still let the socket handshake decide.
+     */
+    data class Incompatible(val reason: String, val endpointMissing: Boolean = false) : AppServerProbeResult
 
     /** The server could not be reached, timed out, or failed for a reason that may pass. */
     data class Unavailable(val detail: String) : AppServerProbeResult
@@ -69,6 +74,9 @@ class AppServerProbe(
             AppServerProbeResult.Unavailable("No answer within ${timeout.inWholeSeconds} s")
         } catch (e: CancellationException) {
             throw e
+        } catch (e: ResponseException) {
+            // A client built with expectSuccess = true throws on non-2xx; classify the status anyway.
+            classifyStatus(e.response.status.value) ?: AppServerProbeResult.Unavailable(e.message ?: "HTTP ${e.response.status.value}")
         } catch (e: Exception) {
             AppServerProbeResult.Unavailable(e.message ?: e::class.simpleName ?: "Connection failed")
         }
@@ -112,7 +120,10 @@ class AppServerProbe(
         /** Null when the status carries a body worth decoding. */
         internal fun classifyStatus(status: Int): AppServerProbeResult? = when {
             status == 401 || status == 403 -> AppServerProbeResult.Authentication("The server rejected the access token (HTTP $status)")
-            status == 404 -> AppServerProbeResult.Incompatible("The server has no /app-server-info endpoint (HTTP 404); it is not an App Server")
+            status == 404 -> AppServerProbeResult.Incompatible(
+                "The server has no /app-server-info endpoint (HTTP 404); it is not an App Server",
+                endpointMissing = true,
+            )
             status == 426 -> AppServerProbeResult.Incompatible("The server requires a protocol this client does not speak (HTTP 426)")
             status in 200..299 -> null
             else -> AppServerProbeResult.Unavailable("The server answered HTTP $status")

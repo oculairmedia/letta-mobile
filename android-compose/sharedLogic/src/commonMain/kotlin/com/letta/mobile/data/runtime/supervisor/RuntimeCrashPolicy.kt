@@ -140,7 +140,9 @@ data class RuntimeHealth(
     val gaveUp: Boolean = false,
     val generation: Long = 0,
     val lastError: String? = null,
+    /** The last exit was not ours (a crash or a clean exit nobody asked for); cleared by a start or our own stop. */
+    val stoppedUnexpectedly: Boolean = false,
 ) {
     /** The runtime is down and nothing will bring it back without the user. */
-    val needsForceRestart: Boolean get() = gaveUp || (!active && !restartPending && lastExitCode != null)
+    val needsForceRestart: Boolean get() = !active && !restartPending && (gaveUp || stoppedUnexpectedly)
 }
