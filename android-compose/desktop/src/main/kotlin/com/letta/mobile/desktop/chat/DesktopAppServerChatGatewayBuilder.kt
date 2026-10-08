@@ -93,6 +93,7 @@ class DesktopAppServerChatGatewayBuilder(
         )
         val client = DefaultAppServerClient(transport, parentScope = clientScope)
         var localClientLease: AutoCloseable? = null
+        var directClientLease: AutoCloseable? = null
         var eventRouter: AppServerRuntimeEventRouter? = null
         try {
             if (transport is KtorAppServerWebSocketTransport) {
@@ -106,6 +107,9 @@ class DesktopAppServerChatGatewayBuilder(
             }
             if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
                 localClientLease = DesktopLocalAppServerClientRegistry.shared.install(client)
+            }
+            if (!isIroh) {
+                directClientLease = DesktopLocalAppServerClientRegistry.direct.install(client)
             }
             val router = AppServerRuntimeEventRouter()
             eventRouter = router
@@ -128,6 +132,7 @@ class DesktopAppServerChatGatewayBuilder(
                 onClose = {
                     eventRouter.detach()
                     localClientLease?.close()
+                    directClientLease?.close()
                     client.failPendingRequests("Desktop App Server gateway closed")
                     clientScope.cancel()
                 },
@@ -135,6 +140,7 @@ class DesktopAppServerChatGatewayBuilder(
         } catch (error: Throwable) {
             eventRouter?.detach()
             localClientLease?.close()
+            directClientLease?.close()
             client.failPendingRequests("Desktop App Server gateway creation failed")
             clientScope.cancel()
             transportResources.close()

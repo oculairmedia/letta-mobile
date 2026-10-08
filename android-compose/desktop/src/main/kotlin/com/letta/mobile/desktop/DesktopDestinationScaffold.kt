@@ -44,7 +44,8 @@ import com.letta.mobile.ui.shell.pages.channels.ChannelsSearchFieldSlot
 import androidx.compose.material.icons.outlined.Refresh
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
-import com.letta.mobile.ui.memory.MemoryPage
+import com.letta.mobile.data.memory.memfs.MemfsPageController
+import com.letta.mobile.desktop.workspace.DesktopMemoryDestination
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
 import com.letta.mobile.desktop.skills.DesktopSkillsSurface
@@ -139,6 +140,8 @@ internal data class DestinationContentActions(
     val home: HomePageCallbacks,
     val onRetryConnection: () -> Unit,
     val memory: MemoryPageActions,
+    /** letta-mobile-bzvro.24: the Memory destination's Files view. */
+    val memfs: MemfsPageController,
     val schedules: DestinationScheduleActions,
     val channels: ChannelsPageActions,
     val tools: DestinationToolsActions,
@@ -199,9 +202,10 @@ internal fun DestinationContent(
             actions = actions,
             modifier = modifier,
         )
-        DesktopDestination.Memory -> MemoryDestinationContent(
+        DesktopDestination.Memory -> DesktopMemoryDestination(
             memoryState = inputs.memoryState,
             actions = actions.memory,
+            memfs = actions.memfs,
             modifier = modifier,
         )
         DesktopDestination.Schedules -> SchedulesDestinationContent(
@@ -277,15 +281,6 @@ private fun HomeDestinationContent(
             options = inputs.home.options,
         )
     }
-}
-
-@Composable
-private fun MemoryDestinationContent(
-    memoryState: MemoryPageState,
-    actions: MemoryPageActions,
-    modifier: Modifier = Modifier,
-) {
-    MemoryPage(state = memoryState, actions = actions, modifier = modifier)
 }
 
 @Composable

@@ -30,6 +30,9 @@ import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.data.memory.graph.MemoryPageController
+import com.letta.mobile.data.memory.memfs.MemfsPageController
+import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
+import com.letta.mobile.desktop.workspace.memfs
 import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
 import com.letta.mobile.desktop.runtime.DesktopLocalBackendDirectorySettings
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
@@ -126,6 +129,8 @@ internal class DesktopLibraryControllers(
     val channels: ChannelsPageController,
     val tools: DesktopToolLibraryController,
     val home: HomePageController,
+    /** letta-mobile-bzvro.24: the MemFS browser beside the memory graph. */
+    val memfs: MemfsPageController,
 )
 
 @Composable
@@ -155,7 +160,9 @@ internal fun rememberDesktopLibraryControllers(
     val home = remember(sessionGraphProvider, settingsStore, chatScope) {
         DesktopHome.controller(sessionGraphProvider = sessionGraphProvider, settingsStore = settingsStore, scope = chatScope)
     }
-    return DesktopLibraryControllers(memory, schedules, channels, tools, home)
+    // The direct App Server session it reads through is process-wide, not per session graph.
+    val memfs = remember(chatScope) { MemfsPageController(DesktopWorkspaceSources().memfs(), chatScope) }
+    return DesktopLibraryControllers(memory, schedules, channels, tools, home, memfs)
 }
 
 private fun desktopMemoryErrorMessage(throwable: Throwable): String =
@@ -239,6 +246,11 @@ private fun LibraryControllerLifecycles(
     )
     ControllerLifecycleEffect(
         controller = libraries.home,
+        onStart = { start() },
+        onClose = { close() },
+    )
+    ControllerLifecycleEffect(
+        controller = libraries.memfs,
         onStart = { start() },
         onClose = { close() },
     )
