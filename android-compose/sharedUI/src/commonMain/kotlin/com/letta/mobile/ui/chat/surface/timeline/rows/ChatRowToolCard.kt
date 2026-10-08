@@ -71,6 +71,7 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.shell.pages.workspace.ToolCallFileLink
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowType
@@ -380,6 +381,7 @@ private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRo
             )
         }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { ToolArgumentLine(it) }
+        ToolCallFileLink(toolCall.arguments)
         toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolResultSection(view, it, isError, callbacks) }
         ToolGeneratedImages(toolCall, callbacks)
         ToolExecutionFooter(toolCall)

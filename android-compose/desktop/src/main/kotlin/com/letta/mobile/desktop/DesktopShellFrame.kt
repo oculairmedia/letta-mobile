@@ -13,6 +13,7 @@ import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.memory.graph.MemoryPageState
+import com.letta.mobile.desktop.workspace.rememberDesktopFileMentions
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
@@ -240,6 +241,9 @@ private fun rememberDesktopShellLists(
     val workPlayMode = context.navigator.workPlayMode
     val conversations = chatState.conversations
     val selectedConversationId = chatState.selectedConversationId
+    val workingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
+    // letta-mobile-bzvro.26: `@` file suggestions from the conversation's workspace.
+    val fileMentions = rememberDesktopFileMentions(context.core.chatScope, chatState.composerText, workingDirectory)
     // For a "Letta Code" subagent stack this is its same-PROVENANCE spawns (grouped by
     // authoritative parent identity via the shared model, so unrelated same-name agents are NOT
     // merged); for a normal agent it is its display-name convs, unchanged.
@@ -266,8 +270,8 @@ private fun rememberDesktopShellLists(
         activeSubagents = activeSubagents,
         archiveFilter = archiveFilter,
         agentConversations = agentConversations,
-        mentionables = remember(focus.railAgents, memoryState) {
-            buildMentionables(BuildMentionablesParams(focus.railAgents, memoryState.parity))
+        mentionables = remember(focus.railAgents, memoryState, fileMentions) {
+            buildMentionables(BuildMentionablesParams(focus.railAgents, memoryState.parity)) + fileMentions
         },
         paletteItems = remember(conversations, focus.railAgents, workPlayMode) {
             buildPaletteItems(conversations, focus.railAgents, workPlayMode)
