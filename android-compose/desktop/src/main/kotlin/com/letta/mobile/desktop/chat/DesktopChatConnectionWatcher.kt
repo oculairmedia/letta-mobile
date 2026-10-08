@@ -25,11 +25,16 @@ internal class DesktopChatConnectionWatcher(
     @Volatile
     private var outageEscalated = false
 
+    @Volatile
+    private var currentOutage: OutageTracker? = null
+
     fun start(gateway: DesktopChatGateway?) {
         connectionJob?.cancel()
         connectionJob = null
+        currentOutage = null
         val statusGateway = gateway as? ConnectionStatusGateway ?: return
         val outage = OutageTracker()
+        currentOutage = outage
         connectionJob = scope.launch {
             val escalationWatchdog = launch { watchForSustainedOutage(outage) }
             try {
@@ -49,6 +54,20 @@ internal class DesktopChatConnectionWatcher(
     fun stop() {
         connectionJob?.cancel()
         connectionJob = null
+        currentOutage = null
+    }
+
+    /**
+     * The machine woke from sleep (letta-mobile-bzvro.4, F04). A connection that is down now is
+     * almost certainly the sleep's doing, so retry at once instead of waiting out the sustained
+     * outage window. Returns true when a retry was triggered.
+     */
+    fun onSystemResumed(): Boolean {
+        val outage = currentOutage ?: return false
+        if (!outage.isDown.get()) return false
+        outageEscalated = true
+        onEscalateRetryConnection()
+        return true
     }
 
     private class OutageTracker {

@@ -61,6 +61,8 @@ class DesktopAppServerChatGatewayBuilder(
     private val irohIdentity: () -> ByteArray = { DesktopIrohIdentity.loadOrCreate() },
     /** Must be the registry the canvas UI registers into, or agent edits miss the open session. */
     private val canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
+    /** HTTP `/app-server-info` probe run before every remote WebSocket dial (letta-mobile-bzvro.2). */
+    private val preflightProbe: DesktopAppServerProbe = defaultDesktopAppServerProbe,
 ) : DesktopAppServerChatGatewayFactory {
 
     override suspend fun create(
@@ -75,6 +77,10 @@ class DesktopAppServerChatGatewayBuilder(
             )
 
         val isIroh = IrohChannelTransport.isIrohUrl(serverUrl)
+        // The bundled local child was just started by us and is checked by the readiness handshake.
+        if (!isIroh && lettaConfig.mode != LettaConfig.Mode.LOCAL) {
+            preflightDesktopAppServer(serverUrl, lettaConfig.accessToken, preflightProbe)
+        }
         val (transport, transportResources) = if (isIroh) {
             buildIrohTransport(serverUrl, lettaConfig)
         } else {

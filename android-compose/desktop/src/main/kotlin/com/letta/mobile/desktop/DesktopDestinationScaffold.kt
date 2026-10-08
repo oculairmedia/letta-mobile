@@ -121,6 +121,7 @@ internal data class DestinationContentInputs(
     val nucleus: DesktopNucleusState,
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
+    val localRuntime: DesktopLocalRuntimeController,
 )
 
 internal data class DestinationNucleusActions(
@@ -166,6 +167,7 @@ private data class ScrollableDestinationInputs(
     val nucleus: DesktopNucleusState,
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
+    val localRuntime: DesktopLocalRuntimeController,
     val railRecencyDays: Int,
 )
 
@@ -233,6 +235,7 @@ internal fun DestinationContent(
                 nucleus = inputs.nucleus,
                 localRuntimeProvider = inputs.localRuntimeProvider,
                 localBackendDirectory = inputs.localBackendDirectory,
+                localRuntime = inputs.localRuntime,
             ),
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
@@ -425,6 +428,7 @@ private fun LazyListScope.scrollableDestinationItems(
                     actions = settings.localBackendDirectory,
                 )
             }
+            item { DesktopLocalRuntimeSettingsCard(controller = inputs.localRuntime) }
             item { DesktopSharedChatPageSettingsCard() }
             item {
                 DesktopRailSettingsCard(
