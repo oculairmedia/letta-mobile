@@ -6,7 +6,9 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** letta-mobile-bglj6.1.22: which approval the Touch canvas offers to answer. */
 class PendingUserInputTest {
@@ -47,6 +49,18 @@ class PendingUserInputTest {
             request("req-2", "AskUserQuestion"),
         )
         assertEquals("req-2", pendingUserInputApproval(messages)?.requestId)
+    }
+
+    /** letta-mobile-bglj6.1.25: the one gate every approval surface draws a card behind. */
+    @Test
+    fun onlyAUserInputToolRequiresTheUser() {
+        assertTrue(request("req-1", "AskUserQuestion").approvalRequest!!.requiresUserInput())
+        assertFalse(request("req-2", "Bash").approvalRequest!!.requiresUserInput())
+        val bundled = UiApprovalRequest(
+            "req-3",
+            listOf(UiApprovalToolCall("c-1", "Bash", "{}"), UiApprovalToolCall("c-2", "AskUserQuestion", "{}")),
+        )
+        assertTrue(bundled.requiresUserInput())
     }
 
     @Test

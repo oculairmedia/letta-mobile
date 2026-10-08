@@ -199,7 +199,11 @@ private fun rememberLegacyFollow(
     }
     FollowTailEffect(listState, tail) { following }
     ForceFollowOnSendEffect(listState, tail.newest) { following = true }
-    val showButton = ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.reversedViewportSnapshot(isDragged))
+    // Off the newest rows by the shared policy, and then a meaningful distance off (with hysteresis).
+    val showButton = rememberScrollToLatestVisible(
+        listState,
+        eligible = ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.reversedViewportSnapshot(isDragged)),
+    )
     return TimelineFollow(showScrollToLatest = showButton) {
         following = true
         scope.launch { glide.toNewest() }

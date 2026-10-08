@@ -174,17 +174,20 @@ internal fun collapsedTurnOf(newestFirst: List<ChatRenderItem>, state: ChatUiSta
     val text = replies.lastOrNull { it.isNarration() }
     val newestReply = replies.lastOrNull()
     val activity = activeRunActivity(messages)
+    // letta-mobile-bglj6.1.25: only a request waiting on the person needs input; one the runtime
+    // resolves (Bash under approve-all) stays undecided until its tool returns, and asks nothing.
+    val pendingApproval = pendingUserInputApproval(messages)
     return CollapsedTurn(
         turnKey = turn.first().key,
         text = text?.content.orEmpty(),
         isError = text?.isError == true,
         streaming = state.isStreaming && text != null && text === newestReply,
         working = busy && turnHasLiveTool(newestReply, state),
-        needsInput = state.a2uiSurfaces.isNotEmpty() || awaitsApproval(messages),
+        needsInput = state.a2uiSurfaces.isNotEmpty() || pendingApproval != null,
         busy = busy,
         runningToolName = runningToolNameOf(activity, state, busy),
         startedAtEpochMs = activity.startedAtEpochMs,
-        pendingApproval = pendingUserInputApproval(messages),
+        pendingApproval = pendingApproval,
     )
 }
 
@@ -203,12 +206,6 @@ private fun UiMessage.isPrompt(): Boolean = role == "user" && subagentNotificati
 
 private fun UiMessage.isNarration(): Boolean =
     content.isNotBlank() && !isReasoning && subagentNotification == null
-
-/** An approval request with no response after it. */
-private fun awaitsApproval(messages: List<UiMessage>): Boolean {
-    val request = messages.indexOfLast { it.approvalRequest != null }
-    return request >= 0 && messages.indexOfLast { it.approvalResponse != null } < request
-}
 
 /** The current turn of [params]' conversation, for the collapsed dock. */
 @Composable

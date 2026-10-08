@@ -279,12 +279,15 @@ private fun RowScope.PromptBody(
 @Composable
 private fun PromptImages(message: UiMessage, callbacks: ChatRowCallbacks) {
     val images = remember(message.attachments) { message.attachments.toImmutableList() }
+    // Docked at the top of the timeline, they shrink to thumbnails as the copy docks, so the
+    // prompt never eats the reply's room; the row in the list keeps them full size.
+    val docked = Modifier.dockedCompaction(LocalDockedPromptCompaction.current, ChatRowDimens.dockedPromptImageMaxHeight)
     // Touch draws them as the legacy Android bubble did: across the bubble's width, large
     // enough to look at (letta-mobile-bglj6.1.9); desktop keeps its compact strip.
     if (touchStyle()) {
-        ChatPromptImageGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = Modifier.fillMaxWidth())
+        ChatPromptImageGrid(tap = ImageTap(images, callbacks.onImageTap), modifier = docked.fillMaxWidth())
     } else {
-        ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap))
+        ChatImageThumbnailStrip(tap = ImageTap(images, callbacks.onImageTap), modifier = docked)
     }
 }
 

@@ -69,8 +69,15 @@ class TimelineUiFramesTest {
         assertTrue(resets.isEmpty(), "left the newest edge while following:\n" + resets.joinToString("\n"))
     }
 
+    /** The send's own glide is not the reader leaving the edge: the button never flashes up (letta-mobile-bglj6.1). */
     @Test
-    fun settledRowsDoNotRecomposePerToken() = replyTurn { frames ->
+    fun sendAtTheNewestEdgeNeverOffersScrollToLatest() = replyTurn { frames ->
+        val shown = frames.filter { it.step != "open" && it.scrollToLatestShown }
+        assertTrue(shown.isEmpty(), "scroll-to-latest showed though the reader never scrolled:\n" + shown.joinToString("\n"))
+    }
+
+    @Test
+    fun settledRowsDoNotRecomposePerToken()= replyTurn { frames ->
         val perFrame = recompositionsPerFrame(frames, "stream")
         assertTrue(perFrame.size >= tokens.size, "too few token frames to judge: $perFrame")
         assertTrue(perFrame.all { it <= MAX_ROW_COMPOSITIONS_PER_FRAME }, "row compositions per frame: $perFrame")

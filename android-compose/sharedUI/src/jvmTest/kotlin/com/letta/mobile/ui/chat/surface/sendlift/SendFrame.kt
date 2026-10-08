@@ -30,6 +30,8 @@ internal data class SendFrame(
     val chevronCount: Int,
     /** The departing draft text of the sent prompt; the redesign (letta-mobile-86njl.2) adds it. */
     val departingTextCount: Int,
+    /** The scroll-to-latest button is on screen. */
+    val latestButton: Boolean = false,
 ) {
     val ghostCount: Int get() = if (ghost == null) 0 else 1
 
@@ -41,7 +43,7 @@ internal data class SendFrame(
     override fun toString() =
         "t=$t ghost=${ghost.fmt()} bubble=${promptBubble.fmt()} slot=${promptSlot.fmt()} older=${olderRow.fmt()} " +
             "field=${composerField.fmt()} companion=$companionRowHeight first=$firstVisibleItemIndex/$scrollOffset " +
-            "scrolls=$scrollCommands composed=$rowCompositions chevrons=$chevronCount departing=$departingTextCount"
+            "scrolls=$scrollCommands composed=$rowCompositions chevrons=$chevronCount departing=$departingTextCount latestButton=$latestButton"
 }
 
 private fun Rect?.fmt(): String =

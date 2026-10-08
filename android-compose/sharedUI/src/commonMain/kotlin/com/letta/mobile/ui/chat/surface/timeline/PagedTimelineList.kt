@@ -46,7 +46,6 @@ import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
-import kotlin.time.TimeSource
 import org.jetbrains.compose.resources.stringResource
 
 /** Everything the paged list reads. */
@@ -109,22 +108,8 @@ private fun PagedTimelineBody(
     val scope = rememberCoroutineScope()
     val anchoredTarget by presentation.target.collectAsState()
     val restoreAnchor = remember(presentation) { presentation.viewport }
-    var following by remember(presentation) { mutableStateOf(restoreAnchor == null && listState.isAtNewestEdge()) }
     var anchorRestored by remember(presentation) { mutableStateOf(restoreAnchor == null) }
-
-    FollowTheNewestEdge(listState, settled.loadState.prepend.endOfPaginationReached) { following = it }
-    // letta-mobile-bglj6.1.18: a NEW user prompt at the head is the user's own send — always
-    // bring them to it, exactly as the legacy list does (LegacyTimelineList's force-follow) and
-    // as the legacy Android chat did (shouldForceScrollOnUserSend). The paged list is missing it,
-    // so sending while scrolled up left the new prompt off-screen and the flight decorated a row
-    // the viewport never showed.
-    val newestKey = remember(rows.identity) { rows.key(rows.leading) }
-    val newestIsUserPrompt = remember(rows.identity) {
-        val newest = rows.itemAt(rows.leading)
-        newest is ChatRenderItem.Single && isUserRole(newest.message.role)
-    }
-    ForceFollowOnSend(listState, newestKey, newestIsUserPrompt) { following = true }
-    SnapToNewestWhileFollowing(listState, rows.identity, following)
+    val follow = rememberPagedListFollow(params, settled, rows, restoring = restoreAnchor != null)
     if (!anchorRestored) {
         RestoreReadingPosition(listState, rows, restoreAnchor) { anchorRestored = true }
     } else {
@@ -145,15 +130,19 @@ private fun PagedTimelineBody(
             bindings = bindings,
             overlays = TimelineFrameOverlays(
                 pinnedPrompt = pinned,
-                showScrollToLatest = !following,
+                // Anchored on a search target, index 0 is the newest row of THAT window, not the conversation's.
+                showScrollToLatest = rememberScrollToLatestVisible(
+                    listState,
+                    eligible = !follow.following,
+                    newerContentPending = anchoredTarget != null,
+                ),
                 onScrollToLatest = {
-                    following = true
+                    follow.following = true
                     scope.launch {
-                        // Anchored on a search target, index 0 is the newest row of THAT window.
                         if (anchoredTarget != null) presentation.navigate(null)
-                        glide.toNewest()
-                        // The glide's own scroll stopped the follow; it ends on the newest edge.
-                        following = true
+                        follow.ownScroll { glide.toNewest() }
+                        // It ends on the newest edge.
+                        follow.following = true
                     }
                 },
                 glide = glide,
@@ -179,20 +168,32 @@ private fun PagedTimelineBody(
 }
 
 /**
- * The stream snaps back to the newest edge while following, coalesced to the legacy cadence
- * (96ms) instead of once per raw live-overlay delta.
+ * The paged list's follow over its rows. letta-mobile-bglj6.1.18: a NEW user prompt at the head
+ * is the user's own send: always bring them to it, exactly as the legacy list does
+ * (LegacyTimelineList's force-follow).
  */
 @Composable
-private fun SnapToNewestWhileFollowing(listState: LazyListState, identity: PagedRowsIdentity, following: Boolean) {
-    val streamClock = remember { TimeSource.Monotonic.markNow() }
-    var lastSnapAtMs by remember { mutableStateOf(Long.MIN_VALUE) }
-    LaunchedEffect(identity, following) {
-        if (!following || listState.isScrollInProgress) return@LaunchedEffect
-        val now = streamClock.elapsedNow().inWholeMilliseconds
-        if (now - lastSnapAtMs < STREAM_SNAP_INTERVAL_MS) return@LaunchedEffect
-        lastSnapAtMs = now
-        listState.scrollToItem(0)
+private fun rememberPagedListFollow(
+    params: PagedTimelineParams,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    rows: PagedRows,
+    restoring: Boolean,
+): PagedFollow {
+    val newestKey = remember(rows.identity) { rows.key(rows.leading) }
+    val newestIsUserPrompt = remember(rows.identity) {
+        val newest = rows.itemAt(rows.leading)
+        newest is ChatRenderItem.Single && isUserRole(newest.message.role)
     }
+    return rememberPagedFollow(
+        params.presentation,
+        PagedFollowInputs(
+            listState = params.listState,
+            restoring = restoring,
+            newerHistoryComplete = settled.loadState.prepend.endOfPaginationReached,
+            newestKey = newestKey,
+            newestIsUserPrompt = newestIsUserPrompt,
+        ),
+    )
 }
 
 /** Opening states the paged list decides from Paging's own load states. */
@@ -365,54 +366,6 @@ internal fun ObserveResidentRows(
 /** What a view reports as resident: nothing (null) while its first page is still loading. */
 internal fun <T> residentReport(rows: List<T>, refresh: LoadState): List<T>? =
     rows.takeUnless { it.isEmpty() && refresh is LoadState.Loading }
-
-/**
- * Leaving the newest edge stops following; coming back resumes, but only once that edge is the
- * true end of the list rather than a page boundary, or a mid-history page load would re-arm the
- * follow and yank the reader to the tail (desktop FollowTheNewestEdge).
- */
-@Composable
-private fun FollowTheNewestEdge(listState: LazyListState, atNewestEdge: Boolean, onFollowChanged: (Boolean) -> Unit) {
-    LaunchedEffect(listState, atNewestEdge) {
-        var wasScrolling = false
-        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (scrolling) {
-                onFollowChanged(false)
-            } else if (wasScrolling && !listState.canScrollBackward && atNewestEdge) {
-                onFollowChanged(true)
-            }
-            wasScrolling = scrolling
-        }
-    }
-}
-
-/**
- * letta-mobile-bglj6.1.18: a new user prompt at the head is the user's own send, so the viewport
- * follows it — the port of LegacyTimelineList's force-follow (the legacy Android chat's
- * shouldForceScrollOnUserSend): re-arm the follow and glide to the newest edge, wherever the
- * reader was scrolled. The very first composition only records the key, so a prompt already at
- * the head when the list opens is not mistaken for a send.
- */
-@Composable
-private fun ForceFollowOnSend(
-    listState: LazyListState,
-    newestKey: String?,
-    newestIsUserPrompt: Boolean,
-    onFollow: () -> Unit,
-) {
-    val previousKey = remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(newestKey) {
-        val isNewPrompt = newestIsUserPrompt && previousKey.value != null && newestKey != previousKey.value
-        previousKey.value = newestKey
-        if (isNewPrompt) {
-            onFollow()
-            listState.animateScrollToItem(0)
-        }
-    }
-}
-
-/** The streaming snap-back cadence; the legacy Android chat coalesced these to 96ms. */
-private const val STREAM_SNAP_INTERVAL_MS = 96
 
 /** Puts the reader back where they left off, once, from resident rows only. */
 @Composable
