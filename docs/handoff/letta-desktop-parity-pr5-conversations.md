@@ -11,7 +11,7 @@ section 5 F15-F18. Beads `letta-mobile-bzvro.15`-`.18` (claimed, open). Follow-u
 | F15 fork from a message | Done (desktop + Android) | Android in-chat fork on the paged canonical timeline only forks through the prompt (bead .32) |
 | F16 edit and resend | Done on desktop; Android works when `ChatUiState.messages` holds the timeline | bead .32 for the paged timeline |
 | F17 rename / pin / delete | Done on desktop (shared nav drawer rows) | undo snackbar deferred (.31); Android drawer binding deferred (.33) |
-| F18 recent models + effort set | Done | desktop shares `~/.letta/settings.json` `recentModels` |
+| F18 recent models + effort set | Done | kept in the app settings store only; TUI interop dropped by decision |
 
 ## Verification state (last runs, Windows, JDK 26)
 
@@ -103,9 +103,8 @@ Disk is tight: delete `build/`, `.gradle/`, `.kotlin/` when done. Never commit `
 
 ### F18 recent models + effort
 - `sharedLogic/.../data/model/RecentModelsStore.kt` (MRU, 8 shown, 10 stored, re-reads before write),
-  `SettingsStoreRecentModels`, `LettaSettingsRecentModels.kt` (reads/merges only `recentModels`, preserves other keys and
-  order, refuses non-object files). Desktop `DesktopRecentModelsPersistence` uses the TUI file only if it exists, writes via
-  temp file + atomic move; else the app settings store.
+  `SettingsStoreRecentModels` (app settings store only). TUI interop was dropped by decision: nothing reads or writes
+  `~/.letta/settings.json`; it may come later as a one-time import of the TUI `recentModels` list.
 - Recording on success: `ConversationModelRepository(recents=)` (Android, Hilt `ModelControlModule`) and desktop
   `applyConversationModel` -> `conversationManagement.recordModel`.
 - Picker: `ModelPickerSource.recents` + `withRecents`, `ModelPickerCatalog.withRecents` prepends a "Recent" group
@@ -115,8 +114,7 @@ Disk is tight: delete `build/`, `.gradle/`, `.kotlin/` when done. Never commit `
 ## Tests added (all passing at last run)
 commonTest: `ConversationBranchingTest`, `ConversationBranchRunnerTest`, `AppServerConversationForkTest`,
 `PinnedConversationsTest`, `RecentModelsStoreTest`, `ModelPickerRecentsTest`, `MessageActionPolicyTest` (+2),
-`ComposerEffortTest` (updated). jvmTest: `ConversationForkHandlerTest`. desktop: `DesktopConversationBrancherTest`,
-`DesktopRecentModelsPersistenceTest`, `DesktopLocalBackendAdminGatewayTest` (delete/rename/fork). sharedUI:
+`ComposerEffortTest` (updated). jvmTest: `ConversationForkHandlerTest`. desktop: `DesktopConversationBrancherTest`, `DesktopLocalBackendAdminGatewayTest` (delete/rename/fork). sharedUI:
 `ChatRowInteractionUiTest` (+2), `ModelControlUiTest` (+1), `ChatComposerPanelUiTest` (label "High"),
 `ShellAgentPanelTest` (+3 rename/pin, written after the rebase, passed), `ShellRowMenusTest` (+1), `ShellSidebarMappingTest` (+1).
 
