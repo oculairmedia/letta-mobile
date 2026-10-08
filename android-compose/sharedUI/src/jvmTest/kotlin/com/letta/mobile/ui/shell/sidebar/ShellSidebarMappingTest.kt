@@ -30,6 +30,18 @@ class ShellSidebarMappingTest {
     }
 
     @Test
+    fun pinnedConversationsLeadAndCarryTheirPin() {
+        // letta-mobile-bzvro.17
+        val rows = ShellSidebarMapping.conversationRows(
+            conversations = listOf(summary("a", archived = false), summary("b", archived = false), summary("c", archived = false)),
+            marks = ShellConversationMarks(pinnedIds = setOf("c")),
+            timeLabel = { it },
+        )
+        assertEquals(listOf("c", "a", "b"), rows.map { it.id })
+        assertEquals(listOf(true, false, false), rows.map { it.pinned })
+    }
+
+    @Test
     fun conversationRowsCarryTheHostsMarks() {
         val rows = ShellSidebarMapping.conversationRows(
             conversations = listOf(summary("a", archived = false), summary("b", archived = true), summary("c", archived = false)),

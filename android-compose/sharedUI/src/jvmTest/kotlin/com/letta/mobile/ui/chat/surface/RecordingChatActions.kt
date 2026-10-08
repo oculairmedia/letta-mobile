@@ -102,6 +102,19 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
         reruns += message
     }
 
+    val forks = mutableListOf<UiMessage>()
+    val edits = mutableListOf<UiMessage>()
+
+    override fun forkFromMessage(message: UiMessage) {
+        record("forkFromMessage")
+        forks += message
+    }
+
+    override fun editAndResend(message: UiMessage) {
+        record("editAndResend")
+        edits += message
+    }
+
     override fun submitApproval(answer: ChatApprovalAnswer) {
         record("submitApproval")
         approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)

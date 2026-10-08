@@ -16,6 +16,8 @@ internal data class DesktopAgentSidebarState(
     val selectedConversationId: String?,
     val thinkingConversationId: String?,
     val deletingConversationIds: Set<String> = emptySet(),
+    /** letta-mobile-bzvro.17: pinned conversations, listed first. */
+    val pinnedConversationIds: Set<String> = emptySet(),
     val archiveFilter: ConversationArchiveFilter,
     val selectedDestination: DesktopDestination,
     val mode: WorkPlayMode,
@@ -33,6 +35,9 @@ internal data class DesktopAgentSidebarActions(
     val onDestinationSelected: (DesktopDestination) -> Unit,
     val onConversationSelected: (String) -> Unit,
     val onDeleteConversation: (String) -> Unit,
+    /** letta-mobile-bzvro.17: rename (persists the conversation's summary) and pin. */
+    val onRenameConversation: (id: String, title: String) -> Unit = { _, _ -> },
+    val onPinConversation: (id: String, pinned: Boolean) -> Unit = { _, _ -> },
     val onNewChat: () -> Unit,
     val onEditAgent: () -> Unit,
     val onOpenCanvas: (com.letta.mobile.data.canvas.CanvasId) -> Unit = {},

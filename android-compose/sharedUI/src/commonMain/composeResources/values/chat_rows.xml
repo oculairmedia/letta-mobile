@@ -11,6 +11,8 @@
     <string name="rows_copy_output">Copy output</string>
     <string name="rows_message_actions">Message actions</string>
     <string name="rows_send_again">Send again</string>
+    <string name="rows_edit_and_resend">Edit and resend</string>
+    <string name="rows_fork_from_here">Fork from here</string>
     <string name="rows_not_sent">Not sent</string>
     <string name="rows_expand_prompt">Expand prompt</string>
     <string name="rows_collapse_prompt">Collapse prompt</string>

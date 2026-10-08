@@ -114,18 +114,56 @@ class DesktopLocalBackendAdminGatewayTest {
     }
 
     @Test
-    fun `delete fails closed instead of silently archiving`() = runTest {
+    fun `delete archives and hides the conversation because the App Server has no delete`() = runTest {
+        // letta-mobile-bzvro.17: hidden conversations never reach a list, so the row is gone, and
+        // the conversation stays on disk (archived) rather than being destroyed.
         val client = FakeAppServerClient(failedCreateResponse()).apply {
             retrieveConversation = conversation("conversation-1", archived = false)
         }
         val gateway = DesktopLocalBackendAdminGateway(client)
 
-        val failure = assertFailsWith<UnsupportedOperationException> {
-            gateway.deleteConversation("conversation-1")
-        }
+        gateway.deleteConversation("conversation-1")
 
-        assertEquals(true, failure.message.orEmpty().contains("archive explicitly"))
-        assertEquals(null, client.updateCommand)
+        assertEquals("conversation-1", client.updateCommand?.conversationId)
+        assertEquals(true, client.updateCommand?.body?.get("archived")?.jsonPrimitive?.boolean)
+        assertEquals(true, client.updateCommand?.body?.get("hidden")?.jsonPrimitive?.boolean)
+    }
+
+    @Test
+    fun `rename writes the conversation summary`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse())
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        gateway.setConversationSummary(
+            com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate(
+                com.letta.mobile.data.model.ConversationId("conversation-1"),
+                com.letta.mobile.data.chat.runtime.ConversationSummary("Trip plans"),
+            ),
+        )
+
+        assertEquals("conversation-1", client.updateCommand?.conversationId)
+        assertEquals("Trip plans", client.updateCommand?.body?.get("summary")?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `fork sends conversation_fork with the message in its body and reads the fork back`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            retrieveConversation = conversation("conversation-fork", archived = false)
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        val fork = gateway.forkConversation(
+            com.letta.mobile.data.chat.branch.ConversationForkRequest(
+                conversationId = "conversation-1",
+                agentId = "agent-1",
+                throughMessageId = "message-7",
+            ),
+        )
+
+        assertEquals("conversation-fork", fork.id.value)
+        assertEquals("conversation-1", client.forkCommand?.conversationId)
+        assertEquals("message-7", client.forkCommand?.body?.messageId)
+        assertEquals("agent-1", client.forkCommand?.body?.agentId)
     }
 
     @Test
@@ -335,6 +373,20 @@ class DesktopLocalBackendAdminGatewayTest {
                     com.letta.mobile.data.model.Conversation.serializer(),
                     updated,
                 ).jsonObject,
+            )
+        }
+
+        var forkCommand: com.letta.mobile.data.transport.appserver.AppServerConversationFork? = null
+
+        override suspend fun conversationFork(
+            command: com.letta.mobile.data.transport.appserver.AppServerConversationFork,
+        ): com.letta.mobile.data.transport.appserver.AppServerConversationForkResponse {
+            forkCommand = command
+            return com.letta.mobile.data.transport.appserver.AppServerConversationForkResponse(
+                requestId = command.requestId,
+                success = true,
+                conversationId = "conversation-fork",
+                error = null,
             )
         }
 

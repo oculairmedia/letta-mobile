@@ -1,9 +1,12 @@
 package com.letta.mobile.di
 
+import com.letta.mobile.data.model.RecentModelsStore
+import com.letta.mobile.data.model.SettingsStoreRecentModels
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectionRepository
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import dagger.Module
 import dagger.Provides
@@ -35,6 +38,14 @@ object ModelControlModule {
 
     @Provides
     @Singleton
-    fun provideConversationModelRepository(rpc: AdminRpcInvoker): ConversationModelRepository =
-        ConversationModelRepository(rpc)
+    fun provideConversationModelRepository(
+        rpc: AdminRpcInvoker,
+        recents: RecentModelsStore,
+    ): ConversationModelRepository = ConversationModelRepository(rpc, recents = recents)
+
+    /** letta-mobile-bzvro.18: the picker's "Recent" group, kept in the app's settings store. */
+    @Provides
+    @Singleton
+    fun provideRecentModelsStore(store: SecureSettingsStore): RecentModelsStore =
+        RecentModelsStore(SettingsStoreRecentModels(store))
 }

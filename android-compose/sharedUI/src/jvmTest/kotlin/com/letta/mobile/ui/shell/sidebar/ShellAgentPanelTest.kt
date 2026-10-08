@@ -16,7 +16,11 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasId
@@ -130,6 +134,64 @@ class ShellAgentPanelTest {
         onNodeWithText("confirm:Delete").performClick()
         assertEquals(listOf("c1"), deleted)
         onNodeWithText("confirm:Delete").assertDoesNotExist()
+    }
+
+    /** A stand-in host: the row menu's entries as plain buttons under the row. */
+    private val menuAsButtons = ShellChromeDecorations(
+        rowMenu = { items, content ->
+            Column {
+                content()
+                items.forEach { Text("menu:${it.label}", Modifier.clickable(onClick = it.onClick)) }
+            }
+        },
+    )
+
+    @Test
+    fun renamingFromTheRowMenuEditsTheTitleInPlace() = runComposeUiTest {
+        // letta-mobile-bzvro.17: Enter saves a changed title, trimmed.
+        val renames = mutableListOf<Pair<String, String>>()
+        setContent {
+            CompositionLocalProvider(LocalShellChromeDecorations provides menuAsButtons) {
+                Panel(state, ShellAgentPanelActions(onRenameConversation = { id, title -> renames += id to title }))
+            }
+        }
+
+        onNodeWithText("menu:Rename chat").performClick()
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).performTextReplacement("  Lisbon trip ")
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).performKeyInput { pressKey(Key.Enter) }
+
+        runOnIdle { assertEquals(listOf("c1" to "Lisbon trip"), renames) }
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).assertDoesNotExist()
+        onNodeWithText("Handoff from local-code").assertExists()
+    }
+
+    @Test
+    fun escapeOrAnUnchangedTitleRenamesNothing() = runComposeUiTest {
+        val renames = mutableListOf<String>()
+        setContent { MaterialTheme { ShellConversationRenameField(title = "Trip plans", onRename = { renames += it }, onDone = {}) } }
+
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).performKeyInput { pressKey(Key.Enter) }
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).performTextReplacement("Other")
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).performKeyInput { pressKey(Key.Escape) }
+
+        runOnIdle { assertEquals(emptyList(), renames) }
+    }
+
+    @Test
+    fun aPinnedRowShowsItsPinAndItsMenuOffersUnpin() = runComposeUiTest {
+        val pins = mutableListOf<Pair<String, Boolean>>()
+        val pinned = state.copy(conversations = state.conversations.map { it.copy(pinned = true) })
+        setContent {
+            CompositionLocalProvider(LocalShellChromeDecorations provides menuAsButtons) {
+                Panel(pinned, ShellAgentPanelActions(onPinConversation = { id, pin -> pins += id to pin }))
+            }
+        }
+
+        onNodeWithTag(ShellConversationTags.PINNED, useUnmergedTree = true).assertExists()
+        onNodeWithText("menu:Rename chat").assertDoesNotExist()
+        onNodeWithText("menu:Unpin chat").performClick()
+
+        assertEquals(listOf("c1" to false), pins)
     }
 
     @androidx.compose.runtime.Composable

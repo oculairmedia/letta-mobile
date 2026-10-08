@@ -155,6 +155,10 @@ private fun AgentScaffoldChatScreenPane(
                     switch(subagentAgentId, subagentConversationId, null)
                 }
             },
+        // letta-mobile-bzvro.15/.16: a fork (or an edit's fork) opens as its own conversation.
+        onOpenConversation = params.navigation.onSwitchConversation?.let { switch ->
+            { agentId, conversationId -> switch(agentId, conversationId, null) }
+        },
         onOpenCanvas = params.navigation.onNavigateToCanvas?.let { navigate ->
             {
                 navigate(

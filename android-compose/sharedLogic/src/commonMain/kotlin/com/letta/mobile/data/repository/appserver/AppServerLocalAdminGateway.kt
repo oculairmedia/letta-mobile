@@ -1,14 +1,19 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.controller.node.iroh.withDefaultContextWindow
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerConversationFork
+import com.letta.mobile.data.transport.appserver.AppServerConversationForkBody
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -162,6 +167,44 @@ class AppServerLocalAdminGateway(
     suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
         updateConversation(conversationId, buildJsonObject { put("archived", archived) })
 
+    /** letta-mobile-bzvro.17: the conversation's title is its `summary`. */
+    suspend fun renameConversation(update: ConversationSummaryUpdate): Conversation =
+        updateConversation(update.conversationId.value, buildJsonObject { put("summary", update.summary.value) })
+
+    /**
+     * letta-mobile-bzvro.17: the App Server has no `conversation_delete`, so a delete archives the
+     * conversation AND hides it: hidden conversations never reach a list (`include_hidden` is off),
+     * and `removed = false` brings it back for an undo.
+     */
+    suspend fun setConversationRemoved(conversationId: ConversationId, removed: Boolean): Conversation =
+        updateConversation(
+            conversationId.value,
+            buildJsonObject {
+                put("archived", removed)
+                put("hidden", removed)
+            },
+        )
+
+    /**
+     * letta-mobile-bzvro.15: `conversation_fork`, then a read of the fork (upstream answers with
+     * its id only). The options go in the body: without it the whole conversation is copied.
+     */
+    suspend fun forkConversation(request: ConversationForkRequest): Conversation {
+        val response = client.conversationFork(
+            AppServerConversationFork(
+                requestId = requestId(Operation.ConversationFork.requestName),
+                conversationId = request.conversationId,
+                body = AppServerConversationForkBody(
+                    agentId = request.agentId,
+                    messageId = request.throughMessageId,
+                ),
+            ),
+        )
+        val forkedId = Payload(response.success, response.error, response.conversationId)
+            .requireValue(Operation.ConversationFork)
+        return getConversation(forkedId)
+    }
+
     private suspend fun updateConversation(conversationId: String, body: JsonObject): Conversation {
         val response = client.conversationUpdate(
             AppServerCommand.ConversationUpdate(
@@ -197,6 +240,7 @@ class AppServerLocalAdminGateway(
         MessageList("message-list", "message listing", "messages"),
         ConversationCreate("conversation-create", "conversation creation", "conversation"),
         ConversationUpdate("conversation-update", "conversation update", "conversation"),
+        ConversationFork("conversation-fork", "conversation fork", "conversation"),
         AgentCreate("agent-create", "agent creation", "agent"),
         ListModels("list-models", "model listing", "models"),
         ;

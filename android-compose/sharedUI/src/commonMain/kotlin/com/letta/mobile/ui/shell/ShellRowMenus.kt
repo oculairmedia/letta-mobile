@@ -27,19 +27,21 @@ import com.letta.mobile.ui.shell.rail.ShellRailEntry
  * [ShellChromeDecorations.rowMenu], so a row's actions are defined in one place.
  */
 object ShellRowMenus {
-    /** A conversation: archive or restore, and delete (the row asks before it deletes). */
+    /**
+     * A conversation: rename and pin or unpin when the host offers them (letta-mobile-bzvro.17),
+     * archive or restore, and delete (the row asks before it deletes).
+     */
     fun conversation(
         archived: Boolean,
         deleting: Boolean,
-        onArchiveToggle: () -> Unit,
-        onRequestDelete: () -> Unit,
+        actions: ShellConversationMenuActions,
     ): List<ShellRowMenuItem> =
         if (deleting) {
             emptyList()
         } else {
-            listOf(
-                ShellRowMenuItem(if (archived) "Restore chat" else "Archive chat", onArchiveToggle),
-                ShellRowMenuItem("Delete chat", onRequestDelete),
+            actions.manage.items() + listOf(
+                ShellRowMenuItem(if (archived) "Restore chat" else "Archive chat", actions.onArchiveToggle),
+                ShellRowMenuItem("Delete chat", actions.onRequestDelete),
             )
         }
 
@@ -58,6 +60,29 @@ object ShellRowMenus {
             },
             actions.onAgentSettings?.let { onSettings -> ShellRowMenuItem("Agent settings") { onSettings(entry.agentId) } },
         )
+}
+
+/** A conversation row's secondary actions (archive, delete, optional rename/pin manage menu). */
+data class ShellConversationMenuActions(
+    val onArchiveToggle: () -> Unit,
+    val onRequestDelete: () -> Unit,
+    val manage: ShellConversationManageMenu = ShellConversationManageMenu.None,
+)
+
+/** A conversation row's rename and pin entries; a null action is one the host does not offer. */
+data class ShellConversationManageMenu(
+    val pinned: Boolean = false,
+    val onRenameRequest: (() -> Unit)? = null,
+    val onPinToggle: (() -> Unit)? = null,
+) {
+    fun items(): List<ShellRowMenuItem> = listOfNotNull(
+        onRenameRequest?.let { ShellRowMenuItem("Rename chat", it) },
+        onPinToggle?.let { ShellRowMenuItem(if (pinned) "Unpin chat" else "Pin chat", it) },
+    )
+
+    companion object {
+        val None = ShellConversationManageMenu()
+    }
 }
 
 /** Test tags for the touch row menu. */
