@@ -81,7 +81,7 @@ fun RunStatusLine(
     var dismissed by remember { mutableStateOf(emptySet<String>()) }
     val commands = status.commands.filter { it.running || it.commandId !in dismissed }
     val phase = phaseLabel(status)
-    if (phase == null && status.notice == null && commands.isEmpty()) return
+    if (nothingToShow(phase, status.notice, commands)) return
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -96,6 +96,9 @@ fun RunStatusLine(
         status.notice?.let { NoticeText(it) }
     }
 }
+
+private fun nothingToShow(phase: PhaseLabel?, notice: LiveNotice?, commands: List<CommandActivity>): Boolean =
+    phase == null && notice == null && commands.isEmpty()
 
 /** What the phase row says, before any retry countdown is filled in; null when nothing runs. */
 internal sealed interface PhaseLabel {

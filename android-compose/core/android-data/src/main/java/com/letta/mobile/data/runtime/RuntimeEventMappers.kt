@@ -128,17 +128,7 @@ fun WsTimelineEvent.toRuntimeEventDrafts(
         ),
     )
 
-    // letta-mobile-bzvro.7: the status line's events, as the engine produced them.
-    is WsTimelineEvent.RunActivity -> listOf(
-        runtimeDraft(
-            backend = backend,
-            agentId = agentId?.let(::AgentId) ?: fallbackAgentId,
-            conversationId = fallbackConversationId,
-            runId = runId?.toRunIdOrNull(),
-            source = RuntimeEventSource.ExternalTransport,
-            payload = payload,
-        ),
-    )
+    is WsTimelineEvent.RunActivity -> listOf(toRuntimeEventDraft(backend, fallbackAgentId, fallbackConversationId))
 
     is WsTimelineEvent.GoalsUpdated,
     is WsTimelineEvent.AgentUpdated, is WsTimelineEvent.TurnQueued,
@@ -290,6 +280,20 @@ fun LettaMessage.toRuntimeEventDrafts(
         else -> emptyList()
     }
 }
+
+/** letta-mobile-bzvro.7: the status line's events, as the engine produced them. */
+private fun WsTimelineEvent.RunActivity.toRuntimeEventDraft(
+    backend: BackendDescriptor,
+    fallbackAgentId: AgentId?,
+    fallbackConversationId: ConversationId?,
+): RuntimeEventDraft = runtimeDraft(
+    backend = backend,
+    agentId = agentId?.let(::AgentId) ?: fallbackAgentId,
+    conversationId = fallbackConversationId,
+    runId = runId?.toRunIdOrNull(),
+    source = RuntimeEventSource.ExternalTransport,
+    payload = payload,
+)
 
 private fun runtimeDraft(
     backend: BackendDescriptor,

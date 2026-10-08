@@ -915,12 +915,15 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.GoalsUpdated, is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.TurnQueued -> serverQueueMarks.markQueuedOnServer(event)
-            is WsTimelineEvent.UserActionOutcome ->
-                runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
-            // letta-mobile-bzvro.7: status-line events go to the run state only.
-            is WsTimelineEvent.RunActivity ->
-                runtimeEventBatcher.enqueue(event, resolveConversationId(event.conversationId) ?: event.conversationId ?: lastActiveConversationId)
+            // letta-mobile-bzvro.7: status-line events, like action outcomes, go to the run state only.
+            is WsTimelineEvent.UserActionOutcome, is WsTimelineEvent.RunActivity -> recordRunStateOnly(event)
         }
+    }
+
+    private fun recordRunStateOnly(event: WsTimelineEvent) {
+        val named = (event as? WsTimelineEvent.RunActivity)?.conversationId
+            ?: (event as? WsTimelineEvent.UserActionOutcome)?.conversationId
+        runtimeEventBatcher.enqueue(event, resolveConversationId(named) ?: named ?: lastActiveConversationId)
     }
 
     /** A delta naming a turn this conversation has already finished is that turn's tail. */

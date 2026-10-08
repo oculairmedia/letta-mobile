@@ -63,7 +63,6 @@ class StreamIntegrityMonitor(
             client: AppServerClient,
             detectGaps: Boolean,
             requestIdFactory: () -> String,
-            clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
         ): StreamIntegrityMonitor {
             val scheduler = RuntimeSyncScheduler(
                 runtimes = router::watchedRuntimes,
@@ -77,7 +76,7 @@ class StreamIntegrityMonitor(
                         ),
                     )
                 },
-                clock = clock,
+                clock = { Clock.System.now().toEpochMilliseconds() },
             )
             return StreamIntegrityMonitor(scheduler, detectGaps, router.connectionGenerationProvider)
         }

@@ -121,14 +121,11 @@ internal fun rememberRowContexts(
 internal fun rememberRowCallbacks(
     actions: ChatActions,
     host: ChatSurfaceHost,
-    /** letta-mobile-bzvro.9: the newest user prompt, read when an error card's Retry is pressed. */
-    lastPrompt: () -> UiMessage? = { null },
     onImageTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
 ): ChatRowCallbacks {
     val currentTap = rememberUpdatedState(onImageTap)
-    val currentPrompt = rememberUpdatedState(lastPrompt)
     return remember(actions, host) {
-        rowCallbacksFor(actions, host, lastPrompt = { currentPrompt.value() }) { images, index -> currentTap.value(images, index) }
+        rowCallbacksFor(actions, host) { images, index -> currentTap.value(images, index) }
     }
 }
 
@@ -139,7 +136,6 @@ internal fun rememberRowCallbacks(
 internal fun rowCallbacksFor(
     actions: ChatActions,
     host: ChatSurfaceHost,
-    lastPrompt: () -> UiMessage? = { null },
     onImageTap: (images: List<UiImageAttachment>, index: Int) -> Unit,
 ): ChatRowCallbacks {
     val resolveName = host.resolveAgentName
@@ -150,6 +146,5 @@ internal fun rowCallbacksFor(
         onImageTap = onImageTap,
         resolveAgentName = resolveName ?: { null },
         openSubagent = open?.let { { target -> it(target.toolCallId, target.subagentAgentId, target.description) } },
-        lastPrompt = lastPrompt,
     )
 }

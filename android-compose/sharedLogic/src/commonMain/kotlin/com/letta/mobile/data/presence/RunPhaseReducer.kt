@@ -23,16 +23,10 @@ object RunPhaseReducer {
 
     /** Apply one event to [state]. Returns [state] unchanged when the event says nothing about phase. */
     fun reduce(state: ConversationRunState, event: RuntimeEventPayload, nowMs: Long): ConversationRunState {
-        val phased = reducePhase(state, event, nowMs)
-        val live = RuntimeLiveStatusReducer.reduce(state.live, event, nowMs)
-        return if (live == phased.live) phased else phased.copy(live = live)
-    }
-
-    private fun reducePhase(state: ConversationRunState, event: RuntimeEventPayload, nowMs: Long): ConversationRunState {
         // DONE is momentary: any next event means a new turn is under way, so the run starts from
         // rest rather than inheriting the finished turn's tool counters.
         val base = if (state.phase == RunPhase.DONE) state.reset() else state
-        return when (event) {
+        val phased = when (event) {
             is RuntimeEventPayload.LocalUserAppend -> base.reset().at(RunPhase.QUEUED, nowMs)
             is RuntimeEventPayload.RetryRequested -> base.reset().at(RunPhase.QUEUED, nowMs)
             is RuntimeEventPayload.SendMarkedFailed -> base.reset().at(RunPhase.FAILED, nowMs)
@@ -80,6 +74,9 @@ object RunPhaseReducer {
             is RuntimeEventPayload.ApprovalClassified,
             -> base
         }
+        // letta-mobile-bzvro.7: the status line's detail, folded from the same event.
+        val live = RuntimeLiveStatusReducer.reduce(state.live, event, nowMs)
+        return if (live == phased.live) phased else phased.copy(live = live)
     }
 
     /**

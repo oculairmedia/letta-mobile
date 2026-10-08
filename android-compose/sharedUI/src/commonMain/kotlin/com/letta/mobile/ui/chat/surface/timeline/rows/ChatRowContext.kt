@@ -76,4 +76,14 @@ internal class ChatRowCallbacks(
     val openSubagent: ((ChatSubagentTarget) -> Unit)? = null,
     /** letta-mobile-bzvro.9: the newest user prompt, for an error card's Retry. */
     val lastPrompt: () -> UiMessage? = { null },
-)
+) {
+    /** These callbacks, with [prompt] as the source of the newest user prompt. */
+    fun withLastPrompt(prompt: () -> UiMessage?): ChatRowCallbacks = ChatRowCallbacks(
+        actions = actions,
+        host = host,
+        onImageTap = onImageTap,
+        resolveAgentName = resolveAgentName,
+        openSubagent = openSubagent,
+        lastPrompt = prompt,
+    )
+}

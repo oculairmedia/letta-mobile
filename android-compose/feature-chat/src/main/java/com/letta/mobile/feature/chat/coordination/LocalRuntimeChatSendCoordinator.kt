@@ -273,21 +273,9 @@ internal class LocalRuntimeChatSendCoordinator(
                     ),
                 )
             }
-            is RuntimeEventPayload.ApprovalRequested,
-            is RuntimeEventPayload.ApprovalResolved,
-            is RuntimeEventPayload.RestSnapshotReconcile,
-            is RuntimeEventPayload.RetryRequested,
-            is RuntimeEventPayload.MemFsCommitObserved,
-            is RuntimeEventPayload.AgentFileImported,
-            is RuntimeEventPayload.AgentFileExported,
-            // letta-mobile-bzvro.7/.8: status-line events are not timeline content.
-            is RuntimeEventPayload.LoopPhaseChanged,
-            is RuntimeEventPayload.RetryNotice,
-            is RuntimeEventPayload.StatusNotice,
-            is RuntimeEventPayload.CommandStarted,
-            is RuntimeEventPayload.CommandFinished,
-            is RuntimeEventPayload.ApprovalClassified,
-            -> Unit
+            // Approvals, snapshots, memfs/agent-file bookkeeping and the status line's events
+            // (letta-mobile-bzvro.7/.8) are not timeline content.
+            else -> Unit
         }
         return false
     }

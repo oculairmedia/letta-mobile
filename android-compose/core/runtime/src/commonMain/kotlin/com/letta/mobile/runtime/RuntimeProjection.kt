@@ -168,16 +168,9 @@ object RuntimeEventProjector {
                 agentFiles = next.agentFiles + (payload.file.id to payload.file),
             )
 
-            // Live status and command progress are presentation-only: the durable projection keeps
-            // no record of them (letta-mobile-bzvro.7/.8/.10).
-            is RuntimeEventPayload.AgentFileExported,
-            is RuntimeEventPayload.LoopPhaseChanged,
-            is RuntimeEventPayload.RetryNotice,
-            is RuntimeEventPayload.StatusNotice,
-            is RuntimeEventPayload.CommandStarted,
-            is RuntimeEventPayload.CommandFinished,
-            is RuntimeEventPayload.ApprovalClassified,
-            -> next
+            // Exports, and the presentation-only live status and command progress
+            // (letta-mobile-bzvro.7/.8/.10), leave no durable record.
+            else -> next
         }
     }
 

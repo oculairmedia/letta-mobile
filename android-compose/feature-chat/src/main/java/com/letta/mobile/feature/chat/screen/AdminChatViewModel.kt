@@ -191,7 +191,7 @@ internal class AdminChatViewModel @Inject constructor(
      * reducer folded it into the registry. Read under the key this screen publishes with.
      */
     val liveStatus: StateFlow<com.letta.mobile.data.runtime.RuntimeLiveStatus> = runRegistry.runs
-        .map { runs -> publishedRunKey?.let(runs::get)?.live ?: com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle }
+        .map(::liveStatusIn)
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(LIVE_STATUS_STOP_TIMEOUT_MS), com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle)
 
@@ -1216,6 +1216,11 @@ internal class AdminChatViewModel @Inject constructor(
             addAttachment(image)
         }
     }
+
+    private fun liveStatusIn(
+        runs: Map<String, com.letta.mobile.data.presence.ConversationRunState>,
+    ): com.letta.mobile.data.runtime.RuntimeLiveStatus =
+        publishedRunKey?.let(runs::get)?.live ?: com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle
 
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
     private var publishedRunKey: String? = null

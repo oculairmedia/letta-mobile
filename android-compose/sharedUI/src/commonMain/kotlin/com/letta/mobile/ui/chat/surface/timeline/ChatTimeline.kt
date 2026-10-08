@@ -60,11 +60,11 @@ internal fun ChatTimeline(
 ) {
     var viewer by remember { mutableStateOf<ImageViewerRequest?>(null) }
     val latestState = rememberUpdatedState(state)
-    val callbacks = rememberRowCallbacks(
-        actions = actions,
-        host = host,
-        lastPrompt = { latestState.value.messages.lastOrNull { it.role == "user" } },
-    ) { images, index -> viewer = ImageViewerRequest(images, index) }
+    val rowCallbacks = rememberRowCallbacks(actions, host) { images, index -> viewer = ImageViewerRequest(images, index) }
+    // letta-mobile-bzvro.9: an error card's Retry reads the newest prompt when pressed.
+    val callbacks = remember(rowCallbacks) {
+        rowCallbacks.withLastPrompt { latestState.value.messages.lastOrNull { it.role == "user" } }
+    }
     val (pinch, pinchModifier) = rememberTimelinePinch(
         enabled = capabilities.fontScale,
         committedScale = TextScale(appearance.fontScale),
