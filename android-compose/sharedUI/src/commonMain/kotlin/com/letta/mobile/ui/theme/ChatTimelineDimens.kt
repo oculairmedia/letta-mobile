@@ -14,6 +14,12 @@ object ChatTimelineDimens {
     /** Top fade ramp: taller than the bottom so it reads under the header (desktop list). */
     val topFadeLength: Dp = 72.dp
 
+    /**
+     * A sticky prompt pushed up past the visible top dissolves over this much, so it is gone before
+     * it reaches the header's controls or the status bar instead of running hard under them.
+     */
+    val stickyPromptExitFadeLength: Dp = 24.dp
+
     /** Bottom fade ramp into the composer. */
     val bottomFadeLength: Dp = 44.dp
 

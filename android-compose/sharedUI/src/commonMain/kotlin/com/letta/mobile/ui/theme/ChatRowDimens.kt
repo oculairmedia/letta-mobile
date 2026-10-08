@@ -47,6 +47,9 @@ object ChatRowDimens {
     const val promptGridMaxImages: Int = 3
     val promptGridCellHeight: Dp = 120.dp
 
+    /** A docked (sticky) prompt's images shrink to thumbnails no taller than this. */
+    val dockedPromptImageMaxHeight: Dp = 72.dp
+
     /** A phone's tool row header: the legacy CollapsibleStatusRow's 48dp touch target (bglj6.1.23). */
     val toolHeaderMinHeight: Dp = 48.dp
 

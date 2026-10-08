@@ -15,11 +15,19 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.ui.theme.ChatTimelineDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
  * How far above the viewport the owning prompt is looked for. Bounded because it runs per scroll
@@ -53,6 +61,8 @@ internal class PinnedPrompt(
     private val owner: State<PinnedOwner?>,
     /** The list's visible top, in px from its top edge. */
     val stickLinePx: Int,
+    /** How the copy's images shrink as it docks (letta-mobile-bglj6.1.26). */
+    val compaction: DockedCopyCompaction,
 ) {
     val item: ChatRenderItem? get() = owner.value?.item
 
@@ -69,10 +79,16 @@ internal class PinnedPrompt(
     var copyBottomPx by mutableIntStateOf(0)
         private set
 
+    /** The sticky copy's top as last placed (read at draw time only): above [stickLinePx] it is being pushed out. */
+    var copyTopPx by mutableIntStateOf(0)
+        private set
+
     /** Where the sticky copy's top goes, in px from the list's top edge, for a copy [heightPx] tall. */
     fun copyTop(heightPx: Int): Int {
         val current = owner.value
+        compaction.recordCopyHeight(heightPx)
         val top = if (current == null) stickLinePx else stickyCopyTop(listState.layoutInfo, current, stickLinePx, heightPx)
+        copyTopPx = top
         copyBottomPx = top + heightPx
         return top
     }
@@ -90,6 +106,7 @@ internal fun rememberPinnedPrompt(
     itemAt: (Int) -> ChatRenderItem?,
 ): PinnedPrompt {
     val stickLinePx = with(LocalDensity.current) { topReserve.roundToPx() }
+    val reducedMotion = LocalReducedMotion.current
     val currentCount = rememberUpdatedState(itemCount)
     val currentItemAt = rememberUpdatedState(itemAt)
     val owner = remember(listState, stickLinePx) {
@@ -99,7 +116,10 @@ internal fun rememberPinnedPrompt(
             if (stickLinePx > 0) stickyOwner(info, stickLinePx, rows) else offScreenOwner(info.visibleItemsInfo, rows)
         }
     }
-    return remember(listState, owner, stickLinePx) { PinnedPrompt(listState, owner, stickLinePx) }
+    return remember(listState, owner, stickLinePx, reducedMotion) {
+        val motion = DockedCopyMotion.of(sticky = stickLinePx > 0, reducedMotion = reducedMotion)
+        PinnedPrompt(listState, owner, stickLinePx, DockedCopyCompaction(listState, owner, stickLinePx, motion))
+    }
 }
 
 /** The list's items as the owner search reads them: how many there are, and each one. */
@@ -170,6 +190,39 @@ internal fun Modifier.hiddenUnderStickyCopy(pinned: PinnedPrompt?, key: String):
     if (pinned == null) return this
     return graphicsLayer { alpha = if (pinned.standsInFor(key)) 0f else 1f }
 }
+
+/**
+ * The header shading for the sticky copy (letta-mobile-bglj6.1.26). The copy is drawn over the list,
+ * outside the list's own top fade, so when the next prompt pushes it up past the visible top it
+ * would run hard under the status bar and the header's controls. Instead whatever of it has crossed
+ * the line dissolves over [ChatTimelineDimens.stickyPromptExitFadeLength] and is gone above that, so
+ * nothing of it reaches the header band's controls. Held at the line, nothing is shaded. Read at draw
+ * time only: a scroll redraws the mask, never recomposes or re-lays out the copy.
+ */
+internal fun Modifier.stickyCopyHeaderFade(pinned: PinnedPrompt): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        // The visible top in the copy's own coordinates: positive once it is pushed above it.
+        val line = (pinned.stickLinePx - pinned.copyTopPx).toFloat()
+        if (line <= 0f) return@drawWithContent
+        val fade = ChatTimelineDimens.stickyPromptExitFadeLength.toPx()
+        // Fully gone above `gone`; just pushed (less than the ramp over the line) its top edge is
+        // only partly faded, so the ramp never steps.
+        val gone = line - fade
+        val topEdge = Color.Black.copy(alpha = (-gone / fade).coerceIn(0f, 1f))
+        drawRect(
+            brush = Brush.verticalGradient(
+                0f to topEdge,
+                (gone.coerceAtLeast(0f) / line) to topEdge,
+                1f to Color.Black,
+                startY = 0f,
+                endY = line,
+            ),
+            size = Size(size.width, line),
+            blendMode = BlendMode.DstIn,
+        )
+    }
 
 /** Places the sticky copy where [pinned] says, read at placement time so a scroll never recomposes it. */
 internal fun Modifier.stickyCopyPlacement(pinned: PinnedPrompt): Modifier = layout { measurable, constraints ->
