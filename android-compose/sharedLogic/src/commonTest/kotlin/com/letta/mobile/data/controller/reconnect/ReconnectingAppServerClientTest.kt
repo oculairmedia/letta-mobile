@@ -4,7 +4,9 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
+import com.letta.mobile.data.transport.appserver.AppServerIdentity
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlin.random.Random
@@ -336,6 +338,138 @@ class ReconnectingAppServerClientTest {
         runCurrent()
 
         assertTrue(received.any { it.frame.type == "skills_updated" })
+    }
+
+    @Test
+    fun preflightAuthenticationFailureProbesOnceAndNeverDials() = runTest {
+        var probes = 0
+        var dials = 0
+        val listener = RecordingListener()
+        val client = ReconnectingAppServerClient(
+            connect = {
+                dials += 1
+                FakeGeneration().handle()
+            },
+            listener = listener,
+            backoff = backoff(),
+            sleep = { },
+            preflight = {
+                probes += 1
+                AppServerProbeResult.Authentication("HTTP 401")
+            },
+        )
+        client.start(backgroundScope)
+        runCurrent()
+
+        assertEquals(1, probes)
+        assertEquals(0, dials)
+        val state = assertIs<ReconnectingClientState.GaveUp>(client.state.value)
+        assertEquals(GiveUpKind.Authentication, state.kind)
+        assertEquals(AppServerSessionStatus.AuthenticationError("HTTP 401"), state.toSessionStatus())
+        assertEquals<List<String?>>(listOf("HTTP 401"), listener.gaveUp)
+    }
+
+    @Test
+    fun preflightIncompatibleServerStopsAfterADrop() = runTest {
+        val generations = mutableListOf<FakeGeneration>()
+        var probeResult: AppServerProbeResult = AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1))
+        var probes = 0
+        val client = ReconnectingAppServerClient(
+            connect = { FakeGeneration().also { generations += it }.handle() },
+            backoff = backoff(),
+            sleep = { },
+            preflight = {
+                probes += 1
+                probeResult
+            },
+        )
+        client.start(backgroundScope)
+        runCurrent()
+        generations.single().ready()
+        runCurrent()
+        assertEquals(ReconnectingClientState.Ready, client.state.value)
+
+        // The server was replaced by something that is not an App Server while we were connected.
+        probeResult = AppServerProbeResult.Incompatible("HTTP 404")
+        generations.single().fail("socket lost")
+        runCurrent()
+
+        assertEquals(2, probes, "the probe runs again before the reconnect")
+        assertEquals(1, generations.size, "an incompatible server is never redialled")
+        assertEquals(GiveUpKind.Incompatible, assertIs<ReconnectingClientState.GaveUp>(client.state.value).kind)
+    }
+
+    @Test
+    fun aNetworkDropReconnectsWithGrowingDelaysThenRecovers() = runTest {
+        val generations = mutableListOf<FakeGeneration>()
+        var probes = 0
+        val backingOff = mutableListOf<ReconnectingClientState.BackingOff>()
+        lateinit var client: ReconnectingAppServerClient
+        client = ReconnectingAppServerClient(
+            connect = { FakeGeneration().also { generations += it }.handle() },
+            backoff = backoff(),
+            random = Random(7),
+            sleep = { backingOff += client.state.value as ReconnectingClientState.BackingOff },
+            preflight = {
+                probes += 1
+                // Up for the first dial, down for three retries, then back.
+                if (probes == 1 || probes >= 5) {
+                    AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1))
+                } else {
+                    AppServerProbeResult.Unavailable("connection refused")
+                }
+            },
+        )
+        client.start(backgroundScope)
+        runCurrent()
+        generations.single().ready()
+        runCurrent()
+
+        generations.single().fail("socket lost")
+        runCurrent()
+
+        // Each retry probes first and backs off without dialling while the server is down.
+        assertEquals(listOf(0, 1, 2, 3), backingOff.map { it.attempt })
+        assertEquals(listOf(100L, 200L, 400L, 800L), backingOff.map { backoff().ceilingMs(it.attempt) })
+        assertEquals("socket lost", backingOff.first().reason)
+        assertTrue(backingOff.drop(1).all { it.reason == "probe: connection refused" })
+        assertIs<AppServerSessionStatus.Reconnecting>(backingOff.last().toSessionStatus())
+        assertEquals(2, generations.size, "the server came back and was redialled once")
+        generations.last().ready()
+        runCurrent()
+        assertEquals(AppServerSessionStatus.Connected, client.state.value.toSessionStatus())
+    }
+
+    @Test
+    fun resumeNowRedialsImmediatelyAndResetsTheAttemptCounter() = runTest {
+        var dials = 0
+        var up = false
+        val generations = mutableListOf<FakeGeneration>()
+        val client = ReconnectingAppServerClient(
+            connect = {
+                dials += 1
+                if (!up) error("dial refused")
+                FakeGeneration().also { generations += it }.handle()
+            },
+            backoff = FullJitterBackoff(baseDelayMs = 20_000, maxDelayMs = 20_000),
+            random = Random(3),
+        )
+        client.start(backgroundScope)
+        runCurrent()
+        assertEquals(1, dials)
+        assertIs<ReconnectingClientState.BackingOff>(client.state.value)
+
+        // The laptop woke up: the network is back, and we do not wait out the 20 s backoff.
+        up = true
+        client.resumeNow()
+        runCurrent()
+
+        assertEquals(0L, testScheduler.currentTime, "no virtual time passed")
+        assertEquals(2, dials)
+        assertEquals(ReconnectingClientState.Connecting(0), client.state.value)
+        generations.single().ready()
+        runCurrent()
+        assertEquals(ReconnectingClientState.Ready, client.state.value)
     }
 
     @Test

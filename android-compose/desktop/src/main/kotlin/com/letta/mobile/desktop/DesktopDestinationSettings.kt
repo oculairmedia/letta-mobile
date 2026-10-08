@@ -33,7 +33,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.controller.reconnect.summary
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.AppServerProbeResult
+import com.letta.mobile.desktop.chat.DesktopConnectionTestState
+import com.letta.mobile.desktop.chat.runDesktopConnectionTest
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.data.desktopConfigIdFor
 import kotlinx.coroutines.launch
@@ -154,8 +158,53 @@ internal fun BackendSettingsCard(
                     onTokenInputChange = { tokenInput = it },
                 ),
             )
+            if (mode == LettaConfig.Mode.SELF_HOSTED) {
+                BackendConnectionTest(
+                    serverUrl = serverUrl.text,
+                    accessToken = tokenInput.text.trim().takeIf { it.isNotEmpty() } ?: config.accessToken,
+                )
+            }
         }
     }
+}
+
+/**
+ * "Test connection" for an App Server URL (letta-mobile-bzvro.1, F01): an HTTP probe of
+ * `/app-server-info` that never opens a socket, so it cannot disturb the live session. Tests the
+ * values in the form, before they are saved.
+ */
+@Composable
+private fun BackendConnectionTest(serverUrl: String, accessToken: String?) {
+    var testState by remember { mutableStateOf<DesktopConnectionTestState>(DesktopConnectionTestState.Idle) }
+    val scope = rememberCoroutineScope()
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DesktopOutlinedButton(
+            enabled = testState != DesktopConnectionTestState.Running,
+            onClick = {
+                testState = DesktopConnectionTestState.Running
+                scope.launch { testState = runDesktopConnectionTest(serverUrl, accessToken) }
+            },
+        ) {
+            DesktopButtonContent(if (testState == DesktopConnectionTestState.Running) "Testing…" else "Test connection")
+        }
+        desktopConnectionTestMessage(testState)?.let { (message, isError) ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+/** The line shown beside Test connection, and whether it reads as a failure; null when idle. */
+internal fun desktopConnectionTestMessage(state: DesktopConnectionTestState): Pair<String, Boolean>? = when (state) {
+    DesktopConnectionTestState.Idle, DesktopConnectionTestState.Running -> null
+    is DesktopConnectionTestState.NotSupported -> state.reason to false
+    is DesktopConnectionTestState.Finished -> state.result.summary() to (state.result !is AppServerProbeResult.Ok)
 }
 
 @Composable

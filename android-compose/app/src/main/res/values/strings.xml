@@ -281,6 +281,13 @@
     <string name="screen_config_refreshing">Refreshing settings…</string>
     <string name="screen_config_refresh_failed">Couldn’t refresh settings</string>
     <string name="screen_config_show_token">Show token</string>
+    <string name="screen_config_test_connection">Test connection</string>
+    <string name="screen_config_test_connection_running">Testing…</string>
+    <string name="screen_config_test_connection_ok">Connected: letta-code %1$s (%2$s backend, protocol %3$d)</string>
+    <string name="screen_config_test_connection_authentication">The server rejected this token. %1$s</string>
+    <string name="screen_config_test_connection_incompatible">This server is not a compatible App Server. %1$s</string>
+    <string name="screen_config_test_connection_unavailable">Could not reach the server. %1$s</string>
+    <string name="screen_config_test_connection_not_supported">Test connection checks ws://, wss:// and http(s):// App Servers. Iroh endpoints are checked when you connect.</string>
     <string name="screen_config_hide_token">Hide token</string>
     <string name="screen_config_embedded_runtime_title">Embedded LettaCode runtime</string>
     <string name="screen_config_embedded_runtime_disabled_placeholder">Model import and configuration are available, but local turn execution is disabled in this build.</string>

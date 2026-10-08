@@ -32,6 +32,7 @@ import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.data.memory.graph.MemoryPageController
 import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
 import com.letta.mobile.desktop.runtime.DesktopLocalBackendDirectorySettings
+import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -70,6 +71,8 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
             // directory override is honored from the app's very first
             // connection, not just after a later Settings visit.
             DesktopLocalBackendDirectorySettings.applyStoredOverride(store)
+            // F05: stable instance id and the default working directory for the child.
+            DesktopRuntimeLaunchSettings.applyStored(store)
         }
     }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }

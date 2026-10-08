@@ -102,6 +102,10 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
         isLocalMode = bootstrap.activeConfig.mode == LettaConfig.Mode.LOCAL,
         onRestartRequested = chatController::retryConnection,
     )
+    DesktopLocalRuntimeLifecycleEffect(
+        chatController = chatController,
+        isLocalMode = bootstrap.activeConfig.mode == LettaConfig.Mode.LOCAL,
+    )
     return DesktopShellCore(
         bootstrap = bootstrap,
         sessionGraph = sessionGraph,

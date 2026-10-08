@@ -5,10 +5,14 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInfoData
+import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -71,10 +76,28 @@ sealed interface ReconnectingClientState {
 
     data class BackingOff(val attempt: Int, val delayMs: Long, val reason: String?) : ReconnectingClientState
 
-    /** Terminal: policy/auth failure or the bounded attempt budget is exhausted. */
-    data class GaveUp(val reason: String?) : ReconnectingClientState
+    /**
+     * Terminal: policy/auth failure or the bounded attempt budget is exhausted. [kind] says which,
+     * so a UI can tell "fix your token" from "the server is down" (letta-mobile-bzvro.2, F02).
+     */
+    data class GaveUp(val reason: String?, val kind: GiveUpKind = GiveUpKind.Exhausted) : ReconnectingClientState
 
     data object Stopped : ReconnectingClientState
+}
+
+/** Why a [ReconnectingAppServerClient] stopped retrying. */
+enum class GiveUpKind {
+    /** The attempt budget ran out on retryable failures. */
+    Exhausted,
+
+    /** The transport reported a terminal close (policy violation, 401/403 upgrade, 426). */
+    Rejected,
+
+    /** The pre-attempt probe classified the server as rejecting the token. */
+    Authentication,
+
+    /** The pre-attempt probe classified the server as not an App Server this client can use. */
+    Incompatible,
 }
 
 class AppServerNotConnectedException(message: String) : IllegalStateException(message)
@@ -98,6 +121,14 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * Terminal handshake failures (the transport's `Failed(terminal = true)`:
  * policy violation, auth rejection) stop the supervisor without retries —
  * retrying an unauthorized connection is never correct.
+ *
+ * [preflight] (letta-mobile-bzvro.2, F02) runs before every dial — typically the HTTP
+ * `GET /app-server-info` [com.letta.mobile.data.transport.appserver.AppServerProbe], which never
+ * opens a socket. An `Authentication` or `Incompatible` answer stops the loop with that
+ * [GiveUpKind], so a revoked token is reported once instead of retried forever; `Unavailable`
+ * backs off without dialling. [resumeNow] (F04) cuts the current backoff short after the system
+ * wakes from sleep. [start] may be called again after a terminal stop (the user pressed Retry or
+ * changed settings).
  */
 class ReconnectingAppServerClient(
     private val connect: suspend () -> AppServerClientGeneration,
@@ -107,6 +138,7 @@ class ReconnectingAppServerClient(
     private val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
     private val random: kotlin.random.Random = kotlin.random.Random.Default,
     private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
+    private val preflight: (suspend () -> AppServerProbeResult)? = null,
 ) : AppServerClient {
     private val _state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Stopped)
     val state: StateFlow<ReconnectingClientState> = _state.asStateFlow()
@@ -137,6 +169,22 @@ class ReconnectingAppServerClient(
      */
     private val pipeGenerationSeq = kotlinx.atomicfu.atomic(0L)
 
+    /** Set by [resumeNow]; consumed by the next backoff, which then redials at once. */
+    private val resumeRequested = kotlinx.atomicfu.atomic(false)
+    private val wakeups = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * The system woke from sleep or the network came back (F04): skip the rest of the current
+     * backoff, reset the attempt counter, and redial now. A no-op while a generation is Ready;
+     * if that generation turns out to be dead, the next drop already redials from attempt 0.
+     */
+    fun resumeNow() {
+        if (_state.value is ReconnectingClientState.Ready) return
+        resumeRequested.value = true
+        wakeups.trySend(Unit)
+        Telemetry.event(telemetryComponent, "resume_now", "state" to _state.value.toString())
+    }
+
     /**
      * Runs the supervise loop until a terminal state or scope cancellation.
      * Call once; the returned [Job] owns every generation minted by [connect].
@@ -154,7 +202,7 @@ class ReconnectingAppServerClient(
                     }
                     is GenerationOutcome.NeverReady -> Unit
                     is GenerationOutcome.Terminal -> {
-                        giveUp(outcome.reason)
+                        giveUp(outcome.reason, outcome.kind)
                         return@launch
                     }
                 }
@@ -172,7 +220,7 @@ class ReconnectingAppServerClient(
                     "reason" to (outcome.reason ?: ""),
                 )
                 attempt += 1
-                sleep(delayMs)
+                if (backOffOrResume(delayMs)) attempt = 0
             }
         } finally {
             current?.close("supervisor stopped")
@@ -193,10 +241,50 @@ class ReconnectingAppServerClient(
         data class NeverReady(override val reason: String?) : GenerationOutcome
 
         /** Generation failed terminally (policy/auth); do not retry. */
-        data class Terminal(override val reason: String?) : GenerationOutcome
+        data class Terminal(
+            override val reason: String?,
+            val kind: GiveUpKind = GiveUpKind.Rejected,
+        ) : GenerationOutcome
+    }
+
+    /** Sleeps [delayMs] unless [resumeNow] interrupts it. Returns true when resumed. */
+    private suspend fun backOffOrResume(delayMs: Long): Boolean {
+        if (resumeRequested.getAndSet(false)) return true
+        while (wakeups.tryReceive().isSuccess) Unit
+        val resumed = coroutineScope {
+            val sleeper = async { sleep(delayMs) }
+            select {
+                sleeper.onAwait { false }
+                wakeups.onReceive {
+                    sleeper.cancel()
+                    true
+                }
+            }
+        }
+        val flagged = resumeRequested.getAndSet(false)
+        return resumed || flagged
+    }
+
+    /** Null when the dial may proceed; otherwise the outcome that replaces it. */
+    private suspend fun runPreflight(): GenerationOutcome? {
+        val probe = preflight ?: return null
+        val result = try {
+            probe()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppServerProbeResult.Unavailable(e.message ?: "probe failed")
+        }
+        return when (result) {
+            is AppServerProbeResult.Ok -> null
+            is AppServerProbeResult.Authentication -> GenerationOutcome.Terminal(result.detail, GiveUpKind.Authentication)
+            is AppServerProbeResult.Incompatible -> GenerationOutcome.Terminal(result.reason, GiveUpKind.Incompatible)
+            is AppServerProbeResult.Unavailable -> GenerationOutcome.NeverReady("probe: ${result.detail}")
+        }
     }
 
     private suspend fun runGeneration(scope: CoroutineScope, attempt: Int): GenerationOutcome {
+        runPreflight()?.let { return it }
         val generation = try {
             connect()
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -250,6 +338,7 @@ class ReconnectingAppServerClient(
         }
 
         _state.value = ReconnectingClientState.Ready
+        resumeRequested.value = false
         Telemetry.event(telemetryComponent, "generation.ready", "attempt" to attempt)
 
         val failed = generation.connectionState.first { it is AppServerConnectionState.Failed }
@@ -264,9 +353,9 @@ class ReconnectingAppServerClient(
         }
     }
 
-    private suspend fun giveUp(reason: String?) {
-        _state.value = ReconnectingClientState.GaveUp(reason)
-        Telemetry.event(telemetryComponent, "gave_up", "reason" to (reason ?: ""))
+    private suspend fun giveUp(reason: String?, kind: GiveUpKind = GiveUpKind.Exhausted) {
+        _state.value = ReconnectingClientState.GaveUp(reason, kind)
+        Telemetry.event(telemetryComponent, "gave_up", "reason" to (reason ?: ""), "kind" to kind.name)
         listener.onGaveUp(reason)
     }
 

@@ -1,6 +1,9 @@
 package com.letta.mobile.desktop.runtime
 
 import java.io.File
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 internal data class DesktopLettaCodeInstallation(
     val nodeExecutable: File,
@@ -73,22 +76,75 @@ internal interface DesktopLocalRuntimeLifecycle : AutoCloseable {
 
 internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
     private const val MAX_LOG_BYTES = 5L * 1024L * 1024L
+    private const val RESTART_HANDOFF_MS = 15_000L
     private val logLock = Any()
     private val manager = DesktopLocalRuntimeManager(
         installationProvider = DesktopLettaCodeRuntimeLocator::locate,
         backendDirectory = ::backendDirectory,
-        processLauncher = DesktopRuntimeProcessLauncher { command, environment ->
-            val process = ProcessBuilder(command).apply { this.environment().putAll(environment) }.start()
+        processLauncher = DesktopRuntimeProcessLauncher { spec ->
+            val process = ProcessBuilder(spec.command).apply {
+                environment().putAll(spec.environment)
+                spec.workingDirectory?.let(::directory)
+            }.start()
             JvmDesktopRuntimeProcess(process)
         },
         logLine = { line -> appendLog(localRuntimeLogFile(), line) },
+        launchContext = DesktopRuntimeLaunchPreference::currentContext,
     )
+
+    // Concurrent so the supervisor can read it from process threads without this object's monitor.
+    @Suppress("NoProcessGlobalMutableState") // This object is the one per-process runtime host; the set is its own state.
+    private val owners: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    @Suppress("NoDetachedCoroutineLifecycle") // Lives as long as the desktop process, like this object.
+    private val supervisorScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+    )
+
+    /** Crash supervision for the child (letta-mobile-bzvro.3, F03). */
+    private val supervisor = DesktopRuntimeSupervisor(
+        manager = manager,
+        scope = supervisorScope,
+        wanted = { owners.isNotEmpty() },
+        logLine = { line -> appendLog(localRuntimeLogFile(), line) },
+    )
+
+    /** Health of the bundled runtime, polled by the settings card and the chat banner. */
+    val health: kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.runtime.supervisor.RuntimeHealth>
+        get() = supervisor.health
+
+    /** Emits each time the supervisor restarted the child on its own; the chat must reconnect. */
+    val restarted: kotlinx.coroutines.flow.SharedFlow<String>
+        get() = supervisor.restarted
+
+    fun forceRestart() = supervisor.forceRestart()
+
+    fun onSystemSuspended() = supervisor.onSuspended()
+
+    fun onSystemResumed() = supervisor.onResumed()
+
+    /**
+     * Reconnects the chat to a restarted child without killing it. The chat's reconnect closes its
+     * old lease before the new gateway acquires one; a short-lived bridge lease keeps the owner
+     * count above zero across that gap so the fresh child is not stopped and spawned again.
+     */
+    suspend fun handOffAfterRestart(reconnect: () -> Unit) {
+        val bridge = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { acquire() }.getOrNull() }
+        try {
+            reconnect()
+        } finally {
+            bridge?.let { lease ->
+                supervisorScope.launch {
+                    delay(RESTART_HANDOFF_MS.milliseconds)
+                    lease.close()
+                }
+            }
+        }
+    }
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread(::close, "letta-desktop-runtime-shutdown"))
     }
-
-    private val owners = mutableSetOf<String>()
 
     /** `~/.letta-mobile/local-backend` unless overridden — see [DesktopLocalBackendDirectorySettings]. */
     fun defaultBackendDirectory(): File =
@@ -108,7 +164,7 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
     @Synchronized
     override fun acquire(): DesktopLocalRuntimeLease {
         val owner = java.util.UUID.randomUUID().toString()
-        val url = manager.ensureStarted()
+        val url = supervisor.ensureStarted()
         owners += owner
         return object : DesktopLocalRuntimeLease {
             override val serverUrl: String = url
@@ -160,6 +216,10 @@ private class JvmDesktopRuntimeProcess(
     override fun destroyForcibly() = process.destroyForcibly().let { Unit }
     override fun waitFor(timeoutMs: Long): Boolean =
         process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+
+    override fun onExit(callback: (exitCode: Int?) -> Unit) {
+        process.onExit().thenAccept { ended -> callback(runCatching { ended.exitValue() }.getOrNull()) }
+    }
 }
 
 private class JvmDesktopRuntimeProcessHandle(
