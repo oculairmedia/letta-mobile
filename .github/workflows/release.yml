@@ -197,11 +197,25 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0  # git describe --tags for versionName
 
+      - name: Setup Java 21 (Gradle daemon JVM)
+        # See desktop.yml: foojay dropped the pinned JDK 21 package id, so the
+        # Windows runner must provide JDK 21 itself for the daemon JVM.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Setup Java 26
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 26
+
+      - name: Expose JDK 21 to Gradle's daemon-JVM resolver
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.gradle"
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
