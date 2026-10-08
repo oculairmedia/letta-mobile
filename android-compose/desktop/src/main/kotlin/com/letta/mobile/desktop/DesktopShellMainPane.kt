@@ -290,6 +290,7 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
         onRetryConnection = core.chatController::retryConnection,
         home = desktopHomeCallbacks(context, frame),
         memory = controllers.memory,
+        memfs = controllers.memfs,
         schedules = destinationScheduleActions(
             ScheduleWiringDeps(
                 schedules = controllers.schedules,
