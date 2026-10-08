@@ -70,17 +70,22 @@ object RunStatusTestTags {
  * doing right now ("Waiting for the model…", "Retrying (2/5) in 4 s"), the server's latest status
  * message, and a card per server-side command (running, then its output until dismissed).
  *
+ * When [companionShowing] (the composer companion already says "Thinking…" with the elapsed time and
+ * running tool) the plain phase label is dropped as a duplicate; the retry countdown, notices and
+ * command cards, which the companion does not carry, stay.
+ *
  * Draws nothing when [status] has nothing to say, so it costs no space between turns.
  */
 @Composable
 fun RunStatusLine(
     status: RuntimeLiveStatus,
     modifier: Modifier = Modifier,
+    companionShowing: Boolean = false,
     now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     var dismissed by remember { mutableStateOf(emptySet<String>()) }
     val commands = status.commands.filter { it.running || it.commandId !in dismissed }
-    val phase = phaseLabel(status)
+    val phase = phaseLabel(status).takeUnless { companionShowing && it is PhaseLabel.Fixed }
     if (nothingToShow(phase, status.notice, commands)) return
     Column(
         modifier = modifier

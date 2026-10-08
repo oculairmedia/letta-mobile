@@ -63,6 +63,7 @@ import com.letta.mobile.ui.chat.surface.composer.ComposerInputs
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.rememberComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerCompanion
+import com.letta.mobile.ui.chat.surface.composer.companionIndicatorShowing
 import com.letta.mobile.ui.chat.surface.sendflight.SendFlightLayer
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightActions
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightState
@@ -646,7 +647,7 @@ private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: M
 @Composable
 private fun LiveRunStatus(frame: ChatSurfaceFrame) {
     val status by frame.port.liveStatus.collectForChatSurface()
-    RunStatusLine(status)
+    RunStatusLine(status, companionShowing = companionIndicatorShowing(frame.uiState))
 }
 
 /** The A2UI surfaces above the docked composer, where no timeline shows them. */

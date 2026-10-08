@@ -47,6 +47,42 @@ class RunStatusLineUiTest {
     }
 
     @Test
+    fun thePhaseIsHiddenWhileTheCompanionShowsIt() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                RunStatusLine(RuntimeLiveStatus(phase = LoopPhase.ProcessingResponse), companionShowing = true)
+            }
+        }
+        onNodeWithTag(RunStatusTestTags.LINE).assertDoesNotExist()
+        onNodeWithTag(RunStatusTestTags.PHASE).assertDoesNotExist()
+    }
+
+    @Test
+    fun aRetryCountdownStaysWhileTheCompanionShows() = runComposeUiTest {
+        val retry = LiveRetry(attempt = 2, maxAttempts = 5, delayMs = 4_000L, provider = "anthropic", atEpochMs = 10_000L)
+        setContent {
+            MaterialTheme {
+                RunStatusLine(
+                    RuntimeLiveStatus(phase = LoopPhase.Retrying, retry = retry),
+                    companionShowing = true,
+                    now = { 10_000L },
+                )
+            }
+        }
+        onNodeWithTag(RunStatusTestTags.PHASE).assertTextEquals("Retrying (2/5) in 4 s · anthropic")
+    }
+
+    @Test
+    fun aHostWithoutTheCompanionKeepsThePhaseLine() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                RunStatusLine(RuntimeLiveStatus(phase = LoopPhase.ProcessingResponse), companionShowing = false)
+            }
+        }
+        onNodeWithTag(RunStatusTestTags.PHASE).assertExists()
+    }
+
+    @Test
     fun aDueRetryReadsAsRetryingNow() {
         val retry = LiveRetry(attempt = 3, maxAttempts = 5, delayMs = 1_000L, atEpochMs = 0L)
         assertEquals(0, retrySecondsLeft(retry, nowMs = 5_000L))

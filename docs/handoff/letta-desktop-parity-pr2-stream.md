@@ -46,7 +46,12 @@ been compiled or tested**. Full local gates were never completed (machine conten
   `AdminChatSessionPort`; desktop `DesktopChatSessionPort.liveStatus` (selected conversation in `controller.runs`);
   `sharedUI/.../chat/surface/status/RunStatusLine.kt`, strings `composeResources/values/run_status.xml`; mounted in
   `ChatSurface.kt` `Composer` (full page) via `LiveRunStatus` (collects only there).
-- Tests: `AppServerRuntimeEventMapperLiveStatusTest` (8), `RuntimeLiveStatusReducerTest` (9), `RunStatusLineUiTest` (8) — passed.
+- No duplicate indicator: `RunStatusLine(companionShowing = ...)` drops the plain phase label ("Processing the
+  response…", "Waiting for the model…") when the composer companion (mascot + elapsed + status) is on screen
+  (`companionIndicatorShowing` in `TouchComposerCompanion.kt`: companion enabled, mascot available, run working).
+  The retry countdown, server notices and command cards stay (the companion does not carry them). Hosts without a
+  mascot (desktop without one) keep the phase line. Folding the retry text into the companion status is a follow-up.
+- Tests: `AppServerRuntimeEventMapperLiveStatusTest` (8), `RuntimeLiveStatusReducerTest` (9), `RunStatusLineUiTest` (11, incl. phase hidden with companion / retry kept / no-companion keeps phase).
 
 ### F08 command progress — partial (status shelf, no timeline row)
 - `CommandStarted`/`CommandFinished` payloads, reducer pairs by `command_id` (max 3, unmatched end standalone, cleared
