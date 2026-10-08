@@ -140,16 +140,19 @@ fun MascotLive(
     val entry = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
+    val cursor = registry.cursor.value
+    // At rest (idle, no pointer, its last beat played out) the scene holds its pose and no frame
+    // is asked for: a seat that stays composed must not redraw the window every vsync (MascotRest).
+    val moving = rememberMascotMoving(mascotEngaged(presence, pointerPresent = cursor != null), identity)
     // The director's timers (listening release, success hold, blink schedule) need a clock;
     // tickTo is idempotent per frame so several surfaces of one agent tick it once.
-    LaunchedEffect(entry) {
-        while (true) withFrameNanos { entry.tickTo(it) }
+    LaunchedEffect(entry, moving) {
+        if (moving) while (true) withFrameNanos { entry.tickTo(it) }
     }
     // Gaze: this tile vs the pointer plus optional composer / timeline rects
     // from the registry. Null input/timeline skip those plan rows; OWN/USER
     // (and CURSOR when the pointer is present) still run so the eyes are never dead.
     var bounds by remember { mutableStateOf(Rect.Zero) }
-    val cursor = registry.cursor.value
     val inputBounds = registry.inputBounds.value
     val timelineBounds = registry.timelineBounds.value
     // This surface's slot in the registry, so the other agents' mascots can look at it.
@@ -183,7 +186,7 @@ fun MascotLive(
         },
         contentAlignment = Alignment.Center,
     ) {
-        host.Surface(entry, Modifier.matchParentSize(), playing = true)
+        host.Surface(entry, Modifier.matchParentSize(), playing = moving)
         if (onClick != null) MascotHitArea(size, onClick)
     }
 }
