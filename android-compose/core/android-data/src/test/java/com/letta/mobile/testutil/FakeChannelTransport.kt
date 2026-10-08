@@ -5,6 +5,9 @@ import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
+import com.letta.mobile.data.transport.api.CronControlTransport
+import com.letta.mobile.data.transport.api.CronPauseCommand
+import com.letta.mobile.data.transport.api.CronResumeCommand
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.delay
@@ -26,7 +29,7 @@ class FakeChannelTransport(
         sessionId = "sess",
         deviceId = "dev",
     ),
-) : IChannelTransport {
+) : IChannelTransport, CronControlTransport {
     override val state: MutableStateFlow<ChannelTransportState> = MutableStateFlow(initialState)
     override val events: MutableSharedFlow<ServerFrame> = MutableSharedFlow(
         replay = 0,
@@ -245,22 +248,15 @@ class FakeChannelTransport(
     val cronPauseResponses = mutableMapOf<String, ArrayDeque<ServerFrame.CronPauseResponse>>()
     val cronResumeResponses = mutableMapOf<String, ArrayDeque<ServerFrame.CronResumeResponse>>()
 
-    override suspend fun sendCronPause(
-        taskId: String,
-        timeoutMs: Long,
-    ): ServerFrame.CronPauseResponse {
-        cronPauseCalls += taskId
-        return cronPauseResponses[taskId]?.removeFirstOrNull()
+    override suspend fun sendCronPause(command: CronPauseCommand): ServerFrame.CronPauseResponse {
+        cronPauseCalls += command.taskId
+        return cronPauseResponses[command.taskId]?.removeFirstOrNull()
             ?: ServerFrame.CronPauseResponse(id = "cp", ts = "ts", requestId = null, success = true)
     }
 
-    override suspend fun sendCronResume(
-        taskId: String,
-        scheduledFor: String?,
-        timeoutMs: Long,
-    ): ServerFrame.CronResumeResponse {
-        cronResumeCalls += taskId to scheduledFor
-        return cronResumeResponses[taskId]?.removeFirstOrNull()
+    override suspend fun sendCronResume(command: CronResumeCommand): ServerFrame.CronResumeResponse {
+        cronResumeCalls += command.taskId to command.scheduledFor
+        return cronResumeResponses[command.taskId]?.removeFirstOrNull()
             ?: ServerFrame.CronResumeResponse(id = "cr", ts = "ts", requestId = null, success = true)
     }
 

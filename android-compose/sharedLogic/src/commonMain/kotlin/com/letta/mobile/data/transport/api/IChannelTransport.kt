@@ -106,17 +106,6 @@ interface IChannelTransport {
         timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronDeleteAllResponse
 
-    suspend fun sendCronPause(
-        taskId: String,
-        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
-    ): ServerFrame.CronPauseResponse
-
-    suspend fun sendCronResume(
-        taskId: String,
-        scheduledFor: String? = null,
-        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
-    ): ServerFrame.CronResumeResponse
-
     suspend fun sendSubagentList(
         all: Boolean = false,
         timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,

@@ -1,9 +1,13 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.CronTask
+import com.letta.mobile.data.repository.api.CronScheduleRef
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.CronControlTransport
+import com.letta.mobile.data.transport.api.CronPauseCommand
+import com.letta.mobile.data.transport.api.CronResumeCommand
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
@@ -162,21 +166,24 @@ open class CronRepository(
             stateFor(agentId).update { list -> list.filterNot { it.id == taskId } }
         }
 
-    override suspend fun pauseSchedule(agentId: String, taskId: String): Result<Unit> =
-        mutateScheduleStatus(agentId, taskId, com.letta.mobile.data.model.CronTaskStatus.PAUSED) {
-            val response = transport.sendCronPause(taskId)
-            response.success to response.error
+    override suspend fun pauseSchedule(target: CronScheduleRef): Result<Unit> =
+        mutateScheduleStatus(target, com.letta.mobile.data.model.CronTaskStatus.PAUSED) {
+            val control = transport as? CronControlTransport
+            val command = CronPauseCommand(taskId = target.taskId)
+            control?.sendCronPause(command)?.let { it.success to it.error }
+                ?: (false to "Unsupported by transport")
         }
 
-    override suspend fun resumeSchedule(agentId: String, taskId: String, scheduledFor: String?): Result<Unit> =
-        mutateScheduleStatus(agentId, taskId, com.letta.mobile.data.model.CronTaskStatus.ACTIVE) {
-            val response = transport.sendCronResume(taskId, scheduledFor)
-            response.success to response.error
+    override suspend fun resumeSchedule(target: CronScheduleRef, scheduledFor: String?): Result<Unit> =
+        mutateScheduleStatus(target, com.letta.mobile.data.model.CronTaskStatus.ACTIVE) {
+            val control = transport as? CronControlTransport
+            val command = CronResumeCommand(taskId = target.taskId, scheduledFor = scheduledFor)
+            control?.sendCronResume(command)?.let { it.success to it.error }
+                ?: (false to "Unsupported by transport")
         }
 
     private suspend fun mutateScheduleStatus(
-        agentId: String,
-        taskId: String,
+        target: CronScheduleRef,
         newStatus: String,
         execute: suspend () -> Pair<Boolean, String?>,
     ): Result<Unit> = runCatchingCancellable {
@@ -184,8 +191,8 @@ open class CronRepository(
         if (!success) {
             throw IllegalStateException(error ?: "cron status update failed")
         }
-        stateFor(agentId).update { list ->
-            list.map { if (it.id == taskId) it.copy(status = newStatus) else it }
+        stateFor(target.agentId).update { list ->
+            list.map { if (it.id == target.taskId) it.copy(status = newStatus) else it }
         }
     }
 

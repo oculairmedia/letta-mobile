@@ -15,6 +15,9 @@ import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.transport.api.SubagentScopeAwareChannelTransport
+import com.letta.mobile.data.transport.api.CronControlTransport
+import com.letta.mobile.data.transport.api.CronPauseCommand
+import com.letta.mobile.data.transport.api.CronResumeCommand
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -105,7 +108,8 @@ class IrohChannelTransport(
     // Process-owned store shared with canvas/document APIs; transport never closes or polls it.
     private val notebookStore: NotebookLocalStore? = null,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
-    FrameCollectorOverflowAwareChannelTransport, SubagentScopeAwareChannelTransport {
+    FrameCollectorOverflowAwareChannelTransport, SubagentScopeAwareChannelTransport,
+    CronControlTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
@@ -816,19 +820,15 @@ class IrohChannelTransport(
         )
     }
 
-    override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse {
-        val requestId = "iroh-cron-delete-${UUID.randomUUID()}"
-        return cronInvoke(
+    override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse =
+        cronTaskAction(
             op = "cron.delete",
-            requestId = requestId,
+            frameType = "cron_delete",
             timeoutMs = timeoutMs,
             body = buildJsonObject { put("task_id", taskId) },
-            mapSuccess = { _ ->
-                ServerFrame.CronDeleteResponse(id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true)
-            },
+            createSuccess = { id, ts, reqId -> ServerFrame.CronDeleteResponse(id = id, ts = ts, requestId = reqId, success = true) },
             onFailure = IrohTransportSupport::cronDeleteFailure,
         )
-    }
 
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse {
         val requestId = "iroh-cron-delete-all-${UUID.randomUUID()}"
@@ -845,11 +845,49 @@ class IrohChannelTransport(
         )
     }
 
-    override suspend fun sendCronPause(taskId: String, timeoutMs: Long): ServerFrame.CronPauseResponse =
-        cronRpcClient.sendCronPause(taskId, timeoutMs)
+    override suspend fun sendCronPause(command: CronPauseCommand): ServerFrame.CronPauseResponse =
+        cronTaskAction(
+            op = "cron.pause",
+            frameType = "cron_pause",
+            timeoutMs = command.timeoutMs,
+            body = buildJsonObject { put("task_id", command.taskId) },
+            createSuccess = { id, ts, reqId -> ServerFrame.CronPauseResponse(id = id, ts = ts, requestId = reqId, success = true) },
+            onFailure = IrohTransportSupport::cronPauseFailure,
+        )
 
-    override suspend fun sendCronResume(taskId: String, scheduledFor: String?, timeoutMs: Long): ServerFrame.CronResumeResponse =
-        cronRpcClient.sendCronResume(CronResumeRequest(taskId = taskId, scheduledFor = scheduledFor, timeoutMs = timeoutMs))
+    override suspend fun sendCronResume(command: CronResumeCommand): ServerFrame.CronResumeResponse =
+        cronTaskAction(
+            op = "cron.resume",
+            frameType = "cron_resume",
+            timeoutMs = command.timeoutMs,
+            body = buildJsonObject {
+                put("task_id", command.taskId)
+                command.scheduledFor?.let { put("scheduled_for", it) }
+            },
+            createSuccess = { id, ts, reqId -> ServerFrame.CronResumeResponse(id = id, ts = ts, requestId = reqId, success = true) },
+            onFailure = IrohTransportSupport::cronResumeFailure,
+        )
+
+    private suspend fun <T : ServerFrame> cronTaskAction(
+        op: String,
+        frameType: String,
+        timeoutMs: Long,
+        body: JsonObject,
+        createSuccess: (id: String, ts: String, reqId: String) -> T,
+        onFailure: (ScopedRpcFailure) -> T,
+    ): T {
+        val requestId = "iroh-$frameType-${UUID.randomUUID()}"
+        return cronInvoke(
+            op = op,
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            body = body,
+            mapSuccess = { _ ->
+                createSuccess(IrohTransportSupport.frameId(frameType), IrohTransportSupport.nowIso(), requestId)
+            },
+            onFailure = onFailure,
+        )
+    }
 
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
         invokeSubagentRpc(subagentListCall(all), currentSubagentScope(), timeoutMs)

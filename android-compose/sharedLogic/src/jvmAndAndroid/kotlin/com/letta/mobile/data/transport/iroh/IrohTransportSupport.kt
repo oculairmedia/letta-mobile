@@ -138,6 +138,14 @@ internal object IrohTransportSupport {
         id = frameId("cron_delete_all"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
 
+    fun cronPauseFailure(failure: ScopedRpcFailure) = ServerFrame.CronPauseResponse(
+        id = frameId("cron_pause"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun cronResumeFailure(failure: ScopedRpcFailure) = ServerFrame.CronResumeResponse(
+        id = frameId("cron_resume"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
     fun launchNotebook(scope: kotlinx.coroutines.CoroutineScope, starter: suspend () -> Unit) {
         scope.launch {
             try {

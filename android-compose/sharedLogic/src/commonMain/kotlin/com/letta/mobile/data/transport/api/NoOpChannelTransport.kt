@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonArray
  * Common placeholder for runtimes that can compile against the transport
  * contract before wiring a platform socket implementation.
  */
-open class NoOpChannelTransport : IChannelTransport {
+open class NoOpChannelTransport : IChannelTransport, CronControlTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state
     override val events: SharedFlow<ServerFrame> = MutableSharedFlow()
@@ -82,10 +82,10 @@ open class NoOpChannelTransport : IChannelTransport {
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
         unsupported()
 
-    override suspend fun sendCronPause(taskId: String, timeoutMs: Long): ServerFrame.CronPauseResponse =
+    override suspend fun sendCronPause(command: CronPauseCommand): ServerFrame.CronPauseResponse =
         unsupported()
 
-    override suspend fun sendCronResume(taskId: String, scheduledFor: String?, timeoutMs: Long): ServerFrame.CronResumeResponse =
+    override suspend fun sendCronResume(command: CronResumeCommand): ServerFrame.CronResumeResponse =
         unsupported()
 
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
