@@ -29,6 +29,12 @@ data class GazeWorld(
      * position changes with the same 500 ms window.
      */
     val pointerMovedRecently: Boolean? = null,
+    /**
+     * The viewer asked for reduced motion: no wandering. The director holds one justified look per
+     * state (the content's live edge while at work, the input or straight ahead at rest), still
+     * eased, never scanned or parked aside.
+     */
+    val reducedMotion: Boolean = false,
 ) {
     companion object {
         /** Product host API: window-space tile + optional composer / timeline. */
@@ -36,13 +42,18 @@ data class GazeWorld(
             window: GazeWindow,
             mode: GazeDriveMode = GazeDriveMode.JUSTIFIED,
             pointerMovedRecently: Boolean? = null,
+            reducedMotion: Boolean = false,
         ): GazeWorld = GazeWorld(
             pointer = GazeMath.pointerPxToGaze(window.pointerPx, window.mascot, window.reach.minPx),
             input = GazeMath.rectCenterToGaze(window.rects.input, window.mascot, window.reach.minPx),
-            timeline = GazeMath.rectCenterToGaze(window.rects.timeline, window.mascot, window.reach.minPx),
+            // The timeline's live edge (where the reply is being written), not the list's centre.
+            timeline = window.rects.timeline?.takeUnless { it.isEmpty }?.let {
+                GazeMath.pointerPxToGaze(ContentGaze.liveEdgeOf(it), window.mascot, window.reach.minPx)
+            },
             peers = window.peersPx.mapNotNull { GazeMath.pointerPxToGaze(it, window.mascot, window.reach.minPx) },
             mode = mode,
             pointerMovedRecently = pointerMovedRecently,
+            reducedMotion = reducedMotion,
         )
     }
 }

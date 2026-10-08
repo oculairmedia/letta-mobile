@@ -42,6 +42,7 @@ import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
  * What a platform contributes to draw a live mascot: the per-agent entry (renderer scene +
@@ -162,7 +163,9 @@ fun MascotLive(
         .filter { it.agentId != agentId && !it.bounds.isEmpty }
         .map { GazePoint(it.bounds.centerX, it.bounds.centerY) }
     val minReachPx = with(LocalDensity.current) { GAZE_MIN_REACH.toPx() }
-    LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds, peersPx) {
+    // Reduced motion holds one look per state (the content at work, the input at rest): no wandering.
+    val reducedMotion = LocalReducedMotion.current
+    LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds, peersPx, reducedMotion) {
         entry.setGazeWorld(
             GazeWorld.fromWindow(
                 GazeWindow(
@@ -172,6 +175,7 @@ fun MascotLive(
                     rects = GazeTargetRects(input = inputBounds, timeline = timelineBounds),
                     peersPx = peersPx,
                 ),
+                reducedMotion = reducedMotion,
             ),
         )
     }

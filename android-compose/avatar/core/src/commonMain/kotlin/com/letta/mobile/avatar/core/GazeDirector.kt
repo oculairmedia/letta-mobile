@@ -69,6 +69,10 @@ class GazeDirector(
     private var stepSeconds: Float = 0f
     private var cursorNear: Boolean = false
     private var pulseBlink: Boolean = false
+    /** Reduced motion this tick: one held look, no plan, no scans, no asides. */
+    private var still: Boolean = false
+    /** The last planned (non-pointer) aim, where a gap after a look at a place rests. */
+    private var lastPlanAim: GazePoint = GazePoint(0f, 0f)
 
     /** Current habituation 0..1 (Pan et al. / Disney Research eq. 2). [GazeTarget.OWN] never decays. */
     fun interestOf(target: GazeTarget): Float = interest[target] ?: 1f
@@ -89,19 +93,27 @@ class GazeDirector(
             return lastPose
         }
         notePointer(world.pointer)
-        if (world.mode == GazeDriveMode.JUSTIFIED) {
-            tickPlan(state, world)
-        } else {
-            target = GazeTarget.CURSOR
-            lastState = state
-        }
+        still = world.mode == GazeDriveMode.JUSTIFIED && world.reducedMotion
+        chooseTarget(state, world)
         if (target != scanKind) resetScan(target)
         cursorNear = cursorDemandsLook(state, world)
         tickHabituation()
-        if (world.mode == GazeDriveMode.JUSTIFIED) tickScan()
+        advanceScan(world.mode)
         val pose = tickMotion(world)
         lastPose = pose
         return pose
+    }
+
+    /** Reduced motion holds one look; the product plan picks justified looks; the bench follows the cursor. */
+    private fun chooseTarget(state: AvatarState, world: GazeWorld) {
+        when {
+            still -> holdStill(state, world)
+            world.mode == GazeDriveMode.JUSTIFIED -> tickPlan(state, world)
+            else -> {
+                target = GazeTarget.CURSOR
+                lastState = state
+            }
+        }
     }
 
     // --- plan (spike `LaunchedEffect(gazeMode, current)`) ----------------------
@@ -132,25 +144,53 @@ class GazeDirector(
         dwellLook = look
         phase = PlanPhase.DWELL
         phaseRemaining = pickRange(look.dwellSeconds)
+        val working = ContentGaze.isAtWork(state)
         when (look.target) {
-            GazeTarget.AWAY -> asidePoint = pickAside(config.awayReach)
+            GazeTarget.AWAY -> asidePoint = pickAside(config.awayReach, working)
             // Own thoughts mostly wander off-axis too; sometimes they rest at centre.
             GazeTarget.OWN -> asidePoint =
-                if (random.nextFloat() < config.ownAsideChance) pickAside(config.ownReach) else GazePoint(0f, 0f)
+                if (random.nextFloat() < config.ownAsideChance) pickAside(config.ownReach, working) else CENTER
             GazeTarget.PEER -> peerIndex = if (world.peers.isEmpty()) 0 else random.nextInt(world.peers.size)
             else -> Unit
         }
     }
 
-    /** A point off to one side: |x| in [reach], a little above or below the line of sight. */
-    private fun pickAside(reach: ClosedFloatingPointRange<Float>): GazePoint {
-        val side = if (random.nextFloat() < 0.5f) -1f else 1f
-        return GazePoint(side * pickRange(reach), pickSigned(config.asideVertical))
+    /**
+     * A point off to one side, biased toward the content (right / up; see [ContentGaze.aside]):
+     * at work always right and up, at rest mostly so and never far left.
+     */
+    private fun pickAside(reach: ClosedFloatingPointRange<Float>, atWork: Boolean): GazePoint =
+        ContentGaze.aside(
+            reach = reach,
+            atWork = atWork,
+            draws = ContentGaze.AsideDraws(
+                side = random.nextFloat(),
+                reach = random.nextFloat(),
+                up = random.nextFloat(),
+                height = random.nextFloat(),
+            ),
+        )
+
+    /**
+     * Reduced motion: one held look per state, no dwell timers. At work the eyes rest on the
+     * content's live edge; at rest on the input when there is one; otherwise straight ahead.
+     */
+    private fun holdStill(state: AvatarState, world: GazeWorld) {
+        // Forget the plan so it restarts cleanly if motion comes back.
+        lastState = null
+        asidePoint = CENTER
+        target = when {
+            ContentGaze.isAtWork(state) && world.timeline != null -> GazeTarget.TIMELINE
+            !ContentGaze.isAtWork(state) && world.input != null -> GazeTarget.INPUT
+            else -> GazeTarget.OWN
+        }
     }
 
     private fun beginGap() {
         // The gap keeps the last parked point when the dwell was already aside: eyes rest where they
-        // were, they do not snap to centre between every look.
+        // were, they do not snap to centre between every look. After a look at a place (the reply,
+        // the input, a peer, you) the eyes rest on that place rather than on a stale aside.
+        if (dwellLook?.target?.isPlace() == true) asidePoint = lastPlanAim
         target = GazeTarget.OWN
         phase = PlanPhase.GAP
         phaseRemaining = dwellLook?.let { pickRange(it.gapSeconds) } ?: 0.5f
@@ -234,7 +274,7 @@ class GazeDirector(
         scanPhase = ScanPhase.STEP
         when (kind) {
             GazeTarget.TIMELINE -> {
-                scanCursor = -0.22f
+                scanCursor = TIMELINE_SCAN_START
                 applyTimeline()
                 scanWait = pickRange(0.180f..0.340f)
             }
@@ -250,6 +290,10 @@ class GazeDirector(
             }
             else -> Unit
         }
+    }
+
+    private fun advanceScan(mode: GazeDriveMode) {
+        if (still) clearScan() else if (mode == GazeDriveMode.JUSTIFIED) tickScan()
     }
 
     private fun tickScan() {
@@ -283,14 +327,14 @@ class GazeDirector(
     private fun stepTimeline() {
         if (scanPhase == ScanPhase.HOLD) {
             scanLine = (scanLine + 1) % 3
-            scanCursor = -0.22f
+            scanCursor = TIMELINE_SCAN_START
             scanPhase = ScanPhase.STEP
             applyTimeline()
             scanWait = pickRange(0.180f..0.340f)
             return
         }
         scanCursor += 0.05f + random.nextFloat() * 0.05f
-        if (scanCursor >= 0.22f) {
+        if (scanCursor >= TIMELINE_SCAN_END) {
             scanPhase = ScanPhase.HOLD
             scanWait = pickRange(0.120f..0.260f)
             return
@@ -332,10 +376,21 @@ class GazeDirector(
         }
     }
 
+    /**
+     * Reading the reply as it is written: each sweep runs left to right from just before the live
+     * edge, and successive lines climb (a reversed list grows upward), so the read stays up / right.
+     */
     private fun applyTimeline() {
         scanX = scanCursor
-        scanY = scanLine * 0.05f
+        scanY = -scanLine * TIMELINE_LINE_STEP
         headScan = scanCursor * 0.5f
+    }
+
+    /** Reduced motion: the target holds still, no saccades on top of it. */
+    private fun clearScan() {
+        scanX = 0f
+        scanY = 0f
+        headScan = 0f
     }
 
     private fun applyInput() {
@@ -358,7 +413,7 @@ class GazeDirector(
         val want = wantLook(base, world.mode)
         noteWantJump(base)
         pulseBlink = commitHeadIfLed(base)
-        easeEyes(want)
+        easeEyes(want, world.mode)
         stepHeadSpring()
         return finishedPose()
     }
@@ -367,8 +422,15 @@ class GazeDirector(
         val useScan = !cursorNear && mode != GazeDriveMode.CURSOR
         val sx = if (useScan) scanX else 0f
         val sy = if (useScan) scanY else 0f
-        return GazePoint((base.x + sx).coerceIn(-1f, 1f), (base.y + sy).coerceIn(-1f, 1f))
+        val want = GazePoint((base.x + sx).coerceIn(-1f, 1f), (base.y + sy).coerceIn(-1f, 1f))
+        return if (pointerDemands(mode)) want else constrained(want)
     }
+
+    /** A look the user's pointer demands is followed as is; every planned look stays toward the content. */
+    private fun pointerDemands(mode: GazeDriveMode): Boolean = mode == GazeDriveMode.CURSOR || cursorNear
+
+    private fun constrained(point: GazePoint): GazePoint =
+        ContentGaze.constrain(point)
 
     private fun noteWantJump(base: GazePoint) {
         if (wantJumped(base)) {
@@ -396,16 +458,18 @@ class GazeDirector(
         return blink
     }
 
-    private fun easeEyes(want: GazePoint) {
-        val tau = when (target) {
-            GazeTarget.TIMELINE, GazeTarget.INPUT -> config.scanTauSeconds
-            else -> config.eyeTauSeconds
-        }
+    private fun easeEyes(want: GazePoint, mode: GazeDriveMode) {
+        // Scans snap between fixations; a held (reduced-motion) look always eases gently.
+        val scanning = !still && (target == GazeTarget.TIMELINE || target == GazeTarget.INPUT)
+        val tau = if (scanning) config.scanTauSeconds else config.eyeTauSeconds
         val k = 1f - exp(-stepSeconds / tau)
         val ex = want.x - headX * config.eyeHeadCompensation
         val ey = want.y - headY * config.eyeHeadCompensation
         eyeX += (ex - eyeX) * k
         eyeY += (ey - eyeY) * k
+        // Head compensation can swing the eyes past the target while the head settles; a planned
+        // look still never reads as glancing left (the pointer, when it demands, is followed as is).
+        if (!pointerDemands(mode)) eyeX = eyeX.coerceAtLeast(ContentGaze.MAX_LEFT_X)
     }
 
     private fun stepHeadSpring() {
@@ -432,9 +496,10 @@ class GazeDirector(
     }
 
     private fun aimBase(world: GazeWorld): GazePoint {
-        val pointerDemands = world.mode == GazeDriveMode.CURSOR || cursorNear
-        val point = if (pointerDemands) world.pointer else planAim(world)
-        return (point ?: CENTER).coerce()
+        if (pointerDemands(world.mode)) return (world.pointer ?: CENTER).coerce()
+        val aim = constrained(planAim(world) ?: CENTER)
+        lastPlanAim = aim
+        return aim
     }
 
     /** Where the current plan target is this frame; null falls back to centre. */
@@ -456,12 +521,22 @@ class GazeDirector(
         return range.start + random.nextFloat() * span
     }
 
+    /** A look at something on screen (or you), as opposed to an aside into its own thoughts. */
+    private fun GazeTarget.isPlace(): Boolean = this != GazeTarget.OWN && this != GazeTarget.AWAY
+
     private enum class PlanPhase { PICK, DWELL, GAP }
 
     private enum class ScanPhase { STEP, HOLD, PAUSE }
 
     private companion object {
         val CENTER = GazePoint(0f, 0f)
+
+        /** A timeline sweep starts just before the live edge and reads rightward past it. */
+        const val TIMELINE_SCAN_START = -0.05f
+        const val TIMELINE_SCAN_END = 0.3f
+
+        /** How far each successive line of the reply climbs (gaze units; negative y is up). */
+        const val TIMELINE_LINE_STEP = 0.05f
 
         /** Spike `triangle`: other person's eyes and nose (Disney Research). */
         val USER_TRIANGLE: List<GazePoint> = listOf(

@@ -11,8 +11,7 @@ class GazeDirectorConfig {
     var ownReach: ClosedFloatingPointRange<Float> = 0.2f..0.45f
     /** OWN: how often an own-thoughts dwell parks aside rather than at centre. */
     var ownAsideChance: Float = 0.65f
-    /** Vertical spread of an aside point (screen y: negative is up, where thinking looks). */
-    var asideVertical: ClosedFloatingPointRange<Float> = -0.35f..0.2f
+    // An aside's side and height are biased toward the content (right / up): see ContentGaze.aside.
     // Product tempo: eyes and head a touch slower than the bench (0.35 / 0.25 / 8.5) - read as too quick at product sizes.
     var headLeadSeconds: Float = 0.45f
     var eyeTauSeconds: Float = 0.32f
