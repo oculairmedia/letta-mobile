@@ -47,7 +47,7 @@ class ConfigFeatureFlagTest {
         every { models.catalog } returns MutableStateFlow(emptyList())
         val runtime = mockk<EmbeddedLettaCodeRuntimeStatusProvider>()
         every { runtime.status } returns EmbeddedLettaCodeRuntimeStatus(nativeEnabled = false, assetsEnabled = false, version = "disabled", integrity = "")
-        return ConfigViewModel(SavedStateHandle(), settings, mockk(relaxed = true), runtime, mockk(relaxed = true), models, mockk(relaxed = true))
+        return ConfigViewModel(SavedStateHandle(), settings, mockk(relaxed = true), runtime, mockk(relaxed = true), models, mockk(relaxed = true), mockk(relaxed = true))
     }
 
     private fun ConfigViewModel.form(): ConfigUiState = (uiState.value as UiState.Success).data
