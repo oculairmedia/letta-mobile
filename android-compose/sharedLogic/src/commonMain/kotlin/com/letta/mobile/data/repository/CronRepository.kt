@@ -163,26 +163,31 @@ open class CronRepository(
         }
 
     override suspend fun pauseSchedule(agentId: String, taskId: String): Result<Unit> =
-        runCatchingCancellable {
+        mutateScheduleStatus(agentId, taskId, com.letta.mobile.data.model.CronTaskStatus.PAUSED) {
             val response = transport.sendCronPause(taskId)
-            if (!response.success) {
-                throw IllegalStateException(response.error ?: "cron_pause failed")
-            }
-            stateFor(agentId).update { list ->
-                list.map { if (it.id == taskId) it.copy(status = com.letta.mobile.data.model.CronTaskStatus.PAUSED) else it }
-            }
+            response.success to response.error
         }
 
     override suspend fun resumeSchedule(agentId: String, taskId: String, scheduledFor: String?): Result<Unit> =
-        runCatchingCancellable {
+        mutateScheduleStatus(agentId, taskId, com.letta.mobile.data.model.CronTaskStatus.ACTIVE) {
             val response = transport.sendCronResume(taskId, scheduledFor)
-            if (!response.success) {
-                throw IllegalStateException(response.error ?: "cron_resume failed")
-            }
-            stateFor(agentId).update { list ->
-                list.map { if (it.id == taskId) it.copy(status = com.letta.mobile.data.model.CronTaskStatus.ACTIVE) else it }
-            }
+            response.success to response.error
         }
+
+    private suspend fun mutateScheduleStatus(
+        agentId: String,
+        taskId: String,
+        newStatus: String,
+        execute: suspend () -> Pair<Boolean, String?>,
+    ): Result<Unit> = runCatchingCancellable {
+        val (success, error) = execute()
+        if (!success) {
+            throw IllegalStateException(error ?: "cron status update failed")
+        }
+        stateFor(agentId).update { list ->
+            list.map { if (it.id == taskId) it.copy(status = newStatus) else it }
+        }
+    }
 
     private suspend fun stateFor(agentId: String): MutableStateFlow<List<CronTask>> =
         stateMutex.withLock { stateForUnlocked(agentId) }
