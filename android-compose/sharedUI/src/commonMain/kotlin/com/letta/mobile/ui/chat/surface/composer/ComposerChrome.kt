@@ -68,6 +68,8 @@ internal fun ComposerWorkingDirectoryRow(
         Text(
             text = when {
                 state.isLoading -> stringResource(Res.string.composer_working_directory_loading)
+                state.branch != null && state.path != null -> "${state.path} (${state.branch})"
+                state.branch != null -> state.branch
                 else -> state.path ?: stringResource(Res.string.composer_working_directory_unknown)
             },
             style = MaterialTheme.typography.labelSmall,

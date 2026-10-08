@@ -101,4 +101,5 @@ data class ChatModelOption(
 data class ChatWorkingDirectoryUiState(
     val path: String?,
     val isLoading: Boolean = false,
+    val branch: String? = null,
 )
