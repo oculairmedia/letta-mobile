@@ -1,8 +1,11 @@
 package com.letta.mobile.desktop.runtime
 
+import com.letta.mobile.data.runtime.supervisor.RuntimeExit
 import java.io.BufferedReader
+import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal interface DesktopRuntimeProcessHandle {
     val isAlive: Boolean
@@ -16,22 +19,61 @@ internal interface DesktopRuntimeProcess : DesktopRuntimeProcessHandle {
     val descendants: List<DesktopRuntimeProcessHandle>
     val exitCodeOrNull: Int?
     fun waitFor(timeoutMs: Long): Boolean
+
+    /** Calls [callback] once, on some thread, when the process ends (exit code when known). */
+    fun onExit(callback: (exitCode: Int?) -> Unit)
 }
 
+/** What to launch: the command, extra environment, and the working directory (null = inherit). */
+internal data class DesktopRuntimeLaunchSpec(
+    val command: List<String>,
+    val environment: Map<String, String>,
+    val workingDirectory: File? = null,
+)
+
 internal fun interface DesktopRuntimeProcessLauncher {
-    fun launch(command: List<String>, environment: Map<String, String>): DesktopRuntimeProcess
+    fun launch(spec: DesktopRuntimeLaunchSpec): DesktopRuntimeProcess
 }
+
+/** Extra environment and working directory for the next spawn (letta-mobile-bzvro.5, F05). */
+internal data class DesktopRuntimeLaunchContext(
+    val environment: Map<String, String> = emptyMap(),
+    val workingDirectory: File? = null,
+)
+
+/** Child lifecycle callbacks the supervisor listens to (letta-mobile-bzvro.3, F03). */
+internal interface DesktopRuntimeEvents {
+    /** A new child announced [url] and is ready. */
+    fun onStarted(url: String) {}
+
+    /** A child ended; [RuntimeExit.intentional] when we stopped it. */
+    fun onExit(exit: RuntimeExit) {}
+
+    fun onStderr(line: String) {}
+}
+
+/** The child died or stayed silent before announcing its listen URL. */
+internal class DesktopRuntimeStartException(message: String, val exitCode: Int?) : IllegalStateException(message)
 
 internal class DesktopLocalRuntimeManager(
     private val installationProvider: () -> DesktopLettaCodeInstallation?,
-    private val backendDirectory: () -> java.io.File,
+    private val backendDirectory: () -> File,
     private val processLauncher: DesktopRuntimeProcessLauncher,
     private val logLine: (String) -> Unit,
     private val readyTimeoutMs: Long = 30_000L,
     private val stopTimeoutMs: Long = 5_000L,
+    private val launchContext: () -> DesktopRuntimeLaunchContext = { DesktopRuntimeLaunchContext() },
 ) : AutoCloseable {
     private var child: DesktopRuntimeProcess? = null
     private var childUrl: String? = null
+    private var childStoppedByUs: AtomicBoolean? = null
+
+    /** Set once by the supervisor before the first start. */
+    @Volatile
+    var events: DesktopRuntimeEvents = object : DesktopRuntimeEvents {}
+
+    val isAlive: Boolean
+        @Synchronized get() = child?.isAlive == true
 
     @Synchronized
     fun ensureStarted(): String {
@@ -50,16 +92,22 @@ internal class DesktopLocalRuntimeManager(
             "--listen",
             "ws://127.0.0.1:0",
         )
+        val context = launchContext()
         val process = processLauncher.launch(
-            command,
-            mapOf(
-                "LETTA_LOCAL_BACKEND_EXPERIMENTAL" to "1",
-                "LETTA_LOCAL_BACKEND_DIR" to backendDir.absolutePath,
+            DesktopRuntimeLaunchSpec(
+                command = command,
+                environment = context.environment + mapOf(
+                    "LETTA_LOCAL_BACKEND_EXPERIMENTAL" to "1",
+                    "LETTA_LOCAL_BACKEND_DIR" to backendDir.absolutePath,
+                ),
+                workingDirectory = context.workingDirectory,
             ),
         )
+        val stoppedByUs = AtomicBoolean(false)
         child = process
+        childStoppedByUs = stoppedByUs
         val queue = LinkedBlockingQueue<RuntimeOutputEvent>()
-        drain("stderr", process.stderr)
+        drainStderr(process.stderr)
         Thread {
             process.stdout.useLines { lines ->
                 lines.forEach { line ->
@@ -79,6 +127,10 @@ internal class DesktopLocalRuntimeManager(
                 val url = parseDesktopRuntimeListenUrl((event as RuntimeOutputEvent.Line).value)
                 if (url != null) {
                     childUrl = url
+                    events.onStarted(url)
+                    // Watch exits only once ready: a child that dies before announcing its URL is
+                    // reported by the exception below, never counted twice.
+                    process.onExit { code -> events.onExit(RuntimeExit(exitCode = code, intentional = stoppedByUs.get())) }
                     return url
                 }
             }
@@ -88,15 +140,17 @@ internal class DesktopLocalRuntimeManager(
         }
         val exitCode = process.exitCodeOrNull
         close()
-        if (exitCode != null) error("Bundled Letta Code runtime exited before ready (exit=$exitCode)")
-        error("Bundled Letta Code runtime did not announce a listen URL")
+        if (exitCode != null) throw DesktopRuntimeStartException("Bundled Letta Code runtime exited before ready (exit=$exitCode)", exitCode)
+        throw DesktopRuntimeStartException("Bundled Letta Code runtime did not announce a listen URL", null)
     }
 
     @Synchronized
     override fun close() {
         val process = child ?: return
+        childStoppedByUs?.set(true)
         child = null
         childUrl = null
+        childStoppedByUs = null
         val descendants = process.descendants
         descendants.filter { it.isAlive }.forEach { it.destroy() }
         if (process.isAlive) process.destroy()
@@ -109,10 +163,15 @@ internal class DesktopLocalRuntimeManager(
         }
     }
 
-    private fun drain(name: String, reader: BufferedReader) {
+    private fun drainStderr(reader: BufferedReader) {
         Thread {
-            reader.useLines { lines -> lines.forEach { logLine("[$name] $it") } }
-        }.apply { isDaemon = true; this.name = "letta-local-runtime-$name"; start() }
+            reader.useLines { lines ->
+                lines.forEach {
+                    logLine("[stderr] $it")
+                    events.onStderr(it)
+                }
+            }
+        }.apply { isDaemon = true; this.name = "letta-local-runtime-stderr"; start() }
     }
 
     private sealed interface RuntimeOutputEvent {
