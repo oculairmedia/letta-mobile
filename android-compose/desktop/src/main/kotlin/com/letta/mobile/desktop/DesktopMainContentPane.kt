@@ -22,6 +22,7 @@ import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
+import com.letta.mobile.desktop.workspace.DesktopAgentSettingsPane
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
@@ -147,16 +148,18 @@ private fun DesktopMainContentInputs.showsBackgroundTasksToggle(): Boolean {
 @Composable
 private fun EditAgentSidePane(agentId: String, inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
     LettaSidePane(title = "Edit agent", onClose = actions.onEditAgentClose, initialWidth = 460.dp) {
-        DesktopEditAgentSurface(
-            agentId = agentId,
-            modelOptions = inputs.modelOptions,
-            agentRepository = inputs.agentRepository,
-            blockApi = inputs.blockApi,
-            settings = inputs.secureSettingsStore,
-            scope = inputs.chatScope,
-            onSaved = actions.onEditAgentSaved,
-            modifier = Modifier.fillMaxSize(),
-        )
+        DesktopAgentSettingsPane(agentId = agentId, scope = inputs.chatScope) { modifier ->
+            DesktopEditAgentSurface(
+                agentId = agentId,
+                modelOptions = inputs.modelOptions,
+                agentRepository = inputs.agentRepository,
+                blockApi = inputs.blockApi,
+                settings = inputs.secureSettingsStore,
+                scope = inputs.chatScope,
+                onSaved = actions.onEditAgentSaved,
+                modifier = modifier,
+            )
+        }
     }
 }
 
