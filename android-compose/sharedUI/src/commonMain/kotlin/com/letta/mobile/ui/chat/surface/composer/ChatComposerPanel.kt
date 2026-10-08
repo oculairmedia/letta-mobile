@@ -160,5 +160,11 @@ private fun ComposerAboveCard(model: ComposerModel) {
     if (model.showWorkingDirectory && model.mode != ChatSurfaceMode.Docked) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
     }
+    if (model.composer.backgroundProcesses.isNotEmpty()) {
+        BackgroundProcessShelf(
+            processes = model.composer.backgroundProcesses,
+            onStop = actions::stopBackgroundProcess,
+        )
+    }
     ComposerSuggestions(model.composer, model.decisions.autocomplete, actions)
 }

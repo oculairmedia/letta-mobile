@@ -49,4 +49,5 @@ object CronTaskStatus {
     const val ACTIVE = "active"
     const val COMPLETED = "completed"
     const val CANCELLED = "cancelled"
+    const val PAUSED = "paused"
 }

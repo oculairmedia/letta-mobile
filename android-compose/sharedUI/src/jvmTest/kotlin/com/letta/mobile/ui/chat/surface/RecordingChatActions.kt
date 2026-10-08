@@ -90,6 +90,13 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
 
     override fun stopRun() = record("stopRun")
 
+    val stoppedProcesses = mutableListOf<String>()
+
+    override fun stopBackgroundProcess(processId: String) {
+        record("stopBackgroundProcess:$processId")
+        stoppedProcesses += processId
+    }
+
     override fun rerun(message: UiMessage) {
         record("rerun")
         reruns += message

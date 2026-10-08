@@ -32,6 +32,7 @@ object AppServerProtocol {
         "update_loop_status",
         "update_queue",
         "update_subagent_state",
+        "crons_updated",
     )
 
     private val KNOWN_INBOUND_MESSAGE_TYPES: Set<String> = STREAM_CHANNEL_MESSAGE_TYPES + setOf(
@@ -45,6 +46,9 @@ object AppServerProtocol {
         // 0.32+ queue control (letta-mobile-qygvv.6).
         "resume_queue_response",
         "remove_queue_item_response",
+        "execute_command_response",
+        "monitor_stop_response",
+        "update_toolset_response",
         "external_tool_call_request",
         "control_request",
         "admin_rpc_response",
@@ -62,6 +66,8 @@ object AppServerProtocol {
         "cron_runs_response",
         "cron_trigger_response",
         "cron_update_response",
+        "cron_pause_response",
+        "cron_resume_response",
         "cron_delete_response",
         "cron_delete_all_response",
         "write_memory_file_response",

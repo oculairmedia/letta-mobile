@@ -480,6 +480,61 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
+     * Executes a device slash command (letta-mobile-bzvro.20).
+     */
+    @Serializable
+    @SerialName("execute_command")
+    data class ExecuteCommand(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("command_id") val commandId: String,
+        val args: String? = null,
+        val runtime: AppServerRuntimeScope? = null,
+    ) : AppServerCommand
+
+    /**
+     * Stops a background process or monitor (letta-mobile-bzvro.21).
+     */
+    @Serializable
+    @SerialName("monitor_stop")
+    data class MonitorStop(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("process_id") val processId: String,
+        val runtime: AppServerRuntimeScope? = null,
+    ) : AppServerCommand
+
+    /**
+     * Updates the active toolset preference (letta-mobile-bzvro.22).
+     */
+    @Serializable
+    @SerialName("update_toolset")
+    data class UpdateToolset(
+        @SerialName("toolset_preference") val toolsetPreference: String,
+        val runtime: AppServerRuntimeScope? = null,
+        @SerialName("request_id") val requestId: String? = null,
+    ) : AppServerCommand
+
+    /**
+     * Pauses a scheduled cron task (letta-mobile-bzvro.23).
+     */
+    @Serializable
+    @SerialName("cron_pause")
+    data class CronPause(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+    ) : AppServerCommand
+
+    /**
+     * Resumes a paused cron task (letta-mobile-bzvro.23).
+     */
+    @Serializable
+    @SerialName("cron_resume")
+    data class CronResume(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+        @SerialName("scheduled_for") val scheduledFor: String? = null,
+    ) : AppServerCommand
+
+    /**
      * Capability discovery request (lgns8.24).
      *
      * Sent over the WebSocket after connect to discover server capabilities

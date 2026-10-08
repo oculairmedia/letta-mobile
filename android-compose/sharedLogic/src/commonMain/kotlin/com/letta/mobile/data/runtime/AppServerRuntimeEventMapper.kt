@@ -82,6 +82,12 @@ open class AppServerRuntimeEventMapper {
             // Queue control answers (letta-mobile-qygvv.6); correlated by the registry.
             is AppServerInboundFrame.ResumeQueueResponse,
             is AppServerInboundFrame.RemoveQueueItemResponse,
+            is AppServerInboundFrame.ExecuteCommandResponse,
+            is AppServerInboundFrame.MonitorStopResponse,
+            is AppServerInboundFrame.UpdateToolsetResponse,
+            is AppServerInboundFrame.CronPauseResponse,
+            is AppServerInboundFrame.CronResumeResponse,
+            is AppServerInboundFrame.CronsUpdated,
             -> emptyList()
             // Decoded as Unknown before 0.32 typing; kept on the same observable path, plus the
             // authoritative lifecycle terminal it carries (letta-mobile-qygvv.2).
