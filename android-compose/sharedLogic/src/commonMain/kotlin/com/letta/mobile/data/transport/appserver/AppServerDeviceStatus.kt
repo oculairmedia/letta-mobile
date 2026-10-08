@@ -95,90 +95,89 @@ val AppServerInboundFrame.UpdateDeviceStatus.snapshot: AppServerDeviceStatusSnap
 
 internal fun JsonObject.toDeviceStatusSnapshot(): AppServerDeviceStatusSnapshot =
     AppServerDeviceStatusSnapshot(
-        currentWorkingDirectory = stringOrNull("current_working_directory") ?: stringOrNull("currentWorkingDirectory"),
-        currentPermissionMode = (stringOrNull("current_permission_mode") ?: stringOrNull("currentPermissionMode"))
+        currentWorkingDirectory = firstString("current_working_directory", "currentWorkingDirectory"),
+        currentPermissionMode = firstString("current_permission_mode", "currentPermissionMode")
             ?.let(AppServerPermissionMode::fromWireValue),
-        cwdRevision = (this["cwd_revision"] as? JsonPrimitive)?.longOrNull
-            ?: (this["cwdRevision"] as? JsonPrimitive)?.longOrNull,
+        cwdRevision = firstLong("cwd_revision", "cwdRevision"),
         gitContext = (this["git_context"] as? JsonObject ?: this["gitContext"] as? JsonObject)?.toGitContext(),
-        lettaCodeVersion = stringOrNull("letta_code_version") ?: stringOrNull("lettaCodeVersion"),
-        supportedCommands = stringListOrEmpty("supported_commands")
-            .ifEmpty { stringListOrEmpty("supportedCommands") },
-        currentToolset = stringOrNull("current_toolset") ?: stringOrNull("currentToolset"),
-        toolsetPreference = stringOrNull("current_toolset_preference")
-            ?: stringOrNull("toolset_preference")
-            ?: stringOrNull("toolsetPreference"),
-        availableToolsets = (this["available_toolsets"] as? JsonArray ?: this["availableToolsets"] as? JsonArray)
+        lettaCodeVersion = firstString("letta_code_version", "lettaCodeVersion"),
+        supportedCommands = stringListOrEmpty("supported_commands", "supportedCommands"),
+        currentToolset = firstString("current_toolset", "currentToolset"),
+        toolsetPreference = firstString("current_toolset_preference", "toolset_preference", "toolsetPreference"),
+        availableToolsets = firstArray("available_toolsets", "availableToolsets")
             ?.mapNotNull { (it as? JsonObject)?.toToolset() } ?: emptyList(),
-        backgroundProcesses = (this["background_processes"] as? JsonArray ?: this["backgroundProcesses"] as? JsonArray)
+        backgroundProcesses = firstArray("background_processes", "backgroundProcesses")
             ?.mapNotNull { (it as? JsonObject)?.toBackgroundProcess() } ?: emptyList(),
-        pendingControlRequests = (this["pending_control_requests"] as? JsonArray ?: this["pendingControlRequests"] as? JsonArray)
+        pendingControlRequests = firstArray("pending_control_requests", "pendingControlRequests")
             ?.mapNotNull { (it as? JsonObject)?.toPendingControlRequest() } ?: emptyList(),
-        experiments = (this["experiments"] as? JsonArray)
+        experiments = firstArray("experiments")
             ?.mapNotNull { (it as? JsonObject)?.toExperiment() } ?: emptyList(),
-        memoryDirectory = stringOrNull("memory_directory") ?: stringOrNull("memoryDirectory"),
-        isProcessing = booleanOrNull("is_processing") ?: booleanOrNull("isProcessing") ?: false,
-        isOnline = booleanOrNull("is_online") ?: booleanOrNull("isOnline"),
+        memoryDirectory = firstString("memory_directory", "memoryDirectory"),
+        isProcessing = firstBoolean("is_processing", "isProcessing") ?: false,
+        isOnline = firstBoolean("is_online", "isOnline"),
     )
 
-private fun JsonObject.toGitContext(): AppServerGitContext {
-    val branch = stringOrNull("branch") ?: stringOrNull("current_branch") ?: stringOrNull("currentBranch")
-    val recent = stringListOrEmpty("recent_branches").ifEmpty { stringListOrEmpty("recentBranches") }
-    return AppServerGitContext(branch = branch, recentBranches = recent)
-}
+private fun JsonObject.toGitContext(): AppServerGitContext =
+    AppServerGitContext(
+        branch = firstString("branch", "current_branch", "currentBranch"),
+        recentBranches = stringListOrEmpty("recent_branches", "recentBranches"),
+    )
 
 private fun JsonObject.toToolset(): AppServerToolset? {
-    val id = stringOrNull("id") ?: return null
+    val id = firstString("id") ?: return null
     return AppServerToolset(
         id = id,
-        displayName = stringOrNull("display_name") ?: stringOrNull("displayName"),
-        label = stringOrNull("label"),
-        description = stringOrNull("description"),
-        isFeatured = booleanOrNull("is_featured") ?: booleanOrNull("isFeatured") ?: false,
+        displayName = firstString("display_name", "displayName"),
+        label = firstString("label"),
+        description = firstString("description"),
+        isFeatured = firstBoolean("is_featured", "isFeatured") ?: false,
     )
 }
 
 private fun JsonObject.toBackgroundProcess(): AppServerBackgroundProcess? {
-    val id = stringOrNull("id") ?: stringOrNull("process_id") ?: stringOrNull("processId") ?: return null
+    val id = firstString("id", "process_id", "processId") ?: return null
     return AppServerBackgroundProcess(
         id = id,
-        type = stringOrNull("type") ?: stringOrNull("kind"),
-        description = stringOrNull("description"),
-        startedAt = stringOrNull("started_at") ?: stringOrNull("startedAt"),
-        ageSeconds = (this["age_seconds"] as? JsonPrimitive)?.longOrNull
-            ?: (this["ageSeconds"] as? JsonPrimitive)?.longOrNull
-            ?: (this["age"] as? JsonPrimitive)?.longOrNull,
+        type = firstString("type", "kind"),
+        description = firstString("description"),
+        startedAt = firstString("started_at", "startedAt"),
+        ageSeconds = firstLong("age_seconds", "ageSeconds", "age"),
     )
 }
 
 private fun JsonObject.toPendingControlRequest(): AppServerPendingControlRequest? {
-    val requestId = stringOrNull("request_id") ?: stringOrNull("requestId") ?: return null
-    val req = this["request"] as? JsonObject ?: JsonObject(emptyMap())
+    val requestId = firstString("request_id", "requestId") ?: return null
     return AppServerPendingControlRequest(
         requestId = requestId,
-        request = req,
-        agentId = stringOrNull("agent_id") ?: stringOrNull("agentId"),
-        conversationId = stringOrNull("conversation_id") ?: stringOrNull("conversationId"),
+        request = this["request"] as? JsonObject ?: JsonObject(emptyMap()),
+        agentId = firstString("agent_id", "agentId"),
+        conversationId = firstString("conversation_id", "conversationId"),
     )
 }
 
 private fun JsonObject.toExperiment(): AppServerExperiment? {
-    val id = stringOrNull("id") ?: return null
+    val id = firstString("id") ?: return null
     return AppServerExperiment(
         id = id,
-        label = stringOrNull("label"),
-        description = stringOrNull("description"),
-        envVar = stringOrNull("envVar") ?: stringOrNull("env_var"),
-        enabled = booleanOrNull("enabled") ?: false,
-        source = stringOrNull("source"),
+        label = firstString("label"),
+        description = firstString("description"),
+        envVar = firstString("envVar", "env_var"),
+        enabled = firstBoolean("enabled") ?: false,
+        source = firstString("source"),
     )
 }
 
-private fun JsonObject.stringOrNull(key: String): String? =
-    (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+private fun JsonObject.firstString(vararg keys: String): String? =
+    keys.firstNotNullOfOrNull { key -> (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull }
 
-private fun JsonObject.booleanOrNull(key: String): Boolean? =
-    (this[key] as? JsonPrimitive)?.booleanOrNull
+private fun JsonObject.firstLong(vararg keys: String): Long? =
+    keys.firstNotNullOfOrNull { key -> (this[key] as? JsonPrimitive)?.longOrNull }
 
-private fun JsonObject.stringListOrEmpty(key: String): List<String> =
-    (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.contentOrNull } ?: emptyList()
+private fun JsonObject.firstBoolean(vararg keys: String): Boolean? =
+    keys.firstNotNullOfOrNull { key -> (this[key] as? JsonPrimitive)?.booleanOrNull }
+
+private fun JsonObject.firstArray(vararg keys: String): JsonArray? =
+    keys.firstNotNullOfOrNull { key -> this[key] as? JsonArray }
+
+private fun JsonObject.stringListOrEmpty(vararg keys: String): List<String> =
+    firstArray(*keys)?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.contentOrNull } ?: emptyList()
