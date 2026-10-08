@@ -23,15 +23,18 @@ import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
-import com.letta.mobile.desktop.home.DesktopHomeState
-import com.letta.mobile.desktop.home.FleetOverviewParams
-import com.letta.mobile.desktop.home.buildFleetOverview
+import com.letta.mobile.data.home.FleetOverviewParams
+import com.letta.mobile.data.home.buildFleetOverview
+import com.letta.mobile.desktop.home.DesktopHomeInputs
+import com.letta.mobile.desktop.home.toFleetConversation
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.resolveMascotIdentity
-import java.time.Instant
+import com.letta.mobile.ui.shell.pages.home.HomePageOptions
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.delay
 
 /** The agent the shell is focused on, and every agent's name and identity around it. */
@@ -274,11 +277,12 @@ private fun rememberDesktopShellLists(
 }
 
 /**
- * Home dashboard state: folded entirely from state the shell already holds (conversations +
- * roster + who is mid-run) - no extra repositories.
+ * Home page inputs. The fleet half is folded from state the shell already holds (conversations +
+ * roster + who is mid-run) and handed to the shared controller; the rest of the page (pins, stats,
+ * search) is the controller's own.
  */
 @Composable
-internal fun rememberDesktopHomeState(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHomeState {
+internal fun rememberDesktopHomeInputs(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHomeInputs {
     val focus = frame.focus
     val conversations = frame.chatState.conversations
     val runningAgentIds = frame.activity.runningAgentIds
@@ -287,7 +291,7 @@ internal fun rememberDesktopHomeState(context: DesktopShellContext, frame: Deskt
     val fleetOverview = remember(conversations, focus.rosterAgents, runningAgentIds, fleetClock) {
         buildFleetOverview(
             FleetOverviewParams(
-                conversations = conversations,
+                conversations = conversations.map { it.toFleetConversation() },
                 rosterAgents = focus.rosterAgents,
                 runningAgentIds = runningAgentIds,
                 now = fleetClock,
@@ -297,28 +301,32 @@ internal fun rememberDesktopHomeState(context: DesktopShellContext, frame: Deskt
             ),
         )
     }
+    val controller = context.panels.libraries.home
+    LaunchedEffect(controller, fleetOverview) { controller.updateFleet(fleetOverview) }
+    val state by controller.state.collectAsState()
     val homeOrbIndexes = remember(focus.railAgents, focus.avatarStyleByAgentId) {
         focus.railAgents
             .mapIndexed { index, (id, _) -> id to (focus.avatarStyleByAgentId[id] ?: index) }
             .toMap()
     }
     val navigator = context.navigator
-    return DesktopHomeState(
-        overview = fleetOverview,
-        sort = navigator.homeSort,
-        orbIndexByAgentId = homeOrbIndexes,
-        composerPlaceholder = WorkPlayLens.composerPlaceholder(navigator.workPlayMode, focus.selectedAgentName),
+    return DesktopHomeInputs(
+        state = state,
+        options = HomePageOptions(
+            orbIndexByAgentId = homeOrbIndexes,
+            composerPlaceholder = WorkPlayLens.composerPlaceholder(navigator.workPlayMode, focus.selectedAgentName),
+        ),
     )
 }
 
 /** Now, advanced once a minute so the fleet dashboard's relative times stay current. */
 @Composable
 private fun rememberFleetClock(): Instant {
-    var fleetClock by remember { mutableStateOf(Instant.now()) }
+    var fleetClock by remember { mutableStateOf(Clock.System.now()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(60.seconds)
-            fleetClock = Instant.now()
+            fleetClock = Clock.System.now()
         }
     }
     return fleetClock

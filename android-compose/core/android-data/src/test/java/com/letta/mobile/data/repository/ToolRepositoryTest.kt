@@ -118,6 +118,31 @@ class ToolRepositoryTest {
         assertEquals("/v1/agents/agent-1/tools/detach/tool-1", transport.adminRpcCalls[1].path)
     }
 
+    @Test
+    fun `countTools in iroh mode counts the admin rpc catalog instead of calling HTTP`() = runTest {
+        val tools = listOf(TestData.tool(id = "t1"), TestData.tool(id = "t2"))
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                assertEquals("tool.list", method)
+                AppServerInboundFrame.AdminRpcResponse(
+                    "req",
+                    true,
+                    Json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(com.letta.mobile.data.model.Tool.serializer()), tools),
+                )
+            }
+        }
+        val irohRepository = ToolRepository(
+            toolApi = fakeApi,
+            irohToolSource = IrohAdminRpcToolSource(transport, irohSettings()),
+        )
+
+        assertEquals(2, irohRepository.countTools())
+        assertEquals(2, irohRepository.countTools())
+
+        assertTrue("no HTTP count under iroh://", fakeApi.calls.none { it == "countTools" })
+        assertEquals("a fresh catalog is reused", 1, transport.adminRpcCalls.size)
+    }
+
     private fun irohSettings() = FakeSettingsRepository(
         initialActiveConfig = LettaConfig(
             id = "iroh",
@@ -177,15 +202,18 @@ class ToolRepositoryTest {
         assertTrue(repository.getTools().first().none { it.id == ToolId("t1") })
     }
 
-    @Test(expected = com.letta.mobile.data.api.ApiException::class)
+    @Test
     fun `refreshTools throws on API failure`() = runTest {
         fakeApi.shouldFail = true
-        repository.refreshTools()
+
+        val failure = runCatching { repository.refreshTools() }.exceptionOrNull()
+
+        assertTrue("expected ApiException, got $failure", failure is com.letta.mobile.data.api.ApiException)
     }
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
+    @Test
     fun `refreshTools in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
         val apiThatThrows = object : FakeToolApi() {
             override suspend fun listTools(tags: List<String>?, limit: Int?, offset: Int?): List<com.letta.mobile.data.model.Tool> {
@@ -193,7 +221,10 @@ class ToolRepositoryTest {
             }
         }
         val repo = ToolRepository(apiThatThrows)
-        repo.refreshTools()
+
+        val failure = runCatching { repo.refreshTools() }.exceptionOrNull()
+
+        assertTrue("expected the iroh guard, got $failure", failure is com.letta.mobile.data.api.IrohAdminApiUnavailableException)
     }
 
     @Test

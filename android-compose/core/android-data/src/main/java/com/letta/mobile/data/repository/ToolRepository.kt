@@ -32,7 +32,19 @@ open class ToolRepository @Inject constructor(
         return _toolsByAgent.map { it[agentId.value] ?: emptyList() }
     }
 
-    override suspend fun countTools(): Int = toolApi.countTools()
+    /**
+     * HTTP backends answer from `/v1/tools/count`. admin_rpc has no count method, so on an iroh://
+     * backend the count is the size of the `tool.list` catalog (refreshed when stale) instead of an
+     * HTTP call the iroh guard rejects.
+     */
+    override suspend fun countTools(): Int {
+        val irohSource = irohToolSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            refreshToolsIfStale(IROH_COUNT_MAX_AGE_MS)
+            return _tools.value.size
+        }
+        return toolApi.countTools()
+    }
 
     override suspend fun refreshTools() = refreshMutex.withLock {
         refreshToolsLocked()
@@ -135,5 +147,10 @@ open class ToolRepository @Inject constructor(
         _toolsByAgent.update { current ->
             current.mapValues { (_, tools) -> tools.filterNot { it.id == toolId } }
         }
+    }
+
+    private companion object {
+        /** How old the cached catalog may be before an iroh:// [countTools] lists the tools again. */
+        const val IROH_COUNT_MAX_AGE_MS = 60_000L
     }
 }

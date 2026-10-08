@@ -115,6 +115,9 @@ kotlin {
                 // The shared chat page's paged canonical timeline (LazyPagingItems over
                 // CanonicalTimelinePresentation.settled). KMP: android, jvm and wasm.
                 implementation(libs.androidx.paging.compose)
+                // letta-mobile-c3np7.3.11: the shared Home page's drag-to-reorder pinned grid - the
+                // library both hosts already use for it. KMP: android, jvm and wasm.
+                implementation(libs.reorderable)
                 // DrawBoxController inherits from androidx.lifecycle.ViewModel; exposed as api so consumers resolve ViewModel hierarchy.
                 api(libs.androidx.lifecycle.viewmodel)
             }

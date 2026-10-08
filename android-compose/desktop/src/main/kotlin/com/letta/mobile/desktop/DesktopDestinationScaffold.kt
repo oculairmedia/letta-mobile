@@ -32,9 +32,9 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
-import com.letta.mobile.desktop.home.DesktopHomeActions
-import com.letta.mobile.desktop.home.DesktopHomeState
-import com.letta.mobile.desktop.home.DesktopHomeSurface
+import com.letta.mobile.desktop.home.DesktopHomeInputs
+import com.letta.mobile.ui.shell.pages.home.HomePage
+import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
@@ -105,7 +105,7 @@ internal data class DestinationContentInputs(
     val state: DesktopBootstrapState,
     /** Agent-rail recency window in days; 0 shows every agent. */
     val railRecencyDays: Int = RAIL_RECENCY_DAYS_DEFAULT,
-    val home: DesktopHomeState,
+    val home: DesktopHomeInputs,
     val chat: DesktopChatSurfaceState,
     val memoryState: MemoryPageState,
     val schedule: DestinationScheduleInputs,
@@ -128,7 +128,7 @@ internal data class DestinationNucleusActions(
 )
 
 internal data class DestinationContentActions(
-    val home: DesktopHomeActions,
+    val home: HomePageCallbacks,
     val onRetryConnection: () -> Unit,
     val memory: MemoryPageActions,
     val schedules: DestinationScheduleActions,
@@ -184,8 +184,7 @@ internal fun DestinationContent(
     modifier: Modifier = Modifier,
 ) {
     when (destination) {
-        // The fleet dashboard. Rendered natively today; see DesktopHomeSurface's
-        // KDoc for the Letta Code mod / A2UI document seam.
+        // The shared Home page; see HomePage's KDoc for the Letta Code mod / A2UI document seam.
         DesktopDestination.Home -> HomeDestinationContent(
             inputs = inputs,
             actions = actions,
@@ -261,10 +260,11 @@ private fun HomeDestinationContent(
             modifier = modifier,
         )
     } else {
-        DesktopHomeSurface(
-            state = inputs.home,
-            actions = actions.home,
+        HomePage(
+            state = inputs.home.state,
+            callbacks = actions.home,
             modifier = modifier,
+            options = inputs.home.options,
         )
     }
 }
