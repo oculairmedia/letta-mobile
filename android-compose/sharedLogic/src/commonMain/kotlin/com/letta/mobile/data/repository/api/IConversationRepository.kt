@@ -34,6 +34,14 @@ interface IConversationRepository {
     suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation = error("forkConversation unsupported")
     suspend fun forkConversation(id: String, agentId: String): Conversation = forkConversation(ConversationId(id), AgentId(agentId))
 
+    /**
+     * letta-mobile-bzvro.15: fork through [throughMessageId] (inclusive), routed by backend: App
+     * Server / Iroh through `conversation_fork`, REST through `/fork?message_id=`. A null id copies
+     * the whole conversation, as [forkConversation] without it does.
+     */
+    suspend fun forkConversation(id: ConversationId, agentId: AgentId, throughMessageId: String?): Conversation =
+        if (throughMessageId == null) forkConversation(id, agentId) else error("forkConversation from a message unsupported")
+
     // letta-mobile-i9h61.3.2: agent-scoped conversation list (the
     // OTHER agent's conversations, for tap-to-navigate on inter-agent
     // messages). Default implementation returns empty so fakes and

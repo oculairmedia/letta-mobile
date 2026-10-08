@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import android.util.Log
 import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
@@ -306,8 +307,21 @@ open class ConversationRepository(
         }
     }
 
-    override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation {
-        val conversation = conversationApi.forkConversation(id, agentId)
+    override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation =
+        forkConversation(id, agentId, throughMessageId = null)
+
+    /**
+     * letta-mobile-bzvro.15: an App Server / Iroh backend forks through the host's
+     * `conversation.fork` (App Server `conversation_fork`); only a REST backend calls `/fork`.
+     */
+    override suspend fun forkConversation(id: ConversationId, agentId: AgentId, throughMessageId: String?): Conversation {
+        val request = ConversationForkRequest(id.value, agentId.value, throughMessageId)
+        val irohSource = irohConversationListSource
+        val conversation = if (irohSource?.shouldUseIroh() == true) {
+            irohSource.forkConversation(request)
+        } else {
+            conversationApi.forkConversation(request)
+        }
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
     }

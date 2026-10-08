@@ -16,6 +16,8 @@ internal data class ChatScreenNavigationCallbacks(
     val onOpenCanvas: (() -> Unit)? = null,
     /** Open the agent switcher (the header's agent pill), from where the header is not shown. */
     val onOpenAgentSwitcher: (() -> Unit)? = null,
+    /** letta-mobile-bzvro.15/.16: open a conversation (agent id, conversation id), e.g. a fresh fork. */
+    val onOpenConversation: ((String, String) -> Unit)? = null,
 )
 
 internal data class ChatContentCallbacks(

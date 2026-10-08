@@ -24,6 +24,20 @@ class ShellRowMenusTest {
     }
 
     @Test
+    fun aConversationOffersRenameAndPinWhenTheHostDoes() {
+        // letta-mobile-bzvro.17
+        val events = mutableListOf<String>()
+        val manage = ShellConversationManageMenu(pinned = false, onRenameRequest = { events += "rename" }, onPinToggle = { events += "pin" })
+        val menu = ShellRowMenus.conversation(archived = false, deleting = false, onArchiveToggle = {}, manage = manage) {}
+        assertEquals(listOf("Rename chat", "Pin chat", "Archive chat", "Delete chat"), menu.map { it.label })
+        menu.take(2).forEach { it.onClick() }
+        assertEquals(listOf("rename", "pin"), events)
+
+        assertEquals("Unpin chat", ShellRowMenus.conversation(false, false, {}, manage.copy(pinned = true)) {}[1].label)
+        assertTrue(ShellRowMenus.conversation(archived = false, deleting = true, onArchiveToggle = {}, manage = manage) {}.isEmpty())
+    }
+
+    @Test
     fun aConversationBeingDeletedOffersNothing() {
         assertTrue(ShellRowMenus.conversation(archived = false, deleting = true, onArchiveToggle = {}, onRequestDelete = {}).isEmpty())
     }

@@ -81,6 +81,7 @@ internal class DesktopChatSessionPort(
         bindings = bindings,
         commandsById = { hostInputs.value.commands.associateBy(ComposerCommand::label) },
         localTimeline = localTimeline,
+        branchView = { uiState.value.let { DesktopBranchView(it.messages, it.hasMoreOlderMessages) } },
     )
 
     /**
@@ -92,8 +93,11 @@ internal class DesktopChatSessionPort(
         controller.canSubmitApprovals,
         controller.canonicalPresentation,
         controller.state.map { controller.supportsWorkingDirectory }.distinctUntilChanged(),
-    ) { approvals, canonical, workingDirectory ->
-        desktopCapabilities(DesktopCapabilityFacts(approvals, paged = canonical != null, workingDirectory = workingDirectory))
+        controller.state.map { controller.conversationManagement.supportsBranching }.distinctUntilChanged(),
+    ) { approvals, canonical, workingDirectory, branching ->
+        desktopCapabilities(
+            DesktopCapabilityFacts(approvals, paged = canonical != null, workingDirectory = workingDirectory, branching = branching),
+        )
     }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities())
 
@@ -102,6 +106,7 @@ internal class DesktopChatSessionPort(
             approvals = controller.canSubmitApprovals.value,
             paged = controller.canonicalPresentation.value != null,
             workingDirectory = controller.supportsWorkingDirectory,
+            branching = controller.conversationManagement.supportsBranching,
         ),
     )
 
@@ -196,9 +201,13 @@ internal data class DesktopCapabilityFacts(
     val paged: Boolean,
     /** The active gateway can change a conversation's working directory. */
     val workingDirectory: Boolean,
+    /** letta-mobile-bzvro.15/.16: the active gateway can fork (fork, edit and resend). */
+    val branching: Boolean = false,
 )
 
 internal fun desktopCapabilities(facts: DesktopCapabilityFacts) = ChatSurfaceCapabilities(
+    fork = facts.branching,
+    editAndResend = facts.branching,
     attachImages = true,
     rerun = false,
     approvals = facts.approvals,
@@ -222,6 +231,8 @@ internal class DesktopChatActions(
     private val bindings: DesktopChatSessionBindings,
     private val commandsById: () -> Map<String, ComposerCommand>,
     private val localTimeline: MutableStateFlow<DesktopChatLocalTimelineState>,
+    /** The page's timeline now, which a fork or edit plans against. */
+    private val branchView: () -> DesktopBranchView = { DesktopBranchView(emptyList(), hasOlderMessages = true) },
 ) : ChatActions {
     private val queue = desktopQueuedSendActions(controller)
 
@@ -254,6 +265,10 @@ internal class DesktopChatActions(
     }
 
     override fun rerun(message: UiMessage) = Unit
+
+    override fun forkFromMessage(message: UiMessage) = controller.conversationManagement.forkFrom(message, branchView())
+
+    override fun editAndResend(message: UiMessage) = controller.conversationManagement.editAndResend(message, branchView())
 
     override fun submitApproval(answer: ChatApprovalAnswer) {
         // A second press while the first answer is in flight must not answer twice.

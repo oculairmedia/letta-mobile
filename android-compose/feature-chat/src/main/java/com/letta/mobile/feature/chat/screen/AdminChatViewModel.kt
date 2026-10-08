@@ -927,6 +927,9 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
+        // letta-mobile-bzvro.16: an "Edit and resend" left its text for the fork it opened.
+        com.letta.mobile.data.chat.branch.PendingComposerDrafts.shared.take(conversationId)
+            ?.let(::handleComposerTextChanged)
         viewModelScope.launch { beginTimelineObserver(conversationId) }
     }
 
@@ -1121,6 +1124,28 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun rerunMessage(message: UiMessage) {
         if (!replacingSendRuntime) composerCoordinator.rerunMessage(message)
+    }
+
+    // letta-mobile-bzvro.15 / .16: fork from a message, and edit-and-resend, opening the fork.
+    private val conversationBranching by lazy(LazyThreadSafetyMode.NONE) {
+        com.letta.mobile.feature.chat.coordination.ChatConversationBranching(
+            viewModelScope,
+            conversationRepository,
+            onError = ::reportComposerError,
+        )
+    }
+
+    private fun branchOrigin(open: (agentId: String, conversationId: String) -> Unit) =
+        conversationId?.let { id ->
+            com.letta.mobile.feature.chat.coordination.ChatConversationBranching.Origin(id.value, agentId.value, uiState.value, open)
+        }
+
+    fun forkFromMessage(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
+        branchOrigin(open)?.let { conversationBranching.forkFrom(it, message) }
+    }
+
+    fun editAndResend(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
+        branchOrigin(open)?.let { conversationBranching.editAndResend(it, message) }
     }
 
     fun interruptRun() {

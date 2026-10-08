@@ -97,7 +97,7 @@ internal data class SharedChatPageParams(
  */
 @Composable
 internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = Modifier) {
-    val port = rememberAdminChatSessionPort(params.viewModel, params.navigation.onBugCommand)
+    val port = rememberAdminChatSessionPort(params.viewModel, params.navigation)
     val canvasSlot = LocalChatCanvasSlot.current
     val presentationState = rememberSaveable(stateSaver = PresentationSaver) {
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
@@ -235,11 +235,22 @@ internal fun routesToCanvasNavigation(
 @Composable
 private fun rememberAdminChatSessionPort(
     viewModel: AdminChatViewModel,
-    onBugCommand: (() -> Unit)?,
+    navigation: ChatScreenNavigationCallbacks,
 ): AdminChatSessionPort {
-    val currentOnBugCommand by rememberUpdatedState(onBugCommand)
-    return remember(viewModel) {
-        AdminChatSessionPort(viewModel, viewModel.viewModelScope) { currentOnBugCommand?.invoke() }
+    val currentOnBugCommand by rememberUpdatedState(navigation.onBugCommand)
+    val currentOpenConversation by rememberUpdatedState(navigation.onOpenConversation)
+    val canOpenConversation = navigation.onOpenConversation != null
+    return remember(viewModel, canOpenConversation) {
+        AdminChatSessionPort(
+            viewModel = viewModel,
+            scope = viewModel.viewModelScope,
+            onOpenBugReport = { currentOnBugCommand?.invoke() },
+            onOpenConversation = if (canOpenConversation) {
+                { agentId, conversationId -> currentOpenConversation?.invoke(agentId, conversationId) }
+            } else {
+                null
+            },
+        )
     }
 }
 

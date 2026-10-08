@@ -31,6 +31,8 @@ internal class AdminChatSessionPort(
     private val viewModel: AdminChatViewModel,
     scope: CoroutineScope,
     onOpenBugReport: () -> Unit = {},
+    /** letta-mobile-bzvro.15/.16: navigates to a fork; null leaves fork and edit off. */
+    onOpenConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
 ) : ChatSessionPort {
 
     override val uiState: StateFlow<ChatUiState> = viewModel.uiState
@@ -39,10 +41,12 @@ internal class AdminChatSessionPort(
         combine(viewModel.composerState, viewModel.uiState, modelFlow(), contextUsageFlow(), ::composerSnapshot)
             .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialComposer())
 
-    override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport)
+    override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport, onOpenConversation)
 
     /** Android's support does not change while the page is open. */
-    override val capabilities: StateFlow<ChatSurfaceCapabilities> = MutableStateFlow(Capabilities)
+    override val capabilities: StateFlow<ChatSurfaceCapabilities> = MutableStateFlow(
+        Capabilities.copy(fork = onOpenConversation != null, editAndResend = onOpenConversation != null),
+    )
 
     private fun initialComposer(): ChatComposerUiState = composerSnapshot(
         viewModel.composerState.value,

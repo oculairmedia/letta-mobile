@@ -111,6 +111,10 @@ interface AppServerClient {
     suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate): AppServerInboundFrame.ConversationUpdateResponse =
         throw UnsupportedOperationException("conversation_update is not supported by this client")
 
+    /** letta-mobile-bzvro.15: forks a conversation (optionally through one message). */
+    suspend fun conversationFork(command: AppServerConversationFork): AppServerConversationForkResponse =
+        throw UnsupportedOperationException("conversation_fork is not supported by this client")
+
     suspend fun conversationMessagesList(
         command: AppServerCommand.ConversationMessagesList,
     ): AppServerInboundFrame.ConversationMessagesListResponse =
@@ -376,6 +380,15 @@ class DefaultAppServerClient(
 
     override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate): AppServerInboundFrame.ConversationUpdateResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationUpdateResponse }) { transport.sendControl(command) }
+
+    override suspend fun conversationFork(command: AppServerConversationFork): AppServerConversationForkResponse =
+        registry.request(
+            requestId = command.requestId,
+            response = { frame ->
+                (frame as? AppServerInboundFrame.Unknown)?.takeIf { it.type == AppServerConversationFork.RESPONSE_TYPE }
+            },
+            send = { transport.sendControl(command) },
+        ).let { checkNotNull(AppServerConversationForkResponse.from(it)) }
 
     override suspend fun conversationMessagesList(
         command: AppServerCommand.ConversationMessagesList,

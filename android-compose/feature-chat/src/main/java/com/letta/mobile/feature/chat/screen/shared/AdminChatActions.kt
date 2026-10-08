@@ -27,6 +27,8 @@ import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 internal class AdminChatActions(
     private val viewModel: AdminChatViewModel,
     private val onOpenBugReport: () -> Unit,
+    /** letta-mobile-bzvro.15/.16: opens a fork (agent id, conversation id); null hides fork and edit. */
+    private val onOpenConversation: ((String, String) -> Unit)? = null,
 ) : ChatActions {
 
     private fun forward(effect: ChatComposerEffect?) {
@@ -65,6 +67,14 @@ internal class AdminChatActions(
     override fun stopRun() = viewModel.interruptRun()
 
     override fun rerun(message: UiMessage) = viewModel.rerunMessage(message)
+
+    override fun forkFromMessage(message: UiMessage) {
+        onOpenConversation?.let { open -> viewModel.forkFromMessage(message, open) }
+    }
+
+    override fun editAndResend(message: UiMessage) {
+        onOpenConversation?.let { open -> viewModel.editAndResend(message, open) }
+    }
 
     override fun submitApproval(answer: ChatApprovalAnswer) =
         viewModel.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)

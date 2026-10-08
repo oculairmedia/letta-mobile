@@ -340,7 +340,7 @@ class ChatComposerPanelUiTest {
         onNodeWithTag(ComposerTestTags.MODEL_SHEET).assertExists()
         onNodeWithText("Model B").performClick()
         onNodeWithTag(ComposerTestTags.EFFORT_CHIP).performClick()
-        onNodeWithText("high").performClick()
+        onNodeWithText("High").performClick()
         runOnIdle {
             assertEquals(
                 listOf(

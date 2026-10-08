@@ -19,7 +19,9 @@ import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.modelcontrol.ModelsEditActions
 import com.letta.mobile.ui.modelcontrol.ModelsEditContent
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
@@ -35,12 +37,15 @@ internal data class DesktopModelControlHost(
     val reloadChatModels: suspend () -> Unit,
     /** The per-conversation switch (`DesktopChatController.setConversationModel`). */
     val onModelSelected: (String) -> Unit,
+    /** letta-mobile-bzvro.18: recently used models, newest first (`DesktopChatController.recentModels`). */
+    val recentModels: Flow<List<String>> = flowOf(emptyList()),
 ) {
     /** The admin catalog while the host answers it, else the chat's list; both keep the chat's list current. */
     fun pickerSource(): ModelPickerSource {
         val fallback = ModelPickerSource.of(chatModels) { reloadChatModels() }
-        val catalog = session?.pickerSource() ?: return fallback
-        return ModelPickerSource.withFallback(ChatSyncedSource(catalog, reloadChatModels), fallback)
+        val catalog = session?.pickerSource()
+            ?: return fallback.withRecents(recentModels)
+        return ModelPickerSource.withFallback(ChatSyncedSource(catalog, reloadChatModels), fallback).withRecents(recentModels)
     }
 }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.api
 
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.model.*
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import io.ktor.client.call.*
@@ -102,12 +103,20 @@ class ConversationApi @Inject constructor(
 
     suspend fun deleteConversation(conversationId: String): Unit = deleteConversation(ConversationId(conversationId))
 
-    suspend fun forkConversation(conversationId: ConversationId, agentId: AgentId? = null): Conversation {
+    suspend fun forkConversation(conversationId: ConversationId, agentId: AgentId? = null): Conversation =
+        forkConversation(ConversationForkRequest(conversationId.value, agentId?.value))
+
+    /**
+     * letta-mobile-bzvro.15: `POST /v1/conversations/{id}/fork`; [ConversationForkRequest.throughMessageId]
+     * forks through that message (inclusive), null copies the whole conversation.
+     */
+    suspend fun forkConversation(request: ConversationForkRequest): Conversation {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.post("$baseUrl/v1/conversations/${conversationId.value}/fork") {
+        val response = client.post("$baseUrl/v1/conversations/${request.conversationId}/fork") {
             contentType(ContentType.Application.Json)
-            agentId?.let { parameter("agent_id", it.value) }
+            parameter("agent_id", request.agentId)
+            parameter("message_id", request.throughMessageId)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())

@@ -12,6 +12,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasLibrary
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
@@ -157,6 +159,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
     val canvasDocuments by canvasShell.library.documents.collectAsState()
     val archivedCanvasIds by canvasShell.library.archived.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
+    val pinnedConversationIds by chatController.conversationManagement.pinnedConversationIds.collectAsState()
     val archiveFilter = frame.lists.archiveFilter
     DesktopAgentSidebar(
         state = DesktopAgentSidebarState(
@@ -168,6 +171,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             selectedConversationId = frame.chatState.selectedConversationId,
             thinkingConversationId = frame.activity.thinkingConversationId,
             deletingConversationIds = deletingConversationIds,
+            pinnedConversationIds = pinnedConversationIds,
             archiveFilter = archiveFilter,
             selectedDestination = navigator.selectedDestination,
             mode = navigator.workPlayMode,
@@ -183,6 +187,10 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             onDestinationSelected = navigator::navigate,
             onConversationSelected = { context.router.openConversation(ConversationId(it)) },
             onDeleteConversation = chatController::deleteConversation,
+            onRenameConversation = { id, title ->
+                chatController.conversationManagement.rename(ConversationSummaryUpdate(ConversationId(id), ConversationSummary(title)))
+            },
+            onPinConversation = { id, pinned -> chatController.conversationManagement.setPinned(ConversationId(id), pinned) },
             onNewChat = { context.openNewChatForFocusedAgent(focus) },
             onEditAgent = { navigator.editAgentId = focus.selectedAgentId },
             onOpenCanvas = { context.openCanvas(it) },

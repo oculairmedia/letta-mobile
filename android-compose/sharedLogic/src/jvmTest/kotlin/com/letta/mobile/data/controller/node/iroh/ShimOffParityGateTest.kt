@@ -129,6 +129,9 @@ class ShimOffParityGateTest {
         override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
             AppServerInboundFrame.ConversationUpdateResponse(command.requestId, true, convObj())
 
+        override suspend fun conversationFork(command: com.letta.mobile.data.transport.appserver.AppServerConversationFork) =
+            com.letta.mobile.data.transport.appserver.AppServerConversationForkResponse(command.requestId, true, "conv-1", null)
+
         // message.get / tool_return.get project a single message out of this page,
         // so the runtime must actually hold the message the gate asks for.
         override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =

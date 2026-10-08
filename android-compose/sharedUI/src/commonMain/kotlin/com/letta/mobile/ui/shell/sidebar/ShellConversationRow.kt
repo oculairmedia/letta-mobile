@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -35,27 +36,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellConfirmRequest
+import com.letta.mobile.ui.shell.ShellConversationManageMenu
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** What a conversation row can do besides open. */
+/** What a conversation row can do besides open; a null rename or pin is one the host does not offer. */
 data class ShellConversationRowActions(
     val onClick: () -> Unit,
     val onArchiveToggle: () -> Unit,
     val onDelete: () -> Unit,
+    val onRename: ((String) -> Unit)? = null,
+    val onPinToggle: (() -> Unit)? = null,
 )
 
 /**
- * One conversation: icon, title over a one-line preview, and its time. While its agent works the
- * icon pulses; on hover it becomes a one-click archive (or restore). The row menu (desktop:
- * right-click, touch: long-press) offers archive and delete; delete asks first.
+ * One conversation: icon, title over a one-line preview, a pin when pinned, and its time. While its
+ * agent works the icon pulses; on hover it becomes a one-click archive (or restore). The row menu
+ * (desktop: right-click, touch: long-press) offers rename, pin, archive and delete; rename edits
+ * the title in place, and delete asks first.
  */
 @Composable
 fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConversationRowActions) {
@@ -63,10 +70,21 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     var confirmDelete by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    val onRename = actions.onRename
+    if (renaming && onRename != null) {
+        ShellConversationRenameField(title = model.title, onRename = onRename, onDone = { renaming = false })
+        return
+    }
     val menuItems = ShellRowMenus.conversation(
         archived = model.archived,
         deleting = model.deleting,
         onArchiveToggle = actions.onArchiveToggle,
+        manage = ShellConversationManageMenu(
+            pinned = model.pinned,
+            onRenameRequest = onRename?.let { { renaming = true } },
+            onPinToggle = actions.onPinToggle,
+        ),
         onRequestDelete = { confirmDelete = true },
     )
     decorations.rowMenu(menuItems) {
@@ -131,6 +149,14 @@ private fun ShellConversationRowSurface(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+            if (model.pinned) {
+                Icon(
+                    imageVector = Icons.Outlined.PushPin,
+                    contentDescription = "Pinned",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(PIN_ICON_SIZE).testTag(ShellConversationTags.PINNED),
+                )
             }
             Text(
                 text = if (model.deleting) "Deleting…" else model.timeLabel,
@@ -223,6 +249,7 @@ fun ShellCanvasRow(model: ShellCanvasRowModel, onClick: () -> Unit, onArchiveTog
     }
 }
 
+private val PIN_ICON_SIZE = 12.dp
 private const val PREVIEW_ALPHA = 0.78f
 private const val PULSE_MIN_ALPHA = 0.4f
 private const val PULSE_MS = 700

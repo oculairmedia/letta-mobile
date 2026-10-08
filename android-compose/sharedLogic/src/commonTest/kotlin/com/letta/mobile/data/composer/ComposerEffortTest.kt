@@ -13,18 +13,41 @@ class ComposerEffortTest {
     @Test
     fun testComposerEffortTransitions() {
         // Test increasing
+        assertEquals(ComposerEffort.Minimal, ComposerEffort.None.increase())
         assertEquals(ComposerEffort.Low, ComposerEffort.Minimal.increase())
         assertEquals(ComposerEffort.Medium, ComposerEffort.Low.increase())
         assertEquals(ComposerEffort.High, ComposerEffort.Medium.increase())
-        assertEquals(ComposerEffort.Max, ComposerEffort.High.increase())
+        assertEquals(ComposerEffort.XHigh, ComposerEffort.High.increase())
+        assertEquals(ComposerEffort.Max, ComposerEffort.XHigh.increase())
         assertEquals(ComposerEffort.Max, ComposerEffort.Max.increase()) // Bounded at Max
 
         // Test decreasing
-        assertEquals(ComposerEffort.High, ComposerEffort.Max.decrease())
+        assertEquals(ComposerEffort.XHigh, ComposerEffort.Max.decrease())
+        assertEquals(ComposerEffort.High, ComposerEffort.XHigh.decrease())
         assertEquals(ComposerEffort.Medium, ComposerEffort.High.decrease())
         assertEquals(ComposerEffort.Low, ComposerEffort.Medium.decrease())
         assertEquals(ComposerEffort.Minimal, ComposerEffort.Low.decrease())
-        assertEquals(ComposerEffort.Minimal, ComposerEffort.Minimal.decrease()) // Bounded at Minimal
+        assertEquals(ComposerEffort.None, ComposerEffort.Minimal.decrease())
+        assertEquals(ComposerEffort.None, ComposerEffort.None.decrease()) // Bounded at None
+    }
+
+    @Test
+    fun theLadderIsTheFullUpstreamReasoningEffortSet() {
+        // letta-mobile-bzvro.18: UpdateModelPayload.reasoning_effort in letta-code's protocol_v2.ts.
+        assertEquals(
+            listOf("none", "minimal", "low", "medium", "high", "xhigh", "max"),
+            ComposerEffort.entries.map { it.wire },
+        )
+        assertEquals(ComposerEffort.XHigh, ComposerEffort.fromWire("XHIGH"))
+        assertEquals(null, ComposerEffort.fromWire("turbo"))
+    }
+
+    @Test
+    fun sortedOrdersKnownEffortsAndKeepsUnknownOnesLast() {
+        assertEquals(
+            listOf("none", "low", "high", "xhigh", "max", "turbo"),
+            ComposerEffort.sorted(listOf("max", "turbo", "high", "none", "xhigh", "low", "high")),
+        )
     }
 
     @Test

@@ -283,6 +283,7 @@ private fun buildDesktopChatController(
         },
         // Conversations created or changed on another device arrive as Meridian pushes.
         conversationChanges = bindings.irohTransport,
+        conversationPrefs = com.letta.mobile.desktop.chat.DesktopConversationPrefs.from(bindings.secureSettingsStore),
     )
 }
 

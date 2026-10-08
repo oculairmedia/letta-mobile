@@ -51,7 +51,7 @@ class AdminRpcContractTest {
 
         fun conversationMethods() = setOf(
             "conversation.archive", "conversation.create", "conversation.delete",
-            "conversation.get", "conversation.list", "conversation.list_agent",
+            "conversation.fork", "conversation.get", "conversation.list", "conversation.list_agent",
             "conversation.restore",
         )
 
