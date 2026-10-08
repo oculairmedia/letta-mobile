@@ -596,6 +596,48 @@ sealed interface AppServerInboundFrame {
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
+
+    @Serializable
+    @SerialName("cron_pause_response")
+    data class CronPauseResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_pause_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("cron_resume_response")
+    data class CronResumeResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_resume_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    /**
+     * Inbound push notifying that cron tasks have changed on the App Server (letta-mobile-bzvro.23).
+     */
+    @Serializable
+    @SerialName("crons_updated")
+    data class CronsUpdated(
+        val reason: String? = null,
+        @SerialName("agent_id") val agentId: String? = null,
+        val at: String? = null,
+        @SerialName("tasks_active") val tasksActive: Long? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "crons_updated"
+        @Transient override val requestId: String? = null
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
     @Serializable
     @SerialName("get_reflection_settings_response")
     data class GetReflectionSettingsResponse(
@@ -882,6 +924,42 @@ sealed interface AppServerInboundFrame {
             } else {
                 null
             }
+    }
+
+    @Serializable
+    @SerialName("execute_command_response")
+    data class ExecuteCommandResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+        val output: String? = null,
+        val result: JsonObject? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "execute_command_response"
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("monitor_stop_response")
+    data class MonitorStopResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "monitor_stop_response"
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("update_toolset_response")
+    data class UpdateToolsetResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+        @SerialName("current_toolset") val currentToolset: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "update_toolset_response"
+        @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
     @Serializable

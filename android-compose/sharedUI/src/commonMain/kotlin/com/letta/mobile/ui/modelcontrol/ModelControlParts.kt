@@ -11,7 +11,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.FilterChip
+import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
+import com.letta.mobile.data.transport.appserver.AppServerToolset
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Small pieces the model-control surfaces share (letta-mobile-w4q4p). */
@@ -58,6 +63,47 @@ fun ReasoningEffortChips(
                 label = { Text(effort) },
                 modifier = Modifier.testTag("reasoning_effort_$effort"),
             )
+        }
+    }
+}
+
+/**
+ * Toolset chooser (letta-mobile-bzvro.22): lets the user switch the active toolset
+ * when the server advertises available toolsets.
+ */
+@Composable
+fun ToolsetSelectorRow(
+    toolsets: List<AppServerToolset>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (toolsets.isEmpty()) return
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
+            .testTag("toolset_selector_row"),
+    ) {
+        Text(
+            text = "Toolset",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = LettaDimens.Space.xs),
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        ) {
+            toolsets.forEach { toolset ->
+                val isSelected = toolset.id == selectedId || (selectedId == null && toolset.id == "auto")
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelect(toolset.id) },
+                    label = { Text(toolset.displayName ?: toolset.label ?: toolset.id) },
+                    modifier = Modifier.testTag("toolset_chip_${toolset.id}"),
+                )
+            }
         }
     }
 }

@@ -72,6 +72,7 @@ internal data class DestinationScheduleActions(
         recurring: Boolean,
         timezone: String,
     ) -> Unit,
+    val onTogglePauseCron: ((String, Boolean) -> Unit)? = null,
 )
 
 internal data class DestinationSkillsInputs(
@@ -303,6 +304,7 @@ private fun SchedulesDestinationContent(
         onDeleteCron = actions.onDeleteCron,
         canCreate = inputs.canCreateCron,
         onCreateCron = actions.onCreateCron,
+        onTogglePauseCron = actions.onTogglePauseCron,
     )
 }
 

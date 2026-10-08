@@ -8,9 +8,13 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.launch
+import com.letta.mobile.data.transport.api.CronPauseCommand
+import com.letta.mobile.data.transport.api.CronResumeCommand
 import java.time.Instant
 import java.util.UUID
 
@@ -137,6 +141,43 @@ internal object IrohTransportSupport {
     fun cronDeleteAllFailure(failure: ScopedRpcFailure) = ServerFrame.CronDeleteAllResponse(
         id = frameId("cron_delete_all"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
     )
+
+    fun cronPauseFailure(failure: ScopedRpcFailure) = ServerFrame.CronPauseResponse(
+        id = frameId("cron_pause"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    fun cronResumeFailure(failure: ScopedRpcFailure) = ServerFrame.CronResumeResponse(
+        id = frameId("cron_resume"), ts = nowIso(), requestId = failure.requestId, success = false, error = failure.error,
+    )
+
+    suspend fun executeCronPause(
+        transport: IrohChannelTransport,
+        command: CronPauseCommand,
+    ): ServerFrame.CronPauseResponse =
+        transport.cronTaskAction(
+            op = "cron.pause",
+            frameType = "cron_pause",
+            timeoutMs = command.timeoutMs,
+            body = buildJsonObject { put("task_id", command.taskId) },
+            createSuccess = { id, ts, reqId -> ServerFrame.CronPauseResponse(id = id, ts = ts, requestId = reqId, success = true) },
+            onFailure = ::cronPauseFailure,
+        )
+
+    suspend fun executeCronResume(
+        transport: IrohChannelTransport,
+        command: CronResumeCommand,
+    ): ServerFrame.CronResumeResponse =
+        transport.cronTaskAction(
+            op = "cron.resume",
+            frameType = "cron_resume",
+            timeoutMs = command.timeoutMs,
+            body = buildJsonObject {
+                put("task_id", command.taskId)
+                command.scheduledFor?.let { put("scheduled_for", it) }
+            },
+            createSuccess = { id, ts, reqId -> ServerFrame.CronResumeResponse(id = id, ts = ts, requestId = reqId, success = true) },
+            onFailure = ::cronResumeFailure,
+        )
 
     fun launchNotebook(scope: kotlinx.coroutines.CoroutineScope, starter: suspend () -> Unit) {
         scope.launch {

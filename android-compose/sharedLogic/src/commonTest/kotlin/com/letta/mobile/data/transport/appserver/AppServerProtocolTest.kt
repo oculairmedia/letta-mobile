@@ -578,9 +578,9 @@ class AppServerProtocolTest {
 
         val frame = assertIs<AppServerInboundFrame.AuthResponse>(received.frame)
         assertEquals(true, frame.success)
-        // Additive key is ignored for typed decoding but preserved on the raw envelope.
         assertEquals("1", received.raw["future_field"]?.jsonObject?.get("x")?.jsonPrimitive?.content)
     }
+
 
     private companion object {
         val runtime = AppServerRuntimeScope(

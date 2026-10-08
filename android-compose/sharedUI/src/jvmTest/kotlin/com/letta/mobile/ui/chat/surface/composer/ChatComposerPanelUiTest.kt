@@ -372,4 +372,31 @@ class ChatComposerPanelUiTest {
         capabilities = ChatSurfaceCapabilities(workingDirectory = false)
         onNodeWithTag(ComposerTestTags.WORKING_DIRECTORY).assertDoesNotExist()
     }
+
+    @Test
+    fun backgroundProcessShelfRendersAndInvokesStop() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        val process = com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess(
+            id = "proc-1",
+            type = "bash",
+            description = "npm run build",
+            ageSeconds = 42,
+        )
+        setContent {
+            Panel(
+                ComposerInputs(
+                    composer = ready().copy(backgroundProcesses = persistentListOf(process)),
+                    actions = actions,
+                ),
+            )
+        }
+
+        onNodeWithTag("background_process_shelf").assertExists()
+        onNodeWithText("npm run build").assertExists()
+        onNodeWithContentDescription("Stop process proc-1").performClick()
+        onNodeWithText("Stop").performClick()
+        runOnIdle {
+            assertEquals(listOf("proc-1"), actions.stoppedProcesses)
+        }
+    }
 }

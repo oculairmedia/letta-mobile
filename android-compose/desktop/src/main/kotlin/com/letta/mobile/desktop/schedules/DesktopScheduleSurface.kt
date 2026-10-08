@@ -35,12 +35,16 @@ import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.data.schedules.ScheduleDef
+import com.letta.mobile.data.schedules.HistorySummary
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.schedules.AgendaView
@@ -87,6 +91,7 @@ fun DesktopScheduleSurface(
     canCreate: Boolean = false,
     onCreateCron: (agentId: String?, name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit =
         { _, _, _, _, _, _ -> },
+    onTogglePauseCron: ((String, Boolean) -> Unit)? = null,
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
     // Keep `now` advancing so countdown labels, the now-line, and the
@@ -143,16 +148,7 @@ fun DesktopScheduleSurface(
     var weekStart by remember(today) { mutableStateOf(ScheduleProjection.mondayOf(today)) }
     var showCreate by remember { mutableStateOf(false) }
 
-    val weekRange = remember(weekStart) {
-        // "June 22 – 28, 2026" (don't repeat the month when the week stays in it).
-        val end = weekStart.plus(6, DateTimeUnit.DAY)
-        val month = fullMonth(weekStart.month.ordinal + 1)
-        if (end.month == weekStart.month) {
-            "$month ${weekStart.day} – ${end.day}, ${weekStart.year}"
-        } else {
-            "$month ${weekStart.day} – ${fullMonth(end.month.ordinal + 1)} ${end.day}, ${end.year}"
-        }
-    }
+    val weekRange = remember(weekStart) { formatWeekRange(weekStart) }
     val selectedId = (rail as? RailState.Detail)?.scheduleId
 
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -169,57 +165,25 @@ fun DesktopScheduleSurface(
             )
             Row(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                    // Local copy: errorMessage is a cross-module property, so it
-                    // can't smart-cast inline in the when below.
-                    val scheduleError = state.errorMessage
-                    when {
-                        // Show data as soon as anything projects, even while a
-                        // parallel source is still loading.
-                        defs.isNotEmpty() -> when (view) {
-                            ScheduleView.Week -> WeekView(
-                                WeekViewParams(
-                                    defs = defs,
-                                    weekStart = weekStart,
-                                    today = today,
-                                    now = now,
-                                    zone = zone,
-                                    selectedId = selectedId,
-                                    onRunClick = { rail = RailState.Run(it) },
-                                ),
-                            )
-                            ScheduleView.Agenda -> AgendaView(
-                                AgendaViewParams(
-                                    defs = defs,
-                                    selectedDate = selectedDate,
-                                    today = today,
-                                    now = now,
-                                    zone = zone,
-                                    onSelectDate = { selectedDate = it },
-                                    onRunClick = { rail = RailState.Run(it) },
-                                ),
-                            )
-                            ScheduleView.Timeline -> TimelineView(
-                                TimelineViewParams(
-                                    defs = defs,
-                                    weekStart = weekStart,
-                                    today = today,
-                                    now = now,
-                                    zone = zone,
-                                    onLaneClick = { rail = RailState.Detail(it) },
-                                ),
-                            )
-                            ScheduleView.History -> HistoryView(historySummary)
-                        }
-                        // Surface backend failures with a retry instead of
-                        // masking them as "No schedules yet" (Codex review).
-                        scheduleError != null -> Box(Modifier.fillMaxSize().padding(LettaDimens.Space.xxl), contentAlignment = Alignment.TopCenter) {
-                            DesktopInlineError(message = scheduleError, onRetry = onRefresh, retrying = state.isLoading)
-                        }
-                        state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Loading schedules…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
-                        }
-                        else -> ScheduleEmptyState(canCreate)
-                    }
+                    ScheduleMainContent(
+                        ScheduleContentParams(
+                            defs = defs,
+                            view = view,
+                            state = state,
+                            weekStart = weekStart,
+                            today = today,
+                            now = now,
+                            zone = zone,
+                            selectedId = selectedId,
+                            selectedDate = selectedDate,
+                            historySummary = historySummary,
+                            canCreate = canCreate,
+                            onRefresh = onRefresh,
+                            onSelectDate = { selectedDate = it },
+                            onSelectRun = { rail = RailState.Run(it) },
+                            onSelectLane = { rail = RailState.Detail(it) },
+                        ),
+                    )
                 }
                 // Week/Agenda always show the rail (Overview or detail). Timeline
                 // and History are full-width like the mockups, unless a schedule
@@ -237,6 +201,7 @@ fun DesktopScheduleSurface(
                             onSelectSchedule = { rail = RailState.Detail(it) },
                             onBackToOverview = { rail = RailState.Overview },
                             onDelete = { onDeleteCron(it); rail = RailState.Overview },
+                            onTogglePause = onTogglePauseCron,
                         ),
                     )
                 }
@@ -256,6 +221,83 @@ fun DesktopScheduleSurface(
                 ),
             )
         }
+    }
+}
+
+private fun formatWeekRange(weekStart: LocalDate): String {
+    val end = weekStart.plus(6, DateTimeUnit.DAY)
+    val month = fullMonth(weekStart.month.ordinal + 1)
+    return if (end.month == weekStart.month) {
+        "$month ${weekStart.day} – ${end.day}, ${weekStart.year}"
+    } else {
+        "$month ${weekStart.day} – ${fullMonth(end.month.ordinal + 1)} ${end.day}, ${end.year}"
+    }
+}
+
+internal data class ScheduleContentParams(
+    val defs: List<ScheduleDef>,
+    val view: ScheduleView,
+    val state: DesktopScheduleLibraryState,
+    val weekStart: LocalDate,
+    val today: LocalDate,
+    val now: Instant,
+    val zone: TimeZone,
+    val selectedId: String?,
+    val selectedDate: LocalDate,
+    val historySummary: HistorySummary,
+    val canCreate: Boolean,
+    val onRefresh: () -> Unit,
+    val onSelectDate: (LocalDate) -> Unit,
+    val onSelectRun: (ScheduleRun) -> Unit,
+    val onSelectLane: (String) -> Unit,
+)
+
+@Composable
+private fun ScheduleMainContent(params: ScheduleContentParams) {
+    val scheduleError = params.state.errorMessage
+    when {
+        params.defs.isNotEmpty() -> when (params.view) {
+            ScheduleView.Week -> WeekView(
+                WeekViewParams(
+                    defs = params.defs,
+                    weekStart = params.weekStart,
+                    today = params.today,
+                    now = params.now,
+                    zone = params.zone,
+                    selectedId = params.selectedId,
+                    onRunClick = params.onSelectRun,
+                ),
+            )
+            ScheduleView.Agenda -> AgendaView(
+                AgendaViewParams(
+                    defs = params.defs,
+                    selectedDate = params.selectedDate,
+                    today = params.today,
+                    now = params.now,
+                    zone = params.zone,
+                    onSelectDate = params.onSelectDate,
+                    onRunClick = params.onSelectRun,
+                ),
+            )
+            ScheduleView.Timeline -> TimelineView(
+                TimelineViewParams(
+                    defs = params.defs,
+                    weekStart = params.weekStart,
+                    today = params.today,
+                    now = params.now,
+                    zone = params.zone,
+                    onLaneClick = params.onSelectLane,
+                ),
+            )
+            ScheduleView.History -> HistoryView(params.historySummary)
+        }
+        scheduleError != null -> Box(Modifier.fillMaxSize().padding(LettaDimens.Space.xxl), contentAlignment = Alignment.TopCenter) {
+            DesktopInlineError(message = scheduleError, onRetry = params.onRefresh, retrying = params.state.isLoading)
+        }
+        params.state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Loading schedules…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        }
+        else -> ScheduleEmptyState(params.canCreate)
     }
 }
 

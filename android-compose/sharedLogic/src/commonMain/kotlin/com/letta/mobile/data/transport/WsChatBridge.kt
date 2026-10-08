@@ -415,6 +415,8 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.CronGetResponse,
     is ServerFrame.CronDeleteResponse,
     is ServerFrame.CronDeleteAllResponse,
+    is ServerFrame.CronPauseResponse,
+    is ServerFrame.CronResumeResponse,
     is ServerFrame.CronsUpdated,
     // letta-mobile-73o2h: active-subagent frames route to the
     // SubagentRepository (active-bar), not chat content.
