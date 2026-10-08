@@ -202,15 +202,18 @@ class ToolRepositoryTest {
         assertTrue(repository.getTools().first().none { it.id == ToolId("t1") })
     }
 
-    @Test(expected = com.letta.mobile.data.api.ApiException::class)
+    @Test
     fun `refreshTools throws on API failure`() = runTest {
         fakeApi.shouldFail = true
-        repository.refreshTools()
+
+        val failure = runCatching { repository.refreshTools() }.exceptionOrNull()
+
+        assertTrue("expected ApiException, got $failure", failure is com.letta.mobile.data.api.ApiException)
     }
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
+    @Test
     fun `refreshTools in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
         val apiThatThrows = object : FakeToolApi() {
             override suspend fun listTools(tags: List<String>?, limit: Int?, offset: Int?): List<com.letta.mobile.data.model.Tool> {
@@ -218,7 +221,10 @@ class ToolRepositoryTest {
             }
         }
         val repo = ToolRepository(apiThatThrows)
-        repo.refreshTools()
+
+        val failure = runCatching { repo.refreshTools() }.exceptionOrNull()
+
+        assertTrue("expected the iroh guard, got $failure", failure is com.letta.mobile.data.api.IrohAdminApiUnavailableException)
     }
 
     @Test
