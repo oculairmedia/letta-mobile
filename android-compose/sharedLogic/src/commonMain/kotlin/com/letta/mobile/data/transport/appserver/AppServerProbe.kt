@@ -9,7 +9,6 @@ import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.SerializationException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -63,22 +62,16 @@ class AppServerProbe(
     private val timeout: Duration = DEFAULT_TIMEOUT,
 ) {
     suspend fun probe(baseUrl: String, bearerToken: String? = null): AppServerProbeResult {
-        val origin = try {
-            AppServerDiscovery.httpOrigin(baseUrl.trim())
-        } catch (e: IllegalArgumentException) {
+        val origin = runCatching { AppServerDiscovery.httpOrigin(baseUrl.trim()) }.getOrElse { e ->
             return AppServerProbeResult.Incompatible(e.message ?: "Not an App Server URL")
         }
         return try {
             withTimeout(timeout) { fetchAndClassify(origin, bearerToken?.trim()?.takeIf { it.isNotEmpty() }) }
-        } catch (_: TimeoutCancellationException) {
-            AppServerProbeResult.Unavailable("No answer within ${timeout.inWholeSeconds} s")
         } catch (e: CancellationException) {
-            throw e
-        } catch (e: ResponseException) {
-            // A client built with expectSuccess = true throws on non-2xx; classify the status anyway.
-            classifyStatus(e.response.status.value) ?: AppServerProbeResult.Unavailable(e.message ?: "HTTP ${e.response.status.value}")
+            if (e !is TimeoutCancellationException) throw e
+            AppServerProbeResult.Unavailable("No answer within ${timeout.inWholeSeconds} s")
         } catch (e: Exception) {
-            AppServerProbeResult.Unavailable(e.message ?: e::class.simpleName ?: "Connection failed")
+            classifyFailure(e)
         }
     }
 
@@ -86,17 +79,20 @@ class AppServerProbe(
         val response = http.get("$origin/app-server-info") {
             bearerToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
         }
-        val status = response.status.value
-        classifyStatus(status)?.let { return it }
+        classifyStatus(response.status.value)?.let { return it }
         val decoded = try {
             AppServerDiscovery.decodeAppServerInfoBody(response.bodyAsText())
-        } catch (e: SerializationException) {
-            return AppServerProbeResult.Incompatible("The server's info response is unreadable: ${e.message.orEmpty().take(MAX_DETAIL)}")
         } catch (e: IllegalArgumentException) {
+            // SerializationException is an IllegalArgumentException.
             return AppServerProbeResult.Incompatible("The server's info response is unreadable: ${e.message.orEmpty().take(MAX_DETAIL)}")
         }
         return classify(decoded, requirement)
     }
+
+    /** A client built with expectSuccess = true throws on non-2xx; classify the status anyway. */
+    private fun classifyFailure(e: Exception): AppServerProbeResult =
+        (e as? ResponseException)?.let { classifyStatus(it.response.status.value) }
+            ?: AppServerProbeResult.Unavailable(e.message ?: e::class.simpleName ?: "Connection failed")
 
     companion object {
         val DEFAULT_TIMEOUT: Duration = 10.seconds
@@ -118,14 +114,14 @@ class AppServerProbe(
         )
 
         /** Null when the status carries a body worth decoding. */
-        internal fun classifyStatus(status: Int): AppServerProbeResult? = when {
-            status == 401 || status == 403 -> AppServerProbeResult.Authentication("The server rejected the access token (HTTP $status)")
-            status == 404 -> AppServerProbeResult.Incompatible(
+        internal fun classifyStatus(status: Int): AppServerProbeResult? = when (status) {
+            401, 403 -> AppServerProbeResult.Authentication("The server rejected the access token (HTTP $status)")
+            404 -> AppServerProbeResult.Incompatible(
                 "The server has no /app-server-info endpoint (HTTP 404); it is not an App Server",
                 endpointMissing = true,
             )
-            status == 426 -> AppServerProbeResult.Incompatible("The server requires a protocol this client does not speak (HTTP 426)")
-            status in 200..299 -> null
+            426 -> AppServerProbeResult.Incompatible("The server requires a protocol this client does not speak (HTTP 426)")
+            in 200..299 -> null
             else -> AppServerProbeResult.Unavailable("The server answered HTTP $status")
         }
 
@@ -167,14 +163,19 @@ class AppServerProbe(
             timeout: Duration = DEFAULT_TIMEOUT,
         ): AppServerProbeResult = try {
             withTimeout(timeout) { classify(client.appServerInfo(AppServerCommand.AppServerInfo(requestId)), requirement) }
-        } catch (_: TimeoutCancellationException) {
-            AppServerProbeResult.Unavailable("No answer within ${timeout.inWholeSeconds} s")
         } catch (e: CancellationException) {
-            throw e
-        } catch (e: UnsupportedOperationException) {
-            AppServerProbeResult.Incompatible(e.message ?: "The server does not answer app_server_info")
+            if (e !is TimeoutCancellationException) throw e
+            AppServerProbeResult.Unavailable("No answer within ${timeout.inWholeSeconds} s")
         } catch (e: Exception) {
-            AppServerProbeResult.Unavailable(e.message ?: e::class.simpleName ?: "Request failed")
+            clientFailure(e)
         }
     }
 }
+
+/** A client that cannot send `app_server_info` is not an App Server we can use; anything else may pass. */
+private fun clientFailure(e: Exception): AppServerProbeResult =
+    if (e is UnsupportedOperationException) {
+        AppServerProbeResult.Incompatible(e.message ?: "The server does not answer app_server_info")
+    } else {
+        AppServerProbeResult.Unavailable(e.message ?: e::class.simpleName ?: "Request failed")
+    }

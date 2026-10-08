@@ -89,12 +89,11 @@ class ConfigViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun selfHosted(url: String, token: String = "") {
+    private fun selfHosted(url: String) {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
         viewModel.updateMode(ServerMode.SELF_HOSTED)
         viewModel.updateServerUrl(url)
-        viewModel.updateApiToken(token)
     }
 
     private fun connectionTest(): ConnectionTestUiState =
@@ -103,7 +102,8 @@ class ConfigViewModelTest {
     @Test
     fun testConnection_reportsTheClassifiedProbeResultForTheFormValues() = runTest {
         // letta-mobile-bzvro.1 (F01): the form is tested before it is saved.
-        selfHosted("wss://appserver.example/ws", token = " tkn ")
+        selfHosted("wss://appserver.example/ws")
+        viewModel.updateApiToken(" tkn ")
         val gate = CompletableDeferred<AppServerProbeResult?>()
         fakeConnectionTester.next = { gate.await() }
 

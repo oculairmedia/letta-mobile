@@ -319,22 +319,20 @@ class ConfigViewModel @Inject constructor(
     fun testConnection() {
         val state = (_uiState.value as? UiState.Success)?.data ?: return
         if (state.mode != ServerMode.SELF_HOSTED || state.connectionTest == ConnectionTestUiState.Running) return
-        val url = state.serverUrl.trim()
-        val token = state.apiToken.trim().ifBlank { null }
-        updateConnectionTest(url, ConnectionTestUiState.Running)
+        val request = ++latestConnectionTest
+        _uiState.value = UiState.Success(state.copy(connectionTest = ConnectionTestUiState.Running))
         viewModelScope.launch {
-            val result = appServerConnectionTester.test(url, token)
-            updateConnectionTest(
-                url,
-                result?.let { ConnectionTestUiState.Finished(it) } ?: ConnectionTestUiState.NotSupported,
-            )
+            val result = appServerConnectionTester.test(state.serverUrl.trim(), state.apiToken.trim().ifBlank { null })
+            finishConnectionTest(request, result?.let { ConnectionTestUiState.Finished(it) } ?: ConnectionTestUiState.NotSupported)
         }
     }
 
-    /** Applies [next] only while the form still shows [url]; an edit meanwhile made the result stale. */
-    private fun updateConnectionTest(url: String, next: ConnectionTestUiState) {
+    private var latestConnectionTest = 0L
+
+    /** Applies [next] only to the latest test, and only if no edit reset it meanwhile (the result would be stale). */
+    private fun finishConnectionTest(request: Long, next: ConnectionTestUiState) {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
-        if (current.serverUrl.trim() != url) return
+        if (request != latestConnectionTest || current.connectionTest != ConnectionTestUiState.Running) return
         _uiState.value = UiState.Success(current.copy(connectionTest = next))
     }
 

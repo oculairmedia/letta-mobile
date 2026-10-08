@@ -80,63 +80,26 @@ internal class DesktopLocalRuntimeManager(
         val existing = child
         if (existing?.isAlive == true) return checkNotNull(childUrl)
         close()
-        val installation = installationProvider()
-            ?: error("The bundled Letta Code runtime is missing from this desktop distribution")
-        val backendDir = backendDirectory().apply { mkdirs() }
-        val command = listOf(
-            installation.nodeExecutable.absolutePath,
-            installation.lettaEntryPoint.absolutePath,
-            "server",
-            "--backend",
-            "local",
-            "--listen",
-            "ws://127.0.0.1:0",
-        )
-        val context = launchContext()
-        val process = processLauncher.launch(
-            DesktopRuntimeLaunchSpec(
-                command = command,
-                environment = context.environment + mapOf(
-                    "LETTA_LOCAL_BACKEND_EXPERIMENTAL" to "1",
-                    "LETTA_LOCAL_BACKEND_DIR" to backendDir.absolutePath,
-                ),
-                workingDirectory = context.workingDirectory,
-            ),
-        )
+        val process = launchChild()
         val stoppedByUs = AtomicBoolean(false)
         child = process
         childStoppedByUs = stoppedByUs
-        val queue = LinkedBlockingQueue<RuntimeOutputEvent>()
         drainStderr(process.stderr)
-        Thread {
-            process.stdout.useLines { lines ->
-                lines.forEach { line ->
-                    logLine("[stdout] $line")
-                    queue.put(RuntimeOutputEvent.Line(line))
-                }
-            }
-            queue.put(RuntimeOutputEvent.End)
-        }.apply { isDaemon = true; name = "letta-local-runtime-stdout"; start() }
+        val queue = pumpStdout(process)
 
-        try {
-            val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readyTimeoutMs)
-            while (System.nanoTime() < deadline) {
-                val remaining = deadline - System.nanoTime()
-                val event = queue.poll(remaining, TimeUnit.NANOSECONDS) ?: break
-                if (event === RuntimeOutputEvent.End) break
-                val url = parseDesktopRuntimeListenUrl((event as RuntimeOutputEvent.Line).value)
-                if (url != null) {
-                    childUrl = url
-                    events.onStarted(url)
-                    // Watch exits only once ready: a child that dies before announcing its URL is
-                    // reported by the exception below, never counted twice.
-                    process.onExit { code -> events.onExit(RuntimeExit(exitCode = code, intentional = stoppedByUs.get())) }
-                    return url
-                }
-            }
+        val url = try {
+            awaitListenUrl(queue)
         } catch (error: Throwable) {
             close()
             throw error
+        }
+        if (url != null) {
+            childUrl = url
+            events.onStarted(url)
+            // Watch exits only once ready: a child that dies before announcing its URL is
+            // reported by the exception below, never counted twice.
+            process.onExit { code -> events.onExit(RuntimeExit(exitCode = code, intentional = stoppedByUs.get())) }
+            return url
         }
         val exitCode = process.exitCodeOrNull
         close()
@@ -161,6 +124,57 @@ internal class DesktopLocalRuntimeManager(
         } else {
             descendants.filter { it.isAlive }.forEach { it.destroyForcibly() }
         }
+    }
+
+    private fun launchChild(): DesktopRuntimeProcess {
+        val installation = installationProvider()
+            ?: error("The bundled Letta Code runtime is missing from this desktop distribution")
+        val backendDir = backendDirectory().apply { mkdirs() }
+        val command = listOf(
+            installation.nodeExecutable.absolutePath,
+            installation.lettaEntryPoint.absolutePath,
+            "server",
+            "--backend",
+            "local",
+            "--listen",
+            "ws://127.0.0.1:0",
+        )
+        val context = launchContext()
+        return processLauncher.launch(
+            DesktopRuntimeLaunchSpec(
+                command = command,
+                environment = context.environment + mapOf(
+                    "LETTA_LOCAL_BACKEND_EXPERIMENTAL" to "1",
+                    "LETTA_LOCAL_BACKEND_DIR" to backendDir.absolutePath,
+                ),
+                workingDirectory = context.workingDirectory,
+            ),
+        )
+    }
+
+    private fun pumpStdout(process: DesktopRuntimeProcess): LinkedBlockingQueue<RuntimeOutputEvent> {
+        val queue = LinkedBlockingQueue<RuntimeOutputEvent>()
+        Thread {
+            process.stdout.useLines { lines ->
+                lines.forEach { line ->
+                    logLine("[stdout] $line")
+                    queue.put(RuntimeOutputEvent.Line(line))
+                }
+            }
+            queue.put(RuntimeOutputEvent.End)
+        }.apply { isDaemon = true; name = "letta-local-runtime-stdout"; start() }
+        return queue
+    }
+
+    /** The announced listen URL, or null when stdout ended or [readyTimeoutMs] passed first. */
+    private fun awaitListenUrl(queue: LinkedBlockingQueue<RuntimeOutputEvent>): String? {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readyTimeoutMs)
+        while (System.nanoTime() < deadline) {
+            val event = queue.poll(deadline - System.nanoTime(), TimeUnit.NANOSECONDS)
+            if (event !is RuntimeOutputEvent.Line) return null
+            parseDesktopRuntimeListenUrl(event.value)?.let { return it }
+        }
+        return null
     }
 
     private fun drainStderr(reader: BufferedReader) {
