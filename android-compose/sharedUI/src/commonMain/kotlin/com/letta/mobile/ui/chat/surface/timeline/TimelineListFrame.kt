@@ -31,6 +31,7 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalDockedPromptCompaction
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.ChatTimelineDimens
@@ -182,6 +183,8 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
         Modifier
             .padding(horizontal = ChatRowSpacing.contentPaddingHorizontal)
             .stickyCopyPlacement(pinned)
+            // Pushed out past the visible top, it dissolves instead of running under the header.
+            .stickyCopyHeaderFade(pinned)
     } else {
         Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
     }
@@ -192,8 +195,9 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
             .testTag(ChatTimelineTags.PINNED_PROMPT),
         contentAlignment = Alignment.TopCenter,
     ) {
-        // A copy, never a send flight's landing spot: only the prompt's own row can be.
-        CompositionLocalProvider(LocalSendFlight provides null) {
+        // A copy, never a send flight's landing spot: only the prompt's own row can be. Its images
+        // shrink to thumbnails as it docks (letta-mobile-bglj6.1).
+        CompositionLocalProvider(LocalSendFlight provides null, LocalDockedPromptCompaction provides pinned.compaction) {
             // The bubble alone: without the row's leading space it holds snug under the chrome,
             // and bottom-aligned with its row it still rides the row seamlessly.
             TimelineItemRow(prompt, bindings, leadingSpace = false)
