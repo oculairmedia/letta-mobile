@@ -113,14 +113,14 @@ internal class IrohCronRpcClient(
             },
         )
 
-    suspend fun sendCronResume(taskId: String, scheduledFor: String?, timeoutMs: Long): ServerFrame.CronResumeResponse =
+    suspend fun sendCronResume(request: CronResumeRequest): ServerFrame.CronResumeResponse =
         executeCronOp<Unit, ServerFrame.CronResumeResponse>(
             op = "cron.resume",
             body = buildJsonObject {
-                put("task_id", taskId)
-                scheduledFor?.let { put("scheduled_for", it) }
+                put("task_id", request.taskId)
+                request.scheduledFor?.let { put("scheduled_for", it) }
             },
-            timeoutMs = timeoutMs,
+            timeoutMs = request.timeoutMs,
             onSuccess = { id, ts, reqId, _ ->
                 ServerFrame.CronResumeResponse(id = id, ts = ts, requestId = reqId, success = true)
             },
@@ -191,4 +191,10 @@ internal data class CronAddRequest(
     val timezone: String?,
     val conversationId: String?,
     val timeoutMs: Long,
+)
+
+internal data class CronResumeRequest(
+    val taskId: String,
+    val scheduledFor: String? = null,
+    val timeoutMs: Long = 15_000L,
 )

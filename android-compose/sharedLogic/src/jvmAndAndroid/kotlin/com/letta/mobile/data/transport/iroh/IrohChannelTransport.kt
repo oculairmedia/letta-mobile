@@ -849,7 +849,7 @@ class IrohChannelTransport(
         cronRpcClient.sendCronPause(taskId, timeoutMs)
 
     override suspend fun sendCronResume(taskId: String, scheduledFor: String?, timeoutMs: Long): ServerFrame.CronResumeResponse =
-        cronRpcClient.sendCronResume(taskId, scheduledFor, timeoutMs)
+        cronRpcClient.sendCronResume(CronResumeRequest(taskId = taskId, scheduledFor = scheduledFor, timeoutMs = timeoutMs))
 
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
         invokeSubagentRpc(subagentListCall(all), currentSubagentScope(), timeoutMs)
