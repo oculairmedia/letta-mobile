@@ -100,25 +100,37 @@ object ChatHeadDimens {
     /** Kept clear under the head's lane: the canvas's own tool bar rides on top of the chat bar. */
     val bottomClearance: Dp = 76.dp
 
-    /** Between the head and its popup. */
-    val popupGap: Dp = LettaDimens.Space.xs
+    /** Between the head and its popup, which sits just above it (or just below, high on the screen). */
+    val popupGap: Dp = LettaDimens.Space.sm
 
     /**
      * The popup is at most this share of the screen's width, and never wider than [popupMaxWidth]:
-     * a speech bubble beside the head, not a page over the board.
+     * a short note over the head, not a page over the board. A short reply hugs its text.
      */
-    const val popupMaxWidthFraction: Float = 0.62f
-    val popupMaxWidth: Dp = 280.dp
+    const val popupMaxWidthFraction: Float = 0.7f
+    val popupMaxWidth: Dp = 264.dp
 
-    /** ...and this tall (a few lines), then it scrolls under its edge fades. */
-    val popupMaxHeight: Dp = 112.dp
+    /** The popup shows this many lines of the reply, then fades it out; a tap opens the rest. */
+    const val popupPeekLines: Int = 3
 
-    /** The popup's edge fades while its text scrolls. */
-    val popupFadeLength: Dp = LettaDimens.Space.lg
+    /** The popup's text fades out over this much at an edge with more to read. */
+    val popupFadeLength: Dp = LettaDimens.Space.md
 
-    /** Around the popup's text: tight, as a bubble's. */
-    val popupPaddingHorizontal: Dp = LettaDimens.Space.sm
-    val popupPaddingVertical: Dp = LettaDimens.Space.sm
+    /** Around the popup's text. */
+    val popupPaddingHorizontal: Dp = LettaDimens.Space.md
+    val popupPaddingVertical: Dp = LettaDimens.Space.md
+
+    /** The popup's corner nearest the head: tucked in, so the card reads as coming from it (no tail). */
+    val popupAnchorCorner: Dp = LettaDimens.Space.xs
+
+    /** The popup's lift off the board: a soft shadow, less than the head's own. */
+    val popupElevation: Dp = 3.dp
+
+    /** The popup's dismiss: a hit target comfortably larger than the small tonal disc it draws. */
+    val popupDismissTarget: Dp = LettaDimens.Control.iconButtonLg
+
+    /** A horizontal swipe past this share of the popup's width dismisses it. */
+    const val popupSwipeDismissFraction: Float = 0.35f
 
     /** The head's lift off the canvas. */
     val elevation: Dp = 6.dp

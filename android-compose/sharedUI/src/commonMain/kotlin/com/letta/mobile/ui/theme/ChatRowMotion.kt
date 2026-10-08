@@ -15,11 +15,14 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.TransformOrigin
 
 /**
  * letta-mobile-bglj6.1.19: the timeline rows' motion vocabulary, ported from the legacy Android
@@ -136,11 +139,33 @@ internal class ChatRowMotion(private val reduced: Boolean) {
         return fadeOut(fastFadeOutSpec) + shrinkHorizontally(bodyLiftSize(), shrinkTowards = Alignment.Start)
     }
 
+    /**
+     * A popup speaking from a point (the Touch canvas's reply, out of its chat head): it grows out
+     * of [origin] on the expressive spatial spring as it fades in, so it reads as coming from the
+     * speaker rather than appearing in place.
+     */
+    fun popEnter(origin: TransformOrigin): EnterTransition {
+        if (reduced) return EnterTransition.None
+        return fadeIn(fastFadeInSpec) + scaleIn(ChatExpressiveMotion.fastSpatial(), initialScale = POP_SCALE, transformOrigin = origin)
+    }
+
+    /** [popEnter] reversed on the exit ramp: the popup folds back into [origin]. */
+    fun popExit(origin: TransformOrigin): ExitTransition {
+        if (reduced) return ExitTransition.None
+        return fadeOut(fastFadeOutSpec) + scaleOut(exitSize(), targetScale = POP_SCALE, transformOrigin = origin)
+    }
+
+    /** A surface growing with its content (a streaming reply), on the content-size ramp. */
+    fun <T> contentSize(): FiniteAnimationSpec<T> = if (reduced) snap() else bodyLiftSize()
+
     /** Legacy RunBlockMotion's lift: 220 ms, FastOutSlowIn. */
     private fun <T> bodyLiftSize(): FiniteAnimationSpec<T> = tween(LettaMotionTokens.CONTENT_SIZE_MILLIS, easing = FastOutSlowInEasing)
 
     private companion object {
         const val REASONING_SLIDE_DIVISOR = 4
+
+        /** How small a popping surface starts (and ends): close enough to read as the same card. */
+        const val POP_SCALE = 0.85f
     }
 }
 

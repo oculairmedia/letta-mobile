@@ -399,7 +399,7 @@ private fun TouchDock(frame: ChatSurfaceFrame, morph: SurfaceMorph, bar: TouchBa
         bar = bar,
         morph = morph,
         topChromeInset = frame.platform.topChromeInset,
-        head = frame.dock?.let { touchHeadContent(frame, it) { turn } },
+        head = frame.dock?.let { touchHeadContent(frame, it, inputPending = touchInputPending(frame, turn.pendingApproval)) { turn } },
         inputTray = { TouchCanvasInput(frame, turn.pendingApproval) },
         composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
     )
@@ -409,7 +409,7 @@ private fun TouchDock(frame: ChatSurfaceFrame, morph: SurfaceMorph, bar: TouchBa
 @Composable
 private fun TouchCanvasInput(frame: ChatSurfaceFrame, approval: UiApprovalRequest?) {
     val surfaces = frame.uiState.a2uiSurfaces
-    if (approval == null && surfaces.isEmpty()) return
+    if (!touchInputPending(frame, approval)) return
     TouchInputTray {
         if (approval != null) {
             val decider = rememberApprovalDecider(
@@ -450,8 +450,17 @@ private fun rememberTouchCanvasChrome(host: ChatSurfaceHost): CanvasHostChrome {
     }
 }
 
+/** The Touch canvas's input tray is up: a question, or a generated form, waits on the person. */
+private fun touchInputPending(frame: ChatSurfaceFrame, approval: UiApprovalRequest?): Boolean =
+    approval != null || frame.uiState.a2uiSurfaces.isNotEmpty()
+
 /** What the chat head shows and does, from the page's frame. */
-private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState, turn: @Composable () -> CollapsedTurn): TouchHeadContent {
+private fun touchHeadContent(
+    frame: ChatSurfaceFrame,
+    dock: ChatDockState,
+    inputPending: Boolean,
+    turn: @Composable () -> CollapsedTurn,
+): TouchHeadContent {
     return TouchHeadContent(
         dock = dock,
         agentId = frame.uiState.agentId,
@@ -459,6 +468,7 @@ private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState, turn:
         openChat = { frame.onIntent(ChatSurfaceIntent.Expand) },
         openAgent = frame.host.openAgentPane,
         turn = turn,
+        inputPending = inputPending,
     )
 }
 

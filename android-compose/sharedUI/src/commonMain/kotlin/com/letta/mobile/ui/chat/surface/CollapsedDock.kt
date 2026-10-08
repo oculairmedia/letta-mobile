@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +79,7 @@ import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.movePointerIcon
+import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.markdown.MarkdownPaint
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.MascotSeat
@@ -414,13 +416,19 @@ internal fun BubbleText(
             // The bubble announces the whole reply itself.
             .clearAndSetSemantics { },
     ) {
-        SharedMarkdownText(
-            text = shown,
-            paint = MarkdownPaint(
-                textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                textStyle = textStyle,
-            ),
+        val paint = MarkdownPaint(
+            textColor = if (turn.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            textStyle = textStyle,
         )
+        if (textStyle == null) {
+            SharedMarkdownText(text = shown, paint = paint)
+        } else {
+            // A host's rich renderer (Android's) paints the timeline's own large body whatever the
+            // paint asks; a bubble with a type of its own keeps the shared paint, which honours it.
+            CompositionLocalProvider(LocalSharedRichMarkdownRenderer provides null) {
+                SharedMarkdownText(text = shown, paint = paint)
+            }
+        }
     }
 }
 
@@ -526,40 +534,6 @@ private fun RestoreButton(state: ChatDockState, modifier: Modifier) {
     }
 }
 
-/**
- * A rounded rectangle with a tail at its bottom-left corner, reaching down and out towards the
- * mascot standing to its left. The tail takes [tailWidth] of the shape's width.
- */
-internal class SpeechBubbleShape(
-    private val radius: Dp,
-    private val tailWidth: Dp,
-    private val tailHeight: Dp,
-    /** The tail reaches out of the right edge instead of the left (towards a speaker on the right). */
-    private val tailAtEnd: Boolean = false,
-    /** The tail leaves from the top corner instead of the bottom one. */
-    private val tailAtTop: Boolean = false,
-) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val r = with(density) { radius.toPx() }
-        val tw = with(density) { tailWidth.toPx() }
-        val th = with(density) { tailHeight.toPx() }
-        val body = Path().apply {
-            addRoundRect(RoundRect(if (tailAtEnd) 0f else tw, 0f, if (tailAtEnd) size.width - tw else size.width, size.height, CornerRadius(r)))
-        }
-        // Drawn for a bottom-left tail, then mirrored into place.
-        val x: (Float) -> Float = { if (tailAtEnd) size.width - it else it }
-        val y: (Float) -> Float = { if (tailAtTop) size.height - it else it }
-        val tail = Path().apply {
-            // A short bubble (the thinking dots) keeps the tail in its lower part.
-            moveTo(x(tw), y((size.height - r - th).coerceAtLeast(size.height * TAIL_MIN_TOP_FRACTION)))
-            lineTo(x(0f), y(size.height))
-            lineTo(x(tw + r), y(size.height))
-            close()
-        }
-        return Outline.Generic(Path().apply { op(body, tail, PathOperation.Union) })
-    }
-}
-
 /** A rounded rectangle with a short tail from the middle of its bottom edge, down to the mascot below. */
 internal class BottomTailBubbleShape(private val radius: Dp, private val tailWidth: Dp, private val tailHeight: Dp) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
@@ -584,8 +558,6 @@ private val BubbleShape = BottomTailBubbleShape(
     tailWidth = ChatSurfaceDimens.collapsedBubbleTailWidth,
     tailHeight = ChatSurfaceDimens.collapsedBubbleTailHeight,
 )
-
-private const val TAIL_MIN_TOP_FRACTION = 0.45f
 
 internal const val DOCK_COLLAPSED_TAG = "chat-dock-collapsed"
 internal const val DOCK_COLLAPSED_MASCOT_TAG = "chat-dock-collapsed-mascot"
