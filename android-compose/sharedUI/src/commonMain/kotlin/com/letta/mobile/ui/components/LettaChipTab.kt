@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -30,11 +29,10 @@ fun LettaChipTab(
         text = text,
         style = MaterialTheme.typography.labelMedium,
         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-        color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (active) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
+            .background(if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(role = Role.Tab, onClick = onClick)
             .semantics { selected = active }
             .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
